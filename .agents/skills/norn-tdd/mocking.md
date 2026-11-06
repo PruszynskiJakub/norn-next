@@ -13,6 +13,8 @@ Don't mock:
 - Internal collaborators
 - Anything you control
 
+When the repo already has a fake for a boundary, use it; don't write a second mock beside it.
+
 ## Designing for Mockability
 
 At system boundaries, design interfaces that are easy to mock:

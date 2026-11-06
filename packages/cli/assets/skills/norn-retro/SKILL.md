@@ -1,7 +1,6 @@
 ---
 name: norn-retro
-description: Run a retrospective over one finished story from its delivery record on the story's record ref on the remote (per-unit state, numbered reports, check logs), its handoffs and this machine's local trace when present. Finds the friction, most severe first, and proposes one concrete change per finding (to a skill, a delivery definition, the config, the contributor docs or the spec template), each citing its evidence, as suggestions in your reply. Writes and changes no file. Use when a person asks for a retro or retrospective on a story, usually after its pull request merges.
-disable-model-invocation: true
+description: Runs a retrospective on one finished story from its delivery record and suggests one change per friction found, each with its evidence, in the reply; changes no file. Use when a person asks for a retro or retrospective on a story, usually after its pull request merges.
 ---
 
 # Retro
@@ -10,11 +9,11 @@ A person asks for this after a story's pull request merges. You read what the de
 
 ## 1. Read the record
 
-The person names the story: a key such as `gh-123`, or its folder `.agents/specs/<key>-<slug>/`. Ask if they did not. Read only: never edit the delivery record, and run no command that changes the repository or the remote (fetching the story's record ref is reading).
+The person names the story: a key such as `gh-123`, or its folder `.agents/specs/<key>-<slug>/`. Ask if they did not. Read only: never edit the delivery record, and run no command that changes the repository or the remote (fetching the record's objects without writing a local ref is reading).
 
 - **The spec**: `spec.md` (Behaviour items, Plan) and each `slices/<nn>-<slug>.md` (acceptance, frontmatter `criteria` with `id` and `verifier`).
 - **The handoffs**: `handoffs/_story.md` for the story and `handoffs/<nn>-<slug>.md` for each slice in the spec folder: Goal, Progress (what was tried and failed) and Resume.
-- **The delivery record**: one commit on a ref of its own on the remote, named after the story and ending in `runs/<key>`, which no clone carries. Find it with `git ls-remote origin "refs/*/runs/<key>"`, fetch it with `git fetch origin <ref>:<ref>`, list it with `git ls-tree -r --name-only <ref>` and read a file with `git show <ref>:<path>`. On the machine that ran the story, the same folders are also in the delivery tool's folder for this checkout, under your home directory, in `runs/<key>/`. It holds one folder per unit: `_story/rounds/<NN>-<workflow>/` for each round of the story and `<nn>-<slug>/` for each slice. A record archived from an older version may lack `rounds/` (the story's state directly under `_story/`, read it as one round) and may still hold a `handoff.md` per unit; a story finished by an older version may still have it in the spec folder, under `runs/`. In each unit folder:
+- **The delivery record**: one commit on a ref of its own on the remote, named after the story and ending in `runs/<key>`, which no clone carries. Find it and its sha with `git ls-remote origin "refs/*/runs/<key>"`, fetch its objects with `git fetch --no-tags origin <ref>` (no `:<ref>`: that would write a local ref the delivery tool keeps as its own), then read it by that sha: `git ls-tree -r --name-only <sha>`, `git show <sha>:<path>`. Never read `FETCH_HEAD`: the tool's background sync fetches too and overwrites it. On the machine that ran the story, the same folders may also be in the tool's folder for this checkout, `ls -d ~/.*/repos/<checkout folder name>-*/`, under `runs/<key>/`. The record holds one folder per unit: `_story/rounds/<NN>-<workflow>/` for each round of the story and `<nn>-<slug>/` for each slice. A record archived from an older version may lack `rounds/` (the story's state directly under `_story/`, read it as one round) and may still hold a `handoff.md` per unit; a story finished by an older version may still have it in the spec folder, under `runs/`. In each unit folder:
   - `state.json`: `counters` (name: times its loop was taken), `visits` (stage name: entries), `attempt`, `status`, `park` (`kind`, `reason`), `nudges_used`, `retries_used`.
   - `workflow.yaml`: the definition this unit ran, pinned when it began. Its `counters` give each `max`; each edge with a `counter` is a loop.
   - `receipts/NNNN-<kind>.json`: numbered reports in the order they happened, each with `step`, `attempt`, `at` and `by`. By `kind`:
@@ -24,10 +23,13 @@ The person names the story: a key such as `gh-123`, or its folder `.agents/specs
     - `approve` and `reject` at a gate, with the person's `comment`;
     - `check`: `command`, `exit_code`, `duration_ms`, `reason: "timeout"`, `output_tail`, `log`;
     - `started`: `agent`, `model`, `retry: true` for a fresh session after one was lost;
-    - `classify`: how a stage ended, judged from facts rather than reported. `outcome` is `silent`, `died`, `timeout`, `stalled`, `conflict`, `stale` or `exhausted`, with `rule`, `detail`, `route` and `counter` (`name`, `value`, `max`); `snapshot.last_message` is what the agent said last before it went quiet.
+    - `classify`: how a stage ended, judged from facts rather than reported. `outcome` is `silent`, `died`, `timeout`, `stalled`, `conflict`, `stale` or `exhausted`, with `rule`, `detail`, `route` and `counter` (`name`, `value`, `max`); `snapshot.last_message` is what the agent said last before it went quiet;
+    - `update` (`from`, `to`): a person moved the work to another stage by hand; `round` with `forced: true` (`left_at`, `comment`): a person ended a round unfinished; `take` (`forced`, `expired`, `record_lost`): another machine took the story over.
+
+    A `delegated: true` on an `approve`, `reject`, `answer` or `unstick` means a supervisor agent decided on the person's behalf: count those apart from the person's own.
   - `logs/<run_id>.log`: the full output of a failed check.
   - `evidence/<run_id>/`: what QA saw.
-- **The local trace**, only on the machine that ran the story: `<YYYY-MM-DD>.jsonl` files in the delivery tool's folder for this checkout, under your home directory (named after the checkout's folder), one JSON object per line. It is not committed; when it is missing, say so in the report and work from the record alone. Keep the lines whose `unit` (or `fact.story`, `fact.slice`) is this story or one of its slices. By `type`:
+- **The local trace**, only on the machine that ran the story: `<YYYY-MM-DD>.jsonl` files (one per UTC day) at the top of that same folder, one JSON object per line. It is not committed; when it is missing, say so in the report and work from the record alone. Keep the lines whose `unit` (or `fact.story`, `fact.slice`) is this story or one of its slices. By `type`:
   - `hook` with `fact.event: "permission_prompt"` and `fact.command`: commands that stopped for a permission prompt;
   - `reject` (`reason`): a report the tool refused;
   - `criteria` (`verdicts`): criteria reports, counted per verdict;
@@ -41,7 +43,7 @@ Go through every unit. For each finding, keep the evidence as you go: the file a
 
 1. **Counters that ran high or ran out.** `counters` in `state.json` against `max` in the pinned `workflow.yaml`; a `classify` with `outcome: "exhausted"`; an `unstick` with `reset`. Read what sent the work back each time (the `findings`, the `reject` comment, the `check` output between loops). One cause behind most loops is the finding, not the count.
 2. **Repeated rejects.** Two or more `reject` at the same gate, or rejects in different slices whose `comment` says the same thing.
-3. **Stuck and lost sessions.** `stuck` reasons; `classify` with `died`, `silent`, `stalled` or `timeout`; `started` with `retry: true`; a high `nudges_used`. Read `snapshot.last_message` and the handoff's Progress for why.
+3. **Stuck and lost sessions.** `stuck` reasons; `classify` with `died`, `silent`, `stalled` or `timeout`; `started` with `retry: true`; a high `nudges_used`; an `update` or a forced `round` where a person stepped in by hand; a `take`. Read `snapshot.last_message` and the handoff's Progress for why.
 4. **Asks a better spec or skill would have answered.** Pair each `ask` with its `answer`. Would the spec, the plan, the contributor docs or a skill have held that answer? An implicit `ask` with a `command` is a permission prompt: name the command.
 5. **Criteria a machine could not check.** `unverified` verdicts and their `reason`: a missing capability. `person` verdicts on criteria an agent could check given a tool, a seed script or a fixture.
 6. **Checks that failed for environment reasons**, not code: `exit_code` 126 or 127, `reason: "timeout"`, a service not running, a port in use, a missing secret, or a flaky test that passed on the next run with no change in between. Read `output_tail` and the `log`.
@@ -69,7 +71,7 @@ Choose where the change belongs:
 - **A capability gap is fixed where it lives**: give the agent the tool (a browser MCP, a device), or send those criteria to a person.
 - **A tight counter is rarely the fix.** Fix what caused the loops; raise a `max` only when the loops were each worth it.
 - **Look for what exists first**: a check that is defined but not wired, a doc that already says it but no agent reads.
-- **Bundled skills are replaced on reinstall.** The skills in `.agents/skills/` that came with the delivery tool are overwritten by its own copy. To change one, suggest a copy under a new name, plus the `skill:` line in `.agents/workflows/<name>.yaml` that points at the copy. A skill the repo wrote itself changes in place.
+- **Bundled skills are not edited in place.** The skills in `.agents/skills/` that came with the delivery tool are rewritten by its next upgrade, and a changed copy is reported as drifted. To change one, suggest a copy under a new name, plus the `skill:` line in `.agents/workflows/<name>.yaml` that points at the copy. A skill the repo wrote itself changes in place. When the contributor docs say `.agents/skills/` holds generated copies of a source elsewhere in the repo, name that source instead.
 
 Never suggest a change without evidence in the record, and never two changes for one finding: pick the one that removes the cause.
 

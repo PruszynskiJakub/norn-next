@@ -1,24 +1,28 @@
 ---
 name: norn-interview
-description: Relentless one-question-at-a-time interview that reaches shared understanding on a plan, design or change before any action is taken. Ends in a summary the person confirms. Use when asked to interview, grill or question someone about an idea, or when another skill needs decisions settled with a person.
+description: Interviews a person one question per turn, each with a recommended answer, until every decision on a plan, design or change is settled, then confirms a summary. Use when asked to interview or grill someone about an idea. Not for writing a spec; use norn-refine.
 argument-hint: "[topic]"
 ---
 
 # Interview
 
-Interview the person relentlessly about $ARGUMENTS until we reach a shared understanding.
+Interview the person relentlessly about the topic you were given ($ARGUMENTS) until you share an understanding of it.
 No topic → the work pending in this conversation; nothing pending → first ask what we are deciding.
 
-Before the first question, explore the project (and the spec, slice or diff being discussed, if any) for a foundational understanding. Never ask what the exploration already answered — ask only for decisions and preferences.
+Before the first question, explore the project (and the spec, slice or diff being discussed, if any). Never ask what the exploration already answered: ask only for decisions and preferences.
 
-Walk down each branch of the design tree, resolving decisions one by one. Ask **one question per turn** — never lettered sub-questions — in plain text, each with your recommended answer, and wait for the reply before continuing. When showing is easier than describing, the caller may build a prototype; the interview itself enacts nothing.
+Walk down each branch of the design tree, resolving decisions one by one. Ask **one question per turn**, never lettered sub-questions, in plain text, each with your recommended answer, and wait for the reply before continuing.
 
 When an answer is terse ("remove these", "X can go"), state your interpretation in one line ("Read as: drop B3 and B4, keep B5.") and carry on with the next question; the person corrects it if it is wrong. Do not spend a turn asking what they meant.
 
 Chase vagueness: "fast", "simple", "secure", "like X" get a concrete number, example or rule. Name a contradiction the moment it appears, and ask which side wins. Never re-ask a settled question.
 
-When no branch remains open, post a summary of decisions in chat — one line each, grouped by branch, assumptions marked — and ask for confirmation. A correction reopens only its branch. Confirmation ends the interview; it does not approve the work. If another skill called this one (refine, clarify, plan), hand back to it: it folds the decisions into its own document. A "go ahead" to the summary is not a request to do anything else.
+A decision that needs someone who is not here is parked: it names who can decide, and its branch closes. Your own unconfirmed assumption is not a settled branch.
 
-Write nothing and change nothing: the interview only talks.
+When no person is with you, do not interview: settle what the code and the docs can settle, and hand back every decision left as an open question with your recommendation.
 
-Done when every branch is settled or explicitly parked, and the person has confirmed the summary.
+When no branch remains open, post a summary of decisions in chat (one line each, grouped by branch, assumptions and parked questions marked) and ask for confirmation. A correction reopens only its branch.
+
+The interview only talks: it writes nothing, changes nothing and builds nothing (a caller may offer a prototype with the `norn-prototype` skill). Confirmation ends the interview; it does not approve the work, and a "go ahead" to the summary is not a request to do anything else. If another skill called this one (refine, clarify, plan), hand the decisions back to it: it folds them into its own document.
+
+Done when every branch is settled or parked, and the person has confirmed the summary.

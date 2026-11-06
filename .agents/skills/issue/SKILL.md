@@ -1,25 +1,25 @@
 ---
 name: issue
-description: Turn what the person noticed in this session (a bug, an idea, friction with norn) into a well-formed norn issue — observed and wanted, a repro, the code location and the rule ids it touches — and create it once they confirm. How an ad-hoc session hands work over to norn. Person-only.
+description: Turn what the person noticed in an ad-hoc session (a bug, an idea, friction with norn) into a norn issue, shown as a draft for their yes and left unassigned. How an ad-hoc session hands work over to norn. Person-only.
 disable-model-invocation: true
 argument-hint: "[what you noticed]"
 ---
 
 # Issue
 
-Every change to this repo starts as a norn issue. An ad-hoc session never changes the repo itself: it reads, explores, discusses, and hands the work over through this skill. You may only read and create this one issue. Never edit a file, commit, branch or push.
+Every change to this repo starts as a norn issue; an ad-hoc session hands work over through this skill. Invoking it lets you read and create this one issue, after the person's yes. Never edit a file, commit, branch, push or assign.
 
 ## 1. Gather
 
-From the conversation and the argument, and by reading what you need:
+From the conversation, the argument, and what you read:
 
-- **Observed**: what happens now, exactly (command, output, file).
+- **Observed**: what happens now, exactly (command, output, file). About norn's behaviour, also the `norn --version` that showed it: the process runs the released binary, and `main` may already differ.
 - **Wanted**: what should happen instead, and for whom.
-- **Repro**: the shortest steps that show it, if there are any. About norn's behaviour, run `bun packages/cli/src/main.ts …` in a throwaway repo, never the installed `norn` against this one.
+- **Repro**: the shortest steps that show it, if any. To try norn's behaviour, run `bun packages/cli/src/main.ts …` in a throwaway git repo under `$TMPDIR`, never the installed `norn` and never in this checkout or a unit worktree (a dev build there acts on live claims and run state).
 - **Where**: `path/to/file.ts:123` for the code involved.
 - **Rules**: the ids in `.agents/RULES.md` it touches (`W9`, `GR8`, …), or that none do.
 
-Search first for one already open: `gh issue list --state open --search "<words>"`. If one exists, show it and stop unless the person still wants a new one. Ask only for what you cannot find yourself, one question at a time.
+Search for an existing issue first: `gh issue list --state all --search "<words>"`. If an open one covers it, show it and stop unless the person still wants a new one; if a closed one does, link it in the new body. Ask only for what you cannot find, one question at a time.
 
 ## 2. Draft and confirm
 
@@ -43,12 +43,11 @@ Assignee: none
 
 Leave out a section with nothing in it. Labels:
 
-- `norn`: always, so norn takes the issue in once a person assigns it (GR1).
-- `norn:wf:reproduce`: always for a bug (norn does something wrong), so it starts in `reproduce`, not `triage`.
-- `norn:wf:<name>` (`refinement`, `quick`, `story`): only when the person names the workflow; otherwise the `triage` workflow decides.
-- `friction`: when it is friction with norn itself (a refusal that made no sense, a step that went in circles, a missing command).
+- `norn`: always; intake takes the issue in once a person assigns it (GR1).
+- One `norn:wf:<name>` at most: it picks the first round's workflow (W9). The workflow the person names wins. Otherwise `norn:wf:reproduce` for a bug (norn does something wrong), so it starts in `reproduce`; otherwise none, and `triage` decides. Never `release` (that is `/release-start`) or `slice`.
+- `friction`: friction with norn itself (a refusal that made no sense, a step that went in circles, a missing command).
 
-Never assign the issue. Intake cuts the story branch from the base the moment norn sees an assigned, labelled issue (GR2), so an issue assigned while it waits in the backlog starts from a base that ages. The person assigns it when work on it should begin.
+Never assign it, and do not use `norn story create` (it assigns). Intake cuts the story branch from the base the moment norn sees an assigned, labelled issue (GR2), so an issue assigned while it waits in the backlog starts from a base that ages.
 
 A fork PR is input: link it in the body, never ask to merge it as is.
 
@@ -62,4 +61,4 @@ EOF
 
 ## 3. Hand over
 
-Print the issue link and: assign it when work on it should begin (`gh issue edit <N> --add-assignee @me`); `norn sync` then takes it in (or the next `norn watch` sync does).
+Print the issue link and: when work on it should begin, run `norn story take gh-<N>` (it assigns the issue to you); the next sync takes it in, or `norn sync` does it now.

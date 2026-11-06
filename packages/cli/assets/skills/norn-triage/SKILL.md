@@ -1,11 +1,11 @@
 ---
 name: norn-triage
-description: Triage one issue — check it still applies on the current base by trying it, add the repro, the affected code (file:line) and the context, judge its kind, risk and priority, and recommend exactly one next move (refinement, quick, reproduce) or closing it, with the reason. Posts the findings as a `## Triage` issue comment, the one place they live, and puts one kind, one risk and one priority label on the issue, never replacing one already there; changes no file. Use when asked to triage an issue, or to check whether an issue is still valid and what should happen to it.
+description: Triages one issue — tries it on the current base, then posts a `## Triage` comment with the repro, the affected code, kind, risk and priority labels, and one recommended next move or closing it. Use when asked to triage an issue or check whether it still applies.
 ---
 
 # Triage
 
-You turn a fresh issue into a decision a person can take in a minute. You do not fix, plan or write a spec. You read, try, and recommend.
+You turn a fresh issue into a decision a person can take in a minute. You do not fix, plan or write a spec, and you change no file. You read, try, and recommend.
 
 ## 1. Read
 
@@ -20,18 +20,16 @@ You work on the current base. Try what the issue describes there.
 - About behaviour: run it the way a user would (the command, the request, the page), from this checkout's code, never from an installed release. Run it somewhere disposable (a throwaway directory or repository), never somewhere your run could change real state.
 - About code, docs or tests: read them, and run the test that covers it.
 - Back every claim about what code or config does with the `file:line` usages that consume it, not only where it is defined. Never infer behaviour from a schema, a type or the docs alone: a key can be defined and documented yet never read. Name any such key as defined but never read.
-- Record the exact commands and what you saw. Say plainly when it no longer applies, or when it could not be tried here and why.
+- Record the exact commands and what you saw. When you only read the code and did not run it, say so and why.
 
 Use the `norn-diagnose` loop only when the symptom does not show on the first try; stop at a repro, never at a cause you guessed.
 
 ## 3. Write `## Triage`
 
-Write the findings in this shape:
-
 ```markdown
 ## Triage
 
-**Still applies:** yes | no | not checked — <one line, base commit>
+**Still applies:** yes | no | not checked — <ran it | read only: why>, <base commit>
 **Repro:** <commands and what they print, minimal>
 **Affected code:** `path/to/file.ts:123` — <what it does there, read at the usage that consumes it>
 **Rules:** <ids or sections of the project's docs it touches; "none" if no doc covers it>
@@ -44,14 +42,14 @@ Write the findings in this shape:
 **Recommend:** <refinement | quick | reproduce | close> — <reason in one or two lines>
 ```
 
-Pick exactly one:
+Recommend exactly one, and never act on it yourself: a person decides.
 
 | Recommend | When |
 |---|---|
 | `refinement` | new behaviour, or a rule to settle or change first: it needs a spec and a plan agreed with a person before anyone builds it |
-| `quick` | a refactor, docs, a chore or a small change with no open design question |
-| `reproduce` | it is a bug: something that should work does not. It is reproduced and its cause confirmed before anyone fixes it |
-| `close` | it no longer applies, is a duplicate, or is out of scope (name the issue, PR or rule that says so) |
+| `quick` | a refactor, docs, a chore or a small change with no open design question; also a rule change that is small and settled |
+| `reproduce` | it is a bug: something that should work does not. Its cause is confirmed before anyone fixes it, even when your repro already shows the symptom; a specific report you could not make happen may still go here |
+| `close` | it no longer applies, is a duplicate, or is out of scope (name the issue, PR or rule that says so); a bug you could not make happen, with what you tried |
 
 Judge one of each set. Your instructions name the label for each value (for example `<prefix>kind:bug`); without them, write the bare value (`bug`) and add no label.
 
@@ -61,11 +59,11 @@ Judge one of each set. Your instructions name the label for each value (for exam
 | risk | how much the change could break: `low` a two-way door with a small blast radius · `medium` a two-way door touching shared code or behaviour · `high` a one-way door (data, formats, public interfaces) or a wide blast radius |
 | priority | `low` can wait · `medium` soon, in the normal flow · `high` next: it blocks or hurts work now · `extreme` drop other work (broken main, data loss, a security hole) |
 
-When the issue already carries a label from a set (a person's, or an earlier triage's), keep it: write `**Kind:** <the label there>, kept as set; triage would say <your pick> — <reason>`, and add nothing to that set.
-
-A rule the issue would change is a `refinement`, unless the change is small and settled, then `quick`. A bug you could not make happen is a `close` with what you tried, or a `reproduce` when the report is specific enough that a deeper loop may still catch it.
+When the issue already carries a label from a set (a person's, or an earlier triage's), it wins: write `**Kind:** <the label there>, kept as set; triage would say <your pick> — <reason>`, and add nothing to that set. The issue never carries two labels from one set.
 
 ## 4. Label the issue and post the comment
+
+Post only when your instructions say to or the person asked you to triage the issue. Asked only whether an issue still applies, show the section and offer to post it.
 
 1. For each set with no label on the issue yet, add the one you picked: `gh issue edit <N> --add-label <label>` (`glab issue update <N> --label <label>` on GitLab). When adding a label fails because the repository does not have it, do not create it: note it for the comment.
 2. When a label could not be set, end the `## Triage` section with `Labels not set: <label> is missing on the remote; <what your instructions say creates it>` (one entry per label).
@@ -73,10 +71,4 @@ A rule the issue would change is a `refinement`, unless the change is small and 
 
 The comment and adding these labels are your only remote writes: never create, edit or delete a label definition, never remove a label from the issue (the one that took the issue in included), never edit the issue body or title, assign or close. On a rerun, post a new comment that starts with `## Triage (updated)`; the labels already on the issue stay, and the comment says where your judgement now differs.
 
-## Rules
-
-- Read-only: you change no file. Later work reads the findings from the issue comment.
-- One recommendation, with its reason. Never act on it yourself: a person decides.
-- One label per set on the issue, never two: a label already there wins over your judgement, which goes in the comment.
-
-Done when the labels you could set are on the issue and the `## Triage` comment is posted; the recommendation lives there, and you hand back only a one-line summary of it.
+Done when the labels you could set are on the issue and the comment is posted. The comment is the one place the findings live; hand back only a one-line summary of the recommendation.

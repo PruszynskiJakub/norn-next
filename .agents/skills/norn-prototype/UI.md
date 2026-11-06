@@ -1,71 +1,29 @@
 # UI prototype
 
-Several **radically different variants** on one route, switched from a floating bar. The person flips between them in the browser, picks one or takes parts of several, and the rest is thrown away.
+Several **radically different variants** of one screen, switched in place. The person flips between them, picks one or takes parts of several, and the rest is thrown away.
 
-Right shape when the question sounds like:
+If the question is about logic or state rather than looks, use [LOGIC.md](LOGIC.md).
 
-- "What should this page look like?"
-- "Show me a few options for this dashboard before we commit."
-- "Try another layout for the settings screen."
+## 1. Real data, real surroundings
 
-If the question is about logic or state rather than looks, use [LOGIC.md](LOGIC.md) instead.
+A variant is judged against the rest of the product: the real header, navigation, data and density. On an empty screen every variant looks fine.
 
-## Where the variants live
+- **Web app:** mount the variants on the existing page, chosen by a `?variant=` URL param; data fetching, params and auth stay above the switch. A new route (with `prototype` in its path) only when nothing existing could host it.
+- **Terminal view or CLI output:** a small harness in the prototype folder renders the real data (a captured `--json` output, or a fixture built from it) through each variant, chosen by `--variant <key>` and cycled with a key (Tab). Add a flag that prints one frame to stdout at a given width, so a variant can be shown without a live terminal.
 
-A variant is judged best against the rest of the app: the real header, navigation, data and density. On an empty route every variant looks fine.
+Default to **3 variants**, never more than 5. Write the plan in one line at the top of the switcher, e.g. "Three variants of the settings page on the existing route, chosen by `?variant=`." Keep today's screen as a variant `0` when the question is "change it or keep it".
 
-- **On an existing page (default).** The route exists; the variants render on it, chosen by a `?variant=` URL param. Data fetching, params and auth stay as they are; only the rendered subtree changes. Something new that would live inside an existing page (a new section, card, or stage of a flow) still mounts inside that page.
-- **On a new page (last resort).** Only when nothing could host it, such as a new top-level surface. Add a throwaway route that follows the project's routing convention, with `prototype` in its path or file name, and the same `?variant=` param. Check first that no existing page could host it.
+## 2. Make them differ in structure
 
-## 1. Pick the number
+Variants differ in layout, information hierarchy and primary affordance, not colours or copy: three tweaked card grids are one variant. If two come out alike, redo one under an explicit constraint ("no card grid"). A shared small piece is fine; a shared layout defeats the point. Use the project's own components and styling, and name each variant (`B (Sidebar layout)`).
 
-Default to **3 variants**; never more than 5, past which they stop being radically different. Write the plan in one line at the top of the switcher file, e.g. "Three variants of the settings page on the existing settings route, chosen by `?variant=`."
+Variants only read: point any action at a stub that shows what it would do.
 
-## 2. Draft radically different variants
+## 3. The switcher
 
-Each variant serves the page's purpose with the data it has, uses the project's component library and styling, and exports a clear name (`VariantA`, `VariantB`, …).
+- Cycles through the variants and wraps around; the current key and name are always visible.
+- Web: a small fixed bar at the bottom centre with `←` `→` buttons, plainly not part of the design (a high-contrast pill). The arrow keys cycle too, except while an `<input>`, `<textarea>` or `[contenteditable]` has focus. Switching updates the URL param, so a variant survives a reload and can be shared. It never renders in a production build.
 
-Variants differ in **structure**: layout, information hierarchy, primary affordance. Not colours, not copy. Three tweaked card grids are wallpaper, not a prototype. If two drafts come out alike, redo one with an explicit constraint ("no card grid"). A shared small piece (a header) is fine; a shared layout defeats the point.
+## 4. Hand it over
 
-Variants only read. If one must mutate, point it at a stub: the question is what it looks like, not whether the backend works.
-
-## 3. Wire the switcher
-
-One switcher on the route picks the variant from the param; data fetching stays above it:
-
-```tsx
-// sketch: adapt to the project's framework
-const variant = searchParams.get("variant") ?? "A";
-return (
-  <>
-    {variant === "A" && <VariantA {...data} />}
-    {variant === "B" && <VariantB {...data} />}
-    {variant === "C" && <VariantC {...data} />}
-    <PrototypeSwitcher variants={["A", "B", "C"]} current={variant} />
-  </>
-);
-```
-
-## 4. Build the floating bar
-
-A small fixed bar at the bottom centre: a left arrow, the current variant's key and name (`B (Sidebar layout)`), a right arrow. It lives in one shared component, wherever the project keeps shared UI.
-
-- Arrows cycle through the variants and wrap around, updating the URL param through the framework's router, so a variant is shareable and survives a reload.
-- The `←` and `→` keys cycle too, except while an `<input>`, `<textarea>` or `[contenteditable]` has focus.
-- It looks plainly not part of the design under review: a high-contrast pill with a light shadow.
-- It never renders in a production build (`process.env.NODE_ENV !== "production"` or the project's equivalent).
-
-## 5. Hand it over
-
-Give the person the one command that starts it, the URL and the variant keys. The useful feedback is usually a mix: "the header from B with the list from C". That mix is the design they want; build it as another variant if they need to see it.
-
-## 6. Capture
-
-Record which variant won, or which mix, and why, then keep the prototype as [SKILL.md](SKILL.md) says. The variants and the switcher stay on the branch in their own `prototype` files; the page that mounted them, and any route added for them, go back to how they were. The winning design reaches the code later, rewritten properly by whoever builds it.
-
-## Anti-patterns
-
-- **Variants that differ only in colour or copy.** That is a tweak; real variants disagree about structure.
-- **Too much shared code.** A shared layout stops the variants from throwing out the layout.
-- **Real mutations.** Stub them.
-- **Promoting a variant as is.** It was written without tests or error handling; the real version is written again.
+Give the person the one command, the URL or flag, and the variant keys. A mix they ask for ("the header from B with the list from C") is the design they want: build it as another variant if they need to see it. Record which variant or mix won and why, and commit as [SKILL.md](SKILL.md) says. Say at the top of the switcher which page mounted it, so it can be mounted again.
