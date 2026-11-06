@@ -106,6 +106,7 @@ It goes red today. It turns green once harness `sh()` (and every `spawnSyncCaptu
 ### Posted
 
 The `## Reproduce` comment is on #215: https://github.com/PruszynskiJakub/norn-next/issues/215#issuecomment-6688881636
+- reproduce#1 reproduced: Reproduced: a stuck Bun.spawnSync can't be cut by bun test's per-test timeout once the file has already run a spawnSync (bun 1.3.13), so a stuck harness sh()/gitSync child stops the whole --parallel run. The stuck file on CI was upgrade-records.test.ts. Loop red 3/3; what made the git child stick is still open (ranked hypotheses). Seam: an integration-tier test that runs a fixture under bun test; fix by giving harness sh() a timeoutMs. ## Reproduce is posted on #215.
 
 ## Resume
 
