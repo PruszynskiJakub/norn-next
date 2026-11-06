@@ -1,13 +1,13 @@
 /**
- * gh-61 B20 (D11): a session started by hand is held to the rule a launched one is — `norn brief`,
- * `norn story start` and `norn story chat` refuse (`skills_drift`, exit 3) when the worktree the
- * agent would run in holds bundled skills that differ from this norn's. B21: a repo-local skill
- * never counts; D14: a worktree whose team file records a newer `norn_version` is not checked.
+ * gh-252 (SK1): a session started by hand is held to the rule a launched one is — `norn brief`,
+ * `norn story start` and `norn story chat` start it with the worktree's skill copies, even when a
+ * bundled one differs from this norn's (gh-61 B20's refusal is gone). B21: a repo-local skill never
+ * counts either.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir } from "@norn/store";
+import { workflowsDir } from "@norn/store";
 import type { CliDeps, CliResult } from "../../src/index.ts";
 import { createHarness, type Harness, issue, runChecked } from "../../../../test/support/harness.ts";
 
@@ -55,7 +55,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("brief, story start and story chat refuse on drifted skills (gh-61 B20, B21, D14)", () => {
+describe("brief, story start and story chat never refuse on drifted skills (gh-252)", () => {
   test("AC3 (B21): a repo-local skill that differs is not refused", async () => {
     h.write(join(wt(), ".agents/skills/release/SKILL.md"), "---\nname: release\n---\nours, edited\n");
     for (const [name, run] of Object.entries(sessionCommands())) {
@@ -64,21 +64,8 @@ describe("brief, story start and story chat refuse on drifted skills (gh-61 B20,
     }
   });
 
-  test("AC1, AC2 (B20): an edited bundled skill in the unit worktree refuses each one, naming the fix", async () => {
+  test("gh-252: an edited bundled skill in the unit worktree refuses none of them", async () => {
     writeFileSync(skill("norn"), `${readFileSync(skill("norn"), "utf8")}\nedited by hand\n`);
-    for (const [name, run] of Object.entries(sessionCommands())) {
-      const r = await run();
-      expect({ name, exit: r.exit, value: r.value }).toEqual({
-        name,
-        exit: 3,
-        value: { error: "skills differ from norn 0.19.0: norn", do_instead: "bring the base in with `norn story update-branch gh-7`", code: "skills_drift" },
-      });
-    }
-  });
-
-  test("AC3 (D14): a worktree whose team file records a newer norn_version is not refused", async () => {
-    const team = repoConfigPath(wt());
-    writeFileSync(team, `${readFileSync(team, "utf8")}norn_version: 0.20.0\n`);
     for (const [name, run] of Object.entries(sessionCommands())) {
       const r = await run();
       expect({ name, exit: r.exit }).toEqual({ name, exit: 0 });
