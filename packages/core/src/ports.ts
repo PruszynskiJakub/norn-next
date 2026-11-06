@@ -341,6 +341,12 @@ export interface RemotePort {
   getIssue(number: number): Promise<RemoteIssue | null>;
   /** latest PR/MR whose head is `branch`, any state; null if none */
   findPullRequest(branch: string): Promise<RemotePullRequest | null>;
+  /**
+   * gh-186 (GR1, H5): `findPullRequest` for every branch at once, in one provider round trip (or a
+   * few for many branches), so a sync costs O(1) PR calls instead of one per story. Every branch
+   * asked is a key: its latest PR/MR, any state, or null if none.
+   */
+  findPullRequests(branches: readonly string[]): Promise<Map<string, RemotePullRequest | null>>;
   /** gh-195 B18: the CI state of PR `number`'s head (checks on GitHub, the head pipeline on GitLab) */
   pullRequestCi(number: number): Promise<PullRequestCi>;
   openDraftPullRequest(opts: { head: string; base: string; title: string; body: string }): Promise<RemotePullRequest>;

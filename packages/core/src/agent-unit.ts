@@ -93,3 +93,29 @@ export function agentWorkRefusal(s: AgentUnit, verb: string): CliError | null {
     return no(`unit ${key} is parked (${st.park?.kind}): ${st.park?.reason ?? ""}`, `end your turn; a person resolves it: ${cmd.runRerun(key)}`, "parked");
   return null;
 }
+
+/**
+ * MO3 (gh-92): the agent session `run_id` belongs to — the applied run's in state.json, else its
+ * latest `started` receipt's (a resume records the session it continues). Null when not known.
+ */
+export function runAgentSession(s: AgentUnit, run_id: string): string | null {
+  if (s.state.run?.run_id === run_id) return s.state.run.agent_session_id ?? null;
+  const started = [...s.receipts, ...s.unapplied].findLast((nr) => nr.receipt.kind === "started" && nr.receipt.run_id === run_id);
+  return started?.receipt.kind === "started" ? (started.receipt.agent_session_id ?? null) : null;
+}
+
+/**
+ * MO3 (gh-92): a run belongs to the session that started it. Another agent session in the worktree
+ * cannot brief or report it, so it never takes the run over and a report's boundary commit only
+ * takes the run's own session's work. Null when the sessions match or either one is not known.
+ */
+export function foreignSessionRefusal(s: AgentUnit, run_id: string, caller: string | null, verb: string): CliError | null {
+  const owner = runAgentSession(s, run_id);
+  if (!owner || !caller || owner === caller) return null;
+  const key = s.unit.key;
+  return no(
+    `run ${run_id} of ${s.state.step}#${s.state.attempt} belongs to agent session ${owner}; this is session ${caller}, which cannot ${verb} it`,
+    `end your turn and leave the step to session ${owner}; if that session is gone, a person retries the step in a fresh session: ${cmd.runCancel(key)}, then ${cmd.runRerun(key)}`,
+    "foreign_session",
+  );
+}

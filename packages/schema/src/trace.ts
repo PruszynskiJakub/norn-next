@@ -110,7 +110,7 @@ export const TickTiming = Type.Object(
     after_ms: NonNegInt,
     /** observe's phases (`worktrees`, `base_fetch`, `local`, `sync.*`, `runner`, `stories`, …) in ms */
     observe: Type.Record(Type.String(), NonNegInt),
-    /** remote calls made by the sync, counted per call (`list_issues`, `get_issue`, `find_pr`, `pr_ci`) */
+    /** remote calls made by the sync, counted per call (`list_issues`, `get_issue`, `find_prs` (gh-186: one per batch of PRs), `pr_ci`) */
     calls: Type.Optional(Type.Record(Type.String(), NonNegInt)),
     slowest: TickSlowest,
   },

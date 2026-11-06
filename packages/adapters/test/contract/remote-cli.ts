@@ -117,6 +117,17 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
       const rows = prs.filter((p) => p.head === head).sort((x, y) => y.number - x.number); // newest first
       return ok(rows.slice(0, Number(flag(argv, "--limit") ?? 30)).map(prJson));
     }
+    if (a === "api" && b === "graphql") {
+      // gh-186: the aliased `pullRequests(headRefName:)` query findPullRequests sends
+      if (flag(argv, "-F") === undefined) throw new Error("scripted gh: graphql without owner/name");
+      const query = flag(argv, "-f")?.replace(/^query=/, "") ?? "";
+      const repository: Record<string, { nodes: unknown[] }> = {};
+      for (const m of query.matchAll(/(b\d+): pullRequests\(headRefName: ("(?:[^"\\]|\\.)*")/g)) {
+        const newest = prs.filter((p) => p.head === JSON.parse(m[2]!)).sort((x, y) => y.number - x.number)[0];
+        repository[m[1]!] = { nodes: newest ? [prJson(newest)] : [] };
+      }
+      return ok({ data: { repository } });
+    }
     if (a === "pr" && b === "create") {
       const p: Pr = { number: 40 + prs.length, head: flag(argv, "--head")!, base: flag(argv, "--base")!, title: flag(argv, "--title")!, draft: argv.includes("--draft") };
       prs.push(p);
@@ -173,7 +184,15 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
       issues = [...issues, i];
       return ok(`- Creating issue in acme/app\n#${i.number} ${i.title} (now)\n https://gitlab.com/acme/app/-/issues/${i.number}\n`);
     }
-    if (a === "repo" && b === "view") return ok({ id: 1, web_url: "https://gitlab.com/acme/app" });
+    if (a === "repo" && b === "view") return ok({ id: 1, web_url: "https://gitlab.com/acme/app", path_with_namespace: "acme/app" });
+    if (a === "api" && b === "graphql") {
+      // gh-186: `mergeRequests(sourceBranches:)` of the project, GitLab GraphQL names
+      const query = flag(argv, "-f")?.replace(/^query=/, "") ?? "";
+      if (!/project\(fullPath: "acme\/app"\)/.test(query)) throw new Error(`scripted glab: unexpected graphql: ${query}`);
+      const branches = JSON.parse(/sourceBranches: (\[[^\]]*\])/.exec(query)![1]!) as string[];
+      const nodes = mrs.filter((m) => branches.includes(m.head)).map((m) => ({ iid: String(m.number), webUrl: `https://gitlab.com/acme/app/-/merge_requests/${m.number}`, state: "opened", draft: m.draft, sourceBranch: m.head, targetBranch: m.base, mergedAt: null, diffHeadSha: SHA, mergeCommitSha: null, squashCommitSha: null, mergeUser: null }));
+      return ok({ data: { project: { mergeRequests: { pageInfo: { hasNextPage: false }, nodes } } } });
+    }
     if (a === "issue" && b === "view") {
       const i = issues.find((x) => x.number === Number(argv[3]));
       return i ? ok(issueJson(i)) : { code: 1, stdout: "", stderr: "ERROR: 404 Not Found" };

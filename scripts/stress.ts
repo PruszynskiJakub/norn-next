@@ -17,7 +17,7 @@ type Tier = "unit" | "integration" | "e2e";
 
 const TIER_ARGS: Record<Tier, string[]> = {
   unit: ["test", "--parallel"],
-  integration: ["test", "--config=bunfig.integration.toml", "--parallel", "--timeout=20000"],
+  integration: ["test", "--config=bunfig.integration.toml", "--parallel=6", "--timeout=20000"],
   e2e: ["test", "--config=bunfig.e2e.toml", "--parallel", "--timeout=20000"],
 };
 

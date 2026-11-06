@@ -301,13 +301,18 @@ describe("skills", () => {
       // B37: stops at the round's end; B13, B27: a stuck unit does not end the round (RD1, W7)
       "Never start another round", "The round ends at `$done`", "A stuck unit does not end the round",
       // B19, B20, B39: a gate left parked on purpose is never waited on with `--until gate` (it returns at once)
-      "Never loop on `--until gate` while you leave a gate parked", "norn story wait <story> --until merged --timeout 5m", "(`--until merged`, not `--until gate`)", "gh run watch <run-id> --exit-status",
+      "Never loop on `--until gate` while you leave a gate parked", "norn story wait <story> --until merged --timeout 160s", "(`--until merged`, not `--until gate`)", "timeout 170 gh run watch <run-id> --exit-status",
+      // gh-250: every wait stays under the harness's foreground limit; norn and gh run directly, never through a script
+      "under the harness's foreground limit", "Bash timeout about 178 s", "norn story wait <story> --until gate --timeout 160s",
+      "exit 7: the timeout passed", "never through a script or in the background",
       // B44, B45: the report
       "One report", "delegated decisions with their reasons", "suspected flakes", "waiting: your answer to",
     ];
     expect(terms.filter((t) => !text.includes(t))).toEqual([]);
     // `$stuck` parks a unit for its one diagnosed rerun; it never ends a round
     expect(text).not.toMatch(/round ends at[^.\n]*\$stuck/);
+    // gh-250: no wait outlasts the harness's foreground limit (Claude Code moves a command over ~180 s to the background)
+    expect(text).not.toMatch(/--timeout 5m|five minutes/);
     // the shipped text names no spec ids and no story of this repo
     expect(text).not.toMatch(/\(B\d+[,)–]|claims were lost/);
   });

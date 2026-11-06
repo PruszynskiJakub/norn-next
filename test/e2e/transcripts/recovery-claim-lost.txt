@@ -181,7 +181,7 @@
   spawn repo $ git fetch --quiet --prune --no-tags origin "+refs/norn/claims/*:refs/norn/claims/*" "+refs/norn/inbox/*:refs/norn/inbox/*"
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/
   A.remote.listAssignedIssues norn
-  A.remote.findPullRequest gh-9-add-search
+  A.remote.findPullRequests gh-9-add-search
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
   spawn repo-worktrees/gh-9-add-search $ git status --porcelain=v2 --branch -z --untracked-files=all

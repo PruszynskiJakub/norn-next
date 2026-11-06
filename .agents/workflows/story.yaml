@@ -1,8 +1,8 @@
 # Story workflow — repo-local copy of the shipped one (W1), with this repo's check commands and its
 # ci.yml wait. Delivers a story a refinement round planned: sync, cut slices against the current base,
 # approve them, run the slices, update, check, QA the whole story once, describe, open the draft PR,
-# wait for its CI, and wait for a person at ready. The local check runs the unit and integration tiers
-# and the type check; CI runs every tier, e2e sharded.
+# wait for its CI, and wait for a person at ready. The local check runs the unit tier and the type
+# check; CI runs every tier, integration and e2e sharded.
 # A story waiting at human-qa or ready goes back through update when the base moved under it in a way
 # that conflicts (BS6–BS8, base.stale: conflict).
 name: story
@@ -56,7 +56,7 @@ steps:
       done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" }
   test:
     type: check
-    run: "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck"
+    run: "bun install --frozen-lockfile && bun run test && bun run typecheck"
     timeout: 15m
     outcomes: { pass: qa, fail: { to: implement, counter: test_loop } }
   qa:
@@ -81,7 +81,7 @@ steps:
     type: agent
     skill: norn-implement
     inputs: [spec, handoff, last_check, last_findings]
-    instructions: "Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in the `test` check and the e2e tier runs in CI, so do not run them before handing back."
+    instructions: "Run `bun run test` (the unit tier) after each change, and the type check; the integration and e2e tiers run in CI, which the `ci` check waits for, so do not run them before handing back."
     outcomes:
       done: { to: test, means: "every rework point has a passing test" }
   describe:

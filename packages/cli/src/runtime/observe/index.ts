@@ -221,33 +221,38 @@ async function syncRemote(
     const listedIssues = await timer.time("sync.issues", () => remotePort.listAssignedIssues({ label: o.label }));
     out.issues = listedIssues;
     const active = o.stories.filter((s) => s.frontmatter && !isClosedStatus(s.frontmatter.status));
-    const read = await timer.time("sync.stories", () =>
-      mapBounded(active, REMOTE_CONCURRENCY, async (s) => {
+    const issues = await timer.time("sync.stories", async () => {
+      const read = await mapBounded(active, REMOTE_CONCURRENCY, async (s) => {
         const fm = s.frontmatter as NonNullable<typeof s.frontmatter>;
         const listed = listedIssues.find((i) => i.number === fm.number && i.provider === fm.provider);
         if (!listed) timer.count("get_issue");
-        const issue = listed ?? (await remotePort.getIssue(fm.number));
-        timer.count("find_pr");
-        return { issue, pr: await remotePort.findPullRequest(storyBranch(s.key, s.slug)) };
-      }),
-    );
-    active.forEach((s, i) => {
-      out.storyIssues.set(s.key, (read[i] as (typeof read)[number]).issue);
-      out.storyPrs.set(s.key, (read[i] as (typeof read)[number]).pr);
+        return listed ?? (await remotePort.getIssue(fm.number));
+      });
+      // gh-186: every active story's PR in one call, not one `findPullRequest` per story
+      const branches = active.map((s) => storyBranch(s.key, s.slug));
+      if (branches.length) timer.count("find_prs");
+      const prs = branches.length ? await remotePort.findPullRequests(branches) : new Map<string, RemotePullRequest | null>();
+      active.forEach((s, i) => out.storyPrs.set(s.key, prs.get(branches[i] as string) ?? null));
+      return read;
     });
+    active.forEach((s, i) => out.storyIssues.set(s.key, issues[i] as RemoteIssue | null));
     // B18: the PR of a story held elsewhere and its CI, for the view (its branch as the fetch just found it)
-    const seen = await timer.time("sync.elsewhere_prs", () =>
-      mapBounded(elsewhere, REMOTE_CONCURRENCY, async (e) => {
-        const branch = remote ? await remoteStoryBranch(root, remote, e.key) : null;
-        if (branch) timer.count("find_pr");
-        const pr = branch ? await remotePort.findPullRequest(branch) : null;
+    const seen = await timer.time("sync.elsewhere_prs", async () => {
+      const branches = await mapBounded(elsewhere, GIT_CONCURRENCY, (e) => (remote ? remoteStoryBranch(root, remote, e.key) : Promise.resolve(null)));
+      const asked = branches.filter((b): b is string => !!b);
+      if (asked.length) timer.count("find_prs");
+      // gh-186: one call for every branch held elsewhere
+      const prs = asked.length ? await remotePort.findPullRequests(asked) : new Map<string, RemotePullRequest | null>();
+      return mapBounded(elsewhere, REMOTE_CONCURRENCY, async (e, i) => {
+        const branch = branches[i];
+        const pr = branch ? (prs.get(branch) ?? null) : null;
         if (pr) timer.count("pr_ci");
         // a CI read that fails leaves the CI unknown for this story only, and the sync says so
         let error: string | null = null;
         const ci = pr ? await remotePort.pullRequestCi(pr.number).catch((err: Error) => void (error = `CI of ${e.key}'s PR #${pr.number}: ${err.message}`)) : undefined;
         return { seen: { pr, observed_at: now, ...(ci ? { ci } : {}) } satisfies StoryPrSeen, error: error as string | null };
-      }),
-    );
+      });
+    });
     elsewhere.forEach((e, i) => {
       const r = seen[i] as (typeof seen)[number];
       out.elsewherePrs.set(e.key, r.seen);
@@ -446,11 +451,14 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
   // ---- P2 (F34): a PR not saying merged whose head is already on the fetched base is merged
   const byAncestry = new Set<string>();
-  if (baseRef)
-    for (const s of snapshot.stories) {
+  if (baseRef) {
+    // gh-186: read like the other per-story git reads, GIT_CONCURRENCY at a time
+    const merged = await mapBounded(snapshot.stories, GIT_CONCURRENCY, async (s) => {
       const pr = storyPrs.get(s.key);
-      if (pr && pr.state !== "merged" && (await mergedByAncestry(git, root, remote, storyBranch(s.key, s.slug), pr, baseRef))) byAncestry.add(s.key);
-    }
+      return !!pr && pr.state !== "merged" && (await mergedByAncestry(git, root, remote, storyBranch(s.key, s.slug), pr, baseRef));
+    });
+    snapshot.stories.forEach((s, i) => merged[i] && byAncestry.add(s.key));
+  }
 
   // ---- machine (K1, K3, MO2)
   const leases = local.leases;

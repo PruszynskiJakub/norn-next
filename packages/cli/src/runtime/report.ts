@@ -8,7 +8,7 @@ import { appendReceipt, handoffProse, readText, writeHandoffBody } from "@norn/s
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
 import { cmd, currentRun, implicitAskOpen, standingReport } from "@norn/core";
-import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, type UnitSession } from "./agent-unit.ts";
+import { agentName, loadUnitSession, refuseForeignSession, refuseUnlessAgentWork, reportCommand, type UnitSession } from "./agent-unit.ts";
 
 export interface ReportTarget {
   s: UnitSession;
@@ -27,6 +27,7 @@ export function reportTarget(ctx: Context, verb: string): ReportTarget {
   }
   refuseUnlessAgentWork(s, verb);
   if (!run) throw refuse(`no run of ${s.state.step}#${s.state.attempt} has started in this worktree`, `${cmd.brief()} (it starts the run), do the step, then report`, "no_run");
+  refuseForeignSession(ctx, s, run.run_id, verb); // MO3: only the run's own session reports it
   return { s, run_id: run.run_id, agent: agentName(s, ctx.config) };
 }
 

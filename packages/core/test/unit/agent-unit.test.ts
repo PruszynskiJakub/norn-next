@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { UnitState } from "@norn/schema";
-import { type AgentUnit, agentWorkRefusal, currentRun, cursorStep, implicitAsk, implicitAskOpen, standingReport } from "../../src/agent-unit.ts";
+import { type AgentUnit, agentWorkRefusal, currentRun, cursorStep, foreignSessionRefusal, implicitAsk, implicitAskOpen, runAgentSession, standingReport } from "../../src/agent-unit.ts";
 import type { NumberedReceipt } from "../../src/facts.ts";
 import { at, numbered, receipt, SLICE_WF, sliceUnit, stateFor } from "../fixtures.ts";
 
@@ -51,5 +51,22 @@ describe("agent-unit rules (§9)", () => {
     expect(agentWorkRefusal(view({ step: "test" }), "brief")?.code).toBe("not_agent_step");
     expect(agentWorkRefusal(view({ status: "parked", park: { kind: "ask", reason: "q", since: at() } }), "done")?.code).toBe("parked_ask");
     expect(agentWorkRefusal(view({ status: "parked", park: { kind: "attended", reason: "r", since: at() } }), "done")).toBeNull();
+  });
+
+  test("a run belongs to the session that started it: another session is refused, an unknown one is not (MO3, gh-92)", () => {
+    const owned = { ...RUN, agent_session_id: "sess-A" };
+    expect(runAgentSession(view({ status: "running", run: owned }), RUN.run_id)).toBe("sess-A");
+    const st = stateFor(unit, SLICE_WF);
+    const started = numbered(1, receipt({ ...st, run: RUN }, "started", { agent_session_id: "sess-A" }));
+    expect(runAgentSession(view({}, [started], [started]), RUN.run_id)).toBe("sess-A");
+    expect(runAgentSession(view({ status: "running", run: RUN }), RUN.run_id)).toBeNull();
+
+    const running = view({ status: "running", run: owned });
+    expect(foreignSessionRefusal(running, RUN.run_id, "sess-A", "done")).toBeNull();
+    expect(foreignSessionRefusal(running, RUN.run_id, null, "done")).toBeNull();
+    expect(foreignSessionRefusal(view({ status: "running", run: RUN }), RUN.run_id, "sess-B", "done")).toBeNull();
+    const no = foreignSessionRefusal(running, RUN.run_id, "sess-B", "done");
+    expect(no).toMatchObject({ code: "foreign_session", error: expect.stringContaining("sess-A") });
+    expect(no?.do_instead).toContain(`norn run rerun ${unit.key}`);
   });
 });

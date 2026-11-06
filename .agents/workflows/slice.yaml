@@ -8,7 +8,7 @@ steps:
     type: agent
     skill: norn-implement
     inputs: [slice, spec, handoff, last_check, last_findings]
-    instructions: "Run `bun run test` (the unit tier) after each change, and the type check; this slice's `test` check runs only those two: the integration tier runs in the story's `test` check, once every slice is integrated, and the e2e tier runs in CI, so do not run them before handing back."
+    instructions: "Run `bun run test` (the unit tier) after each change, and the type check; this slice's `test` check runs only those two: the integration and e2e tiers run in CI, once the story's PR is open, so do not run them before handing back."
     outcomes: { done: { to: test, means: "every acceptance criterion (or rework point) has a passing test" } }
   test:
     type: check

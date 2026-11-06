@@ -397,24 +397,21 @@ describe("test layout (AGENTS.md)", () => {
     (Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as { steps: Record<string, Step> }).steps;
   const DELIVERY = ["quick", "story", "slice"];
 
-  const UNIT_INTEGRATION = "bun install --frozen-lockfile && bun run test && bun run test:integration && bun run typecheck";
   const UNIT_ONLY = "bun install --frozen-lockfile && bun run test && bun run typecheck";
 
-  test("AC2 (B8): the test check of quick and story runs unit, then integration, then the type check; slice's runs unit and the type check only (gh-214), all in 15 m", () => {
+  test("AC2 (B8): the test check of quick, story and slice runs the unit tier, then the type check, in 15 m; the integration tier runs only in CI (bypass #259)", () => {
     const checks = DELIVERY.map((wf) => ({ wf, run: workflowSteps(wf).test?.run, timeout: workflowSteps(wf).test?.timeout }));
-    expect(checks).toEqual(
-      DELIVERY.map((wf) => ({ wf, run: wf === "slice" ? UNIT_ONLY : UNIT_INTEGRATION, timeout: "15m" })),
-    );
+    expect(checks).toEqual(DELIVERY.map((wf) => ({ wf, run: UNIT_ONLY, timeout: "15m" })));
   });
 
-  test("AC3 (B9): the implement step of quick, story and slice names bun run test as the loop, integration in the (story's) test check and e2e in CI", () => {
+  test("AC3 (B9): the implement step of quick, story and slice names bun run test as the loop, and the integration and e2e tiers in CI", () => {
     const says = DELIVERY.map((wf) => {
       const text = workflowSteps(wf).implement?.instructions ?? "";
       return {
         wf,
         loop: /`bun run test`[^.]*after each change/.test(text),
-        integration: (wf === "slice" ? /integration tier runs in the story's `test` check/ : /integration tier runs in the `test` check/).test(text),
-        e2e: /e2e (tier )?(runs )?in CI/.test(text),
+        integration: /integration and e2e tiers run in CI/.test(text),
+        e2e: /e2e tiers? (runs? )?in CI/.test(text),
       };
     });
     expect(says).toEqual(DELIVERY.map((wf) => ({ wf, loop: true, integration: true, e2e: true })));
@@ -434,7 +431,7 @@ describe("test layout (AGENTS.md)", () => {
   const ciJobs = (file: string) => (Bun.YAML.parse(readFileSync(join(ROOT, ".github", "workflows", file), "utf8")) as { jobs: Record<string, CiJob> }).jobs;
   const runs = (job: CiJob) => job.steps.flatMap((s) => (s.run ?? "").split("\n").map((l) => l.trim()).filter(Boolean));
 
-  test("AC5 (B11, B12): ci.yml runs unit and the type check first; integration, 3 e2e shards with fail-fast, and package need it; git-spawning jobs set an identity", () => {
+  test("AC5 (B11, B12): ci.yml runs unit and the type check first; 4 integration shards and 3 e2e shards, each with fail-fast, and package need it; git-spawning jobs set an identity", () => {
     const jobs = ciJobs("ci.yml");
     const unit = jobs.unit;
     expect(unit && runs(unit).filter((r) => r.startsWith("bun run"))).toEqual(["bun run test", "bun run typecheck"]);
@@ -442,7 +439,9 @@ describe("test layout (AGENTS.md)", () => {
     expect(["integration", "e2e", "package"].map((n) => ({ n, needs: needs(jobs[n]) }))).toEqual(
       ["integration", "e2e", "package"].map((n) => ({ n, needs: ["unit"] })),
     );
-    expect(jobs.integration && runs(jobs.integration)).toContain("bun run test:integration");
+    const integration = jobs.integration;
+    expect({ failFast: integration?.strategy?.["fail-fast"], shards: integration?.strategy?.matrix?.shard }).toEqual({ failFast: true, shards: [1, 2, 3, 4] });
+    expect(integration && runs(integration)).toContain("bun run test:integration --shard=${{ matrix.shard }}/4");
     const e2e = jobs.e2e;
     expect({ failFast: e2e?.strategy?.["fail-fast"], shards: e2e?.strategy?.matrix?.shard }).toEqual({ failFast: true, shards: [1, 2, 3] });
     expect(e2e && runs(e2e)).toContain("bun run test:e2e --shard=${{ matrix.shard }}/3");
@@ -487,12 +486,13 @@ describe("test layout (AGENTS.md)", () => {
   });
 
   test.each([
-    ["test:integration", "bunfig.integration.toml", (f: string) => /^packages\/[^/]+\/test\/integration\//.test(f)],
-    ["test:e2e", "bunfig.e2e.toml", (f: string) => f.startsWith("test/e2e/")],
-  ] as const)("B5, B6: %s runs bun test with %s, in parallel with a 20 s timeout, passing extra arguments through, and selects only its tier", (script, config, inTier) => {
+    // integration is spawn-bound: past 6 workers system CPU time eats the gain (bypass #259)
+    ["test:integration", "bunfig.integration.toml", "--parallel=6", (f: string) => /^packages\/[^/]+\/test\/integration\//.test(f)],
+    ["test:e2e", "bunfig.e2e.toml", "--parallel", (f: string) => f.startsWith("test/e2e/")],
+  ] as const)("B5, B6: %s runs bun test with %s, in parallel (%s) with a 20 s timeout, passing extra arguments through, and selects only its tier", (script, config, parallel, inTier) => {
     const scripts = rootScripts();
     // ends in flags, so `bun run <script> <file>` appends the file as bun test's own path filter
-    expect(scripts[script]).toBe(`bun test --config=${config} --parallel --timeout=20000`);
+    expect(scripts[script]).toBe(`bun test --config=${config} ${parallel} --timeout=20000`);
     // the unit guard is the unit tier's alone (B4); --parallel workers also load the root preloads, so the tier says it spawns
     expect(bunfig(config).preload).toEqual(["./test/preload.ts", "./test/support/spawning-tier-preload.ts"]);
     const all = testFilesUnder(ROOT);

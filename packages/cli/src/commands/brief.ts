@@ -10,11 +10,11 @@ import { readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, stepLimits, storyRulings } from "@norn/core";
 import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
-import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, readUnitHooks, writeBriefing, readRemoteCache, spawnSyncCaptured, storyFile, traceEvent, runStateDir, storyRunStateDir } from "@norn/store";
+import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, writeBriefing, readRemoteCache, spawnSyncCaptured, storyFile, traceEvent, runStateDir, storyRunStateDir } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
-import { agentName, loadUnitSession, refuseUnlessAgentWork, reportCommand, unitStoryMode, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
+import { agentName, callerSession, loadUnitSession, refuseUnlessAgentWork, refuseForeignSession, reportCommand, unitStoryMode, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
 
 /** Wrappers between the agent and `norn` that exit right after it (never the run's process). */
 const WRAPPERS = /^-?(sh|bash|zsh|dash|fish|ksh|tcsh|csh|env|bun|bunx|npx|pnpm|timeout|sudo|nice|nohup|xargs|script|login)$/;
@@ -47,26 +47,12 @@ async function agentProcess(ctx: Context, proc: ProcessPort): Promise<ProcessIde
   return null;
 }
 
-/** Agent session id and transcript from the hooks that fired in this worktree just before (A2). */
-function recentSession(ctx: Context, s: UnitSession): { agent_session_id?: string; transcript?: string; agent?: string } {
-  const since = new Date(ctx.clock.now() - 3_600_000).toISOString();
-  const own = readUnitHooks(s.root, [{ story: s.unit.story, slice: s.unit.slice }], since)[0] ?? [];
-  const facts = own.map((e) => e.fact).filter((f) => f.cwd === s.worktree || f.cwd.startsWith(`${s.worktree}/`));
-  const last = facts.findLast((f) => f.agent_session_id);
-  const id = last?.agent_session_id ?? ctx.env.NORN_AGENT_SESSION_ID;
-  const out: { agent_session_id?: string; transcript?: string; agent?: string } = {};
-  if (id) out.agent_session_id = id;
-  if (last?.transcript) out.transcript = last.transcript;
-  if (last?.agent) out.agent = last.agent;
-  return out;
-}
-
 async function startRun(ctx: Context, s: UnitSession, step: AgentStep): Promise<string> {
   const config = ctx.config;
   const ports = await ctx.ports();
   const now = ctx.clock.now();
   const run_id = ulid(now);
-  const session = recentSession(ctx, s);
+  const session = callerSession(ctx, s, "brief");
   const agent = session.agent && config.agents[session.agent] ? session.agent : agentName(s, config);
   const receipt: ReceiptOf<"started"> = {
     kind: "started",
@@ -167,6 +153,7 @@ export const briefCommand = defineCommand({
     if (run) {
       const report = standingReport(s, run.run_id);
       if (report) throw refuse(`this run already reported \`${reportCommand(report.receipt)}\`; exactly one report per run`, "end your turn", "already_reported");
+      refuseForeignSession(ctx, s, run.run_id, "brief"); // MO3: never join another session's run
     }
     const pending = s.unapplied.filter((r) => r.receipt.kind !== "started" && r.receipt.kind !== "mode");
     if (pending.length) throw refuse(`unit ${key} has receipts the heartbeat has not applied yet (${pending.map((r) => r.receipt.kind).join(", ")})`, `${cmd.tick()}, then run ${cmd.brief()} again`, "pending_receipts");
