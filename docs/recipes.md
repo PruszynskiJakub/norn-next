@@ -50,6 +50,8 @@ norn run rerun gh-18/02 --step implement --reset test_loop --reason "test comman
 
 To stop an agent that is still running, `norn run cancel gh-18/02`; the work stays, and `norn run rerun` resumes it.
 
+A check that failed on a glitch (a CI hiccup, machine load, a flaky test) sends the unit back to implement, where an agent starts at once. To run the check again on the same code, `norn run rerun gh-18/02 --step test`: it is accepted while the unit is at the step that check's fail sent it to, and the next tick stops that step's agent. `norn run view gh-18/02 --json` tells you first: its `check_retry` names the check, the rerun, and `code_changed`, whether any commit or uncommitted change since the fail touched more than the spec's `handoffs/`.
+
 ## An agent is stuck
 
 **You see:** an Unblock item with the agent's own reason from `norn stuck`.

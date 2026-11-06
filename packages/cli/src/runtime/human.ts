@@ -141,6 +141,13 @@ async function remoteTarget(ctx: Context, key: string, stepOnly: StepOnlyBuild |
   return { ...base, state: u.state, workflow: u.workflow };
 }
 
+/** The unit's facts as this checkout observes them, without touching the network; null when it is not here. */
+export async function localUnit(ctx: Context, key: string): Promise<UnitFacts | null> {
+  const { story, slice } = parseUnitKey(key);
+  const sf = (await observeLocal(ctx)).facts.stories.find((s) => s.key === story);
+  return (slice ? sf?.units.find((u) => u.unit.key === slice) : sf && storyUnit(sf)) ?? null;
+}
+
 /** Observe this checkout without touching the network. */
 function observeLocal(ctx: Context): Promise<Observed> {
   return observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });

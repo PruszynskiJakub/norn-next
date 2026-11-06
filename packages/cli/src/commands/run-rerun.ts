@@ -2,10 +2,11 @@
  * `norn run rerun [<unit>] [--step <step>] [--reset <counter>]… [--reason "…"]` (B48, B49, O2, W4, W7,
  * GR7): resume a stuck or parked unit (a gate or an ask included) at its step in a fresh session,
  * optionally at another step of its pinned workflow and with counters reset (journaled in the
- * receipt). A running unit is refused: stopping it is `norn run cancel` (B50). Claim free: acquired
- * here (T8); held elsewhere: mailbox (T9).
+ * receipt). A running unit is refused: stopping it is `norn run cancel` (B50), except a rerun at the
+ * check whose fail sent the unit to its step (gh-213, O2a): the check runs again on the same code and
+ * the next tick stops that step's session. Claim free: acquired here (T8); held elsewhere: mailbox (T9).
  */
-import { cmd, nextCommand, rerunWarning, stepOf } from "@norn/core";
+import { checkRetryOf, cmd, nextCommand, rerunWarning, stepOf } from "@norn/core";
 import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
 import { at, DELEGATED_HELP, DELEGATED_OPTION, delegatedFields, delegation, humanReceipt, type StepOnlyBuild, stepOnlyReceipt, resolveTarget as resolveUnit, runHumanVerb } from "../runtime/human.ts";
@@ -38,15 +39,18 @@ export const runRerunCommand = defineCommand({
         throw refuse(`${t.key}'s pinned workflow is on the machine that holds it: --step and --reset are checked there`, `${cmd.runRerun(t.key)} without --step and --reset, or ${cmd.storyCheckout(t.story, { force: true })}`, "story_not_local");
       return stepOnlyReceipt(ctx, t, step, "unstick", delegatedFields(d));
     };
-    const t = await resolveUnit(ctx, key, blocked, { stepOnly });
+    // O2a: with --step, a unit whose last outcome is that step's (a failed check) is a target too
+    const t = await resolveUnit(ctx, key, (st) => blocked(st) || (to !== undefined && st.last_outcome?.step === to), { stepOnly });
     const res = await runHumanVerb(ctx, t, {
       verb: "run rerun",
       mailbox: true,
       check(t, st) {
-        // B50: stopping an agent is always its own, explicit act
-        if (st.status === "running") throw refuse(`${t.key} is running ${at(st)}; stop it first`, cmd.runCancel(t.key), "running");
-        if (!blocked(st)) throw refuse(`${t.key} is not stuck: it is at ${at(st)}`, nextCommand(t.key, st) ?? cmd.storyView(t.story), "not_stuck");
         const wf = t.workflow;
+        // O2a (gh-213): a rerun at the check whose fail sent the unit here retries it on the same code
+        const retry = to !== undefined && !!wf && checkRetryOf(wf, st) === to;
+        // B50: otherwise stopping an agent is always its own, explicit act
+        if (!retry && st.status === "running") throw refuse(`${t.key} is running ${at(st)}; stop it first`, cmd.runCancel(t.key), "running");
+        if (!retry && !blocked(st)) throw refuse(`${t.key} is not stuck: it is at ${at(st)}`, nextCommand(t.key, st) ?? cmd.storyView(t.story), "not_stuck");
         if (!wf) throw refuse(`${t.key} has no readable pinned workflow`, cmd.runView(t.key, { why: true }), "workflow_missing");
         const steps = Object.keys(wf.steps);
         if (to !== undefined && !stepOf(wf, to))

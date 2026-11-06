@@ -344,8 +344,22 @@ function runFrom(st: UnitState, r: ReceiptOf<"started">): NonNullable<UnitState[
   return run;
 }
 
+/**
+ * gh-213 (O2a): the check step whose fail sent the unit to the step it is at, while that fail is still
+ * its last outcome and the step has not ended (ready to launch or running); null otherwise. A rerun at
+ * that check (`norn run rerun <unit> --step <check>`) retries it on the same code without a cancel first:
+ * applying it moves the cursor off the run, and decide stops the run's session (S7/O2).
+ */
+export function checkRetryOf(wf: Workflow, st: UnitState): string | null {
+  const last = st.last_outcome;
+  if (!last || (st.status !== "ready" && st.status !== "running")) return null;
+  if (stepOf(wf, last.step)?.type !== "check" || last.outcome !== "fail" || last.step === st.step) return null;
+  return edgeOf(wf, last.step, last.outcome)?.to === st.step ? last.step : null;
+}
+
 function unstick(st: UnitState, r: ReceiptOf<"unstick">, ctx: ApplyContext): Step1 {
-  if (st.status !== "stuck" && st.status !== "parked") return { reject: `unit is ${st.status}, nothing to unstick` };
+  const retry = r.to !== undefined && r.to === checkRetryOf(ctx.workflow, st);
+  if (st.status !== "stuck" && st.status !== "parked" && !retry) return { reject: `unit is ${st.status}, nothing to unstick` };
   const declared = ctx.workflow.counters ?? {};
   const unknown = (r.reset ?? []).filter((c) => !Object.hasOwn(declared, c));
   if (unknown.length) return { reject: `unknown counter(s): ${unknown.join(", ")}` };
