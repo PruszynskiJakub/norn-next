@@ -53,6 +53,8 @@ describe("transitions (W3, W4)", () => {
     expect(r.state).toMatchObject({ step: "review", status: "stuck", counters: { review_loop: 3 } });
     expect(r.state.park).toMatchObject({ kind: "exhausted", reason: "review_loop 3/3 at review.changes_requested" });
     expect(r.state.last_outcome?.outcome).toBe("exhausted");
+    // gh-212 (W4): the counter and its edge's target are in state, for the way out
+    expect(r.state.park?.counter).toEqual({ name: "review_loop", max: 3, outcome: "changes_requested", to: "implement" });
   });
 
   test("$done and $stuck targets", () => {

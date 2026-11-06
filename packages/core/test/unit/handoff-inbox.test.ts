@@ -3,7 +3,7 @@ import { renderHandoffStatus, renderHandoffWithStatus, STATUS_BEGIN } from "../.
 import type { Decision } from "../../src/actions.ts";
 import { inboxChanges } from "../../src/inbox/history.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
-import { startAgentCommand } from "../../src/commands.ts";
+import { nextCommand, rerunWarning, startAgentCommand } from "../../src/commands.ts";
 import type { StoryFacts } from "../../src/facts.ts";
 import type { RemotePullRequest } from "../../src/ports.ts";
 import { at, CONFIG, facts, numbered, receipt, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyFacts, storyUnit, T0, unitFacts } from "../fixtures.ts";
@@ -39,7 +39,7 @@ describe("inbox (O1)", () => {
     const now = T0 + 90 * 60_000;
     const ask = stateFor(sliceUnit("gh-1", "01", "a"), SLICE_WF, { status: "parked", park: { kind: "ask", reason: "Which DB?", since: at(T0), receipt_id: "01JCCCCCCCCCCCCCCCCCCCCCCC" } });
     const gate = stateFor(sliceUnit("gh-1", "02", "b"), SLICE_WF, { step: "human-qa", status: "parked", park: { kind: "gate", reason: "approve or reject human-qa", since: at(T0) } });
-    const stuck = stateFor(sliceUnit("gh-1", "03", "c"), SLICE_WF, { status: "stuck", park: { kind: "exhausted", reason: "review_loop 3/3 at review.changes_requested", since: at(T0) } });
+    const stuck = stateFor(sliceUnit("gh-1", "03", "c"), SLICE_WF, { status: "stuck", park: { kind: "exhausted", reason: "review_loop 3/3 at review.changes_requested", since: at(T0), counter: { name: "review_loop", max: 3, outcome: "changes_requested", to: "implement" } } });
     const runningSt = stateFor(sliceUnit("gh-1", "04", "d"), SLICE_WF, { status: "running", run: { run_id: "01JDDDDDDDDDDDDDDDDDDDDDDD", step: "implement", attempt: 1, started_at: at(T0), how: "auto" } });
     const story = stateFor(storyUnit(), STORY_WF);
     const units = [
@@ -56,7 +56,7 @@ describe("inbox (O1)", () => {
       your_turn: [`gh-1 | refine: attended step — work with the agent | 1h | cd /r-worktrees/gh-1-login && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'`],
       answer: ['gh-1/01 | Which DB? | 1h | norn story answer gh-1/01 "…"'],
       approve: ["gh-1/02 | approve or reject human-qa | 1h | norn story approve gh-1/02"],
-      unblock: ["gh-1/03 | review_loop 3/3 at review.changes_requested | 1h | norn run rerun gh-1/03"],
+      unblock: ["gh-1/03 | review_loop 3/3 at review.changes_requested | 1h | norn run rerun gh-1/03 --step implement --reset review_loop"],
       check: [],
       unclaimed: ["gh-2 | Unclaimed — Login form | 2h | norn story checkout gh-2"],
       notes: [],
@@ -385,5 +385,32 @@ describe("inbox: a finished round (gh-71 D5, D6; B25–B27, B35)", () => {
     expect(buildInbox(facts([seen(f.issue)]), CONFIG).groups.check).toEqual([]);
     // a fresh observation wins over the cache
     expect(buildInbox(facts([{ ...seen({ ...f.issue!, labels: [] }), issue: f.issue }]), CONFIG).groups.check).toEqual([]);
+  });
+});
+
+describe("the way out of a run-out counter (gh-212, W4, O1)", () => {
+  const stuckOn = (counter?: { name: string; max: number; outcome: string; to: string }, kind: "exhausted" | "stuck" = "exhausted") =>
+    stateFor(SLICE, SLICE_WF, { step: "review", status: "stuck", park: { kind, reason: "r", since: at(), ...(counter ? { counter } : {}) } });
+
+  test("leads to the edge's target with the counter reset", () => {
+    expect(nextCommand("gh-1/02", stuckOn({ name: "review_loop", max: 3, outcome: "changes_requested", to: "implement" }))).toBe(
+      "norn run rerun gh-1/02 --step implement --reset review_loop",
+    );
+  });
+  test("a reserved target reruns the step with the counter reset", () => {
+    expect(nextCommand("gh-1/02", stuckOn({ name: "loop", max: 1, outcome: "fail", to: "$stuck" }))).toBe("norn run rerun gh-1/02 --reset loop");
+  });
+  test("a rerun that leaves the counter at its max warns it will end the same way, with the way out", () => {
+    const st = stuckOn({ name: "review_loop", max: 3, outcome: "changes_requested", to: "implement" });
+    expect(rerunWarning("gh-1/02", st, { reset: [] })).toBe(
+      "review_loop ran out (3/3) at review.changes_requested and is not reset: if review ends changes_requested again, the unit is stuck again. To act on changes_requested: norn run rerun gh-1/02 --step implement --reset review_loop",
+    );
+    expect(rerunWarning("gh-1/02", st, { reset: ["test_loop"] })).toContain("is not reset");
+    expect(rerunWarning("gh-1/02", st, { reset: ["review_loop"] })).toBeNull();
+    expect(rerunWarning("gh-1/02", stuckOn(), { reset: [] })).toBeNull();
+  });
+  test("nudges, retries and other stuck reasons keep the plain rerun", () => {
+    expect(nextCommand("gh-1/02", stuckOn())).toBe("norn run rerun gh-1/02");
+    expect(nextCommand("gh-1/02", stuckOn(undefined, "stuck"))).toBe("norn run rerun gh-1/02");
   });
 });

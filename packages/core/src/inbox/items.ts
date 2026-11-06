@@ -9,7 +9,7 @@
  * action), Recently done.
  */
 import { ATTENDED_WAIT, parseDuration, recordRef, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
-import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, versionMismatch } from "../commands.ts";
+import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, unstickCommand, versionMismatch } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
@@ -623,9 +623,9 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
         const start = personStart(uf, story, facts, config);
         return item("your_turn", `${st.step}: attended step — work with the agent`, start.command, park.since, start.detail ? { detail: start.detail } : {});
       }
-      return item("unblock", park?.reason ?? "parked", cmd.runRerun(key), park?.since ?? st.updated_at);
+      return item("unblock", park?.reason ?? "parked", unstickCommand(key, st), park?.since ?? st.updated_at);
     case "stuck":
-      return item("unblock", park?.reason ?? "stuck", cmd.runRerun(key), park?.since ?? st.updated_at, park?.receipt_id ? { id: park.receipt_id } : {});
+      return item("unblock", park?.reason ?? "stuck", unstickCommand(key, st), park?.since ?? st.updated_at, park?.receipt_id ? { id: park.receipt_id } : {});
     case "running": {
       // R9.1: the agent never took its launch prompt — a person looks at the pane
       const unsent = launchPromptMissed(uf, st);

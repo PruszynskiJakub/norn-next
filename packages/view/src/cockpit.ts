@@ -120,7 +120,11 @@ function itemActions(i: InboxEntry, unit: string, o: CockpitOptions): CockpitAct
     out.push(action("approve", { kind: "verb", argv: ["story", "approve", unit] }));
     out.push(action("reject", { kind: "verb", argv: ["story", "reject", unit, "--reason", "{input}"] }, { prompt: "What to change", required: true }));
   }
-  if (i.command.startsWith(`${cmd.runRerun()} `)) out.push(action("unstick", { kind: "verb", argv: ["run", "rerun", unit] }));
+  // gh-212: the item's own flags too (a run-out counter's `--step <to> --reset <counter>`); no word has a space
+  if (i.command.startsWith(`${cmd.runRerun()} `)) {
+    const flags = i.command.split(" ").slice(cmd.runRerun(unit).split(" ").length);
+    out.push(action("unstick", { kind: "verb", argv: ["run", "rerun", unit, ...flags] }));
+  }
   return out;
 }
 
