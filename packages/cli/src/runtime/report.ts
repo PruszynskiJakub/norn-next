@@ -75,6 +75,16 @@ export function rejectProgress(r: Receipt): string {
   return `${r.step}#${r.attempt} reject${r.who ? ` by ${r.who}` : ""}: ${comment || "(no comment given)"}`;
 }
 
+/**
+ * O6: a gate rejection is a milestone of its unit. Every writer of a unit's receipts calls this once
+ * they are written (P6: receipt first) — act's `writeReceipts` and a person's local delivery — so each
+ * `reject` among them appends its progress line to the handoff whichever route brought it.
+ */
+export function receiptsWritten(handoffFile: string | null, receipts: readonly Receipt[]): void {
+  if (!handoffFile) return;
+  for (const r of receipts) if (r.kind === "reject") appendProgress(handoffFile, rejectProgress(r));
+}
+
 /** The agent's milestone (O6): one line appended to the Progress section of handoff.md. */
 export function appendProgress(handoffFile: string, line: string): void {
   const raw = readText(handoffFile);

@@ -31,6 +31,7 @@ import type { Context } from "../../context.ts";
 import { syncRemoteBranch } from "../integrate.ts";
 import { leaseLiveness } from "../leases.ts";
 import type { Observed, StoryLoc, UnitLoc } from "../observe/index.ts";
+import { receiptsWritten } from "../report.ts";
 
 export class QueueFull extends Error {}
 /** S6: a receipt number another writer (an agent verb, a person) took since observe. */
@@ -108,11 +109,12 @@ export class ActEnv {
 
   // ------------------------------------------------------------ receipts / state / commit
 
-  writeReceipts(runsDir: string, receipts: NewReceipt[]): void {
+  writeReceipts(loc: Pick<UnitLoc, "runsDir" | "handoffFile">, receipts: NewReceipt[]): void {
     for (const r of receipts) {
-      const res = writeReceiptAt(runsDir, r.n, r.receipt);
+      const res = writeReceiptAt(loc.runsDir, r.n, r.receipt);
       if (!res.ok) throw new ReceiptTaken(`receipt number ${r.n} is taken by ${relative(this.root, res.file)} (S6)`);
     }
+    receiptsWritten(loc.handoffFile, receipts.map((r) => r.receipt));
   }
 
   /** Write state.json (S5, last) and keep the in-memory location current for later actions this tick. */

@@ -220,7 +220,7 @@ export function emitApplied(
   res: ApplyResult,
   receipts: NewReceipt[],
   commit: { message: string; step: string; ended?: StepEnd | undefined },
-  o: Partial<Delivery> & { state?: UnitState } = {},
+  o: Partial<Delivery> & { state?: UnitState; yields_to_report?: true } = {},
 ): void {
   ctx.emit({
     kind: "apply_receipts",
@@ -235,6 +235,7 @@ export function emitApplied(
     receipts,
     state: o.state ?? res.state,
     commit: commitFor(ctx, story, uf, commit.message, commit.step, { ended: commit.ended }),
+    ...(o.yields_to_report ? { yields_to_report: true as const } : {}),
   });
 }
 

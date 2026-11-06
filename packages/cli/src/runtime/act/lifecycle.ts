@@ -40,6 +40,7 @@ import { integrate } from "../integrate.ts";
 import { markStoryOnBase, mergeFacts, type RecordResult } from "../record.ts";
 import { equipWorktree } from "../worktrees.ts";
 import { type ActEnv, claimLost } from "./env.ts";
+import type { UnitLoc } from "../observe/index.ts";
 
 /** Create a unit worktree (K4, K5): branch, worktree, slot lease, `.env.norn`, `.norn-unit`. */
 async function ensureWorktree(act: ActEnv, spec: WorktreeSpec, unit: UnitRef, spec_dir: string): Promise<{ created: boolean; slot: number | null }> {
@@ -87,7 +88,7 @@ export async function startUnit(act: ActEnv, a: Extract<Action, { kind: "start_u
   const runsDir = runStateStartDir(wtPath, run, a.unit.dir, a.workflow);
   const pin = pinWorkflow(runsDir, a.workflow_source);
   if (!pin.ok) throw new Error(`${runStateRecord(wtPath, run, runsDir)}/workflow.yaml is already pinned with different content (S7)`);
-  act.obs.units[a.unit.key] = {
+  const loc: UnitLoc = (act.obs.units[a.unit.key] = {
     unit: a.unit,
     story: a.unit.story,
     root: wtPath,
@@ -97,8 +98,8 @@ export async function startUnit(act: ActEnv, a: Extract<Action, { kind: "start_u
     branch: a.worktree?.branch ?? story.branch,
     state: null,
     workflow: null,
-  };
-  act.writeReceipts(runsDir, a.receipts);
+  });
+  act.writeReceipts(loc, a.receipts);
   if (a.state) act.writeUnitState(a.unit, runsDir, a.state);
   if (a.unit.slice === null) {
     const r = patchStoryFile(storyFile(join(wtPath, story.spec_dir)), { status: "active" }, wtPath);
@@ -113,7 +114,7 @@ export async function markDone(act: ActEnv, a: Extract<Action, { kind: "mark_don
   const storyWt = story.worktree;
   const detail: Record<string, unknown> = {};
   const loc = act.unitLoc(a.unit);
-  act.writeReceipts(loc.runsDir, a.receipts);
+  act.writeReceipts(loc, a.receipts);
   if (a.state) act.writeUnitState(a.unit, loc.runsDir, a.state);
   const wt = a.cleanup.worktree;
   if (wt && existsSync(wt) && a.unit.slice) {
@@ -177,7 +178,7 @@ export async function claim(act: ActEnv, a: Extract<Action, { kind: "claim" }>):
   const r = await acquireClaim(act.root, remote, a.blob, { now: act.obs.facts.now });
   const res = claimed(act, a, r);
   // R3.1 (H6): the intake race is lost — undo what the intake made here, unless it holds work
-  if (a.rule === "claim.acquire.intake" && !res.ok && claimLost(res)) (res.detail as Record<string, unknown>).intake = await dropLostIntake(act, story, a.lost_intake).catch((e: Error) => ({ kept: `clean-up failed: ${e.message}` }));
+  if (a.lost_intake && !res.ok && claimLost(res)) (res.detail as Record<string, unknown>).intake = await dropLostIntake(act, story, a.lost_intake).catch((e: Error) => ({ kept: `clean-up failed: ${e.message}` }));
   return res;
 }
 
@@ -204,12 +205,11 @@ function claimed(act: ActEnv, a: Extract<Action, { kind: "claim" }>, r: ClaimWri
 }
 
 /**
- * R3.1: after losing `claim.acquire.intake`, remove what decide said holds nothing beyond the
+ * R3.1: after losing an intake's acquire, remove what decide said holds nothing beyond the
  * intake (`lost_intake.drop`): the story worktree, its local branch (and the spec folder in it) and
  * its slot. Otherwise keep everything: the branch and worktree stay for a person to look at.
  */
-async function dropLostIntake(act: ActEnv, story: string, lost: Extract<Action, { kind: "claim" }>["lost_intake"]): Promise<{ removed: string[] } | { kept: string }> {
-  if (!lost) return { kept: "not decided: the intake branch was not observed" };
+async function dropLostIntake(act: ActEnv, story: string, lost: NonNullable<Extract<Action, { kind: "claim" }>["lost_intake"]>): Promise<{ removed: string[] } | { kept: string }> {
   if ("keep" in lost) return { kept: lost.keep };
   const wt = lost.drop.worktree;
   const removed: string[] = [];

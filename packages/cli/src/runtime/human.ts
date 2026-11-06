@@ -39,6 +39,7 @@ import { opt, type ParsedArgs } from "../command.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
 import { parseUnitKey } from "./args.ts";
 import { gitRemote, type Observed, observe } from "./observe/index.ts";
+import { receiptsWritten } from "./report.ts";
 import { bundledSkillSet } from "./skills-drift.ts";
 
 // ------------------------------------------------------------------ views (X1)
@@ -412,6 +413,7 @@ export interface Delivered {
 async function deliver(ctx: Context, t: Target, route: Route, receipt: Receipt): Promise<Delivered> {
   if (route.via === "local") {
     const r = appendReceipt(t.runsDir as string, receipt);
+    receiptsWritten(t.handoffFile, [receipt]);
     // repo-relative: the runs/ may live in a story or slice worktree, not under ctx.root
     const checkout = t.obs?.units[t.key]?.root ?? ctx.root;
     const rel = relative(checkout, r.file);
