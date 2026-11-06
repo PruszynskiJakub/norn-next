@@ -10,6 +10,7 @@ A run belongs to the agent session that started it (MO3): another session in the
 - MO3 amended in `.agents/RULES.md`.
 - Tests: `packages/cli/test/integration/session-ownership.test.ts` (triage repro; red without the fix), core `agent-unit.test.ts`, store `run-hooks.test.ts`. `agent-protocol.test.ts`'s attended test fired Stop as another session than the run's; now uses `sess-pair`.
 - Not done: the boundary commit still stages the whole worktree (`git add -A`); with the refusal, only the run's own session can trigger a report commit. An auto-launched run with no recorded `agent_session_id` is not protected until one is known.
+- implement#1 done: MO3: a run belongs to the session that started it. brief/done/ask/stuck from another agent session are refused (foreign_session, names the owner, points the person to run cancel + run rerun); that session's hook facts are not stamped with or credited to the run (hook.ts, store runHooks) and its Stop is not blocked. Nothing refused when either session is unknown. Tests: integration session-ownership (red without fix), core agent-unit, store run-hooks; RULES MO3 amended. Boundary commit still uses git add -A (out of scope).
 
 ## Resume
 
