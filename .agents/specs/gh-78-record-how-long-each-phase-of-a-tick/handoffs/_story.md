@@ -41,7 +41,14 @@ Every tick record says where the tick spent its time (observe and its phases, de
 | W6 slowest phase visible (tick.end, norn tick) | test | `tick-timing.test.ts` (integration) › "tick.end and `norn tick` name the slowest phase…" |
 | W7 last tick's duration in status and the cockpit | test | `tick-timing.test.ts` (integration) › "the heartbeat carries the last tick's duration into `norn story list`"; `view.test.ts` › "gh-78: the heartbeat line…"; `cockpit-tui.test.ts` › "gh-78: the header shows…" |
 - review#2 approve: Approve: the tick record carries sync + timing (observe phases with call counts, decide, each action's result.ms incl. claim.renew, after), tick.end/norn tick name the slowest phase, story list and the cockpit show the last tick's duration; fields optional, outside facts/action. review#1 F1 (real-tick integration test) and F2 fixed, F3/F4 documented; test#2 green. One nit: per-story git and process probes share the stories phase.
+- describe#1 done: pr.md written: summary of the new tick record fields, test-based evidence per Wanted item (no QA report in this quick round), merge danger one-way but mild (old schemas reject the new optional fields)
 
 ## Resume
 
 Review approved; next is whatever norn routes after review (the PR / CI). Nothing open from review.
+
+- describe#1: wrote `pr.md` (summary diff of the record shape, test evidence per Wanted item, since no QA report exists in this quick round, and the merge danger: the trace format survives a revert because the old schemas reject the extra fields).
+
+### Resume
+
+pr.md is written. Next: the person reviews the PR.
