@@ -27,14 +27,12 @@ Minor findings (not blocking): `run view` now runs a local observe on every call
 - resolve#2: merged main c207e7c01 (#247 simplify bypass). Conflicts: `run-rerun.ts`, where main renamed the local `blocked` to core's `rerunnable` and the O2a retry check now uses `rerunnable`; `policy.ts` imports kept both sides (`isClosedStatus` + `HANDOFFS_DIR`/`RUNS_DIR`/`SPECS_DIR`). Unit tier, typecheck and integration tier are green.
 - review#2 (on HEAD after the merge of main c207e7c01): approve. The W1–W5 table above still holds with the same tests; test#2 was green on this HEAD. The merge resolution checks out: core's `rerunnable` (stuck/parked) matches apply's `unstick` guard, and apply checks `checkRetryOf` again at apply time, so a rerun that races with implement reporting is rejected. 3 minor findings: F1 run view observes on every call, F2 the `code_changed: null` branch and the markdown line are untested, F3 `LOG_LIMIT` 200 walks merged-in base commits (null on a large base merge, which errs on the safe side).
 
+- describe#2 (on HEAD after the merge of main c207e7c01): reread the diff and found `pr.md` still accurate. Changes: the Evidence intro now cites test#2 on this HEAD, W1's Before no longer points at a stale line number, and W4's not-shown note names F3 (LOG_LIMIT 200 after a large base merge).
+
 ### Resume
 
-Review approved on the current HEAD. Next: the steps after review, as norn routes them.
+Report describe done; the next step is norn's (open/update the PR).
 
 ## Progress
 
-- implement#1 done: O2a: run rerun --step <check> is accepted on a ready/running unit when that check's fail sent it there; the tick stops the session via the existing S7 kill. run view --json gains check_retry {check, failed_at, code_changed, command}. RULES O2a + SK3, norn-fsd-round skill and recipes updated. Unit tier + typecheck green; new integration test run-rerun-check.test.ts passes.
-- review#1 approve: Approve: O2a rerun-at-failed-check and run view check_retry do what gh-213 asks; B50 kept; tests green. Two minor findings (run view observes on every call; code_changed:null branch and markdown line untested).
-- describe#1 done: pr.md written: O2a rerun-at-failed-check + run view check_retry; evidence W1–W5 from tests (code_changed:null and markdown line marked not shown); two-way door, CLI/supervisor blast radius incl. run view observe cost.
-- resolve#2 done: Merged main c207e7c01: run-rerun.ts uses main's rerunnable in place of blocked, with O2a retry kept; policy.ts imports from both sides. Unit, typecheck and integration tiers are green.
-- review#2 approve: Approve on the current HEAD (after merging main c207e7c01): O2a's rerun at the failed check and run view's check_retry do what gh-213 asks, B50 is kept, the merge resolution is sound, test#2 is green. 3 minor findings: run view observes on every call; the code_changed:null branch and markdown line are untested; LOG_LIMIT counts merged base commits.
+- describe#2 done: pr.md rechecked on current HEAD (after main c207e7c01 merge): still accurate; evidence intro cites test#2 on this HEAD, stale line ref dropped, F3 noted under W4's not-shown.

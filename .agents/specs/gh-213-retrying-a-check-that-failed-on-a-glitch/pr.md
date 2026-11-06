@@ -21,10 +21,10 @@ A check that failed on a glitch (CI hiccup, machine load, a flaky test) is now r
 
 ## Evidence
 
-This was a quick round with no QA step, so the evidence is the new tests (unit tier, type check and the new integration test are green, per implement and review). The items come from the issue's Wanted.
+This was a quick round with no QA step, so the evidence is the new tests. The unit tier, the integration tier and the type check were green in test#2 on this HEAD, after main c207e7c01 was merged in. The items come from the issue's Wanted.
 
 - **W1** `run rerun --step <check>` is accepted while the unit sits at the step that check's fail sent it to
-  **Before:** refused with `running` (`run-rerun.ts:40`)
+  **Before:** refused with `running` (`run-rerun.ts` on main, B50)
   **After:** `run-rerun-check.test.ts` uses a check that fails once and then passes. After the fail sends the unit back to a running `implement`, `rerun gh-9 --step test` exits 0 with an `unstick` receipt `{ to: "test", step: "implement" }`. `apply.test.ts` checks that the receipt applies while the unit is ready or running.
 - **W2** The rerun stops that step's session itself
   **Before:** a manual `norn run cancel` was needed first
@@ -35,7 +35,7 @@ This was a quick round with no QA step, so the evidence is the new tests (unit t
 - **W4** `run view --json` says whether the work changed since the fail, and norn's own commits don't count
   **Before:** did not exist. The `<check>.fail → implement` boundary commit made `git log -1 <branch>` useless for this.
   **After:** the integration test sees `code_changed: false` right after the fail (norn's commit ignored), then `true` with an uncommitted file, `true` once that file is committed, `false` after a reset, and `check_retry: null` after `$done`. `decide.test.ts` covers `isStepBoundary` and `isCodePath`.
-  **Not shown:** the `code_changed: null` branch (no worktree, or no boundary commit in the last 200) and the markdown line `run view` adds without `--json` have no tests (review finding F2).
+  **Not shown:** the `code_changed: null` branch (no worktree here, or the boundary commit is not in the last 200 commits, which a base merge of more than about 200 commits causes: review F3; the result errs on the safe side) and the markdown line `run view` adds without `--json` have no tests (review finding F2).
 - **W5** `norn-fsd-round` drops the cancel and git-log workaround
   **Before:** the skill told the supervisor to `run cancel` and then read `git log … :(exclude…)`
   **After:** `assets.test.ts` checks the skill's phrases: it reads `check_retry.code_changed` and never runs `run cancel`.
