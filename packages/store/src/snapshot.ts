@@ -181,11 +181,10 @@ export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { i
   const wf = readPinnedWorkflow(path, name);
   if (!wf.ok && wf.reason === "corrupt") errors.push(wf.error);
   const state = st.ok ? st.value : null;
-  const after = state?.applied_through ?? 0;
-  // S5: state.json is the commit point, so the receipts it applied are opened only for a full history
-  // (`includeApplied`); every file name is still checked, and every receipt that is read (S2)
-  const all = listReceipts(path, { ...(name ? { root: name } : {}), ...(opts.includeApplied ? {} : { after }) });
+  // S2: every receipt is validated on every load, applied or not
+  const all = listReceipts(path, name ? { root: name } : {});
   errors.push(...all.errors);
+  const after = state?.applied_through ?? 0;
   // S7: `norn story edit --workflow --at` re-pins workflow.yaml right after journaling a workflow receipt;
   // until the tick applies it, the new pin matching that receipt's to_hash is expected.
   const switching = (hash: string) => all.receipts.some((r) => r.n > after && r.receipt.kind === "workflow" && r.receipt.to_hash === hash);

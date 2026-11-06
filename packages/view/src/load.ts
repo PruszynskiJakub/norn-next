@@ -104,7 +104,7 @@ export interface LoadProjectViewOptions {
   bundledSkills?: { source: string; names: readonly string[] };
   /**
    * HC13: a view for the inbox and the story statuses alone (`status --segment`, run every few seconds):
-   * no applied receipts are read, so stories' `delegated` is empty and `base_sync` names no last merge
+   * earlier rounds are not read, so stories' `delegated` is empty
    */
   inboxOnly?: boolean;
 }
@@ -313,7 +313,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     storyWorktrees: wts.stories,
     sliceWorktrees: wts.slices,
     liveness: opts.liveness,
-    includeApplied: !opts.inboxOnly,
+    includeApplied: true,
     reportLeaseErrors: true,
     ...(opts.version !== undefined ? { running: opts.version } : {}),
     ...(opts.bundledSkills ? { bundledSkills: opts.bundledSkills } : {}),

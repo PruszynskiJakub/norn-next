@@ -85,14 +85,18 @@ export interface ReceiptIndex {
   read(n: number, root?: string): NumberedReceipt | FileError | null;
 }
 
-export function receiptIndex(unitDir: string): ReceiptIndex {
+/** `valid`: the unit's receipts already read and validated (`listReceipts`), served without opening their files again. */
+export function receiptIndex(unitDir: string, valid: readonly NumberedReceipt[] = []): ReceiptIndex {
   const listed = entries(unitDir).entries;
   const byN = new Map(listed.map((e) => [e.n, e]));
+  const held = new Map(valid.map((r) => [r.n, r.receipt]));
   return {
     entries: listed,
     read(n, root) {
       const e = byN.get(n);
       if (!e) return null;
+      const known = held.get(n);
+      if (known && known.kind === e.kind) return { n, file: displayPath(e.file, root), receipt: known };
       const r = readJsonFile("receipt", e.file, root);
       if (r.ok) return { n, file: displayPath(e.file, root), receipt: r.value };
       return r.reason === "corrupt" ? r.error : null;

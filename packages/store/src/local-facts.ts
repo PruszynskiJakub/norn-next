@@ -184,8 +184,8 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   const drift = skillsDriftOf(opts);
   let refs: Map<string, string> | undefined;
   const stories = placed.map(({ s, storyWt, units: us }): LocalStory => {
-    // each unit's receipts folder is listed once for every read below
-    const index = new Map(s.units.map((u) => [u, receiptIndex(u.path)]));
+    // each unit's receipts folder is listed once for every read below; receipts the snapshot already validated are not read again
+    const index = new Map(s.units.map((u) => [u, receiptIndex(u.path, u.receipts)]));
     const indexOf = (u: UnitSnapshot) => index.get(u) as ReceiptIndex;
     const units = us.map(({ u, worktree }) => {
       const lu = localUnit(root, s, u, indexOf(u), worktree, hooksOf.get(u) ?? [], live, failures);
