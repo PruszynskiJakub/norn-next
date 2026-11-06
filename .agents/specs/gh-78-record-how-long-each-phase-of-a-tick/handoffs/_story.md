@@ -43,12 +43,8 @@ Every tick record says where the tick spent its time (observe and its phases, de
 - review#2 approve: Approve: the tick record carries sync + timing (observe phases with call counts, decide, each action's result.ms incl. claim.renew, after), tick.end/norn tick name the slowest phase, story list and the cockpit show the last tick's duration; fields optional, outside facts/action. review#1 F1 (real-tick integration test) and F2 fixed, F3/F4 documented; test#2 green. One nit: per-story git and process probes share the stories phase.
 - describe#1 done: pr.md written: summary of the new tick record fields, test-based evidence per Wanted item (no QA report in this quick round), merge danger one-way but mild (old schemas reject the new optional fields)
 
+- resolve#2: merged origin/main c207e7c01b (merge 8f7621235). Main refactored observe (`syncRemote`, `classifyWorktrees`, `storyFactsOf` over `mapBounded`); took main's structure and re-applied the timers: `sync.stories` and `sync.elsewhere_prs` time the bounded-parallel reads (call counts inside), `stories` times the bounded per-story pass, `timer` passed into `syncRemote`. cockpit-tui: kept both imports (`isClosedStatus`, `formatTickMs`). Typecheck, unit tier, integration tier green.
+
 ## Resume
 
-Review approved; next is whatever norn routes after review (the PR / CI). Nothing open from review.
-
-- describe#1: wrote `pr.md` (summary diff of the record shape, test evidence per Wanted item, since no QA report exists in this quick round, and the merge danger: the trace format survives a revert because the old schemas reject the extra fields).
-
-### Resume
-
-pr.md is written. Next: the person reviews the PR.
+Base merged and committed; nothing open. Next is whatever norn routes after resolve (CI on the PR).
