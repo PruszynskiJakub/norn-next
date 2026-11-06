@@ -23,6 +23,10 @@ A run belongs to the agent session that started it (MO3): another session in the
 | W5: the run's own session still briefs and reports it | test | `session-ownership.test.ts` › "the run's own session reports it" and the A re-brief in the brief test |
 - review#1 approve: Review approve: MO3 session ownership does what gh-92 asks; every Wanted clause traced to tests (table in handoff). 3 findings, 0 blocking: auto runs with unknown session unprotected (accepted by MO3), callerSession matches Claude's PreToolUse only, misplaced doc comment in hook.ts.
 
+
+- describe#1: wrote `pr.md` (Summary diff-of-shape, Evidence per Wanted clause W1–W5 from the tests, the two accepted gaps, Merge danger two-way / agent sessions).
+- describe#1 done: pr.md written: summary (diff-of-shape of brief/report refusal, hook stamping, runHooks filter), evidence per Wanted clause W1–W5 from session-ownership/agent-unit/run-hooks tests, accepted gaps, merge danger two-way / agent sessions.
+
 ## Resume
 
-Review approved; nothing to rework. Minor findings (not blocking) are in review#1's findings receipt.
+PR body is in `pr.md`; nothing left for describe. Next is the person's ready/merge.
