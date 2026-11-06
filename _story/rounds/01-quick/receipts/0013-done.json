@@ -1,0 +1,1 @@
+{"kind":"done","receipt_id":"01M6RSAAFNP2BZA2NZJ35E9S79","run_id":"01M6RS4E0B3MKEGB90KGS0WK14","step":"describe","attempt":1,"at":"2026-11-06T15:58:25.269Z","by":"agent","who":"claude","outcome":"done","handoff":"pr.md: waits at 160s/178s Bash/timeout 170 gh run watch, direct commands only, exit 7 'the timeout passed'; evidence from assets test; two-way door, low risk"}
