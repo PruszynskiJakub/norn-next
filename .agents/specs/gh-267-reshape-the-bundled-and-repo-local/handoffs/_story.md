@@ -37,9 +37,11 @@ Apply the skill-shaper proposals (skill text only) to the 20 bundled skills (sou
 
 - resolve#1: merged main 4340a8669 (#269, slice dependency guidance) into the branch. The one conflict was in norn-slice's steps 3–5: kept this branch's step 3 (verifiers at agreed seams, review/QA wording) and main's new dependency guidance in steps 2, 4 and 5 (critical path, drop unneeded edges, report the chain). Copied the result to `.agents/skills/norn-slice` (`diff -r` clean). Unit tier (1281 pass) and typecheck green.
 
+- review#3: approve on 84e95497c. Since review#2 the story's own files changed only in norn-slice (source and copy), by the resolve#1 merge. It keeps main's dependency guidance (steps 2, 4, 5) and this branch's verifier wording (step 3), with nothing lost from either side. The diff against origin/main is still only skill files plus the spec folder. `diff -r` of the copies against source is clean, and test#3 is green. The traceability table above is current.
+
 ### Resume
 
-The base merge is committed. Nothing is left for resolve; the PR's CI and a person's judgement come next.
+Review approved on the merged head. The PR's CI and a person's judgement at `ready` come next.
 
 ## Progress
 
@@ -48,3 +50,4 @@ The base merge is committed. Nothing is left for resolve; the PR's CI and a pers
 - review#2 approve: The rework is correct (qa→qa-person pointer, slice wording, fsd-round bounded to the current round, implement fallback seam); copies match source; test#2 green. The story handoff, corrupted to 3.4 MB in c4b07564a by an empty-string replace, has been rebuilt from d7daef4a8 and updated.
 - describe#1 done: Wrote pr.md: summary of the skill-text reshape, evidence per W1–W7/D1–D2 from lints, diffs and the review table (no QA), merge danger two-way with agents as blast radius.
 - resolve#1 done: Merged main 4340a8669 into the story branch. Resolved norn-slice: kept our step 3 verifier wording plus main's dependency/critical-path guidance in steps 2, 4, 5; refreshed the .agents copy. Unit tier (1281) and typecheck green.
+- review#3 approve: Merged head re-reviewed: the norn-slice resolution keeps main's dependency guidance and our verifier wording; copies match source; diff is still skill files plus the spec folder; test#3 green. No findings.
