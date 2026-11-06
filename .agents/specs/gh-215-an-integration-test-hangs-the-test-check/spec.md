@@ -12,7 +12,7 @@ labels:
   - norn:kind:bug
   - norn:priority:high
   - norn:risk:low
-  - norn:wf:reproduce
+  - norn:wf:quick
 workflow: quick
 status: active
 intake_at: 2026-11-06T14:56:57.375Z

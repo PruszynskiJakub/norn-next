@@ -114,6 +114,7 @@ The `## Reproduce` comment is on #215: https://github.com/PruszynskiJakub/norn-n
 - Fix: `test/support/harness.ts` `sh()` passes `timeoutMs` (15 s, below the tier's 20 s per-test timeout) to `spawnSyncCaptured`, so `Bun.spawnSync` kills the git child itself; on timeout `sh()` throws `git <args> (<cwd>): timed out after N ms (killed)`. `NORN_HARNESS_GIT_TIMEOUT_MS` lowers it (the test uses 1000). After: the fixture ends in ~1.3 s, `stuck git call` fails named, its neighbours pass; green 3/3.
 - `sh()` is the only sync spawn in `test/support/`. Not changed (out of scope, noted): direct `Bun.spawnSync` calls in individual test files and `packages/adapters/test/contract/git.ts`'s helper, store's `gitSync` (no timeout for local subcommands, H11), and a tier-level watchdog for non-spawn blocks (the FIFO row). What made the git child stick on CI stays open.
 - Unit tier and typecheck green.
+- implement#1 done: Harness sh() now passes a 15s timeoutMs (below the tier's 20s) to spawnSyncCaptured, so a git child that never exits is killed and its test fails named, instead of blocking the worker and the whole --parallel tier (bun 1.3.13 can't cut a 2nd spawnSync). Regression test packages/cli/test/integration/harness-git-timeout.test.ts runs a stuck-git fixture under bun test: red before (hit 15s bound), green after (~1.3s, 3/3). Unit tier + typecheck green.
 
 ## Resume
 
