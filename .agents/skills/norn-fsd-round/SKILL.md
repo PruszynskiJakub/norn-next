@@ -1,6 +1,6 @@
 ---
 name: norn-fsd-round
-description: Supervises the norn stories a person names through their current round unattended, deciding gates and answers as delegated decisions and escalating only what is theirs. Use when asked to supervise, deliver or babysit named stories. Not for chaining rounds; use `/norn-fsd`.
+description: Supervises the norn stories a person names through their current round unattended, deciding gates and answers as delegated decisions and escalating only what is theirs. Use when asked to supervise, deliver or babysit named stories through their current round. Not for chaining rounds; use `/norn-fsd`.
 ---
 
 # Supervise named stories through their round

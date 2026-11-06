@@ -5,7 +5,7 @@ description: Cuts a planned spec into tracer-bullet slice files (dependencies, a
 
 # Slice
 
-Cut the plan into slices a person can judge at a glance: the slice files you write are what they review before any slice starts, and their frontmatter is run exactly as written.
+Cut the plan into slices a person can judge at a glance: the slice files you write are what they review before any slice starts, and their frontmatter is read exactly as written.
 
 1. Read the spec, its Plan included, and explore the code it touches. When slice files already exist (the person rejected them at the gate, or edited them), start from those files and the rejection reason in your instructions: change what was asked, keep the person's edits, and never renumber.
 2. **Draft tracer bullets.** Break the work into slices. Each slice:
@@ -64,5 +64,5 @@ Pointers to plan decisions (D1), traps, and any call left for the person.
 - Every acceptance criterion cites the Behaviour item(s) it proves and is observable at an agreed seam, not a code detail.
 - **Frontmatter `criteria`** repeats the Acceptance section as data: one `{ id, verifier }` per item, the same ids in the same order, nothing more and nothing less. Nothing reads the prose: whoever verifies gives one verdict per id listed here, so a criterion missing from the list is never checked.
 - When your instructions ask for the criteria in the story's frontmatter too, add them to spec.md's `criteria` as they say; leave every other frontmatter field as it is.
-- **Checks** are the commands the implementer runs for this slice; each runs in the repository and exits non-zero on failure. nothing runs them for the implementer (a separate check runs the repo's own test command), so name the repo's local loop as its contributor docs give it, never a tier they keep for CI.
+- **Checks** are the commands the implementer runs for this slice; each runs in the repository and exits non-zero on failure. Nothing runs them for the implementer (a separate check runs the repo's own test command), so name the repo's local loop as its contributor docs give it, never a tier they keep for CI.
 - Behaviour and interfaces, not file paths: the slice may wait while the code moves.

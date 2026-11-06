@@ -1,6 +1,6 @@
 ---
 name: norn-qa
-description: Checks a change from the user's side by actually running it, giving each acceptance criterion one verdict with evidence in a criteria report. Use when asked to QA, verify or acceptance-test a change. Not for finding a bug's cause; use norn-diagnose.
+description: Checks a change from the user's side by actually running it, giving each acceptance criterion one verdict with evidence in a criteria report. Use when asked to QA, verify or acceptance-test a change. Not for finding a bug's cause; use norn-diagnose. QA alongside a person is norn-qa-person.
 ---
 
 # QA

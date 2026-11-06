@@ -24,4 +24,4 @@ Without this, code lands before its test, rework gets patched without a test tha
 - If a criterion is ambiguous or contradicts the code, stop and name the decision needed rather than guessing.
 - Commit locally; never push.
 
-Done when every behaviour change (criterion or rework point) has a passing test at an agreed seam that would fail without it, the type check, linters and fast suite are green (slower tiers run in their own check), the work is committed, and the diff holds nothing unrelated.
+Done when every behaviour change (criterion or rework point) has a passing test at an agreed or fallback seam that would fail without it, the type check, linters and fast suite are green (slower tiers run in their own check), the work is committed, and the diff holds nothing unrelated.
