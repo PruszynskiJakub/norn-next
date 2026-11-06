@@ -14,3 +14,7 @@ One command retries a check that failed on a glitch on unchanged code, and `run 
 ### Resume
 
 Done: unit tier and typecheck are green. The new integration test and the related integration files pass locally. Next: the `test` check.
+
+## Progress
+
+- implement#1 done: O2a: run rerun --step <check> is accepted on a ready/running unit when that check's fail sent it there; the tick stops the session via the existing S7 kill. run view --json gains check_retry {check, failed_at, code_changed, command}. RULES O2a + SK3, norn-fsd-round skill and recipes updated. Unit tier + typecheck green; new integration test run-rerun-check.test.ts passes.
