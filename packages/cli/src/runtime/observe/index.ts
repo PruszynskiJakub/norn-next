@@ -42,9 +42,13 @@ import {
   loadLocalFacts,
   machineHolder,
   type IssueFactsCache,
+  type LocalStory,
+  type LocalStoryRefs,
   type PrFactsCache,
   readLocalStoryRefs,
+  type RemoteCache,
   readRemoteCache,
+  type RepoSnapshot,
   inferUnitMarker,
   readUnitMarker,
   traceForeignCommits,
@@ -152,22 +156,12 @@ function writeIfChanged<T>(root: string, next: T, prev: T, write: (root: string,
   if (JSON.stringify(next) !== JSON.stringify(prev)) write(root, next);
 }
 
-export async function observe(ctx: Context, opts: ObserveOptions): Promise<Observed> {
-  const now = ctx.clock.now();
-  const root = ctx.root;
-  const config = ctx.config;
-  const ports = await ctx.ports();
-  const git = ports.git;
-  const hb = heartbeatId(root, now);
-  const remoteName = config.git_remote;
-  const remote = await gitRemote(git, root, remoteName);
-
-  // ---- worktrees (A3 markers tell story and slice worktrees apart)
+/** The unit worktrees `git worktree` lists, by their A3 markers: story and slice worktrees, orphans, and the ones a marker is inferred for. */
+function classifyWorktrees(root: string, wtList: ReadonlyArray<{ path: string; branch: string | null }>) {
   const storyWts = new Map<string, string>();
   const sliceWts = new Map<string, string>();
   const orphanWts: string[] = [];
   const unmarked: UnmarkedWorktree[] = [];
-  const wtList = await git.worktreeList(root).catch(() => []);
   for (const w of wtList) {
     if (w.path === root) continue;
     let marker = readUnitMarker(w.path).marker;
@@ -183,6 +177,209 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     if (marker.slice === null) storyWts.set(marker.story, w.path);
     else sliceWts.set(marker.slice, w.path);
   }
+  return { storyWts, sliceWts, orphanWts, unmarked };
+}
+
+type Elsewhere = Awaited<ReturnType<typeof heldElsewhereKeys>>;
+
+/** What a remote sync read; `issues` undefined and the story maps empty when it failed (not observed). */
+interface RemoteRead {
+  issues: RemoteIssue[] | undefined;
+  storyIssues: Map<string, RemoteIssue | null>;
+  storyPrs: Map<string, RemotePullRequest | null>;
+  elsewhere: Elsewhere;
+  elsewherePrs: Map<string, StoryPrSeen>;
+}
+
+/**
+ * GR1, H5: one remote sync — norn refs, the stories another heartbeat holds, the assigned issues, each
+ * active story's issue and PR, and the PRs of the stories held elsewhere. Records the attempt in
+ * `cache` and the outcome in `sync`; a failure leaves the remote facts unobserved.
+ */
+async function syncRemote(
+  remotePort: NonNullable<Ports["remote"]>,
+  o: { root: string; remote: string | null; hb: string; now: number; label: string; stories: RepoSnapshot["stories"]; snapshotKeys: ReadonlySet<string>; cache: RemoteCache; sync: SyncReport },
+): Promise<RemoteRead> {
+  const { root, remote, hb, now, cache, sync } = o;
+  const out: RemoteRead = { issues: undefined, storyIssues: new Map(), storyPrs: new Map(), elsewhere: [], elsewherePrs: new Map() };
+  let elsewhereError: string | null = null;
+  sync.ran = true;
+  cache.attempted_at = now;
+  try {
+    if (remote) await fetchNornRefs(root, remote).catch(() => undefined);
+    // gh-195 D6 (B30): of the record refs, only those of the stories another heartbeat holds that this checkout has no copy of
+    const elsewhere = (out.elsewhere = await heldElsewhereKeys(root, { heartbeat_id: hb }, now, o.snapshotKeys));
+    // a failed fetch leaves the views on the refs fetched before, and the sync says so (trace, remote.json)
+    if (remote) await fetchElsewhere(root, remote, elsewhere.map((e) => e.key)).catch((e: Error) => void (elsewhereError = `fetch of the stories held elsewhere failed: ${e.message}`));
+    const listedIssues = await remotePort.listAssignedIssues({ label: o.label });
+    out.issues = listedIssues;
+    const active = o.stories.filter((s) => s.frontmatter && !isClosedStatus(s.frontmatter.status));
+    const read = await mapBounded(active, REMOTE_CONCURRENCY, async (s) => {
+      const fm = s.frontmatter as NonNullable<typeof s.frontmatter>;
+      const listed = listedIssues.find((i) => i.number === fm.number && i.provider === fm.provider);
+      return { issue: listed ?? (await remotePort.getIssue(fm.number)), pr: await remotePort.findPullRequest(storyBranch(s.key, s.slug)) };
+    });
+    active.forEach((s, i) => {
+      out.storyIssues.set(s.key, (read[i] as (typeof read)[number]).issue);
+      out.storyPrs.set(s.key, (read[i] as (typeof read)[number]).pr);
+    });
+    // B18: the PR of a story held elsewhere and its CI, for the view (its branch as the fetch just found it)
+    const seen = await mapBounded(elsewhere, REMOTE_CONCURRENCY, async (e) => {
+      const branch = remote ? await remoteStoryBranch(root, remote, e.key) : null;
+      const pr = branch ? await remotePort.findPullRequest(branch) : null;
+      // a CI read that fails leaves the CI unknown for this story only, and the sync says so
+      let error: string | null = null;
+      const ci = pr ? await remotePort.pullRequestCi(pr.number).catch((err: Error) => void (error = `CI of ${e.key}'s PR #${pr.number}: ${err.message}`)) : undefined;
+      return { seen: { pr, observed_at: now, ...(ci ? { ci } : {}) } satisfies StoryPrSeen, error: error as string | null };
+    });
+    elsewhere.forEach((e, i) => {
+      const r = seen[i] as (typeof seen)[number];
+      out.elsewherePrs.set(e.key, r.seen);
+      elsewhereError ??= r.error;
+    });
+    cache.synced_at = now;
+    cache.last_error = elsewhereError;
+    if (elsewhereError) {
+      sync.ok = false;
+      sync.error = elsewhereError;
+    }
+  } catch (e) {
+    sync.ok = false;
+    sync.error = (e as Error).message;
+    cache.last_error = sync.error;
+    out.issues = undefined;
+    out.storyIssues.clear();
+    out.storyPrs.clear();
+  }
+  return out;
+}
+
+/** What every story's facts are read against, gathered once per observe. */
+interface StoryEnv {
+  ports: Ports;
+  root: string;
+  remote: string | null;
+  config: ResolvedConfig;
+  workflows: RepoWorkflows;
+  hb: string;
+  now: number;
+  holder: string;
+  base: string;
+  baseRef: string | null;
+  runEnv: LocalRunEnv;
+  refs: Map<string, string>;
+  storyRefs: LocalStoryRefs;
+  wtFacts: (path: string | null) => Promise<WorktreeFacts | null>;
+  storyIssues: ReadonlyMap<string, RemoteIssue | null>;
+  storyPrs: ReadonlyMap<string, RemotePullRequest | null>;
+  prSeen: PrFactsCache;
+  issueSeen: IssueFactsCache;
+  byAncestry: ReadonlySet<string>;
+  baseCacheIn: BaseFactsCache;
+}
+
+/** One story's facts, its location and its units' locations, and its base measurements for the cache. */
+async function storyFactsOf(env: StoryEnv, ls: LocalStory): Promise<{ facts: StoryFacts; loc: StoryLoc; locs: UnitLoc[]; baseNext: BaseFactsCache }> {
+  const { ports, root, remote, config, hb, now, refs } = env;
+  const git = ports.git;
+  const s = ls.snapshot;
+  const branch = storyBranch(s.key, s.slug);
+  const storyWt = ls.worktree;
+  const storyWorktree = await env.wtFacts(storyWt);
+  const loc: StoryLoc = { key: s.key, slug: s.slug, root: s.root, specPath: s.path, spec_dir: s.spec_dir, worktree: storyWt, branch };
+
+  const read = await env.storyRefs.claim(s.key).catch((e: Error) => ({ state: "corrupt" as const, sha: "?", error: { file: claimRef(s.key), errors: [{ path: "", message: e.message }] } }));
+  const claim: ClaimState = classifyClaim(read, { heartbeat_id: hb }, now);
+  const mailbox: MailboxItem[] | undefined = await env.storyRefs.mailbox(s.key).catch(() => undefined);
+
+  const units: UnitFacts[] = [];
+  const locs: UnitLoc[] = [];
+  const foreign: ForeignCommit[] = [];
+  for (const lu of ls.units) {
+    const u = lu.snapshot;
+    const sliceFile = u.unit.slice ? s.slices.find((f) => f.key === u.unit.slice) : undefined;
+    const ownWt = lu.worktree;
+    const worktree = await env.wtFacts(ownWt);
+    const unitBranch = u.unit.slice ? (sliceFile ? sliceBranch(s.key, sliceFile.nn, sliceFile.slug) : (worktree?.status?.branch ?? `${s.key}/${u.unit.dir}`)) : branch;
+    const uf = await unitFacts(ports, s, lu, worktree, lu.hooks, env.runEnv);
+    // a done slice not yet integrated: is its branch in the story branch (the slice cleanup's delete)
+    if (sliceFile && u.state?.status === "done" && sliceFile.frontmatter?.status !== "integrated") {
+      const head = refs.get(`refs/heads/${unitBranch}`);
+      if (head && refs.has(`refs/heads/${branch}`)) {
+        const inStory = await git.isAncestor(root, head, `refs/heads/${branch}`).catch(() => null);
+        if (inStory !== null) uf.branch_in_story = inStory;
+      }
+    }
+    units.push(uf);
+    // Q6: commits norn did not make; an agent's own commits mid-run are not foreign
+    // C4: …nor are commits made during any run of this unit (e.g. while it is parked on an ask)
+    if (u.state?.status !== "running") {
+      const found = await foreignCommits(git, root, remote, unitBranch, env.baseRef, refs);
+      const windows = found.length ? runWindows(s, u) : [];
+      foreign.push(...found.filter((c) => !duringRun(c, windows)).map(({ committed_at: _, ...c }) => c));
+    }
+    locs.push({
+      unit: u.unit,
+      story: s.key,
+      root: ownWt && existsSync(ownWt) ? ownWt : s.root,
+      runsDir: u.path,
+      handoffFile: u.handoffFile,
+      worktree: ownWt,
+      branch: unitBranch,
+      state: u.state,
+      workflow: u.workflow?.workflow ?? null,
+    });
+  }
+
+  const heldHere = claim.state === "mine" || (claim.state === "expired" && claim.blob.heartbeat_id === hb);
+  // gh-195 D11 (B27, R2.3): this checkout's own record of a story another heartbeat holds (read only, H2)
+  const heldElsewhere = claim.state === "other" || (claim.state === "expired" && claim.blob.heartbeat_id !== hb);
+  const localRecord = heldElsewhere ? await localRecordOf(root, s, env.holder) : null;
+  // gh-195 D4 (B10, B12): under remote, what the holder's record would pack to and what it last pushed
+  let record: StoryFacts["record"];
+  if (heldHere && config.record.policy === "remote") {
+    const pushed = await readRecordRef(root, s.key);
+    record = { tree: recordTreeId(root, s, pushed?.sha.length === 64 ? "sha256" : "sha1"), pushed };
+  }
+
+  const baseNext: BaseFactsCache = {};
+  const { storyPrs, prSeen, issueSeen } = env;
+  const facts: StoryFacts = {
+    ...baseStoryFacts(ls, env.workflows, config),
+    worktree: storyWorktree,
+    claim,
+    mailbox,
+    issue: env.storyIssues.get(s.key),
+    pr: storyPrs.get(s.key),
+    ...(prSeen[s.key] ? { pr_seen: prSeen[s.key] } : {}),
+    ...(issueSeen[s.key] ? { issue_seen: issueSeen[s.key] } : {}),
+    ...(env.byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
+    ...(foreign.length ? { foreign_commits: foreign } : {}),
+    ...(await readyHead(root, s.key, ls.ready, (storyPrs.has(s.key) ? storyPrs.get(s.key) : prSeen[s.key]?.pr)?.head_sha)),
+    ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
+    ...(localRecord ? { local_record: localRecord } : {}),
+    ...(claim.state === "none" && s.frontmatter?.status === "new" ? await intakeOnly(git, root, remote ? env.baseRef : `refs/heads/${env.base}`, branch, s.key, refs) : {}),
+    ...(await storyBase(git, root, remote, env.base, branch, s.frontmatter?.status, refs, env.baseCacheIn, baseNext, s.key)),
+    ...(record ? { record } : {}),
+    units,
+    slices: s.slices satisfies SliceFileFacts[],
+  };
+  return { facts, loc, locs, baseNext };
+}
+
+export async function observe(ctx: Context, opts: ObserveOptions): Promise<Observed> {
+  const now = ctx.clock.now();
+  const root = ctx.root;
+  const config = ctx.config;
+  const ports = await ctx.ports();
+  const git = ports.git;
+  const hb = heartbeatId(root, now);
+  const remoteName = config.git_remote;
+  const remote = await gitRemote(git, root, remoteName);
+
+  // ---- worktrees (A3 markers tell story and slice worktrees apart)
+  const wtList = await git.worktreeList(root).catch(() => []);
+  const { storyWts, sliceWts, orphanWts, unmarked } = classifyWorktrees(root, wtList);
 
   // ---- remote sync (GR1, H5): throttled; failures leave remote facts unobserved
   const cache = readRemoteCache(root);
@@ -190,12 +387,6 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const mode = opts.sync ?? "auto";
   const due = mode === "force" || (mode === "auto" && (cache.attempted_at === null || now - cache.attempted_at >= parseDuration(config.sync_interval)));
   const sync: SyncReport = { ran: false, ok: true };
-  let issues: RemoteIssue[] | undefined;
-  const storyIssues = new Map<string, RemoteIssue | null>();
-  const storyPrs = new Map<string, RemotePullRequest | null>();
-  let elsewhere: Awaited<ReturnType<typeof heldElsewhereKeys>> = [];
-  let elsewhereError: string | null = null;
-  const elsewherePrs = new Map<string, StoryPrSeen>();
   if (!cache.default_branch) {
     cache.default_branch = remote ? await git.defaultBranch(root, remote).catch(() => null) : null;
     cache.default_branch ??= (await git.status(root).catch(() => null))?.branch ?? "main";
@@ -214,58 +405,12 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const snapshotKeys = new Set(snapshot.stories.map((s) => s.key));
   const workflows = checkedRepoWorkflows(snapshot.workflows, root, config, ports.agents);
 
-  if (due && ports.remote) {
-    const remotePort = ports.remote;
-    sync.ran = true;
-    cache.attempted_at = now;
-    try {
-      if (remote) await fetchNornRefs(root, remote).catch(() => undefined);
-      // gh-195 D6 (B30): of the record refs, only those of the stories another heartbeat holds that this checkout has no copy of
-      elsewhere = await heldElsewhereKeys(root, { heartbeat_id: hb }, now, snapshotKeys);
-      // a failed fetch leaves the views on the refs fetched before, and the sync says so (trace, remote.json)
-      if (remote) await fetchElsewhere(root, remote, elsewhere.map((e) => e.key)).catch((e: Error) => void (elsewhereError = `fetch of the stories held elsewhere failed: ${e.message}`));
-      const label = config.label;
-      const listedIssues = await remotePort.listAssignedIssues({ label });
-      issues = listedIssues;
-      const active = snapshot.stories.filter((s) => s.frontmatter && !isClosedStatus(s.frontmatter.status));
-      const read = await mapBounded(active, REMOTE_CONCURRENCY, async (s) => {
-        const fm = s.frontmatter as NonNullable<typeof s.frontmatter>;
-        const listed = listedIssues.find((i) => i.number === fm.number && i.provider === fm.provider);
-        return { issue: listed ?? (await remotePort.getIssue(fm.number)), pr: await remotePort.findPullRequest(storyBranch(s.key, s.slug)) };
-      });
-      active.forEach((s, i) => {
-        storyIssues.set(s.key, (read[i] as (typeof read)[number]).issue);
-        storyPrs.set(s.key, (read[i] as (typeof read)[number]).pr);
-      });
-      // B18: the PR of a story held elsewhere and its CI, for the view (its branch as the fetch just found it)
-      const seen = await mapBounded(elsewhere, REMOTE_CONCURRENCY, async (e) => {
-        const branch = remote ? await remoteStoryBranch(root, remote, e.key) : null;
-        const pr = branch ? await remotePort.findPullRequest(branch) : null;
-        // a CI read that fails leaves the CI unknown for this story only, and the sync says so
-        let error: string | null = null;
-        const ci = pr ? await remotePort.pullRequestCi(pr.number).catch((err: Error) => void (error = `CI of ${e.key}'s PR #${pr.number}: ${err.message}`)) : undefined;
-        return { seen: { pr, observed_at: now, ...(ci ? { ci } : {}) } satisfies StoryPrSeen, error: error as string | null };
-      });
-      elsewhere.forEach((e, i) => {
-        const r = seen[i] as (typeof seen)[number];
-        elsewherePrs.set(e.key, r.seen);
-        elsewhereError ??= r.error;
-      });
-      cache.synced_at = now;
-      cache.last_error = elsewhereError;
-      if (elsewhereError) {
-        sync.ok = false;
-        sync.error = elsewhereError;
-      }
-    } catch (e) {
-      sync.ok = false;
-      sync.error = (e as Error).message;
-      cache.last_error = sync.error;
-      issues = undefined;
-      storyIssues.clear();
-      storyPrs.clear();
-    }
-  }
+  const remoteRead: RemoteRead =
+    due && ports.remote
+      ? await syncRemote(ports.remote, { root, remote, hb, now, label: config.label, stories: snapshot.stories, snapshotKeys, cache, sync })
+      : { issues: undefined, storyIssues: new Map(), storyPrs: new Map(), elsewhere: [], elsewherePrs: new Map() };
+  const { issues, storyIssues, storyPrs, elsewherePrs } = remoteRead;
+  let elsewhere = remoteRead.elsewhere;
   if (JSON.stringify(cache) !== cacheIn) writeRemoteCache(root, cache);
   // C1: the last PR seen per story, kept between syncs for the inbox (`pr_seen`); finished stories drop out
   const prSeenIn = local.pr_seen;
@@ -318,91 +463,9 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const stories: StoryFacts[] = [];
   const storyLocs: Record<string, StoryLoc> = {};
   const unitLocs: Record<string, UnitLoc> = {};
+  const env: StoryEnv = { ports, root, remote, config, workflows, hb, now, holder, base, baseRef, runEnv, refs, storyRefs, wtFacts, storyIssues, storyPrs, prSeen, issueSeen, byAncestry, baseCacheIn };
   // each story's git reads are independent of the others': a few stories at a time, assembled in order
-  const perStory = await mapBounded(local.stories, GIT_CONCURRENCY, async (ls) => {
-    const s = ls.snapshot;
-    const branch = storyBranch(s.key, s.slug);
-    const storyWt = ls.worktree;
-    const storyWorktree = await wtFacts(storyWt);
-    const loc: StoryLoc = { key: s.key, slug: s.slug, root: s.root, specPath: s.path, spec_dir: s.spec_dir, worktree: storyWt, branch };
-
-    const read = await storyRefs.claim(s.key).catch((e: Error) => ({ state: "corrupt" as const, sha: "?", error: { file: claimRef(s.key), errors: [{ path: "", message: e.message }] } }));
-    const claim: ClaimState = classifyClaim(read, { heartbeat_id: hb }, now);
-    const mailbox: MailboxItem[] | undefined = await storyRefs.mailbox(s.key).catch(() => undefined);
-
-    const units: UnitFacts[] = [];
-    const locs: UnitLoc[] = [];
-    const foreign: ForeignCommit[] = [];
-    for (const lu of ls.units) {
-      const u = lu.snapshot;
-      const sliceFile = u.unit.slice ? s.slices.find((f) => f.key === u.unit.slice) : undefined;
-      const ownWt = lu.worktree;
-      const worktree = await wtFacts(ownWt);
-      const unitBranch = u.unit.slice ? (sliceFile ? sliceBranch(s.key, sliceFile.nn, sliceFile.slug) : (worktree?.status?.branch ?? `${s.key}/${u.unit.dir}`)) : branch;
-      const uf = await unitFacts(ports, s, lu, worktree, lu.hooks, runEnv);
-      // a done slice not yet integrated: is its branch in the story branch (the slice cleanup's delete)
-      if (sliceFile && u.state?.status === "done" && sliceFile.frontmatter?.status !== "integrated") {
-        const head = refs.get(`refs/heads/${unitBranch}`);
-        if (head && refs.has(`refs/heads/${branch}`)) {
-          const inStory = await git.isAncestor(root, head, `refs/heads/${branch}`).catch(() => null);
-          if (inStory !== null) uf.branch_in_story = inStory;
-        }
-      }
-      units.push(uf);
-      // Q6: commits norn did not make; an agent's own commits mid-run are not foreign
-      // C4: …nor are commits made during any run of this unit (e.g. while it is parked on an ask)
-      if (u.state?.status !== "running") {
-        const found = await foreignCommits(git, root, remote, unitBranch, baseRef, refs);
-        const windows = found.length ? runWindows(s, u) : [];
-        foreign.push(...found.filter((c) => !duringRun(c, windows)).map(({ committed_at: _, ...c }) => c));
-      }
-      locs.push({
-        unit: u.unit,
-        story: s.key,
-        root: ownWt && existsSync(ownWt) ? ownWt : s.root,
-        runsDir: u.path,
-        handoffFile: u.handoffFile,
-        worktree: ownWt,
-        branch: unitBranch,
-        state: u.state,
-        workflow: u.workflow?.workflow ?? null,
-      });
-    }
-
-    const heldHere = claim.state === "mine" || (claim.state === "expired" && claim.blob.heartbeat_id === hb);
-    // gh-195 D11 (B27, R2.3): this checkout's own record of a story another heartbeat holds (read only, H2)
-    const heldElsewhere = claim.state === "other" || (claim.state === "expired" && claim.blob.heartbeat_id !== hb);
-    const localRecord = heldElsewhere ? await localRecordOf(root, s, holder) : null;
-    // gh-195 D4 (B10, B12): under remote, what the holder's record would pack to and what it last pushed
-    let record: StoryFacts["record"];
-    if (heldHere && config.record.policy === "remote") {
-      const pushed = await readRecordRef(root, s.key);
-      record = { tree: recordTreeId(root, s, pushed?.sha.length === 64 ? "sha256" : "sha1"), pushed };
-    }
-
-    const baseNext: BaseFactsCache = {};
-    const facts: StoryFacts = {
-      ...baseStoryFacts(ls, workflows, config),
-      worktree: storyWorktree,
-      claim,
-      mailbox,
-      issue: storyIssues.get(s.key),
-      pr: storyPrs.get(s.key),
-      ...(prSeen[s.key] ? { pr_seen: prSeen[s.key] } : {}),
-      ...(issueSeen[s.key] ? { issue_seen: issueSeen[s.key] } : {}),
-      ...(byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
-      ...(foreign.length ? { foreign_commits: foreign } : {}),
-      ...(await readyHead(root, s.key, ls.ready, (storyPrs.has(s.key) ? storyPrs.get(s.key) : prSeen[s.key]?.pr)?.head_sha)),
-      ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
-      ...(localRecord ? { local_record: localRecord } : {}),
-      ...(claim.state === "none" && s.frontmatter?.status === "new" ? await intakeOnly(git, root, remote ? baseRef : `refs/heads/${base}`, branch, s.key, refs) : {}),
-      ...(await storyBase(git, root, remote, base, branch, s.frontmatter?.status, refs, baseCacheIn, baseNext, s.key)),
-      ...(record ? { record } : {}),
-      units,
-      slices: s.slices satisfies SliceFileFacts[],
-    };
-    return { facts, loc, locs, baseNext };
-  });
+  const perStory = await mapBounded(local.stories, GIT_CONCURRENCY, (ls) => storyFactsOf(env, ls));
   for (const r of perStory) {
     stories.push(r.facts);
     storyLocs[r.facts.key] = r.loc;
