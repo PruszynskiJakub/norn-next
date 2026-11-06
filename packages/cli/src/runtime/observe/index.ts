@@ -57,6 +57,7 @@ import {
 import type { Context } from "../../context.ts";
 import { leaseLiveness } from "../leases.ts";
 import { bundledSkillSet } from "../skills-drift.ts";
+import { PhaseTimer } from "../timing.ts";
 import { checkedRepoWorkflows } from "../workflows.ts";
 import { findOrphanBranches, foreignCommits, intakeOnly, refMap, storyBase, worktreeFacts } from "./git-facts.ts";
 import { gitRemote, mergedByAncestry, readyHead, trackingRef } from "./remote.ts";
@@ -125,6 +126,8 @@ export interface Observed {
   stories: Record<string, StoryLoc>;
   units: Record<string, UnitLoc>;
   sync: SyncReport;
+  /** gh-78 (O4): observe's phases and remote calls, for the tick record's `timing`; never a fact */
+  timing: PhaseTimer;
 }
 
 // ------------------------------------------------------------ observe
@@ -134,6 +137,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const root = ctx.root;
   const config = ctx.config;
   const ports = await ctx.ports();
+  const timer = new PhaseTimer();
   const git = ports.git;
   const hb = heartbeatId(root, now);
   const remoteName = config.git_remote;
@@ -144,7 +148,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const sliceWts = new Map<string, string>();
   const orphanWts: string[] = [];
   const unmarked: UnmarkedWorktree[] = [];
-  const wtList = await git.worktreeList(root).catch(() => []);
+  const wtList = await timer.time("worktrees", () => git.worktreeList(root).catch(() => []));
   for (const w of wtList) {
     if (w.path === root) continue;
     let marker = readUnitMarker(w.path).marker;
@@ -180,12 +184,12 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const base = config.base_branch ?? cache.default_branch ?? "main";
   // P2 / F33 / F36: the fetched base branch is the record and the merge reference — never the
   // main checkout's local `main`, which norn does not move. Fetched with every remote sync.
-  if (due && ports.remote && remote) await git.fetch(root, remote, [`+refs/heads/${base}:refs/remotes/${remote}/${base}`], { quiet: true }).catch(() => undefined);
+  if (due && ports.remote && remote) await timer.time("base_fetch", () => git.fetch(root, remote, [`+refs/heads/${base}:refs/remotes/${remote}/${base}`], { quiet: true }).catch(() => undefined));
   const baseRef = await trackingRef(git, root, remote, base);
 
   // ---- local facts (H2): the snapshot, leases (K1, K3), hook facts, caches, what the receipts say
   const liveness = leaseLiveness((p) => ports.process.isAlive(p));
-  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, backfillHooks: opts.backfillHooks, running: ctx.version, bundledSkills: bundledSkillSet(ctx.env) });
+  const local = await timer.time("local", () => loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, backfillHooks: opts.backfillHooks, running: ctx.version, bundledSkills: bundledSkillSet(ctx.env) }));
   const snapshot = local.snapshot;
   const snapshotKeys = new Set(snapshot.stories.map((s) => s.key));
   const workflows = checkedRepoWorkflows(snapshot.workflows, root, config, ports.agents);
@@ -194,28 +198,41 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     sync.ran = true;
     cache.attempted_at = now;
     try {
-      if (remote) await fetchNornRefs(root, remote).catch(() => undefined);
-      // gh-195 D6 (B30): of the record refs, only those of the stories another heartbeat holds that this checkout has no copy of
-      elsewhere = await heldElsewhereKeys(root, { heartbeat_id: hb }, now, snapshotKeys);
-      // a failed fetch leaves the views on the refs fetched before, and the sync says so (trace, remote.json)
-      if (remote) await fetchElsewhere(root, remote, elsewhere.map((e) => e.key)).catch((e: Error) => void (elsewhereError = `fetch of the stories held elsewhere failed: ${e.message}`));
+      const rp = ports.remote;
+      if (remote) await timer.time("sync.norn_refs", () => fetchNornRefs(root, remote).catch(() => undefined));
+      await timer.time("sync.elsewhere", async () => {
+        // gh-195 D6 (B30): of the record refs, only those of the stories another heartbeat holds that this checkout has no copy of
+        elsewhere = await heldElsewhereKeys(root, { heartbeat_id: hb }, now, snapshotKeys);
+        // a failed fetch leaves the views on the refs fetched before, and the sync says so (trace, remote.json)
+        if (remote) await fetchElsewhere(root, remote, elsewhere.map((e) => e.key)).catch((e: Error) => void (elsewhereError = `fetch of the stories held elsewhere failed: ${e.message}`));
+      });
       const label = config.label;
-      issues = await ports.remote.listAssignedIssues({ label });
-      for (const s of snapshot.stories) {
-        const fm = s.frontmatter;
-        if (!fm || fm.status === "done" || fm.status === "dropped") continue;
-        const listed = issues.find((i) => i.number === fm.number && i.provider === fm.provider);
-        storyIssues.set(s.key, listed ?? (await ports.remote.getIssue(fm.number)));
-        storyPrs.set(s.key, await ports.remote.findPullRequest(storyBranch(s.key, s.slug)));
-      }
+      timer.count("list_issues");
+      const listedIssues = await timer.time("sync.issues", () => rp.listAssignedIssues({ label }));
+      issues = listedIssues;
+      await timer.time("sync.stories", async () => {
+        for (const s of snapshot.stories) {
+          const fm = s.frontmatter;
+          if (!fm || fm.status === "done" || fm.status === "dropped") continue;
+          const listed = listedIssues.find((i) => i.number === fm.number && i.provider === fm.provider);
+          if (!listed) timer.count("get_issue");
+          storyIssues.set(s.key, listed ?? (await rp.getIssue(fm.number)));
+          timer.count("find_pr");
+          storyPrs.set(s.key, await rp.findPullRequest(storyBranch(s.key, s.slug)));
+        }
+      });
       // B18: the PR of a story held elsewhere and its CI, for the view (its branch as the fetch just found it)
-      for (const e of elsewhere) {
-        const branch = remote ? await remoteStoryBranch(root, remote, e.key) : null;
-        const pr = branch ? await ports.remote.findPullRequest(branch) : null;
-        // a CI read that fails leaves the CI unknown for this story only, and the sync says so
-        const ci = pr ? await ports.remote.pullRequestCi(pr.number).catch((err: Error) => void (elsewhereError ??= `CI of ${e.key}'s PR #${pr.number}: ${err.message}`)) : undefined;
-        elsewherePrs.set(e.key, { pr, observed_at: now, ...(ci ? { ci } : {}) });
-      }
+      await timer.time("sync.elsewhere_prs", async () => {
+        for (const e of elsewhere) {
+          const branch = remote ? await remoteStoryBranch(root, remote, e.key) : null;
+          if (branch) timer.count("find_pr");
+          const pr = branch ? await rp.findPullRequest(branch) : null;
+          if (pr) timer.count("pr_ci");
+          // a CI read that fails leaves the CI unknown for this story only, and the sync says so
+          const ci = pr ? await rp.pullRequestCi(pr.number).catch((err: Error) => void (elsewhereError ??= `CI of ${e.key}'s PR #${pr.number}: ${err.message}`)) : undefined;
+          elsewherePrs.set(e.key, { pr, observed_at: now, ...(ci ? { ci } : {}) });
+        }
+      });
       cache.synced_at = now;
       cache.last_error = elsewhereError;
       if (elsewhereError) {
@@ -267,7 +284,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
   // ---- machine (K1, K3, MO2)
   const leases = local.leases;
-  const runner = ports.runner && (await ports.runner.available().catch(() => false)) ? ports.runner.name : null;
+  const rn = ports.runner;
+  const runner = rn && (await timer.time("runner", () => rn.available().catch(() => false))) ? rn.name : null;
 
   // ---- per-worktree facts, cached by path
   const wtCache = new Map<string, Promise<WorktreeFacts | null>>();
@@ -291,6 +309,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const stories: StoryFacts[] = [];
   const storyLocs: Record<string, StoryLoc> = {};
   const unitLocs: Record<string, UnitLoc> = {};
+  const tStories = performance.now();
   for (const ls of local.stories) {
     const s = ls.snapshot;
     const branch = storyBranch(s.key, s.slug);
@@ -387,6 +406,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     });
   }
 
+  timer.add("stories", performance.now() - tStories);
+
   // K5: worktrees of known shape whose story is unknown
   const known = new Set(stories.map((s) => s.key));
   for (const [story, path] of storyWts) if (!known.has(story)) orphanWts.push(path);
@@ -419,5 +440,5 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     orphans: { worktrees: orphanWts.sort(), branches: orphanBranches },
     ...(unmarked.length ? { unmarked } : {}),
   };
-  return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync };
+  return { facts, workflows, config, ports, root, remote, heartbeat_id: hb, stories: storyLocs, units: unitLocs, sync, timing: timer };
 }

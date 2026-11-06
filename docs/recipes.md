@@ -116,6 +116,16 @@ Run a tick from cron every minute in the repository:
 
 `--interval` tells norn how often the tick runs: it is recorded for the checkout and sets when the heartbeat counts as down and how long a claim lasts. Match it to the cron schedule; without it, norn assumes 30 seconds. Every tick on one checkout shares one heartbeat id, so each recognises the claim the previous one renewed. cron has a minimal `PATH`: give full paths to `norn`, `gh` and your agent, or set `PATH` in the crontab.
 
+## Explain a slow tick
+
+`norn story list` and the cockpit header show how long the last tick took. Each tick's record in the trace (one JSON line per tick in the day file `~/.norn/repos/<id>/<day>.jsonl`) says where it spent its time. Its `tick.end` line names the slowest phase, so a slow tick is one `jq` away:
+
+```sh
+jq -c 'select(.type == "tick.end" and .duration_ms > 8000) | {tick_id, duration_ms, slowest}' ~/.norn/repos/<id>/<day>.jsonl
+```
+
+The full `tick` record with that `tick_id` holds the rest. `sync` says whether a remote sync ran and how it ended. `timing` gives `observe_ms`, `decide_ms`, `act_ms` and `after_ms`, observe's phases in `timing.observe` (`base_fetch`, `local`, `sync.norn_refs`, `sync.issues`, `sync.stories`, `runner`, `stories`, …), and the remote calls the sync made in `timing.calls`. Each decision's `result.ms` is the time its action took; claim renewals are pushed in one batch, so each one shows the batch's time. Older records have none of these fields.
+
 ## Roll out a new norn to a team
 
 The repo's norn version (`norn_version` in `.agents/norn.config.yaml`, see [Concepts](concepts.md#the-repos-norn-version)) says which norn every machine runs. Moving it is one commit by one person; everyone else pulls and installs.

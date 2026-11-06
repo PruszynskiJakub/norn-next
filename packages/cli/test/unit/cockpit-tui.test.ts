@@ -175,6 +175,12 @@ describe("the cockpit's tabs (CP6, CP7)", () => {
     expect(frame(initialState()).split("\n")[0]).toEndWith("tick 0s ago  12:00");
   });
 
+  test("gh-78: the header shows how long the last tick took", () => {
+    const m = model();
+    const head = renderCockpit({ ...m, header: { ...m.header, heartbeat: { ...m.header.heartbeat, last_tick_ms: 9400 } } }, initialState(), look).split("\n")[0];
+    expect(head).toEndWith("tick 0s ago · took 9.4s  12:00");
+  });
+
   test("a story shows its round and workflow: the row before the step, the preview like story view (RD8, gh-71 B28)", () => {
     const f = frame(press(initialState(), "]", "j"));
     expect(f).toMatch(/│ ◐ round 2 · refinement · running at implement · auto/);

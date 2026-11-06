@@ -174,6 +174,8 @@ export interface HeartbeatView {
   last_tick_at: string | null;
   /** compact age of last_tick_at */
   age: string | null;
+  /** gh-78: how long the last tick took, in ms; absent when not recorded */
+  last_tick_ms?: number;
   /** older than 3 × watch interval (or never) while a held story has a unit in auto mode */
   down: boolean;
   /**

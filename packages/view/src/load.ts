@@ -36,6 +36,7 @@ import {
   classifyClaim,
   defaultBaseRef,
   lastTickAt,
+  lastTickMs,
   type LeaseEntry,
   type LeaseLiveness,
   type LocalUnit,
@@ -505,7 +506,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const down = heartbeatDown(facts, config);
   ctx.heartbeatDown = !!down;
   for (const build of views) build();
-  const heartbeat = { holder, last_tick_at: lastTick === null ? null : new Date(lastTick).toISOString(), age: lastTick === null ? null : formatAge(now - lastTick), down: !!down, up: heartbeatUp(facts, config) };
+  const tookMs = lastTickMs(opts.repoRoot);
+  const heartbeat = { holder, last_tick_at: lastTick === null ? null : new Date(lastTick).toISOString(), age: lastTick === null ? null : formatAge(now - lastTick), down: !!down, up: heartbeatUp(facts, config), ...(tookMs === null ? {} : { last_tick_ms: tookMs }) };
 
   const recently_done: RecentDone[] = stories
     .flatMap((s) => [s, ...s.slices])

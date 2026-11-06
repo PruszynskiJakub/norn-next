@@ -6,7 +6,7 @@
  */
 import { basename } from "node:path";
 import { cmd, formatAge, type InboxGroup } from "@norn/core";
-import type { CockpitAction, CockpitModel, CockpitRow, CockpitTab } from "@norn/view";
+import { type CockpitAction, type CockpitModel, type CockpitRow, type CockpitTab, formatTickMs } from "@norn/view";
 import { GROUP_MARK } from "./cockpit.ts";
 
 export type Key =
@@ -471,7 +471,7 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
     ? paint(`! ${model.header.version}`, ["bold", "red"])
     : hb.down
       ? paint(`no heartbeat${hb.age ? ` for ${hb.age}` : ""} — ${cmd.watch()}`, ["red"])
-      : paint(hb.age ? `tick ${hb.age} ago` : "no tick yet", ["dim"]);
+      : paint(hb.age ? `tick ${hb.age} ago${hb.last_tick_ms === undefined ? "" : ` · took ${formatTickMs(hb.last_tick_ms)}`}` : "no tick yet", ["dim"]);
   const right = `${beat}  ${paint(o.clock, ["dim"])}`;
   const header = `${left}${" ".repeat(Math.max(2, width - visible(left) - visible(right)))}${right}`;
   const out = [visible(header) > width ? fit(header.replace(/\x1b\[[0-9;]*m/g, ""), width) : header];

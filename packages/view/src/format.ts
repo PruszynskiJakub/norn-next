@@ -57,7 +57,14 @@ function sliceLine(s: SliceView): string {
 function heartbeatText(view: ProjectView): string | null {
   const h = view.heartbeat;
   if (h.down) return `! no heartbeat on ${h.holder}${h.age ? ` for ${h.age}` : " yet"} — run \`${cmd.watch()}\` (auto steps wait for it)`;
-  return h.last_tick_at ? `heartbeat: last tick ${h.age} ago on ${h.holder}` : null;
+  return h.last_tick_at ? `heartbeat: last tick ${h.age} ago on ${h.holder}${h.last_tick_ms === undefined ? "" : ` (took ${formatTickMs(h.last_tick_ms)})`}` : null;
+}
+
+/** gh-78: a tick's duration: `320ms`, `9.4s`, then as `formatDuration` (`1m15s`). */
+export function formatTickMs(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  if (ms < 10_000) return `${(ms / 1000).toFixed(1)}s`;
+  return formatDuration(ms);
 }
 
 /** `norn story list` human mode: one block per story, slices indented, then runs and errors. */
