@@ -4,7 +4,7 @@
  * units at a gate (B54, B57). Writes an `approve` or `reject` receipt at the cursor. Claim free:
  * acquired here (T8); held elsewhere: posted to the mailbox (T9).
  */
-import { cmd, nextCommand, stepOf } from "@norn/core";
+import { cmd, isParked, nextCommand, stepOf } from "@norn/core";
 import { isGitSha, type UnitState } from "@norn/schema";
 import type { Context } from "../context.ts";
 import { defineCommand, type ParsedArgs } from "../command.ts";
@@ -13,7 +13,7 @@ import { at, DELEGATED_HELP, DELEGATED_OPTION, delegatedFields, delegation, huma
 import { appendProgress, rejectProgress } from "../runtime/report.ts";
 import { parkedOn, targetKey } from "../runtime/target.ts";
 
-const atGate = (st: UnitState) => st.status === "parked" && st.park?.kind === "gate";
+const atGate = (st: UnitState) => isParked(st, "gate");
 
 /**
  * F35: the story branch head at `approve` — the story worktree's HEAD, else the local branch,

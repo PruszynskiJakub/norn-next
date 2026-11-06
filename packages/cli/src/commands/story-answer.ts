@@ -11,7 +11,7 @@
  * A failed delivery writes no receipt, keeps the unit parked, is kept as the unit's act failure
  * (R4.3) and names how to reach the pane.
  */
-import { cmd, nextCommand, optionIndex, optionsLine, promptKeys, type SessionRef } from "@norn/core";
+import { cmd, isParked, nextCommand, optionIndex, optionsLine, promptKeys, type SessionRef } from "@norn/core";
 import { type Receipt, ulid, type UnitState } from "@norn/schema";
 import { machineHolder, readActFailures, writeActFailures } from "@norn/store";
 import { defineCommand } from "../command.ts";
@@ -20,7 +20,7 @@ import { failure, refuse, usageError } from "../output.ts";
 import { at, DELEGATED_HELP, DELEGATED_OPTION, delegatedFields, delegation, humanReceipt, stepOnlyReceipt, resolveTarget, type Route, runHumanVerb, type Target } from "../runtime/human.ts";
 import { parkedOn, targetKey } from "../runtime/target.ts";
 
-const asks = (st: UnitState) => st.status === "parked" && st.park?.kind === "ask";
+const asks = (st: UnitState) => isParked(st, "ask");
 
 export const storyAnswerCommand = defineCommand({
   name: "story answer",

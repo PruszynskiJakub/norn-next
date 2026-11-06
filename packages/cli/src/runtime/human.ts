@@ -222,6 +222,30 @@ export const delegatedFields = (d: Delegation): { delegated?: true; comment?: st
 
 type HumanKind = "answer" | "approve" | "reject" | "unstick" | "stuck" | "mode" | "workflow" | "update" | "round";
 
+/**
+ * S6: how an unapplied receipt of a kind conflicts with a new one of the same `purpose` — `step-attempt`:
+ * one per step attempt (the tick would apply the first and reject the second silently); `any-step`: one
+ * per unit at any step (update); `last-wins`: never, every receipt applies and the last one wins (mode,
+ * MO1; a workflow switch or cursor move).
+ */
+type Conflict = "step-attempt" | "any-step" | "last-wins";
+
+/** Per human receipt kind: the verb that records it, its command as printed (B7), what it decides and how it conflicts (S6). */
+const HUMAN_KINDS: Record<HumanKind, { verb: string; command: (unit: string) => string; purpose: string; conflict: Conflict }> = {
+  answer: { verb: "story answer", command: (u) => cmd.storyAnswer(u), purpose: "answer", conflict: "step-attempt" },
+  approve: { verb: "story approve", command: (u) => cmd.storyApprove(u), purpose: "gate", conflict: "step-attempt" },
+  reject: { verb: "story reject", command: (u) => cmd.storyReject(u), purpose: "gate", conflict: "step-attempt" },
+  unstick: { verb: "run rerun", command: (u) => cmd.runRerun(u), purpose: "unstick", conflict: "step-attempt" },
+  stuck: { verb: "run cancel", command: (u) => cmd.runCancel(u), purpose: "stuck", conflict: "step-attempt" },
+  round: { verb: "story edit", command: (u) => cmd.storyEdit(u, { workflow: "<name>" }), purpose: "round", conflict: "step-attempt" },
+  update: { verb: "story update-branch", command: (u) => cmd.storyUpdateBranch(parseUnitKey(u).story), purpose: "update", conflict: "any-step" },
+  mode: { verb: "story edit", command: (u) => cmd.storyEdit(u, { mode: "auto" }), purpose: "mode", conflict: "last-wins" },
+  workflow: { verb: "story edit", command: (u) => cmd.storyEdit(u, { workflow: "<name>" }), purpose: "workflow", conflict: "last-wins" },
+};
+
+/** The table row of a receipt kind; only human kinds are ever looked up. */
+const humanKind = (kind: Receipt["kind"]) => HUMAN_KINDS[kind as HumanKind];
+
 /** A human receipt at the unit's cursor (S6): step + attempt + slice (+ the story's round) so the tick routes it (T9). */
 export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, "slice">, st: UnitState, kind: K, body: Record<string, unknown>): Extract<Receipt, { kind: K }> {
   return validReceipt(kind, {
@@ -254,7 +278,7 @@ export function stepOnlyReceipt<K extends StepOnlyKind>(ctx: Context, t: Pick<Ta
 /** Validate a person's receipt (S6): a shape the schema refuses is a usage error. */
 function validReceipt<K extends HumanKind>(kind: K, r: Record<string, unknown>): Extract<Receipt, { kind: K }> {
   const v = validate("receipt", r);
-  if (!v.ok) throw usageError(`invalid ${kind}: ${v.errors.map((e) => `${e.path || "/"} ${e.message}`).join("; ")}`, `norn ${kind === "reject" ? "approve" : kind} --help`);
+  if (!v.ok) throw usageError(`invalid ${kind}: ${v.errors.map((e) => `${e.path || "/"} ${e.message}`).join("; ")}`, `norn ${HUMAN_KINDS[kind].verb} --help`);
   return v.value as Extract<Receipt, { kind: K }>;
 }
 
@@ -337,17 +361,20 @@ function refuseUnlessHolder(claim: ClaimState, t: Target, verb: string, rule: st
 /** A live claim of another heartbeat (T9: the verb goes through the mailbox), else null. */
 const heldElsewhere = (c: ClaimState): ClaimBlob | null => (c.state === "other" ? c.blob : null);
 
-/** What a human receipt decides; two receipts with the same purpose at one step attempt conflict. */
-const purpose = (r: Receipt): string => (r.kind === "reject" ? "approve" : r.kind);
-const sameDecision = (a: Receipt, b: Receipt) =>
-  purpose(a) === purpose(b) && a.step === b.step && a.attempt === b.attempt && (a.slice ?? null) === (b.slice ?? null);
+/** S6: whether an unapplied receipt `a` conflicts with the new `b`, by `b`'s conflict scope (`HUMAN_KINDS`). */
+function conflicts(a: Receipt, b: Receipt): boolean {
+  const row = humanKind(b.kind);
+  if (row.conflict === "last-wins" || humanKind(a.kind)?.purpose !== row.purpose || (a.slice ?? null) !== (b.slice ?? null)) return false;
+  return row.conflict === "any-step" || (a.step === b.step && a.attempt === b.attempt);
+}
 
 /**
- * Refuse a second answer / gate decision / unstick for the step attempt one is already recorded
- * for and not yet applied (S6): the tick would apply the first and reject the second silently.
+ * Refuse a receipt that conflicts with one already recorded and not yet applied (S6, `HUMAN_KINDS`).
  * Looks at the unit's unapplied receipts and, for a verb that may use it, the story's mailbox (T9).
  */
 async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder: ClaimBlob | null, mailbox: boolean): Promise<void> {
+  const scope = humanKind(receipt.kind).conflict;
+  if (scope === "last-wins") return;
   const unit = receipt.slice ?? t.story;
   const pending: Array<{ receipt: Receipt; where: string }> = [];
   const uf = t.story_facts?.units.find((u) => u.unit.key === unit);
@@ -358,8 +385,9 @@ async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder
     if (remote) await fetchNornRefs(ctx.root, remote).catch(() => undefined);
     for (const m of await listMailbox(ctx.root, t.story).catch(() => [])) if (m.receipt) pending.push({ receipt: m.receipt, where: m.ref });
   }
-  const dup = pending.find((p) => sameDecision(p.receipt, receipt));
+  const dup = pending.find((p) => conflicts(p.receipt, receipt));
   if (!dup) return;
+  if (scope === "any-step") throw refuse(`an ${receipt.kind} of ${t.story} is already recorded (${dup.where}) and not applied yet`, cmd.tick(), "already_recorded");
   const next = holder ? `wait for ${holder.holder}'s next tick to import it (T9)` : cmd.tick();
   throw refuse(
     `${dup.receipt.kind} already recorded for ${stepLabel(receipt.step, receipt.attempt)} (${dup.where}) and not applied yet`,
@@ -392,7 +420,7 @@ async function deliver(ctx: Context, t: Target, route: Route, receipt: Receipt):
   }
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   const posted = await postMailbox(ctx.root, remote, t.story, receipt);
-  if (!posted.ok) throw failure(`mailbox push failed: ${posted.message}`, `norn ${receipt.kind === "reject" ? "approve" : receipt.kind} again`, "mailbox_failed");
+  if (!posted.ok) throw failure(`mailbox push failed: ${posted.message}`, `${humanKind(receipt.kind).command(t.key)} again`, "mailbox_failed");
   return { via: "mailbox", ref: posted.ref, holder: route.holder.holder };
 }
 
@@ -411,11 +439,6 @@ export interface HumanVerbOptions {
    * `check`; the claim is never acquired here and never goes through the mailbox.
    */
   requireHolder?: string;
-  /**
-   * false: no duplicate refusal (S6), e.g. mode, where every receipt applies (MO1). A function: the
-   * verb's own duplicate refusal (update: any unapplied update of the story), run in its place.
-   */
-  refuseDuplicate?: false | ((t: Target, receipt: Receipt) => void);
   check: (t: Target, st: UnitState) => void;
   /** true: nothing to record (mode already set); the verb returns null without touching the claim */
   noop?: (t: Target, st: UnitState) => boolean;
@@ -461,8 +484,7 @@ export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptio
     claim ??= await claimFor(ctx, t.story);
     held = refuseUnlessHolder(claim, t, opts.verb, opts.requireHolder);
   }
-  if (typeof opts.refuseDuplicate === "function") opts.refuseDuplicate(t, receipt);
-  else if (opts.refuseDuplicate !== false) await refuseDuplicate(ctx, t, receipt, claim && heldElsewhere(claim), opts.mailbox);
+  await refuseDuplicate(ctx, t, receipt, claim && heldElsewhere(claim), opts.mailbox);
   const route = held ?? (await claimRoute(ctx, t, { mailbox: opts.mailbox, verb: opts.verb, ...(claim ? { claim } : {}) }));
   if (route.via === "local" && target !== t) {
     // the claim turned out free after all: write under it, against the local cursor

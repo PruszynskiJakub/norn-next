@@ -15,6 +15,7 @@ import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from ".
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, heldBySkillsDrift, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
+import { isParked } from "../verbs.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
 
@@ -466,7 +467,7 @@ function staleItem(story: StoryFacts, base: string): InboxItem | null {
   const wf = uf?.workflow ?? null;
   if (!b || !st || !wf || !isStale(wf, b)) return null;
   const step = stepOf(wf, st.step);
-  const atGate = st.status === "parked" && st.park?.kind === "gate" && step?.type === "gate";
+  const atGate = isParked(st, "gate") && step?.type === "gate";
   const stuck = st.status === "stuck" && !baseSyncSteps(wf).has(st.step);
   if (!atGate && !stuck) return null;
   // BS6: a gate with a `stale` route is classified by the tick, not shown
