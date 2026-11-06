@@ -124,7 +124,7 @@ Run a tick from cron every minute in the repository:
 jq -c 'select(.type == "tick.end" and .duration_ms > 8000) | {tick_id, duration_ms, slowest}' ~/.norn/repos/<id>/<day>.jsonl
 ```
 
-The full `tick` record with that `tick_id` holds the rest. `sync` says whether a remote sync ran and how it ended. `timing` gives `observe_ms`, `decide_ms`, `act_ms` and `after_ms`, observe's phases in `timing.observe` (`base_fetch`, `local`, `sync.norn_refs`, `sync.issues`, `sync.stories`, `runner`, `stories`, …), and the remote calls the sync made in `timing.calls`. Each decision's `result.ms` is the time its action took; claim renewals are pushed in one batch, so each one shows the batch's time. Older records have none of these fields.
+The full `tick` record with that `tick_id` holds the rest. `sync` says whether a remote sync ran and how it ended. `timing` gives `observe_ms`, `decide_ms`, `act_ms` and `after_ms`, observe's phases in `timing.observe` (`base_fetch`, `local`, `sync.norn_refs`, `sync.issues`, `sync.stories`, `runner`, `stories`, …), and the remote calls the sync made in `timing.calls`. Process liveness probes have no phase of their own: they count under `local` (the claims' leases) and `stories` (each story's sessions). `act_ms` includes writing the `tick.start` line. Each decision's `result.ms` is the time its action took; claim renewals are pushed in one batch, so each one shows the batch's time, and `slowest` names the batch once (`act claim renew (N claims)`). Older records have none of these fields.
 
 ## Roll out a new norn to a team
 

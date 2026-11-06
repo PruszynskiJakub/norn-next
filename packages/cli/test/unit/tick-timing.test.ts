@@ -47,6 +47,14 @@ describe("tickTiming", () => {
       slowest: { phase: "act run_check gh-2", ms: 4000 },
     });
     expect(tickTiming({ observe_ms: 10, decide_ms: 1, act_ms: 0, after_ms: 0, observe: {}, calls: {} }, []).slowest).toEqual({ phase: "observe", ms: 10 });
+    // a batched claim renewal is one candidate with the batch's time, not one per claim
+    const renewals = [
+      { unit: "gh-1", kind: "claim", ms: 900, batched: true },
+      { unit: "gh-2", kind: "claim", ms: 900, batched: true },
+      { unit: "gh-3", kind: "run_check", ms: 400 },
+    ];
+    expect(tickTiming({ observe_ms: 0, decide_ms: 0, act_ms: 1300, after_ms: 0, observe: {}, calls: {} }, renewals).slowest).toEqual({ phase: "act claim renew (2 claims)", ms: 900 });
+    expect(tickTiming({ observe_ms: 0, decide_ms: 0, act_ms: 900, after_ms: 0, observe: {}, calls: {} }, renewals.slice(0, 1)).slowest).toEqual({ phase: "act claim gh-1", ms: 900 });
     // no calls made: the field stays out
     expect("calls" in tickTiming({ observe_ms: 1, decide_ms: 1, act_ms: 0, after_ms: 0, observe: {}, calls: {} }, [])).toBe(false);
   });

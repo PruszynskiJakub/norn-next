@@ -104,7 +104,7 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
     const tEnd = performance.now();
     const timing = tickTiming(
       { observe_ms: tDecide - tObserve, decide_ms: tAct - tDecide, act_ms: tAfter - tAct, after_ms: tEnd - tAfter, observe: obs.timing.phases, calls: obs.timing.calls },
-      records.map((r) => ({ unit: r.decision.unit, kind: r.decision.action.kind, ms: r.ms })),
+      records.map((r) => ({ unit: r.decision.unit, kind: r.decision.action.kind, ms: r.ms, ...(r.batched ? { batched: true } : {}) })),
     );
     const record = traceRecord(obs, records, startedAt, tEnd - t0, ctx.version, timing);
     if (inbox.changes.length) record.inbox = inbox.changes;

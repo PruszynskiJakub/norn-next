@@ -104,6 +104,7 @@ export const TickTiming = Type.Object(
   {
     observe_ms: NonNegInt,
     decide_ms: NonNegInt,
+    /** act, from writing the `tick.start` line to the last action */
     act_ms: NonNegInt,
     /** after act: owed record retries, inbox notifications, inbox history */
     after_ms: NonNegInt,

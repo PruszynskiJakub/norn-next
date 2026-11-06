@@ -54,16 +54,20 @@ const ms = (n: number) => Math.max(0, Math.round(n));
 /**
  * The tick record's `timing`, rounded to whole ms, with the slowest of: each observe phase
  * (`observe.<phase>`), the rest of observe no phase covers (`observe`), `decide`, each action
- * (`act <kind> <unit>`) and `after`.
+ * (`act <kind> <unit>`) and `after`. Claim renewals pushed in one batch (`batched`) each carry the
+ * batch's time, so they are one candidate (`act claim renew (N claims)`), not one per claim.
  */
-export function tickTiming(t: TimingInput, actions: ReadonlyArray<{ unit: string; kind: string; ms: number }>): TickTiming {
+export function tickTiming(t: TimingInput, actions: ReadonlyArray<{ unit: string; kind: string; ms: number; batched?: boolean }>): TickTiming {
   const observe = Object.fromEntries(Object.entries(t.observe).map(([k, v]) => [k, ms(v)]));
   const covered = Object.values(observe).reduce((a, b) => a + b, 0);
+  const batch = actions.filter((a) => a.batched);
+  const single = batch.length > 1 ? actions.filter((a) => !a.batched) : actions;
   const candidates: TickSlowest[] = [
     ...Object.entries(observe).map(([k, v]) => ({ phase: `observe.${k}`, ms: v })),
     { phase: "observe", ms: Math.max(0, ms(t.observe_ms) - covered) },
     { phase: "decide", ms: ms(t.decide_ms) },
-    ...actions.map((a) => ({ phase: `act ${a.kind} ${a.unit}`, ms: ms(a.ms) })),
+    ...single.map((a) => ({ phase: `act ${a.kind} ${a.unit}`, ms: ms(a.ms) })),
+    ...(batch.length > 1 ? [{ phase: `act claim renew (${batch.length} claims)`, ms: ms(Math.max(...batch.map((a) => a.ms))) }] : []),
     { phase: "after", ms: ms(t.after_ms) },
   ];
   const slowest = candidates.reduce((a, b) => (b.ms > a.ms ? b : a));

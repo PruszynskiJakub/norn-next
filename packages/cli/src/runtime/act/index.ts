@@ -36,6 +36,8 @@ export interface ActRecord {
   result: ActionResult;
   /** gh-78: how long act took over the action (a batched renewal: the batch's time) */
   ms: number;
+  /** gh-78: a claim renewal pushed in the tick's one batch (its `ms` is the batch's) */
+  batched?: boolean;
 }
 
 /** Inbox groups that need a person; their new items are notified once (O3). */
@@ -95,7 +97,7 @@ export class Actor extends ActEnv {
         }
       if (story && isSideAction(d.action) && !isTailAction(d.action) && !result.ok && claimLost(result)) lost.add(story);
       if (counted) this.recordFailure(d, result);
-      out.push({ decision: d, result, ms: renewed.has(d) ? renewMs : performance.now() - t0 });
+      out.push(renewed.has(d) ? { decision: d, result, ms: renewMs, batched: true } : { decision: d, result, ms: performance.now() - t0 });
     }
     this.dropRecordPushSlots();
     if (this.failuresChanged) writeActFailures(this.root, this.failures);
