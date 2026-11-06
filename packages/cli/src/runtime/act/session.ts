@@ -20,14 +20,15 @@ import {
   writeTranscriptSnapshot,
 } from "@norn/store";
 import { ensureShim, withNornOnPath } from "../shim.ts";
+import { runnerFor } from "../../wiring.ts";
 import { type ActEnv, QueueFull, ReceiptTaken } from "./env.ts";
 import type { UnitLoc } from "../observe/index.ts";
 
 // ------------------------------------------------------------ runner
 
 async function killSession(act: ActEnv, session: SessionRef | null): Promise<boolean> {
-  const runner = act.obs.ports.runner;
-  if (!session || !runner || session.runner !== runner.name) return false;
+  const runner = runnerFor(act.obs.ports, session);
+  if (!session || !runner) return false;
   await runner.kill(session).catch(() => undefined);
   return true;
 }
@@ -54,7 +55,7 @@ async function launchSession(act: ActEnv, unit: UnitRef, launch: AgentLaunch): P
       cwd: launch.cwd,
       prompt: launch.prompt,
       env,
-      headless: runner.name === "headless",
+      headless: runner.capabilities.headless === true,
       config: { ...(cfg?.args ? { args: cfg.args } : {}) },
       ...(launch.model ? { model: launch.model } : {}),
       ...(launch.resume ? { resume: launch.resume } : {}),
@@ -97,8 +98,7 @@ function recordSession(act: ActEnv, unit: UnitRef, runsDir: string, decided: Uni
 
 /** R6.3, R9.1: how a person reaches the session, recorded with it for the inbox */
 function reachOf(act: ActEnv, session: SessionRef): { reach?: string } {
-  const runner = act.obs.ports.runner;
-  const reach = runner?.reach && runner.name === session.runner ? runner.reach(session) : undefined;
+  const reach = runnerFor(act.obs.ports, session)?.reach?.(session);
   return reach ? { reach } : {};
 }
 
@@ -117,16 +117,16 @@ export async function applyReceipts(act: ActEnv, a: Extract<Action, { kind: "app
   const killed = await killSession(act, a.kill ?? null);
   if (a.launch) {
     // B2: resume the same agent session with the answer as the prompt (headless / session gone)
-    ({ session: resumed } = await launchAfterReceipts(act, a.unit, loc.runsDir, a.receipts, a.launch));
+    ({ session: resumed } = await launchAfterReceipts(act, a.unit, loc, a.receipts, a.launch));
     if (state) state = recordSession(act, a.unit, loc.runsDir, state, a.receipts, resumed);
   } else
     try {
-      act.writeReceipts(loc.runsDir, a.receipts);
+      act.writeReceipts(loc, a.receipts);
     } catch (e) {
       // R6.1, B11: the tick resolving an implicit ask raced the agent's own report, whose `answer`
       // (`by: "agent"`) took the number first. S6 keeps the first; the ask is closed either way, so
       // this is not a failed action — nothing else is written, the next tick applies the report.
-      if (e instanceof ReceiptTaken && a.rule === "agent.ask.implicit.resolved") return { ok: true, detail: { superseded: e.message } };
+      if (e instanceof ReceiptTaken && a.yields_to_report) return { ok: true, detail: { superseded: e.message } };
       throw e;
     }
   for (const r of a.rejected) act.traceReject(a.unit.key, `receipt ${r.n}`, r.reason, { receipt_id: r.receipt_id });
@@ -137,8 +137,8 @@ export async function applyReceipts(act: ActEnv, a: Extract<Action, { kind: "app
     // a failed delivery leaves the unit parked on the ask (the next tick tries again)
     const input = a.input;
     try {
-      const runner = act.obs.ports.runner;
-      if (!runner || runner.name !== input.session.runner) throw new Error("the session's runner is not available here");
+      const runner = runnerFor(act.obs.ports, input.session);
+      if (!runner) throw new Error("the session's runner is not available here");
       if (!runner.sendKeys) throw new Error(`runner ${runner.name} cannot type into a prompt`);
       await runner.sendKeys(input.session, keys);
     } catch (e) {
@@ -161,8 +161,8 @@ export async function applyReceipts(act: ActEnv, a: Extract<Action, { kind: "app
   if (a.input && !keyed) {
     // B2: the answer goes into the same session after state is written
     try {
-      const runner = act.obs.ports.runner;
-      if (!runner || runner.name !== a.input.session.runner) throw new Error("session's runner is not available here");
+      const runner = runnerFor(act.obs.ports, a.input.session);
+      if (!runner) throw new Error("session's runner is not available here");
       await runner.send(a.input.session, a.input.text, { submit: true });
       delivered = true;
       act.effectsOk.add("answer");
@@ -184,7 +184,7 @@ const startedPaths = (loc: UnitLoc) => [loc.handoffFile];
 
 export async function startRun(act: ActEnv, a: Extract<Action, { kind: "start_run" }>): Promise<ActionResult> {
   const loc = act.unitLoc(a.unit);
-  const { session, lease } = await launchAfterReceipts(act, a.unit, loc.runsDir, a.receipts, a.launch);
+  const { session, lease } = await launchAfterReceipts(act, a.unit, loc, a.receipts, a.launch);
   act.effectsOk.add("launch");
   const state = a.state ? recordSession(act, a.unit, loc.runsDir, a.state, a.receipts, session) : null;
   if (state) act.writeUnitState(a.unit, loc.runsDir, state);
@@ -198,11 +198,11 @@ export async function startRun(act: ActEnv, a: Extract<Action, { kind: "start_ru
  * then the launch. A failed launch leaves the started receipt; the next tick applies it and
  * classification (stalled/timeout) bounds the run.
  */
-async function launchAfterReceipts(act: ActEnv, unit: UnitRef, runsDir: string, receipts: NewReceipt[], launch: AgentLaunch, beforeLaunch?: () => Promise<unknown>) {
+async function launchAfterReceipts(act: ActEnv, unit: UnitRef, loc: UnitLoc, receipts: NewReceipt[], launch: AgentLaunch, beforeLaunch?: () => Promise<unknown>) {
   const listing = await listLeases(act.ctx.home, act.liveness());
   const agents = listing.live.filter((e) => e.lease.kind === "agent" && e.lease.run_id !== launch.run_id).length;
   if (agents >= act.config.max_agents) throw new QueueFull(`queued: max_agents ${act.config.max_agents} in use (K1)`);
-  act.writeReceipts(runsDir, receipts);
+  act.writeReceipts(loc, receipts);
   await beforeLaunch?.();
   return launchSession(act, unit, launch);
 }
@@ -221,7 +221,7 @@ export async function nudge(act: ActEnv, a: Extract<Action, { kind: "nudge" }>):
     const launch = a.launch;
     const kill = a.kill;
     try {
-      ({ session: resumed } = await launchAfterReceipts(act, a.unit, loc.runsDir, a.receipts, launch, async () => {
+      ({ session: resumed } = await launchAfterReceipts(act, a.unit, loc, a.receipts, launch, async () => {
         await killSession(act, kill);
         // the old process held the run's agent lease; the resumed one takes it over (K1)
         await act.releaseRunLeases(a.unit, ["agent"], launch.run_id);
@@ -232,12 +232,12 @@ export async function nudge(act: ActEnv, a: Extract<Action, { kind: "nudge" }>):
       throw new Error(`nudge to ${a.unit.key} not delivered: resume failed: ${(e as Error).message}`);
     }
     act.effectsOk.add("resume");
-  } else act.writeReceipts(loc.runsDir, a.receipts);
+  } else act.writeReceipts(loc, a.receipts);
   const snapshot = await snapshotRun(act, a.unit, runId, a.snapshot);
   if (a.input) {
-    const runner = act.obs.ports.runner;
+    const runner = runnerFor(act.obs.ports, a.input.session);
     try {
-      if (!runner || runner.name !== a.input.session.runner) throw new Error("the run's runner is not available on this machine");
+      if (!runner) throw new Error("the run's runner is not available on this machine");
       await runner.send(a.input.session, a.input.text, { submit: true });
     } catch (e) {
       act.failedSession = a.input.session;
@@ -259,11 +259,11 @@ export async function retryFresh(act: ActEnv, a: Extract<Action, { kind: "retry_
   await act.releaseRunLeases(a.unit, ["agent"]);
   if (a.launch) {
     // receipts, kill the old session, then the fresh one (B2, C1)
-    ({ session } = await launchAfterReceipts(act, a.unit, loc.runsDir, a.receipts, a.launch, () => killSession(act, a.kill)));
+    ({ session } = await launchAfterReceipts(act, a.unit, loc, a.receipts, a.launch, () => killSession(act, a.kill)));
     act.effectsOk.add("launch");
     if (state) state = recordSession(act, a.unit, loc.runsDir, state, a.receipts, session);
   } else {
-    act.writeReceipts(loc.runsDir, a.receipts);
+    act.writeReceipts(loc, a.receipts);
     await killSession(act, a.kill);
   }
   if (state) act.writeUnitState(a.unit, loc.runsDir, state);
@@ -273,7 +273,7 @@ export async function retryFresh(act: ActEnv, a: Extract<Action, { kind: "retry_
 
 export async function classify(act: ActEnv, a: Extract<Action, { kind: "classify" }>): Promise<ActionResult> {
   const loc = act.unitLoc(a.unit);
-  act.writeReceipts(loc.runsDir, a.receipts);
+  act.writeReceipts(loc, a.receipts);
   const killed = await killSession(act, a.kill);
   const runId = loc.state?.run?.run_id ?? a.receipts[0]?.receipt.run_id ?? "none";
   const transcript = await snapshotRun(act, a.unit, runId, a.snapshot);

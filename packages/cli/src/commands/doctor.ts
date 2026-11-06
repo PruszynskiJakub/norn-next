@@ -35,14 +35,13 @@ import { tmpdir } from "node:os";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, FileError, Ports, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
-import { type ConfigEntry, ExitCode, type ResolvedConfig, ulid, type VersionMatch, versionMatch } from "@norn/schema";
-import { baseRunStateStories, baseSpecsRoot, bindNornHome, cachedDefaultBranch, defaultBaseRef, type Layout, layoutProblems, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, SKILLS_DIR, skillsDrift, skillsReport, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
+import { type ConfigEntry, ExitCode, PROVIDERS, type ResolvedConfig, ulid, type VersionMatch, versionMatch } from "@norn/schema";
+import { baseRunStateStories, baseSpecsRoot, bindNornHome, cachedDefaultBranch, defaultBaseRef, type Layout, layoutProblems, loadWorkflows, gitRemoteUrl, machineDir, machineHolder, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, SKILLS_DIR, skillsDrift, skillsReport, spawnBounded, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { CliFailure, configError, rendered, withExit } from "../output.ts";
 import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
-import { gitRemoteUrl } from "../runtime/detect.ts";
 import { type LabelsReport, labelsWarnings, remoteLabels } from "../runtime/labels.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
 import { effectiveRetain, formatBytes, retainCutoffDay, retainWarning } from "../runtime/trace-retention.ts";
@@ -50,6 +49,7 @@ import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { layoutRefusal } from "../runtime/layout.ts";
 import { hookBinary, hookCommand } from "./init.ts";
 import { baseRunStateHint, cmd } from "@norn/core";
+import { oneLine } from "@norn/view";
 
 interface RunOut {
   code: number | null;
@@ -59,34 +59,21 @@ interface RunOut {
 }
 
 async function run(argv: string[], o: { cwd?: string; env?: Record<string, string | undefined>; input?: string; timeoutMs: number }): Promise<RunOut> {
-  try {
-    noteSpawn(argv, o.cwd);
-    const p = Bun.spawn(argv, {
-      cwd: o.cwd,
-      env: (o.env ?? process.env) as Record<string, string>,
-      stdin: o.input === undefined ? "ignore" : new TextEncoder().encode(o.input),
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      p.kill("SIGKILL");
-    }, o.timeoutMs);
-    const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
-    const code = await p.exited;
-    clearTimeout(timer);
-    return { code: timedOut ? null : code, out: `${out}${err}`.trim(), timed_out: timedOut };
-  } catch (e) {
-    return { code: null, out: "", timed_out: false, error: (e as Error).message };
-  }
+  const r = await spawnBounded(argv, {
+    ...(o.cwd === undefined ? {} : { cwd: o.cwd }),
+    ...(o.env === undefined ? {} : { env: o.env }),
+    ...(o.input === undefined ? {} : { stdin: o.input }),
+    timeoutMs: o.timeoutMs,
+  });
+  if (r.spawn_error !== undefined) return { code: null, out: "", timed_out: false, error: r.spawn_error };
+  return { code: r.timed_out ? null : r.code, out: `${r.stdout}${r.stderr}`.trim(), timed_out: r.timed_out };
 }
 
 const firstLine = (s: string) => s.split("\n")[0]?.trim() ?? "";
 const SHORT = 200;
 /** An error as one readable line for a person; `--json` keeps all of it. */
 const short = (s: string) => {
-  const one = s.replace(/\s+/g, " ").trim();
+  const one = oneLine(s, Infinity);
   return one.length > SHORT ? `${one.slice(0, SHORT)}… (${cmd.doctor({ json: true })} has the rest)` : one;
 };
 const which = (cmd: string, env: Record<string, string | undefined>) => (cmd.includes("/") ? cmd : Bun.which(cmd, { PATH: env.PATH ?? process.env.PATH ?? "" }));
@@ -572,8 +559,7 @@ export const doctorCommand = defineCommand({
       const turn = live ? await liveTurn(ctx, name, agent, command) : null;
       const notes: string[] = [];
       if (agent.tier === "none") notes.push("no hooks: runner, process and git facts only (A5)");
-      if (name === "codex")
-        notes.push("Codex runs project hooks only once the project's .codex/ layer is trusted and the hooks reviewed via /hooks in Codex");
+      if (agent.setupNote) notes.push(agent.setupNote);
       if (hooksInstalled === false) notes.push(`run ${cmd.init()} to install hooks`);
       const ok = !!path && hooksInstalled !== false && (fires?.ok ?? true) && (turn?.ok ?? true);
       agents.push({
@@ -595,7 +581,7 @@ export const doctorCommand = defineCommand({
       try {
         remote = { ok: true, provider: ports.remote.provider, user: await ports.remote.whoami() };
       } catch (e) {
-        remote = { ok: false, provider: ports.remote.provider, error: (e as Error).message, do_instead: `${config.provider === "glab" ? "glab" : "gh"} auth login` };
+        remote = { ok: false, provider: ports.remote.provider, error: (e as Error).message, do_instead: `${PROVIDERS[config.provider].cli} auth login` };
       }
     }
     // sync reads issues and every step pushes through this remote: without it nothing moves
@@ -619,10 +605,10 @@ export const doctorCommand = defineCommand({
         name: ports.runner.name,
         available,
         ...(onPath ? { norn_on_path: onPath } : {}),
-        ...(available ? {} : { error: ports.runner.name === "herdr" ? "herdr server not reachable (start herdr)" : `${ports.runner.name} runner not available` }),
+        ...(available ? {} : { error: ports.runner.unavailableHint ?? `${ports.runner.name} runner not available` }),
       };
       // HC11: informational — the cockpit plugin is optional, so it never fails doctor
-      if (available && ports.runner.name === "herdr") runner.cockpit_plugin = await cockpitPlugin(ctx);
+      if (available && ports.runner.name === herdr.RUNNER_NAME) runner.cockpit_plugin = await cockpitPlugin(ctx);
     }
 
     const names = bundledSkills(ctx.env);

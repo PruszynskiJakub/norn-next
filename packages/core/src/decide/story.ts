@@ -7,6 +7,8 @@ import {
   parseDuration,
   type Receipt,
   type RejectedMailboxReceipt,
+  claimRef,
+  isClosedStatus,
   sliceBranch,
   SPEC_FILE,
   type StoryFrontmatter,
@@ -18,7 +20,7 @@ import {
   treeRunStatePath,
   unitRecordPath,
 } from "@norn/schema";
-import type { Action, ClaimAction, UpdateStoryMirrorAction } from "../actions.ts";
+import { type Action, type ClaimAction, NOT_OBSERVED, type UpdateStoryMirrorAction } from "../actions.ts";
 import type { NumberedReceipt, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { initialState } from "../apply.ts";
 import { sha256 } from "../hash.ts";
@@ -37,10 +39,10 @@ import { cmd } from "../commands.ts";
 /**
  * R3.1 (H6): what the loser of an intake race removes — the story worktree and local branch, when
  * the branch holds nothing beyond the intake commit (`intake_only`, from trailers) and the worktree
- * is clean. Undefined when not observed: act then keeps everything.
+ * is clean. Not observed: keep everything.
  */
-function lostIntake(story: StoryFacts): NonNullable<ClaimAction["lost_intake"]> | undefined {
-  if (story.intake_only === undefined) return undefined;
+function lostIntake(story: StoryFacts): NonNullable<ClaimAction["lost_intake"]> {
+  if (story.intake_only === undefined) return { keep: NOT_OBSERVED };
   if (!story.intake_only) return { keep: `${story.branch} has commits beyond the intake` };
   const wt = story.worktree?.exists ? story.worktree : null;
   if (wt && !wt.status?.clean) return { keep: `${wt.path} has uncommitted changes` };
@@ -79,13 +81,12 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
     // (or whose PR merged) is never acquired by a stale local intake or a returning checkout. Only this
     // heartbeat's own expired claim (nobody took it since) is re-acquired for a merged PR whose record
     // is not yet done, so GR6 cleanup and the base record still happen.
-    const baseDone = story.base_status === "done" || story.base_status === "dropped";
+    const baseDone = isClosedStatus(story.base_status);
     if (baseDone || (mergedIntoBase(story, ctx.facts.repo.default_branch) && !ours))
       return ctx.noop(ref, "story.finished", baseDone ? `finished: ${ctx.facts.repo.default_branch} records it ${story.base_status} (R3.2); nothing to acquire` : "finished: PR merged (R3.2); nothing to acquire");
     // GR6: a finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
-    if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped" ? story.frontmatter.status : "workflow done"}); nothing to take`);
+    if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${isClosedStatus(story.frontmatter?.status) ? story.frontmatter.status : "workflow done"}); nothing to take`);
     if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — ${cmd.storyCheckout(story.key)} (T10)`);
-    const lost = fresh ? lostIntake(story) : undefined;
     return ctx.emit({
       kind: "claim",
       unit: ref,
@@ -93,7 +94,7 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
       op: "acquire",
       expected: claim.state === "expired" ? claim.sha : null,
       blob: claimBlob(ctx, story.key, null),
-      ...(lost ? { lost_intake: lost } : {}),
+      ...(fresh ? { lost_intake: lostIntake(story) } : {}),
     });
   }
   // T4 + R1.1: renewal is a side action — emitted first (act renews before the story's other
@@ -112,7 +113,7 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   if (story.frontmatter_error || !story.frontmatter) {
     const errors = story.frontmatter_error ? [story.frontmatter_error] : [{ file: `${story.spec_dir}/${SPEC_FILE}`, errors: [{ path: "", message: "missing" }] }];
     // S2: a broken spec.md is surfaced, never written into the unit's state
-    if (!ctx.has(ref.key)) ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "story.corrupt", errors, mark_state: false, notify: null });
+    if (!ctx.has(ref.key)) ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "story.corrupt", errors, state: null, notify: null });
     return;
   }
   const fm = story.frontmatter;
@@ -276,7 +277,7 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
       worktrees: [...(story.worktree?.exists ? [story.worktree.path] : []), ...sliceWts],
       local_branches: [...sliceBranches, story.branch],
       remote_branches: sliceBranches,
-      refs: [`refs/norn/claims/${story.key}`, ...(story.mailbox ?? []).map((m) => m.ref)],
+      refs: [claimRef(story.key), ...(story.mailbox ?? []).map((m) => m.ref)],
       story_status: "done",
       finish: finishMerged(ctx, story),
     });
@@ -449,8 +450,12 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
     // never one read from an older norn's branch (gh-195/06): nothing is written there
     const own = uf.errors.every((e) => e.file.includes(`/${unitRecordPath(ref.dir)}/`));
     const onBranch = story.units.some((u) => u.branch_record?.copy.includes(ref.dir));
-    const mark_state = uf.state !== null && own && !onBranch && !uf.errors.some((e) => /(^|\/)state\.json$/.test(e.file));
-    return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.corrupt", errors: uf.errors, mark_state, notify });
+    const marked = uf.state !== null && own && !onBranch && !uf.errors.some((e) => /(^|\/)state\.json$/.test(e.file));
+    const reason = `corrupt: ${uf.errors.map((e) => e.file).join(", ")} failed validation (S2)`;
+    const state: UnitState | null = marked
+      ? { ...(uf.state as UnitState), status: "corrupt", park: { kind: "corrupt", reason, since: ctx.nowIso }, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id }
+      : null;
+    return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.corrupt", errors: uf.errors, state, notify });
   }
   const st = uf.state;
   if (!st) {
@@ -464,7 +469,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   if (st.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
   const wf = uf.workflow;
   // S2: a missing pinned workflow is surfaced; the state stays as it is (no file failed validation)
-  if (!wf) return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.workflow_missing", errors: [{ file: `${recordOf(uf)}/workflow.yaml`, errors: [{ path: "", message: "pinned workflow missing" }] }], mark_state: false, notify: null });
+  if (!wf) return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.workflow_missing", errors: [{ file: `${recordOf(uf)}/workflow.yaml`, errors: [{ path: "", message: "pinned workflow missing" }] }], state: null, notify: null });
 
   // R5.1: a run whose launch is unknown is looked for before anything else is decided for the unit
   if (uf.run?.launch_unknown) return launchUnknown(ctx, story, uf, st, wf);

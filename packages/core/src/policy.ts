@@ -2,7 +2,7 @@
  * Rules decide and the inbox both read off Facts — each defined once here, so the tick that acts
  * and the inbox that tells a person never disagree about them.
  */
-import { BUILT_IN_LIMITS, type Mode, parseDuration, type ResolvedConfig, type Step, type UnitState, type Workflow } from "@norn/schema";
+import { BUILT_IN_LIMITS, isClosedStatus, type Mode, parseDuration, type ResolvedConfig, type Step, type UnitState, type Workflow } from "@norn/schema";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "./facts.ts";
 import { stepOf } from "./workflow.ts";
 
@@ -15,13 +15,13 @@ export function checkRunningSince(step: Step | null | undefined, uf: UnitFacts):
 }
 
 /**
- * gh-61 B18, B22 (D6): the unit waits at an agent step decide does not start, because its worktree's
- * bundled skills differ from the running norn's; the inbox names the fix (B19) and
- * `norn story update-branch` takes it (BS9).
+ * gh-252 (SK1): the unit's worktree holds bundled skills that differ from the running norn's while
+ * it still has work to do. Nothing is held: its runs use the worktree's copies, and merging the base
+ * brings the new ones in. The inbox shows it as a Check item.
  */
-export function heldBySkillsDrift(uf: UnitFacts): boolean {
+export function skillsDiffer(uf: UnitFacts): boolean {
   const st = uf.state;
-  return st?.status === "ready" && !!uf.skills_drift?.length && !!uf.workflow && stepOf(uf.workflow, st.step)?.type === "agent";
+  return !!uf.skills_drift?.length && !!st && st.status !== "done" && st.status !== "corrupt";
 }
 
 /** MO2: manual if the step is attended or no runner is configured; else the story's mode. */
@@ -76,7 +76,7 @@ export const storyUnit = (story: StoryFacts): UnitFacts | null => story.units.fi
 /** GR6: the story unit reached `$done`, or spec.md says done/dropped — finished, never "unclaimed". */
 export function storyFinished(story: StoryFacts): boolean {
   const status = story.frontmatter?.status;
-  if (status === "done" || status === "dropped") return true;
+  if (isClosedStatus(status)) return true;
   return storyUnit(story)?.state?.status === "done";
 }
 

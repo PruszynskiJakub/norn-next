@@ -10,7 +10,7 @@ import { CONFIG_FILES, type ConfigEntry } from "@norn/schema";
 import type { LoadedConfig } from "@norn/store";
 import { defineCommand, defineNoun } from "../command.ts";
 import type { Context } from "../context.ts";
-import { rendered, usageError } from "../output.ts";
+import { rendered, tableCell, usageError } from "../output.ts";
 import { cmd } from "@norn/core";
 import { configSetCommand, configUnsetCommand } from "./config-edit.ts";
 
@@ -118,8 +118,6 @@ function show(v: unknown, key?: string): string {
   return `\`${typeof v === "string" ? v : JSON.stringify(v)}\``;
 }
 
-const cell = (s: string) => s.replace(/\|/g, "\\|");
-
 const sourceText = (e: ConfigEntry) => (e.reason ? `${e.source}: ${e.reason}` : e.source);
 
 function formatConfig(entries: ConfigEntry[], files: Record<"user" | "local" | "repo", { path: string; exists: boolean }>): string {
@@ -136,7 +134,7 @@ function formatConfig(entries: ConfigEntry[], files: Record<"user" | "local" | "
     const rows = entries.filter((e) => groupOf(e.key) === g.group);
     if (!rows.length) continue;
     lines.push("", `## ${g.title}`, "", "| Setting | Value | From | What it does |", "|---|---|---|---|");
-    for (const e of rows) lines.push(`| \`${e.key}\` | ${cell(show(e.value, e.key))} | ${cell(sourceText(e))} | ${cell(meaning(e.key))} |`);
+    for (const e of rows) lines.push(`| \`${e.key}\` | ${tableCell(show(e.value, e.key))} | ${tableCell(sourceText(e))} | ${tableCell(meaning(e.key))} |`);
   }
   return lines.join("\n");
 }

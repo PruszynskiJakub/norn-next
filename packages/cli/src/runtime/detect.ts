@@ -1,11 +1,10 @@
 /**
  * What `norn init` can tell about a repository before the first story: its test command, for the
- * `test` check steps of the workflow templates (W1), and whether the git remote norn pushes to exists.
+ * `test` check steps of the workflow templates (W1).
  * A check runs in a fresh worktree with no installed dependencies (F3), so a JS command installs first.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { noteSpawn, spawnSyncCaptured } from "@norn/store";
 
 export interface DetectedTestCommand {
   command: string;
@@ -64,16 +63,4 @@ export const TEMPLATE_TEST_COMMAND = "bun test";
 /** A workflow template with its `run: bun test` lines set to `command` (quoted, YAML-safe). */
 export function withTestCommand(yaml: string, command: string): string {
   return yaml.replace(/^(\s+run:) bun test[ \t]*$/gm, (_m, key: string) => `${key} ${JSON.stringify(command)}`);
-}
-
-/** The fetch URL of the named git remote, or null when the repository has no such remote. */
-export function gitRemoteUrl(root: string, name: string): string | null {
-  noteSpawn(["git", "remote", "get-url", name], root);
-  let r: ReturnType<typeof spawnSyncCaptured>;
-  try {
-    r = spawnSyncCaptured(["git", "remote", "get-url", name], { cwd: root });
-  } catch {
-    return null;
-  }
-  return r.exitCode === 0 ? r.stdout.toString().trim() || null : null;
 }

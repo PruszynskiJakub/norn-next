@@ -7,12 +7,12 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, treeHandoffPath, unitHandoffPath } from "@norn/schema";
+import { CONFIG_FILES, LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, treeHandoffPath, unitHandoffPath } from "@norn/schema";
 
 /** gh-110 B1, B2 (D1): the committed repo config and workflows, relative to a root, as messages name them. */
-export const REPO_CONFIG_FILE = ".agents/norn.config.yaml";
+export const REPO_CONFIG_FILE = CONFIG_FILES.repo;
 /** gh-64 B3: your settings for this repo (gitignored). */
-export const LOCAL_CONFIG_FILE = ".agents/norn.config.local.yaml";
+export const LOCAL_CONFIG_FILE = CONFIG_FILES.local;
 /** gh-64 B50, B55 (D14): the JSON schema copies editors read through the starters' modelines. */
 export const REPO_CONFIG_SCHEMA_FILE = ".agents/norn.config.schema.json";
 export const LOCAL_CONFIG_SCHEMA_FILE = ".agents/norn.config.local.schema.json";
@@ -121,7 +121,7 @@ export function unbindNornHome(root: string): void {
 }
 
 /** The norn home `root`'s machine dir lives in. */
-export const machineHomeOf = (root: string) => homes.get(checkoutOf(root).common) ?? nornHome();
+const machineHomeOf = (root: string) => homes.get(checkoutOf(root).common) ?? nornHome();
 
 /** B5, D1: the checkout's machine-local files (trace, locks, heartbeat, caches), `<norn home>/repos/<id>/`. */
 export const machineDir = (root: string) => join(machineReposDir(machineHomeOf(root)), checkoutOf(root).id);
@@ -162,10 +162,13 @@ export const issueFactsPath = (root: string) => join(machineDir(root), "issue.js
 export function hookFilePath(root: string, unit: { story: string; slice?: string | null }): string {
   const nn = unit.slice ? parseSliceKey(unit.slice)?.nn : null;
   if (unit.slice && !nn) throw new Error(`not a slice key: ${unit.slice}`);
-  return join(machineDir(root), "hooks", unit.story, `${nn ?? STORY_UNIT_DIR}.jsonl`);
+  return join(hooksDir(root), unit.story, `${nn ?? STORY_UNIT_DIR}.jsonl`);
 }
+/** B5 (D3): the machine dir's `hooks/`, one folder per story holding its units' hook files. */
+export const HOOKS_DIR = "hooks";
+export const hooksDir = (root: string) => join(machineDir(root), HOOKS_DIR);
 /** D5: the one-time backfill of the hook files from the day files (`hooks/backfill.json`). */
-export const hookBackfillPath = (root: string) => join(machineDir(root), "hooks", "backfill.json");
+export const hookBackfillPath = (root: string) => join(hooksDir(root), "backfill.json");
 /** GR6: the base branch's `.agents/specs/` materialized per tree id (store/base.ts). */
 export const baseCacheDir = (root: string) => join(machineDir(root), "base");
 /** gh-195 D6, D7 (B29): finished stories' records unpacked from their archive ref, one folder per record commit (`archive/<story>/<commit>/`, record-ref.ts). */
@@ -199,9 +202,12 @@ export const handoffPath = (specDir: string, unit: string) => join(specDir, unit
 /** gh-195/07 (B34, D13 step 2): an older norn's handoff of `unit` in a tree's spec folder, `runs/<unit>/handoff.md`; only the record move reads it. */
 export const treeHandoffFile = (specDir: string, unit: string) => join(specDir, treeHandoffPath(unit));
 
-/** Worktree marker files (A3, K4). */
-export const unitMarkerPath = (worktree: string) => join(worktree, ".norn-unit");
-export const envNornPath = (worktree: string) => join(worktree, ".env.norn");
+/** Worktree marker files (A3, K4), machine-local: never committed (§7.1). */
+export const UNIT_MARKER_FILE = ".norn-unit";
+export const ENV_NORN_FILE = ".env.norn";
+export const WORKTREE_LOCAL_FILES = [ENV_NORN_FILE, UNIT_MARKER_FILE] as const;
+export const unitMarkerPath = (worktree: string) => join(worktree, UNIT_MARKER_FILE);
+export const envNornPath = (worktree: string) => join(worktree, ENV_NORN_FILE);
 
 /** `~/.norn`, overridable with NORN_HOME_DIR (tests) or an explicit argument. */
 export function nornHome(override?: string, env: Record<string, string | undefined> = process.env): string {

@@ -14,7 +14,7 @@ import { type Dirent, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileS
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { FileError } from "@norn/core";
-import { parseRoundDirName, parseSpecDirName, RECORD_REF_PREFIX, ROUNDS_DIR, type RunStory, recordRef, SPECS_DIR, STORY_UNIT_DIR, treeStoryRunStatePath, type UnitState, validate, type Workflow } from "@norn/schema";
+import { parseRoundDirName, parseSliceDirName, parseSpecDirName, RECORD_REF_PREFIX, ROUNDS_DIR, type RunStory, recordRef, sliceKey, SPECS_DIR, STORY_UNIT_DIR, treeStoryRunStatePath, type UnitState, validate, type Workflow } from "@norn/schema";
 import { fsyncTree, isErrno } from "./fsx.ts";
 import { archiveCacheDir } from "./paths.ts";
 import { casRef, casRefs, git, gitOk, gitSync, readLocalRef } from "./git.ts";
@@ -170,7 +170,7 @@ interface RecordEntry {
  * every entry must be a plain file (mode 100644 or 100755) whose path stays inside `base` (the folder
  * it would land in): an absolute path, an empty, `.` or `..` segment, a symlink or a submodule is
  * refused, since a record may come from another machine. `fail` names a refused entry's file. One set
- * of checks for an unpack (`unpackRecordSync`) and for a read into memory (`readRecordObjects`).
+ * of checks for an unpack (`unpackRecord`) and for a read into memory (`readRecordObjects`).
  */
 function recordEntries(root: string, sha: string, base: string, fail: (path: string, message: string) => FileError): { entries: RecordEntry[]; refused: FileError[] } {
   const entries: RecordEntry[] = [];
@@ -202,6 +202,8 @@ function jsonErrors(files: ReadonlyArray<{ path: string; text: string }>, fail: 
   return errors;
 }
 
+export type UnpackResult = { ok: true; files: number } | { ok: false; errors: FileError[] };
+
 /**
  * D3 (S1, S2): extract the record commit `sha` into `dest` (a story's run-state folder). Every entry
  * must be a plain file (mode 100644 or 100755) whose path stays inside `dest`: an absolute path, an
@@ -209,16 +211,10 @@ function jsonErrors(files: ReadonlyArray<{ path: string; text: string }>, fail: 
  * F2), since a record may come from another machine. The files are written into a temp folder beside
  * `dest`; every JSON file must parse, and each state, pinned workflow and receipt must pass its schema.
  * Only then is the temp folder renamed into place, replacing `dest` whole (review F3). A record that
- * fails puts nothing in place: its errors are returned instead.
+ * fails puts nothing in place: its errors are returned instead. Synchronous, so the snapshot's archive
+ * cache (gh-195/16) uses it too.
  */
-export async function unpackRecord(root: string, sha: string, dest: string): Promise<UnpackResult> {
-  return unpackRecordSync(root, sha, dest);
-}
-
-export type UnpackResult = { ok: true; files: number } | { ok: false; errors: FileError[] };
-
-/** `unpackRecord` for a synchronous reader (the snapshot's archive cache, gh-195/16): the same checks and the same rename into place. */
-export function unpackRecordSync(root: string, sha: string, dest: string): UnpackResult {
+export function unpackRecord(root: string, sha: string, dest: string): UnpackResult {
   const staged = stageRecordSync(root, sha, dest);
   if (!staged.ok) return staged;
   try {
@@ -349,7 +345,7 @@ export function localRecordRefs(root: string): Map<string, string> {
 /**
  * gh-195 D6, D7, D16 (B29, B30): the folder holding a finished story's record as its archive ref
  * `refs/norn/runs/<story>` has it here (local refs only: never the network, H2), unpacked once per
- * record commit into the machine dir's `archive/<story>/<commit>/` (`unpackRecordSync`: hostile
+ * record commit into the machine dir's `archive/<story>/<commit>/` (`unpackRecord`: hostile
  * entries refused, every file validated, renamed into place), older commits' copies dropped. Null when
  * there is no such ref here, or its record does not unpack (nothing is guessed, S2). Read-only input.
  */
@@ -359,7 +355,7 @@ export function archivedRecordDir(root: string, story: string, sha: string | und
   const dir = join(cache, sha);
   if (existsSync(dir)) return dir;
   mkdirSync(cache, { recursive: true });
-  if (!unpackRecordSync(root, sha, dir).ok) return null;
+  if (!unpackRecord(root, sha, dir).ok) return null;
   for (const n of readdirSync(cache)) if (n !== sha && !n.startsWith(".")) rmSync(join(cache, n), { recursive: true, force: true });
   return dir;
 }
@@ -433,7 +429,7 @@ export function treeRecordCommit(root: string, rev: string, story: RunStory, o: 
   const sha = c.stdout.toString().trim();
   const check = mkdtempSync(join(tmpdir(), "norn-record-check-"));
   try {
-    const u = unpackRecordSync(root, sha, join(check, "record"));
+    const u = unpackRecord(root, sha, join(check, "record"));
     if (!u.ok) return { ok: false, kind: "invalid", errors: u.errors.map((e) => ({ ...e, file: e.file.replace(join(check, "record"), join(root, path)) })) };
   } finally {
     rmSync(check, { recursive: true, force: true });
@@ -594,7 +590,7 @@ export async function readRecordObjects(root: string, story: string, sha: string
       const held = folders.get(STORY_UNIT_DIR);
       const heldRound = held ? parseRoundDirName(held.split("/")[2] ?? "") : null;
       if (!held || (r && (!heldRound || r.n > heldRound.n))) folders.set(STORY_UNIT_DIR, dir);
-    } else if (top && sub === undefined && /^[0-9]{2,3}-/.test(top)) folders.set(top, dir);
+    } else if (top && sub === undefined && parseSliceDirName(top, { loose: true })) folders.set(top, dir);
   }
   const units: RecordObjectUnit[] = [];
   for (const unit of [...folders.keys()].sort((a, b) => (a === STORY_UNIT_DIR ? -1 : b === STORY_UNIT_DIR ? 1 : a.localeCompare(b)))) {
@@ -609,8 +605,9 @@ export async function readRecordObjects(root: string, story: string, sha: string
     const wfText = texts.get(`${dir}/workflow.yaml`);
     const wf = wfText === undefined ? null : parseWorkflowText(wfText, name(`${dir}/workflow.yaml`));
     if (wf && !wf.ok && wf.reason === "corrupt") errors.push(wf.error);
-    const nn = unit === STORY_UNIT_DIR ? null : (unit.split("-")[0] as string);
-    units.push({ key: nn === null ? story : `${story}/${nn}`, slice: nn === null ? null : `${story}/${nn}`, state: st.value, workflow: wf?.ok ? wf.value : null });
+    const nn = unit === STORY_UNIT_DIR ? null : (parseSliceDirName(unit, { loose: true })?.nn as string);
+    const slice = nn === null ? null : sliceKey(story, nn);
+    units.push({ key: slice ?? story, slice, state: st.value, workflow: wf?.ok ? wf.value : null });
   }
   return { units, errors };
 }

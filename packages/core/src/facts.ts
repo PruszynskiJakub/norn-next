@@ -146,10 +146,6 @@ export interface UnitFacts {
   errors: FileError[];
   /** receipts with n > state.applied_through, ascending by n */
   unapplied: NumberedReceipt[];
-  /** latest check receipt with outcome fail since the last step entry (B3 Rework, B6) */
-  last_check: NumberedReceipt | null;
-  /** latest done receipt carrying findings that routed back here (B3 Rework, B6) */
-  last_findings: NumberedReceipt | null;
   /**
    * The done/check receipt of `state.last_outcome` (the report that moved the cursor here), e.g. the
    * qa report a gate shows with its evidence (O1, F21). Absent/null = not read or none.

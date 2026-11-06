@@ -430,7 +430,7 @@ export interface ResolvedConfigResult {
 }
 
 /** B22, B54 (D7): the provider a remote URL names; null = a host that is neither; "local" = a path. */
-export function providerFromUrl(url: string): { provider: "gh" | "glab"; host: string } | { provider: null; host: string } | "local" {
+function providerFromUrl(url: string): { provider: "gh" | "glab"; host: string } | { provider: null; host: string } | "local" {
   const m = /^(?:[a-z+]+:\/\/)?(?:[^@/\s]+@)?([^/:\s]+)[:/]/i.exec(url);
   if (!m || url.startsWith("/") || url.startsWith(".") || url.startsWith("file:")) return "local";
   const host = (m[1] as string).toLowerCase();
@@ -440,7 +440,7 @@ export function providerFromUrl(url: string): { provider: "gh" | "glab"; host: s
 }
 
 /** `ms` as a duration string (`3m20s`). */
-export function durationText(ms: number): string {
+function durationText(ms: number): string {
   const parts: string[] = [];
   let rest = Math.round(ms / 1000);
   for (const [unit, s] of [
@@ -457,7 +457,7 @@ export function durationText(ms: number): string {
 }
 
 /** B35: lease = the larger of 10 minutes and 4 × interval, renewed every third of it. */
-export function claimTiming(interval: string): { lease: string; renew: string } {
+function claimTiming(interval: string): { lease: string; renew: string } {
   const lease = Math.max(10 * 60_000, 4 * parseDuration(interval));
   return { lease: durationText(lease), renew: durationText(lease / 3) };
 }
@@ -481,31 +481,25 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
   }
   const entries: ConfigEntry[] = [];
   const entry = (key: string, value: unknown, source: ConfigSource, reason?: string) => entries.push({ key, value, source, ...(reason ? { reason } : {}) });
-  const personal = <T>(key: string, builtIn: T): T => {
-    for (const kind of ["local", "user"] as const)
-      if (clean[kind][key] !== undefined) {
-        entry(key, clean[kind][key], kind);
-        return clean[kind][key] as T;
+  const at = (file: Record<string, unknown>, path: string): unknown =>
+    path.split(".").reduce<unknown>((v, seg) => (isMap(v) ? (v[seg] ?? undefined) : undefined), file);
+  /** The value at dotted `path` in the first of `kinds` that sets it, else `builtIn`; records where it came from. */
+  const layered =
+    (kinds: readonly ConfigFileKind[]) =>
+    <T>(path: string, builtIn: T): T => {
+      for (const kind of kinds) {
+        const v = at(clean[kind], path);
+        if (v !== undefined) {
+          entry(path, v, kind);
+          return v as T;
+        }
       }
-    entry(key, builtIn, "built-in");
-    return builtIn;
-  };
-  const team = <T>(key: string, builtIn: T): T => {
-    if (clean.repo[key] !== undefined) {
-      entry(key, clean.repo[key], "repo");
-      return clean.repo[key] as T;
-    }
-    entry(key, builtIn, "built-in");
-    return builtIn;
-  };
-  const machine = <T>(key: string, builtIn: T): T => {
-    if (clean.user[key] !== undefined) {
-      entry(key, clean.user[key], "user");
-      return clean.user[key] as T;
-    }
-    entry(key, builtIn, "built-in");
-    return builtIn;
-  };
+      entry(path, builtIn, "built-in");
+      return builtIn;
+    };
+  const personal = layered(["local", "user"]);
+  const team = layered(["repo"]);
+  const machine = layered(["user"]);
 
   const mode = personal<ResolvedConfig["mode"]>("mode", "manual");
   const agent = personal<string>("agent", "claude");
@@ -558,20 +552,17 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
   const slice_workflow = team<string>("slice_workflow", "slice");
   const norn_version = team<string | null>("norn_version", null);
   // gh-195 B9: the record policy, a team key; local unless the team file says remote
-  const recordPolicy = ((clean.repo.record as { policy?: RecordPolicy } | undefined)?.policy ?? undefined) as RecordPolicy | undefined;
-  entry("record.policy", recordPolicy ?? "local", recordPolicy === undefined ? "built-in" : "repo");
+  const recordPolicy = team<RecordPolicy>("record.policy", "local");
 
   const max_agents = machine<number>("max_agents", 9);
   const notifyFile = (clean.user.notify ?? {}) as Notify;
-  const notify: ResolvedConfig["notify"] = { os: notifyFile.os ?? true };
-  entry("notify.os", notify.os, notifyFile.os === undefined ? "built-in" : "user");
+  const notify: ResolvedConfig["notify"] = { os: machine<boolean>("notify.os", true) };
   for (const c of ["ntfy", "webhook"] as const)
     if (notifyFile[c] !== undefined) {
       notify[c] = notifyFile[c];
       entry(`notify.${c}`, notifyFile[c], "user");
     }
-  const retain = ((clean.user.trace as { retain?: string } | undefined)?.retain ?? undefined) as string | undefined;
-  entry("trace.retain", retain ?? "14d", retain === undefined ? "built-in" : "user");
+  const retain = machine<string>("trace.retain", "14d");
 
   const interval = derived.interval ?? DEFAULT_INTERVAL;
   entry("interval", interval, derived.interval ? "derived" : "built-in", derived.interval ? "recorded by the last watch or tick --interval" : undefined);
@@ -596,8 +587,8 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
     notify,
     interval,
     claim,
-    trace: { retain: retain ?? "14d" },
-    record: { policy: recordPolicy ?? "local" },
+    trace: { retain },
+    record: { policy: recordPolicy },
   };
   return { config, entries, problems };
 }

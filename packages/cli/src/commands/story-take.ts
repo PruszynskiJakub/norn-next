@@ -5,9 +5,9 @@
  * locally and takes nothing in itself.
  */
 import { cmd } from "@norn/core";
-import { parseStoryKey } from "@norn/schema";
+import { PROVIDERS, parseStoryKey } from "@norn/schema";
 import { defineCommand } from "../command.ts";
-import { CliFailure, failure, refuse, rendered, usageError } from "../output.ts";
+import { CliFailure, refuse, remoteFailed, rendered, requireRemote, usageError } from "../output.ts";
 import { projectView } from "../runtime/human.ts";
 
 export const storyTakeCommand = defineCommand({
@@ -21,13 +21,11 @@ export const storyTakeCommand = defineCommand({
     const raw = args.positionals[0];
     const provider = ctx.config.provider;
     const parts = raw ? parseStoryKey(raw) : null;
-    if (!raw || !parts || parts.provider !== provider) throw usageError(`name the issue's story key${raw ? `, not '${raw}'` : ""} (e.g. ${provider === "gh" ? "gh" : "gl"}-123)`, cmd.storyTake("<story>"));
+    if (!raw || !parts || parts.provider !== provider) throw usageError(`name the issue's story key${raw ? `, not '${raw}'` : ""} (e.g. ${PROVIDERS[provider].key_prefix}-123)`, cmd.storyTake("<story>"));
     const key = raw;
     const label = ctx.config.label;
     if ((await projectView(ctx)).stories.some((s) => s.key === key)) throw refuse(`${key} is taken in already`, cmd.storyView(key), "taken_in");
-    const remote = (await ctx.ports()).remote;
-    if (!remote) throw refuse("no remote is configured", cmd.doctor(), "no_remote");
-    const remoteFailed = (e: unknown) => failure(`the remote failed: ${(e as Error).message}`, cmd.doctor(), "remote_failed");
+    const remote = requireRemote((await ctx.ports()).remote);
     try {
       const issue = await remote.getIssue(parts.number);
       if (!issue) throw refuse(`no issue #${parts.number} on the remote`, cmd.status(), "no_issue");

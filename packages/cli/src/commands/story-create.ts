@@ -12,7 +12,7 @@ import { storyKey } from "@norn/schema";
 import { loadWorkflows, WORKFLOWS_DIR } from "@norn/store";
 import { defineCommand, opt, type ParsedArgs } from "../command.ts";
 import type { Context } from "../context.ts";
-import { CliFailure, failure, refuse, rendered, usageError } from "../output.ts";
+import { CliFailure, failure, refuse, remoteFailed, rendered, requireRemote, usageError } from "../output.ts";
 import { openLink } from "../runtime/open-link.ts";
 import { runTick } from "../runtime/tick.ts";
 
@@ -45,9 +45,7 @@ export const storyCreateCommand = defineCommand({
         throw refuse(`no workflow '${workflow}' in ${WORKFLOWS_DIR}/ (available: ${listed.join(", ") || "none"})`, cmd.storyCreate({ workflow: `<${listed.join("|")}>` }), "unknown_workflow", { workflows: listed });
     }
     const labels = [ctx.config.label, ...(workflow ? [`${WF_LABEL}${workflow}`] : [])];
-    const remote = (await ctx.ports()).remote;
-    if (!remote) throw refuse("no remote is configured", cmd.doctor(), "no_remote");
-    const remoteFailed = (e: unknown) => failure(`the remote failed: ${(e as Error).message}`, cmd.doctor(), "remote_failed");
+    const remote = requireRemote((await ctx.ports()).remote);
 
     if (opt.bool(args, "web")) {
       // B23

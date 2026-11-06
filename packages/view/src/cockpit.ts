@@ -6,7 +6,7 @@
  * run their effects; they never decide which actions fit a row (CP4). Writes stay CLI verbs (X1).
  */
 import type { InboxGroup, InboxItem, RemoteIssue } from "@norn/core";
-import { type RemoteProvider, storyKey } from "@norn/schema";
+import { isClosedStatus, type RemoteProvider, storyKey } from "@norn/schema";
 import { inboxItemsInOrder } from "./format.ts";
 import { type OrientReport, orientReport } from "./orient.ts";
 import type { HeartbeatView, InboxEntry, ProjectView, StoryView } from "./types.ts";
@@ -132,7 +132,7 @@ const TAB_ORDER: readonly CockpitTab[] = ["now", "backlog", "done"];
 
 /** A closed story (`story_status` done or dropped) is done whatever its unit says; one never started is backlog. */
 function storyTab(s: StoryView): CockpitTab {
-  if (s.story_status === "done" || s.story_status === "dropped" || s.status === "done") return "done";
+  if (isClosedStatus(s.story_status) || s.status === "done") return "done";
   return s.status === "not_started" ? "backlog" : "now";
 }
 

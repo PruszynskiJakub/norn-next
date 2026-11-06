@@ -9,7 +9,7 @@
  */
 import type { ProjectView, SliceView, StoryView } from "@norn/view";
 import { inboxItemsInOrder, loadRunView, stepTitle } from "@norn/view";
-import { cmd } from "@norn/core";
+import { cmd, isParked } from "@norn/core";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
 import { storyArg } from "./args.ts";
@@ -92,5 +92,5 @@ export async function resolveStory(ctx: Context, explicit: string | undefined, j
 
 /** A unit parked on a question (`story answer`) or at a gate (`story approve`, `story reject`). */
 export function parkedOn(kind: "ask" | "gate", verb: string, none: string, command: (key: string) => string): TargetRule {
-  return { verb, command, none, applies: (_key, u) => u?.status === "parked" && u.park?.kind === kind };
+  return { verb, command, none, applies: (_key, u) => !!u && isParked(u, kind) };
 }

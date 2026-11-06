@@ -55,8 +55,6 @@ async function editMode(ctx: Context, raw: string, mode: Mode) {
     verb: "story edit",
     mailbox: false,
     claim,
-    // MO1: every mode receipt applies, the last one wins — a second switch is no duplicate
-    refuseDuplicate: false,
     check(t, st) {
       if (st.status === "done") throw refuse(`${t.key} is done`, cmd.storyView(t.story), "unit_done");
     },
@@ -156,8 +154,6 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
     const out = await runHumanVerb(ctx, t, {
       verb: "story edit",
       mailbox: false,
-      // as before: a second switch before the tick is written, not refused as a duplicate (S6)
-      refuseDuplicate: false,
       check(t, st) {
         if (st.status === "done") throw refuse(`${t.key} is done`, cmd.storyView(t.story), "unit_done");
         // B32, S7: the step a started unit lands on is always explicit
@@ -187,8 +183,6 @@ async function moveCursor(ctx: Context, raw: string, at: string) {
       verb: "story edit",
       mailbox: false,
       claim,
-      // as a workflow switch: a second move before the tick is written, not refused as a duplicate (S6)
-      refuseDuplicate: false,
       check(t, st) {
         // gh-71 B16 (RD4): a finished round is never revived; the next one starts with --workflow
         if (t.slice === null && roundFinished(st))

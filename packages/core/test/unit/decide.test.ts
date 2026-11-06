@@ -96,7 +96,7 @@ describe("claims (T1–T10)", () => {
     expect(isSideAction(ds[0]!.action)).toBe(true);
     expect(unitDecision(ds, "gh-1")?.rule).toBe("receipts.apply");
   });
-  test("R3.1: the intake claim carries what to remove if it is lost — from the intake_only fact, never decided without it", () => {
+  test("R3.1: the intake claim carries what to remove if it is lost — from the intake_only fact, kept without it", () => {
     const fresh = (patch: Partial<StoryFacts>) => {
       const s = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)], { claim: { state: "none" }, ...patch });
       s.frontmatter = { ...s.frontmatter!, status: "new" };
@@ -104,7 +104,7 @@ describe("claims (T1–T10)", () => {
       return a.kind === "claim" ? a : null;
     };
     expect(fresh({})).toMatchObject({ rule: "claim.acquire.intake" });
-    expect(fresh({})).not.toHaveProperty("lost_intake");
+    expect(fresh({})?.lost_intake).toEqual({ keep: "not decided: the intake branch was not observed" });
     const clean = { ...worktreeOf("/r-worktrees/gh-1-login"), status: wtStatus("/r-worktrees/gh-1-login", "gh-1-login") };
     expect(fresh({ intake_only: true, worktree: clean })?.lost_intake).toEqual({ drop: { worktree: "/r-worktrees/gh-1-login", branch: "gh-1-login" } });
     expect(fresh({ intake_only: true, worktree: null })?.lost_intake).toEqual({ drop: { worktree: null, branch: "gh-1-login" } });
@@ -136,10 +136,11 @@ describe("corrupt units (S2)", () => {
       s.units[0]!.errors = [{ file, errors: [{ path: "", message: "bad" }] }];
       return only(facts([s]));
     };
-    expect(corrupt(".agents/specs/gh-1-login/runs/_story/receipts/0001-done.json")).toMatchObject({ kind: "mark_corrupt", mark_state: true });
-    expect(corrupt(".agents/specs/gh-1-login/runs/_story/state.json")).toMatchObject({ kind: "mark_corrupt", mark_state: false });
+    const reason = "corrupt: .agents/specs/gh-1-login/runs/_story/receipts/0001-done.json failed validation (S2)";
+    expect(corrupt(".agents/specs/gh-1-login/runs/_story/receipts/0001-done.json")).toMatchObject({ kind: "mark_corrupt", state: { status: "corrupt", park: { kind: "corrupt", reason } } });
+    expect(corrupt(".agents/specs/gh-1-login/runs/_story/state.json")).toMatchObject({ kind: "mark_corrupt", state: null });
     const broken = solo({}, null, { frontmatter: null, frontmatter_error: { file: ".agents/specs/gh-1-login/story.md", errors: [{ path: "", message: "bad" }] } });
-    expect(only(facts([broken]))).toMatchObject({ kind: "mark_corrupt", rule: "story.corrupt", mark_state: false });
+    expect(only(facts([broken]))).toMatchObject({ kind: "mark_corrupt", rule: "story.corrupt", state: null });
   });
   test("never touched: mark once, then noop forever", () => {
     const s = solo();
@@ -838,6 +839,20 @@ describe("trace compatibility (O5)", () => {
     };
     expect(legacyAction(old)).toEqual(now);
     expect(legacyAction(now)).toBe(now);
+  });
+  test("an older norn's actions without what act now reads from them (lost_intake, yields_to_report, state) read as decide emits them now", () => {
+    const s = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)], { claim: { state: "none" } });
+    s.frontmatter = { ...s.frontmatter!, status: "new" };
+    const intake = only(facts([s]));
+    if (intake.kind !== "claim") throw new Error(intake.kind);
+    const { lost_intake: _l, ...oldIntake } = intake;
+    expect(legacyAction(oldIntake)).toEqual(intake);
+    const broken = only(facts([solo({}, null, { frontmatter: null, frontmatter_error: { file: ".agents/specs/gh-1-login/story.md", errors: [{ path: "", message: "bad" }] } })]));
+    if (broken.kind !== "mark_corrupt") throw new Error(broken.kind);
+    const { state: _s, ...oldBroken } = broken;
+    expect(legacyAction({ ...oldBroken, mark_state: false })).toEqual(broken);
+    const resolved = { kind: "apply_receipts", rule: "agent.ask.implicit.resolved", receipts: [] };
+    expect(legacyAction(resolved)).toEqual({ ...resolved, yields_to_report: true });
   });
 });
 

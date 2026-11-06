@@ -89,8 +89,6 @@
       "units": [
         {
           "errors": [],
-          "last_check": null,
-          "last_findings": null,
           "last_outcome_receipt": null,
           "lease": null,
           "record": "_story",

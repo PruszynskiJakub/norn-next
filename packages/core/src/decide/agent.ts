@@ -110,9 +110,8 @@ function startedReceipt(ctx: Ctx, st: UnitState, step: AgentStep, run_id: string
 
 export function startRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, step: AgentStep): void {
   const ref = uf.unit;
-  // gh-61 B18 (D6): no agent step on drifted bundled skills — before the mode check, so a manual unit
-  // is not offered a start `brief` would refuse (B20); gates, checks, syncs and merges go on
-  if (uf.skills_drift?.length) return ctx.noop(ref, "agent.skills_drift", `skills differ from the running norn: ${uf.skills_drift.join(", ")}`);
+  // gh-252 (SK1): a run uses the bundled skills its worktree holds, like the workflow it pinned (S7);
+  // a copy that differs from the running norn's never holds the start — the inbox says so (Check)
   const { mode, downgraded } = effectiveMode(story.mode, !!step.attended, ctx.facts.machine.runner);
   if (mode === "manual")
     return ctx.noop(ref, downgraded ? "agent.ready.manual.no_runner" : "agent.ready.manual", downgraded ? "auto requested, no runner; running manual (MO2)" : `ready: a person starts an agent and runs ${cmd.brief()}`);
@@ -436,7 +435,7 @@ export function resolveImplicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, s
   if (st.park?.receipt_id) answer.ask_receipt_id = st.park.receipt_id;
   if (uf.unit.slice) answer.slice = uf.unit.slice;
   const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), answer);
-  emitApplied(ctx, story, uf, "agent.ask.implicit.resolved", res, [nr], { message: `norn: ${uf.unit.key} ${st.step} moved on (${why})`, step: st.step });
+  emitApplied(ctx, story, uf, "agent.ask.implicit.resolved", res, [nr], { message: `norn: ${uf.unit.key} ${st.step} moved on (${why})`, step: st.step }, { yields_to_report: true });
 }
 
 /** R9.1: how long a started session may go without taking its launch prompt, before a re-send and again before `silent`. */
