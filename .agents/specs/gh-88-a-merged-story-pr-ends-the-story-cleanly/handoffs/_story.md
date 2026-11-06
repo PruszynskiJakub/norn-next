@@ -11,8 +11,8 @@ GR6 cleanup records a merged story's units done, so a story merged while parked 
 - Golden: `bun run golden -- --update` rewrote 3 cases (only the new `finish` field). Transcript `test/e2e/transcripts/base-sync.txt` updated (one new state.json write at cleanup).
 - Stories cleaned up by an older norn (gh-60, gh-69, gh-76) keep their parked state; not migrated.
 - Not changed: `norn-fsd-round` still waits `--until merged`; it could go back to `--until done` now (triage note), left for a later change.
-- #72 (a workflow merging its own PR) is a GR5 change with open decisions (merge method, refused merge, process check); asked the person whether it belongs in this quick round.
+- #72 (a workflow merging its own PR) is out of this round, by the person's decision: it changes GR5 and has open decisions (merge method, whether an approved gate counts as a person merging, refused merges), so it gets its own refinement round.
 
 ## Resume
 
-Read the person's answer to the #72 question. If #72 is out of this round: report `norn done done`. If in: add a `merge` git action (W2/W8), after a gate, per the answer, with tests at decide and the act/remote port.
+Implement is finished for #88. Next: the workflow's checks and review of commit `64cc1390e`. #72 waits for its own refinement round.
