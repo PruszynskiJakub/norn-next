@@ -629,7 +629,7 @@ describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run r
   }, 60_000);
 });
 
-describe("gh-61 B22: a story in flight waits for its branch to take in the base's new skills", () => {
+describe("gh-252 (SK1): a story in flight keeps running on its worktree's skills after the base moves to new ones", () => {
   const HELD = `name: held
 start: work
 steps:
@@ -686,7 +686,7 @@ counters: { reject_loop: { max: 3 }, stale_loop: { max: 3 } }
   });
   afterAll(() => h.cleanup());
 
-  test("AC1: held at the next agent step (Unblock item) until the base sync brings the skills in; then it launches on the same pinned workflow", async () => {
+  test("its next agent step launches on the worktree's copies (a Check item, nothing under Unblock), on the same pinned workflow", async () => {
     // the story runs its first agent step on 0.18.0's skills
     await until(() => h.state(runs())?.status === "running", "work running");
     expect(h.runner.launches).toHaveLength(1);
@@ -709,29 +709,17 @@ counters: { reject_loop: { max: 3 }, stale_loop: { max: 3 } }
     sh(sibling, ["push", "-q", "origin", "main"]);
     h.git(["pull", "-q", "--ff-only"]);
 
-    // the next agent step is held: no launch, an Unblock item naming the fix
+    // the next agent step is not held: it launches in the worktree, still on the 0.18.0 copy
     expect((await h.norn("story", "reject", "gh-7", "--reason", "one more pass")).exit).toBe(0);
-    for (let i = 0; i < 2; i++) {
-      h.clock.advance(10_000);
-      await h.tick("--sync");
-    }
-    h.clock.advance(10_000);
-    const held = await h.tick();
-    expect(held.decisions.filter((d) => d.rule === "agent.skills_drift").map((d) => d.unit)).toEqual(["gh-7"]);
-    expect(h.state(runs())).toMatchObject({ step: "work", status: "ready" });
-    expect(h.runner.launches).toHaveLength(1);
-    const groups = ((await h.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; title: string; command: string }>> }).groups;
-    expect(groups.unblock?.map((i) => [i.story, i.title, i.command])).toEqual([
-      ["gh-7", "skills differ from norn 0.19.0 (norn): bring the base in with `norn story update-branch gh-7`", "norn story update-branch gh-7"],
-    ]);
-
-    // the person runs the fix: the base sync merges the base into the story branch, the next tick launches the step
-    expect((await h.norn("story", "update-branch", "gh-7")).exit).toBe(0);
     await until(() => h.state(runs())?.step === "work" && h.state(runs())?.status === "running", "work running again");
-    expect(h.git(["log", "-1", "--merges", "--format=%s"], wt())).toMatch(/^Update gh-7 from main /);
-    expect(skill(wt())).not.toContain("the 0.18.0 protocol");
     expect(h.runner.launches).toHaveLength(2);
     expect(h.runner.launches[1]?.cwd).toBe(wt());
+    expect(skill(wt())).toContain("the 0.18.0 protocol");
+    const groups = ((await h.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; title: string; command: string }>> }).groups;
+    expect(groups.unblock ?? []).toEqual([]);
+    expect(groups.check?.filter((i) => i.story === "gh-7" && i.title.startsWith("skills differ")).map((i) => [i.title, i.command])).toEqual([
+      ["skills differ from norn 0.19.0 (norn): runs use this worktree's copies until the base is merged in", "norn story view gh-7"],
+    ]);
     expect(readFileSync(pinnedWorkflowPath(runs()), "utf8")).toBe(pinned);
   }, 60_000);
 });

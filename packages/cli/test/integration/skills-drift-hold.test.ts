@@ -1,8 +1,9 @@
 /**
- * gh-61 B18, B19, B21 (D5, D6, D14): observe records each unit worktree's drifted bundled skills; a
- * tick launches no agent in a drifted unit and `norn status` names the fix, while a unit with only a
- * repo-local skill edited launches. A unit worktree whose team file records a newer `norn_version`
- * is not drift. The view's inbox equals `buildInbox` over observe's Facts.
+ * gh-61 B21 (D5, D14), gh-252 (SK1): observe records each unit worktree's drifted bundled skills; a
+ * tick launches a drifted unit like any other (its runs use the worktree's copies) and `norn status`
+ * shows the difference as a Check item, while a repo-local skill never counts. A unit worktree whose
+ * team file records a newer `norn_version` is not drift. The view's inbox equals `buildInbox` over
+ * observe's Facts.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -24,7 +25,7 @@ steps:
     skill: norn-implement
     outcomes: { done: $done }
 `;
-const HELD = "skills differ from norn 0.19.0 (norn): bring the base in with `norn story update-branch gh-7`";
+const DIFFER = "skills differ from norn 0.19.0 (norn): runs use this worktree's copies until the base is merged in";
 
 let h: Harness;
 const wt = (key: string, slug: string) => `${h.root}-worktrees/${key}-${slug}`;
@@ -63,7 +64,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("drifted skills hold a unit's agent steps (gh-61 B18, B19, B21)", () => {
+describe("drifted skills hold nothing (gh-252, gh-61 B21)", () => {
   test("AC4, D5: observe records the drifted bundled skill, never the repo-local one", async () => {
     const obs = await observeNow(h);
     const unit = (key: string) => obs.facts.stories.find((s) => s.key === key)?.units[0];
@@ -72,29 +73,27 @@ describe("drifted skills hold a unit's agent steps (gh-61 B18, B19, B21)", () =>
     expect(obs.facts.norn?.skills_drift).toEqual([]);
   });
 
-  test("AC5 (B18): the tick launches gh-8 and no agent for gh-7", async () => {
-    await ticks();
-    expect(launchedIn()).toEqual([gh8()]);
-  });
-
-  test("AC5 (B19): norn status shows the held unit under Unblock with its fix; inbox parity holds", async () => {
+  test("gh-252: norn status shows the drifted unit as a Check item, nothing under Unblock; inbox parity holds", async () => {
     const r = await h.norn("status", "--json");
     expect(r.exit).toBe(0);
     const groups = (r.value as { groups: Groups }).groups;
-    expect(groups.unblock?.map((i) => [i.story, i.title, i.command])).toEqual([["gh-7", HELD, "norn story update-branch gh-7"]]);
-    expect((await h.norn("status")).stdout).toContain(HELD);
+    expect(groups.unblock ?? []).toEqual([]);
+    expect(groups.check?.filter((i) => i.title === DIFFER).map((i) => [i.story, i.command])).toEqual([["gh-7", "norn story view gh-7"]]);
     const obs = await observeNow(h);
     const ctx = new Context(h.deps);
     await ctx.locate();
     expect((await projectView(ctx)).inbox).toEqual(buildInbox(obs.facts, obs.config));
   });
 
-  test("AC2 (D14): gh-7's own team file records a newer norn_version → not drift, it launches", async () => {
+  test("gh-252: the tick launches both, the drifted gh-7 included", async () => {
+    await ticks();
+    expect(launchedIn().sort()).toEqual([gh7(), gh8()].sort());
+  });
+
+  test("AC2 (D14): gh-7's own team file records a newer norn_version → not drift", async () => {
     const team = repoConfigPath(gh7());
     writeFileSync(team, `${readFileSync(team, "utf8")}norn_version: 0.20.0\n`);
     const obs = await observeNow(h);
     expect(obs.facts.stories.find((s) => s.key === "gh-7")?.units[0]?.skills_drift).toEqual([]);
-    await ticks();
-    expect(launchedIn()).toEqual([gh8(), gh7()]);
   });
 });

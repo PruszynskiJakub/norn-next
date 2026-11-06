@@ -1,7 +1,7 @@
 /**
- * gh-61 B18, B19, B21 (D5, D6): a unit whose worktree holds drifted bundled skills starts no agent
- * step — before the mode check, so a manual unit is not offered a start `brief` would refuse — while
- * its gates, checks and base syncs go on; the inbox names the fix. Hand-built Facts (S3).
+ * gh-252 (SK1): a unit whose worktree holds bundled skills that differ from the running norn's runs
+ * as any other: its agent steps start with the worktree's copies, its gates, checks and base syncs
+ * go on, and the inbox shows the difference as a Check item. Hand-built Facts (S3).
  */
 import { describe, expect, test } from "bun:test";
 import type { Workflow } from "@norn/schema";
@@ -42,18 +42,31 @@ function driftedStory(wf: Workflow, patch: Parameters<typeof stateFor>[2], uf: P
   return facts([storyFacts("gh-1", [unitFacts(u, wf, st, { skills_drift: DRIFT, ...uf })], { frontmatter: { ...fm, workflow: wf.name, refined_body_hash: fm.body_hash }, ...sf })], { norn: NORN });
 }
 
-describe("drifted skills hold an agent start (gh-61 B18, D6)", () => {
-  test("a drifted slice is not launched; its sibling is", () => {
+describe("drifted skills hold nothing (gh-252, SK1)", () => {
+  test("a drifted slice is launched like its sibling", () => {
     const ds = decide(twoSlices(["01"]), WORKFLOWS, CONFIG);
-    expect(of(ds, "gh-1/01")).toMatchObject({ kind: "noop", rule: "agent.skills_drift" });
+    expect(of(ds, "gh-1/01")?.kind).toBe("start_run");
     expect(of(ds, "gh-1/02")?.kind).toBe("start_run");
-    expect(ds.filter((d) => d.action.kind === "start_run")).toHaveLength(1);
   });
 
-  test("the rule sits before the mode check: a manual unit is held the same", () => {
+  test("a drifted manual unit waits for a person like any manual unit", () => {
     const ds = decide(twoSlices(["01", "02"], { mode: "manual" }), WORKFLOWS, CONFIG);
-    expect(of(ds, "gh-1/01")).toMatchObject({ kind: "noop", rule: "agent.skills_drift" });
-    expect(of(ds, "gh-1/02")).toMatchObject({ kind: "noop", rule: "agent.skills_drift" });
+    expect(of(ds, "gh-1/01")).toMatchObject({ kind: "noop", rule: "agent.ready.manual" });
+    expect(of(ds, "gh-1/02")).toMatchObject({ kind: "noop", rule: "agent.ready.manual" });
+  });
+
+  test("a drifted unit at its resolve step starts the merge agent (the base cannot come in otherwise)", () => {
+    const BASED: Workflow = {
+      name: "based",
+      start: "resolve",
+      steps: {
+        update: { type: "git", action: "update", outcomes: { done: "$done", conflict: { to: "resolve", counter: "loop" } } },
+        resolve: { type: "agent", skill: "merge", outcomes: { done: "update" } },
+      },
+      counters: { loop: { max: 3 } },
+    };
+    const ds = decide(driftedStory(BASED, { step: "resolve" }), { ...WORKFLOWS, based: loaded(BASED) }, CONFIG);
+    expect(of(ds, "gh-1")?.kind).toBe("start_run");
   });
 
   test("no skills_drift observed, or an empty list, launches as before", () => {
@@ -90,24 +103,24 @@ describe("drifted skills hold an agent start (gh-61 B18, D6)", () => {
   });
 });
 
-describe("drifted skills in the inbox (gh-61 B19, B21)", () => {
-  test("B19: the held unit is an Unblock item naming the fix", () => {
+describe("drifted skills in the inbox (gh-252, gh-61 B21)", () => {
+  test("a drifted unit is a Check item, never Unblock", () => {
     const inbox = buildInbox(twoSlices(["01"]), CONFIG);
-    const held = inbox.groups.unblock.filter((i) => i.slice === "gh-1/01");
-    expect(held).toHaveLength(1);
-    expect(held[0]).toMatchObject({
+    const items = inbox.groups.check.filter((i) => i.slice === "gh-1/01");
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
       story: "gh-1",
       step: "implement",
-      title: "skills differ from norn 0.19.0 (norn, norn-implement): bring the base in with `norn story update-branch gh-1`",
-      command: "norn story update-branch gh-1",
+      title: "skills differ from norn 0.19.0 (norn, norn-implement): runs use this worktree's copies until the base is merged in",
+      command: "norn story view gh-1",
     });
-    expect(inbox.groups.unblock.some((i) => i.slice === "gh-1/02")).toBe(false);
+    expect(inbox.groups.unblock).toEqual([]);
+    expect(inbox.groups.check.some((i) => i.slice === "gh-1/02")).toBe(false);
   });
 
-  test("B19: a held manual unit is not offered a start", () => {
+  test("a drifted manual unit is offered a start like its sibling", () => {
     const inbox = buildInbox(twoSlices(["01"], { mode: "manual" }), CONFIG);
-    expect(inbox.groups.your_turn.some((i) => i.slice === "gh-1/01")).toBe(false);
-    expect(inbox.groups.unblock.some((i) => i.slice === "gh-1/01")).toBe(true);
+    expect(inbox.groups.your_turn.some((i) => i.slice === "gh-1/01")).toBe(true);
     expect(inbox.groups.your_turn.some((i) => i.slice === "gh-1/02")).toBe(true);
   });
 
@@ -124,9 +137,10 @@ describe("drifted skills in the inbox (gh-61 B19, B21)", () => {
     expect(inbox.groups.unblock).toEqual([]);
   });
 
-  test("a drifted unit at a check step is not an item: only agent starts are held", () => {
+  test("a drifted unit at a check step is the same Check item, and nothing under Unblock", () => {
     const inbox = buildInbox(driftedStory(STORY_WF, { step: "test" }), CONFIG);
     expect(inbox.groups.unblock).toEqual([]);
+    expect(inbox.groups.check.filter((i) => i.story === "gh-1" && i.id.startsWith("skills_drift:"))).toHaveLength(1);
   });
 });
 
