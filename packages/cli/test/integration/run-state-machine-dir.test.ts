@@ -207,7 +207,26 @@ describe("a worktree is disposable (B2, B3)", () => {
     expect(await uncommitted()).toBe(false);
   });
 
-  test("AC3: the story worktree removed while parked on an ask, `norn story start` recreates it: status shows the same ask, same attempt", async () => {
+  test("#265: recover.commit commits the dirty handoff alone: never a run-state path from the machine dir, never the agent's files (S12, R2.1)", async () => {
+    const handoff = handoffPath(join(wt10(), SPEC10), STORY_UNIT_DIR);
+    const rel = `${SPEC10}/${unitHandoffPath(STORY_UNIT_DIR)}`;
+    const text = h.read(handoff);
+    const head = sh(wt10(), ["rev-parse", "HEAD"]).trim();
+    writeFileSync(handoff, `${text}\nrecovered\n`);
+    h.write(join(wt10(), "src/wip.ts"), "export const wip = 1;\n");
+    const r = await tick();
+    const recover = r.decisions.filter((d) => d.rule === "recover.commit");
+    expect(recover).toMatchObject([{ kind: "commit_push", ok: true }]);
+    expect(recover[0]?.error).toBeUndefined();
+    expect(sh(wt10(), ["show", "--name-only", "--format=", "HEAD"]).split("\n").filter(Boolean)).toEqual([rel]);
+    expect(sh(wt10(), ["rev-list", "--count", `${head}..HEAD`]).trim()).toBe("1");
+    expect(status(wt10())).toEqual(["src/wip.ts"]);
+    // the handoff is committed: nothing owed, no recover.commit on the next tick
+    expect((await tick()).decisions.map((d) => d.rule)).not.toContain("recover.commit");
+    rmSync(join(wt10(), "src"), { recursive: true });
+  });
+
+  test("AC3:the story worktree removed while parked on an ask, `norn story start` recreates it: status shows the same ask, same attempt", async () => {
     const before = await asked();
     expect(before.some((i) => i.title.includes("Which colour?"))).toBe(true);
     sh(h.root, ["worktree", "remove", "--force", wt10()]);

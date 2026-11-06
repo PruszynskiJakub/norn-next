@@ -220,7 +220,10 @@ export class Actor extends ActEnv {
         return markDone(this, a);
       case "commit_push": {
         const loc = this.unitLoc(a.unit);
-        const rel = relative(a.commit.cwd, loc.runsDir);
+        // #265 (S12, gh-195 D8): what recover.commit owes is the unit's handoff, norn's one file in the worktree
+        // (observe's `uncommitted`); its run state is in the machine dir, never staged in the worktree (outside
+        // the repository), and the agent's own files are never committed under a live session (R2.1)
+        const rel = relative(a.commit.cwd, loc.handoffFile);
         return { ok: true, detail: await this.commit(a.commit, a.unit, loc.state, [rel]) };
       }
       case "reject_receipt":
