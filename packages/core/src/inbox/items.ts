@@ -13,7 +13,7 @@ import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, s
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
-import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, heldBySkillsDrift, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, skillsDiffer, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { isParked } from "../verbs.ts";
 import { epoch, formatAge, iso } from "../time.ts";
@@ -197,6 +197,25 @@ function recordPushItem(story: StoryFacts): InboxItem | null {
     detail: `${f.reason} · tick ${f.tick_id}`,
     command: cmd.storyCheckout(story.key),
     since: f.at,
+    ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
+  };
+}
+
+/**
+ * gh-252 (SK1): the unit's worktree holds bundled skills that differ from the running norn's. Nothing
+ * is held — its runs use those copies — so it is a Check item, one per unit and set of skills.
+ */
+function skillsDriftItem(story: StoryFacts, uf: UnitFacts, facts: Facts): InboxItem | null {
+  if (!skillsDiffer(uf) || !uf.skills_drift || !facts.norn) return null;
+  return {
+    id: `skills_drift:${uf.unit.key}:${facts.norn.running}:${uf.skills_drift.join(",")}`,
+    group: "check",
+    story: story.key,
+    slice: uf.unit.slice,
+    step: uf.state?.step ?? null,
+    title: skillsDriftHint.unit(facts.norn.running, uf.skills_drift),
+    command: cmd.storyView(story.key),
+    since: uf.state?.step_entered_at ?? iso(facts.now),
     ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
   };
 }
@@ -648,11 +667,6 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       return item("running", `${st.step} #${st.attempt}${st.run ? ` (${st.run.how})` : ""}`, cmd.runList(key), st.run?.started_at ?? st.step_entered_at);
     case "ready": {
       const step = uf.workflow ? stepOf(uf.workflow, st.step) : null;
-      // gh-61 B19 (D6): decide holds the agent start on drifted skills; say why and how to fix it
-      if (heldBySkillsDrift(uf) && uf.skills_drift && facts.norn)
-        return item("unblock", skillsDriftHint.held(facts.norn.running, uf.skills_drift, story.key), cmd.storyUpdateBranch(story.key), st.step_entered_at, {
-          id: `skills_drift:${key}:${st.step}#${st.attempt}:${uf.skills_drift.join(",")}`,
-        });
       if (step?.type === "agent") {
         const { mode, downgraded } = effectiveMode(story.mode, !!step.attended, facts.machine.runner);
         if (mode === "manual") {
@@ -891,6 +905,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     for (const it of noteItems(story)) add(it);
     for (const uf of story.units) {
       add(unitInboxItem(story, uf, facts, config));
+      add(skillsDriftItem(story, uf, facts));
       add(actFailureItem(story, uf));
     }
   }

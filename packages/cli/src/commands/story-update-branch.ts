@@ -6,7 +6,7 @@
  * applies it (S5). The tick never moves a done unit by itself — only a person does, with this verb.
  * Without a story: the worktree's story, a slice worktree's too (B55), else a pick of the waiting stories (B57).
  */
-import { cmd, baseUpdateStep, heldBySkillsDrift, storyUnit, waitsForBaseUpdate } from "@norn/core";
+import { cmd, baseUpdateStep, waitsForBaseUpdate } from "@norn/core";
 import { isClosedStatus } from "@norn/schema";
 import { defineCommand } from "../command.ts";
 import { refuse } from "../output.ts";
@@ -50,9 +50,9 @@ export const storyUpdateBranchCommand = defineCommand({
         if (fm?.status === "done" || sf?.pr?.state === "merged" || sf?.merged_by_ancestry)
           throw refuse(`${t.story} is merged; nothing to update`, cmd.storyView(t.story), "story_merged");
         if (fm?.status === "dropped") throw refuse(`${t.story} is dropped`, cmd.storyView(t.story), "story_dropped");
-        const su = sf ? storyUnit(sf) : null;
-        if (!waitsForBaseUpdate(st, !!su && heldBySkillsDrift(su)))
-          throw refuse(`${t.story} is not waiting: it is at ${at(st)}; update re-enters a story that is done, at a gate, stuck or held by drifted skills`, cmd.storyView(t.story), "not_waiting");
+        // gh-252: drifted skills hold nothing any more, so only done, a gate or stuck waits (BS9)
+        if (!waitsForBaseUpdate(st, false))
+          throw refuse(`${t.story} is not waiting: it is at ${at(st)}; update re-enters a story that is done, at a gate or stuck`, cmd.storyView(t.story), "not_waiting");
         const wf = t.workflow;
         if (!wf) throw refuse(`${t.story} has no readable pinned workflow`, cmd.runView(t.story, { why: true }), "workflow_missing");
         const step = baseUpdateStep(wf);
@@ -60,12 +60,7 @@ export const storyUpdateBranchCommand = defineCommand({
         to = step;
       },
       // P6: the receipt first; the tick applies it and writes state.json last (S5)
-      build: (t, st) => {
-        // gh-61 B22: name the drift that held the unit, so apply takes the update from its agent step
-        const su = t.story_facts ? storyUnit(t.story_facts) : null;
-        const held = su && heldBySkillsDrift(su) ? su.skills_drift : undefined;
-        return humanReceipt(ctx, t, st, "update", { from: st.step, to, reason: "person", ...(held ? { skills_drift: held } : {}) });
-      },
+      build: (t, st) => humanReceipt(ctx, t, st, "update", { from: st.step, to, reason: "person" }),
     });
     return { unit: t.story, receipt: out.receipt, delivered: out.delivered, next: out.next };
   },
