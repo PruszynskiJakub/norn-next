@@ -325,10 +325,13 @@ function readyOf(story: StorySnapshot, u: UnitSnapshot | undefined, indexOf: (u:
 
 /**
  * A2/R5.3: the hook facts of a run — those naming its run id, and those naming none fired in its
- * worktree since it started. observe and the view (X1) pick them the same way.
+ * worktree since it started by the run's own agent session (MO3) or an unknown one. observe and the
+ * view (X1) pick them the same way.
  */
-export function runHooks(hooks: readonly HookFact[], run: Pick<RunInfo, "run_id" | "started_at">, worktree: string | null): HookFact[] {
-  return hooks.filter((h) => (h.run_id ? h.run_id === run.run_id : !!worktree && h.cwd.startsWith(worktree) && h.at >= run.started_at));
+export function runHooks(hooks: readonly HookFact[], run: Pick<RunInfo, "run_id" | "started_at" | "agent_session_id">, worktree: string | null): HookFact[] {
+  // MO3 (gh-92): a fact of another agent session in the worktree is not the run's
+  const own = (h: HookFact) => !run.agent_session_id || !h.agent_session_id || h.agent_session_id === run.agent_session_id;
+  return hooks.filter((h) => (h.run_id ? h.run_id === run.run_id : !!worktree && h.cwd.startsWith(worktree) && h.at >= run.started_at && own(h)));
 }
 
 /** Run facts are observed for running units and for parked ones that keep their run (B2: is the session still there to answer into?). */

@@ -70,7 +70,7 @@ function env() {
 const inWt = (cwd: string, ...argv: string[]): Promise<CliResult> => runChecked(argv, { ...h.deps, cwd, env: env() });
 const hook = (cwd: string, event: string, payload: Record<string, unknown>, ...flags: string[]) =>
   runChecked(["hook", event, ...flags], { ...h.deps, cwd, env: env(), stdin: JSON.stringify({ session_id: "sess-1", transcript_path: "/tmp/t.jsonl", cwd, ...payload }) });
-const stop = (cwd: string) => hook(cwd, "stop", { hook_event_name: "Stop", stop_hook_active: false });
+const stop = (cwd: string, session_id = "sess-1") => hook(cwd, "stop", { hook_event_name: "Stop", stop_hook_active: false, session_id });
 /** B5 (D3): the lines of a unit's hook file (`_story` for the story unit) */
 const hookFileLines = (story: string, unit = "_story") => {
   const file = join(machineDir(h.root), "hooks", story, `${unit}.jsonl`);
@@ -355,11 +355,11 @@ describe("attended steps never block (MO4)", () => {
     const started = receipts(pairRuns()).filter((f) => f.endsWith("-started.json"));
     expect(readReceipt(pairRuns(), started.at(-1) as string)).toMatchObject({ kind: "started", agent_session_id: "sess-pair", worktree: pairWt() });
     expect((b?.value as { markdown: string }).markdown).toContain("Attended step: no deadline or nudges (MO4)");
-    expect((await stop(pairWt())).value).toEqual({});
+    expect((await stop(pairWt(), "sess-pair")).value).toEqual({});
     h.clock.advance(10_000);
     await h.tick();
     expect(h.state(pairRuns())).toMatchObject({ status: "running", step: "refine" });
-    expect((await stop(pairWt())).value).toEqual({});
+    expect((await stop(pairWt(), "sess-pair")).value).toEqual({});
     expect((await inWt(pairWt(), "done", "done", "--handoff", "spec agreed")).exit).toBe(0);
     h.clock.advance(10_000);
     await h.tick();
