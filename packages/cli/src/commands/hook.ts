@@ -12,7 +12,7 @@
  * `--agent` (a configured agent name or an adapter name; `norn init` always installs it), else
  * NORN_AGENT, else the first configured adapter (claude first) that recognizes the event.
  */
-import { cmd, type AgentAdapter, currentRun, cursorStep, type HookDecision, type HookResponse, reportableOutcomes, standingReport } from "@norn/core";
+import { cmd, type AgentAdapter, currentRun, cursorStep, type HookDecision, type HookResponse, reportableOutcomes, runAgentSession, standingReport } from "@norn/core";
 import { DEFAULT_CONFIG, type ExitCode, type HookFact, type ResolvedConfig, ulid } from "@norn/schema";
 import { appendHookTrace, bindNornHome, blockedHookCount, loadConfig, repoLayout } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
@@ -77,6 +77,12 @@ const refusableTurnEnd = (adapter: AgentAdapter, fact: HookFact): boolean =>
   adapter.tier === "blocking" && fact.event === "turn_end" && fact.agent === adapter.name && Object.hasOwn(adapter.hookEvents, fact.native) && adapter.hookEvents[fact.native] === "turn_end";
 
 /** A4 / MO4: block turn end only in an unattended agent step whose live run has not reported. */
+/** MO3 (gh-92): the fact comes from an agent session other than the one `run_id` belongs to. */
+function foreignFact(s: UnitSession, run_id: string, fact: HookFact): boolean {
+  const owner = runAgentSession(s, run_id);
+  return !!owner && !!fact.agent_session_id && fact.agent_session_id !== owner;
+}
+
 function decideBlock(root: string, s: UnitSession | null, fact: HookFact, adapter: AgentAdapter): HookDecision {
   if (!refusableTurnEnd(adapter, fact) || !s) return { block: false };
   const step = cursorStep(s);
@@ -84,6 +90,7 @@ function decideBlock(root: string, s: UnitSession | null, fact: HookFact, adapte
   if (s.state.status !== "running" && s.state.status !== "ready") return { block: false };
   const run = currentRun(s);
   if (!run || (fact.run_id && fact.run_id !== run.run_id)) return { block: false };
+  if (foreignFact(s, run.run_id, fact)) return { block: false }; // MO3: it cannot report the run, so it is not held to it
   if (standingReport(s, run.run_id)) return { block: false };
   if (blockedHookCount(root, { story: s.unit.story, slice: s.unit.slice }, run.run_id) >= MAX_STOP_BLOCKS) return { block: false };
   const outcomes = reportableOutcomes(step);
@@ -145,7 +152,8 @@ export const hookEventCommand = defineCommand({
       if (found.marker.slice) fact.slice ??= found.marker.slice;
       if (!fact.run_id && session) {
         const run = currentRun(session);
-        if (run) fact.run_id = run.run_id;
+        // MO3, A2 (gh-92): another agent session's fact is not the run's (no silent, nudge or snapshot from it)
+        if (run && !foreignFact(session, run.run_id, fact)) fact.run_id = run.run_id;
       }
       const decision = decideBlock(root, session, fact, adapter);
       // B5, B7 (D3): the unit is the worktree's, whether the fact names a run or not

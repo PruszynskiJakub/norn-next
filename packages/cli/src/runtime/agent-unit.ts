@@ -6,9 +6,9 @@
 import { existsSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { AgentUnit, UnitRef } from "@norn/core";
-import { cmd, agentWorkRefusal, cursorStep, storyMode, storyWorktreePath } from "@norn/core";
+import { cmd, agentWorkRefusal, cursorStep, foreignSessionRefusal, storyMode, storyWorktreePath } from "@norn/core";
 import { type Criterion, type Mode, type Receipt, type ResolvedConfig, STORY_UNIT_DIR } from "@norn/schema";
-import { loadUnit, readPinnedWorkflow, readSliceFile, readState, readStoryFile, storyFile, type UnitMarker, runStateDir } from "@norn/store";
+import { loadUnit, readPinnedWorkflow, readUnitHooks, readSliceFile, readState, readStoryFile, storyFile, type UnitMarker, runStateDir } from "@norn/store";
 import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { corruptError, refuse } from "../output.ts";
 
@@ -75,6 +75,31 @@ export const reportCommand = (r: Receipt) => (r.kind === "done" ? `norn done ${r
 /** Throw the refusal when the unit is in no shape for an agent to work on it (rule: core `agentWorkRefusal`). */
 export function refuseUnlessAgentWork(s: UnitSession, verb: string): void {
   const no = agentWorkRefusal(s, verb);
+  if (no) throw refuse(no.error, no.do_instead, no.code);
+}
+
+/**
+ * A2, MO3: the agent session running `norn <verb>` here, from the hooks that fired in this worktree just
+ * before — the PreToolUse of this very call when it names the verb, else the latest fact with a session —
+ * or `NORN_AGENT_SESSION_ID`. Also its transcript and agent.
+ */
+export function callerSession(ctx: Context, s: UnitSession, verb: string): { agent_session_id?: string; transcript?: string; agent?: string } {
+  const since = new Date(ctx.clock.now() - 3_600_000).toISOString();
+  const own = readUnitHooks(s.root, [{ story: s.unit.story, slice: s.unit.slice }], since)[0] ?? [];
+  const facts = own.map((e) => e.fact).filter((f) => f.agent_session_id && (f.cwd === s.worktree || f.cwd.startsWith(`${s.worktree}/`)));
+  const call = new RegExp(`\\bnorn\\b.*\\b${verb}\\b`);
+  const last = facts.findLast((f) => f.event === "tool_use" && f.native === "PreToolUse" && !!f.command && call.test(f.command)) ?? facts.at(-1);
+  const id = last?.agent_session_id ?? ctx.env.NORN_AGENT_SESSION_ID;
+  const out: { agent_session_id?: string; transcript?: string; agent?: string } = {};
+  if (id) out.agent_session_id = id;
+  if (last?.transcript) out.transcript = last.transcript;
+  if (last?.agent) out.agent = last.agent;
+  return out;
+}
+
+/** MO3 (gh-92): refuse when another agent session than the run's own runs `norn <verb>` on it. */
+export function refuseForeignSession(ctx: Context, s: UnitSession, run_id: string, verb: string): void {
+  const no = foreignSessionRefusal(s, run_id, callerSession(ctx, s, verb).agent_session_id ?? null, verb);
   if (no) throw refuse(no.error, no.do_instead, no.code);
 }
 
