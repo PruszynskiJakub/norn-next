@@ -16,3 +16,7 @@ A sync tick makes O(1) PR calls instead of one per story, and `mergedByAncestry`
 ### Resume
 
 Nothing left for implement. Next: review, or the optional per-unit parallel reads and the batched `ps` in a later round.
+
+## Progress
+
+- implement#1 done: New RemotePort.findPullRequests(branches): one GraphQL round trip on gh and glab, same answer as findPullRequest for each branch. Sync makes one PR call for the active stories and one for the stories held elsewhere, not one per story. mergedByAncestry runs through mapBounded. New contract case passes for gh, glab and FakeRemote. Transcripts rewritten for the renamed call; observe snapshots and golden cases unchanged. The optional per-unit parallel reads and the single ps were not done.
