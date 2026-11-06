@@ -31340,3 +31340,6 @@ Review the rework (implement#2): the four one-line skill text edits above, sourc
 
 Review the rework (implement#2): the four one-line skill text edits above, source and `.agents` copies.
 
+## Progress
+
+- implement#2 done: Reworked review#1: norn-qa description points to norn-qa-person (W7); norn-slice 'Nothing'/'read exactly as written'; norn-fsd-round bounded to the current round; norn-implement Done says 'agreed or fallback seam'. Kept the qa-person example (it shows person evidence). Copies refreshed; unit tier and typecheck green.
