@@ -29,6 +29,19 @@ Every tick record says where the tick spent its time (observe and its phases, de
 - implement#2 (rework of review#1): F1 fixed with `packages/cli/test/integration/tick-timing.test.ts`: a real `--sync` tick over the harness (one running story, clock past the claim's renew time) whose record validates and carries `sync`, the observe phases, `timing.calls` equal to the calls FakeRemote saw (`list_issues: 1`), an integer `result.ms` on every decision incl. `claim.renew`; `tick.end.slowest` and `norn tick`'s `slowest` equal the record's; `story list --json` heartbeat `last_tick_ms` equals the record's `duration_ms`. Checked it goes red with `markTick`'s duration dropped. F2 fixed: batched renewals (`ActRecord.batched`) are one `slowest` candidate, `act claim renew (N claims)` (unit test). F3, F4 documented: recipe says process probes count under `local`/`stories` and `act_ms` includes the `tick.start` write; the `act_ms` schema comment says so too (schemas re-emitted). Unit tier and typecheck green.
 - implement#2 done: Rework of review#1: F1 fixed with an integration test (packages/cli/test/integration/tick-timing.test.ts) that runs a real --sync tick with a renewed claim and checks the record's sync, observe phases, call counts against FakeRemote, result.ms on every decision, tick.end/norn tick slowest, and heartbeat last_tick_ms in story list (proven red when markTick's duration is dropped). F2: a renewal batch is one slowest candidate. F3/F4 documented in the recipe and the act_ms schema comment. Unit tier, typecheck green.
 
+- review#2 (approve): on HEAD 7308a837c, test#2 green. F1/F2 from review#1 fixed, F3/F4 documented. No blocking findings.
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| W1 observe broken down (sync phases, call counts, local, stories, runner) | test | `packages/cli/test/integration/tick-timing.test.ts` › "observe's phases are timed and the sync's remote calls counted as made" (process probes counted under `local`/`stories`, documented) |
+| W2 decide timed | test | `tick-timing.test.ts` (integration) › "observe's phases are timed…" (`decide_ms` integer); unit `tick-timing.test.ts` › "tickTiming names the slowest…" |
+| W3 each action's time in result.ms, incl. claim.renew | test | `tick-timing.test.ts` (integration) › "each action's time is in its result, the claim renewal's included" |
+| W4 SyncReport in the tick record | test | `tick-timing.test.ts` (integration) › "the tick record carries the sync report and validates" |
+| W5 new fields optional, outside facts/action | test | `packages/schema/test/unit/records.test.ts` › "gh-78: a tick record carries its phase timings…"; golden replay unchanged |
+| W6 slowest phase visible (tick.end, norn tick) | test | `tick-timing.test.ts` (integration) › "tick.end and `norn tick` name the slowest phase…" |
+| W7 last tick's duration in status and the cockpit | test | `tick-timing.test.ts` (integration) › "the heartbeat carries the last tick's duration into `norn story list`"; `view.test.ts` › "gh-78: the heartbeat line…"; `cockpit-tui.test.ts` › "gh-78: the header shows…" |
+- review#2 approve: Approve: the tick record carries sync + timing (observe phases with call counts, decide, each action's result.ms incl. claim.renew, after), tick.end/norn tick name the slowest phase, story list and the cockpit show the last tick's duration; fields optional, outside facts/action. review#1 F1 (real-tick integration test) and F2 fixed, F3/F4 documented; test#2 green. One nit: per-story git and process probes share the stories phase.
+
 ## Resume
 
-Next: the review of implement#2's rework; nothing left open from review#1.
+Review approved; next is whatever norn routes after review (the PR / CI). Nothing open from review.
