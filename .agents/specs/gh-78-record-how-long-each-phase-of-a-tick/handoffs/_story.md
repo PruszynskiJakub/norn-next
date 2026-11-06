@@ -46,6 +46,9 @@ Every tick record says where the tick spent its time (observe and its phases, de
 - resolve#2: merged origin/main c207e7c01b (merge 8f7621235). Main refactored observe (`syncRemote`, `classifyWorktrees`, `storyFactsOf` over `mapBounded`); took main's structure and re-applied the timers: `sync.stories` and `sync.elsewhere_prs` time the bounded-parallel reads (call counts inside), `stories` times the bounded per-story pass, `timer` passed into `syncRemote`. cockpit-tui: kept both imports (`isClosedStatus`, `formatTickMs`). Typecheck, unit tier, integration tier green.
 - resolve#2 done: Merged origin/main c207e7c01b: took main's observe refactor (syncRemote, mapBounded per story) and re-applied gh-78's phase timers and call counts to it; cockpit-tui kept both imports. Typecheck, unit and integration tiers green.
 
+- implement#3 (rework of test#3): the one failure, `takeover-record.test.ts` › "AC4: a record made without a branch…", is a harness flake, not this change: `cloneOf`'s `git clone` of the bare remote failed with "failed to copy file … pack-….pack: No such file or directory". The test pushes twice to the bare remote just before cloning, and the remote keeps git's default `receive.autogc`, so a detached `gc --auto` can repack while the local clone copies packs. gh-78 touches no git code, harness or that test. The file passes 12/12 on its own; unit tier and typecheck green. No code changed.
+- Friction (for `/issue`, label `friction`): the harness's bare remote (`test/support/harness.ts:335`) should set `receive.autogc false` / `gc.auto 0` so a push cannot repack it under a concurrent clone; this flake sent a green change back to implement.
+
 ## Resume
 
-Base merged and committed; nothing open. Next is whatever norn routes after resolve (CI on the PR).
+Nothing open: test#3's failure was a harness flake (see Progress). Next is the `test` check again.
