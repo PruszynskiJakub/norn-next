@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NUDGE_TEXT } from "@norn/core";
 import { ulid } from "@norn/schema";
-import { appendHookTrace, appendReceipt, readTrace, repoConfigPath, workflowsDir } from "@norn/store";
+import { appendHookTrace, appendReceipt, readTrace, repoConfigPath, workflowsDir, writeState } from "@norn/store";
 import { humanSummary, humanTickLines } from "../../src/commands/watch.ts";
 import { runShell, type TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
@@ -139,7 +139,11 @@ describe("runtime", () => {
     rmSync(join(runs(), "receipts", "0042-done.json"));
   });
 
-  test("PR merged → worktree, branches, claim ref and slot removed (GR6)", async () => {
+  test("PR merged → worktree, branches, claim ref and slot removed; a unit parked at merge time recorded done (GR6, gh-88)", async () => {
+    const parked = h.state(runs());
+    if (!parked) throw new Error("no state");
+    writeState(runs(), { ...parked, status: "parked", park: { kind: "gate", reason: "PR ready?", since: h.clock.iso() } });
+    const runsDir = runs();
     h.remote.prs = [{ number: 1, url: "u", state: "merged", is_draft: false, head_sha: "", head: "gh-9-fix-the-bug", base_branch: "main", merged_at: h.clock.iso() }];
     h.clock.advance(10_000);
     const s = await h.norn("sync");
@@ -148,6 +152,7 @@ describe("runtime", () => {
     expect(h.git(["branch", "--list", "gh-9-fix-the-bug"])).toBe("");
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-9"])).toBe("");
     expect(readdirSync(join(h.home, "leases")).filter((f) => f.startsWith("slot-"))).toEqual([]);
+    expect(h.state(runsDir)).toMatchObject({ status: "done", park: null, run: null });
   });
 
   test("uninstall removes norn-owned hooks and skills, keeps config", async () => {

@@ -412,6 +412,25 @@ describe("story lifecycle (GR6–GR8)", () => {
     const f = storyAt("ready", { pr: { number: 7, url: "u", state: "merged", is_draft: false, head_sha: "", head: "gh-1-login", base_branch: "main", merged_at: at() } }, [{ nn: "01", status: "integrated" }]);
     expect(only(facts([f]))).toMatchObject({ kind: "cleanup_merged_story", local_branches: ["gh-1/01-s01", "gh-1-login"], remote_branches: ["gh-1/01-s01"], refs: ["refs/norn/claims/gh-1"], story_status: "done" });
   });
+  test("gh-88 GR6: a PR merged while parked at a gate → the cleanup records every unfinished unit done; the inbox then has nothing for it", () => {
+    const pr = { number: 7, url: "u", state: "merged" as const, is_draft: false, head_sha: "", head: "gh-1-login", base_branch: "main", merged_at: at() };
+    const f = storyAt("ready", { pr }, [{ nn: "01", status: "integrated", state: { status: "done" } }, { nn: "02", state: { status: "stuck", park: { kind: "ask", reason: "q", since: at() } } }]);
+    f.units[0]!.state = { ...f.units[0]!.state!, status: "parked", park: { kind: "gate", reason: "PR ready?", since: at() } };
+    const a = only(facts([f]));
+    if (a.kind !== "cleanup_merged_story") throw new Error(a.kind);
+    expect(a.finish.map((x) => [x.unit.key, x.state.status, x.state.park, x.state.run, x.state.step, x.state.last_tick_id])).toEqual([
+      ["gh-1", "done", null, null, "ready", TICK],
+      ["gh-1/02", "done", null, null, f.units[2]!.state!.step, TICK],
+    ]);
+    // after the cleanup: spec.md done, the claim gone, the units as act wrote them
+    const after = structuredClone(f);
+    after.frontmatter = { ...after.frontmatter!, status: "done" };
+    after.claim = { state: "none" };
+    for (const x of a.finish) after.units.find((u) => u.unit.key === x.unit.key)!.state = x.state;
+    const items = Object.values(buildInbox(facts([after]), CONFIG).groups).flat().filter((i) => i.story === "gh-1");
+    expect(items.filter((i) => i.group !== "recently_done")).toEqual([]);
+    expect(items.map((i) => i.id)).toContain("recently_done:gh-1:ready#1");
+  });
   test("issue closed / unlabelled / PR closed → park remote under Unblock, once", () => {
     const closed = storyAt("test", { issue: null });
     const a = only(facts([closed]));

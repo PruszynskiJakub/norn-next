@@ -375,6 +375,11 @@ export interface CleanupMergedStoryAction extends UnitBase {
   refs: string[];
   /** spec.md status → done (committed on the base branch record) */
   story_status: "done";
+  /**
+   * gh-88: each unit not yet done, with its state recorded `done` (park and run cleared). Act writes
+   * them before the archive push, so the final record carries them ([] = every unit is done).
+   */
+  finish: Array<{ unit: UnitRef; state: UnitState }>;
 }
 
 /**
