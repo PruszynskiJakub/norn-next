@@ -14,7 +14,7 @@ labels:
   - norn:risk:low
   - norn:wf:reproduce
 workflow: reproduce
-status: new
+status: active
 intake_at: 2026-11-06T14:56:57.375Z
 body_hash: 4e275a1346c117f013d53443686c23c7d14f33c02796dab8b6760b5b3f6d93ac
 ---
