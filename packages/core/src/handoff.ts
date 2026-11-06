@@ -7,7 +7,7 @@ import type { UnitState, Workflow } from "@norn/schema";
 import { nextCommand } from "./commands.ts";
 
 export const STATUS_BEGIN = "<!-- norn:status — generated from state.json, do not edit -->";
-export const STATUS_END = "<!-- /norn:status -->";
+const STATUS_END = "<!-- /norn:status -->";
 
 /** The unit's counters as the status shows them, `review_loop 1/3, test_loop 0/5`; "none" without any. */
 export function handoffCounters(state: UnitState, workflow?: Workflow | null): string {

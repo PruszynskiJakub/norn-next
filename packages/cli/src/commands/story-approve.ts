@@ -4,16 +4,15 @@
  * units at a gate (B54, B57). Writes an `approve` or `reject` receipt at the cursor. Claim free:
  * acquired here (T8); held elsewhere: posted to the mailbox (T9).
  */
-import { cmd, nextCommand, stepOf } from "@norn/core";
+import { cmd, isParked, nextCommand, stepOf } from "@norn/core";
 import { isGitSha, type UnitState } from "@norn/schema";
 import type { Context } from "../context.ts";
 import { defineCommand, type ParsedArgs } from "../command.ts";
 import { refuse, usageError } from "../output.ts";
 import { at, DELEGATED_HELP, DELEGATED_OPTION, delegatedFields, delegation, humanReceipt, stepOnlyReceipt, resolveTarget, runHumanVerb, type Target } from "../runtime/human.ts";
-import { appendProgress, rejectProgress } from "../runtime/report.ts";
 import { parkedOn, targetKey } from "../runtime/target.ts";
 
-const atGate = (st: UnitState) => st.status === "parked" && st.park?.kind === "gate";
+const atGate = (st: UnitState) => isParked(st, "gate");
 
 /**
  * F35: the story branch head at `approve` — the story worktree's HEAD, else the local branch,
@@ -37,7 +36,7 @@ async function unitHead(ctx: Context, t: Target): Promise<string | null> {
   return null;
 }
 
-/** Decide the gate: the receipt, and for a rejection the milestone in handoff.md (O6). */
+/** Decide the gate: the receipt (a rejection's milestone in handoff.md follows it on every route, O6). */
 async function decideGate(ctx: Context, args: ParsedArgs, kind: "approve" | "reject") {
   const verb = `story ${kind}`;
   const d = delegation(ctx, args, verb);
@@ -72,9 +71,6 @@ async function decideGate(ctx: Context, args: ParsedArgs, kind: "approve" | "rej
     build: (t, st) =>
       humanReceipt(ctx, t, st, kind, { ...delegatedFields(d), ...(head ? { head_sha: head } : {}), ...(acknowledged.length ? { acknowledged_notes: acknowledged } : {}) }),
   });
-  // the rejection is a milestone of the unit, like `done` (O6): the next brief's Context carries it;
-  // through the mailbox the holder's tick appends it when it imports the receipt (T9)
-  if (kind === "reject" && out.delivered.via === "local" && t.handoffFile) appendProgress(t.handoffFile, rejectProgress(out.receipt));
   return out;
 }
 

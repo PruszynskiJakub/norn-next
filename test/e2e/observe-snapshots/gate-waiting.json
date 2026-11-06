@@ -129,8 +129,6 @@
       "units": [
         {
           "errors": [],
-          "last_check": null,
-          "last_findings": null,
           "last_outcome_receipt": {
             "file": "<dir>/home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/receipts/0003-done.json",
             "n": 3,
@@ -251,8 +249,6 @@
         },
         {
           "errors": [],
-          "last_check": null,
-          "last_findings": null,
           "last_outcome_receipt": {
             "file": "<dir>/home/repos/repo-<id>/runs/gh-7/01-form/receipts/0006-check.json",
             "n": 6,

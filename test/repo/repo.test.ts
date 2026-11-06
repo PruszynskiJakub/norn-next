@@ -926,10 +926,7 @@ const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
 };
 
 /** (d) processes are spawned by store and adapters only (ports perform effects). */
-const SPAWN_ALLOW: Counts = {
-  "packages/cli/src/commands/doctor.ts": 1,
-  "packages/cli/src/runtime/strays.ts": 1,
-};
+const SPAWN_ALLOW: Counts = {};
 
 /**
  * (g) B1, B2, B5: norn's paths under a repo are spelled only by store's path module (paths.ts), so a
@@ -939,7 +936,7 @@ const SPAWN_ALLOW: Counts = {
  */
 const NORN_PATH = /\.agents\/norn\b|["'`]\.agents["'`]\s*,\s*["'`]norn["'`]/;
 const NORN_PATH_ALLOW: Record<string, [number, string]> = {
-  "packages/store/src/paths.ts": [8, "the path module, and the old layout's places (gh-110 D4)"],
+  "packages/store/src/paths.ts": [6, "the path module, and the old layout's places (gh-110 D4)"],
   "packages/schema/src/config.ts": [2, "the config files as messages name them (gh-64 B5: an error names the right file)"],
   "test/support/harness.ts": [1, "the old layout's places as a person had them, spelled independently of store (gh-110 S1)"],
   "packages/cli/test/integration/upgrade.test.ts": [7, "the old paths as a person had them and as `git status` and the report show them (gh-110 S1, gh-64 B40)"],

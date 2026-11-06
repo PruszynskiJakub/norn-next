@@ -14,22 +14,23 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { atomicWrite, installSkills, LOCAL_CONFIG_FILE, linkSkills, loadWorkflows, readText, REPO_CONFIG_FILE, repoConfigPath, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
+import { atomicWrite, gitRemoteUrl, installSkills, LOCAL_CONFIG_FILE, linkSkills, loadWorkflows, readText, REPO_CONFIG_FILE, repoConfigPath, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, WORKTREE_LOCAL_FILES, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered } from "../output.ts";
 import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
-import { detectTestCommand, gitRemoteUrl, TEMPLATE_TEST_COMMAND, withTestCommand } from "../runtime/detect.ts";
+import { detectTestCommand, TEMPLATE_TEST_COMMAND, withTestCommand } from "../runtime/detect.ts";
 import { type LabelsReport, labelsLines, remoteLabels } from "../runtime/labels.ts";
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { cmd } from "@norn/core";
+import { PROVIDERS, type RemoteProvider } from "@norn/schema";
 
 /** gh-226: the repo's review guide the `norn-review` skill reads, at the repo root. */
 const REVIEW_FILE = "REVIEW.md";
 
 /** Paths that must never be committed (§7.1, gh-64 B9); the machine-local files live outside the checkout (B5). */
-const IGNORED = [".env.norn", ".norn-unit", LOCAL_CONFIG_FILE];
+const IGNORED = [...WORKTREE_LOCAL_FILES, LOCAL_CONFIG_FILE];
 
 function ensureGitignore(root: string): string[] {
   const path = join(root, ".gitignore");
@@ -72,7 +73,7 @@ export interface InitReport {
   hook_command: string;
   gitignore: string[];
   /** the git remote norn pushes to; `url: null` when the repository has none (nothing can sync or push) */
-  remote: { provider: string; label: string; git_remote: string; url: string | null };
+  remote: { provider: RemoteProvider; label: string; git_remote: string; url: string | null };
   /** the `test` check command written into the workflows created now (null when none were created) */
   test_command: { command: string; detected_from: string | null; set_in: string[] } | null;
   /**
@@ -140,11 +141,8 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
   steps.push(`Check this machine: \`${cmd.doctor()}\`.`);
   const label = r.remote.label;
   // B29: the labels line above says how to get a label norn could not create
-  steps.push(
-    r.remote.provider === "gh"
-      ? `Make a first story: an issue labelled \`${label}\` and assigned to you, e.g. \`gh issue create --label ${label} --assignee @me --title "…"\`.`
-      : `Make a first story: an issue labelled \`${label}\` and assigned to you.`,
-  );
+  const issueCreate = PROVIDERS[r.remote.provider].issueCreate;
+  steps.push(`Make a first story: an issue labelled \`${label}\` and assigned to you${issueCreate ? `, e.g. \`${issueCreate(label)}\`` : ""}.`);
   steps.push(`Pick it up: \`${cmd.sync()}\`, then \`${cmd.status()}\` shows what needs you and the command for each item; \`${cmd.watch()}\` keeps norn working.`);
   return steps;
 }

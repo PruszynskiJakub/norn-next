@@ -40,7 +40,7 @@ interface ChunkedReplay {
 }
 
 /** Hook facts per block (D7): blocks are cut by position in the run's hook list, so full ones never change. */
-export const HOOK_BLOCK = 64;
+const HOOK_BLOCK = 64;
 
 const CHUNKED = "$chunked";
 

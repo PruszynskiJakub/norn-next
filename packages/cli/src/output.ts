@@ -54,6 +54,15 @@ export const busyError = (error: string, do_instead: string | null, code = "busy
 export const claimHeld = (claim: Pick<ClaimBlob, "holder" | "acquired_at" | "expires_at">, do_instead: string, note = "") =>
   busyError(`held by ${claim.holder} since ${claim.acquired_at} (expires ${claim.expires_at})${note}`, do_instead, "claim_held", { claim });
 /** Unexpected failure (exit 1). */
+/** The remote port, or the `no_remote` refusal when this repo has none. */
+export function requireRemote<R>(remote: R | null): R {
+  if (!remote) throw refuse("no remote is configured", cmd.doctor(), "no_remote");
+  return remote;
+}
+
+/** A remote call that threw, as the `remote_failed` failure. */
+export const remoteFailed = (e: unknown) => failure(`the remote failed: ${(e as Error).message}`, cmd.doctor(), "remote_failed");
+
 export const failure = (error: string, do_instead: string | null = null, code = "error", details?: unknown) =>
   new CliFailure(body(error, do_instead, code, details), ExitCode.error);
 
@@ -96,6 +105,9 @@ export function rendered(value: unknown, markdown: string, opts: { asked?: boole
 export function isRendered(v: unknown): v is Rendered {
   return typeof v === "object" && v !== null && (v as Partial<Rendered>)[RENDERED] === true;
 }
+
+/** Text safe inside a markdown table cell: its pipes escaped. */
+export const tableCell = (s: string): string => s.replace(/\|/g, "\\|");
 
 const FAILURE_TITLE: Partial<Record<ExitCode, string>> = {
   [ExitCode.refused]: "Refused",

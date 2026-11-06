@@ -89,7 +89,7 @@ function gitConfigValue(text: string, section: string, name: string, key: string
  * with no `base_branch` the branch checked out in the main checkout, else `origin`) and its URL, and
  * the interval the heartbeat records. Reads files only.
  */
-export function deriveConfig(opts: { repoRoot: string; env?: Record<string, string | undefined>; baseBranch?: string | null }): ConfigDerived {
+function deriveConfig(opts: { repoRoot: string; env?: Record<string, string | undefined>; baseBranch?: string | null }): ConfigDerived {
   const env = opts.env ?? process.env;
   const runner: ConfigDerived["runner"] =
     env.HERDR_ENV === "1"

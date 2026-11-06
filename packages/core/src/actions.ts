@@ -28,6 +28,10 @@
  *   compares an old recorded decision with its replay. An older `round_migrate` (before gh-195/05, S12)
  *   also carries a `commit` and names its folders from the spec folder (`<spec>/runs/_story…`):
  *   `legacyAction` drops the commit and names them as decide does now (`runs/<story>/_story…`).
+ *   An older norn left act to read three things from the rule id or build them itself: `legacyAction`
+ *   gives an intake acquire without `lost_intake` the `keep` act then fell back to, a resolved implicit
+ *   ask its `yields_to_report`, and an unmarked `mark_corrupt` (`mark_state: false`) `state: null`; a
+ *   marked one keeps `mark_state: true`, since the state act built is not in the trace.
  */
 import type {
   ClaimBlob,
@@ -160,6 +164,12 @@ export interface ApplyReceiptsAction extends UnitBase, Transition, Delivery {
     /** gh-195 B18, B19: a person's receipt moved the cursor (workflow, unstick, update; `Advance.moved`): no step ended */
     moved?: true;
   } | null;
+  /**
+   * R6.1, B11: a receipt number already taken means the agent's own report got there first (an
+   * implicit ask resolved by the tick): act writes nothing more and the action has not failed.
+   * Absent = a taken number fails the action (S6).
+   */
+  yields_to_report?: true;
 }
 
 /** Start a unit: pin its workflow (S7), create the worktree, write the first state. */
@@ -311,11 +321,11 @@ export interface MarkCorruptAction extends UnitBase {
   kind: "mark_corrupt";
   errors: FileError[];
   /**
-   * S2: write `status: corrupt` into the unit's state.json — only when the failing files are the
-   * unit's own runs/ files and its state.json reads. A broken spec.md (or state.json) is surfaced,
-   * never written into state.
+   * S2: the `status: corrupt` state act writes into the unit's state.json — only when the failing files
+   * are the unit's own runs/ files and its state.json reads; null = written nowhere. A broken spec.md
+   * (or state.json) is surfaced, never written into state.
    */
-  mark_state: boolean;
+  state: UnitState | null;
   notify: InboxItem | null;
 }
 
@@ -334,9 +344,10 @@ export interface ClaimAction extends UnitBase {
   /** null for release (delete ref) */
   blob: ClaimBlob | null;
   /**
-   * R3.1 (H6): for `claim.acquire.intake`, what act does when the acquire is lost — `drop` the story
-   * worktree (when there) and local branch (they hold nothing beyond the intake, `intake_only`), or
-   * `keep` them, with why. Absent = not decided (no `intake_only` fact): act keeps everything.
+   * R3.1 (H6): an intake's acquire (`claim.acquire.intake`) — what act does when it is lost: `drop` the
+   * story worktree (when there) and local branch (they hold nothing beyond the intake, `intake_only`),
+   * or `keep` them, with why (also when there is no `intake_only` fact). Absent = not an intake: a lost
+   * acquire touches nothing.
    */
   lost_intake?: { drop: { worktree: string | null; branch: string } } | { keep: string };
 }
@@ -536,6 +547,9 @@ export interface Decision {
   action: Action;
 }
 
+/** R3.1: why a lost intake keeps everything when observe could not tell what the intake holds. */
+export const NOT_OBSERVED = "not decided: the intake branch was not observed";
+
 const NO_TRANSITION: ReadonlySet<string> = new Set(["run_check", "run_git", "start_slices"]);
 
 /**
@@ -562,6 +576,12 @@ export function legacyAction(action: unknown): unknown {
       return m ? recordRunStatePath({ key: story as string, spec_dir: m[1] as string }, m[2] as string) : p;
     };
     return { ...rest, from: moved(a.from), to: moved(a.to) };
+  }
+  if (a.kind === "claim" && a.rule === "claim.acquire.intake" && !("lost_intake" in a)) return { ...a, lost_intake: { keep: NOT_OBSERVED } };
+  if (a.kind === "apply_receipts" && a.rule === "agent.ask.implicit.resolved" && !("yields_to_report" in a)) return { ...a, yields_to_report: true };
+  if (a.kind === "mark_corrupt" && a.mark_state === false) {
+    const { mark_state: _m, ...rest } = a;
+    return { ...rest, state: null };
   }
   if (a.kind === "park" && "park" in a) {
     const { park: _p, ...rest } = a;

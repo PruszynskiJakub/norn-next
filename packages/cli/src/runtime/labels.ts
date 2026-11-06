@@ -6,6 +6,7 @@
  * with its command (B13). A tick never calls this (B20).
  */
 import { cmd, labelCreateCommand, labelDeleteCommand, NORN_LABEL_COLOR, type PortError, planLabels, type RemotePort, type RepoWorkflows, WF_LABEL } from "@norn/core";
+import { oneLine } from "@norn/view";
 
 export interface LabelsChecked {
   checked: true;
@@ -37,10 +38,8 @@ const notChecked = (e: unknown, cli: string): LabelsNotChecked => {
   const code = typeof err.code === "string" ? err.code : "";
   if (code.endsWith("_missing")) return { checked: false, reason: `${cli} is not installed`, fix: `install ${cli}`, do_instead: `install ${cli}, then run ${cmd.upgrade()}` };
   if (code.endsWith("_auth")) return { checked: false, reason: `${cli} is not logged in`, fix: `${cli} auth login`, do_instead: `run ${cli} auth login, then ${cmd.upgrade()}` };
-  return { checked: false, reason: oneLine(err.message ?? String(e)), fix: null, do_instead: `run ${cmd.upgrade()} again` };
+  return { checked: false, reason: oneLine(err.message ?? String(e), Infinity), fix: null, do_instead: `run ${cmd.upgrade()} again` };
 };
-
-const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
 
 export async function remoteLabels(opts: { remote: RemotePort | null; gitRemoteUrl: string | null; intake: string; workflows: RepoWorkflows; create: boolean }): Promise<LabelsReport> {
   // B11: a local-only repo has nothing to label
@@ -70,7 +69,7 @@ export async function remoteLabels(opts: { remote: RemotePort | null; gitRemoteU
       const code = String((e as PortError).code ?? "");
       // a label beyond the listed page, or made meanwhile: there now, never restyled (B8)
       if (code.endsWith("_exists")) existing.push(l.name);
-      else not_created.push({ name: l.name, reason: code.endsWith("_auth") ? "permission denied" : oneLine((e as Error).message ?? String(e)), command: labelCreateCommand(cli, label(l)) });
+      else not_created.push({ name: l.name, reason: code.endsWith("_auth") ? "permission denied" : oneLine((e as Error).message ?? String(e), Infinity), command: labelCreateCommand(cli, label(l)) });
     }
   }
   // B5: a workflow that fails validation gets no label

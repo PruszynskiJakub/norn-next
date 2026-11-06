@@ -174,6 +174,14 @@ export function releaseLease(home: string, file: string): boolean {
   return safeUnlink(join(leasesDir(home), file));
 }
 
+/** Release every lease of `story` in `repo` (dead holders included) that `filter` keeps; the files released. */
+export async function releaseStoryLeases(home: string, repo: string, story: string, filter: (lease: LeaseFile) => boolean = () => true): Promise<string[]> {
+  const out: string[] = [];
+  for (const e of (await listLeases(home, () => true)).live)
+    if (e.lease.repo === repo && e.lease.story === story && filter(e.lease) && releaseLease(home, e.file)) out.push(e.file);
+  return out;
+}
+
 /**
  * Take a run's lease over for `holder` (K1): the process that does the run's work holds it, so the
  * lease dies with that process (K3). Only while the lease validates (S2) and still names `runId`; false otherwise.

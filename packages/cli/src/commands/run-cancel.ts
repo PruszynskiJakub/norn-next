@@ -12,6 +12,7 @@ import { defineCommand } from "../command.ts";
 import { failure, refuse } from "../output.ts";
 import { at, claimFor, humanReceipt, resolveTarget as resolveUnit, runHumanVerb, started } from "../runtime/human.ts";
 import { inState, targetKey } from "../runtime/target.ts";
+import { runnerFor } from "../wiring.ts";
 
 const CANCEL_REASON = "cancelled by person";
 
@@ -58,9 +59,9 @@ export const runCancelCommand = defineCommand({
     if (!session) throw notStopped("norn did not start it, so it has no session to stop", "not_stopped");
     const here = machineHolder(ctx.env);
     if (st.run?.machine && st.run.machine !== here) throw notStopped(`it runs on ${st.run.machine}, not ${here}`, "not_stopped");
-    const runner = (await ctx.ports()).runner;
-    if (!runner || runner.name !== session.runner)
-      throw notStopped(`it runs in ${session.runner}, and this checkout's runner is ${runner?.name ?? "not configured"}`, "not_stopped");
+    const ports = await ctx.ports();
+    const runner = runnerFor(ports, session);
+    if (!runner) throw notStopped(`it runs in ${session.runner}, and this checkout's runner is ${ports.runner?.name ?? "not configured"}`, "not_stopped");
     try {
       await runner.kill(session);
     } catch (e) {

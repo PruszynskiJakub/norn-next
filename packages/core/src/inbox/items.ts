@@ -8,13 +8,14 @@
  * F35, Q6), Unclaimed, Running, Notes (agents' notes for a person, NT2: information, not an
  * action), Recently done.
  */
-import { ATTENDED_WAIT, parseDuration, recordRef, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
+import { ATTENDED_WAIT, isClosedStatus, parseDuration, receiptNumber, recordRef, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, unstickCommand, versionMismatch } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, heldBySkillsDrift, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
+import { isParked } from "../verbs.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
 
@@ -328,7 +329,7 @@ function judgedDetail(story: StoryFacts, uf: UnitFacts): { detail: string; full:
     const runsDir = file.replace(/\/receipts\/[^/]+$/, "");
     lines.push(`Evidence: ${runsDir}/${r.evidence.replace(/\/+$/, "")}/`);
   }
-  return { detail: `step ${r.step}#${r.attempt} reported ${"outcome" in r ? r.outcome : r.kind} (receipt ${String(nr.n).padStart(4, "0")})`, full: lines.join("\n") };
+  return { detail: `step ${r.step}#${r.attempt} reported ${"outcome" in r ? r.outcome : r.kind} (receipt ${receiptNumber(nr.n)})`, full: lines.join("\n") };
 }
 
 const oneLine = (t: string) => t.replace(/\s*\n\s*/g, " ").trim();
@@ -388,7 +389,7 @@ function notesClearedBy(story: StoryFacts): string {
  */
 function noteItems(story: StoryFacts): InboxItem[] {
   const status = story.frontmatter?.status;
-  if (status === "done" || status === "dropped") return [];
+  if (isClosedStatus(status)) return [];
   const notes = story.notes ?? [];
   const cleared_by = notes.length ? notesClearedBy(story) : "";
   return notes.map((n) => ({
@@ -466,7 +467,7 @@ function staleItem(story: StoryFacts, base: string): InboxItem | null {
   const wf = uf?.workflow ?? null;
   if (!b || !st || !wf || !isStale(wf, b)) return null;
   const step = stepOf(wf, st.step);
-  const atGate = st.status === "parked" && st.park?.kind === "gate" && step?.type === "gate";
+  const atGate = isParked(st, "gate") && step?.type === "gate";
   const stuck = st.status === "stuck" && !baseSyncSteps(wf).has(st.step);
   if (!atGate && !stuck) return null;
   // BS6: a gate with a `stale` route is classified by the tick, not shown

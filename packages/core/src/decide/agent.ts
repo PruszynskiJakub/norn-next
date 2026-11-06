@@ -436,7 +436,7 @@ export function resolveImplicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, s
   if (st.park?.receipt_id) answer.ask_receipt_id = st.park.receipt_id;
   if (uf.unit.slice) answer.slice = uf.unit.slice;
   const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), answer);
-  emitApplied(ctx, story, uf, "agent.ask.implicit.resolved", res, [nr], { message: `norn: ${uf.unit.key} ${st.step} moved on (${why})`, step: st.step });
+  emitApplied(ctx, story, uf, "agent.ask.implicit.resolved", res, [nr], { message: `norn: ${uf.unit.key} ${st.step} moved on (${why})`, step: st.step }, { yields_to_report: true });
 }
 
 /** R9.1: how long a started session may go without taking its launch prompt, before a re-send and again before `silent`. */

@@ -18,7 +18,7 @@ function cut(text: string, max: number): string {
 
 /** gh-196 D5 (B21): how a receipt a supervisor sent on the person's behalf is marked. */
 export const DELEGATED_MARK = "delegated (supervisor)";
-export const delegatedMark = (r: Receipt): string => (r.delegated ? ` — ${DELEGATED_MARK}` : "");
+const delegatedMark = (r: Receipt): string => (r.delegated ? ` — ${DELEGATED_MARK}` : "");
 /** A decision's tail: its delegated mark, then its reason (`--reason`) when it has one. */
 export const decisionSuffix = (r: Receipt & { comment?: string }): string => `${delegatedMark(r)}${r.comment ? `: ${r.comment}` : ""}`;
 /** An answer receipt's line: its delegated mark, the answer, then its reason in brackets (one text for timeline and steps). */

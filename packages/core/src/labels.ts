@@ -3,7 +3,7 @@
  * workflow (W9) and the fixed triage set — planned against the labels the remote defines. Pure:
  * `norn init`, `norn upgrade` and `norn doctor` list the remote's labels and act on the plan.
  */
-import type { RemoteProvider } from "@norn/schema";
+import { PROVIDERS, type RemoteProvider } from "@norn/schema";
 import type { RemoteLabel } from "./ports.ts";
 import { WF_LABEL } from "./policy.ts";
 
@@ -82,12 +82,10 @@ const quoted = (s: string) => (/^[\w:./@%+=,-]+$/.test(s) ? s : `'${s.replace(/'
 
 /** B13: the command a person runs to create a label norn could not. */
 export function labelCreateCommand(provider: RemoteProvider, label: RemoteLabel): string {
-  return provider === "glab"
-    ? `glab label create --name ${quoted(label.name)} --color ${quoted(`#${label.color}`)} --description ${quoted(label.description)}`
-    : `gh label create ${quoted(label.name)} --color ${label.color} --description ${quoted(label.description)}`;
+  return PROVIDERS[provider].labelCreate(label, quoted);
 }
 
 /** B10: the command a person runs to delete an unused label; norn never runs it. */
 export function labelDeleteCommand(provider: RemoteProvider, name: string): string {
-  return `${provider === "glab" ? "glab" : "gh"} label delete ${quoted(name)}`;
+  return `${PROVIDERS[provider].cli} label delete ${quoted(name)}`;
 }
