@@ -79,7 +79,7 @@ For example, an Approve item shows the gate's instruction and `norn story approv
 
 ## One tick
 
-`norn watch` runs the heartbeat: a tick every 30 seconds (`norn tick` runs one by hand). Each tick:
+`norn watch` runs the heartbeat: a tick every 30 seconds (`norn tick` runs one by hand), and the next one at once when a tick leaves it something to do, such as starting the step a reported outcome led to (up to 3 ticks in a row). Each tick:
 
 1. **observes** the facts: the units' state files and receipts, the agents' hooks and runner panes, git, and every few minutes the remote's issues and PRs;
 2. **decides**, with one pure function, the next action for each unit: start an agent, nudge a silent one, run a check, take a reported outcome to the next step, push, notify;

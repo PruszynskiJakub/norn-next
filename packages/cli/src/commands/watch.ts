@@ -4,6 +4,8 @@
  * A clean exit releases the claims this heartbeat holds (T6) unless `--keep-claims`.
  * `--human` is for a person at the terminal: a line per action instead of JSON (quiet ticks print
  * nothing; the cockpit shows the last tick) and a sentence instead of the summary. `--json` wins.
+ * H12: a tick that left the next one something to do (`follow_up`) is followed at once, up to
+ * `SETTLE_TICKS` in a row, then the interval; `--max-ticks` counts every tick.
  */
 import { git as gitAdapter } from "@norn/adapters";
 import { DEFAULT_INTERVAL, ExitCode, parseDuration } from "@norn/schema";
@@ -13,9 +15,16 @@ import { CliFailure, refuse, rendered, usageError, withExit } from "../output.ts
 import { type ReleaseResult, releaseHeldClaims } from "../runtime/release.ts";
 import { runTick, type TickReport } from "../runtime/tick.ts";
 import { versionRefusal } from "../runtime/version-guard.ts";
-import { abortableSleep } from "../runtime/tick-lock.ts";
 import { cmd, type InboxItem, ticksPausedTitle } from "@norn/core";
 import type { Context } from "../context.ts";
+
+/** H12: at most this many ticks in a row run at once after a tick that left a follow-up, so a unit that keeps changing never spins. */
+export const SETTLE_TICKS = 3;
+
+/** H12: after a tick, whether the next one runs at once, and how many have run at once in a row since the last pause. */
+export function settleStep(followUp: boolean, settling: number): { now: boolean; settling: number } {
+  return followUp && settling < SETTLE_TICKS ? { now: true, settling: settling + 1 } : { now: false, settling: 0 };
+}
 
 const clockTime = (at: string | number) => new Date(at).toTimeString().slice(0, 8);
 
@@ -105,9 +114,11 @@ export const watchCommand = defineCommand({
     let failed = 0;
     let busy = 0;
     let skippedVersion = 0;
+    let settling = 0;
     const version = { notified: null as string | null };
     while (ticks < max && !signal?.aborted) {
       const started = ctx.clock.now();
+      let followUp = false;
       try {
         const refused = await pausedOnVersion(ctx, version);
         if (refused) {
@@ -117,9 +128,10 @@ export const watchCommand = defineCommand({
         } else {
           const r = await runTick(ctx);
           failed += r.failed;
+          followUp = r.follow_up === true;
           const decisions = r.decisions.filter((d) => d.kind !== "noop");
           if (human) for (const line of humanTickLines(decisions, r.at)) ctx.log(line);
-          else ctx.log(JSON.stringify({ tick_id: r.tick_id, at: r.at, duration_ms: r.duration_ms, decisions, failed: r.failed }));
+          else ctx.log(JSON.stringify({ tick_id: r.tick_id, at: r.at, duration_ms: r.duration_ms, decisions, failed: r.failed, ...(r.follow_up ? { follow_up: true } : {}) }));
         }
       } catch (e) {
         if (e instanceof CliFailure && e.exit === ExitCode.busy) busy++;
@@ -127,7 +139,11 @@ export const watchCommand = defineCommand({
       }
       ticks++;
       if (ticks >= max || signal?.aborted) break;
-      await abortableSleep(Math.max(0, interval - (ctx.clock.now() - started)), signal);
+      // H12: the follow-up a tick left (a receipt to apply, a step to start) runs now, not an interval later
+      const next = settleStep(followUp, settling);
+      settling = next.settling;
+      if (next.now) continue;
+      await ctx.sleep(Math.max(0, interval - (ctx.clock.now() - started)), signal);
     }
     const kept = opt.bool(args, "keep-claims");
     const released = kept ? [] : await releaseHeldClaims(ctx);
