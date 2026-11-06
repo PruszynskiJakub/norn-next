@@ -14,13 +14,13 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { atomicWrite, installSkills, LOCAL_CONFIG_FILE, linkSkills, loadWorkflows, readText, REPO_CONFIG_FILE, repoConfigPath, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, WORKTREE_LOCAL_FILES, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
+import { atomicWrite, gitRemoteUrl, installSkills, LOCAL_CONFIG_FILE, linkSkills, loadWorkflows, readText, REPO_CONFIG_FILE, repoConfigPath, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, WORKTREE_LOCAL_FILES, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered } from "../output.ts";
 import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
-import { detectTestCommand, gitRemoteUrl, TEMPLATE_TEST_COMMAND, withTestCommand } from "../runtime/detect.ts";
+import { detectTestCommand, TEMPLATE_TEST_COMMAND, withTestCommand } from "../runtime/detect.ts";
 import { type LabelsReport, labelsLines, remoteLabels } from "../runtime/labels.ts";
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { cmd } from "@norn/core";

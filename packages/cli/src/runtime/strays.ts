@@ -7,6 +7,7 @@
  */
 import { realpathSync } from "node:fs";
 import { sep } from "node:path";
+import { spawnBounded } from "@norn/store";
 
 export interface StoppedListener {
   pid: number;
@@ -14,15 +15,12 @@ export interface StoppedListener {
   command: string;
 }
 
+/** A pid probe: bounded, and not told to the spawn observer (its argv carries live pids). */
+const LSOF_TIMEOUT_MS = 10_000;
+
 async function lsof(args: string[]): Promise<string> {
-  try {
-    const p = Bun.spawn(["lsof", ...args], { stdout: "pipe", stderr: "ignore" });
-    const out = await new Response(p.stdout).text();
-    await p.exited;
-    return out;
-  } catch {
-    return "";
-  }
+  const r = await spawnBounded(["lsof", ...args], { timeoutMs: LSOF_TIMEOUT_MS, unobserved: true });
+  return r.timed_out ? "" : r.stdout;
 }
 
 /** `lsof -F` output: one field per line, `p<pid>` opens a process, then `c<command>`, `n<name>`, … */

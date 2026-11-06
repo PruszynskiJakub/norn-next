@@ -36,13 +36,12 @@ import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, FileError, Ports, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
 import { type ConfigEntry, ExitCode, type ResolvedConfig, ulid, type VersionMatch, versionMatch } from "@norn/schema";
-import { baseRunStateStories, baseSpecsRoot, bindNornHome, cachedDefaultBranch, defaultBaseRef, type Layout, layoutProblems, loadWorkflows, machineDir, machineHolder, noteSpawn, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, SKILLS_DIR, skillsDrift, skillsReport, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
+import { baseRunStateStories, baseSpecsRoot, bindNornHome, cachedDefaultBranch, defaultBaseRef, type Layout, layoutProblems, loadWorkflows, gitRemoteUrl, machineDir, machineHolder, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, SKILLS_DIR, skillsDrift, skillsReport, spawnBounded, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { CliFailure, configError, rendered, withExit } from "../output.ts";
 import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
-import { gitRemoteUrl } from "../runtime/detect.ts";
 import { type LabelsReport, labelsWarnings, remoteLabels } from "../runtime/labels.ts";
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
 import { effectiveRetain, formatBytes, retainCutoffDay, retainWarning } from "../runtime/trace-retention.ts";
@@ -59,27 +58,14 @@ interface RunOut {
 }
 
 async function run(argv: string[], o: { cwd?: string; env?: Record<string, string | undefined>; input?: string; timeoutMs: number }): Promise<RunOut> {
-  try {
-    noteSpawn(argv, o.cwd);
-    const p = Bun.spawn(argv, {
-      cwd: o.cwd,
-      env: (o.env ?? process.env) as Record<string, string>,
-      stdin: o.input === undefined ? "ignore" : new TextEncoder().encode(o.input),
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    let timedOut = false;
-    const timer = setTimeout(() => {
-      timedOut = true;
-      p.kill("SIGKILL");
-    }, o.timeoutMs);
-    const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
-    const code = await p.exited;
-    clearTimeout(timer);
-    return { code: timedOut ? null : code, out: `${out}${err}`.trim(), timed_out: timedOut };
-  } catch (e) {
-    return { code: null, out: "", timed_out: false, error: (e as Error).message };
-  }
+  const r = await spawnBounded(argv, {
+    ...(o.cwd === undefined ? {} : { cwd: o.cwd }),
+    ...(o.env === undefined ? {} : { env: o.env }),
+    ...(o.input === undefined ? {} : { stdin: o.input }),
+    timeoutMs: o.timeoutMs,
+  });
+  if (r.spawn_error !== undefined) return { code: null, out: "", timed_out: false, error: r.spawn_error };
+  return { code: r.timed_out ? null : r.code, out: `${r.stdout}${r.stderr}`.trim(), timed_out: r.timed_out };
 }
 
 const firstLine = (s: string) => s.split("\n")[0]?.trim() ?? "";

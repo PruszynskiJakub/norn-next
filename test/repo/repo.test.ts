@@ -926,10 +926,7 @@ const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
 };
 
 /** (d) processes are spawned by store and adapters only (ports perform effects). */
-const SPAWN_ALLOW: Counts = {
-  "packages/cli/src/commands/doctor.ts": 1,
-  "packages/cli/src/runtime/strays.ts": 1,
-};
+const SPAWN_ALLOW: Counts = {};
 
 /**
  * (g) B1, B2, B5: norn's paths under a repo are spelled only by store's path module (paths.ts), so a

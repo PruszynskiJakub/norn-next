@@ -13,7 +13,7 @@ import { closeSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { AdapterContext, LaunchSpec, PaneState, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
 import type { RunnerConfig } from "@norn/schema";
-import { definedEnv, noteSpawn, runnerLogDir } from "@norn/store";
+import { noteSpawn, runnerLogDir, spawnDetached } from "@norn/store";
 import { portError } from "../exec.ts";
 import { createProcessPort } from "../process/index.ts";
 
@@ -61,15 +61,7 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
       let pid: number | undefined;
       try {
         noteSpawn(spec.argv, spec.cwd);
-        // Bun.spawn, not child_process: under `bun test --parallel` a child_process event can be lost (store spawnBounded)
-        const child = Bun.spawn([cmd, ...args], {
-          cwd: spec.cwd,
-          env: definedEnv({ ...process.env, ...spec.env }),
-          detached: true, // own process group: survives the tick, killable as a group
-          stdio: ["ignore", fd, fd],
-        });
-        pid = child.pid;
-        child.unref();
+        pid = spawnDetached([cmd, ...args], { cwd: spec.cwd, env: { ...process.env, ...spec.env }, output: fd }).pid;
       } catch (err) {
         throw portError("launch_failed", `cannot start ${cmd}: ${err instanceof Error ? err.message : String(err)}`);
       } finally {

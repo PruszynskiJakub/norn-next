@@ -67,6 +67,12 @@ export function gitSync(cwd: string, args: string[], input?: Uint8Array, opts: {
   }
 }
 
+/** The fetch URL of the named git remote, or null when the repository has no such remote. */
+export function gitRemoteUrl(root: string, name: string): string | null {
+  const r = gitSync(root, ["remote", "get-url", name]);
+  return r.code === 0 ? r.stdout.toString().trim() || null : null;
+}
+
 export async function gitOk(cwd: string, args: string[], input?: string): Promise<string> {
   const r = await git(cwd, args, input);
   if (r.code !== 0) throw new Error(`git ${args.join(" ")} failed (${r.code}): ${r.stderr.trim()}`);

@@ -27,6 +27,8 @@ export interface BoundedResult {
   stdout: string;
   stderr: string;
   timed_out: boolean;
+  /** set when the executable could not be started (code 127): why */
+  spawn_error?: string;
 }
 
 /** One child process norn is about to start: what an effect transcript records (refactor Phase 0.2). */
@@ -41,8 +43,8 @@ let observer: SpawnObserver | null = null;
 
 /**
  * Test hook: call `fn` with each argv + cwd before it is spawned (`spawnBounded`, store's sync git
- * calls, and every other spawn that calls `noteSpawn`: check commands, `gitRemoteUrl`, adapters'
- * `bunExec`, the headless launch, doctor's probes; the read-only `ps`/`lsof` pid probes are left
+ * calls (`gitRemoteUrl` among them), and every other spawn that calls `noteSpawn`: check commands,
+ * the headless launch; the read-only `ps`/`lsof` pid probes are left
  * out). `null` (the default) turns it off. Returns the observer it replaced. The observer
  * only watches; it cannot change or stop the spawn, and one that throws is ignored.
  */
@@ -115,7 +117,8 @@ export async function spawnBounded(argv: string[], opts: BoundedOptions): Promis
       stderr: "pipe",
     });
   } catch (e) {
-    return { code: 127, stdout: "", stderr: e instanceof Error ? e.message : String(e), timed_out: false };
+    const message = e instanceof Error ? e.message : String(e);
+    return { code: 127, stdout: "", stderr: message, timed_out: false, spawn_error: message };
   }
   const cap = opts.maxOutputChars;
   const keep = (text: string) => (cap !== undefined && text.length > cap ? text.slice(text.length - cap) : text);
@@ -223,17 +226,19 @@ export interface DetachedChild {
 }
 
 /**
- * Start argv in its own process group with no stdio, not waited for: it outlives this process (a
- * `norn check-run`). Does not tell the spawn observer (the caller does, with the argv a transcript
+ * Start argv in its own process group, not waited for: it outlives this process (a `norn check-run`,
+ * a headless agent run). No stdio, unless `output` names an open fd for stdout and stderr (a log
+ * file; the caller closes its copy). Does not tell the spawn observer (the caller does, with the argv a transcript
  * should show). Throws when the executable cannot be started. `Bun.spawn`, not child_process (see
  * `spawnBounded`).
  */
-export function spawnDetached(argv: string[], opts: { cwd?: string; env: Record<string, string | undefined> }): DetachedChild {
+export function spawnDetached(argv: string[], opts: { cwd?: string; env: Record<string, string | undefined>; output?: number }): DetachedChild {
+  const output = opts.output ?? "ignore";
   const child = Bun.spawn(argv, {
     ...(opts.cwd === undefined ? {} : { cwd: opts.cwd }),
     env: definedEnv(opts.env),
     detached: true,
-    stdio: ["ignore", "ignore", "ignore"],
+    stdio: ["ignore", output, output],
   });
   const exited = child.exited.then(() => {});
   child.unref();
