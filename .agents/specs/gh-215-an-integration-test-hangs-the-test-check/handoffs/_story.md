@@ -135,6 +135,18 @@ The `## Reproduce` comment is on #215: https://github.com/PruszynskiJakub/norn-n
 - Not done: F2 (minor, reviewer: acceptable) — `Bun.spawnSync`'s timeout kills the child only, so a grandchild is orphaned until it exits; `Bun.spawnSync` has no process-group option. No tier-level watchdog either: non-spawn blocks (the FIFO row) are still uncovered; the observed hang was a spawn. What made the git child stick on CI stays open.
 - implement#2 done: F1: spawning-tier preload now wraps Bun.spawnSync (test/support/spawn-sync-bound.ts) with a 15s SIGKILL default when a call sets no timeout, covering harness sh(), norn's in-process gitSync (H11 unchanged for real runs) and direct test-file spawnSync. Red-first fixture test in harness-git-timeout.test.ts (stuck in-process gitSync + direct spawnSync: 15s bound hit before, green 3/3 after, ~3.6s); unit test pins the wrapper. F2 (minor) left: spawnSync timeout kills only the child, no process-group option. Unit tier + typecheck green.
 
+### Review (review#2)
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| Wanted: a stuck harness git call (`sh()` / `h.git`) fails its test, named, and the run goes on | test | `packages/cli/test/integration/harness-git-timeout.test.ts` › "a harness git call that never exits fails its test, named, instead of hanging the run" |
+| Wanted: the integration tier never hangs past the per-test timeout (any stuck test fails named) | test | `packages/cli/test/integration/harness-git-timeout.test.ts` › "norn's in-process git call or a test's own spawnSync that never exits fails its test, named" (covers the sync-spawn paths; the wrapper itself in `test/repo/spawn-sync-bound.test.ts`) |
+
+- Ran: the fixture file, store `spawn.test.ts` and `upgrade-records.test.ts` with the integration config (25 pass); unit tier 1279 pass; typecheck green.
+- Checked: every `Bun.spawnSync` in norn's src (store `gitSync`, `proc.ts` and `brief.ts` ps probes) is a short local call, so the 15 s default kills nothing legitimate; remote git calls set their own timeout and keep it; the unit guard's `uninstall` is only called in the unit tier.
+- F1 (minor, spec): non-spawn blocks (a blocking read, the FIFO row) are still uncut; the observed hang was a sync spawn. F2 (minor): a timed-out child's grandchildren are orphaned until they exit (no process-group option on `Bun.spawnSync`).
+- No blocking findings.
+
 ## Resume
 
-implement#2 done; the next step is norn's. Nothing pending here.
+review#2 approve; the next step is norn's. Nothing pending here.
