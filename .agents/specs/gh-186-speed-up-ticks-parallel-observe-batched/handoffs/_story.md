@@ -15,7 +15,7 @@ A sync tick makes O(1) PR calls instead of one per story, and `mergedByAncestry`
 
 ### Resume
 
-Review approved. Next: describe (PR body); measure a sync tick and a noop tick against #78's timings for the PR evidence.
+describe#1 wrote pr.md (summary, evidence per spec item, merge danger). The speed-up is listed as not measured, with how to check it. Next: the person reviews the PR; measuring a sync tick and a noop tick against #78 is still open.
 
 ## Progress
 
@@ -32,3 +32,4 @@ Review approved. Next: describe (PR body); measure a sync tick and a noop tick a
 | C1 golden cases and observe snapshots unchanged | test | `packages/core/test/unit/golden.test.ts`, `test/e2e/observe-snapshots.test.ts`; no file under either changed |
 | C2 sync failure leaves remote unobserved, `.catch` fallbacks as before | test | existing sync tests; the throw still propagates out of `syncRemote`, CI `.catch` kept |
 - review#1 approve: Approve: findPullRequests on gh/glab/FakeRemote with a contract case, sync makes one PR call per kind of story, mergedByAncestry bounded; golden and observe snapshots unchanged; unit tier and typecheck green. 3 minor findings: speed-up not measured vs #78, gh api graphql host on GHE unverified, GitLab GraphQL query only run against the scripted CLI.
+- describe#1 done: pr.md written: batched findPullRequests and bounded mergedByAncestry, evidence per W1/W2/W3/C1/C2 (speed-up not measured, says how to check), merge danger: two-way, every sync; GitLab query, GHE host and the new required RemotePort method flagged.
