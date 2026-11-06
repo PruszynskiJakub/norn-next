@@ -19,3 +19,7 @@ Apply the skill-shaper proposals (skill text only) to the 20 bundled skills (sou
 ### Resume
 
 Nothing left in implement: the change is committed. The next step reviews the diff.
+
+## Progress
+
+- implement#1 done: Applied the skill-shaper proposals to the 20 bundled skills (source + refreshed .agents copies) and issue/release/release-start. Fixed the proposal lines that broke the P7, pinned-phrase and AC4 lints or contradicted the code (slice checks are not run by norn). Made the cross-cutting cleanups: tdd seam = interface, qa→qa-person, deduplicated the interview/refine/clarify and tdd/implement rules. retro is now model-invocable, and prototype defaults to <spec>/prototype/. Unit tier and typecheck green.
