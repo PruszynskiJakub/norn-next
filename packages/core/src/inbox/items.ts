@@ -8,7 +8,7 @@
  * F35, Q6), Unclaimed, Running, Notes (agents' notes for a person, NT2: information, not an
  * action), Recently done.
  */
-import { ATTENDED_WAIT, parseDuration, receiptNumber, recordRef, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
+import { ATTENDED_WAIT, isClosedStatus, parseDuration, receiptNumber, recordRef, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, unstickCommand, versionMismatch } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
@@ -389,7 +389,7 @@ function notesClearedBy(story: StoryFacts): string {
  */
 function noteItems(story: StoryFacts): InboxItem[] {
   const status = story.frontmatter?.status;
-  if (status === "done" || status === "dropped") return [];
+  if (isClosedStatus(status)) return [];
   const notes = story.notes ?? [];
   const cleared_by = notes.length ? notesClearedBy(story) : "";
   return notes.map((n) => ({

@@ -8,6 +8,7 @@ import {
   type Receipt,
   type RejectedMailboxReceipt,
   claimRef,
+  isClosedStatus,
   sliceBranch,
   SPEC_FILE,
   type StoryFrontmatter,
@@ -80,11 +81,11 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
     // (or whose PR merged) is never acquired by a stale local intake or a returning checkout. Only this
     // heartbeat's own expired claim (nobody took it since) is re-acquired for a merged PR whose record
     // is not yet done, so GR6 cleanup and the base record still happen.
-    const baseDone = story.base_status === "done" || story.base_status === "dropped";
+    const baseDone = isClosedStatus(story.base_status);
     if (baseDone || (mergedIntoBase(story, ctx.facts.repo.default_branch) && !ours))
       return ctx.noop(ref, "story.finished", baseDone ? `finished: ${ctx.facts.repo.default_branch} records it ${story.base_status} (R3.2); nothing to acquire` : "finished: PR merged (R3.2); nothing to acquire");
     // GR6: a finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
-    if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped" ? story.frontmatter.status : "workflow done"}); nothing to take`);
+    if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${isClosedStatus(story.frontmatter?.status) ? story.frontmatter.status : "workflow done"}); nothing to take`);
     if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — ${cmd.storyCheckout(story.key)} (T10)`);
     return ctx.emit({
       kind: "claim",

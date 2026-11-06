@@ -121,7 +121,7 @@ export function unbindNornHome(root: string): void {
 }
 
 /** The norn home `root`'s machine dir lives in. */
-export const machineHomeOf = (root: string) => homes.get(checkoutOf(root).common) ?? nornHome();
+const machineHomeOf = (root: string) => homes.get(checkoutOf(root).common) ?? nornHome();
 
 /** B5, D1: the checkout's machine-local files (trace, locks, heartbeat, caches), `<norn home>/repos/<id>/`. */
 export const machineDir = (root: string) => join(machineReposDir(machineHomeOf(root)), checkoutOf(root).id);

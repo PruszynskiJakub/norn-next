@@ -334,8 +334,6 @@ export const storyRunStatePath = (story: RunStory): string => `${RUNS_DIR}/${sto
  * mailbox's step stamp, the run state `norn upgrade` moves off the base, gh-195 D16).
  */
 export const treeRunStatePath = (story: RunStory, unit: string): string => `${treeStoryRunStatePath(story)}/${unitRecordPath(unit)}`;
-/** gh-195/05: round `n`'s record folder in an older norn's tree (`<spec folder>/runs/_story/rounds/NN-<wf>`). */
-export const treeRoundRunStatePath = (story: RunStory, n: number, workflow: string): string => `${treeStoryRunStatePath(story)}/${roundRecordPath(n, workflow)}`;
 /** gh-195/05: the folder of an older norn's tree that held every unit's record of a story (`<spec folder>/runs`). */
 export const treeStoryRunStatePath = (story: RunStory): string => `${story.spec_dir}/${RUNS_DIR}`;
 /** Slice branch: `gh-123/03-add-form`. */

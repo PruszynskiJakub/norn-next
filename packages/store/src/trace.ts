@@ -27,7 +27,7 @@ import {
 } from "@norn/schema";
 import { appendDurable, atomicWrite, isErrno, readText, safeUnlink } from "./fsx.ts";
 import { HOOKS_DIR, hookFilePath, hooksDir, machineDir } from "./paths.ts";
-import { oldRunnerLogDir } from "./run-state.ts";
+import { machineRunsDir } from "./run-state.ts";
 
 function eventTime(ev: TraceEvent): string {
   return ev.type === "hook" ? ev.fact.at : ev.at;
@@ -516,9 +516,9 @@ export function listRunTraces(root: string): RunTraceEntry[] {
     }
   }
   // gh-195 D1: session logs moved to `sessions/`; the ones an older norn left in `runs/` are pruned with their run
-  for (const name of listDir(oldRunnerLogDir(root))) {
+  for (const name of listDir(machineRunsDir(root))) {
     const run = OLD_SESSION_LOG.exec(name)?.[1];
-    const st = run ? statOrNull(join(oldRunnerLogDir(root), name)) : null;
+    const st = run ? statOrNull(join(machineRunsDir(root), name)) : null;
     if (!run || !st?.isFile()) continue;
     const e = runs.get(run) ?? { run_id: run, files: [], bytes: 0, newestMs: Number.NEGATIVE_INFINITY };
     e.files.push(`${RUNS_DIR}/${name}`);

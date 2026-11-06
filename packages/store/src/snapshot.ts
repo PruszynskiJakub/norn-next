@@ -14,7 +14,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { FileError, NumberedReceipt, SliceFileFacts, UnitRef } from "@norn/core";
-import { claimRef, isStoryKey, type RunStory, SPEC_FILE, STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, parseSliceDirName, parseSliceFileName, parseSpecDirName, sliceDirName, sliceKey, treeStoryRunStatePath } from "@norn/schema";
+import { claimRef, isClosedStatus, isStoryKey, parseSliceDirName, parseSliceFileName, parseSpecDirName, type RunStory, sliceDirName, sliceKey, SPEC_FILE, STORY_UNIT_DIR, type StoryFrontmatter, treeStoryRunStatePath, type UnitState } from "@norn/schema";
 import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
@@ -284,7 +284,7 @@ export function loadStory(
   const run: RunStory = { key, spec_dir: relative(root, specPath) };
   const checkout = opts.checkout ?? root;
   // D7, D16 (B29): only a finished story's record is read from its archive ref, never written there
-  const finished = story.ok && (story.value.frontmatter.status === "done" || story.value.frontmatter.status === "dropped");
+  const finished = story.ok && isClosedStatus(story.value.frontmatter.status);
   const at = runStateSource(root, run, { checkout, ...(opts.archive && finished ? { archive: opts.archive } : {}) });
   const base = { key, slug, root, path: specPath, spec_dir: run.spec_dir, checkout, run_state: at, frontmatter: story.ok && !frontmatter_error ? story.value.frontmatter : null, frontmatter_error, slices };
   if (opts.units === false) return { ...base, units: [] };

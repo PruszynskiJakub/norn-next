@@ -7,6 +7,7 @@
  * Without a story: the worktree's story, a slice worktree's too (B55), else a pick of the waiting stories (B57).
  */
 import { cmd, baseUpdateStep, heldBySkillsDrift, storyUnit, waitsForBaseUpdate } from "@norn/core";
+import { isClosedStatus } from "@norn/schema";
 import { defineCommand } from "../command.ts";
 import { refuse } from "../output.ts";
 import { at, humanReceipt, resolveTarget, runHumanVerb } from "../runtime/human.ts";
@@ -21,7 +22,7 @@ const updatable: TargetRule = {
   command: (k) => cmd.storyUpdateBranch(k),
   applies: (_key, u) =>
     // the view carries no skills drift: a unit held by it is not offered
-    u?.slice === null && u.story_status !== "done" && u.story_status !== "dropped" && u.pr?.state !== "merged" && waitsForBaseUpdate(u, false),
+    u?.slice === null && !isClosedStatus(u.story_status) && u.pr?.state !== "merged" && waitsForBaseUpdate(u, false),
 };
 
 export const storyUpdateBranchCommand = defineCommand({

@@ -29,7 +29,7 @@ import {
   type UnitFacts,
   type WorktreeFacts,
 } from "@norn/core";
-import { CLAIMS_PREFIX, DEFAULT_CONFIG, type HookFact, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
+import { CLAIMS_PREFIX, DEFAULT_CONFIG, type HookFact, isClosedStatus, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import {
   cachedDefaultBranch,
   classifyClaim,
@@ -361,7 +361,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     const story = ls.snapshot;
     let claim = classifyClaim(claims[i] ?? { state: "none" }, me, now);
     if (claim.state === "other" && claim.blob.holder === holder) claim = { ...claim, state: "mine" };
-    const finished = story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped";
+    const finished = isClosedStatus(story.frontmatter?.status);
 
     const units: UnitFacts[] = ls.units.map((lu) => unitFacts(lu, lu.hooks, leaseByRun));
     const sf: StoryFacts = {

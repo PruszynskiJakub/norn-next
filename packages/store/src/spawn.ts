@@ -71,7 +71,7 @@ const KILL_GRACE_MS = 2_000;
  * Read a child's pipe to the end, chunk by chunk, so the text read so far survives `stop()` (a
  * grandchild that left the group may hold the pipe open after the kill).
  */
-export function drainPipe(stream: ReadableStream<Uint8Array>, onText: (text: string) => void): { done: Promise<void>; stop: () => void } {
+function drainPipe(stream: ReadableStream<Uint8Array>, onText: (text: string) => void): { done: Promise<void>; stop: () => void } {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   const done = (async () => {

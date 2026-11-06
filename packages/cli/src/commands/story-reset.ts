@@ -14,14 +14,14 @@
  */
 import { existsSync } from "node:fs";
 import { cmd } from "@norn/core";
-import { deleteMailbox, fetchNornRefs, listLeases, listMailbox, releaseClaim, releaseLease, scanWorktrees } from "@norn/store";
+import { deleteMailbox, fetchNornRefs, listMailbox, releaseClaim, releaseStoryLeases, scanWorktrees } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { failure, refuse } from "../output.ts";
+import { killLocalSessions } from "../runtime/close.ts";
 import { withStory } from "../runtime/release.ts";
 import { resetBlockers } from "../runtime/reset.ts";
 import { aStory, resolveStory } from "../runtime/target.ts";
 import { claimIfFree, refuseOthers } from "./story-close.ts";
-import { runnerFor } from "../wiring.ts";
 
 export const storyResetCommand = defineCommand({
   name: "story reset",
@@ -58,15 +58,7 @@ export const storyResetCommand = defineCommand({
       const claimSha = await claimIfFree(ctx, obs, key);
 
       // 1. stop live sessions this machine runs (best effort)
-      const killed: string[] = [];
-      for (const u of story.units) {
-        const s = u.state?.status === "running" ? u.run?.session : null;
-        const runner = runnerFor(obs.ports, s);
-        if (s && runner) {
-          await runner.kill(s).catch(() => undefined);
-          killed.push(u.unit.key);
-        }
-      }
+      const killed = await killLocalSessions(obs, story);
 
       const sliceWts = story.units.flatMap((u) => {
         const ul = obs.units[u.unit.key];
@@ -97,9 +89,7 @@ export const storyResetCommand = defineCommand({
         await git.deleteBranch(obs.root, b, { force: true });
         deleted.push(b);
       }
-      const leases: string[] = [];
-      for (const e of (await listLeases(ctx.home, () => true)).live)
-        if (e.lease.repo === obs.root && e.lease.story === key && releaseLease(ctx.home, e.file)) leases.push(e.file);
+      const leases = await releaseStoryLeases(ctx.home, obs.root, key);
       // a receipt left for the old run would only be rejected later (T9); delete it with the claim, as GR6 does
       if (obs.remote) await fetchNornRefs(obs.root, obs.remote).catch(() => undefined);
       const mailbox: string[] = [];

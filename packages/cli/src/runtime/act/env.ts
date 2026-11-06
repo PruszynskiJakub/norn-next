@@ -15,9 +15,8 @@ import {
 import type { ClaimBlob, UnitState } from "@norn/schema";
 import {
   appendTrace,
-  listLeases,
   readActFailures,
-  releaseLease,
+  releaseStoryLeases,
   tidyHandoff,
   writeReceiptAt,
   writeState,
@@ -126,15 +125,7 @@ export class ActEnv {
   }
 
   async releaseRunLeases(unit: UnitRef, kinds: Array<"agent" | "check" | "slot">, runId?: string): Promise<string[]> {
-    const listing = await listLeases(this.ctx.home, () => true);
-    const out: string[] = [];
-    for (const e of listing.live) {
-      const l = e.lease;
-      if (l.repo !== this.root || l.story !== unit.story || l.slice !== unit.slice || !kinds.includes(l.kind)) continue;
-      if (runId && l.run_id !== runId && l.kind !== "slot") continue;
-      if (releaseLease(this.ctx.home, e.file)) out.push(e.file);
-    }
-    return out;
+    return releaseStoryLeases(this.ctx.home, this.root, unit.story, (l) => l.slice === unit.slice && kinds.includes(l.kind) && (!runId || l.run_id === runId || l.kind === "slot"));
   }
 
   /** Tidy the unit's handoff (gh-195 D9: skeleton when new, an older norn's blocks gone, B6, B8), commit with trailers (S4) and push (S8, T7). */

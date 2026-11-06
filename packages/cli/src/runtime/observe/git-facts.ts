@@ -2,6 +2,7 @@
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { type ForeignCommit, type GitInProgress, type GitPort, isIntakeCommit, type Ports, type StoryBase, type StoryFacts, type WorktreeFacts, type WorktreeStatus } from "@norn/core";
+import { isClosedStatus } from "@norn/schema";
 import { type BaseFactsCache, readEnvNorn } from "@norn/store";
 
 /** Newest mtime of the given worktree-relative paths (ms), or null. */
@@ -38,7 +39,7 @@ export async function storyBase(
   next: BaseFactsCache,
   key: string,
 ): Promise<{ base?: StoryBase }> {
-  if (status === "done" || status === "dropped") return {};
+  if (isClosedStatus(status)) return {};
   const ref = storyBaseRef(remote, base);
   const head = refs.get(`refs/heads/${branch}`);
   const sha = refs.get(ref);
@@ -127,7 +128,7 @@ const SLICE_BRANCH = /^((?:gh|gl)-\d+)\/(\d+)-([a-z0-9][a-z0-9-]*)$/;
 export function findOrphanBranches(refs: ReadonlyMap<string, string>, worktrees: Array<{ branch: string | null }>, stories: StoryFacts[]): string[] {
   const checkedOut = new Set(worktrees.map((w) => w.branch).filter((b): b is string => !!b));
   const byKey = new Map(stories.map((s) => [s.key, s]));
-  const finished = (s: StoryFacts | undefined) => !s || s.frontmatter?.status === "done" || s.frontmatter?.status === "dropped";
+  const finished = (s: StoryFacts | undefined) => !s || isClosedStatus(s.frontmatter?.status);
   const out: string[] = [];
   for (const ref of refs.keys()) {
     if (!ref.startsWith("refs/heads/")) continue;

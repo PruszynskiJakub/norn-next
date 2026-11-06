@@ -56,7 +56,7 @@ interface GlMr {
  * gh-195 B18: a GitLab pipeline status as one CI state: `success`; `failed` or `canceled` → failure;
  * `skipped` or no pipeline → none; every other status (created, pending, running, manual, …) → pending.
  */
-export function ciOfPipeline(status: string | null | undefined): PullRequestCi {
+function ciOfPipeline(status: string | null | undefined): PullRequestCi {
   if (!status || status === "skipped") return "none";
   if (status === "success") return "success";
   if (status === "failed" || status === "canceled") return "failure";

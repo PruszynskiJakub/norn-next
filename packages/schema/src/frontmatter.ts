@@ -16,6 +16,9 @@ export const StoryStatus = Type.Union([
 ]);
 export type StoryStatus = Static<typeof StoryStatus>;
 
+/** A story whose spec.md says it is over: `done` or `dropped`. */
+export const isClosedStatus = (status: string | null | undefined): status is "done" | "dropped" => status === "done" || status === "dropped";
+
 /** How the story PR landed (GR6, P2), recorded at cleanup. */
 export const StoryMerge = Type.Object(
   {

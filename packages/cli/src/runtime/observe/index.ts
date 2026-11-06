@@ -26,7 +26,7 @@ import {
   type UnmarkedWorktree,
   type WorktreeFacts,
 } from "@norn/core";
-import { claimRef, parseDuration, type ResolvedConfig, sliceBranch, storyBranch, type UnitState, type Workflow } from "@norn/schema";
+import { claimRef, isClosedStatus, parseDuration, type ResolvedConfig, sliceBranch, storyBranch, type UnitState, type Workflow } from "@norn/schema";
 import {
   type BaseFactsCache,
   baseStoryFacts,
@@ -133,6 +133,25 @@ export interface Observed {
 
 // ------------------------------------------------------------ observe
 
+/**
+ * The last seen value per story, kept between syncs: what this sync read (`fresh`, null included), else
+ * what was kept before; finished stories drop out.
+ */
+function carrySeen<V, T>(stories: ReadonlyArray<{ key: string; frontmatter?: { status: string } | null }>, prev: Record<string, T>, fresh: ReadonlyMap<string, V | null>, seen: (v: V | null) => T): Record<string, T> {
+  const out: Record<string, T> = {};
+  for (const s of stories) {
+    if (isClosedStatus(s.frontmatter?.status)) continue;
+    const v = fresh.has(s.key) ? seen(fresh.get(s.key) ?? null) : prev[s.key];
+    if (v) out[s.key] = v;
+  }
+  return out;
+}
+
+/** Write a cache only when it changed since it was read. */
+function writeIfChanged<T>(root: string, next: T, prev: T, write: (root: string, value: T) => void): void {
+  if (JSON.stringify(next) !== JSON.stringify(prev)) write(root, next);
+}
+
 export async function observe(ctx: Context, opts: ObserveOptions): Promise<Observed> {
   const now = ctx.clock.now();
   const root = ctx.root;
@@ -208,7 +227,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       const label = config.label;
       const listedIssues = await remotePort.listAssignedIssues({ label });
       issues = listedIssues;
-      const active = snapshot.stories.filter((s) => s.frontmatter && s.frontmatter.status !== "done" && s.frontmatter.status !== "dropped");
+      const active = snapshot.stories.filter((s) => s.frontmatter && !isClosedStatus(s.frontmatter.status));
       const read = await mapBounded(active, REMOTE_CONCURRENCY, async (s) => {
         const fm = s.frontmatter as NonNullable<typeof s.frontmatter>;
         const listed = listedIssues.find((i) => i.number === fm.number && i.provider === fm.provider);
@@ -250,28 +269,18 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   if (JSON.stringify(cache) !== cacheIn) writeRemoteCache(root, cache);
   // C1: the last PR seen per story, kept between syncs for the inbox (`pr_seen`); finished stories drop out
   const prSeenIn = local.pr_seen;
-  const prSeen: PrFactsCache = {};
-  for (const s of snapshot.stories) {
-    if (s.frontmatter?.status === "done" || s.frontmatter?.status === "dropped") continue;
-    const fresh = storyPrs.has(s.key) ? { pr: storyPrs.get(s.key) ?? null, observed_at: now } : prSeenIn[s.key];
-    if (fresh) prSeen[s.key] = fresh;
-  }
+  const prSeen: PrFactsCache = carrySeen(snapshot.stories, prSeenIn, storyPrs, (pr) => ({ pr, observed_at: now }));
   // B18: a story held elsewhere keeps its last PR (and CI) seen while another heartbeat holds it; never a fact of decide's
   if (!sync.ran && Object.keys(prSeenIn).some((k) => !snapshotKeys.has(k))) elsewhere = await heldElsewhereKeys(root, { heartbeat_id: hb }, now, snapshotKeys).catch(() => []);
   for (const e of elsewhere) {
     const seen = elsewherePrs.get(e.key) ?? prSeenIn[e.key];
     if (seen) prSeen[e.key] = seen;
   }
-  if (JSON.stringify(prSeen) !== JSON.stringify(prSeenIn)) writePrFacts(root, prSeen);
+  writeIfChanged(root, prSeen, prSeenIn, writePrFacts);
   // gh-71 D5: the last issue seen per story, kept between syncs for the finished-round Check item (`issue_seen`)
   const issueSeenIn = local.issue_seen;
-  const issueSeen: IssueFactsCache = {};
-  for (const s of snapshot.stories) {
-    if (s.frontmatter?.status === "done" || s.frontmatter?.status === "dropped") continue;
-    const fresh = storyIssues.has(s.key) ? { issue: storyIssues.get(s.key) ?? null, observed_at: now } : issueSeenIn[s.key];
-    if (fresh) issueSeen[s.key] = fresh;
-  }
-  if (JSON.stringify(issueSeen) !== JSON.stringify(issueSeenIn)) writeIssueFacts(root, issueSeen);
+  const issueSeen: IssueFactsCache = carrySeen(snapshot.stories, issueSeenIn, storyIssues, (issue) => ({ issue, observed_at: now }));
+  writeIfChanged(root, issueSeen, issueSeenIn, writeIssueFacts);
 
   // ---- P2 (F34): a PR not saying merged whose head is already on the fetched base is merged
   const byAncestry = new Set<string>();
@@ -377,8 +386,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       worktree: storyWorktree,
       claim,
       mailbox,
-      issue: storyIssues.has(s.key) ? storyIssues.get(s.key) : undefined,
-      pr: storyPrs.has(s.key) ? storyPrs.get(s.key) : undefined,
+      issue: storyIssues.get(s.key),
+      pr: storyPrs.get(s.key),
       ...(prSeen[s.key] ? { pr_seen: prSeen[s.key] } : {}),
       ...(issueSeen[s.key] ? { issue_seen: issueSeen[s.key] } : {}),
       ...(byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
@@ -406,7 +415,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   for (const [story, path] of storyWts) if (!known.has(story)) orphanWts.push(path);
   for (const [slice, path] of sliceWts) if (!known.has(slice.split("/")[0] as string)) orphanWts.push(path);
 
-  if (JSON.stringify(baseCache) !== JSON.stringify(baseCacheIn)) writeBaseFacts(root, baseCache);
+  writeIfChanged(root, baseCache, baseCacheIn, writeBaseFacts);
   const orphanBranches = findOrphanBranches(refs, wtList, stories);
   traceForeignCommits(root, stories, opts.tick_id, now);
 

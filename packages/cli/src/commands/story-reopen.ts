@@ -80,7 +80,7 @@ async function restoreRecord(ctx: Context, key: string, spec_dir: string): Promi
     });
   const ref = await readRecordRef(ctx.root, key);
   if (!ref) return;
-  const r = await unpackRecord(ctx.root, ref.sha, dir);
+  const r = unpackRecord(ctx.root, ref.sha, dir);
   if (!r.ok)
     throw failure(
       `${recordRef(key)} at ${ref.sha} does not unpack: ${r.errors.map((e) => `${e.file}: ${e.errors.map((x) => x.message).join(", ")}`).join("; ")}`,

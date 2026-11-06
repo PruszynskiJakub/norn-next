@@ -6,6 +6,7 @@
  */
 import { basename } from "node:path";
 import { cmd, formatAge, type InboxGroup } from "@norn/core";
+import { isClosedStatus } from "@norn/schema";
 import type { CockpitAction, CockpitModel, CockpitRow, CockpitTab } from "@norn/view";
 import { GROUP_MARK } from "./cockpit.ts";
 
@@ -108,9 +109,13 @@ const likeKey = (r: CockpitRow) => r.group ?? `${sectionOf(r)}:${standing(r)}`;
 function standing(r: CockpitRow): string {
   const rep = r.preview.report;
   if (!rep) return "issue";
-  if (rep.story_status === "done" || rep.story_status === "dropped") return rep.story_status;
+  if (isClosedStatus(rep.story_status)) return rep.story_status;
   return rep.unit.status;
 }
+
+/** Where a story stands in words: its standing, then `sep` and the step it is at, when it has one. */
+const whereText = (status: string, step: string | null | undefined, sep: string) =>
+  isClosedStatus(status) ? status : status === "not_started" ? "not started" : step ? `${status}${sep}${step}` : status;
 
 /** The selected row: the one with the state's id among the visible rows, else the first. */
 function selectedRow(model: CockpitModel, s: TuiState): CockpitRow | null {
@@ -344,7 +349,7 @@ export function previewLines(row: CockpitRow, now: number, width: number, paint:
   const out: string[] = [paint(fit(`${r.story} — ${r.title}`, width), ["bold"])];
   const status = standing(row);
   const [mark, markStyle] = unitMark(status === "dropped" ? "done" : status);
-  const where = status === "done" || status === "dropped" ? status : status === "not_started" ? "not started" : `${status}${r.unit.step ? ` at ${r.unit.step}` : ""}`;
+  const where = whereText(status, r.unit.step, " at ");
   // RD8, gh-71 B28 (D10): the round and its workflow before the step, as `story view` writes them
   const round = r.unit.round ? `round ${r.unit.round} · ` : "";
   out.push(`${paint(mark, markStyle)} ${fit(`${round}${r.unit.workflow} · ${where} · ${r.mode} · ${r.claim}`, width - 2)}`);
@@ -408,7 +413,7 @@ function storySummary(r: CockpitRow): string {
   if (!rep) return issue ? `${issue.labels.join(", ")} · ${issue.assignees.join(", ") || "unassigned"}` : "";
   const done = rep.slices.filter((s) => s.status === "done").length;
   const status = standing(r);
-  const where = status === "done" || status === "dropped" ? status : status === "not_started" ? "not started" : `${status} ${rep.unit.step ?? ""}`.trim();
+  const where = whereText(status, rep.unit.step, " ");
   const slices = rep.slices.length ? `${done}/${rep.slices.length} slices` : "";
   const pr = rep.pr ? `PR #${rep.pr.number}${rep.pr.is_draft && rep.pr.state === "open" ? " draft" : rep.pr.state === "open" ? "" : ` ${rep.pr.state}`}` : "";
   return [rep.unit.workflow, where, slices, pr].filter(Boolean).join(" · ");

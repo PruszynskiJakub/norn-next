@@ -9,8 +9,8 @@ import { acquireTickLock, type LockContent, type LockResult } from "@norn/store"
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 
-export const TICK_WAIT_MS = 60_000;
-export const TICK_POLL_MS = 250;
+const TICK_WAIT_MS = 60_000;
+const TICK_POLL_MS = 250;
 
 export type HeldTickLock = Extract<LockResult, { ok: true }>;
 

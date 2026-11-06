@@ -320,7 +320,7 @@ export const upgradeCommand = defineCommand({
 });
 
 /** gh-61 B30: the old name, kept for one minor; the same code, one line on stderr. */
-export const MIGRATE_RENAMED = "`norn migrate` is now `norn upgrade`; the old name goes in the next minor";
+const MIGRATE_RENAMED = "`norn migrate` is now `norn upgrade`; the old name goes in the next minor";
 
 export const migrateCommand = defineCommand({
   name: "migrate",

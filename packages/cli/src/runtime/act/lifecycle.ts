@@ -11,12 +11,11 @@ import {
   pushRecord as pushStoryRecord,
   type ClaimWriteResult,
   deleteMailbox,
-  listLeases,
   patchSliceFile,
   patchStoryFile,
   pinWorkflow,
   releaseClaim,
-  releaseLease,
+  releaseStoryLeases,
   renewClaims,
   sliceFile as sliceFilePath,
   storyFile,
@@ -221,8 +220,7 @@ async function dropLostIntake(act: ActEnv, story: string, lost: NonNullable<Extr
     await act.git.deleteBranch(act.root, lost.drop.branch, { force: true });
     removed.push(lost.drop.branch);
   }
-  const listing = await listLeases(act.ctx.home, () => true);
-  for (const e of listing.live) if (e.lease.repo === act.root && e.lease.story === story && releaseLease(act.ctx.home, e.file)) removed.push(e.file);
+  removed.push(...(await releaseStoryLeases(act.ctx.home, act.root, story)));
   return { removed };
 }
 
@@ -279,8 +277,7 @@ export async function cleanupMerged(act: ActEnv, a: Extract<Action, { kind: "cle
   };
   // slice worktrees first, the story worktree last
   for (const wt of [...a.worktrees].reverse()) if (existsSync(wt)) await tryDo(`remove ${wt}`, () => act.git.worktreeRemove(act.root, wt, { force: true }));
-  const listing = await listLeases(act.ctx.home, () => true);
-  for (const e of listing.live) if (e.lease.repo === act.root && e.lease.story === a.unit.story) releaseLease(act.ctx.home, e.file);
+  await releaseStoryLeases(act.ctx.home, act.root, a.unit.story);
   for (const b of a.local_branches) if (await act.git.branchExists(act.root, b)) await tryDo(`delete ${b}`, () => act.git.deleteBranch(act.root, b, { force: true }));
   if (act.obs.remote) for (const b of a.remote_branches) await tryDo(`delete remote ${b}`, () => act.git.deleteRemoteBranch(act.root, act.obs.remote as string, b));
   for (const ref of a.refs) {

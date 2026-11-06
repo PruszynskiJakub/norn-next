@@ -13,7 +13,7 @@ import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { StoryFacts } from "@norn/core";
 import { recordRef } from "@norn/schema";
-import { listLeases, patchStoryFile, pushRecord, readRecordRef, type RecordPushResult, releaseClaim, releaseLease, storyFile } from "@norn/store";
+import { patchStoryFile, pushRecord, readRecordRef, type RecordPushResult, releaseClaim, releaseStoryLeases, storyFile } from "@norn/store";
 import { refuse } from "../output.ts";
 import type { Observed } from "./observe/index.ts";
 import { runnerFor } from "../wiring.ts";
@@ -47,15 +47,8 @@ export interface CloseStoryOptions {
   claimSha: string;
 }
 
-/** Close `story` on this machine (see the header for the order). The caller holds the claim and the tick lock. */
-export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseStoryOptions): Promise<StoryClosed | StoryCloseFailure> {
-  const key = story.key;
-  const git = obs.ports.git;
-  const loc = obs.stories[key];
-  const tick = obs.facts.tick_id;
-  const trailers = (unit: string | null, step: string) => ({ "Norn-Story": key, ...(unit ? { "Norn-Slice": unit } : {}), "Norn-Step": step, "Norn-Tick": tick });
-
-  // 1. stop live sessions this machine runs (best effort; their work is committed below)
+/** Stop the live sessions of `story`'s running units that this machine runs (best effort); the units stopped. */
+export async function killLocalSessions(obs: Observed, story: StoryFacts): Promise<string[]> {
   const killed: string[] = [];
   for (const u of story.units) {
     const s = u.state?.status === "running" ? u.run?.session : null;
@@ -65,6 +58,19 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
       killed.push(u.unit.key);
     }
   }
+  return killed;
+}
+
+/** Close `story` on this machine (see the header for the order). The caller holds the claim and the tick lock. */
+export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseStoryOptions): Promise<StoryClosed | StoryCloseFailure> {
+  const key = story.key;
+  const git = obs.ports.git;
+  const loc = obs.stories[key];
+  const tick = obs.facts.tick_id;
+  const trailers = (unit: string | null, step: string) => ({ "Norn-Story": key, ...(unit ? { "Norn-Slice": unit } : {}), "Norn-Step": step, "Norn-Tick": tick });
+
+  // 1. stop live sessions this machine runs (best effort; their work is committed below)
+  const killed = await killLocalSessions(obs, story);
 
   // 2. record + every change committed (GR7: never delete work)
   const committed: string[] = [];
@@ -116,9 +122,7 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
     await git.deleteBranch(obs.root, b, { force: true });
     deleted.push(b);
   }
-  const leases: string[] = [];
-  for (const e of (await listLeases(opts.home, () => true)).live)
-    if (e.lease.repo === obs.root && e.lease.story === key && releaseLease(opts.home, e.file)) leases.push(e.file);
+  const leases = await releaseStoryLeases(opts.home, obs.root, key);
   const rel = await releaseClaim(obs.root, obs.remote, key, opts.claimSha);
 
   return {

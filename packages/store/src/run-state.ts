@@ -32,8 +32,6 @@ import { archivedRecordDir } from "./record-ref.ts";
 
 /** S12: the machine dir's `runs/`, holding every story's run state of the checkout `root` belongs to. */
 export const machineRunsDir = (root: string): string => join(machineDir(root), RUNS_DIR);
-/** gh-195 D1: where an older norn wrote the headless runner's session logs (`<run_id>.log`), next to run state; left for `tidy`. */
-export const oldRunnerLogDir = machineRunsDir;
 /** S12: a path decide names relative to the machine dir (`runs/<story>/…`, schema's `runStatePath`) under `root`'s checkout. */
 export const runStateFile = (root: string, rel: string): string => join(machineDir(root), rel);
 

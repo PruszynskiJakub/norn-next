@@ -49,6 +49,7 @@ import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { layoutRefusal } from "../runtime/layout.ts";
 import { hookBinary, hookCommand } from "./init.ts";
 import { baseRunStateHint, cmd } from "@norn/core";
+import { oneLine } from "@norn/view";
 
 interface RunOut {
   code: number | null;
@@ -72,7 +73,7 @@ const firstLine = (s: string) => s.split("\n")[0]?.trim() ?? "";
 const SHORT = 200;
 /** An error as one readable line for a person; `--json` keeps all of it. */
 const short = (s: string) => {
-  const one = s.replace(/\s+/g, " ").trim();
+  const one = oneLine(s, Infinity);
   return one.length > SHORT ? `${one.slice(0, SHORT)}… (${cmd.doctor({ json: true })} has the rest)` : one;
 };
 const which = (cmd: string, env: Record<string, string | undefined>) => (cmd.includes("/") ? cmd : Bun.which(cmd, { PATH: env.PATH ?? process.env.PATH ?? "" }));
