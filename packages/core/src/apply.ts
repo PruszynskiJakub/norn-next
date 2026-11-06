@@ -391,8 +391,11 @@ function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, las
     if (value + 1 > max) {
       // W4: the edge is not taken; the outcome becomes `exhausted` → $stuck
       const reason = `${edge.counter} ${value}/${max} at ${from}.${outcome}`;
+      const parked = stuckPark(st, "exhausted", reason, r.at, r.receipt_id);
+      // gh-212: the way out is the edge's target with the counter reset; record it, never parse `reason`
+      if (parked.park) parked.park.counter = { name: edge.counter, max, outcome, to: edge.to };
       return {
-        state: { ...stuckPark(st, "exhausted", reason, r.at, r.receipt_id), last_outcome: { ...last, outcome: "exhausted", source: "classified" } },
+        state: { ...parked, last_outcome: { ...last, outcome: "exhausted", source: "classified" } },
         log: `exhausted: ${reason}`,
       };
     }

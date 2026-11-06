@@ -5,7 +5,7 @@
  * receipt). A running unit is refused: stopping it is `norn run cancel` (B50). Claim free: acquired
  * here (T8); held elsewhere: mailbox (T9).
  */
-import { cmd, nextCommand, stepOf } from "@norn/core";
+import { cmd, nextCommand, rerunWarning, stepOf } from "@norn/core";
 import { defineCommand, opt } from "../command.ts";
 import { refuse } from "../output.ts";
 import { at, DELEGATED_HELP, DELEGATED_OPTION, delegatedFields, delegation, humanReceipt, type StepOnlyBuild, stepOnlyReceipt, resolveTarget as resolveUnit, runHumanVerb } from "../runtime/human.ts";
@@ -39,7 +39,7 @@ export const runRerunCommand = defineCommand({
       return stepOnlyReceipt(ctx, t, step, "unstick", delegatedFields(d));
     };
     const t = await resolveUnit(ctx, key, blocked, { stepOnly });
-    return runHumanVerb(ctx, t, {
+    const res = await runHumanVerb(ctx, t, {
       verb: "run rerun",
       mailbox: true,
       check(t, st) {
@@ -65,5 +65,8 @@ export const runRerunCommand = defineCommand({
       build: (t, st) =>
         humanReceipt(ctx, t, st, "unstick", { ...(to ? { to } : {}), ...(reset.length ? { reset } : {}), ...delegatedFields(d) }),
     });
+    // gh-212 (W4): a counter left at its max closes its edge again; say so, with the way out
+    const warning = t.state ? rerunWarning(t.key, t.state, { reset }) : null;
+    return warning ? { ...res, warning } : res;
   },
 });

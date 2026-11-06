@@ -285,3 +285,38 @@ describe("the surface (B2, B5)", () => {
     expect((run.value as { verbs: Array<{ command: string }> }).verbs.map((v) => v.command)).toEqual(expect.arrayContaining(["run rerun", "run cancel"]));
   });
 });
+
+describe("run rerun after a counter runs out (gh-212, W4)", () => {
+  const toGate = async () => {
+    h.report(runs5(), "done", { outcome: "done", handoff: "built" });
+    await tick();
+    await tick();
+    h.report(runs5(), "done", { outcome: "pass", handoff: "works" });
+    await tick();
+    expect(h.state(runs5())).toMatchObject({ step: "review", status: "parked", park: { kind: "gate" } });
+  };
+  const reject = async () => {
+    expect((await h.norn("story", "reject", "gh-5", "--reason", "not yet")).exit).toBe(0);
+    await tick();
+    await tick();
+  };
+
+  test("the way out is the edge's target with the counter reset; a plain rerun warns it ends the same way", async () => {
+    expect(h.state(runs5())).toMatchObject({ step: "implement", status: "running" });
+    // loop max 2: the third reject runs it out
+    for (let i = 0; i < 3; i++) {
+      await toGate();
+      await reject();
+    }
+    const st = h.state(runs5());
+    expect(st).toMatchObject({ step: "review", status: "stuck", park: { kind: "exhausted", counter: { name: "loop", max: 2, outcome: "reject", to: "implement" } } });
+    const way = "norn run rerun gh-5 --step implement --reset loop";
+    const inbox = (await h.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; command: string }>> };
+    expect(inbox.groups.unblock?.find((i) => i.story === "gh-5")?.command).toBe(way);
+    const r = await h.norn("run", "rerun", "gh-5");
+    expect(r.exit).toBe(0);
+    expect((r.value as Verb & { warning?: string }).warning).toBe(
+      `loop ran out (2/2) at review.reject and is not reset: if review ends reject again, the unit is stuck again. To act on reject: ${way}`,
+    );
+  }, 120_000);
+});
