@@ -62,7 +62,14 @@ Every tick record says where the tick spent its time (observe and its phases, de
 | W6 slowest phase visible (tick.end, norn tick) | test | `tick-timing.test.ts` (integration) › "tick.end and `norn tick` name the slowest phase, the one the record names" |
 | W7 last tick's duration in status and the cockpit | test | `tick-timing.test.ts` (integration) › "the heartbeat carries the last tick's duration into `norn story list`"; `view.test.ts` › "gh-78: the heartbeat line…"; `cockpit-tui.test.ts` › "gh-78: the header shows…" |
 - review#3 approve: Approve on HEAD 81faeee92 (after the merge of main): tick record carries sync + timing (observe phases with call counts, decide, act, after, result.ms incl. claim.renew), tick.end/norn tick name the slowest phase, story list and cockpit show the last tick's duration; fields optional, outside facts/action; heartbeat stays readable by older norn. test#4 green. 2 findings, 0 blocking (process probes share local/stories; base_fetch/norn_refs phases not asserted).
+- describe#2 done: pr.md rewritten for HEAD after main's merge: summary of the new tick record fields (phases incl. worktrees/sync.elsewhere*), test-based evidence per Wanted item from test#4 with uncovered phases named, merge danger one-way but mild (only trace records; heartbeat schema is open)
 
 ## Resume
 
 review#3 approved; nothing open. Next is the PR description and CI, which norn routes.
+
+- describe#2: rewrote pr.md for HEAD after the merge of main: phase list now includes `worktrees`, `sync.elsewhere`, `sync.elsewhere_prs`; evidence names test#4 and the current test names; says `base_fetch`/`sync.norn_refs` are not asserted; merge danger corrected (heartbeat schema is open, so only trace records are one-way).
+
+### Resume
+
+describe#2 is reported; nothing left for this step.
