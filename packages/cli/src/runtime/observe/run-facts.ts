@@ -1,7 +1,7 @@
 /** observe: a unit's run facts — its run windows (C4), hook facts refined per agent (A2), the live or unknown run (R5.1, R5.3, B3). */
-import type { AgentAdapter, FileError, Ports, RunFacts, UnitFacts, WorktreeFacts } from "@norn/core";
+import type { AgentAdapter, Ports, RunFacts, UnitFacts, WorktreeFacts } from "@norn/core";
 import { type HookFact, treeStoryRunStatePath } from "@norn/schema";
-import { handoffPath, type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot } from "@norn/store";
+import { baseUnitFacts, handoffPath, type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot } from "@norn/store";
 import type { DatedCommit } from "./git-facts.ts";
 
 /** A2: each agent adapter's own pass over a run's hook facts (`refineHooks`), once per adapter name. */
@@ -121,23 +121,11 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
     }
   }
 
-  const errors: FileError[] = u.errors;
   return {
-    unit: u.unit,
-    record: u.record,
-    state: st,
-    workflow: u.workflow?.workflow ?? null,
-    workflow_hash: u.workflow?.hash ?? null,
-    errors,
-    unapplied: u.unapplied,
-    last_check: lu.last_check,
-    last_findings: lu.last_findings,
-    last_outcome_receipt: lu.last_outcome_receipt,
+    ...baseUnitFacts(lu),
     worktree,
     run,
-    lease: lu.lease,
     uncommitted,
-    ...(lu.step_runs ? { step_runs: lu.step_runs } : {}),
     ...branchRecord(story, u, worktree),
   };
 }

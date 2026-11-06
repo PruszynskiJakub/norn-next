@@ -28,9 +28,8 @@ import {
   stepOf,
   type UnitFacts,
   type WorktreeFacts,
-  storyMode,
 } from "@norn/core";
-import { CLAIMS_PREFIX, DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, storyBranch, type UnitState, type Workflow } from "@norn/schema";
+import { CLAIMS_PREFIX, DEFAULT_CONFIG, type HookFact, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import {
   cachedDefaultBranch,
   classifyClaim,
@@ -39,6 +38,8 @@ import {
   type LeaseEntry,
   type LeaseLiveness,
   type LocalUnit,
+  baseStoryFacts,
+  baseUnitFacts,
   bindNornHome,
   loadLocalFacts,
   loadRounds,
@@ -239,25 +240,7 @@ function unitFacts(lu: LocalUnit, hooks: readonly HookFact[], leaseByRun: Readon
       transcript: [...mine].reverse().find((h) => h.transcript)?.transcript ?? r.transcript ?? null,
     };
   }
-  return {
-    unit: u.unit,
-    record: u.record,
-    state: st,
-    workflow: u.workflow?.workflow ?? null,
-    workflow_hash: u.workflow?.hash ?? null,
-    errors: u.errors,
-    unapplied: u.unapplied,
-    last_check: lu.last_check,
-    last_findings: lu.last_findings,
-    last_outcome_receipt: lu.last_outcome_receipt,
-    worktree,
-    run,
-    lease: lu.lease,
-    uncommitted: false,
-    ...(lu.step_runs ? { step_runs: lu.step_runs } : {}),
-    ...(lu.act_failure ? { act_failure: lu.act_failure } : {}),
-    ...(lu.skills_drift ? { skills_drift: lu.skills_drift } : {}),
-  };
+  return { ...baseUnitFacts(lu), worktree, run, uncommitted: false };
 }
 
 /** BS1/BS3: the last base measurement (`trace/base.json`) and the newest base merge in the story unit's receipts. */
@@ -372,19 +355,11 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     const story = ls.snapshot;
     let claim = classifyClaim(claims[i] ?? { state: "none" }, me, now);
     if (claim.state === "other" && claim.blob.holder === holder) claim = { ...claim, state: "mine" };
-    const storyState = story.units[0]?.state ?? null;
-    // B10, B25: before its story unit pins a workflow, a story runs in the one it will start (MO1)
-    const mode: Mode = storyMode(storyState, story.units[0]?.workflow?.workflow ?? snap.workflows.workflows[story.frontmatter?.workflow ?? config.workflow]?.workflow, config);
     const finished = story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped";
 
     const units: UnitFacts[] = ls.units.map((lu) => unitFacts(lu, lu.hooks, leaseByRun));
     const sf: StoryFacts = {
-      key: story.key,
-      slug: story.slug,
-      spec_dir: story.spec_dir,
-      branch: storyBranch(story.key, story.slug),
-      frontmatter: story.frontmatter,
-      frontmatter_error: story.frontmatter_error,
+      ...baseStoryFacts(ls, snap.workflows.workflows, config),
       worktree: worktreeFacts(ls.worktree),
       claim,
       mailbox: undefined,
@@ -397,14 +372,6 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       ...readyHeads[i],
       units,
       slices: story.slices,
-      mode,
-      // NT2/NT3: open notes of the story (loadLocalFacts, as observe)
-      ...(ls.notes ? { notes: ls.notes } : {}),
-      // gh-195 D12 (B21): mailbox receipts this checkout rejected (loadLocalFacts, as observe)
-      ...(ls.rejected ? { rejected_mailbox: ls.rejected } : {}),
-      ...(ls.record_refused ? { record_refused: ls.record_refused } : {}),
-      ...(ls.record_unplaced ? { record_unplaced: ls.record_unplaced } : {}),
-      ...(ls.snapshot.record_only ? { record_only: true } : {}),
       // BS1: the last base measurement of this checkout's ticks (stale items, merge-item detail)
       ...(local.base[story.key] && !finished ? { base: local.base[story.key] } : {}),
     };

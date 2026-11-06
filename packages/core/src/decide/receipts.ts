@@ -91,8 +91,20 @@ export class Ctx {
   }
 }
 
+/** B3: the last outcome receipt when it is a failed check. */
+export const lastCheck = (uf: UnitFacts): NumberedReceipt | null => {
+  const lo = uf.last_outcome_receipt;
+  return lo?.receipt.kind === "check" && lo.receipt.outcome === "fail" ? lo : null;
+};
+
+/** B3: the last outcome receipt when it is a `done` with findings. */
+export const lastFindings = (uf: UnitFacts): NumberedReceipt | null => {
+  const lo = uf.last_outcome_receipt;
+  return lo?.receipt.kind === "done" && lo.receipt.findings?.length ? lo : null;
+};
+
 export const nextReceiptNumber = (uf: UnitFacts): number =>
-  Math.max(uf.state?.applied_through ?? 0, ...uf.unapplied.map((r) => r.n), uf.last_check?.n ?? 0, uf.last_findings?.n ?? 0) + 1;
+  Math.max(uf.state?.applied_through ?? 0, ...uf.unapplied.map((r) => r.n), lastCheck(uf)?.n ?? 0, lastFindings(uf)?.n ?? 0) + 1;
 
 /** H1: a merge, rebase, cherry-pick or revert (or unmerged paths) in progress in the unit's worktree. */
 export const gitBusy = (uf: UnitFacts): boolean => !!uf.worktree?.in_progress && (!!uf.worktree.in_progress.operation || uf.worktree.in_progress.unmerged.length > 0);

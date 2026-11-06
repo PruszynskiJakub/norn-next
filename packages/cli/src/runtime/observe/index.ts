@@ -25,11 +25,11 @@ import {
   type UnitRef,
   type UnmarkedWorktree,
   type WorktreeFacts,
-  storyMode,
 } from "@norn/core";
 import { claimRef, parseDuration, type ResolvedConfig, sliceBranch, storyBranch, type UnitState, type Workflow } from "@norn/schema";
 import {
   type BaseFactsCache,
+  baseStoryFacts,
   classifyClaim,
   localRecordOf,
   readRecordRef,
@@ -311,8 +311,6 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       const worktree = await wtFacts(ownWt);
       const unitBranch = u.unit.slice ? (sliceFile ? sliceBranch(s.key, sliceFile.nn, sliceFile.slug) : (worktree?.status?.branch ?? `${s.key}/${u.unit.dir}`)) : branch;
       const uf = await unitFacts(ports, s, lu, worktree, lu.hooks, runEnv);
-      if (lu.act_failure) uf.act_failure = lu.act_failure;
-      if (lu.skills_drift) uf.skills_drift = lu.skills_drift;
       // a done slice not yet integrated: is its branch in the story branch (the slice cleanup's delete)
       if (sliceFile && u.state?.status === "done" && sliceFile.frontmatter?.status !== "integrated") {
         const head = refs.get(`refs/heads/${unitBranch}`);
@@ -354,12 +352,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     }
 
     stories.push({
-      key: s.key,
-      slug: s.slug,
-      spec_dir: s.spec_dir,
-      branch,
-      frontmatter: s.frontmatter,
-      frontmatter_error: s.frontmatter_error,
+      ...baseStoryFacts(ls, workflows, config),
       worktree: storyWorktree,
       claim,
       mailbox,
@@ -370,11 +363,6 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
       ...(foreign.length ? { foreign_commits: foreign } : {}),
       ...(await readyHead(root, s.key, ls.ready, (storyPrs.has(s.key) ? storyPrs.get(s.key) : prSeen[s.key]?.pr)?.head_sha)),
-      ...(ls.notes ? { notes: ls.notes } : {}),
-      ...(ls.rejected ? { rejected_mailbox: ls.rejected } : {}),
-      ...(ls.record_refused ? { record_refused: ls.record_refused } : {}),
-      ...(ls.record_unplaced ? { record_unplaced: ls.record_unplaced } : {}),
-      ...(ls.snapshot.record_only ? { record_only: true } : {}),
       ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
       ...(localRecord ? { local_record: localRecord } : {}),
       ...(claim.state === "none" && s.frontmatter?.status === "new" ? await intakeOnly(git, root, remote ? baseRef : `refs/heads/${base}`, branch, s.key, refs) : {}),
@@ -382,8 +370,6 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       ...(record ? { record } : {}),
       units,
       slices: s.slices satisfies SliceFileFacts[],
-      // B10, B25: before its story unit pins a workflow, a story runs in the one it will start (MO1)
-      mode: storyMode(units[0]?.state, units[0]?.workflow ?? workflows[s.frontmatter?.workflow ?? config.workflow]?.workflow, config),
     });
   }
 

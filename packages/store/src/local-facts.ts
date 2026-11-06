@@ -9,8 +9,22 @@
  * tick's hook-file backfill (`backfillHooks`, D5).
  */
 import { existsSync, readdirSync } from "node:fs";
-import { type ActFailure, type FileError, hookWindowMs, type NumberedReceipt, openNotes, RE_ENTRY_KINDS, readyApproval, recordPushSlot, type StepRunFacts, type StoryFacts, storyWorktreePath } from "@norn/core";
-import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RejectedMailboxReceipt, type RunInfo, type UnitState } from "@norn/schema";
+import {
+  type ActFailure,
+  type FileError,
+  hookWindowMs,
+  type NumberedReceipt,
+  openNotes,
+  RE_ENTRY_KINDS,
+  readyApproval,
+  recordPushSlot,
+  type StepRunFacts,
+  type StoryFacts,
+  storyMode,
+  storyWorktreePath,
+  type UnitFacts,
+} from "@norn/core";
+import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RejectedMailboxReceipt, type ResolvedConfig, type RunInfo, storyBranch, type UnitState, type Workflow } from "@norn/schema";
 import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
 import { readRejectedReceipts } from "./local.ts";
@@ -67,10 +81,6 @@ export interface LocalUnit {
   /** the unit's own worktree (slice) or the story worktree (story unit), when known */
   worktree: string | null;
   last_outcome_receipt: NumberedReceipt | null;
-  /** the last outcome receipt when it is a failed check (B3) */
-  last_check: NumberedReceipt | null;
-  /** the last outcome receipt when it is a `done` with findings (B3) */
-  last_findings: NumberedReceipt | null;
   cursor: CursorRuns | null;
   /** R5.1: the `started` receipt whose launch never reached state.json */
   unknown_launch: (NumberedReceipt & { receipt: ReceiptOf<"started"> }) | null;
@@ -240,14 +250,61 @@ function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, worktree
     snapshot: u,
     worktree,
     last_outcome_receipt: lo,
-    last_check: lo?.receipt.kind === "check" && lo.receipt.outcome === "fail" ? lo : null,
-    last_findings: lo?.receipt.kind === "done" && lo.receipt.findings?.length ? lo : null,
     cursor,
     unknown_launch: st ? unknownLaunch(u.unapplied) : null,
     lease: mine.find((l) => l.kind === "check") ?? mine.find((l) => l.kind === "agent") ?? null,
     hooks,
     ...(step_runs ? { step_runs } : {}),
     ...(failure ? { act_failure: failure } : {}),
+  };
+}
+
+/** A unit's facts as its own files give them (X1); observe adds its worktree, run and git facts on top, the view its worktree and its run judged by lease. */
+export function baseUnitFacts(
+  lu: LocalUnit,
+): Pick<UnitFacts, "unit" | "record" | "state" | "workflow" | "workflow_hash" | "errors" | "unapplied" | "last_outcome_receipt" | "lease" | "step_runs" | "act_failure" | "skills_drift"> {
+  const u = lu.snapshot;
+  return {
+    unit: u.unit,
+    record: u.record,
+    state: u.state,
+    workflow: u.workflow?.workflow ?? null,
+    workflow_hash: u.workflow?.hash ?? null,
+    errors: u.errors,
+    unapplied: u.unapplied,
+    last_outcome_receipt: lu.last_outcome_receipt,
+    lease: lu.lease,
+    ...(lu.step_runs ? { step_runs: lu.step_runs } : {}),
+    ...(lu.act_failure ? { act_failure: lu.act_failure } : {}),
+    ...(lu.skills_drift ? { skills_drift: lu.skills_drift } : {}),
+  };
+}
+
+/**
+ * A story's facts as its own files give them (X1); observe adds its claim, mailbox, remote, base and
+ * git facts on top, the view its claim and caches. `workflows` and `config` are the caller's: the mode
+ * (B10, B25) of a story whose story unit pins no workflow yet is the one it will start in (MO1).
+ */
+export function baseStoryFacts(
+  ls: LocalStory,
+  workflows: Readonly<Record<string, { workflow: Workflow | null } | undefined>>,
+  config: Pick<ResolvedConfig, "mode" | "workflow">,
+): Pick<StoryFacts, "key" | "slug" | "spec_dir" | "branch" | "frontmatter" | "frontmatter_error" | "mode" | "notes" | "rejected_mailbox" | "record_refused" | "record_unplaced" | "record_only"> {
+  const s = ls.snapshot;
+  const story = s.units[0];
+  return {
+    key: s.key,
+    slug: s.slug,
+    spec_dir: s.spec_dir,
+    branch: storyBranch(s.key, s.slug),
+    frontmatter: s.frontmatter,
+    frontmatter_error: s.frontmatter_error,
+    mode: storyMode(story?.state, story?.workflow?.workflow ?? workflows[s.frontmatter?.workflow ?? config.workflow]?.workflow, config),
+    ...(ls.notes ? { notes: ls.notes } : {}),
+    ...(ls.rejected ? { rejected_mailbox: ls.rejected } : {}),
+    ...(ls.record_refused ? { record_refused: ls.record_refused } : {}),
+    ...(ls.record_unplaced ? { record_unplaced: ls.record_unplaced } : {}),
+    ...(s.record_only ? { record_only: true } : {}),
   };
 }
 

@@ -93,8 +93,6 @@ export function unitFacts(unit: UnitRef, wf: Workflow | null, state: UnitState |
     workflow_hash: state?.workflow_hash ?? null,
     errors: [],
     unapplied: [],
-    last_check: null,
-    last_findings: null,
     worktree: worktree(unit.slice ? `/r-worktrees/gh-1-login--${unit.dir}` : "/r-worktrees/gh-1-login"),
     run: null,
     lease: null,
