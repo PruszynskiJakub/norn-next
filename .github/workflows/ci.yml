@@ -1,5 +1,5 @@
 # Every PR and every push to main: the unit tier and the type check first, then the integration
-# tier, the e2e tier in shards, and the distributables built and smoke-tested as a user would
+# tier and the e2e tier in shards, and the distributables built and smoke-tested as a user would
 # install them, side by side (gh-118 B11, B12).
 name: CI
 
@@ -29,22 +29,28 @@ jobs:
       - run: bun run test
       - run: bun run typecheck
 
+  # bun shards by file (B12); the only place the integration tier runs, so no local check waits on it
   integration:
     needs: unit
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2, 3, 4]
+    name: integration (shard ${{ matrix.shard }}/4)
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.13
       - run: bun install --frozen-lockfile
-      - name: Integration tier
+      - name: Integration tier, one shard
         run: |
           git config --global user.name "norn ci"
           git config --global user.email "ci@norn.invalid"
           git config --global init.defaultBranch main
-          bun run test:integration
+          bun run test:integration --shard=${{ matrix.shard }}/4
 
   # bun shards by file (B12); a red shard cancels the others.
   e2e:
