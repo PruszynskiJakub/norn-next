@@ -1,6 +1,6 @@
 ## Goal
 
-Fix gh-215 (quick round): a stuck harness git call fails its test, named, instead of hanging the integration tier. (Round 1, reproduce, found the cause; its findings stay below.)
+Fix gh-215 (quick round): a stuck sync spawn in a spawning-tier test (harness git, norn's in-process git, a test's own `Bun.spawnSync`) fails its test, named, instead of hanging the integration tier. (Round 1, reproduce, found the cause; its findings stay below.)
 
 ## Progress
 
@@ -127,6 +127,13 @@ The `## Reproduce` comment is on #215: https://github.com/PruszynskiJakub/norn-n
 - F2 (minor, standards): a `sh()` timeout SIGKILLs only git; a grandchild (the fixture's `sleep 60`) is left orphaned until it exits.
 - review#1 changes_requested: Harness sh() bound is correct and its regression test is green, but it covers only the harness's own git calls. In-process norn git calls (store gitSync, local subcommands unbounded per H11) and direct spawnSync in test files can still hang the tier, including reproduce's top suspect for the CI hang. F1 blocking: add a bound the harness controls (tier watchdog or test-only in-process git timeout) plus a red-first fixture test. F2 minor: the timeout kills git only, so its grandchildren are orphaned.
 
+### Rework (implement#2, review#1 F1/F2)
+
+- Red first: `harness-git-timeout.test.ts` got a second fixture test (runs `bun test` with the spawning tiers' preloads): a stuck in-process store `gitSync` and a stuck direct `Bun.spawnSync` in a test file. Before the fix it hit the 15 s outer bound (15 008 ms).
+- Fix (F1): `test/support/spawn-sync-bound.ts` wraps `Bun.spawnSync` so a call that sets no `timeout` gets 15 s (below the tier's 20 s) and `SIGKILL`; `spawning-tier-preload.ts` (integration and e2e) installs it. Covers harness `sh()`, every in-process norn `gitSync` / `ps` probe, and direct test-file calls. Real runs keep H11 (only tests load it). A call with its own timeout keeps it. `sh()` uses the same value (`spawnSyncTimeoutMs`) and keeps its named error; the env override is now `NORN_TEST_SPAWN_SYNC_TIMEOUT_MS`.
+- After: both fixture tests green 3/3 (~3.6 s). Unit test `test/repo/spawn-sync-bound.test.ts` pins the wrapper (both call shapes, own timeout kept). Unit tier (1279) and typecheck green; ci-check and store spawn integration files still green.
+- Not done: F2 (minor, reviewer: acceptable) — `Bun.spawnSync`'s timeout kills the child only, so a grandchild is orphaned until it exits; `Bun.spawnSync` has no process-group option. No tier-level watchdog either: non-spawn blocks (the FIFO row) are still uncovered; the observed hang was a spawn. What made the git child stick on CI stays open.
+
 ## Resume
 
-review#1 requested changes (F1 above, findings in the receipt). Next implement: bound what the harness cannot reach, without changing H11 for real runs. Either a tier-level watchdog for `test:integration` that kills the run when output stops and names the files still running (it also covers the FIFO row), or a test-only bound on in-process git under the harness. Add a fixture test that goes red today for a stuck in-process norn git call.
+implement#2 done; the next step is norn's. Nothing pending here.
