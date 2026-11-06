@@ -1,12 +1,17 @@
 /**
  * H12 (bypass #265): `norn watch` runs the next tick at once after a tick that left a follow-up (a
- * receipt applied, a unit started), up to SETTLE_TICKS in a row, then waits its interval. Driven
- * through `runCli` with the harness and an injected sleep that records each pause.
+ * receipt applied, a unit started), up to SETTLE_TICKS in a row, then waits its interval. H13: a
+ * receipt another process appends while it waits wakes it. Driven through `runCli` with the harness
+ * and an injected sleep that records each pause.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { workflowsDir } from "@norn/store";
+import { machineDir, machineDirOfRunState, touchWake, wakePath, workflowsDir } from "@norn/store";
 import { settleStep, SETTLE_TICKS } from "../../src/commands/watch.ts";
+import type { Context } from "../../src/context.ts";
+import { abortableSleep } from "../../src/runtime/tick-lock.ts";
+import { pauseUntilWake, wakeStamp } from "../../src/runtime/wake.ts";
 import { createHarness, type Harness, issue, runChecked } from "../../../../test/support/harness.ts";
 import { runStateOf } from "../../../../test/support/run-state.ts";
 
@@ -90,6 +95,73 @@ describe("watch settles at once after a tick that changed run state (H12)", () =
     const { lines, pauses } = await watch(2);
     expect(lines.every((l) => !l.follow_up)).toBe(true);
     expect(pauses).toEqual([3_600_000]);
+  });
+
+  test("H13: a receipt written while watch pauses wakes it: the next tick applies it at once, not an hour later", async () => {
+    const lines: Line[] = [];
+    let pauses = 0;
+    const t0 = performance.now();
+    const r = await runChecked(["watch", "--interval", "1h", "--max-ticks", "2", "--keep-claims"], {
+      ...h.deps,
+      log: (l) => lines.push(JSON.parse(l) as Line),
+      // a real pause (ended early only by its signal); the agent reports 50 ms into it
+      sleep: (ms, signal) => {
+        if (pauses++ === 0) setTimeout(() => h.report(runs(), "done", { outcome: "approve", handoff: "looks right" }), 50);
+        return abortableSleep(ms, signal);
+      },
+    });
+    expect(r.exit).toBe(0);
+    expect(pauses).toBe(1);
+    expect(performance.now() - t0).toBeLessThan(15_000);
+    expect(acted(lines[1]!)).toEqual(["apply_receipts"]);
+  });
+});
+
+describe("pauseUntilWake (H13)", () => {
+  let h: Harness;
+  beforeAll(async () => {
+    h = await createHarness();
+    expect((await h.norn("init")).exit).toBe(0);
+    await h.tick(); // the machine dir and its checkout.json
+  });
+  afterAll(() => h.cleanup());
+  const ctx = () => ({ root: h.root, sleep: abortableSleep }) as unknown as Context;
+  const machine = () => machineDir(h.root);
+
+  test("a stamp this process wrote during the tick does not wake; one another process wrote does, at once", async () => {
+    const since = wakeStamp(h.root);
+    writeFileSync(wakePath(machine()), `${process.pid} own\n`); // the tick's own receipt (git step's classify)
+    expect(await pauseUntilWake(ctx(), 100, since)).toBe("interval");
+    const before = wakeStamp(h.root);
+    writeFileSync(wakePath(machine()), `999999 other\n`); // `norn done` in an agent's process, during the tick
+    const t0 = performance.now();
+    expect(await pauseUntilWake(ctx(), 60_000, before)).toBe("wake");
+    expect(performance.now() - t0).toBeLessThan(1000);
+  });
+
+  test("a receipt appended during the pause wakes it within about a second; a burst is one wake", async () => {
+    const unitDir = join(machine(), "runs", "gh-1", "_story");
+    const since = wakeStamp(h.root);
+    setTimeout(() => {
+      touchWake(unitDir);
+      touchWake(unitDir);
+      touchWake(unitDir);
+    }, 50);
+    const t0 = performance.now();
+    expect(await pauseUntilWake(ctx(), 60_000, since)).toBe("wake");
+    expect(performance.now() - t0).toBeLessThan(2000);
+    expect(wakeStamp(h.root)).not.toBe(since);
+  });
+
+  test("a run-state folder outside a machine dir touches nothing", () => {
+    expect(machineDirOfRunState(join(h.dir, "elsewhere", "runs", "gh-1", "_story"))).toBeNull();
+    expect(machineDirOfRunState(join(machine(), "runs", "gh-1", "_story", "rounds", "01-story"))).toBe(machine());
+  });
+
+  test("Ctrl-C ends the pause as an interval, never a wake", async () => {
+    const ac = new AbortController();
+    setTimeout(() => ac.abort(), 50);
+    expect(await pauseUntilWake(ctx(), 60_000, wakeStamp(h.root), ac.signal)).toBe("interval");
   });
 });
 

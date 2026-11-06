@@ -5,7 +5,8 @@
  * `--human` is for a person at the terminal: a line per action instead of JSON (quiet ticks print
  * nothing; the cockpit shows the last tick) and a sentence instead of the summary. `--json` wins.
  * H12: a tick that left the next one something to do (`follow_up`) is followed at once, up to
- * `SETTLE_TICKS` in a row, then the interval; `--max-ticks` counts every tick.
+ * `SETTLE_TICKS` in a row, then the interval; `--max-ticks` counts every tick. H13: a receipt another
+ * process appends during the pause (a report, a finished check) wakes it within about a second.
  */
 import { git as gitAdapter } from "@norn/adapters";
 import { DEFAULT_INTERVAL, ExitCode, parseDuration } from "@norn/schema";
@@ -15,6 +16,7 @@ import { CliFailure, refuse, rendered, usageError, withExit } from "../output.ts
 import { type ReleaseResult, releaseHeldClaims } from "../runtime/release.ts";
 import { runTick, type TickReport } from "../runtime/tick.ts";
 import { versionRefusal } from "../runtime/version-guard.ts";
+import { pauseUntilWake, wakeStamp } from "../runtime/wake.ts";
 import { cmd, type InboxItem, ticksPausedTitle } from "@norn/core";
 import type { Context } from "../context.ts";
 
@@ -118,6 +120,7 @@ export const watchCommand = defineCommand({
     const version = { notified: null as string | null };
     while (ticks < max && !signal?.aborted) {
       const started = ctx.clock.now();
+      const since = wakeStamp(ctx.root); // H13: receipts written from here on by another process wake the pause
       let followUp = false;
       try {
         const refused = await pausedOnVersion(ctx, version);
@@ -143,7 +146,8 @@ export const watchCommand = defineCommand({
       const next = settleStep(followUp, settling);
       settling = next.settling;
       if (next.now) continue;
-      await ctx.sleep(Math.max(0, interval - (ctx.clock.now() - started)), signal);
+      // H13: a receipt another process writes (an agent report, a finished check) ends the pause early
+      await pauseUntilWake(ctx, Math.max(0, interval - (ctx.clock.now() - started)), since, signal);
     }
     const kept = opt.bool(args, "keep-claims");
     const released = kept ? [] : await releaseHeldClaims(ctx);

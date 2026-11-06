@@ -5,7 +5,7 @@
  * next tick. `norn watch` runs that tick at once instead of after its interval, up to a bound.
  *
  * Kinds that only wait on someone else afterwards — an agent launched or nudged (`start_run`, `nudge`,
- * `retry_fresh`), a detached check started (`run_check`: a detached `norn check-run` writes its receipt later), a person asked
+ * `retry_fresh`), a detached check started (`run_check`: the receipt the detached `norn check-run` writes wakes watch, H13), a person asked
  * (`park`, `notify`), a renewal or a release, housekeeping — leave nothing for an immediate tick.
  * Pure: read from the decided action alone, never from prose (P8).
  */
