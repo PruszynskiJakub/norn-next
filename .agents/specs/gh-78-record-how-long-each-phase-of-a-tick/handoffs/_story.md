@@ -11,6 +11,7 @@ Every tick record says where the tick spent its time (observe and its phases, de
 - O4 in `.agents/RULES.md` amended to say what the record now holds.
 - Tests: `packages/cli/test/unit/tick-timing.test.ts`, schema records test, view formatter test, cockpit header test. Smoked with the dev build in a throwaway repo: the record has `sync`/`timing`, `tick.end` has `slowest`, `story list` shows the duration.
 - Note: `act_ms` includes writing `tick.start` and building the Actor.
+- implement#1 done: Tick records now carry sync report + timing (observe phases with remote call counts, decide, act, after, slowest); each decision result has ms; tick.end names the slowest phase; story list and cockpit header show the last tick's duration. Optional fields, outside facts/actions (O4 amended, O5 untouched). Unit tests + dev-build smoke; unit tier and typecheck green.
 
 ## Resume
 
