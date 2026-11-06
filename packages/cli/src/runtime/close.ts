@@ -16,6 +16,7 @@ import { recordRef } from "@norn/schema";
 import { listLeases, patchStoryFile, pushRecord, readRecordRef, type RecordPushResult, releaseClaim, releaseLease, storyFile } from "@norn/store";
 import { refuse } from "../output.ts";
 import type { Observed } from "./observe/index.ts";
+import { runnerFor } from "../wiring.ts";
 
 export interface StoryClosed {
   ok: true;
@@ -58,8 +59,9 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
   const killed: string[] = [];
   for (const u of story.units) {
     const s = u.state?.status === "running" ? u.run?.session : null;
-    if (s && obs.ports.runner && s.runner === obs.ports.runner.name) {
-      await obs.ports.runner.kill(s).catch(() => undefined);
+    const runner = runnerFor(obs.ports, s);
+    if (s && runner) {
+      await runner.kill(s).catch(() => undefined);
       killed.push(u.unit.key);
     }
   }

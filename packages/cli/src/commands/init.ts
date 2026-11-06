@@ -24,6 +24,7 @@ import { detectTestCommand, TEMPLATE_TEST_COMMAND, withTestCommand } from "../ru
 import { type LabelsReport, labelsLines, remoteLabels } from "../runtime/labels.ts";
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { cmd } from "@norn/core";
+import { PROVIDERS, type RemoteProvider } from "@norn/schema";
 
 /** gh-226: the repo's review guide the `norn-review` skill reads, at the repo root. */
 const REVIEW_FILE = "REVIEW.md";
@@ -72,7 +73,7 @@ export interface InitReport {
   hook_command: string;
   gitignore: string[];
   /** the git remote norn pushes to; `url: null` when the repository has none (nothing can sync or push) */
-  remote: { provider: string; label: string; git_remote: string; url: string | null };
+  remote: { provider: RemoteProvider; label: string; git_remote: string; url: string | null };
   /** the `test` check command written into the workflows created now (null when none were created) */
   test_command: { command: string; detected_from: string | null; set_in: string[] } | null;
   /**
@@ -140,11 +141,8 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
   steps.push(`Check this machine: \`${cmd.doctor()}\`.`);
   const label = r.remote.label;
   // B29: the labels line above says how to get a label norn could not create
-  steps.push(
-    r.remote.provider === "gh"
-      ? `Make a first story: an issue labelled \`${label}\` and assigned to you, e.g. \`gh issue create --label ${label} --assignee @me --title "…"\`.`
-      : `Make a first story: an issue labelled \`${label}\` and assigned to you.`,
-  );
+  const issueCreate = PROVIDERS[r.remote.provider].issueCreate;
+  steps.push(`Make a first story: an issue labelled \`${label}\` and assigned to you${issueCreate ? `, e.g. \`${issueCreate(label)}\`` : ""}.`);
   steps.push(`Pick it up: \`${cmd.sync()}\`, then \`${cmd.status()}\` shows what needs you and the command for each item; \`${cmd.watch()}\` keeps norn working.`);
   return steps;
 }

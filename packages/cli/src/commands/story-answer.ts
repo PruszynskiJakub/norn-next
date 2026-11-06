@@ -19,6 +19,7 @@ import type { Context } from "../context.ts";
 import { failure, refuse, usageError } from "../output.ts";
 import { at, DELEGATED_HELP, DELEGATED_OPTION, delegatedFields, delegation, humanReceipt, stepOnlyReceipt, resolveTarget, type Route, runHumanVerb, type Target } from "../runtime/human.ts";
 import { parkedOn, targetKey } from "../runtime/target.ts";
+import { runnerFor } from "../wiring.ts";
 
 const asks = (st: UnitState) => isParked(st, "ask");
 
@@ -59,8 +60,8 @@ async function typeIntoPrompt(ctx: Context, t: Target, st: UnitState, route: Rou
   // a mailbox answer is typed by the holder's tick (SessionInput keys); a hook-only ask takes text from the tick (B2)
   if (route.via !== "local" || park?.kind !== "ask" || park.implicit !== "pane" || !run?.session) return receipt;
   if (run.machine && run.machine !== machineHolder(ctx.env)) return receipt;
-  const runner = (await ctx.ports()).runner;
-  if (!runner || runner.name !== run.session.runner) return receipt;
+  const runner = runnerFor(await ctx.ports(), run.session);
+  if (!runner) return receipt;
   const session: SessionRef = { runner: run.session.runner, session_id: run.session.session_id, ...(run.session.pane_id ? { pane_id: run.session.pane_id } : {}), ...(run.process ? { process: run.process } : {}) };
   const reach = runner.reach?.(session) ?? null;
   const fail = (reason: string) => {

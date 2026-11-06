@@ -105,6 +105,7 @@ export const skillDir = (repoRoot: string) => join(repoRoot, SKILLS_DIR);
 export const codexAgent: AgentAdapter = {
   name: NAME,
   tier: "blocking",
+  setupNote: "Codex runs project hooks only once the project's .codex/ layer is trusted and the hooks reviewed via /hooks in Codex",
   hookEvents,
   ...jsonHookInstaller(NAME, settingsPath, hookSpecs),
   parseHookEvent,

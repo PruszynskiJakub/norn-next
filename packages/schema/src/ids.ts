@@ -77,7 +77,43 @@ export function ulidTime(id: string): number {
 // ---------------------------------------------------------------- keys
 
 export type KeyPrefix = "gh" | "gl";
-const PROVIDER_PREFIX: Record<RemoteProvider, KeyPrefix> = { gh: "gh", glab: "gl" };
+
+/** A label as the provider CLI creates it: colour hex without `#`. */
+interface LabelWords {
+  name: string;
+  color: string;
+  description: string;
+}
+
+/** Per provider: its CLI, its story key prefix and the commands norn prints for a person to run. */
+export interface ProviderCommands {
+  cli: string;
+  key_prefix: KeyPrefix;
+  /** shows the branch's pull (merge) request */
+  prView(branch: string): string;
+  /** creates a label; `quote` makes one shell word */
+  labelCreate(label: LabelWords, quote: (s: string) => string): string;
+  /** an example first story: an issue labelled `label`, assigned to the person; null = none given */
+  issueCreate: ((label: string) => string) | null;
+}
+
+export const PROVIDERS: Readonly<Record<RemoteProvider, ProviderCommands>> = {
+  gh: {
+    cli: "gh",
+    key_prefix: "gh",
+    prView: (branch) => `gh pr view ${branch}`,
+    labelCreate: (l, q) => `gh label create ${q(l.name)} --color ${l.color} --description ${q(l.description)}`,
+    issueCreate: (label) => `gh issue create --label ${label} --assignee @me --title "…"`,
+  },
+  glab: {
+    cli: "glab",
+    key_prefix: "gl",
+    prView: (branch) => `glab mr view ${branch}`,
+    labelCreate: (l, q) => `glab label create --name ${q(l.name)} --color ${q(`#${l.color}`)} --description ${q(l.description)}`,
+    issueCreate: null,
+  },
+};
+
 const PREFIX_PROVIDER: Record<KeyPrefix, RemoteProvider> = { gh: "gh", gl: "glab" };
 
 export interface StoryKeyParts {
@@ -97,7 +133,7 @@ const SLICE_NN_RE = new RegExp(SLICE_NN_PATTERN);
 
 export function storyKey(provider: RemoteProvider, number: number): string {
   if (!Number.isInteger(number) || number < 1) throw new RangeError(`bad issue number: ${number}`);
-  return `${PROVIDER_PREFIX[provider]}-${number}`;
+  return `${PROVIDERS[provider].key_prefix}-${number}`;
 }
 export function isStoryKey(s: unknown): s is string {
   return typeof s === "string" && STORY_KEY_RE.test(s);

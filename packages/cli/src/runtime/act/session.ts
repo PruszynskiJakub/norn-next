@@ -20,14 +20,15 @@ import {
   writeTranscriptSnapshot,
 } from "@norn/store";
 import { ensureShim, withNornOnPath } from "../shim.ts";
+import { runnerFor } from "../../wiring.ts";
 import { type ActEnv, QueueFull, ReceiptTaken } from "./env.ts";
 import type { UnitLoc } from "../observe/index.ts";
 
 // ------------------------------------------------------------ runner
 
 async function killSession(act: ActEnv, session: SessionRef | null): Promise<boolean> {
-  const runner = act.obs.ports.runner;
-  if (!session || !runner || session.runner !== runner.name) return false;
+  const runner = runnerFor(act.obs.ports, session);
+  if (!session || !runner) return false;
   await runner.kill(session).catch(() => undefined);
   return true;
 }
@@ -54,7 +55,7 @@ async function launchSession(act: ActEnv, unit: UnitRef, launch: AgentLaunch): P
       cwd: launch.cwd,
       prompt: launch.prompt,
       env,
-      headless: runner.name === "headless",
+      headless: runner.capabilities.headless === true,
       config: { ...(cfg?.args ? { args: cfg.args } : {}) },
       ...(launch.model ? { model: launch.model } : {}),
       ...(launch.resume ? { resume: launch.resume } : {}),
@@ -97,8 +98,7 @@ function recordSession(act: ActEnv, unit: UnitRef, runsDir: string, decided: Uni
 
 /** R6.3, R9.1: how a person reaches the session, recorded with it for the inbox */
 function reachOf(act: ActEnv, session: SessionRef): { reach?: string } {
-  const runner = act.obs.ports.runner;
-  const reach = runner?.reach && runner.name === session.runner ? runner.reach(session) : undefined;
+  const reach = runnerFor(act.obs.ports, session)?.reach?.(session);
   return reach ? { reach } : {};
 }
 
@@ -137,8 +137,8 @@ export async function applyReceipts(act: ActEnv, a: Extract<Action, { kind: "app
     // a failed delivery leaves the unit parked on the ask (the next tick tries again)
     const input = a.input;
     try {
-      const runner = act.obs.ports.runner;
-      if (!runner || runner.name !== input.session.runner) throw new Error("the session's runner is not available here");
+      const runner = runnerFor(act.obs.ports, input.session);
+      if (!runner) throw new Error("the session's runner is not available here");
       if (!runner.sendKeys) throw new Error(`runner ${runner.name} cannot type into a prompt`);
       await runner.sendKeys(input.session, keys);
     } catch (e) {
@@ -161,8 +161,8 @@ export async function applyReceipts(act: ActEnv, a: Extract<Action, { kind: "app
   if (a.input && !keyed) {
     // B2: the answer goes into the same session after state is written
     try {
-      const runner = act.obs.ports.runner;
-      if (!runner || runner.name !== a.input.session.runner) throw new Error("session's runner is not available here");
+      const runner = runnerFor(act.obs.ports, a.input.session);
+      if (!runner) throw new Error("session's runner is not available here");
       await runner.send(a.input.session, a.input.text, { submit: true });
       delivered = true;
       act.effectsOk.add("answer");
@@ -235,9 +235,9 @@ export async function nudge(act: ActEnv, a: Extract<Action, { kind: "nudge" }>):
   } else act.writeReceipts(loc, a.receipts);
   const snapshot = await snapshotRun(act, a.unit, runId, a.snapshot);
   if (a.input) {
-    const runner = act.obs.ports.runner;
+    const runner = runnerFor(act.obs.ports, a.input.session);
     try {
-      if (!runner || runner.name !== a.input.session.runner) throw new Error("the run's runner is not available on this machine");
+      if (!runner) throw new Error("the run's runner is not available on this machine");
       await runner.send(a.input.session, a.input.text, { submit: true });
     } catch (e) {
       act.failedSession = a.input.session;

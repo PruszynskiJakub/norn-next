@@ -21,6 +21,7 @@ import { withStory } from "../runtime/release.ts";
 import { resetBlockers } from "../runtime/reset.ts";
 import { aStory, resolveStory } from "../runtime/target.ts";
 import { claimIfFree, refuseOthers } from "./story-close.ts";
+import { runnerFor } from "../wiring.ts";
 
 export const storyResetCommand = defineCommand({
   name: "story reset",
@@ -60,8 +61,9 @@ export const storyResetCommand = defineCommand({
       const killed: string[] = [];
       for (const u of story.units) {
         const s = u.state?.status === "running" ? u.run?.session : null;
-        if (s && obs.ports.runner && s.runner === obs.ports.runner.name) {
-          await obs.ports.runner.kill(s).catch(() => undefined);
+        const runner = runnerFor(obs.ports, s);
+        if (s && runner) {
+          await runner.kill(s).catch(() => undefined);
           killed.push(u.unit.key);
         }
       }

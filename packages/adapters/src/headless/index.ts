@@ -6,7 +6,7 @@
  * There is no pane to type into: `send` throws PortError `unsupported`. Per B2 the caller then
  * continues the same agent session by launching `AgentAdapter.launchCommand({ resume })` through
  * this runner, or starts a fresh session from the handoff — capabilities `send: false, resume: true`
- * (R4.1). `findSessions` looks for a run's process by its `NORN_RUN` env (R5.1). `output` is the head
+ * (R4.1), and `headless`: agents launch their non-interactive command. `findSessions` looks for a run's process by its `NORN_RUN` env (R5.1). `output` is the head
  * of the run's log (B3).
  */
 import { closeSync, mkdirSync, openSync, readFileSync } from "node:fs";
@@ -40,7 +40,7 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
 
   return {
     name: RUNNER_NAME,
-    capabilities: { send: false, resume: true },
+    capabilities: { send: false, resume: true, headless: true },
 
     async available() {
       return true;

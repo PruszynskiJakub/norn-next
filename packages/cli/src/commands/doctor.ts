@@ -35,7 +35,7 @@ import { tmpdir } from "node:os";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, FileError, Ports, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
-import { type ConfigEntry, ExitCode, type ResolvedConfig, ulid, type VersionMatch, versionMatch } from "@norn/schema";
+import { type ConfigEntry, ExitCode, PROVIDERS, type ResolvedConfig, ulid, type VersionMatch, versionMatch } from "@norn/schema";
 import { baseRunStateStories, baseSpecsRoot, bindNornHome, cachedDefaultBranch, defaultBaseRef, type Layout, layoutProblems, loadWorkflows, gitRemoteUrl, machineDir, machineHolder, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, SKILLS_DIR, skillsDrift, skillsReport, spawnBounded, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
@@ -558,8 +558,7 @@ export const doctorCommand = defineCommand({
       const turn = live ? await liveTurn(ctx, name, agent, command) : null;
       const notes: string[] = [];
       if (agent.tier === "none") notes.push("no hooks: runner, process and git facts only (A5)");
-      if (name === "codex")
-        notes.push("Codex runs project hooks only once the project's .codex/ layer is trusted and the hooks reviewed via /hooks in Codex");
+      if (agent.setupNote) notes.push(agent.setupNote);
       if (hooksInstalled === false) notes.push(`run ${cmd.init()} to install hooks`);
       const ok = !!path && hooksInstalled !== false && (fires?.ok ?? true) && (turn?.ok ?? true);
       agents.push({
@@ -581,7 +580,7 @@ export const doctorCommand = defineCommand({
       try {
         remote = { ok: true, provider: ports.remote.provider, user: await ports.remote.whoami() };
       } catch (e) {
-        remote = { ok: false, provider: ports.remote.provider, error: (e as Error).message, do_instead: `${config.provider === "glab" ? "glab" : "gh"} auth login` };
+        remote = { ok: false, provider: ports.remote.provider, error: (e as Error).message, do_instead: `${PROVIDERS[config.provider].cli} auth login` };
       }
     }
     // sync reads issues and every step pushes through this remote: without it nothing moves
@@ -605,10 +604,10 @@ export const doctorCommand = defineCommand({
         name: ports.runner.name,
         available,
         ...(onPath ? { norn_on_path: onPath } : {}),
-        ...(available ? {} : { error: ports.runner.name === "herdr" ? "herdr server not reachable (start herdr)" : `${ports.runner.name} runner not available` }),
+        ...(available ? {} : { error: ports.runner.unavailableHint ?? `${ports.runner.name} runner not available` }),
       };
       // HC11: informational — the cockpit plugin is optional, so it never fails doctor
-      if (available && ports.runner.name === "herdr") runner.cockpit_plugin = await cockpitPlugin(ctx);
+      if (available && ports.runner.name === herdr.RUNNER_NAME) runner.cockpit_plugin = await cockpitPlugin(ctx);
     }
 
     const names = bundledSkills(ctx.env);
