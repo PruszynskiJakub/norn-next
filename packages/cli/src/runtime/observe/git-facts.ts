@@ -1,7 +1,7 @@
 /** observe: git facts of the repository — story bases (BS0, BS1), intake-only branches (R3.1), foreign commits (Q6), orphan branches (K5), worktrees. */
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { type ForeignCommit, type GitPort, isIntakeCommit, type Ports, type StoryBase, type StoryFacts, type WorktreeFacts, type WorktreeStatus } from "@norn/core";
+import { type ForeignCommit, type GitInProgress, type GitPort, isIntakeCommit, type Ports, type StoryBase, type StoryFacts, type WorktreeFacts, type WorktreeStatus } from "@norn/core";
 import { type BaseFactsCache, readEnvNorn } from "@norn/store";
 
 /** Newest mtime of the given worktree-relative paths (ms), or null. */
@@ -124,13 +124,13 @@ const SLICE_BRANCH = /^((?:gh|gl)-\d+)\/(\d+)-([a-z0-9][a-z0-9-]*)$/;
  * and their story is unknown here or finished (done/dropped), or (slice branches) their slice is
  * integrated/dropped. Reported every tick; `norn tidy` deletes the ones whose commits are kept elsewhere.
  */
-export async function findOrphanBranches(git: Ports["git"], root: string, worktrees: Array<{ branch: string | null }>, stories: StoryFacts[]): Promise<string[]> {
-  const refs = await git.listRefs(root, "refs/heads/").catch(() => []);
+export function findOrphanBranches(refs: ReadonlyMap<string, string>, worktrees: Array<{ branch: string | null }>, stories: StoryFacts[]): string[] {
   const checkedOut = new Set(worktrees.map((w) => w.branch).filter((b): b is string => !!b));
   const byKey = new Map(stories.map((s) => [s.key, s]));
   const finished = (s: StoryFacts | undefined) => !s || s.frontmatter?.status === "done" || s.frontmatter?.status === "dropped";
   const out: string[] = [];
-  for (const { ref } of refs) {
+  for (const ref of refs.keys()) {
+    if (!ref.startsWith("refs/heads/")) continue;
     const name = ref.slice("refs/heads/".length);
     if (checkedOut.has(name)) continue;
     const slice = SLICE_BRANCH.exec(name);
@@ -149,12 +149,14 @@ export async function findOrphanBranches(git: Ports["git"], root: string, worktr
 
 export async function worktreeFacts(ports: Ports, path: string): Promise<WorktreeFacts | null> {
   if (!existsSync(path)) return null;
-  const status: WorktreeStatus | null = await ports.git.status(path).catch(() => null);
-  const last_commit_at = await ports.git.lastCommitTime(path).catch(() => null);
+  // H1/BS5.1: an agent's merge (or rebase) in progress defers norn's commits; decide must know it
+  const [status, last_commit_at, in_progress]: [WorktreeStatus | null, number | null, GitInProgress | null] = await Promise.all([
+    ports.git.status(path).catch(() => null),
+    ports.git.lastCommitTime(path).catch(() => null),
+    ports.git.inProgress(path).catch(() => null),
+  ]);
   const changed = status ? [...status.staged, ...status.unstaged, ...status.untracked] : [];
   const slotRaw = readEnvNorn(path)?.NORN_SLOT;
   const slot = slotRaw !== undefined && /^\d+$/.test(slotRaw) ? Number(slotRaw) : null;
-  // H1/BS5.1: an agent's merge (or rebase) in progress defers norn's commits; decide must know it
-  const in_progress = await ports.git.inProgress(path).catch(() => null);
   return { path, exists: true, status, last_commit_at, last_file_change_at: newestMtime(path, changed), slot, ...(in_progress ? { in_progress } : {}) };
 }

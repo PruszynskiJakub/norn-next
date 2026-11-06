@@ -95,8 +95,8 @@ export async function readLocalRef(cwd: string, ref: string): Promise<string | n
   return r.code === 0 ? r.stdout.trim() : null;
 }
 
-export async function listLocalRefs(cwd: string, prefix: string): Promise<Array<{ ref: string; sha: string }>> {
-  const out = await gitOk(cwd, ["for-each-ref", "--format=%(objectname) %(refname)", prefix]);
+export async function listLocalRefs(cwd: string, prefix: string | readonly string[]): Promise<Array<{ ref: string; sha: string }>> {
+  const out = await gitOk(cwd, ["for-each-ref", "--format=%(objectname) %(refname)", ...(typeof prefix === "string" ? [prefix] : prefix)]);
   return parseRefLines(out);
 }
 

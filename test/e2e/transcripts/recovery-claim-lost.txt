@@ -14,7 +14,6 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/
   A.remote.listAssignedIssues norn
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
   spawn repo $ git show-ref --verify --quiet refs/heads/gh-9-add-search
   spawn repo $ git ls-remote --exit-code --heads origin refs/heads/gh-9-add-search
   spawn repo $ git show-ref --verify --quiet refs/heads/gh-9-add-search
@@ -41,13 +40,11 @@
   spawn repo-worktrees/gh-9-add-search $ git log -1 "--format=%ct" HEAD
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
-  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-9
-  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-9/
+  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:2> "^<sha:1>" --
   spawn repo $ git log "--format=%H%x1f%s%x1f%ct%x1f%(trailers:only,unfold)%x1e" refs/remotes/origin/main..refs/heads/gh-9-add-search --
   spawn repo $ git rev-list --left-right --count <sha:2>...<sha:1> --
   spawn repo $ git merge-base <sha:2> <sha:1>
-  spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
   spawn repo $ git ls-remote origin refs/norn/claims/gh-9
   spawn repo $ git update-ref -d refs/norn/claims/gh-9
   spawn repo $ git hash-object -w --stdin
@@ -66,10 +63,8 @@
   spawn repo-worktrees/gh-9-add-search $ git log -1 "--format=%ct" HEAD
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
-  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-9
-  spawn repo $ git cat-file blob <sha:3>
-  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-9/
-  spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
+  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
+  spawn repo $ git cat-file --batch
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
   spawn repo-worktrees/gh-9-add-search $ git add -A
@@ -96,13 +91,11 @@
   spawn repo-worktrees/gh-9-add-search $ git log -1 "--format=%ct" HEAD
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
-  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-9
-  spawn repo $ git cat-file blob <sha:3>
-  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-9/
+  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
+  spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:4> "^<sha:1>" --
   spawn repo $ git rev-list --left-right --count <sha:4>...<sha:1> --
   spawn repo $ git merge-base <sha:4> <sha:1>
-  spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
   A.runner.launch title="gh-9 implement" cwd=<dir>/repo-worktrees/gh-9-add-search argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Use the norn skill, then run `norn brief`."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:3>","NORN_SLOT":"1","NORN_STORY":"gh-9"}
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
@@ -173,11 +166,9 @@
   spawn repo-worktrees/gh-9-add-search $ git log -1 "--format=%ct" HEAD
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
-  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-9
-  spawn repo $ git cat-file blob <sha:3>
-  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-9/
+  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
+  spawn repo $ git cat-file --batch
   A.runner.paneState s-1
-  spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
   spawn repo $ git hash-object -w --stdin
   spawn repo $ git push --porcelain --force-with-lease=refs/norn/claims/gh-9:<sha:3> origin <sha:6>:refs/norn/claims/gh-9
 > [A] norn tick --sync
@@ -197,12 +188,10 @@
   spawn repo-worktrees/gh-9-add-search $ git log -1 "--format=%ct" HEAD
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
-  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-9
-  spawn repo $ git cat-file blob <sha:5>
-  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/inbox/gh-9/
+  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
+  spawn repo $ git cat-file --batch
   A.runner.paneState s-1
   spawn repo $ git rev-parse --verify --quiet refs/norn/runs/gh-9
-  spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/
   - home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0001-started.json
   - home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0002-started.json
   - home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0003-done.json
@@ -213,6 +202,6 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/runs/
-  spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-9
-  spawn repo $ git cat-file blob <sha:5>
+  spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
+  spawn repo $ git cat-file --batch
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/

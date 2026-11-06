@@ -5,9 +5,9 @@
  * Classification helpers report facts only; whether to take/renew is decide's call.
  */
 import type { ClaimState, FileError, MailboxItem } from "@norn/core";
-import { type ClaimBlob, MAILBOX_KINDS, type Receipt, assertValid, claimRef, isUlid, mailboxPrefix, mailboxRef, parseDuration, validate } from "@norn/schema";
+import { CLAIMS_PREFIX, type ClaimBlob, INBOX_PREFIX, MAILBOX_KINDS, type Receipt, assertValid, claimRef, isUlid, mailboxPrefix, mailboxRef, parseDuration, validate } from "@norn/schema";
 import { json } from "./fsx.ts";
-import { type CasResult, casRef, casRefs, git, listLocalRefs, listRemoteRefs, readBlob, readLocalRef, writeBlob } from "./git.ts";
+import { type CasResult, casRef, casRefs, git, gitSync, listLocalRefs, listRemoteRefs, readBlob, readLocalRef, writeBlob } from "./git.ts";
 
 export type ClaimRead =
   | { state: "none" }
@@ -30,10 +30,13 @@ export function parseBlob<N extends "claim" | "receipt">(name: N, ref: string, r
   return r.ok ? { ok: true as const, value: r.value } : { ok: false as const, error: { file: ref, errors: r.errors } };
 }
 
-async function claimAt(cwd: string, ref: string, sha: string | null): Promise<ClaimRead> {
-  if (sha === null) return { state: "none" };
-  const p = parseBlob("claim", ref, await readBlob(cwd, sha));
+function claimOf(ref: string, sha: string, raw: string | null): ClaimRead {
+  const p = parseBlob("claim", ref, raw);
   return p.ok ? { state: "present", sha, blob: p.value } : { state: "corrupt", sha, error: p.error };
+}
+
+async function claimAt(cwd: string, ref: string, sha: string | null): Promise<ClaimRead> {
+  return sha === null ? { state: "none" } : claimOf(ref, sha, await readBlob(cwd, sha));
 }
 
 /** Claim as recorded in the local ref (after the last fetch). */
@@ -221,11 +224,77 @@ export async function postMailbox(
 export async function listMailbox(cwd: string, story: string): Promise<MailboxItem[]> {
   const prefix = mailboxPrefix(story);
   const refs = (await listLocalRefs(cwd, prefix)).sort((a, b) => a.ref.localeCompare(b.ref));
-  const out: MailboxItem[] = [];
-  for (const { ref, sha } of refs) {
-    const id = ref.slice(prefix.length);
-    const p = parseBlob("receipt", ref, await readBlob(cwd, sha));
-    out.push({ ref, sha, id, receipt: p.ok ? p.value : null, error: p.ok ? null : p.error });
+  const blobs: Array<string | null> = [];
+  for (const { sha } of refs) blobs.push(await readBlob(cwd, sha));
+  return mailboxOf(prefix, refs, (_sha, i) => blobs[i] ?? null);
+}
+
+/** Mailbox items of `refs` (sorted, oldest ULID first) from their blobs. */
+function mailboxOf(prefix: string, refs: ReadonlyArray<{ ref: string; sha: string }>, raw: (sha: string, i: number) => string | null): MailboxItem[] {
+  return refs.map(({ ref, sha }, i) => {
+    const p = parseBlob("receipt", ref, raw(sha, i));
+    return { ref, sha, id: ref.slice(prefix.length), receipt: p.ok ? p.value : null, error: p.ok ? null : p.error };
+  });
+}
+
+/** Every story's local claim (T2) and mailbox items (T9), as `readLocalClaim` and `listMailbox` read them one story at a time. */
+export interface LocalStoryRefs {
+  claim(story: string): Promise<ClaimRead>;
+  mailbox(story: string): Promise<MailboxItem[]>;
+}
+
+/**
+ * All local claim and mailbox refs in one `for-each-ref` and their blobs in one `cat-file --batch`,
+ * read on the first ask (call fetchNornRefs first). Parsed and validated as `readLocalClaim` and
+ * `listMailbox` do (S2): a corrupt claim or mailbox item reads the same either way. When either git
+ * call fails, each story is read on its own instead, so a failure reads as it would there.
+ */
+export function readLocalStoryRefs(cwd: string): LocalStoryRefs {
+  const fallback: LocalStoryRefs = { claim: (story) => readLocalClaim(cwd, story), mailbox: (story) => listMailbox(cwd, story) };
+  let batch: Promise<LocalStoryRefs> | undefined;
+  const read = async (): Promise<LocalStoryRefs> => {
+    const listed = await listLocalRefs(cwd, [CLAIMS_PREFIX, INBOX_PREFIX]).catch(() => null);
+    if (!listed) return fallback;
+    const blobs = readBlobs(cwd, listed.map((r) => r.sha));
+    if (!blobs) return fallback;
+    const raw = (sha: string) => blobs.get(sha) ?? null;
+    const claims = new Map(listed.filter((r) => r.ref.startsWith(CLAIMS_PREFIX)).map((r) => [r.ref, r.sha]));
+    const items = listed.filter((r) => r.ref.startsWith(INBOX_PREFIX));
+    return {
+      claim: async (story) => {
+        const ref = claimRef(story);
+        const sha = claims.get(ref);
+        return sha === undefined ? { state: "none" } : claimOf(ref, sha, raw(sha));
+      },
+      mailbox: async (story) => {
+        const prefix = mailboxPrefix(story);
+        return mailboxOf(prefix, items.filter((r) => r.ref.startsWith(prefix)).sort((a, b) => a.ref.localeCompare(b.ref)), raw);
+      },
+    };
+  };
+  const refs = () => (batch ??= read());
+  return { claim: async (story) => (await refs()).claim(story), mailbox: async (story) => (await refs()).mailbox(story) };
+}
+
+/** The blobs among `shas` by sha, in one `cat-file --batch`; a missing object or one that is no blob is left out. Null when git fails. */
+function readBlobs(cwd: string, shas: readonly string[]): Map<string, string> | null {
+  const out = new Map<string, string>();
+  const wanted = [...new Set(shas)];
+  if (!wanted.length) return out;
+  const r = gitSync(cwd, ["cat-file", "--batch"], new TextEncoder().encode(`${wanted.join("\n")}\n`));
+  if (r.code !== 0) return null;
+  // one reply per object, in order: `<sha> <type> <size>\n<content>\n`, or `<sha> missing\n` with no content
+  let pos = 0;
+  for (const sha of wanted) {
+    const nl = r.stdout.indexOf(0x0a, pos);
+    if (nl < 0) return null;
+    const [, type, size] = r.stdout.subarray(pos, nl).toString().split(" ");
+    if (type === "missing" || size === undefined) {
+      pos = nl + 1;
+      continue;
+    }
+    if (type === "blob") out.set(sha, r.stdout.subarray(nl + 1, nl + 1 + Number(size)).toString("utf8"));
+    pos = nl + 1 + Number(size) + 1;
   }
   return out;
 }

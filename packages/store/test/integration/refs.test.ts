@@ -10,6 +10,7 @@ import {
   postMailbox,
   readClaim,
   readLocalClaim,
+  readLocalStoryRefs,
   releaseClaim,
   renewClaim,
   renewClaims,
@@ -204,5 +205,39 @@ describe("mailbox (T9)", () => {
     expect((await deleteMailbox(a, "origin", it.ref, it.sha)).ok).toBe(true);
     await fetchNornRefs(b, "origin");
     expect(await listMailbox(b, "gh-12")).toEqual([]);
+  });
+});
+
+describe("readLocalStoryRefs (T2, T9)", () => {
+  test("reads every claim and mailbox as readLocalClaim and listMailbox do, corrupt ones included, in two git calls", async () => {
+    const { a } = await setup();
+    const hb = ulid();
+    expect((await acquireClaim(a, null, blob("jakub@mac", hb), { now: NOW })).ok).toBe(true);
+    // gh-1: a claim that is no JSON; gh-2: a claim ref at a tree (no blob); gh-12's mailbox: a good item and a bad one
+    const junk = await gitOk(a, ["hash-object", "-w", "--stdin"], "not json");
+    await gitOk(a, ["update-ref", "refs/norn/claims/gh-1", junk.trim()]);
+    const tree = await gitOk(a, ["mktree"], "");
+    await gitOk(a, ["update-ref", "refs/norn/claims/gh-2", tree.trim()]);
+    const answer: Receipt = { kind: "answer", receipt_id: ulid(), run_id: null, step: "plan", attempt: 1, at: AT, by: "human", who: "ola@pc", answer: "pg" };
+    expect((await postMailbox(a, null, "gh-12", answer)).ok).toBe(true);
+    await gitOk(a, ["update-ref", `refs/norn/inbox/gh-12/${ulid()}`, junk.trim()]);
+    await gitOk(a, ["update-ref", `refs/norn/inbox/gh-1/${ulid()}`, junk.trim()]);
+
+    const spawned: string[][] = [];
+    const prev = setSpawnObserver(({ argv }) => spawned.push([...argv]));
+    const refs = readLocalStoryRefs(a);
+    try {
+      await refs.claim("gh-12");
+    } finally {
+      setSpawnObserver(prev);
+    }
+    expect(spawned.map((argv) => argv.slice(1, 3).join(" "))).toEqual(["for-each-ref --format=%(objectname) %(refname)", "cat-file --batch"]);
+    for (const story of ["gh-12", "gh-1", "gh-2", "gh-3"]) {
+      expect(await refs.claim(story)).toEqual(await readLocalClaim(a, story));
+      expect(await refs.mailbox(story)).toEqual(await listMailbox(a, story));
+    }
+    expect(await refs.claim("gh-1")).toMatchObject({ state: "corrupt" });
+    expect(await refs.claim("gh-2")).toMatchObject({ state: "corrupt", error: { errors: [{ message: "object missing" }] } });
+    expect((await refs.mailbox("gh-12")).map((m) => m.error === null)).toContain(false);
   });
 });

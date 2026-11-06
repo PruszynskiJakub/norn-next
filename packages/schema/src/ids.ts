@@ -319,8 +319,9 @@ export const CLAIMS_PREFIX = "refs/norn/claims/";
 export function claimRef(story: string): string {
   return `${CLAIMS_PREFIX}${story}`;
 }
+export const INBOX_PREFIX = "refs/norn/inbox/";
 export function mailboxPrefix(story: string): string {
-  return `refs/norn/inbox/${story}/`;
+  return `${INBOX_PREFIX}${story}/`;
 }
 export function mailboxRef(story: string, id: string): string {
   return `${mailboxPrefix(story)}${id}`;

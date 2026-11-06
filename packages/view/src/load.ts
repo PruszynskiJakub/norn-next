@@ -45,7 +45,7 @@ import {
   machineHolder,
   onlyNornCommitsSince,
   readEnvNorn,
-  readLocalClaim,
+  readLocalStoryRefs,
   runHooks,
   scanWorktrees,
   type StorySnapshot,
@@ -328,7 +328,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const ctx: Ctx = { now, config, runner, heartbeatDown: false };
 
   const leases = local.leases;
-  const claims = await Promise.all(local.stories.map((s) => readLocalClaim(opts.repoRoot, s.snapshot.key).catch(() => ({ state: "none" }) as const)));
+  const storyRefs = readLocalStoryRefs(opts.repoRoot);
+  const claims = await Promise.all(local.stories.map((s) => storyRefs.claim(s.snapshot.key).catch(() => ({ state: "none" }) as const)));
   errors.push(...leases.errors);
 
   const leaseByRun = new Map<string, { entry: LeaseEntry; alive: boolean }>();
