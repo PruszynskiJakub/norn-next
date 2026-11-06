@@ -16,10 +16,25 @@ Apply the skill-shaper proposals (skill text only) to the 20 bundled skills (sou
 - `bun run test` (1277 pass) and `bun run typecheck` are green.
 - Out of scope, left for follow-up issues (SUMMARY.md): a `waiting` outcome for `clarify`, instructions for the slice `merge` step, `last_findings` as a review input, the RULES §16 prototype line. RULES.md line 691 still calls norn-retro something a person runs. That stays true, since being model-invocable does not make it a step.
 
+- review#1: changes requested. One blocking finding: norn-qa's description has no pointer to norn-qa-person (W7). Minor findings: a lowercase "nothing" in norn-slice:67, and norn-fsd-round's description lost "through their current round". Traceability:
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| W1 20 bundled skills applied | test | Diffed against the proposals: 10 are identical; the other 10 differ only where a lint requires it (`packages/cli/test/unit/assets.test.ts` P7 + fsd-round pinned phrases, `test/repo/repo.test.ts` AC4) |
+| W2 `.agents/skills` copies refreshed | test | `diff -r` against source is clean |
+| W3 issue/release/release-start | person | Identical to the proposals (QA (person)) |
+| W4 interview/refine/clarify dedup | person | norn-interview:16 keeps it; refine dropped it; clarify:26 defers |
+| W5 tdd/implement dedup | person | norn-tdd:21 keeps it; implement dropped it |
+| W6 tdd seam = interface | person | norn-tdd:12 |
+| W7 norn-qa description → norn-qa-person | person | NOT MET: description (line 3) lacks it (F1) |
+| D1 retro model-invocable | person | norn-retro frontmatter |
+| D2 prototype home | person | norn-prototype:23 |
+
 ### Resume
 
-Nothing left in implement: the change is committed. The next step reviews the diff.
+Rework the review findings: add the norn-qa-person pointer to norn-qa's description (source, then refresh the `.agents` copy); capitalise "Nothing" in norn-slice:67; consider bounding norn-fsd-round's description to the current round.
 
 ## Progress
 
 - implement#1 done: Applied the skill-shaper proposals to the 20 bundled skills (source + refreshed .agents copies) and issue/release/release-start. Fixed the proposal lines that broke the P7, pinned-phrase and AC4 lints or contradicted the code (slice checks are not run by norn). Made the cross-cutting cleanups: tdd seam = interface, qa→qa-person, deduplicated the interview/refine/clarify and tdd/implement rules. retro is now model-invocable, and prototype defaults to <spec>/prototype/. Unit tier and typecheck green.
+- review#1 changes_requested: 1 blocking: norn-qa's description lacks the pointer to norn-qa-person the spec asks for (W7). Minor: lowercase 'nothing' in norn-slice:67; norn-fsd-round description lost its current-round bound. Everything else matches the proposals; unit tier and typecheck green.
