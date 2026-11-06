@@ -83,12 +83,15 @@ async function presentOrientWorkspaces(ctx: Context, view: ProjectView, ttlMs: n
   const ours = new Map<string, string>();
   for (const s of view.stories) for (const w of workspaces) if (isOrientWorkspace(w, s.key, s.root)) ours.set(w.workspace_id, s.key);
   const needs = new Set<string>();
-  let tokens = 0;
-  for (const [id, story] of ours) {
-    const token = storyToken(view, story);
-    if (token.needs) needs.add(id);
-    if (await cockpit.reportWorkspace(id, { norn: token.text }, ttlMs).then(() => true, () => false)) tokens++;
-  }
+  // each workspace's token is its own: reported side by side; the moves below go one by one, in order
+  const reported = await Promise.all(
+    [...ours].map(([id, story]) => {
+      const token = storyToken(view, story);
+      if (token.needs) needs.add(id);
+      return cockpit.reportWorkspace(id, { norn: token.text }, ttlMs).then(() => true, () => false);
+    }),
+  );
+  const tokens = reported.filter(Boolean).length;
   const moves = planWorkspaceMoves(
     workspaces.map((w) => w.workspace_id),
     [...ours.keys()],
@@ -112,7 +115,8 @@ async function segment(ctx: Context, ttlRaw: string) {
   }
   let view: ProjectView;
   try {
-    view = await projectView(ctx);
+    // the line and the tokens read only the inbox and the story statuses
+    view = await projectView(ctx, { inboxOnly: true });
   } catch (e) {
     const line = `norn ! ${(e as Error).message.split("\n")[0]}`;
     return rendered({ segment: line, repo: ctx.root }, line);

@@ -8,7 +8,7 @@
  * as they are (`loadProjectView`), so `norn status` and the tick see one world. Its one write is the
  * tick's hook-file backfill (`backfillHooks`, D5).
  */
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync } from "node:fs";
 import {
   type ActFailure,
   type FileError,
@@ -24,18 +24,18 @@ import {
   storyWorktreePath,
   type UnitFacts,
 } from "@norn/core";
-import { type HookFact, type LeaseFile, parseDuration, parseReceiptFileName, type ReceiptOf, type RejectedMailboxReceipt, type ResolvedConfig, type RunInfo, storyBranch, type UnitState, type Workflow } from "@norn/schema";
+import { type HookFact, type LeaseFile, parseDuration, type ReceiptOf, type RejectedMailboxReceipt, type ResolvedConfig, type RunInfo, storyBranch, type UnitState, type Workflow } from "@norn/schema";
+import type { LoadedConfig } from "./config.ts";
 import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
 import { readRejectedReceipts } from "./local.ts";
 import { listSuperseded, type SupersededCopy } from "./superseded.ts";
 import { type BackfillRun, backfillHookFiles } from "./hook-backfill.ts";
 import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
-import { receiptsDir } from "./paths.ts";
-import { readReceipt } from "./receipts.ts";
+import { type ReceiptIndex, receiptIndex } from "./receipts.ts";
 import { localRecordRefs } from "./record-ref.ts";
 import { loadSnapshot, type RepoSnapshot, type StorySnapshot, type UnitSnapshot, withSliceWorktrees } from "./snapshot.ts";
-import { worktreeSkillsDrift } from "./skills.ts";
+import { skillSource, worktreeSkillsDrift } from "./skills.ts";
 import { readUnitHooks, unitHooksChangedAt } from "./trace.ts";
 import { readUnitMarker } from "./worktree.ts";
 
@@ -51,6 +51,8 @@ export interface LocalFactsOptions {
   sliceWorktrees: ReadonlyMap<string, string>;
   /** remote-tracking ref of the base branch records are read from (loadSnapshot); null = none */
   baseRef?: string | null;
+  /** the config already loaded for this repo, home and env (loadSnapshot); default loaded here */
+  config?: LoadedConfig;
   /** lease liveness check (default: holder pid + start time) */
   liveness?: LeaseLiveness;
   /** R5.3: the stalled window (ms) hook facts are always read back over; default the snapshot config's `limits.stalled` */
@@ -137,7 +139,7 @@ export interface LocalFacts {
 export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Promise<LocalFacts> {
   const now = opts.now;
   const includeApplied = opts.includeApplied;
-  const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...opts.storyWorktrees].map(([story, path]) => ({ story, path })), home: opts.home, env: opts.env, baseRef: opts.baseRef, includeApplied });
+  const snapshot = loadSnapshot({ repoRoot: root, storyRoots: [...opts.storyWorktrees].map(([story, path]) => ({ story, path })), home: opts.home, env: opts.env, baseRef: opts.baseRef, includeApplied, ...(opts.config ? { config: opts.config } : {}) });
   const leases = await listLeases(snapshot.home, opts.liveness).catch((e: unknown): LeaseListing => {
     if (!opts.reportLeaseErrors) throw e;
     return { live: [], dead: [], errors: [{ file: "leases", errors: [{ path: "", message: (e as Error).message }] } satisfies FileError] };
@@ -182,18 +184,21 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   const drift = skillsDriftOf(opts);
   let refs: Map<string, string> | undefined;
   const stories = placed.map(({ s, storyWt, units: us }): LocalStory => {
+    // each unit's receipts folder is listed once for every read below
+    const index = new Map(s.units.map((u) => [u, receiptIndex(u.path)]));
+    const indexOf = (u: UnitSnapshot) => index.get(u) as ReceiptIndex;
     const units = us.map(({ u, worktree }) => {
-      const lu = localUnit(root, s, u, worktree, hooksOf.get(u) ?? [], live, failures);
+      const lu = localUnit(root, s, u, indexOf(u), worktree, hooksOf.get(u) ?? [], live, failures);
       // a finished unit starts no agent step: its skills are not compared (observe cost)
       const skills_drift = worktree && u.state?.status !== "done" ? drift(worktree) : undefined;
       return skills_drift ? { ...lu, skills_drift } : lu;
     });
-    const ready = readyOf(s, s.units[0]);
-    const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"]) })));
+    const ready = readyOf(s, s.units[0], indexOf);
+    const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"], indexOf(u)) })));
     const refused = failures[recordPushSlot(s.key)];
     // review#2 F3: a record ref here while the story unit has no run state — the record is not in place
     const unplaced = !s.units[0]?.state ? (refs ??= localRecordRefs(root)).get(s.key) : undefined;
-    const open = openRejections(s, rejected);
+    const open = openRejections(s, rejected, indexOf);
     return {
       snapshot: s,
       worktree: storyWt,
@@ -220,22 +225,24 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
 function skillsDriftOf(opts: LocalFactsOptions): (worktree: string) => string[] | undefined {
   const { running, bundledSkills: bundled } = opts;
   const seen = new Map<string, string[]>();
+  // the bundled folders are read once for every worktree compared
+  const source = bundled ? skillSource(bundled.source) : null;
   return (worktree) => {
-    if (running === undefined || !bundled || !existsSync(worktree)) return undefined;
+    if (running === undefined || !bundled || !source || !existsSync(worktree)) return undefined;
     let names = seen.get(worktree);
-    if (!names) seen.set(worktree, (names = worktreeSkillsDrift(worktree, bundled.source, bundled.names, running)));
+    if (!names) seen.set(worktree, (names = worktreeSkillsDrift(worktree, source, bundled.names, running)));
     return names;
   };
 }
 
-function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, worktree: string | null, hooks: HookFact[], leases: LeaseFile[], failures: Record<string, ActFailure>): LocalUnit {
+function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, index: ReceiptIndex, worktree: string | null, hooks: HookFact[], leases: LeaseFile[], failures: Record<string, ActFailure>): LocalUnit {
   const st = u.state;
   // S12 (gh-195/05): receipts in the machine dir display absolute; an older norn's record in a tree
   // relative to the unit's worktree when it is there, else the story's checkout; gh-195/06: a record
   // read from a unit worktree's branch (an older norn's), relative to that worktree
   const at = u.tree_root ?? (!story.run_state.tree ? undefined : worktree && existsSync(worktree) ? worktree : story.root);
-  const lo = st ? lastOutcomeReceipt(u.path, st, at) : null;
-  const cursor = st ? cursorRuns(u.path, st, at) : null;
+  const lo = st ? lastOutcomeReceipt(index, st, at) : null;
+  const cursor = st ? cursorRuns(index, st, at) : null;
   const mine = leases.filter((l) => l.repo === root && l.story === u.unit.story && l.slice === u.unit.slice);
   let step_runs: StepRunFacts[] | undefined;
   if (cursor) {
@@ -309,10 +316,10 @@ export function baseStoryFacts(
 }
 
 /** F35/C5: the story unit's approve and re-entry receipts give its ready approval (BS10.2: with its time). */
-function readyOf(story: StorySnapshot, u: UnitSnapshot | undefined): { sha: string; at: string } | undefined {
+function readyOf(story: StorySnapshot, u: UnitSnapshot | undefined, indexOf: (u: UnitSnapshot) => ReceiptIndex): { sha: string; at: string } | undefined {
   const wf = u?.workflow?.workflow;
   if (!u || !wf) return undefined;
-  const ready = readyApproval(wf, receiptsOfKinds(story, u, ["approve", ...RE_ENTRY_KINDS]));
+  const ready = readyApproval(wf, receiptsOfKinds(story, u, ["approve", ...RE_ENTRY_KINDS], indexOf(u)));
   return ready ? { sha: ready.sha, at: ready.at } : undefined;
 }
 
@@ -344,11 +351,11 @@ function unknownLaunch(unapplied: readonly NumberedReceipt[]): (NumberedReceipt 
  * numbered past the unit's last one when the receipt was rejected (`seen`; a unit not seen then, any).
  * A gate rejection does not clear it.
  */
-function openRejections(story: StorySnapshot, rejected: readonly RejectedMailboxReceipt[]): RejectedMailboxReceipt[] {
+function openRejections(story: StorySnapshot, rejected: readonly RejectedMailboxReceipt[], indexOf: (u: UnitSnapshot) => ReceiptIndex): RejectedMailboxReceipt[] {
   const mine = rejected.filter((r) => r.story === story.key);
   if (!mine.length) return [];
   const accepted = story.units.flatMap((u) =>
-    receiptsOfKinds(story, u, ["answer", "approve"])
+    receiptsOfKinds(story, u, ["answer", "approve"], indexOf(u))
       .filter((r) => r.n <= (u.state?.applied_through ?? 0))
       .map((r) => ({ unit: u.unit.key, n: r.n })),
   );
@@ -356,44 +363,26 @@ function openRejections(story: StorySnapshot, rejected: readonly RejectedMailbox
 }
 
 /** Receipts of the given kinds in a unit's runs dir, ascending — read by file name, the others never opened. */
-export function receiptsOfKinds(story: StorySnapshot, u: UnitSnapshot, kinds: readonly string[]): NumberedReceipt[] {
-  let names: string[];
-  try {
-    names = readdirSync(receiptsDir(u.path));
-  } catch {
-    return [];
-  }
+export function receiptsOfKinds(story: StorySnapshot, u: UnitSnapshot, kinds: readonly string[], index: ReceiptIndex = receiptIndex(u.path)): NumberedReceipt[] {
   const out: NumberedReceipt[] = [];
-  const ns = names
-    .map(parseReceiptFileName)
-    .filter((p): p is { n: number; kind: string } => !!p && kinds.includes(p.kind))
-    .map((p) => p.n)
-    .sort((a, b) => a - b);
-  for (const n of ns) {
-    const r = readReceipt(u.path, n, story.root);
+  for (const { n } of index.entries.filter((e) => kinds.includes(e.kind))) {
+    const r = index.read(n, story.root);
     if (r && "receipt" in r) out.push(r);
   }
   return out;
 }
 
 /** The receipt that produced `state.last_outcome`, scanning newest receipts first (B3 Rework). */
-function lastOutcomeReceipt(runsDir: string, state: UnitState, root: string | undefined): NumberedReceipt | null {
+function lastOutcomeReceipt(index: ReceiptIndex, state: UnitState, root: string | undefined): NumberedReceipt | null {
   const id = state.last_outcome?.receipt_id;
   if (!id) return null;
-  let names: string[];
-  try {
-    names = readdirSync(receiptsDir(runsDir));
-  } catch {
-    return null;
-  }
-  const ns = names
-    .map(parseReceiptFileName)
-    .filter((p): p is { n: number; kind: string } => !!p && (p.kind === "check" || p.kind === "done"))
-    .map((p) => p.n)
-    .sort((a, b) => b - a)
+  const ns = index.entries
+    .filter((e) => e.kind === "check" || e.kind === "done")
+    .map((e) => e.n)
+    .reverse()
     .slice(0, 50);
   for (const n of ns) {
-    const r = readReceipt(runsDir, n, root);
+    const r = index.read(n, root);
     if (r && "receipt" in r && r.receipt.receipt_id === id) return r;
   }
   return null;
@@ -403,22 +392,13 @@ function lastOutcomeReceipt(runsDir: string, state: UnitState, root: string | un
  * R5.3 + R5.1: the unit's `started` / `classify` receipts at its cursor step/attempt (newest first,
  * stopping at the first of another cursor), and every session id its `started` receipts recorded.
  */
-function cursorRuns(runsDir: string, st: UnitState, root: string | undefined): CursorRuns {
+function cursorRuns(index: ReceiptIndex, st: UnitState, root: string | undefined): CursorRuns {
   const runs = new Map<string, { died: boolean }>();
   const sessions = new Set<string>();
-  let names: string[];
-  try {
-    names = readdirSync(receiptsDir(runsDir));
-  } catch {
-    return { runs, sessions };
-  }
-  const ns = names
-    .map(parseReceiptFileName)
-    .filter((p): p is { n: number; kind: string } => !!p && (p.kind === "started" || p.kind === "classify"))
-    .sort((a, b) => b.n - a.n);
+  const ns = index.entries.filter((e) => e.kind === "started" || e.kind === "classify").reverse();
   let atCursor = true;
   for (const { n } of ns) {
-    const r = readReceipt(runsDir, n, root);
+    const r = index.read(n, root);
     if (!r || !("receipt" in r)) continue;
     const rc = r.receipt;
     if (rc.kind === "started" && rc.session) sessions.add(rc.session.session_id);

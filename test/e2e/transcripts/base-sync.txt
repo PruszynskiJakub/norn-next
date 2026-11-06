@@ -161,7 +161,6 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
   spawn repo $ git cat-file blob <sha:4>
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/
   exit 0
 > norn story list --json
@@ -170,7 +169,6 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
   spawn repo $ git cat-file blob <sha:4>
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/
   exit 0
 > norn story list
@@ -179,7 +177,6 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
   spawn repo $ git cat-file blob <sha:4>
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/
   exit 0
 > norn tick

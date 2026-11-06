@@ -163,6 +163,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
   // ---- remote sync (GR1, H5): throttled; failures leave remote facts unobserved
   const cache = readRemoteCache(root);
+  const cacheIn = JSON.stringify(cache);
   const mode = opts.sync ?? "auto";
   const due = mode === "force" || (mode === "auto" && (cache.attempted_at === null || now - cache.attempted_at >= parseDuration(config.sync_interval)));
   const sync: SyncReport = { ran: false, ok: true };
@@ -185,7 +186,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
 
   // ---- local facts (H2): the snapshot, leases (K1, K3), hook facts, caches, what the receipts say
   const liveness = leaseLiveness((p) => ports.process.isAlive(p));
-  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, liveness, backfillHooks: opts.backfillHooks, running: ctx.version, bundledSkills: bundledSkillSet(ctx.env) });
+  const local = await loadLocalFacts(root, { now, home: ctx.home, env: ctx.env, storyWorktrees: storyWts, sliceWorktrees: sliceWts, baseRef, config: ctx.loaded, liveness, backfillHooks: opts.backfillHooks, running: ctx.version, bundledSkills: bundledSkillSet(ctx.env) });
   const snapshot = local.snapshot;
   const snapshotKeys = new Set(snapshot.stories.map((s) => s.key));
   const workflows = checkedRepoWorkflows(snapshot.workflows, root, config, ports.agents);
@@ -231,7 +232,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
       storyPrs.clear();
     }
   }
-  writeRemoteCache(root, cache);
+  if (JSON.stringify(cache) !== cacheIn) writeRemoteCache(root, cache);
   // C1: the last PR seen per story, kept between syncs for the inbox (`pr_seen`); finished stories drop out
   const prSeenIn = local.pr_seen;
   const prSeen: PrFactsCache = {};

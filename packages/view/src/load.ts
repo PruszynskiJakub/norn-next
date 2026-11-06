@@ -33,7 +33,6 @@ import { CLAIMS_PREFIX, DEFAULT_CONFIG, type HookFact, type ResolvedConfig, type
 import {
   cachedDefaultBranch,
   classifyClaim,
-  defaultBaseRef,
   lastTickAt,
   type LeaseEntry,
   type LeaseLiveness,
@@ -103,6 +102,11 @@ export interface LoadProjectViewOptions {
   version?: string;
   /** gh-61 D5 (B19): this norn's bundled skills; given with `version` = the inbox shows drifted skills */
   bundledSkills?: { source: string; names: readonly string[] };
+  /**
+   * HC13: a view for the inbox and the story statuses alone (`status --segment`, run every few seconds):
+   * no applied receipts are read, so stories' `delegated` is empty and `base_sync` names no last merge
+   */
+  inboxOnly?: boolean;
 }
 
 /** A worktree as the view sees it: on disk and its slot; git status is not read (no git, X1). Null when absent, as observe. */
@@ -309,7 +313,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     storyWorktrees: wts.stories,
     sliceWorktrees: wts.slices,
     liveness: opts.liveness,
-    includeApplied: true,
+    includeApplied: !opts.inboxOnly,
     reportLeaseErrors: true,
     ...(opts.version !== undefined ? { running: opts.version } : {}),
     ...(opts.bundledSkills ? { bundledSkills: opts.bundledSkills } : {}),
@@ -334,7 +338,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const me = { heartbeat_id: opts.heartbeatId ?? null };
 
   const remoteName = config.git_remote;
-  const baseRef = defaultBaseRef(opts.repoRoot, remoteName, config.base_branch);
+  const baseRef = snap.base_ref;
+  const defaultBranch = config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main";
   const prSeen = local.pr_seen;
   // F35/C5: the ready approval's head, voided by a later re-entry; and whether only norn moved the PR head since
   const readyHeads = await Promise.all(
@@ -426,9 +431,9 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
           errors: file?.error ? [file.error, ...v.errors] : v.errors,
         };
       });
-      // gh-196 D5 (B22): reads each earlier round's receipts on every load, `status --segment` included (HC13);
+      // gh-196 D5 (B22): reads each earlier round's receipts on every load but the inbox-only one (`status --segment`, HC13);
       // accepted: a story has few rounds, and a cache across loads went stale
-      const delegated = delegatedDecisions(story);
+      const delegated = opts.inboxOnly ? { decisions: [], errors: [] } : delegatedDecisions(story);
       stories.push({
         ...base,
         slice: null,
@@ -437,7 +442,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
         pr: prView(prSeen[story.key]),
         notes: sf.notes ?? [],
         delegated: delegated.decisions,
-        base_sync: baseSync(sf, storyUnit.receipts ?? [], config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main"),
+        base_sync: baseSync(sf, storyUnit.receipts ?? [], defaultBranch),
         story_status: story.frontmatter?.status ?? null,
         spec_dir: story.spec_dir,
         root: story.root,
@@ -450,7 +455,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const facts: Facts = {
     tick_id: "view",
     now,
-    repo: { root: opts.repoRoot, default_branch: config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main", remote: config.git_remote },
+    repo: { root: opts.repoRoot, default_branch: defaultBranch, remote: config.git_remote },
     machine: {
       holder,
       heartbeat_id: opts.heartbeatId ?? null,

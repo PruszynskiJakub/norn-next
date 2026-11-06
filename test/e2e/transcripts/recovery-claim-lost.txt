@@ -215,5 +215,4 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/runs/
   spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-9
   spawn repo $ git cat-file blob <sha:5>
-  spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/

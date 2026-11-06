@@ -44,7 +44,7 @@ import { bundledSkillSet } from "./skills-drift.ts";
 // ------------------------------------------------------------------ views (X1)
 
 /** The read model for this checkout and machine (no writes, no network). */
-export async function projectView(ctx: Context): Promise<ProjectView> {
+export async function projectView(ctx: Context, opts: { inboxOnly?: boolean } = {}): Promise<ProjectView> {
   // B7: a config file with a problem refuses under "Config error" (exit config), never a view
   // drawn on fallback values
   void ctx.config;
@@ -61,6 +61,7 @@ export async function projectView(ctx: Context): Promise<ProjectView> {
     version: ctx.version,
     bundledSkills: bundledSkillSet(ctx.env),
     ...(runner ? { runnerCapabilities: runner.capabilities } : {}),
+    ...(opts.inboxOnly ? { inboxOnly: true } : {}),
   });
 }
 
