@@ -123,12 +123,10 @@ export const cmd = {
   watch: (o: { interval?: string; maxTicks?: number } = {}) => norn("watch", o.interval && `--interval ${o.interval}`, o.maxTicks !== undefined && `--max-ticks ${o.maxTicks}`),
 };
 
-/** gh-61 B20 (D11): what a session started on drifted skills is told; B19's inbox item names the same fix. */
+/** gh-61 B19, gh-252 (SK1): what the inbox says about bundled skills that differ from the running norn's. */
 export const skillsDriftHint = {
-  text: (running: string, names: readonly string[]) => `skills differ from norn ${running}: ${names.join(", ")}`,
-  fix: (story: string) => `bring the base in with \`${cmd.storyUpdateBranch(story)}\``,
-  /** B19: the Unblock item of a unit decide holds (D6) */
-  held: (running: string, names: readonly string[], story: string) => `skills differ from norn ${running} (${names.join(", ")}): ${skillsDriftHint.fix(story)}`,
+  /** gh-252: the Check item of a unit whose worktree copies differ; its runs use them */
+  unit: (running: string, names: readonly string[]) => `skills differ from norn ${running} (${names.join(", ")}): runs use this worktree's copies until the base is merged in`,
   /** B19: the repo-level item when the main checkout itself drifted */
   repo: (running: string) => `skills differ from norn ${running}: run \`${cmd.upgrade()}\` and commit`,
 };

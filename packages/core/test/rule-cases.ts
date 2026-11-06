@@ -199,7 +199,6 @@ function cases(): RuleCase[] {
   out.push(c("auto requested but no runner", "agent.ready.manual.no_runner", facts([story(SOLO_WF)], machine({ runner: null }))));
   out.push(c("the unit worktree is missing", "agent.no_worktree", facts([story(SOLO_WF, {}, null, { worktree: null }, noWorktree)])));
   // gh-61 B18 (D6): bundled skills in the unit's worktree differ from the running norn's
-  out.push(c("the unit worktree holds drifted bundled skills", "agent.skills_drift", facts([story(SOLO_WF, {}, null, {}, { skills_drift: ["norn"] })])));
 
   // ---- agent steps: running
   out.push(c("an attended run in progress", "agent.attended.running", facts([story(STORY_WF, running("refine"), {})])));
