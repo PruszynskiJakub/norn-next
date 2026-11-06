@@ -13,9 +13,11 @@ The proposals were treated as drafts. Where one broke a lint or contradicted the
 - norn-fsd-round keeps its pinned phrases, and norn-implement keeps "fast suite after each change" (AC4).
 - norn-slice no longer claims a check step runs slice `checks`, because nothing reads them.
 
+norn-slice also takes in main's dependency guidance (#269, steps 2, 4, 5) from the merge of main; the branch's own change there is the verifier wording in step 3.
+
 ## Evidence
 
-No QA ran. These entries come from the lint tests, `diff`s and the review's traceability table. `bun run test` and `bun run typecheck` pass (test#2).
+No QA ran. These entries come from the lint tests, `diff`s and the review's traceability table. `bun run test` (1281 pass) and `bun run typecheck` pass on the merged head (test#3).
 
 - **W1** 20 bundled skills applied
   **After:** 10 match their proposals exactly. The other 10 differ only where `assets.test.ts` (P7, fsd-round pinned phrases) or `repo.test.ts` (AC4) needs it, or where the slice-checks line contradicted the code.

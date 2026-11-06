@@ -39,9 +39,11 @@ Apply the skill-shaper proposals (skill text only) to the 20 bundled skills (sou
 
 - review#3: approve on 84e95497c. Since review#2 the story's own files changed only in norn-slice (source and copy), by the resolve#1 merge. It keeps main's dependency guidance (steps 2, 4, 5) and this branch's verifier wording (step 3), with nothing lost from either side. The diff against origin/main is still only skill files plus the spec folder. `diff -r` of the copies against source is clean, and test#3 is green. The traceability table above is current.
 
+- describe#2: refreshed `pr.md` for the merged head: notes norn-slice takes in main's dependency guidance (#269) beside this branch's step 3 wording, and cites test#3 (1281 pass). Copies still match source.
+
 ### Resume
 
-Review approved on the merged head. The PR's CI and a person's judgement at `ready` come next.
+pr.md is current for the merged head. The PR update, its CI and a person's judgement at `ready` come next.
 
 ## Progress
 
@@ -51,3 +53,4 @@ Review approved on the merged head. The PR's CI and a person's judgement at `rea
 - describe#1 done: Wrote pr.md: summary of the skill-text reshape, evidence per W1–W7/D1–D2 from lints, diffs and the review table (no QA), merge danger two-way with agents as blast radius.
 - resolve#1 done: Merged main 4340a8669 into the story branch. Resolved norn-slice: kept our step 3 verifier wording plus main's dependency/critical-path guidance in steps 2, 4, 5; refreshed the .agents copy. Unit tier (1281) and typecheck green.
 - review#3 approve: Merged head re-reviewed: the norn-slice resolution keeps main's dependency guidance and our verifier wording; copies match source; diff is still skill files plus the spec folder; test#3 green. No findings.
+- describe#2 done: Refreshed pr.md for the merged head: notes norn-slice keeps main's #269 dependency guidance beside this branch's verifier wording, evidence cites test#3 (1281 pass); merge danger unchanged (two-way, agents).
