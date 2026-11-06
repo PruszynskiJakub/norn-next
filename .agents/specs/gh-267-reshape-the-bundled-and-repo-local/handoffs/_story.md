@@ -35,9 +35,11 @@ Apply the skill-shaper proposals (skill text only) to the 20 bundled skills (sou
 
 - describe#1: wrote `pr.md`. It covers the summary, evidence per W1–W7 and D1–D2 (no QA ran, so the evidence is tests and diffs) and the merge danger (two-way, agents).
 
+- resolve#1: merged main 4340a8669 (#269, slice dependency guidance) into the branch. The one conflict was in norn-slice's steps 3–5: kept this branch's step 3 (verifiers at agreed seams, review/QA wording) and main's new dependency guidance in steps 2, 4 and 5 (critical path, drop unneeded edges, report the chain). Copied the result to `.agents/skills/norn-slice` (`diff -r` clean). Unit tier (1281 pass) and typecheck green.
+
 ### Resume
 
-`pr.md` is written. Nothing is left for describe. A person judges the PR next.
+The base merge is committed. Nothing is left for resolve; the PR's CI and a person's judgement come next.
 
 ## Progress
 

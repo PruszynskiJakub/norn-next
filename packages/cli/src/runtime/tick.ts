@@ -5,7 +5,7 @@
  * `appendTick`), each rule fired, action and result (O4), so `norn run view --why` replays decide on exactly the
  * same inputs (O5) via store `readTickInputs`.
  */
-import { decide, type Facts } from "@norn/core";
+import { decide, type Facts, leavesFollowUp } from "@norn/core";
 import { type TickSlowest, type TickTiming, type TickTrace, type TickUnitRecord, ulid } from "@norn/schema";
 import { acquireTickLock, appendTick, appendTrace, markTick, trackInbox } from "@norn/store";
 import type { Context } from "../context.ts";
@@ -36,6 +36,8 @@ export interface TickReport {
   orphans?: Facts["orphans"];
   /** gh-78: the tick's slowest phase (its full timing is in the trace record) */
   slowest: TickSlowest;
+  /** H12: an action of this tick that went through left the next tick something to do (`leavesFollowUp`); absent = none */
+  follow_up?: true;
 }
 
 const jsonSafe = <T>(v: T): T => JSON.parse(JSON.stringify(v ?? null)) as T;
@@ -136,6 +138,7 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
       ...(recorded.length ? { records: recorded } : {}),
       ...(obs.facts.orphans.worktrees.length || obs.facts.orphans.branches.length ? { orphans: obs.facts.orphans } : {}),
       slowest: timing.slowest,
+      ...(records.some((r) => r.result.ok && leavesFollowUp(r.decision.action)) ? { follow_up: true as const } : {}),
     };
   } finally {
     lock.release();

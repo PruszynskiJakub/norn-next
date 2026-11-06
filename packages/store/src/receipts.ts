@@ -8,6 +8,7 @@ import type { FileError, NumberedReceipt } from "@norn/core";
 import { type Receipt, assertValid, parseReceiptFileName, receiptFileName } from "@norn/schema";
 import { createExclusive, displayPath, isErrno, jsonLine, readJsonFile, readText, safeUnlink } from "./fsx.ts";
 import { receiptsDir } from "./paths.ts";
+import { touchWake } from "./wake.ts";
 
 export interface ReceiptListing {
   /** valid receipts ascending by number */
@@ -176,7 +177,10 @@ export function appendReceipt(unitDir: string, receipt: Receipt): { n: number; f
   for (let attempt = 0; attempt < 100; attempt++) {
     const n = lastReceiptNumber(unitDir) + 1;
     const r = writeReceiptAt(unitDir, n, receipt);
-    if (r.ok) return { n: r.n, file: r.file, existed: r.existed };
+    if (r.ok) {
+      if (!r.existed) touchWake(unitDir); // H13: a sleeping `norn watch` ticks now, not at its interval
+      return { n: r.n, file: r.file, existed: r.existed };
+    }
   }
   throw new Error(`could not append receipt in ${unitDir}: too many concurrent writers`);
 }

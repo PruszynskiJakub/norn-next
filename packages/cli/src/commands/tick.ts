@@ -1,4 +1,8 @@
-/** `norn tick` (H1): one idempotent pass — lock → observe → decide → act → log. */
+/**
+ * `norn tick` (H1): one idempotent pass — lock → observe → decide → act → log. It stays one pass even
+ * when it leaves a follow-up (H12, `follow_up: true` in its output): one invocation, one tick, for cron,
+ * scripts and a person stepping through by hand; only `watch` runs the follow-up at once.
+ */
 import { parseDuration } from "@norn/schema";
 import { recordInterval } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";

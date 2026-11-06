@@ -32,7 +32,7 @@ Two-machine operation was only simulated on one Mac (`NORN_MACHINE`). Everything
    - A merged story stays offered for `story checkout` on a checkout that once worked on it, and `norn tidy` does not remove leaked intake worktrees or slot leases.
 2. **A machine-specific hook command is committed as is.** The default hook command, `"${NORN_BIN:-norn}" hook`, is portable. But `norn init --hook-command` or `NORN_HOOK_COMMAND` with an absolute path writes that path into the committed `.claude/settings.json`, as the dogfood sandbox did, and a second machine then gets no hook facts. Without hook facts, `silent`, stalled, adoption and implicit asks are all lost. Neither `init` nor `doctor` flags it: `doctor` tests the hook command this machine would install, not the one committed.
 3. **Implicit asks flicker.** When an agent sends several tool calls at once, its Answer item can vanish for one tick and return with a new id. A notifier fires twice, and a `norn story answer` sent in the gap is refused.
-   - After an accepted answer, `status` and `story view` show the old question until the next tick, which takes 20–40 s.
+   - After an accepted answer, `status` and `story view` show the old question until the next tick, which `norn watch` runs within about a second (a cron `norn tick` only at its interval).
    - If a runner kept reporting `waiting_input` from before the last answer, a second prompt would not be raised.
 4. **Agents' housekeeping.**
    - QA agents commit evidence files at the repo root.
