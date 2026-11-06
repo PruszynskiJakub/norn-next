@@ -25,7 +25,9 @@ GR6 cleanup records a merged story's units done, so a story merged while parked 
 | #88 W3: no claim held or renewed for a story main records done | test | same runtime test (claim ref gone); re-acquisition already refused by R3.2 (`story.ts` `baseDone`) |
 | #72: a workflow merges its own PR | person | out of this round by the person's decision (own refinement round) |
 - review#1 approve: Review approved: GR6 cleanup records unfinished units of a merged story done before the archive; pure decide, atomic write, S2 kept; tests at decide and runtime seams. 1 minor (older cleaned-up stories not repaired, deliberate).
+- describe#1: wrote `pr.md` (summary diff of decide/act, evidence per #88 Wanted point from the tests, #72 marked not shown, merge danger two-way / merged stories only).
+- describe#1 done: pr.md written: decide/act diff picture, evidence for #88's three Wanted points from the decide and runtime tests, #72 marked not shown (out of round), merge danger two-way, merged stories only.
 
 ## Resume
 
-Review approved. Next: the workflow's following step (QA / PR / ready). #72 waits for its own refinement round.
+PR body written. Next: the person reviews the PR and merges it. #72 waits for its own refinement round.
