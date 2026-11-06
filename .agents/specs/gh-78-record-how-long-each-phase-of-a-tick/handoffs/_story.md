@@ -48,6 +48,7 @@ Every tick record says where the tick spent its time (observe and its phases, de
 
 - implement#3 (rework of test#3): the one failure, `takeover-record.test.ts` › "AC4: a record made without a branch…", is a harness flake, not this change: `cloneOf`'s `git clone` of the bare remote failed with "failed to copy file … pack-….pack: No such file or directory". The test pushes twice to the bare remote just before cloning, and the remote keeps git's default `receive.autogc`, so a detached `gc --auto` can repack while the local clone copies packs. gh-78 touches no git code, harness or that test. The file passes 12/12 on its own; unit tier and typecheck green. No code changed.
 - Friction (for `/issue`, label `friction`): the harness's bare remote (`test/support/harness.ts:335`) should set `receive.autogc false` / `gc.auto 0` so a push cannot repack it under a concurrent clone; this flake sent a green change back to implement.
+- implement#3 done: test#3's only failure (takeover-record AC4) is a harness flake unrelated to gh-78: cloneOf's git clone lost a pack file, likely a background gc --auto on the bare remote after the test's two pushes. The file passes 12/12 alone; unit tier and typecheck green; no code changed. Friction noted: the harness bare remote should disable receive.autogc.
 
 ## Resume
 
