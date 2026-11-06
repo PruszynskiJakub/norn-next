@@ -10,9 +10,16 @@ labels:
   - norn
   - norn:wf:quick
 workflow: quick
-status: active
+status: done
 intake_at: 2026-11-05T23:06:55.379Z
 body_hash: e05e46ae42bfa7f5fa3d2fc769f4b7561051e0e0b03dfbc5f5b652a2abc15a35
+merge:
+  pr: 239
+  url: https://github.com/PruszynskiJakub/norn-next/pull/239
+  head_sha: a6c0887ebef4b33303aef50c912c2113bd28c082
+  merge_commit_sha: cf04092b6994e5db4d9bdb94316e5b731194ee5c
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-06T07:59:19.000Z
 ---
 
 ## Observed
