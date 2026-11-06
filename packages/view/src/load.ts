@@ -30,7 +30,7 @@ import {
   type WorktreeFacts,
   storyMode,
 } from "@norn/core";
-import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, storyBranch, type UnitState, type Workflow } from "@norn/schema";
+import { CLAIMS_PREFIX, DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, storyBranch, type UnitState, type Workflow } from "@norn/schema";
 import {
   cachedDefaultBranch,
   classifyClaim,
@@ -517,7 +517,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
 
   // gh-195 D6: stories another heartbeat holds that this checkout has no copy of, from local refs only
   const held = await heldElsewhereKeys(opts.repoRoot, me, now, new Set(local.stories.map((s) => s.snapshot.key))).catch((e: Error) => {
-    errors.push({ file: "refs/norn/claims/", errors: [{ path: "", message: `cannot list the claims held elsewhere: ${e.message}` }] });
+    errors.push({ file: CLAIMS_PREFIX, errors: [{ path: "", message: `cannot list the claims held elsewhere: ${e.message}` }] });
     return [];
   });
   const elsewhere = await Promise.all(held.map(async (e) => elsewhereView(await loadElsewhereStory(opts.repoRoot, remoteName, e.key, e.claim, baseRef), config.record.policy, prSeen[e.key])));

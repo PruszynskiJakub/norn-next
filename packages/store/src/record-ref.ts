@@ -14,7 +14,7 @@ import { type Dirent, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileS
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import type { FileError } from "@norn/core";
-import { parseRoundDirName, parseSpecDirName, RECORD_REF_PREFIX, ROUNDS_DIR, type RunStory, recordRef, SPECS_DIR, STORY_UNIT_DIR, treeStoryRunStatePath, type UnitState, validate, type Workflow } from "@norn/schema";
+import { parseRoundDirName, parseSliceDirName, parseSpecDirName, RECORD_REF_PREFIX, ROUNDS_DIR, type RunStory, recordRef, sliceKey, SPECS_DIR, STORY_UNIT_DIR, treeStoryRunStatePath, type UnitState, validate, type Workflow } from "@norn/schema";
 import { fsyncTree, isErrno } from "./fsx.ts";
 import { archiveCacheDir } from "./paths.ts";
 import { casRef, casRefs, git, gitOk, gitSync, readLocalRef } from "./git.ts";
@@ -594,7 +594,7 @@ export async function readRecordObjects(root: string, story: string, sha: string
       const held = folders.get(STORY_UNIT_DIR);
       const heldRound = held ? parseRoundDirName(held.split("/")[2] ?? "") : null;
       if (!held || (r && (!heldRound || r.n > heldRound.n))) folders.set(STORY_UNIT_DIR, dir);
-    } else if (top && sub === undefined && /^[0-9]{2,3}-/.test(top)) folders.set(top, dir);
+    } else if (top && sub === undefined && parseSliceDirName(top, { loose: true })) folders.set(top, dir);
   }
   const units: RecordObjectUnit[] = [];
   for (const unit of [...folders.keys()].sort((a, b) => (a === STORY_UNIT_DIR ? -1 : b === STORY_UNIT_DIR ? 1 : a.localeCompare(b)))) {
@@ -609,8 +609,9 @@ export async function readRecordObjects(root: string, story: string, sha: string
     const wfText = texts.get(`${dir}/workflow.yaml`);
     const wf = wfText === undefined ? null : parseWorkflowText(wfText, name(`${dir}/workflow.yaml`));
     if (wf && !wf.ok && wf.reason === "corrupt") errors.push(wf.error);
-    const nn = unit === STORY_UNIT_DIR ? null : (unit.split("-")[0] as string);
-    units.push({ key: nn === null ? story : `${story}/${nn}`, slice: nn === null ? null : `${story}/${nn}`, state: st.value, workflow: wf?.ok ? wf.value : null });
+    const nn = unit === STORY_UNIT_DIR ? null : (parseSliceDirName(unit, { loose: true })?.nn as string);
+    const slice = nn === null ? null : sliceKey(story, nn);
+    units.push({ key: slice ?? story, slice, state: st.value, workflow: wf?.ok ? wf.value : null });
   }
   return { units, errors };
 }

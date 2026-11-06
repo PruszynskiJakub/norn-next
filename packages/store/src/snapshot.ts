@@ -14,17 +14,18 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { FileError, NumberedReceipt, SliceFileFacts, UnitRef } from "@norn/core";
-import { claimRef, isStoryKey, type RunStory, SPEC_FILE, validate, STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, parseSliceFileName, parseSpecDirName, sliceKey, treeStoryRunStatePath } from "@norn/schema";
+import { claimRef, isStoryKey, type RunStory, SPEC_FILE, STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, parseSliceDirName, parseSliceFileName, parseSpecDirName, sliceDirName, sliceKey, treeStoryRunStatePath } from "@norn/schema";
 import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { displayPath, isErrno } from "./fsx.ts";
-import { handoffPath, slicesDir, specsDir, statePath, storyFile } from "./paths.ts";
+import { handoffPath, pinnedWorkflowPath, slicesDir, specsDir, statePath, storyFile } from "./paths.ts";
 import { gitSync } from "./git.ts";
 import { recordedHeartbeatId } from "./heartbeat.ts";
 import { machineRunsDir, runStateDirIn, runStateRoundsIn, runStateSource, treeRunStateDir, treeRunStateFiles } from "./run-state.ts";
 import { listReceipts } from "./receipts.ts";
 import { localRecordRefs } from "./record-ref.ts";
+import { parseBlob } from "./refs.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
 import { readUnitMarker } from "./worktree.ts";
 
@@ -185,9 +186,9 @@ export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { i
   // until the tick applies it, the new pin matching that receipt's to_hash is expected.
   const switching = (hash: string) => all.receipts.some((r) => r.n > after && r.receipt.kind === "workflow" && r.receipt.to_hash === hash);
   if (state && wf.ok && state.workflow_hash !== wf.value.hash && !switching(wf.value.hash))
-    errors.push({ file: displayPath(join(path, "workflow.yaml"), name), errors: [{ path: "", message: "hash differs from state.workflow_hash" }] });
+    errors.push({ file: displayPath(pinnedWorkflowPath(path), name), errors: [{ path: "", message: "hash differs from state.workflow_hash" }] });
   if (st.ok && !wf.ok && wf.reason === "missing")
-    errors.push({ file: displayPath(join(path, "workflow.yaml"), name), errors: [{ path: "", message: "pinned workflow missing" }] });
+    errors.push({ file: displayPath(pinnedWorkflowPath(path), name), errors: [{ path: "", message: "pinned workflow missing" }] });
   return {
     unit,
     path,
@@ -278,9 +279,9 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
   const branch = !!opts.branch;
   const units: UnitSnapshot[] = [readUnit(root, run, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, unitOpts, at, branch)];
   const runDirs = new Set([...dirs(at.base), ...(branch ? dirs(treeRunStateDir(root, run)) : [])].filter((d) => d !== STORY_UNIT_DIR));
-  for (const s of slices) runDirs.add(`${s.nn}-${s.slug}`);
+  for (const s of slices) runDirs.add(sliceDirName(s.nn, s.slug));
   for (const d of [...runDirs].sort()) {
-    const nn = /^([0-9]{2,3})-/.exec(d)?.[1];
+    const nn = parseSliceDirName(d, { loose: true })?.nn;
     if (!nn) continue;
     const sk = sliceKey(key, nn);
     units.push(readUnit(root, run, { story: key, slice: sk, dir: d, key: sk }, unitOpts, at, branch));
@@ -371,20 +372,16 @@ function recordOnlyStories(root: string, seen: ReadonlyMap<string, StorySnapshot
     if (seen.has(key) || !isStoryKey(key)) continue;
     const claim = gitSync(root, ["cat-file", "blob", claimRef(key)]);
     if (claim.code !== 0) continue;
-    let blob: unknown;
-    try {
-      blob = JSON.parse(claim.stdout.toString("utf8"));
-    } catch {
-      continue;
-    }
-    if (!validate("claim", blob).ok || (blob as { heartbeat_id: string }).heartbeat_id !== hb) continue;
+    const blob = parseBlob("claim", claimRef(key), claim.stdout.toString("utf8"));
+    // a corrupt claim is skipped here, as before: observe reads the claim and reports it corrupt (S2)
+    if (!blob.ok || blob.value.heartbeat_id !== hb) continue;
     const run: RunStory = { key, spec_dir: "" };
     const at = runStateSource(root, run, { checkout: root });
     const unitOpts = opts.includeApplied ? { includeApplied: true } : {};
     const units: UnitSnapshot[] = [readUnit(root, run, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, unitOpts, at, false)];
     if (!units[0]?.state) continue;
     for (const d of dirs(at.base).filter((x) => x !== STORY_UNIT_DIR).sort()) {
-      const nn = /^([0-9]{2,3})-/.exec(d)?.[1];
+      const nn = parseSliceDirName(d, { loose: true })?.nn;
       if (nn) units.push(readUnit(root, run, { story: key, slice: sliceKey(key, nn), dir: d, key: sliceKey(key, nn) }, unitOpts, at, false));
     }
     out.push({ key, slug: "", root, path: "", spec_dir: "", checkout: root, run_state: at, frontmatter: null, frontmatter_error: null, slices: [], units, record_only: true });

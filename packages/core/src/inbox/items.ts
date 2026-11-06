@@ -8,7 +8,7 @@
  * F35, Q6), Unclaimed, Running, Notes (agents' notes for a person, NT2: information, not an
  * action), Recently done.
  */
-import { ATTENDED_WAIT, parseDuration, recordRef, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
+import { ATTENDED_WAIT, parseDuration, receiptNumber, recordRef, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, unstickCommand, versionMismatch } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
@@ -328,7 +328,7 @@ function judgedDetail(story: StoryFacts, uf: UnitFacts): { detail: string; full:
     const runsDir = file.replace(/\/receipts\/[^/]+$/, "");
     lines.push(`Evidence: ${runsDir}/${r.evidence.replace(/\/+$/, "")}/`);
   }
-  return { detail: `step ${r.step}#${r.attempt} reported ${"outcome" in r ? r.outcome : r.kind} (receipt ${String(nr.n).padStart(4, "0")})`, full: lines.join("\n") };
+  return { detail: `step ${r.step}#${r.attempt} reported ${"outcome" in r ? r.outcome : r.kind} (receipt ${receiptNumber(nr.n)})`, full: lines.join("\n") };
 }
 
 const oneLine = (t: string) => t.replace(/\s*\n\s*/g, " ").trim();

@@ -27,7 +27,7 @@ import {
   type WorktreeFacts,
   storyMode,
 } from "@norn/core";
-import { parseDuration, type ResolvedConfig, sliceBranch, storyBranch, type UnitState, type Workflow } from "@norn/schema";
+import { claimRef, parseDuration, type ResolvedConfig, sliceBranch, storyBranch, type UnitState, type Workflow } from "@norn/schema";
 import {
   type BaseFactsCache,
   classifyClaim,
@@ -298,7 +298,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     const storyWorktree = await wtFacts(storyWt);
     storyLocs[s.key] = { key: s.key, slug: s.slug, root: s.root, specPath: s.path, spec_dir: s.spec_dir, worktree: storyWt, branch };
 
-    const read = await readLocalClaim(root, s.key).catch((e: Error) => ({ state: "corrupt" as const, sha: "?", error: { file: `refs/norn/claims/${s.key}`, errors: [{ path: "", message: e.message }] } }));
+    const read = await readLocalClaim(root, s.key).catch((e: Error) => ({ state: "corrupt" as const, sha: "?", error: { file: claimRef(s.key), errors: [{ path: "", message: e.message }] } }));
     const claim: ClaimState = classifyClaim(read, { heartbeat_id: hb }, now);
     const mailbox: MailboxItem[] | undefined = await listMailbox(root, s.key).catch(() => undefined);
 

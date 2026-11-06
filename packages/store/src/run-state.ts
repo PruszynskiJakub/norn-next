@@ -27,7 +27,7 @@ import {
   unitRecordPath,
 } from "@norn/schema";
 import { isErrno } from "./fsx.ts";
-import { machineDir } from "./paths.ts";
+import { machineDir, statePath } from "./paths.ts";
 import { archivedRecordDir } from "./record-ref.ts";
 
 /** S12: the machine dir's `runs/`, holding every story's run state of the checkout `root` belongs to. */
@@ -121,7 +121,7 @@ export function storyRounds(base: string): Array<{ n: number; workflow: string; 
   const rounds = join(base, unitRecordPath(STORY_UNIT_DIR), ROUNDS_DIR);
   try {
     for (const d of readdirSync(rounds, { withFileTypes: true })) {
-      const r = d.isDirectory() && existsSync(join(rounds, d.name, "state.json")) ? parseRoundDirName(d.name) : null;
+      const r = d.isDirectory() && existsSync(statePath(join(rounds, d.name))) ? parseRoundDirName(d.name) : null;
       if (r) out.push({ ...r, path: join(rounds, d.name) });
     }
   } catch {
@@ -140,7 +140,7 @@ export function startDir(base: string, unit: string, workflow: string): string {
   return roundDir(base, 1, workflow);
 }
 /** gh-71 D7 (B34): a story record kept the old flat way, `_story/state.json` directly in the folder. */
-export const isFlatStoryRecord = (base: string) => existsSync(join(base, unitRecordPath(STORY_UNIT_DIR), "state.json"));
+export const isFlatStoryRecord = (base: string) => existsSync(statePath(join(base, unitRecordPath(STORY_UNIT_DIR))));
 
 /**
  * gh-195/05, D7, D16 (B29): where a story's run state is read from — the machine dir of `checkout`

@@ -26,7 +26,7 @@ import {
   validate,
 } from "@norn/schema";
 import { appendDurable, atomicWrite, isErrno, readText, safeUnlink } from "./fsx.ts";
-import { hookFilePath, machineDir } from "./paths.ts";
+import { HOOKS_DIR, hookFilePath, hooksDir, machineDir } from "./paths.ts";
 import { oldRunnerLogDir } from "./run-state.ts";
 
 function eventTime(ev: TraceEvent): string {
@@ -468,11 +468,11 @@ const HOOK_FILE = /^(\d+|_story)\.jsonl$/;
 /** D12: every unit hook file under `hooks/`, sorted by path. */
 export function listHookFiles(root: string): HookFileEntry[] {
   const out: HookFileEntry[] = [];
-  for (const story of listDir(join(machineDir(root), "hooks"))) {
-    for (const name of listDir(join(machineDir(root), "hooks", story))) {
+  for (const story of listDir(hooksDir(root))) {
+    for (const name of listDir(join(hooksDir(root), story))) {
       const nn = HOOK_FILE.exec(name)?.[1];
       if (!nn) continue;
-      const file = `hooks/${story}/${name}`;
+      const file = `${HOOKS_DIR}/${story}/${name}`;
       const st = statOrNull(join(machineDir(root), file));
       if (!st?.isFile()) continue;
       out.push({ story, slice: nn === STORY_UNIT_DIR ? null : `${story}/${nn}`, file, bytes: st.size, mtimeMs: st.mtimeMs });
@@ -537,7 +537,7 @@ export function deleteTracePaths(root: string, rels: readonly string[]): void {
   for (const rel of rels) {
     rmSync(join(machineDir(root), safeRel(rel)), { recursive: true, force: true });
     const parent = dirname(join(machineDir(root), rel));
-    if (dirname(parent) === join(machineDir(root), "hooks") && listDir(parent).length === 0) rmSync(parent, { recursive: true, force: true });
+    if (dirname(parent) === hooksDir(root) && listDir(parent).length === 0) rmSync(parent, { recursive: true, force: true });
   }
 }
 

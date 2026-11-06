@@ -28,7 +28,7 @@
  * window and whose day file is gone is refused as `tick_pruned`, never guessed at.
  */
 import { cmd, criterionLine, decide, type Decision, legacyAction, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
-import { ExitCode, isUlid, type Receipt, storyOf, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN, ulidTime } from "@norn/schema";
+import { ExitCode, isUlid, type Receipt, receiptNumber, storyOf, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN, ulidTime } from "@norn/schema";
 import { crashedTicksFor, decisionUnit, findCrashedTick, findTick, hasTraceDay, loadSnapshot, readTrace, type TickReader, tickReader } from "@norn/store";
 import { formatRunView, loadRunView } from "@norn/view";
 import { defineCommand, opt, type ParsedArgs } from "../command.ts";
@@ -324,7 +324,7 @@ async function why(ctx: Context, args: ParsedArgs) {
       attempt: st?.attempt ?? null,
       park: st?.park ?? null,
       counters: st?.counters ?? {},
-      unapplied: uf?.unapplied.map((r) => `${String(r.n).padStart(4, "0")}-${r.receipt.kind}`) ?? [],
+      unapplied: uf?.unapplied.map((r) => `${receiptNumber(r.n)}-${r.receipt.kind}`) ?? [],
       errors: uf?.errors ?? [],
     },
     decision: recorded.action,

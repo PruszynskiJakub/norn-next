@@ -201,6 +201,16 @@ export const storyBranch = storyDirName;
 export function sliceDirName(nn: string, slug: string): string {
   return `${sliceNn(nn)}-${slug}`;
 }
+const SLICE_DIR_RE = /^([0-9]{2,3})-([a-z0-9-]+)$/;
+const SLICE_DIR_LOOSE_RE = /^([0-9]{2,3})-([^]*)$/;
+/**
+ * A slice's unit folder name `03-add-form` → `{ nn: "03", slug: "add-form" }`. `loose` takes whatever
+ * follows `<nn>-` as the slug (a run-state folder found on disk or in a record), else the slug is `[a-z0-9-]+`.
+ */
+export function parseSliceDirName(name: string, opts: { loose?: boolean } = {}): { nn: string; slug: string } | null {
+  const m = (opts.loose ? SLICE_DIR_LOOSE_RE : SLICE_DIR_RE).exec(name);
+  return m ? { nn: m[1] as string, slug: m[2] as string } : null;
+}
 /**
  * The folder that holds every story's run state: `runs/` in the checkout's machine dir (S12, gh-195 D1:
  * `<machine dir>/runs/<story>/<unit>/`), and, in a spec folder of an older norn's tree, the folder that
@@ -305,8 +315,9 @@ export const SPEC_FILE = "spec.md";
 export const LEGACY_SPEC_FILE = "story.md";
 /** GR9: the story PR body an agent writes, in the spec folder. */
 export const PR_BODY_FILE = "pr.md";
+export const CLAIMS_PREFIX = "refs/norn/claims/";
 export function claimRef(story: string): string {
-  return `refs/norn/claims/${story}`;
+  return `${CLAIMS_PREFIX}${story}`;
 }
 export function mailboxPrefix(story: string): string {
   return `refs/norn/inbox/${story}/`;
@@ -320,10 +331,12 @@ export function recordRef(story: string): string {
   return `${RECORD_REF_PREFIX}${story}`;
 }
 
+/** A receipt's number as its file name spells it: 7 → `0007` (S6). */
+export const receiptNumber = (n: number): string => String(n).padStart(4, "0");
 /** Receipt file name `NNNN-<kind>.json` (S6). */
 export function receiptFileName(n: number, kind: string): string {
   if (!Number.isInteger(n) || n < 1 || n > 9999) throw new RangeError(`bad receipt number: ${n}`);
-  return `${String(n).padStart(4, "0")}-${kind}.json`;
+  return `${receiptNumber(n)}-${kind}.json`;
 }
 export function parseReceiptFileName(name: string): { n: number; kind: string } | null {
   const m = /^(\d{4})-([a-z]+)\.json$/.exec(name);

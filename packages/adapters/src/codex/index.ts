@@ -8,6 +8,7 @@
 import { join } from "node:path";
 import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookDecision, HookResponse } from "@norn/core";
 import type { HookEventKind, HookFact } from "@norn/schema";
+import { SKILLS_DIR } from "@norn/store";
 import * as shared from "../agent-hooks/index.ts";
 
 const { buildFact, field, isObject, jsonHookInstaller, kebab, launchEnv, nativeEvent, objField, readJsonl, textOf } = shared;
@@ -99,7 +100,7 @@ export async function lastAssistantMessage(transcriptPath: string): Promise<stri
 }
 
 /** Codex discovers Agent Skills in `.agents/skills`, where norn keeps them: no links needed. */
-export const skillDir = (repoRoot: string) => join(repoRoot, ".agents", "skills");
+export const skillDir = (repoRoot: string) => join(repoRoot, SKILLS_DIR);
 
 export const codexAgent: AgentAdapter = {
   name: NAME,

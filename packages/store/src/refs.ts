@@ -17,7 +17,8 @@ export type ClaimRead =
 /** A claim read from the remote: what it holds, or `unreachable` when `ls-remote` or the fetch of its blob failed. */
 export type RemoteClaimRead = ClaimRead | { state: "unreachable"; reason: "network"; message: string };
 
-function parseBlob<N extends "claim" | "receipt">(name: N, ref: string, raw: string | null) {
+/** A claim or receipt blob read from `ref`, parsed and validated (S2): the value, or the FileError it fails with. */
+export function parseBlob<N extends "claim" | "receipt">(name: N, ref: string, raw: string | null) {
   if (raw === null) return { ok: false as const, error: { file: ref, errors: [{ path: "", message: "object missing" }] } };
   let v: unknown;
   try {

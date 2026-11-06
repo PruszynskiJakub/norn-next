@@ -14,7 +14,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { atomicWrite, installSkills, LOCAL_CONFIG_FILE, linkSkills, loadWorkflows, readText, REPO_CONFIG_FILE, repoConfigPath, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
+import { atomicWrite, installSkills, LOCAL_CONFIG_FILE, linkSkills, loadWorkflows, readText, REPO_CONFIG_FILE, repoConfigPath, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, WORKTREE_LOCAL_FILES, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { rendered } from "../output.ts";
@@ -29,7 +29,7 @@ import { cmd } from "@norn/core";
 const REVIEW_FILE = "REVIEW.md";
 
 /** Paths that must never be committed (§7.1, gh-64 B9); the machine-local files live outside the checkout (B5). */
-const IGNORED = [".env.norn", ".norn-unit", LOCAL_CONFIG_FILE];
+const IGNORED = [...WORKTREE_LOCAL_FILES, LOCAL_CONFIG_FILE];
 
 function ensureGitignore(root: string): string[] {
   const path = join(root, ".gitignore");

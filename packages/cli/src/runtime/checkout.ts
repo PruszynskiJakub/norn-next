@@ -51,7 +51,7 @@ import {
   sliceWorktreePath,
   storyWorktreePath,
 } from "@norn/core";
-import { ExitCode, type ReceiptOf, recordRef, type RunStory, sliceBranch, SPEC_FILE, specDir, STORY_UNIT_DIR, treeStoryRunStatePath, ulid, type UnitState, type Workflow } from "@norn/schema";
+import { ExitCode, type ReceiptOf, recordRef, type RunStory, sliceBranch, sliceDirName, SPEC_FILE, specDir, STORY_UNIT_DIR, treeStoryRunStatePath, ulid, type UnitState, type Workflow } from "@norn/schema";
 import {
   acquireClaim,
   appendReceipt,
@@ -523,7 +523,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
     );
     for (const s of snapshot?.slices ?? []) {
       const sb = sliceBranch(key, s.nn, s.slug);
-      const dir = `${s.nn}-${s.slug}`;
+      const dir = sliceDirName(s.nn, s.slug);
       const status = s.frontmatter?.status;
       let wt: string | null = null;
       if (storyWt && sliceRefs.has(sb) && status !== "integrated" && status !== "dropped") {

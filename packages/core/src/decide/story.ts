@@ -7,6 +7,7 @@ import {
   parseDuration,
   type Receipt,
   type RejectedMailboxReceipt,
+  claimRef,
   sliceBranch,
   SPEC_FILE,
   type StoryFrontmatter,
@@ -261,7 +262,7 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
       worktrees: [...(story.worktree?.exists ? [story.worktree.path] : []), ...sliceWts],
       local_branches: [...sliceBranches, story.branch],
       remote_branches: sliceBranches,
-      refs: [`refs/norn/claims/${story.key}`, ...(story.mailbox ?? []).map((m) => m.ref)],
+      refs: [claimRef(story.key), ...(story.mailbox ?? []).map((m) => m.ref)],
       story_status: "done",
     });
   }
