@@ -94,6 +94,47 @@ function mapMr(m: GlMr): RemotePullRequest {
   };
 }
 
+/** gh-186: the merge request fields `findPullRequests` reads, GitLab GraphQL names. */
+interface GlMrNode {
+  iid: string;
+  webUrl: string;
+  state: string;
+  draft?: boolean;
+  sourceBranch: string;
+  targetBranch: string;
+  mergedAt?: string | null;
+  diffHeadSha?: string | null;
+  mergeCommitSha?: string | null;
+  squashCommitSha?: string | null;
+  mergeUser?: { username?: string } | null;
+}
+
+/** How many merge requests one GraphQL page holds (gh-186); a fuller answer falls back to one call per branch. */
+const MRS_PER_QUERY = 100;
+
+/** gh-186: every merge request of `branches`, any state, as GitLab GraphQL lists it. JSON strings are GraphQL strings. */
+export function mrsQuery(fullPath: string, branches: readonly string[]): string {
+  const node = "iid webUrl state draft sourceBranch targetBranch mergedAt diffHeadSha mergeCommitSha squashCommitSha mergeUser { username }";
+  return `query { project(fullPath: ${JSON.stringify(fullPath)}) { mergeRequests(sourceBranches: ${JSON.stringify(branches)}, first: ${MRS_PER_QUERY}) { pageInfo { hasNextPage } nodes { ${node} } } } }`;
+}
+
+const restMr = (n: GlMrNode): GlMr => ({
+  iid: Number(n.iid),
+  web_url: n.webUrl,
+  state: n.state,
+  ...(n.draft === undefined ? {} : { draft: n.draft }),
+  source_branch: n.sourceBranch,
+  target_branch: n.targetBranch,
+  merged_at: n.mergedAt ?? null,
+  sha: n.diffHeadSha ?? null,
+  merge_commit_sha: n.mergeCommitSha ?? null,
+  squash_commit_sha: n.squashCommitSha ?? null,
+  merge_user: n.mergeUser ?? null,
+});
+
+/** The MR with the highest iid, as `findPullRequest` picks it. */
+const latestMr = (rows: readonly GlMr[]): GlMr | null => rows.reduce<GlMr | null>((a, m) => (a === null || m.iid > a.iid ? m : a), null);
+
 export function createGlab(opts: GlabOptions): RemotePort {
   const exec = opts.exec ?? bunExec;
   const bin = opts.bin ?? "glab";
@@ -104,6 +145,10 @@ export function createGlab(opts: GlabOptions): RemotePort {
   const json = async <T>(args: string[]): Promise<T> =>
     parseJson<T>(okOrThrow(await run(args), `glab ${args[0]} ${args[1]}`, "glab"), `glab ${args[0]}`, "glab");
   const notFound = (stderr: string) => /404|not found/i.test(stderr);
+  const findPullRequest = async (branch: string): Promise<RemotePullRequest | null> => {
+    const latest = latestMr(await json<GlMr[]>(["mr", "list", ...repo, "--source-branch", branch, "--all", "--per-page", "100", "--output", "json"]));
+    return latest ? mapMr(latest) : null;
+  };
 
   return {
     provider: "glab",
@@ -131,10 +176,28 @@ export function createGlab(opts: GlabOptions): RemotePort {
       if (r.code !== 0 && notFound(r.stderr)) return null;
       return mapIssue(parseJson<GlIssue>(okOrThrow(r, "glab issue view", "glab"), "glab issue view", "glab"));
     },
-    async findPullRequest(branch) {
-      const rows = await json<GlMr[]>(["mr", "list", ...repo, "--source-branch", branch, "--all", "--per-page", "100", "--output", "json"]);
-      const latest = rows.reduce<GlMr | null>((a, m) => (a === null || m.iid > a.iid ? m : a), null);
-      return latest ? mapMr(latest) : null;
+    findPullRequest,
+    async findPullRequests(branches) {
+      // gh-186: one GraphQL query for every branch instead of one `glab mr list` per branch
+      const out = new Map<string, RemotePullRequest | null>();
+      const unique = [...new Set(branches)];
+      if (!unique.length) return out;
+      const fullPath = opts.repo ?? (await json<{ path_with_namespace?: string }>(["repo", "view", "--output", "json"])).path_with_namespace;
+      if (!fullPath) throw portError("glab_bad_output", "glab repo view: no path_with_namespace");
+      const r = await json<{ data?: { project?: { mergeRequests?: { pageInfo?: { hasNextPage?: boolean }; nodes?: GlMrNode[] } } | null } }>(["api", "graphql", "-f", `query=${mrsQuery(fullPath, unique)}`]);
+      const mrs = r.data?.project?.mergeRequests;
+      if (!mrs) throw portError("glab_bad_output", "glab api graphql: no project merge requests in the answer");
+      if (mrs.pageInfo?.hasNextPage) {
+        // more than one page: ask branch by branch rather than miss a newer MR
+        for (const b of unique) out.set(b, await findPullRequest(b));
+        return out;
+      }
+      const rows = (mrs.nodes ?? []).map(restMr);
+      for (const b of unique) {
+        const latest = latestMr(rows.filter((m) => m.source_branch === b));
+        out.set(b, latest ? mapMr(latest) : null);
+      }
+      return out;
     },
     async pullRequestCi(number) {
       return ciOfPipeline((await json<GlMr>(["mr", "view", String(number), ...repo, "--output", "json"])).head_pipeline?.status);

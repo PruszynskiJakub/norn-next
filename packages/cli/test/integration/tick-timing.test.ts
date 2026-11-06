@@ -75,6 +75,9 @@ describe("gh-78: a tick records where it spent its time", () => {
     expect(t.calls?.list_issues).toBe(made("list "));
     expect(t.calls?.list_issues).toBe(1);
     expect(t.calls?.find_pr ?? 0).toBe(made("pr? "));
+    // gh-186: every PR of the sync in one batched call per kind of story, never one per story
+    expect(t.calls?.find_prs ?? 0).toBe(made("prs? "));
+    expect(made("pr? ")).toBe(0);
     expect(t.calls?.get_issue ?? 0).toBe(made("issue "));
     expect(t.calls?.pr_ci ?? 0).toBe(made("ci? "));
   });

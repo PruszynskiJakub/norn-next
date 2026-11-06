@@ -66,6 +66,10 @@ export class FakeRemote implements RemotePort {
     this.calls.push(`pr? ${branch}`);
     return [...this.prs].reverse().find((p) => p.head === branch) ?? null;
   }
+  async findPullRequests(branches: readonly string[]) {
+    this.calls.push(`prs? ${branches.join(",")}`);
+    return new Map(branches.map((b) => [b, [...this.prs].reverse().find((p) => p.head === b) ?? null] as const));
+  }
   /** gh-195 B18: PR number → the CI state of its head; unset = none */
   ci = new Map<number, PullRequestCi>();
   /** set → `pullRequestCi` throws it */
