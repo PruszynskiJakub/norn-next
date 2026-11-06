@@ -64,6 +64,7 @@ const REMOTE_CALLS: Record<string, (...a: never[]) => string> = {
   assignIssue: (n: number, assignee: string) => `assignIssue ${n} ${assignee}`,
   getIssue: (n: number) => `getIssue ${n}`,
   findPullRequest: (branch: string) => `findPullRequest ${branch}`,
+  findPullRequests: (branches: readonly string[]) => `findPullRequests ${branches.join(",")}`,
   pullRequestCi: (n: number) => `pullRequestCi ${n}`,
   openDraftPullRequest: (o: { head: string; base: string; title: string }) => `openDraftPullRequest ${o.head} → ${o.base} ${JSON.stringify(o.title)}`,
   editPullRequestBody: (n: number) => `editPullRequestBody ${n}`,

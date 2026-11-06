@@ -89,6 +89,19 @@ function ciOf(buckets: readonly string[]): PullRequestCi {
   return "success";
 }
 
+/** How many branches one GraphQL query asks for (gh-186): one alias each. */
+const PRS_PER_QUERY = 50;
+const PR_NODE = "number url state isDraft headRefName headRefOid baseRefName mergedAt mergeCommit { oid } mergedBy { login }";
+
+/**
+ * gh-186: one aliased `pullRequests(headRefName:)` per branch, newest first like `gh pr list`,
+ * every state. Branch names go in as JSON string literals, which GraphQL reads the same way.
+ */
+export function prsQuery(branches: readonly string[]): string {
+  const fields = branches.map((b, i) => `b${i}: pullRequests(headRefName: ${JSON.stringify(b)}, first: 1, orderBy: { field: CREATED_AT, direction: DESC }) { nodes { ${PR_NODE} } }`);
+  return `query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { ${fields.join(" ")} } }`;
+}
+
 export function createGh(opts: GhOptions): RemotePort {
   const exec = opts.exec ?? bunExec;
   const bin = opts.bin ?? "gh";
@@ -128,6 +141,23 @@ export function createGh(opts: GhOptions): RemotePort {
       // gh lists newest first
       const rows = await json<GhPr[]>(["pr", "list", ...repo, "--head", branch, "--state", "all", "--limit", "1", "--json", PR_FIELDS]);
       return rows[0] ? mapPr(rows[0]) : null;
+    },
+    async findPullRequests(branches) {
+      // gh-186: one `gh api graphql` per PRS_PER_QUERY branches instead of one `gh pr list` per branch
+      const out = new Map<string, RemotePullRequest | null>();
+      const [owner, name] = opts.repo ? opts.repo.split("/") : ["{owner}", "{repo}"];
+      const unique = [...new Set(branches)];
+      for (let at = 0; at < unique.length; at += PRS_PER_QUERY) {
+        const chunk = unique.slice(at, at + PRS_PER_QUERY);
+        const r = await json<{ data?: { repository?: Record<string, { nodes?: GhPr[] } | null> | null } }>(["api", "graphql", "-F", `owner=${owner}`, "-F", `name=${name}`, "-f", `query=${prsQuery(chunk)}`]);
+        const repository = r.data?.repository;
+        if (!repository) throw portError("gh_bad_output", "gh api graphql: no repository in the pull request query's answer");
+        chunk.forEach((b, i) => {
+          const node = repository[`b${i}`]?.nodes?.[0];
+          out.set(b, node ? mapPr(node) : null);
+        });
+      }
+      return out;
     },
     async pullRequestCi(number) {
       // gh exits 8 while checks are pending and 1 when one failed, printing the JSON either way;

@@ -14,6 +14,7 @@ export type RemoteContractTest =
   | "findPullRequest: null for a branch without one"
   | "openDraftPullRequest opens a draft the branch then finds (GR6)"
   | "findPullRequest picks the newest of a branch's PRs"
+  | "findPullRequests: every branch's PR as findPullRequest finds it, null without one (gh-186)"
   | "pullRequestCi: none, pending, failure and success of a PR's head (B18)"
   | "createIssue opens an issue with the labels and assignee, which intake then lists (B18)"
   | "newIssueUrl: the remote's new-issue page with the labels filled in (B23)"
@@ -143,6 +144,20 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       await port.openDraftPullRequest({ head: "gh-1-add-login", base: "main", title: "first", body: "" });
       const second = await port.openDraftPullRequest({ head: "gh-1-add-login", base: "main", title: "second", body: "" });
       expect((await port.findPullRequest("gh-1-add-login"))?.number).toBe(second.number);
+    });
+
+    t("findPullRequests: every branch's PR as findPullRequest finds it, null without one (gh-186)", async () => {
+      const { port } = await seeded();
+      expect(await port.findPullRequests([])).toEqual(new Map());
+      await port.openDraftPullRequest({ head: "gh-1-add-login", base: "main", title: "first", body: "" });
+      await port.openDraftPullRequest({ head: "gh-2-other", base: "main", title: "other", body: "" });
+      await port.openDraftPullRequest({ head: "gh-1-add-login", base: "main", title: "second", body: "" });
+      const branches = ["gh-1-add-login", "gh-2-other", "gh-3-no-pr-here"];
+      const found = await port.findPullRequests(branches);
+      expect([...found.keys()].sort()).toEqual([...branches].sort());
+      for (const b of branches) expect(found.get(b)).toEqual(await port.findPullRequest(b));
+      expect(found.get("gh-3-no-pr-here")).toBeNull();
+      expectPrShape(found.get("gh-1-add-login")!);
     });
 
     t("createIssue opens an issue with the labels and assignee, which intake then lists (B18)", async () => {
