@@ -35,6 +35,7 @@ export * from "./skills.ts";
 export * from "./snapshot.ts";
 export * from "./tick-trace.ts";
 export * from "./trace.ts";
+export * from "./wake.ts";
 export * from "./unit.ts";
 export * from "./superseded.ts";
 export * from "./worktree.ts";
