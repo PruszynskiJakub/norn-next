@@ -1,13 +1,13 @@
 ---
 name: norn-slice
-description: Break a planned spec into tracer-bullet slice files, each with its dependencies, acceptance criteria citing Behaviour numbers (also listed as frontmatter `criteria` with id and verifier), check commands and a verifier per criterion. Use when asked to slice, split or break a planned spec into deliverable pieces.
+description: Cuts a planned spec into tracer-bullet slice files (dependencies, acceptance criteria with verifiers, checks) that a person approves before any slice starts. Use when asked to slice, split or break a planned spec into deliverable pieces.
 ---
 
 # Slice
 
-Cut the plan into slices a person can judge at a glance: the slice files you write are what they review before any slice starts.
+Cut the plan into slices a person can judge at a glance: the slice files you write are what they review before any slice starts, and their frontmatter is read exactly as written.
 
-1. Read the spec, its Plan included, and explore the code it touches.
+1. Read the spec, its Plan included, and explore the code it touches. When slice files already exist (the person rejected them at the gate, or edited them), start from those files and the rejection reason in your instructions: change what was asked, keep the person's edits, and never renumber.
 2. **Draft tracer bullets.** Break the work into slices. Each slice:
    - cuts a narrow but complete path through every layer it touches, tests included: vertical, never one layer;
    - is verifiable on its own and leaves the codebase green;
@@ -19,15 +19,15 @@ Cut the plan into slices a person can judge at a glance: the slice files you wri
    - **Keep the chain shallow.** Aim for a critical path (the longest chain of dependencies) of a few levels, and for as many slices startable at once as there are agents to run them. When many slices need the same groundwork, cut it into one prefactor slice they all depend on rather than chaining them through each other.
 
    **Wide refactors are the exception.** A single mechanical change whose blast radius fans across the codebase (rename a column, retype a shared symbol) cannot land green as one vertical slice. Sequence it as **expand–contract**: expand (add the new form beside the old), then migrate call sites in batches sized by blast radius, each depending on the expand, then contract (delete the old form) depending on every batch.
-3. **Verifiers.** Every criterion gets one: `test` when an automated test proves it, `agent` when it is checked by using the software, `person` when it needs human judgement or access (visual design, a real payment, a third-party console). An agent checks every slice from the user's side; use `person` sparingly, and say why in the criterion. That reason is all a person checks.
+3. **Verifiers.** Every criterion gets one: `test` when a test at a seam the Plan agreed proves it, `agent` when it is checked by using the software, `person` when it needs human judgement or access (visual design, a real payment, a third-party console). Review blocks a `test` criterion no test traces, and QA gives every criterion a verdict from the user's side; use `person` sparingly, and say why in the criterion. That reason is all a person checks.
 4. **Check the breakdown** before writing files: every Behaviour item covered, every edge real (drop each one the slice could be built and tested without), the critical path a few levels at most, nothing that should merge or split. If a call is genuinely the person's (two equally good cuts, a slice far bigger than the plan suggests), say so in that slice's Notes rather than guessing silently.
 5. **Write** the slice files in dependency order, so the slices a file depends on exist before it, each in the layout below. Then hand back a numbered overview, one line per slice: title, verifiers, depends on, and what it delivers end to end; then the critical path's length in slices (and the chain itself) and the slices startable at the start.
 
-Done when every Behaviour item is cited by some acceptance criterion; each slice file has valid frontmatter (with `criteria` matching its Acceptance section id for id), a goal, acceptance with verifiers, and checks; and `depends_on` forms no cycle and names only existing slices.
+Done when every Behaviour item is cited by some acceptance criterion; each slice file has valid frontmatter (with `criteria` matching its Acceptance section id for id), a goal, acceptance with verifiers, and checks; and `depends_on` forms no cycle and names only existing slices (a slice waiting on a missing one never starts).
 
 ## Slice file
 
-One file per slice: `slices/<nn>-<slug>.md` next to the spec, `nn` two digits from `01`, slug short kebab-case. The id is the story key from the spec's frontmatter `id` plus `/<nn>`.
+One file per slice: `slices/<nn>-<slug>.md` next to the spec, `nn` two digits from `01`, slug short kebab-case. The id is the story key from the spec's frontmatter `id` plus `/<nn>`, and must match the file name.
 
 ```markdown
 ---
@@ -64,7 +64,7 @@ Pointers to plan decisions (D1), traps, and any call left for the person.
 
 - Never renumber or rename existing slice files; their keys are permanent. Append new numbers.
 - Every acceptance criterion cites the Behaviour item(s) it proves and is observable at an agreed seam, not a code detail.
-- **Frontmatter `criteria`** repeats the Acceptance section as data: one `{ id, verifier }` per item, the same ids in the same order, nothing more and nothing less. Whoever verifies the slice gives one verdict per id listed here, so a criterion missing from the list is never checked.
-- When the story spec itself has acceptance criteria checked across slices (story-level verification), add the same `criteria` list to the story file's frontmatter, with the ids its Behaviour or acceptance items use; leave every other frontmatter field as it is.
-- Checks are commands that run in the repository and exit non-zero on failure.
+- **Frontmatter `criteria`** repeats the Acceptance section as data: one `{ id, verifier }` per item, the same ids in the same order, nothing more and nothing less. Nothing reads the prose: whoever verifies gives one verdict per id listed here, so a criterion missing from the list is never checked.
+- When your instructions ask for the criteria in the story's frontmatter too, add them to spec.md's `criteria` as they say; leave every other frontmatter field as it is.
+- **Checks** are the commands the implementer runs for this slice; each runs in the repository and exits non-zero on failure. Nothing runs them for the implementer (a separate check runs the repo's own test command), so name the repo's local loop as its contributor docs give it, never a tier they keep for CI.
 - Behaviour and interfaces, not file paths: the slice may wait while the code moves.

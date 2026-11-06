@@ -1,6 +1,6 @@
 ---
 name: norn-refine
-description: Interview the person to a shared understanding of a story and write its spec — problem, solution, numbered Behaviour items with examples, out of scope, open questions. Use when asked to refine, spec out, or write requirements for a story before planning.
+description: Interview the person about a story and write its spec, with numbered Behaviour items that planning, review and QA cite. Use when asked to refine, spec out or write requirements for a story. Not for settling an existing spec's open questions; use norn-clarify.
 ---
 
 # Refine
@@ -11,11 +11,12 @@ The person makes every decision. Finding facts in the code is yours. The spec is
 
 Before the first question, know the ground as well as the code can teach it.
 
-- **The story.** Read the story file: its title, its body and anything it links. Whatever is already written there is a starting point, not a re-ask.
+- **The story.** Read the story file: its title, its body and anything it links, and the comments on its issue: an earlier triage leaves its repro, affected code and recommendation only there. Whatever is already written is a starting point, not a re-ask.
+- **An earlier spec.** When the body already holds a spec (an earlier refinement round), amend it in place: keep every `B` number, strike what goes, and leave an existing Plan section alone.
 - **The status quo.** Find where the code does today what the story changes, and run it if that is cheap. Note what users observe now; the Problem is written against it.
 - **The vocabulary.** Read the project's glossary (e.g. `CONTEXT.md`, `GLOSSARY.md`) and the decision records (e.g. `docs/adr/`) in the area. The spec uses those terms; a decision record constrains the solution unless the person chooses to revisit it.
 - **Neighbours.** Look for behaviour the story will rub against: other commands or screens on the same data, configuration, help text, docs, error paths. These are where the hidden Behaviour items live.
-- **Outside facts.** A fact that lives outside the repository (a third-party API, a platform limit) is yours to look up too. Delegate long reading to a subagent and keep interviewing on the branches that do not wait on it.
+- **Outside facts.** A fact that lives outside the repository (a third-party API, a platform limit) is yours to look up too, not the person's to answer.
 
 ## 2. Interview
 
@@ -28,12 +29,10 @@ Invoke the `norn-interview` skill on the story. Walk the branches in this order,
 
 While interviewing, hold the language and the claims to account:
 
-- **Challenge terms against the glossary.** "The glossary defines a *claim* as X, but you seem to mean Y. Which is it?"
-- **Sharpen fuzzy words.** When a word could mean two things (*user*, *done*, *sync*), propose the precise term and ask which is meant.
+- **Challenge terms against the glossary.** "The glossary defines a *claim* as X, but you seem to mean Y. Which is it?" When a word could mean two things (*user*, *done*, *sync*), propose the precise term and ask which is meant.
 - **Invent scenarios.** Stress the boundaries with specific cases: the empty list, the second run, two people at once, the item deleted halfway through.
 - **Cross-check with the code.** When the person says how something works today, check it. "The code closes the whole order, but you said partial closing is possible. Which is right?"
 - **Back your own claims with the code.** Before you tell the person what code or config does, find the `file:line` usages that consume it, not only where it is defined. Never infer behaviour from a schema, a type or the docs alone; say "defined but never read" of a key nothing consumes. Your answers feed the spec, so a wrong one becomes a wrong Behaviour item.
-- **Read a terse answer out loud.** When an answer is terse ("remove these", "X can go"), state in one line how you read it ("Read as: drop B3 and B4, keep B5.") and carry on; the person corrects it if it is wrong.
 
 When a decision turns on how something looks or feels, or on a state model that is hard to judge on paper, offer the person a prototype (the `norn-prototype` skill) before they decide. Its verdict is the decision.
 
@@ -85,7 +84,7 @@ Read the spec once more as the planner will.
 - Every Behaviour item has an example and is observable without reading the code.
 - The edge checklist is reflected: each item covered by a Behaviour item, out of scope, or an open question.
 - Problem and Solution are told from the user's side, in the project's terms.
-- No file paths, function names or code snippets (a prototype's line may name its path).
+- No file paths, function names or code snippets: nothing only the code knows (a prototype's line may name its path). What the user meets is fine: a command, a flag, a message, an error code.
 
 Done when the person has confirmed the interview summary (every branch settled, or parked as an open question) and agrees the spec says what they meant; with no person present, when every decision left is an open question. The spec is what you hand back, with Open questions empty or not.
 
@@ -123,4 +122,4 @@ Numbered. Each names who can answer it. Removed once answered.
 Written by the `norn-plan` skill.
 ```
 
-Write in the project's domain vocabulary. Leave file paths and code snippets out: they go stale before the story lands.
+Write in the project's domain vocabulary. Code names stay out because they go stale before the story lands.

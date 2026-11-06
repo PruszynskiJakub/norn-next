@@ -1,72 +1,60 @@
 ---
 name: norn-plan
-description: Agree a spec's test seams, prefactoring and implementation decisions with the person and write them into the spec's Plan section, with a coverage table mapping every Behaviour item to a seam. Use when asked to plan, design or architect how a spec gets built.
+description: Agree with the person how a refined spec gets built — test seams, prefactoring, decisions, risks — and write the spec's Plan section, mapping every Behaviour item to a seam. Use when asked to plan a spec or story before it is sliced or built.
 ---
 
 # Plan
 
-The person agrees every seam and decision. The plan is what implementation builds to: it writes tests only at the agreed seams, and treats every decision here as settled. Anything left vague is decided later, by an agent, without the person.
+The plan is what implementation builds to: it writes tests only at the agreed seams and treats every decision here as settled. Anything left vague is decided later, by an agent, without the person.
 
-When no person is with you, write the plan with your recommendations, mark every seam and decision **(proposed)**, and stop: say which of them need a person's agreement before anyone builds to them.
+**No person with you** (an unattended run): write the plan with your recommendations, mark every seam and decision **(proposed)**, build no prototype or spike, and stop, saying which of them need a person's agreement before anyone builds to them. A proposed plan is never "ready to build to".
+
+**A Plan is already there** (a replan round): the handoff says what no longer holds. Check the rest against the code on this base too, revise the section in place, and keep the ids (S1, D1, …) of what still holds.
 
 ## 1. Explore
 
 Read the whole spec, then map it onto the code.
 
-- **Where each Behaviour item lives.** For each item, find the module that does that work today, or the nearest one that will. Items that land in the same module usually share a seam.
-- **The tests already there.** Find how this area is tested today: which interface the tests drive, their helpers and fixtures, what they fake. That is prior art to follow, and it shows which seams already exist.
-- **The constraints.** Read the decision records (e.g. `docs/adr/`) and the glossary in the area. A decision record holds unless the person chooses to revisit it; say when the story would cut across one.
-- **The friction.** Note what would make the story awkward to build: logic spread over several callers, a module whose interface is as wide as its body, a missing seam that would force tests onto internals, a name that disagrees with the glossary.
+- **Where each Behaviour item lives**: the module that does that work today, or the nearest one that will. Items that land in one module usually share a seam.
+- **The tests already there**: which interface they drive, their helpers, fixtures and fakes. That is the prior art to copy, and it shows which seams exist.
+- **The constraints**: the decision records and the glossary in the area. A decision record holds unless the person chooses to revisit it; say when the story cuts across one.
+- **The friction**: logic spread over several callers, an interface as wide as its body, a missing seam that would force tests onto internals, a name that disagrees with the glossary.
 
 ## 2. Seams
 
-Sketch the seams the Behaviour will be tested at.
+- Prefer an existing seam to a new one, and the highest seam that observes the behaviour: the one closest to what the user does. A test there survives refactors below it. The fewer seams the better; the ideal is one.
+- Too low: the test must reach past the interface to check the result, or would mock the project's own modules. Move it up.
+- Too high: it cannot observe the result without a real network, clock or person. Keep the seam and fake only that boundary.
 
-- Prefer an existing seam to a new one, and the highest seam that observes the behaviour: the one closest to what the user does. A test there survives refactors below it.
-- Propose any new seam as high as it can go. The fewer seams the better; the ideal number is one.
-- A seam is too low when the test must reach past the interface to check the result, or when it would mock the project's own modules. Move it up.
-- A seam is too high when it cannot observe the result without a real network, a real clock or a real person. Keep the seam and fake only that boundary.
+Every Behaviour item goes in the coverage table under exactly one seam, with a test kind. An item with no seam is a gap: close it with a seam, or take it to the person (part 5). An item no test can observe (a docs or skill-text change, a judgment only a person makes) still gets a row: name the check that observes it (a lint, review, QA by a person).
 
-Build a coverage table: every Behaviour item against the seam that observes it and the kind of test (unit, integration, end to end). An item with no seam is a gap; close it with a seam, or take it to the person (part 5).
-
-When a module's interface or the seam's placement is itself in question, invoke the `norn-codebase-design` skill for the vocabulary. When a new interface is central to the story, offer to design it twice ([DESIGN-IT-TWICE.md](../norn-codebase-design/DESIGN-IT-TWICE.md)): several radically different interfaces from parallel subagents, compared, with your recommendation.
+When a module's interface or a seam's placement is itself in question, invoke the `norn-codebase-design` skill. When a new interface is central to the story, offer to design it twice ([DESIGN-IT-TWICE.md](../norn-codebase-design/DESIGN-IT-TWICE.md)) and recommend one.
 
 ## 3. Prefactor
 
-Look for changes that make the story easy to build: make the change easy, then make the easy change. Slicing puts them first.
-
-- Each prefactor changes no behaviour, lands green on its own, and is worth it for this story, not for tidiness.
-- Typical ones: extract the module the story will grow; deepen a shallow interface the story would widen further; add the seam the tests need; rename to the glossary's term before the story spreads the old one.
-- Say what each one buys: which Behaviour items get easier, and how.
-
-No prefactor is a fine answer. Do not invent one.
+Make the change easy, then make the easy change; slicing puts prefactors first. Each one changes no behaviour, lands green on its own, and earns its place for this story, not for tidiness: say which Behaviour items it makes easier, and how. Typical: extract the module the story will grow, deepen an interface the story would widen, add the seam the tests need, rename to the glossary's term before the story spreads the old one. "None" is a fine answer; do not invent one.
 
 ## 4. Decide
 
-List what the code does not settle and the implementation will need: interface changes, schema or file-format changes, contracts with other systems, error handling, migration of existing data or configuration, anything that is costly to change once shipped. For each, have a recommendation and its reason.
+List what the code does not settle and implementation will need: interface, schema and file-format changes, contracts with other systems, error handling, migration of existing data or configuration, anything costly to change once shipped. Each gets a recommendation and its reason.
 
-Name the risks too: the part most likely to go wrong, or not known to work. If a question can only be answered by trying (does the library do X, is it fast enough), propose a quick spike or prototype before the plan is agreed, rather than a guess in it. When a decision turns on how something looks or feels, or on a state model that is hard to judge on paper, offer the person the `norn-prototype` skill; its verdict is the decision. With no person present, build none: mark the decision proposed and suggest the prototype in it.
+Name the risks: the part most likely to go wrong, or not known to work. A question only trying can answer (does the library do X, is it fast enough) gets a spike before the plan is agreed, not a guess in it. A decision that turns on look and feel, or on a state model hard to judge on paper: offer the `norn-prototype` skill; its verdict is the decision.
 
-A decision that is hard to reverse, surprising without its context, and the result of a real trade-off deserves a decision record. Offer one when all three hold, and only then.
+Offer a decision record only when a decision is hard to reverse, surprising without its context, and the result of a real trade-off: all three.
 
 ## 5. Interview
 
-Invoke the `norn-interview` skill to agree, in this order: the seams (with the coverage table), the prefactoring, then each decision. Implementation treats the agreed seams as pre-agreed and writes tests nowhere else.
+Invoke the `norn-interview` skill to agree, in this order: the seams with the coverage table, the prefactoring, then each decision.
 
-If planning shows a Behaviour item is ambiguous, contradicts another, or costs far more than the person may expect, take it to them rather than planning around it. With their agreement, amend the item in the spec (never renumber). If it needs someone not present, it becomes an open question again, and the plan waits for it.
+A Behaviour item that is ambiguous, contradicts another, or costs far more than the person may expect goes to them; do not plan around it. With their agreement, amend the item in the spec, keeping its number: slices, criteria and review cite it, so never renumber. If it needs someone not present, it becomes an open question again and the plan waits.
 
 ## 6. Write the Plan
 
-Write the `## Plan` section of the spec, in the layout below, and touch nothing above it except the items the person agreed to amend.
+Write the `## Plan` section in the layout below. Touch nothing above it except the items the person agreed to amend.
 
-Then check it as implementation will read it:
+Name modules, interfaces and existing tests by name, never by file path, and put no code in it: the plan outlives refactors. Leave out the order of work too: slicing decides it. The one exception is a prototype snippet that encodes a decision more precisely than prose (a state machine, a schema, a type shape): inline its decision-rich part and say it came from a prototype.
 
-- Every Behaviour item appears in the coverage table under exactly one seam, with a test kind.
-- Every seam names its interface and the prior-art tests to copy, or says there are none.
-- Every decision says what was chosen and why; none says "to be decided".
-- What may be faked is named, and it is only system boundaries.
-- Prefactoring is listed, or says "None".
-- No file paths or code, except a prototype snippet as below.
+Before you hand back, read it as implementation will: no decision says "to be decided"; what may be faked is only a system boundary; every seam names its prior art or says there is none.
 
 Done when every Behaviour item is observable at an agreed seam and the person agrees the plan; with no person present, when the plan is written with every seam and decision marked proposed.
 
@@ -76,8 +64,6 @@ Done when every Behaviour item is observable at an agreed seam and the person ag
 ## Plan
 
 ### Seams
-Each seam: the module and its interface, the Behaviour items it observes, and prior-art tests to follow.
-
 - **S1 <module>, through <its interface>.** Observes B1–B4, B7.
   Prior art: <the existing tests in this area that drive the same interface>.
 
@@ -87,22 +73,15 @@ Each seam: the module and its interface, the Behaviour items it observes, and pr
 | B1 | S1 | integration | |
 
 ### Prefactoring
-Changes that make the story easy to build, each with the reason.
-
 1. <the change> — <what it makes easier, for which Behaviour items>
 
 ### Implementation decisions
-The modules built or changed, their interface changes, schema changes,
-API contracts, architectural decisions, technical clarifications from the person.
-
 - D1 <decision> — <why, and the alternative it beat when that matters>
 
 ### Testing decisions
 What a good test means here (external behaviour through the seam, never internals),
-which modules are tested, and what sits at a system boundary and may be mocked.
+which modules are tested, and what sits at a system boundary and may be faked.
 
 ### Risks
 What is most likely to go wrong or is not yet known to work, and how the slices meet it early.
 ```
-
-Describe modules and interfaces, not file paths or code: the plan outlives refactors. Exception: when a prototype produced a snippet that encodes a decision more precisely than prose (a state machine, a schema, a type shape), inline its decision-rich part and say it came from a prototype.
