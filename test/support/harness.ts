@@ -257,9 +257,20 @@ const pathWithoutHerdr = (path: string | undefined) =>
     .join(":");
 export const hostEnv = () => ({ ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !AGENT_ENV.includes(k))), PATH: pathWithoutHerdr(process.env.PATH) });
 
+/**
+ * gh-215: how long one harness git call may run before it is killed. bun test (1.3.13) cannot cut a
+ * test stuck in `Bun.spawnSync` once its file has run another `spawnSync`, so a git child that never
+ * exits would block the worker and the whole `--parallel` tier with no test named. Below the tier's
+ * 20 s per-test timeout; `NORN_HARNESS_GIT_TIMEOUT_MS` lowers it for the test that proves it.
+ */
+const SH_TIMEOUT_MS = 15_000;
+const shTimeoutMs = () => Number(process.env.NORN_HARNESS_GIT_TIMEOUT_MS) || SH_TIMEOUT_MS;
+
 export function sh(cwd: string, args: string[], input?: string): string {
   // not Bun.spawnSync with pipes: under load it now and then returns exit 0 with an empty stdout (spawnSyncCaptured)
-  const r = spawnSyncCaptured(["git", ...args], { cwd, ...(input === undefined ? {} : { stdin: new TextEncoder().encode(input) }) });
+  const timeoutMs = shTimeoutMs();
+  const r = spawnSyncCaptured(["git", ...args], { cwd, timeoutMs, ...(input === undefined ? {} : { stdin: new TextEncoder().encode(input) }) });
+  if (r.exitedDueToTimeout) throw new Error(`git ${args.join(" ")} (${cwd}): timed out after ${timeoutMs} ms (killed)`);
   if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")} (${cwd}): ${r.stderr.toString()}`);
   return r.stdout.toString().trim();
 }

@@ -1,6 +1,6 @@
 ## Goal
 
-Reproduce gh-215 (the integration tier hangs past its per-test timeout, no test named): a loop that goes red, the minimised repro, the cause and the seam, posted as a `## Reproduce` issue comment. No fix.
+Fix gh-215 (quick round): a stuck harness git call fails its test, named, instead of hanging the integration tier. (Round 1, reproduce, found the cause; its findings stay below.)
 
 ## Progress
 
@@ -108,6 +108,13 @@ It goes red today. It turns green once harness `sh()` (and every `spawnSyncCaptu
 The `## Reproduce` comment is on #215: https://github.com/PruszynskiJakub/norn-next/issues/215#issuecomment-6688881636
 - reproduce#1 reproduced: Reproduced: a stuck Bun.spawnSync can't be cut by bun test's per-test timeout once the file has already run a spawnSync (bun 1.3.13), so a stuck harness sh()/gitSync child stops the whole --parallel run. The stuck file on CI was upgrade-records.test.ts. Loop red 3/3; what made the git child stick is still open (ranked hypotheses). Seam: an integration-tier test that runs a fixture under bun test; fix by giving harness sh() a timeoutMs. ## Reproduce is posted on #215.
 
+### Fix (quick round, implement#1)
+
+- Red first: `packages/cli/test/integration/harness-git-timeout.test.ts` runs a fixture under `bun test --timeout=5000` (quick `sh()`, then a `sh()` on a git alias that sleeps 60 s, then a passing test) with a 15 s outer bound. Before the fix: killed at the bound (15 006 ms).
+- Fix: `test/support/harness.ts` `sh()` passes `timeoutMs` (15 s, below the tier's 20 s per-test timeout) to `spawnSyncCaptured`, so `Bun.spawnSync` kills the git child itself; on timeout `sh()` throws `git <args> (<cwd>): timed out after N ms (killed)`. `NORN_HARNESS_GIT_TIMEOUT_MS` lowers it (the test uses 1000). After: the fixture ends in ~1.3 s, `stuck git call` fails named, its neighbours pass; green 3/3.
+- `sh()` is the only sync spawn in `test/support/`. Not changed (out of scope, noted): direct `Bun.spawnSync` calls in individual test files and `packages/adapters/test/contract/git.ts`'s helper, store's `gitSync` (no timeout for local subcommands, H11), and a tier-level watchdog for non-spawn blocks (the FIFO row). What made the git child stick on CI stays open.
+- Unit tier and typecheck green.
+
 ## Resume
 
-Reproduce is finished. Next: a fix behind the integration-tier regression test described under Seam above.
+Implement is done and reported. Next is the workflow's check/CI; if CI shows a hang again, look at the remaining unbounded sync spawns listed above.
