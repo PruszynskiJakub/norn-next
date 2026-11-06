@@ -25,10 +25,10 @@ import { type LabelsReport, labelsLines, remoteLabels } from "../runtime/labels.
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { cmd } from "@norn/core";
 
-/** Paths that must never be committed (§7.1, gh-64 B9); the machine-local files live outside the checkout (B5). */
 /** gh-226: the repo's review guide the `norn-review` skill reads, at the repo root. */
 const REVIEW_FILE = "REVIEW.md";
 
+/** Paths that must never be committed (§7.1, gh-64 B9); the machine-local files live outside the checkout (B5). */
 const IGNORED = [".env.norn", ".norn-unit", LOCAL_CONFIG_FILE];
 
 function ensureGitignore(root: string): string[] {

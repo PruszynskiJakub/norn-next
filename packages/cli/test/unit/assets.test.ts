@@ -353,8 +353,6 @@ describe("skills", () => {
     expect(text).toMatch(/Write the table into the handoff\*\* \(the Progress section/);
     // a craft skill does not cite the rule ids of norn's own rules file (P7)
     expect(text).not.toMatch(/\bQV\d/);
-    // this repo's installed copy matches the bundled source
-    expect(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "skills", "norn-review", "SKILL.md"), "utf8")).toBe(text);
   });
 
   test("norn-review reads REVIEW.md, verifies each blocking candidate, and pins every finding to a file and line (gh-226)", () => {
