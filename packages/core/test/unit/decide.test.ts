@@ -4,7 +4,7 @@ import { type Action, legacyAction } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { decide, isSideAction, unitDecision } from "../../src/decide/index.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
-import { isIntakeCommit, nornTrailers } from "../../src/policy.ts";
+import { isCodePath, isIntakeCommit, isStepBoundary, nornTrailers } from "../../src/policy.ts";
 import type { RunFacts, StoryFacts, UnitFacts } from "../../src/facts.ts";
 import type { WorktreeStatus } from "../../src/ports.ts";
 import { sha256 } from "../../src/hash.ts";
@@ -671,6 +671,23 @@ describe("audit fixes", () => {
     expect(only(facts([d]))).toMatchObject({ kind: "apply_receipts", kill: null });
   });
 
+  test("gh-213 (O2a): a rerun at the check whose fail sent the running unit here stops the session and enters the check", () => {
+    const wf: Workflow = {
+      name: "solo",
+      start: "implement",
+      steps: {
+        implement: { type: "agent", skill: "implement", outcomes: { done: "test" } },
+        test: { type: "check", run: "bun test", timeout: "5m", outcomes: { pass: "$done", fail: { to: "implement", counter: "loop" } } },
+      },
+      counters: { loop: { max: 3 } },
+    };
+    const last = { step: "test", outcome: "fail", source: "classified" as const, at: at(T0 - 120_000), receipt_id: RUN };
+    const s = solo(running({ attempt: 2, visits: { implement: 2, test: 1 }, last_outcome: last }), {}, {}, "gh-1", T0 - 3_600_000, wf);
+    const st = s.units[0]!.state!;
+    s.units[0]!.unapplied = [numbered(1, receipt(st, "unstick", { to: "test" }, "human"))];
+    expect(only(facts([s]))).toMatchObject({ kind: "apply_receipts", kill: { runner: "herdr", session_id: "s1" }, state: { step: "test", attempt: 2, status: "ready", run: null } });
+  });
+
   test("B2: an answer to a headless run resumes the agent session with the answer as the prompt", () => {
     const s = solo(running({ status: "parked", park: { kind: "ask", reason: "Q?", since: at() } }), { process_alive: false });
     const u = s.units[0]!;
@@ -788,6 +805,21 @@ describe("commit trailers (S4, R3.1)", () => {
     // a person's commit (no Norn-Tick) is never the intake, whatever its subject says
     expect(isIntakeCommit({ "Norn-Story": "gh-1" }, "gh-1")).toBe(false);
     expect(isIntakeCommit({}, "gh-1")).toBe(false);
+  });
+
+  test("gh-213 (O2a): isStepBoundary finds the commit a unit's check fail made; isCodePath leaves out norn's own files", () => {
+    const fail = { outcome: "fail", next: "implement" };
+    const at = { step: "test", ...fail };
+    expect(isStepBoundary(nornTrailers(TICK, "gh-1", null, "test", fail), "gh-1", null, at)).toBe(true);
+    expect(isStepBoundary(nornTrailers(TICK, "gh-1", "gh-1/01", "test", fail), "gh-1", null, at)).toBe(false);
+    expect(isStepBoundary(nornTrailers(TICK, "gh-1", "gh-1/01", "test", fail), "gh-1", "gh-1/01", at)).toBe(true);
+    expect(isStepBoundary(nornTrailers(TICK, "gh-1", null, "test", { outcome: "pass", next: "review" }), "gh-1", null, at)).toBe(false);
+    expect(isStepBoundary(nornTrailers(TICK, "gh-1", null, "test"), "gh-1", null, at)).toBe(false);
+    expect(isCodePath("packages/core/src/apply.ts")).toBe(true);
+    expect(isCodePath("packages/view/src/runs/x.ts")).toBe(true);
+    expect(isCodePath(".agents/specs/gh-1-login/spec.md")).toBe(true);
+    expect(isCodePath(".agents/specs/gh-1-login/handoffs/_story.md")).toBe(false);
+    expect(isCodePath(".agents/specs/gh-1-login/runs/_story/state.json")).toBe(false);
   });
 });
 

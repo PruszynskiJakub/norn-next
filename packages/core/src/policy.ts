@@ -2,7 +2,7 @@
  * Rules decide and the inbox both read off Facts — each defined once here, so the tick that acts
  * and the inbox that tells a person never disagree about them.
  */
-import { BUILT_IN_LIMITS, isClosedStatus, type Mode, parseDuration, type ResolvedConfig, type Step, type UnitState, type Workflow } from "@norn/schema";
+import { BUILT_IN_LIMITS, HANDOFFS_DIR, isClosedStatus, type Mode, parseDuration, type ResolvedConfig, RUNS_DIR, SPECS_DIR, type Step, type UnitState, type Workflow } from "@norn/schema";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "./facts.ts";
 import { stepOf } from "./workflow.ts";
 
@@ -175,6 +175,28 @@ export function nornTrailers(tick: string, story: string, slice: string | null, 
   }
   trailers["Norn-Tick"] = tick;
   return trailers;
+}
+
+/**
+ * gh-213 (O2a): is this the boundary commit (S4 trailers) of `slice`'s (null: the story unit's) step
+ * `at.step` ending with `at.outcome` and moving the cursor to `at.next`? Read off the trailers, never the subject.
+ */
+export const isStepBoundary = (trailers: Record<string, string>, story: string, slice: string | null, at: { step: string } & StepEnd): boolean =>
+  trailers["Norn-Story"] === story &&
+  (trailers["Norn-Slice"] ?? null) === slice &&
+  trailers["Norn-Step"] === at.step &&
+  trailers["Norn-Outcome"] === at.outcome &&
+  trailers["Norn-Next"] === at.next;
+
+/**
+ * gh-213 (O2a): is `path` (repo-relative) the work's own, not norn's bookkeeping in a spec folder:
+ * its `handoffs/` (prose a boundary commit carries), or an older layout's `runs/` (S12)?
+ */
+export function isCodePath(path: string): boolean {
+  const specs = `${SPECS_DIR}/`;
+  if (!path.startsWith(specs)) return true;
+  const sub = path.slice(specs.length).split("/")[1];
+  return sub !== HANDOFFS_DIR && sub !== RUNS_DIR;
 }
 
 /**

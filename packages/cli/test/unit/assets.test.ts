@@ -287,17 +287,13 @@ describe("skills", () => {
       "Stuck again at the same step → escalate with the receipts", "Exhausted again → escalate",
       // B40: release, install and restart in that order
       "approve on their answer → wait for the merge and the publish → install → pull → restart the watch and the cockpit",
-      // B41–B43: load and flakes; B42: a running unit is cancelled first (rerun refuses it), then rerun at its check
-      "reason: timeout", "the load is far above the core count", "suspected flake", "never run tests in a unit worktree", "`norn run cancel <unit>`", "--step <check> --delegated --reason",
-      // B15, B41: a CI glitch and a load failure are rerun at their check too, after a cancel
+      // B41–B43: load and flakes; gh-213 (O2a): rerun at its check while implement runs, no cancel first
+      "reason: timeout", "the load is far above the core count", "suspected flake", "never run tests in a unit worktree", "--step <check> --delegated --reason",
+      // B15, B41: a CI glitch and a load failure are rerun at their check too
       "Rerun at its check** (CI glitch, load, suspected flake)", "then rerun at its check (`--step ci`, below)", "then rerun at its check once (`--step <check>`, below)",
-      "`norn run cancel` only right before a rerun at its check",
-      // B15, B41, B42 (gh-196 D6): norn's own boundary commits (handoffs only, or empty: gh-195 S12) never count as newer work
-      "git log -1 --format=%cI <branch> -- . ':(exclude,glob)**/handoffs/**'",
-      // B15: a hung run is cancelled on the forge first; a unit not yet running is cancelled once it runs
-      "gh run cancel <id>", "`nothing_to_cancel`",
-      // SK3: the cancel is a mechanical step; the delegated rerun after it carries the reason
-      "the delegated rerun that follows carries the reason",
+      // gh-213 (O2a): whether the work changed since the fail is run view's `check_retry`, not git; norn stops the session itself
+      "norn run view <unit> --json", "check_retry", "code_changed", "norn stops that session itself",
+      "gh run cancel <id>",
       // B7, B11: JSON only and no story passed to status; a permission prompt answered by its option number
       "never pass a story to `norn status`", "its option number",
       // B24, B40: a merge and a watch restart the request named are allowed

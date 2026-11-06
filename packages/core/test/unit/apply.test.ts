@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Receipt, UnitState, Workflow } from "@norn/schema";
-import { type ApplyContext, applyReceipts, initialState, restartStepOf } from "../../src/apply.ts";
+import { type ApplyContext, applyReceipts, checkRetryOf, initialState, restartStepOf } from "../../src/apply.ts";
 import { at, numbered, receipt, SLICE_WF, sliceUnit, SOLO_WF, STORY_WF, stateFor, storyUnit } from "../fixtures.ts";
 
 const ctx = (workflow: Workflow = SLICE_WF): ApplyContext => ({ workflow, now: at() });
@@ -134,6 +134,27 @@ describe("universal reports and human receipts", () => {
     expect(un.state).toMatchObject({ step: "review", attempt: 1, status: "ready", counters: { test_loop: 0 } });
     expect(run(st, SLICE_WF, (s) => receipt(s, "unstick", { reset: ["zzz"] }, "human")).rejected[0]?.reason).toBe("unknown counter(s): zzz");
     expect(run(st, SLICE_WF, (s) => receipt(s, "unstick", {}, "human")).state).toMatchObject({ step: "implement", attempt: 2 });
+  });
+
+  test("gh-213 (O2a): rerun at the check whose fail sent the unit here applies while it is ready or running", () => {
+    const failed = run(stateFor(SLICE, SLICE_WF), SLICE_WF, started, done("done"), check("fail"));
+    expect(failed.state).toMatchObject({ step: "implement", attempt: 2, status: "ready" });
+    expect(checkRetryOf(SLICE_WF, failed.state)).toBe("test");
+    const atCheck = (s: UnitState) => receipt(s, "unstick", { to: "test" }, "human");
+    expect(run(failed.state, SLICE_WF, atCheck).state).toMatchObject({ step: "test", attempt: 2, status: "ready", run: null, counters: { test_loop: 1 } });
+    const running = run(failed.state, SLICE_WF, started);
+    expect(running.state).toMatchObject({ step: "implement", status: "running" });
+    expect(checkRetryOf(SLICE_WF, running.state)).toBe("test");
+    expect(run(running.state, SLICE_WF, atCheck).state).toMatchObject({ step: "test", status: "ready", run: null });
+    // only that check, and only while its fail is the last outcome
+    expect(run(running.state, SLICE_WF, (s) => receipt(s, "unstick", { to: "review" }, "human")).rejected[0]?.reason).toBe("unit is running, nothing to unstick");
+    expect(run(running.state, SLICE_WF, (s) => receipt(s, "unstick", {}, "human")).rejected[0]?.reason).toBe("unit is running, nothing to unstick");
+    const asked = run(running.state, SLICE_WF, (s) => receipt(s, "ask", { question: "Q?" }), (s) => receipt(s, "answer", { answer: "A" }, "human"));
+    expect(checkRetryOf(SLICE_WF, asked.state)).toBeNull();
+    // an agent's fail (qa) is no check: not a glitch to retry
+    const qa = run(stateFor(SLICE, SLICE_WF, { step: "qa", visits: { implement: 1, qa: 1 } }), SLICE_WF, started, done("fail"));
+    expect(qa.state).toMatchObject({ step: "implement", status: "ready" });
+    expect(checkRetryOf(SLICE_WF, qa.state)).toBeNull();
   });
 
   test("gate approve / reject take the gate's edges", () => {

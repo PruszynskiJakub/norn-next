@@ -36,6 +36,8 @@ import type { Context } from "../context.ts";
 import { corruptError, refuse, rendered, usageError, withExit } from "../output.ts";
 import { parseUnitKey } from "../runtime/args.ts";
 import { hasRun, targetKey } from "../runtime/target.ts";
+import { checkRetry } from "../runtime/check-retry.ts";
+import { localUnit } from "../runtime/human.ts";
 import { fetchArchived } from "../runtime/archive.ts";
 import { effectiveRetain } from "../runtime/trace-retention.ts";
 
@@ -382,6 +384,11 @@ export const runViewCommand = defineCommand({
     let run = load();
     if (!run && runId && (await fetchArchived(ctx, loadSnapshot({ repoRoot: ctx.root, home: ctx.home, env: ctx.env }).stories.map((s) => s.key))).length) run = load();
     if (!run) throw refuse(runId ? `no run ${key} in the trace` : `${key} is unknown or has no run yet`, cmd.status(), runId ? "unknown_run" : "unknown_unit");
-    return rendered(run, formatRunView(run));
+    // gh-213 (O2a): a unit a check's fail sent back: that check, and whether the work changed since
+    const uf = runId ? null : await localUnit(ctx, key);
+    const retry = uf ? await checkRetry(ctx.git, uf) : null;
+    const changed = retry && (retry.code_changed === null ? "unknown" : retry.code_changed ? "yes" : "no");
+    const text = retry ? `${formatRunView(run)}\n\n${retry.check} failed at ${retry.failed_at}; work changed since: ${changed}. Rerun at it: \`${retry.command}\`` : formatRunView(run);
+    return rendered({ ...run, check_retry: retry }, text);
   },
 });
