@@ -33,12 +33,15 @@ Apply the skill-shaper proposals (skill text only) to the 20 bundled skills (sou
 - implement#2 (rework of review#1): F1 added the norn-qa-person pointer to norn-qa's description; F2 capitalised "Nothing" in norn-slice:67 and line 8 now says the frontmatter is "read exactly as written"; F3 norn-fsd-round's description says "through their current round"; F5 norn-implement's Done says "agreed or fallback seam". F4 not taken: the norn-qa-person example shows a person's `pass` evidence in their own words, which norn-qa's example does not.
 - review#2: approve. The four edits are correct and the `.agents` copies match source (`diff -r` clean); test#2 green. The table above is current (W7 now met). The implement#2 commit (c4b07564a) had grown this handoff to 3.4 MB: a scripted edit replaced an empty string (`"## Progress"` also matches inside `"### Progress"`, so the slice it computed was empty), which inserts the new text between every character. The Goal, the earlier Progress and the table were lost. review#2 rebuilt the handoff from d7daef4a8. Friction worth filing: norn put a 3.3 MB handoff into the brief without a size guard.
 
+- describe#1: wrote `pr.md`. It covers the summary, evidence per W1–W7 and D1–D2 (no QA ran, so the evidence is tests and diffs) and the merge danger (two-way, agents).
+
 ### Resume
 
-Review approved; nothing left to rework.
+`pr.md` is written. Nothing is left for describe. A person judges the PR next.
 
 ## Progress
 
 - implement#1 done: Applied the skill-shaper proposals to the 20 bundled skills (source + refreshed .agents copies) and issue/release/release-start. Fixed the proposal lines that broke the P7, pinned-phrase and AC4 lints or contradicted the code (slice checks are not run by norn). Made the cross-cutting cleanups: tdd seam = interface, qa→qa-person, deduplicated the interview/refine/clarify and tdd/implement rules. retro is now model-invocable, and prototype defaults to <spec>/prototype/. Unit tier and typecheck green.
 - review#1 changes_requested: 1 blocking: norn-qa's description lacks the pointer to norn-qa-person the spec asks for (W7). Minor: lowercase 'nothing' in norn-slice:67; norn-fsd-round description lost its current-round bound. Everything else matches the proposals; unit tier and typecheck green.
 - review#2 approve: The rework is correct (qa→qa-person pointer, slice wording, fsd-round bounded to the current round, implement fallback seam); copies match source; test#2 green. The story handoff, corrupted to 3.4 MB in c4b07564a by an empty-string replace, has been rebuilt from d7daef4a8 and updated.
+- describe#1 done: Wrote pr.md: summary of the skill-text reshape, evidence per W1–W7/D1–D2 from lints, diffs and the review table (no QA), merge danger two-way with agents as blast radius.
