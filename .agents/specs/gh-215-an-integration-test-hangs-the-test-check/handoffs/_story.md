@@ -1,5 +1,112 @@
 ## Goal
 
+Reproduce gh-215 (the integration tier hangs past its per-test timeout, no test named): a loop that goes red, the minimised repro, the cause and the seam, posted as a `## Reproduce` issue comment. No fix.
+
 ## Progress
 
+### Findings (the `## Reproduce` comment)
+
+**Verdict:** the hang is reproduced as a mechanism, and the CI sighting is explained by it. Bun 1.3.13 cuts a test that is stuck in `Bun.spawnSync` at the per-test timeout only when no other `spawnSync` ran earlier in that file's tests. Every integration test makes many harness `sh()` / `gitSync` calls (both are `spawnSync`), so in practice a git child that does not exit is never cut. The worker blocks until the child exits, and `bun test --parallel` never ends and names no test. What made the git child stick on CI's run is **not** confirmed (see "Left open").
+
+**The suspect file is the wrong one.** In the hung CI run (42192167752, job 127806756354), `upgrade-version.test.ts` printed 7/7 and `run-state-move.test.ts` printed 9/9. The file that stuck is `packages/cli/test/integration/upgrade-records.test.ts`. At 09:05:56Z its first test timed out:
+
+```
+packages/cli/test/integration/upgrade-records.test.ts:
+killed 1 dangling process
+(fail) norn upgrade moves the base's run state into archive refs (B35) > AC1: every story's ref is on the remote … 
+  ^ this test timed out after 90000ms.
+```
+
+Its other 11 tests never printed, and neither did the next test's own 90 s timeout. On green runs AC1 takes about 6 s (6268 ms on run 42234925764). Two more files never printed a line: `run-rerun-check.test.ts` and `tick-timing.test.ts`. Both ran normally here (9 pass, 9 s), so they were most likely queued behind the blocked worker. The other 4 files had all reported by 09:08:08. CI ran 4 workers (`4x PARALLEL`).
+
+#### Loop (red 3/3, about 15 s each)
+
+`gh215-loop.test.ts` (outside the repo, imports the real harness):
+
+```ts
+import { test } from "bun:test";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { sh } from "<worktree>/test/support/harness.ts";
+const dir = mkdtempSync(join(tmpdir(), "gh215-"));
+sh(dir, ["init", "-q"]);
+const stuckGit = () => sh(dir, ["-c", "alias.stuck=!sleep 600", "stuck"]); // a git child that never exits
+test("first stuck git call", () => { stuckGit(); });
+test("second stuck git call", () => { stuckGit(); });
+test("after", () => {});
+```
+
+```
+$ GITHUB_ACTIONS=true timeout 15 bun test --parallel=1 --timeout=2000 ./gh215-loop.test.ts
+bun test v1.3.13 (bf2e2cec) 1x PARALLEL
+exit 124        ← red: nothing named, never ends (3/3)
+```
+
+Green means the run ends within the per-test timeout and names the stuck test as `(fail)`. (Through the harness even the first stuck `sh()` is not cut, unlike the bare probes below; the loop does not depend on which.)
+
+#### Minimised repro (bun only, no norn code)
+
+```ts
+import { test } from "bun:test";
+test("quick spawnSync", () => { Bun.spawnSync(["true"]); });
+test("stuck after a quick spawnSync in an earlier test", () => { Bun.spawnSync(["sleep", "600"], { stdin: "ignore", stdout: "ignore", stderr: "ignore" }); });
+```
+
+`timeout 12 bun test --timeout=2000 ./pre-async.test.ts` → exit 124, nothing printed. Drop the first test and it fails in 2.0 s with `killed 1 dangling process` and the test named. Probes that pin the rule (each run alone and with `--parallel`):
+
+| what the test does | cut at the timeout? |
+|---|---|
+| awaits a never-settling promise, in a test or a `beforeAll` | yes |
+| `Bun.spawnSync` stuck, first in the file (pipes, file fds, stdin bytes, grandchild, git alias) | yes, `killed 1 dangling process` |
+| `Bun.spawnSync` stuck after a `spawnSync` at module load | yes |
+| `Bun.spawnSync` stuck after any `spawnSync` in an earlier test, or after an earlier cut | **no**: it runs until the child exits (30 s child → test "timed out after 2000ms" at 30 010 ms) |
+| `Bun.spawnSync` stuck after an *async* timeout | yes |
+| a busy JS loop or `Bun.sleepSync` | only when it ends by itself |
+| a blocking read (FIFO) | **no**: the run never ends; with `--parallel=3` and 6 other files, nothing printed and no summary |
+| an awaited, or left, detached `Bun.spawn` child | yes / no effect |
+
+So one blocked worker is enough to stop the whole `--parallel` run, and the 15-min check timeout is the first thing that ends it.
+
+#### Cause
+
+- **Confirmed (amplifier):** a stuck `spawnSync` cannot be cut by the per-test timeout once the file has run another `spawnSync` (bun 1.3.13). The repo's sync spawns with no timeout of their own are where this bites:
+  - `test/support/harness.ts:256-260`: `sh()` calls `spawnSyncCaptured(["git", …])` with no `timeoutMs`;
+  - `packages/store/src/spawn.ts:192-207`: `spawnSyncCaptured` passes `timeout` to `Bun.spawnSync` only when the caller gives one;
+  - `packages/store/src/git.ts:49-57`: `gitSync`, whose default comes from `gitTimeoutMs(args)`.
+- **Corrected from triage:** "`spawnSync` blocks the event loop, so the timeout never fires" holds only from the second `spawnSync` on. The first is cut.
+- **Not the cause:** `upgrade-version.test.ts:14` `setDefaultTimeout(60_000)`. That file finished 7/7 in the hung run. `upgrade-records.test.ts:14` (`90_000`) and `run-rerun-check.test.ts` / `tick-timing.test.ts` (`30_000`) also override the tier's 20 s, which is why AC1 failed after 90 s, not 20 s.
+
+#### Left open (ranked, not confirmed)
+
+The trigger, meaning which git (or other) child stuck in `upgrade-records.test.ts` on CI, did not show here:
+
+- 18 runs of that file alone, 6 at once under full-tier load: 12/12 each time.
+- 24 runs of the CI-silent files plus their neighbours.
+- 3 full tiers at once (12 workers each; ~8 min each; only bounded, named per-test timeouts).
+
+Ranked:
+
+1. AC1's first wait was async (it was cut, with a dangling child killed). The next test's `sh()`/`gitSync` then blocked on a child that did not exit, uncuttable. Check: whether AC1's `upgrade` → `pushRecord`/`casRef` (`packages/store/src/record-ref.ts:141-160`) or its `norn sync` can wait on a git child that holds a lock or waits on the remote.
+2. AC1 timed out, and its abandoned continuation keeps running against the module-level `h` (`upgrade-records.test.ts:27`, reassigned by the next test's `olderBase()`, while `afterEach` cleans up). The two then race on one repo.
+
+#### Rules
+
+None (test infrastructure). C5 only by analogy: a check's own timeout kills the process group, and the harness has no such bound.
+
+#### Seam for a regression test
+
+An integration-tier test (it starts processes, so not the unit tier). It runs a fixture file like the loop above as a child `bun test --timeout=2000` with an outer bound, and asserts two things:
+
+- the run ends well before the bound;
+- the second stuck test is named `(fail)`.
+
+It goes red today. It turns green once harness `sh()` (and every `spawnSyncCaptured` in test support) carries its own `timeoutMs` below the tier's per-test timeout, because `Bun.spawnSync`'s own `timeout` kills the child whatever bun test does. A tier-level watchdog that names the running files when output stops would cover blocks that are not spawns (the FIFO row).
+
+### Not done
+
+Posting the `## Reproduce` comment on #215 was denied by the session's permission classifier (external write). The comment text is exactly the Findings above.
+
 ## Resume
+
+Post the Findings above as a comment on #215, beginning `## Reproduce`, then report `norn done reproduced`.
