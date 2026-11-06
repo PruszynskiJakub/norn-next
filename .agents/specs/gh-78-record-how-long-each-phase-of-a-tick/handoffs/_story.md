@@ -13,6 +13,19 @@ Every tick record says where the tick spent its time (observe and its phases, de
 - Note: `act_ms` includes writing `tick.start` and building the Actor.
 - implement#1 done: Tick records now carry sync report + timing (observe phases with remote call counts, decide, act, after, slowest); each decision result has ms; tick.end names the slowest phase; story list and cockpit header show the last tick's duration. Optional fields, outside facts/actions (O4 amended, O5 untouched). Unit tests + dev-build smoke; unit tier and typecheck green.
 
+- review#1 (changes_requested): the scope and the design are right; test#1 passed. Blocking F1: no test runs a tick and checks the timing it records (observe phases and call counts, Actor ms, record sync/timing, tick.end slowest, heartbeat last_tick_ms → view). Minor F2: a batched renewal's time is counted again for each claim in slowest/result.ms. Minor F3: there is no separate 'process' phase. Nit F4: act_ms includes the tick.start write.
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| W1 observe broken down (sync phases, call counts, local, stories, runner) | test | UNTRACED (only `tick-timing.test.ts` › "PhaseTimer adds up the time of each phase and counts calls"; observe's wiring is untested) |
+| W2 decide timed | test | partial: `tick-timing.test.ts` › "tickTiming names the slowest…" (fed input; runTick untested) |
+| W3 each action's time in result.ms, incl. claim.renew | test | partial: `tick-timing.test.ts` › "traceRecord records the sync report, each action's time…" (Actor's measuring untested) |
+| W4 SyncReport in the tick record | test | `tick-timing.test.ts` › "traceRecord records the sync report…" |
+| W5 new fields optional, outside facts/action | test | `packages/schema/test/unit/records.test.ts` › "gh-78: a tick record carries its phase timings…" |
+| W6 slowest phase visible (tick.end) | test | partial: tickTiming test + schema test; the tick.end write is UNTRACED |
+| W7 last tick's duration in status and the cockpit | test | `packages/view/test/unit/view.test.ts` › "gh-78: the heartbeat line…", `cockpit-tui.test.ts` › "gh-78: the header shows…"; markTick → lastTickMs → load is UNTRACED |
+- review#1 changes_requested: Scope and design are right and every test tier passed. Blocking: no test runs a tick and checks the timing it records (observe phases and call counts, Actor ms, sync/timing in the record, tick.end slowest, heartbeat last_tick_ms in the view). Also minor: renewal batch time counted per claim, no separate process phase; nit: act_ms includes the tick.start write.
+
 ## Resume
 
-Done; waiting for review. If review wants more, the seams are `tickTiming`/`PhaseTimer` (unit) and the tick record (cli integration harness).
+Next (implement): add one cli integration test on createHarness (FakeRemote, one story) that runs a sync tick and checks the trace's tick record (sync, timing.observe phases, timing.calls, result.ms), tick.end.slowest and loadProjectView's heartbeat.last_tick_ms. Optionally address F2–F4 (see review findings).
