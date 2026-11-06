@@ -1,0 +1,1 @@
+{"kind":"update","receipt_id":"01M6RBKSH9JJKSVV3G1WBNMJ37","run_id":null,"step":"resolve","attempt":1,"at":"2026-11-06T11:58:55.529Z","by":"human","who":"jakubpruszynski@mac","slice":null,"round":1,"from":"resolve","to":"update","reason":"person","skills_drift":["norn-review"]}
