@@ -13,3 +13,7 @@
 ### Resume
 
 Nothing left for implement; next is the workflow's review/test.
+
+## Progress
+
+- implement#1 done: norn-review: REVIEW.md source, verify pass before Decide, file+line required, counted summary; norn init writes starter REVIEW.md when absent. Tests: init-review integration, assets unit content test; unit/integration/typecheck green.
