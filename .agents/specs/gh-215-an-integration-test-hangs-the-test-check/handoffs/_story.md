@@ -116,6 +116,17 @@ The `## Reproduce` comment is on #215: https://github.com/PruszynskiJakub/norn-n
 - Unit tier and typecheck green.
 - implement#1 done: Harness sh() now passes a 15s timeoutMs (below the tier's 20s) to spawnSyncCaptured, so a git child that never exits is killed and its test fails named, instead of blocking the worker and the whole --parallel tier (bun 1.3.13 can't cut a 2nd spawnSync). Regression test packages/cli/test/integration/harness-git-timeout.test.ts runs a stuck-git fixture under bun test: red before (hit 15s bound), green after (~1.3s, 3/3). Unit tier + typecheck green.
 
+### Review (review#1)
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| Wanted: a stuck harness git call (`sh()` / `h.git`) fails its test, named, and the run goes on | test | `packages/cli/test/integration/harness-git-timeout.test.ts` › "a harness git call that never exits fails its test, named, instead of hanging the run" (ran green: 1 pass, 1.3 s) |
+| Wanted: the integration tier never hangs past the per-test timeout (any stuck test fails named) | test | UNTRACED (F1): norn's in-process local `gitSync` and direct `Bun.spawnSync` in test files are still unbounded |
+
+- F1 (blocking, spec): the bound covers only harness `sh()`. Commands run in-process (`test/support/harness.ts:4`, `runCli`), so norn's own local git calls go through store `gitSync` (`packages/store/src/git.ts:50`, `gitTimeoutMs` → no timeout for local subcommands, H11) on `spawnSync`, the same uncuttable path. Reproduce's top hypothesis for the CI hang (`upgrade` → `pushRecord`/`casRef`) runs exactly there, so the observed hang can recur unchanged. Direct `Bun.spawnSync` in test files (e.g. `records.test.ts:217`, `story-reopen.test.ts:242`) is also unbounded.
+- F2 (minor, standards): a `sh()` timeout SIGKILLs only git; a grandchild (the fixture's `sleep 60`) is left orphaned until it exits.
+- review#1 changes_requested: Harness sh() bound is correct and its regression test is green, but it covers only the harness's own git calls. In-process norn git calls (store gitSync, local subcommands unbounded per H11) and direct spawnSync in test files can still hang the tier, including reproduce's top suspect for the CI hang. F1 blocking: add a bound the harness controls (tier watchdog or test-only in-process git timeout) plus a red-first fixture test. F2 minor: the timeout kills git only, so its grandchildren are orphaned.
+
 ## Resume
 
-Implement is done and reported. Next is the workflow's check/CI; if CI shows a hang again, look at the remaining unbounded sync spawns listed above.
+review#1 requested changes (F1 above, findings in the receipt). Next implement: bound what the harness cannot reach, without changing H11 for real runs. Either a tier-level watchdog for `test:integration` that kills the run when output stops and names the files still running (it also covers the FIFO row), or a test-only bound on in-process git under the harness. Add a fixture test that goes red today for a stuck in-process norn git call.
