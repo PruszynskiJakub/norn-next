@@ -19,6 +19,7 @@ import type { NumberedReceipt, UnitRef } from "./facts.ts";
 import { edgeOf, OVERRIDABLE_ROUTES, stepOf } from "./workflow.ts";
 import { cmd } from "./commands.ts";
 import { stepLimits } from "./policy.ts";
+import { waitsForBaseUpdate } from "./verbs.ts";
 
 export interface ApplyContext {
   /** the unit's pinned workflow (S7) */
@@ -367,8 +368,7 @@ function updateFrom(st: UnitState, r: ReceiptOf<"update">, ctx: ApplyContext): S
   if (st.slice !== null) return { reject: `${cmd.storyUpdateBranch()} is for the story unit` };
   if (r.step !== st.step || r.attempt !== st.attempt) return { reject: `stale: receipt for ${r.step}#${r.attempt}, cursor at ${st.step}#${st.attempt}` };
   const held = st.status === "ready" && !!r.skills_drift?.length && stepOf(ctx.workflow, st.step)?.type === "agent";
-  const waiting = st.status === "done" || st.status === "stuck" || (st.status === "parked" && st.park?.kind === "gate") || held;
-  if (!waiting) return { reject: `unit is ${st.status}${st.park ? ` (${st.park.kind})` : ""}; update needs it done, at a gate, stuck or held by drifted skills` };
+  if (!waitsForBaseUpdate(st, held)) return { reject: `unit is ${st.status}${st.park ? ` (${st.park.kind})` : ""}; update needs it done, at a gate, stuck or held by drifted skills` };
   if (!stepOf(ctx.workflow, r.to)) return { reject: `no step '${r.to}' in workflow ${ctx.workflow.name}` };
   const next = enterStep(st, ctx.workflow, r.to, ctx.now);
   return { state: next, log: `update by ${r.who ?? r.by}: ${st.step} → ${r.to}`, advance: { from: st.step, outcome: "update", to: r.to, moved: true } };

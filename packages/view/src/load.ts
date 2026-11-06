@@ -28,25 +28,25 @@ import {
   stepOf,
   type UnitFacts,
   type WorktreeFacts,
-  storyMode,
 } from "@norn/core";
-import { DEFAULT_CONFIG, type HookFact, type Mode, type ResolvedConfig, storyBranch, type UnitState, type Workflow } from "@norn/schema";
+import { CLAIMS_PREFIX, DEFAULT_CONFIG, type HookFact, isClosedStatus, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import {
   cachedDefaultBranch,
   classifyClaim,
-  defaultBaseRef,
   lastTickAt,
   lastTickMs,
   type LeaseEntry,
   type LeaseLiveness,
   type LocalUnit,
+  baseStoryFacts,
+  baseUnitFacts,
   bindNornHome,
   loadLocalFacts,
   loadRounds,
   machineHolder,
   onlyNornCommitsSince,
   readEnvNorn,
-  readLocalClaim,
+  readLocalStoryRefs,
   runHooks,
   scanWorktrees,
   type StorySnapshot,
@@ -103,6 +103,11 @@ export interface LoadProjectViewOptions {
   version?: string;
   /** gh-61 D5 (B19): this norn's bundled skills; given with `version` = the inbox shows drifted skills */
   bundledSkills?: { source: string; names: readonly string[] };
+  /**
+   * HC13: a view for the inbox and the story statuses alone (`status --segment`, run every few seconds):
+   * earlier rounds are not read, so stories' `delegated` is empty
+   */
+  inboxOnly?: boolean;
 }
 
 /** A worktree as the view sees it: on disk and its slot; git status is not read (no git, X1). Null when absent, as observe. */
@@ -240,25 +245,7 @@ function unitFacts(lu: LocalUnit, hooks: readonly HookFact[], leaseByRun: Readon
       transcript: [...mine].reverse().find((h) => h.transcript)?.transcript ?? r.transcript ?? null,
     };
   }
-  return {
-    unit: u.unit,
-    record: u.record,
-    state: st,
-    workflow: u.workflow?.workflow ?? null,
-    workflow_hash: u.workflow?.hash ?? null,
-    errors: u.errors,
-    unapplied: u.unapplied,
-    last_check: lu.last_check,
-    last_findings: lu.last_findings,
-    last_outcome_receipt: lu.last_outcome_receipt,
-    worktree,
-    run,
-    lease: lu.lease,
-    uncommitted: false,
-    ...(lu.step_runs ? { step_runs: lu.step_runs } : {}),
-    ...(lu.act_failure ? { act_failure: lu.act_failure } : {}),
-    ...(lu.skills_drift ? { skills_drift: lu.skills_drift } : {}),
-  };
+  return { ...baseUnitFacts(lu), worktree, run, uncommitted: false };
 }
 
 /** BS1/BS3: the last base measurement (`trace/base.json`) and the newest base merge in the story unit's receipts. */
@@ -342,7 +329,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const ctx: Ctx = { now, config, runner, heartbeatDown: false };
 
   const leases = local.leases;
-  const claims = await Promise.all(local.stories.map((s) => readLocalClaim(opts.repoRoot, s.snapshot.key).catch(() => ({ state: "none" }) as const)));
+  const storyRefs = readLocalStoryRefs(opts.repoRoot);
+  const claims = await Promise.all(local.stories.map((s) => storyRefs.claim(s.snapshot.key).catch(() => ({ state: "none" }) as const)));
   errors.push(...leases.errors);
 
   const leaseByRun = new Map<string, { entry: LeaseEntry; alive: boolean }>();
@@ -352,7 +340,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const me = { heartbeat_id: opts.heartbeatId ?? null };
 
   const remoteName = config.git_remote;
-  const baseRef = defaultBaseRef(opts.repoRoot, remoteName, config.base_branch);
+  const baseRef = snap.base_ref;
+  const defaultBranch = config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main";
   const prSeen = local.pr_seen;
   // F35/C5: the ready approval's head, voided by a later re-entry; and whether only norn moved the PR head since
   const readyHeads = await Promise.all(
@@ -373,19 +362,11 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     const story = ls.snapshot;
     let claim = classifyClaim(claims[i] ?? { state: "none" }, me, now);
     if (claim.state === "other" && claim.blob.holder === holder) claim = { ...claim, state: "mine" };
-    const storyState = story.units[0]?.state ?? null;
-    // B10, B25: before its story unit pins a workflow, a story runs in the one it will start (MO1)
-    const mode: Mode = storyMode(storyState, story.units[0]?.workflow?.workflow ?? snap.workflows.workflows[story.frontmatter?.workflow ?? config.workflow]?.workflow, config);
-    const finished = story.frontmatter?.status === "done" || story.frontmatter?.status === "dropped";
+    const finished = isClosedStatus(story.frontmatter?.status);
 
     const units: UnitFacts[] = ls.units.map((lu) => unitFacts(lu, lu.hooks, leaseByRun));
     const sf: StoryFacts = {
-      key: story.key,
-      slug: story.slug,
-      spec_dir: story.spec_dir,
-      branch: storyBranch(story.key, story.slug),
-      frontmatter: story.frontmatter,
-      frontmatter_error: story.frontmatter_error,
+      ...baseStoryFacts(ls, snap.workflows.workflows, config),
       worktree: worktreeFacts(ls.worktree),
       claim,
       mailbox: undefined,
@@ -398,14 +379,6 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       ...readyHeads[i],
       units,
       slices: story.slices,
-      mode,
-      // NT2/NT3: open notes of the story (loadLocalFacts, as observe)
-      ...(ls.notes ? { notes: ls.notes } : {}),
-      // gh-195 D12 (B21): mailbox receipts this checkout rejected (loadLocalFacts, as observe)
-      ...(ls.rejected ? { rejected_mailbox: ls.rejected } : {}),
-      ...(ls.record_refused ? { record_refused: ls.record_refused } : {}),
-      ...(ls.record_unplaced ? { record_unplaced: ls.record_unplaced } : {}),
-      ...(ls.snapshot.record_only ? { record_only: true } : {}),
       // BS1: the last base measurement of this checkout's ticks (stale items, merge-item detail)
       ...(local.base[story.key] && !finished ? { base: local.base[story.key] } : {}),
     };
@@ -460,9 +433,9 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
           errors: file?.error ? [file.error, ...v.errors] : v.errors,
         };
       });
-      // gh-196 D5 (B22): reads each earlier round's receipts on every load, `status --segment` included (HC13);
+      // gh-196 D5 (B22): reads each earlier round's receipts on every load but the inbox-only one (`status --segment`, HC13);
       // accepted: a story has few rounds, and a cache across loads went stale
-      const delegated = delegatedDecisions(story);
+      const delegated = opts.inboxOnly ? { decisions: [], errors: [] } : delegatedDecisions(story);
       stories.push({
         ...base,
         slice: null,
@@ -471,7 +444,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
         pr: prView(prSeen[story.key]),
         notes: sf.notes ?? [],
         delegated: delegated.decisions,
-        base_sync: baseSync(sf, storyUnit.receipts ?? [], config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main"),
+        base_sync: baseSync(sf, storyUnit.receipts ?? [], defaultBranch),
         story_status: story.frontmatter?.status ?? null,
         spec_dir: story.spec_dir,
         root: story.root,
@@ -484,7 +457,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const facts: Facts = {
     tick_id: "view",
     now,
-    repo: { root: opts.repoRoot, default_branch: config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main", remote: config.git_remote },
+    repo: { root: opts.repoRoot, default_branch: defaultBranch, remote: config.git_remote },
     machine: {
       holder,
       heartbeat_id: opts.heartbeatId ?? null,
@@ -519,7 +492,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
 
   // gh-195 D6: stories another heartbeat holds that this checkout has no copy of, from local refs only
   const held = await heldElsewhereKeys(opts.repoRoot, me, now, new Set(local.stories.map((s) => s.snapshot.key))).catch((e: Error) => {
-    errors.push({ file: "refs/norn/claims/", errors: [{ path: "", message: `cannot list the claims held elsewhere: ${e.message}` }] });
+    errors.push({ file: CLAIMS_PREFIX, errors: [{ path: "", message: `cannot list the claims held elsewhere: ${e.message}` }] });
     return [];
   });
   const elsewhere = await Promise.all(held.map(async (e) => elsewhereView(await loadElsewhereStory(opts.repoRoot, remoteName, e.key, e.claim, baseRef), config.record.policy, prSeen[e.key])));

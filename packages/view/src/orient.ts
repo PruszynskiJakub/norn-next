@@ -5,7 +5,7 @@
  * Built on the orient report, which it extends. Pure: a ProjectView in, a report out; read only (X1).
  */
 import { cmd, formatAge, type InboxGroup } from "@norn/core";
-import type { RemoteProvider, StoryStatus } from "@norn/schema";
+import { PROVIDERS, type RemoteProvider, type StoryStatus } from "@norn/schema";
 import { inboxItemsInOrder } from "./format.ts";
 import type { ClaimView, DelegatedDecision, PrView, ProjectView, SliceView, StoryView, UnitView } from "./types.ts";
 
@@ -87,7 +87,7 @@ export interface OrientReport {
 
 /** The provider CLI that shows the story PR (`--web` opens it in the browser). */
 export function prCommand(provider: RemoteProvider, branch: string, web = false): string {
-  const base = provider === "glab" ? `glab mr view ${branch}` : `gh pr view ${branch}`;
+  const base = PROVIDERS[provider].prView(branch);
   return web ? `${base} --web` : base;
 }
 

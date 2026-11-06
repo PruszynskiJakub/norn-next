@@ -3,7 +3,7 @@
  * as an immutable receipt (P6, S6) that the next tick applies; the agent then ends its turn.
  */
 import { relative } from "node:path";
-import { type Receipt, type ReceiptOf, ulid } from "@norn/schema";
+import { type Receipt, type ReceiptOf, receiptNumber, ulid } from "@norn/schema";
 import { appendReceipt, handoffProse, readText, writeHandoffBody } from "@norn/store";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
@@ -23,7 +23,7 @@ export function reportTarget(ctx: Context, verb: string): ReportTarget {
   if (run) {
     const report = standingReport(s, run.run_id);
     if (report)
-      throw refuse(`this run already reported \`${reportCommand(report.receipt)}\` (receipt ${String(report.n).padStart(4, "0")}); exactly one report per run`, "end your turn", "already_reported");
+      throw refuse(`this run already reported \`${reportCommand(report.receipt)}\` (receipt ${receiptNumber(report.n)}); exactly one report per run`, "end your turn", "already_reported");
   }
   refuseUnlessAgentWork(s, verb);
   if (!run) throw refuse(`no run of ${s.state.step}#${s.state.attempt} has started in this worktree`, `${cmd.brief()} (it starts the run), do the step, then report`, "no_run");
@@ -73,6 +73,16 @@ export function writeReport(t: ReportTarget, receipt: Receipt) {
 export function rejectProgress(r: Receipt): string {
   const comment = r.kind === "reject" ? r.comment?.trim() : undefined;
   return `${r.step}#${r.attempt} reject${r.who ? ` by ${r.who}` : ""}: ${comment || "(no comment given)"}`;
+}
+
+/**
+ * O6: a gate rejection is a milestone of its unit. Every writer of a unit's receipts calls this once
+ * they are written (P6: receipt first) — act's `writeReceipts` and a person's local delivery — so each
+ * `reject` among them appends its progress line to the handoff whichever route brought it.
+ */
+export function receiptsWritten(handoffFile: string | null, receipts: readonly Receipt[]): void {
+  if (!handoffFile) return;
+  for (const r of receipts) if (r.kind === "reject") appendProgress(handoffFile, rejectProgress(r));
 }
 
 /** The agent's milestone (O6): one line appended to the Progress section of handoff.md. */

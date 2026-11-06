@@ -10,7 +10,7 @@ export * from "./config-migrate.ts";
 export * from "./frontmatter.ts";
 export * from "./fsx.ts";
 // raw git (`git`, `gitSync`, blob and ref plumbing) stays inside store: everyone else goes through GitPort (X2)
-export { type CasResult, fetchNornRefs, gitTimeoutMs, NETWORK_TIMEOUT_MS, onlyNornCommitsSince } from "./git.ts";
+export { type CasResult, fetchNornRefs, gitRemoteUrl, gitTimeoutMs, NETWORK_TIMEOUT_MS, onlyNornCommitsSince } from "./git.ts";
 export * from "./heartbeat.ts";
 export * from "./inbox-history.ts";
 export * from "./layout.ts";

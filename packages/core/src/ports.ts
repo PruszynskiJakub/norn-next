@@ -430,6 +430,8 @@ export interface RunnerCapabilities {
   resume: boolean;
   /** MO5: `openForPerson` opens a terminal a person works in; absent = false */
   open?: boolean;
+  /** sessions have no terminal: the agent runs its non-interactive command (`AgentLaunchRequest.headless`); absent = false */
+  headless?: boolean;
 }
 
 /** MO5: a terminal for a person in `cwd`, running `command` (the start command a person would type). */
@@ -452,6 +454,8 @@ export interface RunnerSessionInfo {
 export interface RunnerPort {
   readonly name: string;
   readonly capabilities: RunnerCapabilities;
+  /** doctor's error when `available()` is false; absent = `<name> runner not available` */
+  readonly unavailableHint?: string;
   /** Usable on this machine now (binary present, server reachable). */
   available(): Promise<boolean>;
   launch(spec: LaunchSpec): Promise<SessionRef>;
@@ -525,6 +529,8 @@ export interface AgentAdapter {
   /** adapter id, e.g. `claude` */
   readonly name: string;
   readonly tier: HookTier;
+  /** doctor: what a person sets up in the agent tool before its hooks run; absent = nothing */
+  readonly setupNote?: string;
   /**
    * A1: add/update norn-owned hooks in the repo's agent config; each runs
    * `<hookCommand> <event> --agent <agent>` so `norn hook` never has to guess the agent (A2).

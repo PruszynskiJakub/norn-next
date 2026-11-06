@@ -107,3 +107,8 @@ export async function buildPorts(registry: AdapterRegistry, actx: AdapterContext
     notifiers,
   };
 }
+
+/** The wired runner when `session` runs in it, else null: a session of another runner is not reachable from here. */
+export function runnerFor(ports: Pick<Ports, "runner">, session: { runner: string } | null | undefined): RunnerPort | null {
+  return session && ports.runner && ports.runner.name === session.runner ? ports.runner : null;
+}

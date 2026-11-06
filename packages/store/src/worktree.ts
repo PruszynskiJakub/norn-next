@@ -5,13 +5,10 @@
 import { readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { SLOTS } from "@norn/schema";
-import { isSliceKey, isStoryKey, parseSliceFileName, parseSpecDirName, sliceDirName, sliceKey, specDir, STORY_UNIT_DIR, storyDirName } from "@norn/schema";
+import { isSliceKey, isStoryKey, parseSliceDirName, parseSliceFileName, parseSpecDirName, sliceDirName, sliceKey, specDir, STORY_UNIT_DIR, storyDirName } from "@norn/schema";
 import { atomicWrite, readText } from "./fsx.ts";
 import { git } from "./git.ts";
-import { envNornPath, unitMarkerPath } from "./paths.ts";
-
-/** Worktree files norn writes per machine; never committed. */
-const WORKTREE_LOCAL_FILES = [".env.norn", ".norn-unit"] as const;
+import { envNornPath, unitMarkerPath, WORKTREE_LOCAL_FILES } from "./paths.ts";
 
 /**
  * `.env.norn` and `.norn-unit` are machine-local: add them to the repo's shared `info/exclude`
@@ -98,7 +95,7 @@ export function inferUnitMarker(repo: string, path: string, branch: string | nul
   const cut = name.indexOf("--");
   const owner = cut > 0 ? parseSpecDirName(name.slice(0, cut)) : null;
   const unit = cut > 0 ? name.slice(cut + 2) : "";
-  const nn = /^([0-9]{2,3})-[a-z0-9-]+$/.exec(unit)?.[1];
+  const nn = parseSliceDirName(unit)?.nn;
   if (!owner || !nn || branch !== `${owner.story}/${unit}`) return null;
   return { repo, story: owner.story, slice: sliceKey(owner.story, nn), unit, spec_dir: specDir(owner.story, owner.slug) };
 }

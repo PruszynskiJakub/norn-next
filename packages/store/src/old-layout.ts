@@ -30,7 +30,7 @@ export function moveFile(from: string, to: string): void {
 }
 
 /** The old trace dir's entries to move, without the tick lock `norn upgrade` holds there. */
-export const oldTraceEntries = (root: string): string[] => entries(join(root, OLD_TRACE_DIR)).filter((n) => n !== basename(oldTickLockPath(root)));
+const oldTraceEntries = (root: string): string[] => entries(join(root, OLD_TRACE_DIR)).filter((n) => n !== basename(oldTickLockPath(root)));
 
 /** Entries of the old workflows folder, relative to the root. */
 export const oldWorkflowEntries = (root: string): string[] => entries(join(root, OLD_WORKFLOWS_DIR)).map((n) => `${OLD_WORKFLOWS_DIR}/${n}`);

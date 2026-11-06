@@ -74,11 +74,34 @@ export function listReceipts(unitDir: string, opts: { after?: number; root?: str
 }
 
 export function readReceipt(unitDir: string, n: number, root?: string): NumberedReceipt | FileError | null {
-  const e = entries(unitDir).entries.find((x) => x.n === n);
-  if (!e) return null;
-  const r = readJsonFile("receipt", e.file, root);
-  if (r.ok) return { n, file: displayPath(e.file, root), receipt: r.value };
-  return r.reason === "corrupt" ? r.error : null;
+  return receiptIndex(unitDir).read(n, root);
+}
+
+/** A unit's receipts listed once (S6: numbered, never rewritten), each read by number without listing the folder again. */
+export interface ReceiptIndex {
+  /** every numbered receipt file, ascending */
+  entries: ReadonlyArray<{ n: number; kind: string }>;
+  /** receipt `n` as `readReceipt` reads it */
+  read(n: number, root?: string): NumberedReceipt | FileError | null;
+}
+
+/** `valid`: the unit's receipts already read and validated (`listReceipts`), served without opening their files again. */
+export function receiptIndex(unitDir: string, valid: readonly NumberedReceipt[] = []): ReceiptIndex {
+  const listed = entries(unitDir).entries;
+  const byN = new Map(listed.map((e) => [e.n, e]));
+  const held = new Map(valid.map((r) => [r.n, r.receipt]));
+  return {
+    entries: listed,
+    read(n, root) {
+      const e = byN.get(n);
+      if (!e) return null;
+      const known = held.get(n);
+      if (known && known.kind === e.kind) return { n, file: displayPath(e.file, root), receipt: known };
+      const r = readJsonFile("receipt", e.file, root);
+      if (r.ok) return { n, file: displayPath(e.file, root), receipt: r.value };
+      return r.reason === "corrupt" ? r.error : null;
+    },
+  };
 }
 
 /** Highest receipt number present or reserved (valid or not); 0 when none. */

@@ -1,8 +1,9 @@
 /** observe: a unit's run facts — its run windows (C4), hook facts refined per agent (A2), the live or unknown run (R5.1, R5.3, B3). */
-import type { AgentAdapter, FileError, Ports, RunFacts, UnitFacts, WorktreeFacts } from "@norn/core";
+import type { AgentAdapter, Ports, RunFacts, UnitFacts, WorktreeFacts } from "@norn/core";
 import { type HookFact, treeStoryRunStatePath } from "@norn/schema";
-import { handoffPath, type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot } from "@norn/store";
+import { baseUnitFacts, handoffPath, type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot } from "@norn/store";
 import type { DatedCommit } from "./git-facts.ts";
+import { runnerFor } from "../../wiring.ts";
 
 /** A2: each agent adapter's own pass over a run's hook facts (`refineHooks`), once per adapter name. */
 function refineHooks(agents: Record<string, AgentAdapter>, hooks: HookFact[]): HookFact[] {
@@ -97,7 +98,8 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
     // R7.2 (N5): a pid or pane id from another machine means nothing in this machine's tables
     const foreign = !!r.machine && r.machine !== env.holder;
     const process_alive = r.process && !foreign ? await ports.process.isAlive(r.process).catch(() => null) : null;
-    const pane = session && !foreign && ports.runner && session.runner === ports.runner.name ? await ports.runner.paneState(session).catch(() => null) : null;
+    const runner = foreign ? null : runnerFor(ports, session);
+    const pane = session && runner ? await runner.paneState(session).catch(() => null) : null;
     // A2: a Claude permission prompt names no command; its adapter takes it from the preceding
     // PreToolUse (other agents' facts pass through unchanged) so the implicit ask and inbox show it
     const mine = refineHooks(ports.agents, runHooks(hooks, r, worktree?.path ?? null));
@@ -115,29 +117,18 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
       transcript: [...mine].reverse().find((h) => h.transcript)?.transcript ?? r.transcript ?? null,
     };
     // B3: a gone process's first output lines (its run log) say why it never got going
-    if (session && (process_alive === false || pane?.alive === false) && ports.runner?.output && session.runner === ports.runner.name) {
-      const output = await ports.runner.output(session).catch(() => null);
+    const own = runnerFor(ports, session);
+    if (session && (process_alive === false || pane?.alive === false) && own?.output) {
+      const output = await own.output(session).catch(() => null);
       if (output) run.output = output;
     }
   }
 
-  const errors: FileError[] = u.errors;
   return {
-    unit: u.unit,
-    record: u.record,
-    state: st,
-    workflow: u.workflow?.workflow ?? null,
-    workflow_hash: u.workflow?.hash ?? null,
-    errors,
-    unapplied: u.unapplied,
-    last_check: lu.last_check,
-    last_findings: lu.last_findings,
-    last_outcome_receipt: lu.last_outcome_receipt,
+    ...baseUnitFacts(lu),
     worktree,
     run,
-    lease: lu.lease,
     uncommitted,
-    ...(lu.step_runs ? { step_runs: lu.step_runs } : {}),
     ...branchRecord(story, u, worktree),
   };
 }

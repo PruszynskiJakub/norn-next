@@ -164,7 +164,7 @@ describe("unpack (D3)", () => {
     const parent = join(tmp(), "machine", "runs");
     mkdirSync(parent, { recursive: true });
     const dest = join(parent, "gh-9");
-    const r = await unpackRecord(root, sha, dest);
+    const r = unpackRecord(root, sha, dest);
     expect(r.ok).toBe(false);
     expect(existsSync(dest)).toBe(false);
     expect(existsSync(join(parent, "escaped.txt"))).toBe(false);
@@ -176,7 +176,7 @@ describe("unpack (D3)", () => {
     const target = await git(root, ["hash-object", "-w", "--stdin"], "/etc/passwd");
     const sha = await commitOf(root, `120000 blob ${target}\tlink\n`);
     const dest = join(tmp(), "gh-9");
-    expect((await unpackRecord(root, sha, dest)).ok).toBe(false);
+    expect(unpackRecord(root, sha, dest).ok).toBe(false);
     expect(existsSync(dest)).toBe(false);
   });
 
@@ -186,7 +186,7 @@ describe("unpack (D3)", () => {
     const tree = await git(root, ["mktree", "-z"], `100644 blob ${blob}\ta\tb\nc\0`);
     const sha = await git(root, ["commit-tree", tree, "-m", "record"]);
     const dest = join(tmp(), "gh-9");
-    expect(await unpackRecord(root, sha, dest)).toEqual({ ok: true, files: 1 });
+    expect(unpackRecord(root, sha, dest)).toEqual({ ok: true, files: 1 });
     expect(readFileSync(join(dest, "a\tb\nc"), "utf8")).toBe("t\n");
   });
 
@@ -197,7 +197,7 @@ describe("unpack (D3)", () => {
     expect((await pushRecord(root, null, STORY, { expected: null, holder: "me@host", branch_commit: null, at: AT })).ok).toBe(true);
     const dest = join(tmp(), "gh-9");
     write(dest, { "_story/notes.txt": "old\n", "_story/receipts/0009-done.json": "{}", "01-old/state.txt": "stale\n" });
-    expect(await unpackRecord(root, await git(root, ["rev-parse", recordRef(STORY.key)]), dest)).toEqual({ ok: true, files: 1 });
+    expect(unpackRecord(root, await git(root, ["rev-parse", recordRef(STORY.key)]), dest)).toEqual({ ok: true, files: 1 });
     expect(filesOf(dest)).toEqual(["_story/notes.txt"]);
     expect(readFileSync(join(dest, "_story/notes.txt"), "utf8")).toBe("kept\n");
     expect(readdirSync(dirname(dest)).filter((n) => n !== "gh-9")).toEqual([]);
@@ -210,7 +210,7 @@ describe("unpack (D3)", () => {
     const sha = await commitOf(root, `040000 tree ${inner}\t_story\n`);
     const dest = join(tmp(), "gh-9");
     write(dest, { "_story/notes.txt": "old\n" });
-    const r = await unpackRecord(root, sha, dest);
+    const r = unpackRecord(root, sha, dest);
     expect(r.ok).toBe(false);
     expect(filesOf(dest)).toEqual(["_story/notes.txt"]);
   });

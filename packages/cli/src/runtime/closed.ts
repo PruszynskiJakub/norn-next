@@ -3,7 +3,7 @@
  * without a remote) says `dropped`. `story close` refuses a closed story (B39); `story reopen`
  * acts only on one (B42) and offers only those (B55).
  */
-import { LEGACY_SPEC_FILE, parseSliceFileName, type SliceFrontmatter, sliceBranch, SPEC_FILE, specDir, STORY_KEY_PATTERN, type StoryFrontmatter } from "@norn/schema";
+import { LEGACY_SPEC_FILE, parseSliceFileName, type SliceFrontmatter, sliceBranch, sliceKey, SPEC_FILE, specDir, STORY_KEY_PATTERN, type StoryFrontmatter } from "@norn/schema";
 import { parseSliceFile, parseStoryFile } from "@norn/store";
 import type { Context } from "../context.ts";
 import { failure } from "../output.ts";
@@ -75,7 +75,7 @@ export async function startedSliceBranches(ctx: Context, s: PushedStory): Promis
     if (!file || text === null) continue;
     const doc = parseSliceFile(text, `${s.rev}:${dir}/${name}`);
     const fm: SliceFrontmatter | null = doc.ok ? doc.value.frontmatter : null;
-    if (fm?.status === "active") out.push({ key: `${s.key}/${file.nn}`, branch: sliceBranch(s.key, file.nn, file.slug) });
+    if (fm?.status === "active") out.push({ key: sliceKey(s.key, file.nn), branch: sliceBranch(s.key, file.nn, file.slug) });
   }
   return out;
 }

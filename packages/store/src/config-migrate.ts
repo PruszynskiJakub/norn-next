@@ -8,7 +8,7 @@
 import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import { AGENT_NAMES, ATTENDED_WAIT, isAgentName, SPEC_FILE } from "@norn/schema";
+import { AGENT_NAMES, ATTENDED_WAIT, CONFIG_FILES, isAgentName, SPEC_FILE } from "@norn/schema";
 import { Document, isMap, isScalar, isSeq, type Pair, parseDocument, type YAMLMap } from "yaml";
 import { writeConfigSchemas, WORKFLOW_EXT } from "./config.ts";
 import { atomicWrite, isErrno, readText } from "./fsx.ts";
@@ -34,7 +34,7 @@ export interface ConfigMigration {
   renamed: Array<{ file: "user" | "repo"; from: string; to: string }>;
 }
 
-const USER_FILE = "~/.norn/config.yaml";
+const USER_FILE = CONFIG_FILES.user;
 
 type YMap = YAMLMap<unknown, unknown>;
 

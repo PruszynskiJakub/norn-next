@@ -36,13 +36,12 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { cmd, upgradeBackward } from "@norn/core";
 import { versionMatch } from "@norn/schema";
-import { acquireLock, acquireTickLock, archiveBaseRunState, type BaseRecordOutcome, type ConfigMigration, dropOldIgnoreLine, dropRunsAttribute, installSkills, linkSkills, loadWorkflows, migrateConfig, machineDir, machineHolder, moveFile, moveOldTrace, OLD_CONFIG_FILE, OLD_TRACE_DIR, OLD_WORKFLOWS_DIR, oldTickLockPath, oldWorkflowEntries, REPO_CONFIG_FILE, recordedNornVersion, removeOldLayoutDirs, repoConfigPath, repoLayout, SKILLS_DIR, traceClashes, WORKFLOWS_DIR, writeNornVersion } from "@norn/store";
+import { acquireLock, acquireTickLock, archiveBaseRunState, type BaseRecordOutcome, type ConfigMigration, dropOldIgnoreLine, dropRunsAttribute, gitRemoteUrl, installSkills, linkSkills, loadWorkflows, migrateConfig, machineDir, machineHolder, moveFile, moveOldTrace, OLD_CONFIG_FILE, OLD_TRACE_DIR, OLD_WORKFLOWS_DIR, oldTickLockPath, oldWorkflowEntries, REPO_CONFIG_FILE, recordedNornVersion, removeOldLayoutDirs, repoConfigPath, repoLayout, SKILLS_DIR, traceClashes, WORKFLOWS_DIR, writeNornVersion } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import { type Context, safeRealpath } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
 import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
-import { gitRemoteUrl } from "../runtime/detect.ts";
 import { gitRemote } from "../runtime/observe/remote.ts";
 import { type LabelsReport, labelsLines, remoteLabels } from "../runtime/labels.ts";
 import { layoutRefusal } from "../runtime/layout.ts";
@@ -321,7 +320,7 @@ export const upgradeCommand = defineCommand({
 });
 
 /** gh-61 B30: the old name, kept for one minor; the same code, one line on stderr. */
-export const MIGRATE_RENAMED = "`norn migrate` is now `norn upgrade`; the old name goes in the next minor";
+const MIGRATE_RENAMED = "`norn migrate` is now `norn upgrade`; the old name goes in the next minor";
 
 export const migrateCommand = defineCommand({
   name: "migrate",

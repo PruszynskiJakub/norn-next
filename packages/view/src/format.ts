@@ -285,7 +285,7 @@ function outcomeText(r: StepRow): string {
 }
 
 /** gh-196 D5 (B21, B34): the mark of a supervisor's decision, with its reason; nothing for the person's own. */
-export const delegatedText = (reason: string | undefined): string => (reason === undefined ? "" : ` — ${DELEGATED_MARK}: ${reason}`);
+const delegatedText = (reason: string | undefined): string => (reason === undefined ? "" : ` — ${DELEGATED_MARK}: ${reason}`);
 
 /** gh-71 B29, B32: ` · finished`, ` · ended by the person at <step>`, or nothing while the round is under way. */
 function roundEndText(r: RoundView): string {

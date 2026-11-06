@@ -8,7 +8,7 @@ import type { LaunchSpec, RunnerPort } from "@norn/core";
 import { type ContractOptions, contractTest, expectPortError } from "./suite.ts";
 
 export type RunnerContractTest =
-  | "name and capabilities are well-formed; openForPerson is present iff capabilities.open (MO5)"
+  | "name and capabilities are well-formed; openForPerson is present iff capabilities.open (MO5); a headless runner cannot send"
   | "available() answers a boolean"
   | "launch returns a session of this runner that is alive, and its pane state says so"
   | "kill ends the session, and killing it again is harmless"
@@ -33,13 +33,16 @@ export function runnerContract(name: string, make: () => RunnerSubject, opts: Co
       return { cwd, argv: ["sh", "-c", "exec sleep 30"], env: { NORN_RUN: run_id, NORN_STORY: "gh-1", NORN_SLICE: "01-contract" }, title: "gh-1/01 contract", run_id };
     };
 
-    t("name and capabilities are well-formed; openForPerson is present iff capabilities.open (MO5)", async () => {
+    t("name and capabilities are well-formed; openForPerson is present iff capabilities.open (MO5); a headless runner cannot send", async () => {
       const { runner } = make();
       expect(typeof runner.name).toBe("string");
       expect(runner.name.length).toBeGreaterThan(0);
       expect(typeof runner.capabilities.send).toBe("boolean");
       expect(typeof runner.capabilities.resume).toBe("boolean");
       expect(runner.openForPerson !== undefined).toBe(runner.capabilities.open === true);
+      // a headless session has no terminal to type into
+      if (runner.capabilities.headless) expect(runner.capabilities.send).toBe(false);
+      if (runner.unavailableHint !== undefined) expect(runner.unavailableHint.length).toBeGreaterThan(0);
     });
 
     t("available() answers a boolean", async () => {
