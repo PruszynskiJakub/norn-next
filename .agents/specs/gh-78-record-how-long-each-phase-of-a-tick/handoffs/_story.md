@@ -44,6 +44,7 @@ Every tick record says where the tick spent its time (observe and its phases, de
 - describe#1 done: pr.md written: summary of the new tick record fields, test-based evidence per Wanted item (no QA report in this quick round), merge danger one-way but mild (old schemas reject the new optional fields)
 
 - resolve#2: merged origin/main c207e7c01b (merge 8f7621235). Main refactored observe (`syncRemote`, `classifyWorktrees`, `storyFactsOf` over `mapBounded`); took main's structure and re-applied the timers: `sync.stories` and `sync.elsewhere_prs` time the bounded-parallel reads (call counts inside), `stories` times the bounded per-story pass, `timer` passed into `syncRemote`. cockpit-tui: kept both imports (`isClosedStatus`, `formatTickMs`). Typecheck, unit tier, integration tier green.
+- resolve#2 done: Merged origin/main c207e7c01b: took main's observe refactor (syncRemote, mapBounded per story) and re-applied gh-78's phase timers and call counts to it; cockpit-tui kept both imports. Typecheck, unit and integration tiers green.
 
 ## Resume
 
