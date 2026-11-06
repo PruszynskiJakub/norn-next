@@ -33,6 +33,10 @@ import { startUnit, markDone, rejectReceipt, claim, renewAll, intake, mirror, cl
 export interface ActRecord {
   decision: Decision;
   result: ActionResult;
+  /** gh-78: how long act took over the action (a batched renewal: the batch's time) */
+  ms: number;
+  /** gh-78: a claim renewal pushed in the tick's one batch (its `ms` is the batch's) */
+  batched?: boolean;
 }
 
 /** Inbox groups that need a person; their new items are notified once (O3). */
@@ -67,8 +71,11 @@ export class Actor extends ActEnv {
     const renewals = decisions.filter((d) => isSideAction(d.action) && !isTailAction(d.action));
     const order = [...renewals, ...decisions.filter((d) => !isSideAction(d.action)), ...decisions.filter((d) => isTailAction(d.action))];
     const lost = new Set<string>();
+    const r0 = performance.now();
     const renewed = await this.renewals(renewals);
+    const renewMs = performance.now() - r0;
     for (const d of order) {
+      const t0 = performance.now();
       const story = d.action.unit?.story;
       let result: ActionResult;
       this.effectErrors = [];
@@ -89,7 +96,7 @@ export class Actor extends ActEnv {
         }
       if (story && isSideAction(d.action) && !isTailAction(d.action) && !result.ok && claimLost(result)) lost.add(story);
       if (counted) this.recordFailure(d, result);
-      out.push({ decision: d, result });
+      out.push(renewed.has(d) ? { decision: d, result, ms: renewMs, batched: true } : { decision: d, result, ms: performance.now() - t0 });
     }
     this.dropRecordPushSlots();
     if (this.failuresChanged) writeActFailures(this.root, this.failures);

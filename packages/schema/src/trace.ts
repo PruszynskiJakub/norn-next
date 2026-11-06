@@ -52,6 +52,8 @@ export const TickUnitRecord = Type.Object(
         detail: Type.Optional(Type.Unknown()),
         /** gh-71 B20: an effect that failed without failing the action (a label not updated) */
         warnings: Type.Optional(Type.Array(Type.String())),
+        /** gh-78: how long act took over this action (a batched claim renewal: the batch's time); absent on older traces */
+        ms: Type.Optional(NonNegInt),
       },
       { additionalProperties: false },
     ),
@@ -90,6 +92,36 @@ export const InboxChange = Type.Object(
 );
 export type InboxChange = Static<typeof InboxChange>;
 
+/** gh-78: a tick's slowest phase (`observe.<phase>`, `decide`, `act <kind> <unit>`, `after`) and its time. */
+export const TickSlowest = Type.Object({ phase: NonEmpty, ms: NonNegInt }, { additionalProperties: false });
+export type TickSlowest = Static<typeof TickSlowest>;
+
+/**
+ * gh-78 (O4): where a tick spent its time. Diagnostic only: outside `facts` and the decisions'
+ * `action`, so decide never reads it and `--why` replays ignore it (O5).
+ */
+export const TickTiming = Type.Object(
+  {
+    observe_ms: NonNegInt,
+    decide_ms: NonNegInt,
+    /** act, from writing the `tick.start` line to the last action */
+    act_ms: NonNegInt,
+    /** after act: owed record retries, inbox notifications, inbox history */
+    after_ms: NonNegInt,
+    /** observe's phases (`worktrees`, `base_fetch`, `local`, `sync.*`, `runner`, `stories`, …) in ms */
+    observe: Type.Record(Type.String(), NonNegInt),
+    /** remote calls made by the sync, counted per call (`list_issues`, `get_issue`, `find_pr`, `pr_ci`) */
+    calls: Type.Optional(Type.Record(Type.String(), NonNegInt)),
+    slowest: TickSlowest,
+  },
+  { additionalProperties: false },
+);
+export type TickTiming = Static<typeof TickTiming>;
+
+/** gh-78: observe's remote sync outcome, as `norn tick` prints it. */
+export const TickSync = Type.Object({ ran: Type.Boolean(), ok: Type.Boolean(), error: Type.Optional(Type.String()) }, { additionalProperties: false });
+export type TickSync = Static<typeof TickSync>;
+
 export const TickTrace = Type.Object(
   {
     type: Type.Literal("tick"),
@@ -104,6 +136,10 @@ export const TickTrace = Type.Object(
     decisions: Type.Array(TickUnitRecord),
     /** inbox items that appeared or were resolved by this tick (O1 history); absent = none */
     inbox: Type.Optional(Type.Array(InboxChange)),
+    /** gh-78: observe's remote sync outcome; absent on older traces */
+    sync: Type.Optional(TickSync),
+    /** gh-78: where the tick spent its time; absent on older traces */
+    timing: Type.Optional(TickTiming),
   },
   { additionalProperties: false },
 );
@@ -222,6 +258,8 @@ export const TickEndTrace = Type.Object(
     duration_ms: NonNegInt,
     /** actions that ended `ok: false` */
     failed: NonNegInt,
+    /** gh-78: the tick's slowest phase, so a slow tick is explained from this line alone; absent on older traces */
+    slowest: Type.Optional(TickSlowest),
   },
   { additionalProperties: false },
 );

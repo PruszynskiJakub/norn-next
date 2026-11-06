@@ -6,12 +6,13 @@
  * same inputs (O5) via store `readTickInputs`.
  */
 import { decide, type Facts } from "@norn/core";
-import { type TickTrace, type TickUnitRecord, ulid } from "@norn/schema";
+import { type TickSlowest, type TickTiming, type TickTrace, type TickUnitRecord, ulid } from "@norn/schema";
 import { acquireTickLock, appendTick, appendTrace, markTick, trackInbox } from "@norn/store";
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 import { type ActRecord, Actor } from "./act/index.ts";
 import { type Observed, observe, type SyncMode, type SyncReport } from "./observe/index.ts";
+import { tickTiming } from "./timing.ts";
 
 export interface TickOptions {
   sync?: SyncMode;
@@ -33,13 +34,15 @@ export interface TickReport {
   records?: Array<{ story: string; state: string; reason?: string }>;
   /** K5: orphan worktrees/branches seen this tick (also in the trace facts); `norn tidy` cleans them */
   orphans?: Facts["orphans"];
+  /** gh-78: the tick's slowest phase (its full timing is in the trace record) */
+  slowest: TickSlowest;
 }
 
 const jsonSafe = <T>(v: T): T => JSON.parse(JSON.stringify(v ?? null)) as T;
 
 /** The tick record's fields beside its facts; store `appendTick` records the facts and replay inputs as chunks (O4). */
-export function traceRecord(obs: Observed, records: ActRecord[], startedAt: number, duration: number, version: string): Omit<TickTrace, "type" | "facts"> {
-  const decisions: TickUnitRecord[] = records.map(({ decision, result }) => ({
+export function traceRecord(obs: Observed, records: ActRecord[], startedAt: number, duration: number, version: string, timing?: TickTiming): Omit<TickTrace, "type" | "facts"> {
+  const decisions: TickUnitRecord[] = records.map(({ decision, result, ms }) => ({
     unit: decision.unit,
     rule: decision.rule,
     action: jsonSafe(decision.action) as TickUnitRecord["action"],
@@ -48,6 +51,8 @@ export function traceRecord(obs: Observed, records: ActRecord[], startedAt: numb
       ...(result.error ? { error: result.error } : {}),
       ...(result.detail === undefined ? {} : { detail: jsonSafe(result.detail) }),
       ...(result.warnings?.length ? { warnings: result.warnings } : {}),
+      // gh-78: the action's time, beside its result, never in `action` (O5)
+      ms: Math.max(0, Math.round(ms)),
     },
     ...(result.briefing ? { briefing: result.briefing } : {}),
     ...(result.transcript ? { transcript: result.transcript } : {}),
@@ -60,6 +65,9 @@ export function traceRecord(obs: Observed, records: ActRecord[], startedAt: numb
     norn_version: version,
     duration_ms: Math.max(0, Math.round(duration)),
     decisions,
+    // gh-78: the sync outcome and where the tick spent its time, outside `facts` (O5)
+    sync: { ...obs.sync },
+    ...(timing ? { timing } : {}),
   };
 }
 
@@ -70,8 +78,11 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
   if (!lock.ok) throw busyError(`another tick is running (pid ${lock.holder.holder.pid} since ${lock.holder.acquired_at})`, "wait for it to finish; ticks are idempotent", "tick_locked");
   try {
     const tick_id = ulid(startedAt);
+    const tObserve = performance.now();
     const obs = await observe(ctx, { tick_id, backfillHooks: true, ...(opts.sync ? { sync: opts.sync } : {}) });
+    const tDecide = performance.now();
     const decisions = decide(obs.facts, obs.workflows, obs.config);
+    const tAct = performance.now();
     // R5.4 (N2): the decisions reach the trace before act, so a tick that dies mid-act is explainable
     appendTrace(ctx.root, {
       type: "tick.start",
@@ -82,6 +93,7 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
     });
     const actor = new Actor(ctx, obs);
     const records = await actor.run(decisions);
+    const tAfter = performance.now();
     const recorded = await actor.retryRecords();
     // O3: notify from what is true after act (post-act local facts), so items resolved this tick
     // stay quiet and items created this tick are not a tick late
@@ -89,13 +101,18 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
     await actor.notifyInbox(post);
     // O1 history: items needing a person that appeared or were resolved this tick, in the tick record
     const inbox = trackInbox(ctx.root, post, obs.facts, decisions, obs.config);
-    const record = traceRecord(obs, records, startedAt, performance.now() - t0, ctx.version);
+    const tEnd = performance.now();
+    const timing = tickTiming(
+      { observe_ms: tDecide - tObserve, decide_ms: tAct - tDecide, act_ms: tAfter - tAct, after_ms: tEnd - tAfter, observe: obs.timing.phases, calls: obs.timing.calls },
+      records.map((r) => ({ unit: r.decision.unit, kind: r.decision.action.kind, ms: r.ms, ...(r.batched ? { batched: true } : {}) })),
+    );
+    const record = traceRecord(obs, records, startedAt, tEnd - t0, ctx.version, timing);
     if (inbox.changes.length) record.inbox = inbox.changes;
     const file = appendTick(ctx.root, record, { facts: obs.facts, workflows: obs.workflows, config: obs.config });
     const failed = records.filter((r) => !r.result.ok).length;
-    appendTrace(ctx.root, { type: "tick.end", tick_id, at: new Date(ctx.clock.now()).toISOString(), duration_ms: record.duration_ms, failed });
-    // R5.5: the checkout's heartbeat is alive as of this tick
-    markTick(ctx.root, new Date(ctx.clock.now()).toISOString());
+    appendTrace(ctx.root, { type: "tick.end", tick_id, at: new Date(ctx.clock.now()).toISOString(), duration_ms: record.duration_ms, failed, slowest: timing.slowest });
+    // R5.5: the checkout's heartbeat is alive as of this tick; gh-78: and how long the tick took (status, cockpit)
+    markTick(ctx.root, new Date(ctx.clock.now()).toISOString(), record.duration_ms);
     inbox.commit();
     const lines = records.map(({ decision, result }) => ({
       unit: decision.unit,
@@ -118,6 +135,7 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
       failed: lines.filter((l) => !l.ok).length,
       ...(recorded.length ? { records: recorded } : {}),
       ...(obs.facts.orphans.worktrees.length || obs.facts.orphans.branches.length ? { orphans: obs.facts.orphans } : {}),
+      slowest: timing.slowest,
     };
   } finally {
     lock.release();

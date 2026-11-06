@@ -214,6 +214,33 @@ describe("claim, lease, trace, hook, cli-error", () => {
     expect(validate("trace", { type: "hook", id: ID, fact: { ...hook, event: "idle" } }).ok).toBe(false);
   });
 
+  test("gh-78: a tick record carries its phase timings, its sync report and each action's time; all optional", () => {
+    const tick = {
+      type: "tick",
+      tick_id: ID,
+      at: AT,
+      heartbeat_id: null,
+      duration_ms: 9400,
+      facts: { stories: [] },
+      decisions: [{ unit: "gh-1", rule: "claim.renew", action: { kind: "claim" }, result: { ok: true, ms: 1200 } }],
+      sync: { ran: true, ok: false, error: "gh issue list failed" },
+      timing: {
+        observe_ms: 8000,
+        decide_ms: 3,
+        act_ms: 1250,
+        after_ms: 40,
+        observe: { base_fetch: 2100, "sync.issues": 3000 },
+        calls: { list_issues: 1, get_issue: 2, find_pr: 3 },
+        slowest: { phase: "observe.sync.issues", ms: 3000 },
+      },
+    };
+    expect(validate("trace", tick).ok).toBe(true);
+    expect(validate("trace", { ...tick, timing: { ...tick.timing, extra: 1 } }).ok).toBe(false);
+    expect(validate("trace", { ...tick, decisions: [{ ...tick.decisions[0], result: { ok: true, ms: -1 } }] }).ok).toBe(false);
+    expect(validate("trace", { type: "tick.end", tick_id: ID, at: AT, duration_ms: 9400, failed: 0, slowest: { phase: "observe.sync.issues", ms: 3000 } }).ok).toBe(true);
+    expect(validate("trace", { type: "tick.end", tick_id: ID, at: AT, duration_ms: 9400, failed: 0 }).ok).toBe(true);
+  });
+
   test("cli error", () => {
     expect(validate("cli-error", { error: "not in a norn unit", do_instead: "cd into a worktree with .norn-unit" }).ok).toBe(true);
     expect(validate("cli-error", { error: "x", do_instead: null, code: "stale_attempt" }).ok).toBe(true);

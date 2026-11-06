@@ -109,6 +109,10 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "ms": {
+                    "minimum": 0,
+                    "type": "integer"
                   }
                 }
               },
@@ -206,6 +210,91 @@
               "resolved_by": {
                 "minLength": 1,
                 "type": "string"
+              }
+            }
+          }
+        },
+        "sync": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "ran",
+            "ok"
+          ],
+          "properties": {
+            "ran": {
+              "type": "boolean"
+            },
+            "ok": {
+              "type": "boolean"
+            },
+            "error": {
+              "type": "string"
+            }
+          }
+        },
+        "timing": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "observe_ms",
+            "decide_ms",
+            "act_ms",
+            "after_ms",
+            "observe",
+            "slowest"
+          ],
+          "properties": {
+            "observe_ms": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "decide_ms": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "act_ms": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "after_ms": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "observe": {
+              "type": "object",
+              "patternProperties": {
+                "^(.*)$": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              }
+            },
+            "calls": {
+              "type": "object",
+              "patternProperties": {
+                "^(.*)$": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              }
+            },
+            "slowest": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "phase",
+                "ms"
+              ],
+              "properties": {
+                "phase": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "ms": {
+                  "minimum": 0,
+                  "type": "integer"
+                }
               }
             }
           }
@@ -680,6 +769,24 @@
         "failed": {
           "minimum": 0,
           "type": "integer"
+        },
+        "slowest": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "phase",
+            "ms"
+          ],
+          "properties": {
+            "phase": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "ms": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
         }
       }
     },

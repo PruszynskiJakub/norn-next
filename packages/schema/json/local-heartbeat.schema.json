@@ -13,6 +13,10 @@
     "last_tick_at": {
       "type": "string"
     },
+    "last_tick_ms": {
+      "minimum": 0,
+      "type": "integer"
+    },
     "interval": {
       "pattern": "^([0-9]+(ms|s|m|h|d))+$",
       "type": "string"

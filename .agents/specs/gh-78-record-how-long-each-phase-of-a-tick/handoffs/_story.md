@@ -1,0 +1,75 @@
+## Goal
+
+Every tick record says where the tick spent its time (observe and its phases, decide, each action, after act), carries the sync report, and the last tick's duration shows in `norn story list` and the cockpit header.
+
+## Progress
+
+- Schema (`packages/schema/src/trace.ts`): optional `TickTrace.sync` (`TickSync`), `TickTrace.timing` (`TickTiming`: `observe_ms`, `decide_ms`, `act_ms`, `after_ms`, `observe` phases, `calls`, `slowest`), `TickUnitRecord.result.ms`, `TickEndTrace.slowest`. All optional, so older traces validate. `heartbeat.json` gets `last_tick_ms`. JSON schemas re-emitted.
+- `packages/cli/src/runtime/timing.ts`: `PhaseTimer` (time/add/count) and `tickTiming` (rounds, picks the slowest of `observe.<phase>`, the rest of observe (`observe`), `decide`, `act <kind> <unit>`, `after`).
+- observe times `worktrees`, `base_fetch`, `local`, `sync.norn_refs`, `sync.elsewhere`, `sync.issues`, `sync.stories`, `sync.elsewhere_prs`, `runner`, `stories`, and counts `list_issues`, `get_issue`, `find_pr`, `pr_ci`. Act times each action (a batched claim renewal gets the batch's time). runTick puts it all in the record outside `facts`/`action` (O5 replay untouched), `slowest` on `tick.end` and in `norn tick`'s output, and `markTick` records `last_tick_ms`.
+- Display decision (the triage's open question, settled small since this is a `quick` round): the slowest phase is on the `tick.end` line (one `jq` away, recipe "Explain a slow tick" in `docs/recipes.md`) and in `norn tick` output; the heartbeat line of `norn story list` says `(took 9.4s)`, the cockpit header `tick 3s ago · took 9.4s`. No new command or `--why` change.
+- O4 in `.agents/RULES.md` amended to say what the record now holds.
+- Tests: `packages/cli/test/unit/tick-timing.test.ts`, schema records test, view formatter test, cockpit header test. Smoked with the dev build in a throwaway repo: the record has `sync`/`timing`, `tick.end` has `slowest`, `story list` shows the duration.
+- Note: `act_ms` includes writing `tick.start` and building the Actor.
+- implement#1 done: Tick records now carry sync report + timing (observe phases with remote call counts, decide, act, after, slowest); each decision result has ms; tick.end names the slowest phase; story list and cockpit header show the last tick's duration. Optional fields, outside facts/actions (O4 amended, O5 untouched). Unit tests + dev-build smoke; unit tier and typecheck green.
+
+- review#1 (changes_requested): the scope and the design are right; test#1 passed. Blocking F1: no test runs a tick and checks the timing it records (observe phases and call counts, Actor ms, record sync/timing, tick.end slowest, heartbeat last_tick_ms → view). Minor F2: a batched renewal's time is counted again for each claim in slowest/result.ms. Minor F3: there is no separate 'process' phase. Nit F4: act_ms includes the tick.start write.
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| W1 observe broken down (sync phases, call counts, local, stories, runner) | test | UNTRACED (only `tick-timing.test.ts` › "PhaseTimer adds up the time of each phase and counts calls"; observe's wiring is untested) |
+| W2 decide timed | test | partial: `tick-timing.test.ts` › "tickTiming names the slowest…" (fed input; runTick untested) |
+| W3 each action's time in result.ms, incl. claim.renew | test | partial: `tick-timing.test.ts` › "traceRecord records the sync report, each action's time…" (Actor's measuring untested) |
+| W4 SyncReport in the tick record | test | `tick-timing.test.ts` › "traceRecord records the sync report…" |
+| W5 new fields optional, outside facts/action | test | `packages/schema/test/unit/records.test.ts` › "gh-78: a tick record carries its phase timings…" |
+| W6 slowest phase visible (tick.end) | test | partial: tickTiming test + schema test; the tick.end write is UNTRACED |
+| W7 last tick's duration in status and the cockpit | test | `packages/view/test/unit/view.test.ts` › "gh-78: the heartbeat line…", `cockpit-tui.test.ts` › "gh-78: the header shows…"; markTick → lastTickMs → load is UNTRACED |
+- review#1 changes_requested: Scope and design are right and every test tier passed. Blocking: no test runs a tick and checks the timing it records (observe phases and call counts, Actor ms, sync/timing in the record, tick.end slowest, heartbeat last_tick_ms in the view). Also minor: renewal batch time counted per claim, no separate process phase; nit: act_ms includes the tick.start write.
+
+- implement#2 (rework of review#1): F1 fixed with `packages/cli/test/integration/tick-timing.test.ts`: a real `--sync` tick over the harness (one running story, clock past the claim's renew time) whose record validates and carries `sync`, the observe phases, `timing.calls` equal to the calls FakeRemote saw (`list_issues: 1`), an integer `result.ms` on every decision incl. `claim.renew`; `tick.end.slowest` and `norn tick`'s `slowest` equal the record's; `story list --json` heartbeat `last_tick_ms` equals the record's `duration_ms`. Checked it goes red with `markTick`'s duration dropped. F2 fixed: batched renewals (`ActRecord.batched`) are one `slowest` candidate, `act claim renew (N claims)` (unit test). F3, F4 documented: recipe says process probes count under `local`/`stories` and `act_ms` includes the `tick.start` write; the `act_ms` schema comment says so too (schemas re-emitted). Unit tier and typecheck green.
+- implement#2 done: Rework of review#1: F1 fixed with an integration test (packages/cli/test/integration/tick-timing.test.ts) that runs a real --sync tick with a renewed claim and checks the record's sync, observe phases, call counts against FakeRemote, result.ms on every decision, tick.end/norn tick slowest, and heartbeat last_tick_ms in story list (proven red when markTick's duration is dropped). F2: a renewal batch is one slowest candidate. F3/F4 documented in the recipe and the act_ms schema comment. Unit tier, typecheck green.
+
+- review#2 (approve): on HEAD 7308a837c, test#2 green. F1/F2 from review#1 fixed, F3/F4 documented. No blocking findings.
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| W1 observe broken down (sync phases, call counts, local, stories, runner) | test | `packages/cli/test/integration/tick-timing.test.ts` › "observe's phases are timed and the sync's remote calls counted as made" (process probes counted under `local`/`stories`, documented) |
+| W2 decide timed | test | `tick-timing.test.ts` (integration) › "observe's phases are timed…" (`decide_ms` integer); unit `tick-timing.test.ts` › "tickTiming names the slowest…" |
+| W3 each action's time in result.ms, incl. claim.renew | test | `tick-timing.test.ts` (integration) › "each action's time is in its result, the claim renewal's included" |
+| W4 SyncReport in the tick record | test | `tick-timing.test.ts` (integration) › "the tick record carries the sync report and validates" |
+| W5 new fields optional, outside facts/action | test | `packages/schema/test/unit/records.test.ts` › "gh-78: a tick record carries its phase timings…"; golden replay unchanged |
+| W6 slowest phase visible (tick.end, norn tick) | test | `tick-timing.test.ts` (integration) › "tick.end and `norn tick` name the slowest phase…" |
+| W7 last tick's duration in status and the cockpit | test | `tick-timing.test.ts` (integration) › "the heartbeat carries the last tick's duration into `norn story list`"; `view.test.ts` › "gh-78: the heartbeat line…"; `cockpit-tui.test.ts` › "gh-78: the header shows…" |
+- review#2 approve: Approve: the tick record carries sync + timing (observe phases with call counts, decide, each action's result.ms incl. claim.renew, after), tick.end/norn tick name the slowest phase, story list and the cockpit show the last tick's duration; fields optional, outside facts/action. review#1 F1 (real-tick integration test) and F2 fixed, F3/F4 documented; test#2 green. One nit: per-story git and process probes share the stories phase.
+- describe#1 done: pr.md written: summary of the new tick record fields, test-based evidence per Wanted item (no QA report in this quick round), merge danger one-way but mild (old schemas reject the new optional fields)
+
+- resolve#2: merged origin/main c207e7c01b (merge 8f7621235). Main refactored observe (`syncRemote`, `classifyWorktrees`, `storyFactsOf` over `mapBounded`); took main's structure and re-applied the timers: `sync.stories` and `sync.elsewhere_prs` time the bounded-parallel reads (call counts inside), `stories` times the bounded per-story pass, `timer` passed into `syncRemote`. cockpit-tui: kept both imports (`isClosedStatus`, `formatTickMs`). Typecheck, unit tier, integration tier green.
+- resolve#2 done: Merged origin/main c207e7c01b: took main's observe refactor (syncRemote, mapBounded per story) and re-applied gh-78's phase timers and call counts to it; cockpit-tui kept both imports. Typecheck, unit and integration tiers green.
+
+- implement#3 (rework of test#3): the one failure, `takeover-record.test.ts` › "AC4: a record made without a branch…", is a harness flake, not this change: `cloneOf`'s `git clone` of the bare remote failed with "failed to copy file … pack-….pack: No such file or directory". The test pushes twice to the bare remote just before cloning, and the remote keeps git's default `receive.autogc`, so a detached `gc --auto` can repack while the local clone copies packs. gh-78 touches no git code, harness or that test. The file passes 12/12 on its own; unit tier and typecheck green. No code changed.
+- Friction (for `/issue`, label `friction`): the harness's bare remote (`test/support/harness.ts:335`) should set `receive.autogc false` / `gc.auto 0` so a push cannot repack it under a concurrent clone; this flake sent a green change back to implement.
+- implement#3 done: test#3's only failure (takeover-record AC4) is a harness flake unrelated to gh-78: cloneOf's git clone lost a pack file, likely a background gc --auto on the bare remote after the test's two pushes. The file passes 12/12 alone; unit tier and typecheck green; no code changed. Friction noted: the harness bare remote should disable receive.autogc.
+
+- review#3 (approve): full review on HEAD 81faeee92 (after the merge of main's observe refactor); test#4 green on this code. The re-applied timers sit on main's `syncRemote` and `mapBounded` per-story pass, counts match the calls made, the heartbeat schema stays open (an older norn still reads `last_tick_ms`), the recipe's trace path is right. No blocking findings; carried over: process probes share `local`/`stories` (documented), `base_fetch`/`sync.norn_refs` not asserted by the integration test.
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| W1 observe broken down (sync phases, call counts, local, stories, runner) | test | `packages/cli/test/integration/tick-timing.test.ts` › "observe's phases are timed and the sync's remote calls counted as made" (process probes counted under `local`/`stories`, documented) |
+| W2 decide timed | test | `tick-timing.test.ts` (integration) › "observe's phases are timed…" (`decide_ms`); unit `tick-timing.test.ts` › "names the slowest of observe's phases, decide, each action and after" |
+| W3 each action's time in result.ms, incl. claim.renew | test | `tick-timing.test.ts` (integration) › "each action's time is in its result, the claim renewal's included" |
+| W4 SyncReport in the tick record | test | `tick-timing.test.ts` (integration) › "the tick record carries the sync report and validates"; unit › "records the sync report, each action's time and the timing, and validates" |
+| W5 new fields optional, outside facts/action | test | `packages/schema/test/unit/records.test.ts` › "gh-78: a tick record carries its phase timings…"; golden replay unchanged |
+| W6 slowest phase visible (tick.end, norn tick) | test | `tick-timing.test.ts` (integration) › "tick.end and `norn tick` name the slowest phase, the one the record names" |
+| W7 last tick's duration in status and the cockpit | test | `tick-timing.test.ts` (integration) › "the heartbeat carries the last tick's duration into `norn story list`"; `view.test.ts` › "gh-78: the heartbeat line…"; `cockpit-tui.test.ts` › "gh-78: the header shows…" |
+- review#3 approve: Approve on HEAD 81faeee92 (after the merge of main): tick record carries sync + timing (observe phases with call counts, decide, act, after, result.ms incl. claim.renew), tick.end/norn tick name the slowest phase, story list and cockpit show the last tick's duration; fields optional, outside facts/action; heartbeat stays readable by older norn. test#4 green. 2 findings, 0 blocking (process probes share local/stories; base_fetch/norn_refs phases not asserted).
+- describe#2 done: pr.md rewritten for HEAD after main's merge: summary of the new tick record fields (phases incl. worktrees/sync.elsewhere*), test-based evidence per Wanted item from test#4 with uncovered phases named, merge danger one-way but mild (only trace records; heartbeat schema is open)
+
+## Resume
+
+review#3 approved; nothing open. Next is the PR description and CI, which norn routes.
+
+- describe#2: rewrote pr.md for HEAD after the merge of main: phase list now includes `worktrees`, `sync.elsewhere`, `sync.elsewhere_prs`; evidence names test#4 and the current test names; says `base_fetch`/`sync.norn_refs` are not asserted; merge danger corrected (heartbeat schema is open, so only trace records are one-way).
+
+### Resume
+
+describe#2 is reported; nothing left for this step.

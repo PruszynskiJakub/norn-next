@@ -62,6 +62,25 @@ describe("formatters", () => {
     expect(formatStatus(empty)).toContain("No stories.");
   });
 
+  test("gh-78: the heartbeat line says how long the last tick took", () => {
+    const view = {
+      at: "",
+      repo: "",
+      holder: "me@box",
+      runner: null,
+      heartbeat: { holder: "me@box", last_tick_at: "2026-11-06T09:00:00.000Z", age: "12s", down: false, up: true, last_tick_ms: 9400 },
+      stories: [],
+      inbox: { at: "", pending: 0, groups: { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], notes: [], recently_done: [] } },
+      runs: [],
+      recently_done: [],
+      elsewhere: [],
+      errors: [],
+    };
+    expect(formatStatus(view)).toContain("heartbeat: last tick 12s ago on me@box (took 9.4s)");
+    expect(formatStatus({ ...view, heartbeat: { ...view.heartbeat, last_tick_ms: 320 } })).toContain("(took 320ms)");
+    expect(formatStatus({ ...view, heartbeat: { ...view.heartbeat, last_tick_ms: 75_000 } })).toContain("(took 1m15s)");
+  });
+
   test("receiptSummary is one line", () => {
     const r = receipt({ kind: "done", outcome: "done", handoff: "line one\nline two", findings: [{ severity: "minor", title: "x" }] });
     expect(receiptSummary(r)).toBe("done done at implement#1 (1 finding) — line one line two");
