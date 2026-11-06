@@ -146,6 +146,7 @@ The `## Reproduce` comment is on #215: https://github.com/PruszynskiJakub/norn-n
 - Checked: every `Bun.spawnSync` in norn's src (store `gitSync`, `proc.ts` and `brief.ts` ps probes) is a short local call, so the 15 s default kills nothing legitimate; remote git calls set their own timeout and keep it; the unit guard's `uninstall` is only called in the unit tier.
 - F1 (minor, spec): non-spawn blocks (a blocking read, the FIFO row) are still uncut; the observed hang was a sync spawn. F2 (minor): a timed-out child's grandchildren are orphaned until they exit (no process-group option on `Bun.spawnSync`).
 - No blocking findings.
+- review#2 approve: Approve, 0 blocking. Spawning-tier preload bounds every untimed Bun.spawnSync (15s, SIGKILL): harness sh(), in-process gitSync/ps, direct test calls; fixture tests prove stuck calls fail named and the run continues. Unit tier, typecheck, touched integration files green. Minor: non-spawn blocks uncut; grandchildren orphaned on timeout.
 
 ## Resume
 
