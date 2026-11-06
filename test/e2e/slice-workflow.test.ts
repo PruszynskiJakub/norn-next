@@ -99,7 +99,7 @@ describe("norn init", () => {
     // nothing in the repo names a test command: the templates keep theirs, and init says so
     expect(r.value).toMatchObject({ remote: { provider: "gh", label: "norn", git_remote: "origin", url: h.remoteDir }, test_command: { command: "bun test", detected_from: null, set_in: ["quick.yaml", "slice.yaml", "story.yaml"] } });
     expect(r.stdout).toContain("Next steps\n  1. Set your test command:");
-    expect(r.stdout).toContain('`git add .agents .claude .gitignore && git commit -m "Set up norn" && git push`');
+    expect(r.stdout).toContain('`git add .agents .claude REVIEW.md .gitignore && git commit -m "Set up norn" && git push`');
     expect(r.stdout).toContain("`gh issue create --label norn --assignee @me --title \"…\"`");
     // SK1: one copy in .agents/skills (whole folders), linked from the agent's skill folder
     expect(existsSync(join(h.root, ".agents/skills/norn-review/SMELLS.md"))).toBe(true);

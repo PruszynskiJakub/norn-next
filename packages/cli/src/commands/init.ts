@@ -8,6 +8,8 @@
  * Workflows created now get the repo's test command when its build files name one (`runtime/detect.ts`).
  * gh-67 GR10: last, the labels norn uses are created on the remote (`runtime/labels.ts`); a remote it
  * cannot reach or write is reported, never a failure.
+ * gh-226: a starter `REVIEW.md` at the repo root (what `norn-review` ignores, counts as failure and
+ * does not report), only when the repo has none.
  * Prints a summary for a person, ending in the next steps to a first story; `--json` for data.
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
@@ -22,6 +24,9 @@ import { detectTestCommand, gitRemoteUrl, TEMPLATE_TEST_COMMAND, withTestCommand
 import { type LabelsReport, labelsLines, remoteLabels } from "../runtime/labels.ts";
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { cmd } from "@norn/core";
+
+/** gh-226: the repo's review guide the `norn-review` skill reads, at the repo root. */
+const REVIEW_FILE = "REVIEW.md";
 
 /** Paths that must never be committed (§7.1, gh-64 B9); the machine-local files live outside the checkout (B5). */
 const IGNORED = [".env.norn", ".norn-unit", LOCAL_CONFIG_FILE];
@@ -57,6 +62,8 @@ export interface InitReport {
   config: "exists" | "created";
   /** B49: `~/.norn/config.yaml` */
   user_config: "exists" | "created";
+  /** gh-226: the starter `REVIEW.md` at the repo root; never overwritten */
+  review: "exists" | "created";
   /** B50, B55: schema copies written or refreshed */
   schemas: string[];
   workflows: { created: string[]; kept: string[] };
@@ -87,6 +94,7 @@ function formatInit(r: InitReport): string {
   const row = (label: string, text: string) => out.push(`  ${label.padEnd(15)} ${text}`);
   row("config", `${REPO_CONFIG_FILE} ${r.config === "created" ? "created" : "kept (exists)"}`);
   row("user config", `~/.norn/config.yaml ${r.user_config === "created" ? "created" : "kept (exists)"}`);
+  row("review", `${REVIEW_FILE} ${r.review === "created" ? "created" : "kept (exists)"}`);
   if (r.schemas.length) row("schemas", `wrote ${r.schemas.map((p) => (p.startsWith(r.root) ? rel(p) : p)).join(", ")}`);
   row("workflows", [r.workflows.created.length ? `created ${r.workflows.created.join(", ")}` : "", r.workflows.kept.length ? `kept ${r.workflows.kept.join(", ")}` : ""].filter(Boolean).join("; ") || "none");
   const sk = r.skills;
@@ -99,7 +107,7 @@ function formatInit(r: InitReport): string {
   for (const h of r.hooks) row("hooks", `${h.agent}: ${h.tier === "none" ? "none (adapter has no hooks)" : h.changed.length ? `installed in ${h.changed.map(rel).join(", ")}` : "up to date"}`);
   row("hook command", r.hook_command);
   row(".gitignore", r.gitignore.length ? `added ${r.gitignore.join(", ")}` : "up to date");
-  const changed = r.config === "created" || r.norn_version.recorded || r.schemas.some((p) => p.startsWith(r.root)) || r.workflows.created.length || sk.updated.length || sk.links.some((l) => l.linked.length) || r.hooks.some((h) => h.changed.length) || r.gitignore.length;
+  const changed = r.config === "created" || r.review === "created" || r.norn_version.recorded || r.schemas.some((p) => p.startsWith(r.root)) || r.workflows.created.length || sk.updated.length || sk.links.some((l) => l.linked.length) || r.hooks.some((h) => h.changed.length) || r.gitignore.length;
   if (r.test_command) row("test command", `${r.test_command.command} (${r.test_command.detected_from ? `from ${r.test_command.detected_from}` : "not detected: the template's default"})`);
   row("remote", r.remote.url ? `${r.remote.git_remote} → ${r.remote.url}` : `no git remote named ${r.remote.git_remote}`);
   // B15, B29: the labels line says what norn did on the remote, or what to run
@@ -126,7 +134,7 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
   if (changed) {
     // each agent folder whole (`.claude`, not `.claude/settings.json`): skills and hooks live there
     const top = (p: string) => rel(p).split("/")[0] as string;
-    const paths = [".agents", ...r.skills.links.map((l) => top(l.dir)), ...r.hooks.flatMap((h) => h.changed.map(top)), ...(r.gitignore.length ? [".gitignore"] : [])];
+    const paths = [".agents", ...r.skills.links.map((l) => top(l.dir)), ...r.hooks.flatMap((h) => h.changed.map(top)), ...(r.review === "created" ? [REVIEW_FILE] : []), ...(r.gitignore.length ? [".gitignore"] : [])];
     steps.push(`Commit and push the setup: \`git add ${[...new Set(paths)].join(" ")} && git commit -m "Set up norn" && git push\`.`);
   }
   steps.push(`Check this machine: \`${cmd.doctor()}\`.`);
@@ -159,6 +167,8 @@ export const initCommand = defineCommand({
     // B49: the commented user file on a machine's first init, never overwritten
     const userPath = userConfigPath(ctx.home);
     const user_config = existsSync(userPath) ? "exists" : (atomicWrite(userPath, readFileSync(join(assets, "user-config.yaml"), "utf8")), "created");
+    const reviewPath = join(root, REVIEW_FILE);
+    const review = existsSync(reviewPath) ? "exists" : (atomicWrite(reviewPath, readFileSync(join(assets, REVIEW_FILE), "utf8")), "created");
     // B50, B55 (D14): the schema copies the starters' modelines point at
     const schemas = writeConfigSchemas({ repoRoot: root, home: ctx.home });
 
@@ -217,7 +227,7 @@ export const initCommand = defineCommand({
     const url = gitRemoteUrl(root, ctx.config.git_remote);
     // GR10: after every file is in place, so the workflows (and the skills they name) are the repo's
     const labels = await remoteLabels({ remote: ports.remote, gitRemoteUrl: url, intake: ctx.config.label, workflows: checkedRepoWorkflows(loadWorkflows(root), root, ctx.config, ports.agents), create: true });
-    const report: InitReport = { root, config, user_config, schemas, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url }, test_command, norn_version: { repo: repoVersion, running: ctx.version, recorded, skills_kept }, labels };
+    const report: InitReport = { root, config, review, user_config, schemas, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url }, test_command, norn_version: { repo: repoVersion, running: ctx.version, recorded, skills_kept }, labels };
     return rendered(report, formatInit(report));
   },
 });

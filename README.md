@@ -55,12 +55,12 @@ cd your-repo
 norn init
 ```
 
-`norn init` writes the team config (`.agents/norn.config.yaml`, with the norn version the repo now needs), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/`, the agent skills and hooks, a JSON schema next to each config file for your editor, and its `.gitignore` lines. On the remote it creates the labels norn uses (see [Concepts: Labels](docs/concepts.md#labels)); when it cannot, it says why and what to run. It reads your test command from your build files and ends with the next steps:
+`norn init` writes the team config (`.agents/norn.config.yaml`, with the norn version the repo now needs), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/`, the agent skills and hooks, a starter `REVIEW.md` (what a review ignores, counts as failure and does not report) when the repo has none, a JSON schema next to each config file for your editor, and its `.gitignore` lines. On the remote it creates the labels norn uses (see [Concepts: Labels](docs/concepts.md#labels)); when it cannot, it says why and what to run. It reads your test command from your build files and ends with the next steps:
 
 ```console
 Next steps
   1. Check the test command `npm install && npm test` in the `test` steps of .agents/workflows/ (detected from package.json).
-  2. Commit and push the setup: `git add .agents .claude .gitignore && git commit -m "Set up norn" && git push`.
+  2. Commit and push the setup: `git add .agents .claude REVIEW.md .gitignore && git commit -m "Set up norn" && git push`.
   3. Check this machine: `norn doctor`.
   4. Make a first story: an issue labelled `norn` and assigned to you, e.g. `gh issue create --label norn --assignee @me --title "…"`.
   5. Pick it up: `norn sync`, then `norn status` shows what needs you and the command for each item; `norn watch` keeps norn working.

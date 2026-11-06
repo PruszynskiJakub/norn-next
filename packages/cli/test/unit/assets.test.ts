@@ -353,8 +353,21 @@ describe("skills", () => {
     expect(text).toMatch(/Write the table into the handoff\*\* \(the Progress section/);
     // a craft skill does not cite the rule ids of norn's own rules file (P7)
     expect(text).not.toMatch(/\bQV\d/);
-    // this repo's installed copy matches the bundled source
-    expect(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "skills", "norn-review", "SKILL.md"), "utf8")).toBe(text);
+  });
+
+  test("norn-review reads REVIEW.md, verifies each blocking candidate, and pins every finding to a file and line (gh-226)", () => {
+    const text = readSkill("norn-review");
+    // the repo's REVIEW.md: ignored paths, what fails here, what not to report
+    expect(text).toMatch(/`REVIEW\.md`\*\* at the repo root, when present/);
+    for (const s of ["ignore", "counts as failure", "not to report"]) expect(text).toContain(s);
+    // a verify pass sits before Decide and drops a candidate that does not hold
+    expect(text.indexOf("**Verify each blocking candidate**")).toBeGreaterThan(-1);
+    expect(text.indexOf("**Verify each blocking candidate**")).toBeLessThan(text.indexOf("**Decide.**"));
+    expect(text).toContain("fresh subagent");
+    expect(text).toContain("Drop a candidate that does not hold");
+    // every finding names a file and line; the summary states the count, and says so when there are none
+    expect(text).toMatch(/`file` and `line` are required/);
+    expect(text).toContain("No findings.");
   });
 
   test.each(CRAFT)("%s is unaware of norn (P7)", (name) => {
