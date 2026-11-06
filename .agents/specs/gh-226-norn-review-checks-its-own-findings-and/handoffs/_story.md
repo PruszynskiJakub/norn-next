@@ -19,12 +19,14 @@
 | Every finding has file and line; summary states the count or `No findings.` | test | same test |
 | `norn init` writes a starter `REVIEW.md` only when none exists | test | `packages/cli/test/integration/init-review.test.ts` › "a repo without one gets the starter, and init says so", "a repo's own REVIEW.md is kept as it is" |
 
+- describe#1: wrote `pr.md` in the spec folder (Summary as a step diff, Evidence per Wanted item from the unit and integration tests since quick has no QA, Merge danger: small one-way door, `REVIEW.md` lands in users' repos; the review's lockfile-glob minor is named there).
 - Friction: implement#2's handoff edit multiplied the file to 1.38 MB, and `norn brief` inlined all of it (1.3 MB brief). Worth an issue: the brief could cap or refuse an oversized handoff.
 
 ### Resume
 
-Nothing left for review; the next step goes on from the approved change.
+`pr.md` is written for the branch as it is; the next step goes on from it.
 
 ## Progress
 
 - review#2 approve: Approve: all four gh-226 items implemented and traced; test#2 green. 1 minor (starter REVIEW.md lockfile globs). Rewrote the 1.38 MB corrupted handoff from its last good version.
+- describe#1 done: pr.md written: step-diff summary, test evidence per Wanted item (no QA in quick), merge danger: small one-way door (REVIEW.md written into repos), lockfile-glob minor named.
