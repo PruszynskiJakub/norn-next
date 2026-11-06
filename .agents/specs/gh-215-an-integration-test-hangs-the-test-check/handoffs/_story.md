@@ -148,6 +148,11 @@ The `## Reproduce` comment is on #215: https://github.com/PruszynskiJakub/norn-n
 - No blocking findings.
 - review#2 approve: Approve, 0 blocking. Spawning-tier preload bounds every untimed Bun.spawnSync (15s, SIGKILL): harness sh(), in-process gitSync/ps, direct test calls; fixture tests prove stuck calls fail named and the run continues. Unit tier, typecheck, touched integration files green. Minor: non-spawn blocks uncut; grandchildren orphaned on timeout.
 
+### Describe (describe#1)
+
+- Wrote `pr.md` in the spec folder: summary with the preload/`sh()` shape diff, evidence per Wanted item (fixture tests red at the 15 s bound before, green after; non-spawn blocks and the CI trigger marked not shown), merge danger two-way / CI.
+- describe#1 done: pr.md written: summary (spawning-tier preload bounds every untimed Bun.spawnSync at 15s/SIGKILL; harness sh() names the timed-out call), evidence per Wanted item (fixture tests red at 15s bound before, green after; non-spawn blocks and the CI trigger not shown), merge danger two-way / CI.
+
 ## Resume
 
-review#2 approve; the next step is norn's. Nothing pending here.
+describe#1 wrote pr.md; the next step is norn's. Nothing pending here.
