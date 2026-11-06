@@ -20079,3 +20079,6 @@ Nothing left for implement; the next step reviews the change again.
 
 Nothing left for implement; the next step reviews the change again.
 
+## Progress
+
+- implement#2 done: F1: dropped the assets.test.ts assertion pinning the installed norn-review copy to the source (release refreshes copies); F2: moved REVIEW_FILE above the IGNORED doc comment in init.ts. Unit tier 1263 pass, typecheck green.
