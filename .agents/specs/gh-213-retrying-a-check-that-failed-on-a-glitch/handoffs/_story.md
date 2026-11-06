@@ -23,11 +23,14 @@ One command retries a check that failed on a glitch on unchanged code, and `run 
 
 Minor findings (not blocking): `run view` now runs a local observe on every call (F1); the `code_changed: null` branch and the markdown line are untested (F2).
 
+- describe#1: PR body written to `pr.md` in the spec folder (summary diff of the rerun/run view shape, evidence W1–W5 from the tests with F2 marked not shown, two-way door, F1 in the blast radius).
+
 ### Resume
 
-Review approved. Next: the steps after review, as norn routes them.
+PR body is in `pr.md`. Next: the steps after describe, as norn routes them.
 
 ## Progress
 
 - implement#1 done: O2a: run rerun --step <check> is accepted on a ready/running unit when that check's fail sent it there; the tick stops the session via the existing S7 kill. run view --json gains check_retry {check, failed_at, code_changed, command}. RULES O2a + SK3, norn-fsd-round skill and recipes updated. Unit tier + typecheck green; new integration test run-rerun-check.test.ts passes.
 - review#1 approve: Approve: O2a rerun-at-failed-check and run view check_retry do what gh-213 asks; B50 kept; tests green. Two minor findings (run view observes on every call; code_changed:null branch and markdown line untested).
+- describe#1 done: pr.md written: O2a rerun-at-failed-check + run view check_retry; evidence W1–W5 from tests (code_changed:null and markdown line marked not shown); two-way door, CLI/supervisor blast radius incl. run view observe cost.
