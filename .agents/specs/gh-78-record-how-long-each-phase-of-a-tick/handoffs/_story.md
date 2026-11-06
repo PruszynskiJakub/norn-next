@@ -50,6 +50,19 @@ Every tick record says where the tick spent its time (observe and its phases, de
 - Friction (for `/issue`, label `friction`): the harness's bare remote (`test/support/harness.ts:335`) should set `receive.autogc false` / `gc.auto 0` so a push cannot repack it under a concurrent clone; this flake sent a green change back to implement.
 - implement#3 done: test#3's only failure (takeover-record AC4) is a harness flake unrelated to gh-78: cloneOf's git clone lost a pack file, likely a background gc --auto on the bare remote after the test's two pushes. The file passes 12/12 alone; unit tier and typecheck green; no code changed. Friction noted: the harness bare remote should disable receive.autogc.
 
+- review#3 (approve): full review on HEAD 81faeee92 (after the merge of main's observe refactor); test#4 green on this code. The re-applied timers sit on main's `syncRemote` and `mapBounded` per-story pass, counts match the calls made, the heartbeat schema stays open (an older norn still reads `last_tick_ms`), the recipe's trace path is right. No blocking findings; carried over: process probes share `local`/`stories` (documented), `base_fetch`/`sync.norn_refs` not asserted by the integration test.
+
+| Item | Verifier | Proven by |
+| --- | --- | --- |
+| W1 observe broken down (sync phases, call counts, local, stories, runner) | test | `packages/cli/test/integration/tick-timing.test.ts` › "observe's phases are timed and the sync's remote calls counted as made" (process probes counted under `local`/`stories`, documented) |
+| W2 decide timed | test | `tick-timing.test.ts` (integration) › "observe's phases are timed…" (`decide_ms`); unit `tick-timing.test.ts` › "names the slowest of observe's phases, decide, each action and after" |
+| W3 each action's time in result.ms, incl. claim.renew | test | `tick-timing.test.ts` (integration) › "each action's time is in its result, the claim renewal's included" |
+| W4 SyncReport in the tick record | test | `tick-timing.test.ts` (integration) › "the tick record carries the sync report and validates"; unit › "records the sync report, each action's time and the timing, and validates" |
+| W5 new fields optional, outside facts/action | test | `packages/schema/test/unit/records.test.ts` › "gh-78: a tick record carries its phase timings…"; golden replay unchanged |
+| W6 slowest phase visible (tick.end, norn tick) | test | `tick-timing.test.ts` (integration) › "tick.end and `norn tick` name the slowest phase, the one the record names" |
+| W7 last tick's duration in status and the cockpit | test | `tick-timing.test.ts` (integration) › "the heartbeat carries the last tick's duration into `norn story list`"; `view.test.ts` › "gh-78: the heartbeat line…"; `cockpit-tui.test.ts` › "gh-78: the header shows…" |
+- review#3 approve: Approve on HEAD 81faeee92 (after the merge of main): tick record carries sync + timing (observe phases with call counts, decide, act, after, result.ms incl. claim.renew), tick.end/norn tick name the slowest phase, story list and cockpit show the last tick's duration; fields optional, outside facts/action; heartbeat stays readable by older norn. test#4 green. 2 findings, 0 blocking (process probes share local/stories; base_fetch/norn_refs phases not asserted).
+
 ## Resume
 
-Nothing open: test#3's failure was a harness flake (see Progress). Next is the `test` check again.
+review#3 approved; nothing open. Next is the PR description and CI, which norn routes.
