@@ -14,9 +14,16 @@ labels:
   - norn:risk:high
   - norn:wf:quick
 workflow: quick
-status: active
+status: done
 intake_at: 2026-11-06T09:17:02.313Z
 body_hash: 565a361dac0ebcbdb2fc9e09c66aaf9f5be964be8d80a4d00b3e32c6523d5da8
+merge:
+  pr: 257
+  url: https://github.com/PruszynskiJakub/norn-next/pull/257
+  head_sha: fec2ae443546f233a80a2f903be5705f096ce59a
+  merge_commit_sha: 98bac119ef612c198acb4a3b1218bc36659a511c
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-06T14:28:17.000Z
 ---
 
 One change about the end of a story: once its PR is merged, GR6 cleanup records the story done (state.json, claim, inbox), even when it was parked at a gate (#88), and a workflow may merge its own PR behind a gate a person approves, with cleanup running the same way (#72). Fix #88's cleanup first; #72 builds on it.
