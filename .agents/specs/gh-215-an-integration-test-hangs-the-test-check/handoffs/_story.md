@@ -103,10 +103,10 @@ An integration-tier test (it starts processes, so not the unit tier). It runs a 
 
 It goes red today. It turns green once harness `sh()` (and every `spawnSyncCaptured` in test support) carries its own `timeoutMs` below the tier's per-test timeout, because `Bun.spawnSync`'s own `timeout` kills the child whatever bun test does. A tier-level watchdog that names the running files when output stops would cover blocks that are not spawns (the FIFO row).
 
-### Not done
+### Posted
 
-Posting the `## Reproduce` comment on #215 was denied by the session's permission classifier (external write). The comment text is exactly the Findings above.
+The `## Reproduce` comment is on #215: https://github.com/PruszynskiJakub/norn-next/issues/215#issuecomment-6688881636
 
 ## Resume
 
-Post the Findings above as a comment on #215, beginning `## Reproduce`, then report `norn done reproduced`.
+Reproduce is finished. Next: a fix behind the integration-tier regression test described under Seam above.
