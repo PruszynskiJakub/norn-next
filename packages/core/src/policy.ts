@@ -2,7 +2,7 @@
  * Rules decide and the inbox both read off Facts — each defined once here, so the tick that acts
  * and the inbox that tells a person never disagree about them.
  */
-import { BUILT_IN_LIMITS, type Mode, parseDuration, type ResolvedConfig, type Step, type UnitState, type Workflow } from "@norn/schema";
+import { BUILT_IN_LIMITS, isClosedStatus, type Mode, parseDuration, type ResolvedConfig, type Step, type UnitState, type Workflow } from "@norn/schema";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "./facts.ts";
 import { stepOf } from "./workflow.ts";
 
@@ -76,7 +76,7 @@ export const storyUnit = (story: StoryFacts): UnitFacts | null => story.units.fi
 /** GR6: the story unit reached `$done`, or spec.md says done/dropped — finished, never "unclaimed". */
 export function storyFinished(story: StoryFacts): boolean {
   const status = story.frontmatter?.status;
-  if (status === "done" || status === "dropped") return true;
+  if (isClosedStatus(status)) return true;
   return storyUnit(story)?.state?.status === "done";
 }
 

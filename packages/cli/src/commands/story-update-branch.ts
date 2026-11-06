@@ -6,17 +6,13 @@
  * applies it (S5). The tick never moves a done unit by itself — only a person does, with this verb.
  * Without a story: the worktree's story, a slice worktree's too (B55), else a pick of the waiting stories (B57).
  */
-import { cmd, baseUpdateStep, heldBySkillsDrift, storyUnit, type UnitFacts } from "@norn/core";
-import type { UnitState } from "@norn/schema";
+import { cmd, baseUpdateStep, heldBySkillsDrift, storyUnit, waitsForBaseUpdate } from "@norn/core";
+import { isClosedStatus } from "@norn/schema";
 import { defineCommand } from "../command.ts";
 import { refuse } from "../output.ts";
 import { at, humanReceipt, resolveTarget, runHumanVerb } from "../runtime/human.ts";
 import { storyArg } from "../runtime/args.ts";
 import { targetKey, type TargetRule } from "../runtime/target.ts";
-
-/** BS9: done (PR unmerged), at a gate, or stuck; gh-61 B22: or held by drifted skills until the base brings them in. */
-const waiting = (st: UnitState, uf: UnitFacts | null) =>
-  st.status === "done" || st.status === "stuck" || (st.status === "parked" && st.park?.kind === "gate") || (uf !== null && heldBySkillsDrift(uf));
 
 /** B57: the stories the pick offers — waiting (BS9) and not finished. */
 const updatable: TargetRule = {
@@ -25,7 +21,8 @@ const updatable: TargetRule = {
   none: "No story waits for a base update (done with an unmerged PR, at a gate, or stuck)",
   command: (k) => cmd.storyUpdateBranch(k),
   applies: (_key, u) =>
-    u?.slice === null && u.story_status !== "done" && u.story_status !== "dropped" && u.pr?.state !== "merged" && (u.status === "done" || u.status === "stuck" || (u.status === "parked" && u.park?.kind === "gate")),
+    // the view carries no skills drift: a unit held by it is not offered
+    u?.slice === null && !isClosedStatus(u.story_status) && u.pr?.state !== "merged" && waitsForBaseUpdate(u, false),
 };
 
 export const storyUpdateBranchCommand = defineCommand({
@@ -53,18 +50,14 @@ export const storyUpdateBranchCommand = defineCommand({
         if (fm?.status === "done" || sf?.pr?.state === "merged" || sf?.merged_by_ancestry)
           throw refuse(`${t.story} is merged; nothing to update`, cmd.storyView(t.story), "story_merged");
         if (fm?.status === "dropped") throw refuse(`${t.story} is dropped`, cmd.storyView(t.story), "story_dropped");
-        if (!waiting(st, sf ? storyUnit(sf) : null))
+        const su = sf ? storyUnit(sf) : null;
+        if (!waitsForBaseUpdate(st, !!su && heldBySkillsDrift(su)))
           throw refuse(`${t.story} is not waiting: it is at ${at(st)}; update re-enters a story that is done, at a gate, stuck or held by drifted skills`, cmd.storyView(t.story), "not_waiting");
         const wf = t.workflow;
         if (!wf) throw refuse(`${t.story} has no readable pinned workflow`, cmd.runView(t.story, { why: true }), "workflow_missing");
         const step = baseUpdateStep(wf);
         if (!step) throw refuse(`workflow ${wf.name} of ${t.story} has no base update step (no \`git: update\` step, no base.step)`, cmd.storyEdit(t.story, { workflow: "<name>", at: "<step>" }), "no_update_step");
         to = step;
-      },
-      // any unapplied update of the story, whatever step it was recorded at
-      refuseDuplicate(t) {
-        const pending = (t.story_facts ? storyUnit(t.story_facts) : null)?.unapplied.find((r) => r.receipt.kind === "update");
-        if (pending) throw refuse(`an update of ${t.story} is already recorded (${pending.file}) and not applied yet`, cmd.tick(), "already_recorded");
       },
       // P6: the receipt first; the tick applies it and writes state.json last (S5)
       build: (t, st) => {

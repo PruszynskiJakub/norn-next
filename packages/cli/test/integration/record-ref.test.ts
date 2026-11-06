@@ -185,7 +185,7 @@ describe("under remote, every boundary pushes the record after the branch (B10)"
     sh(other, ["fetch", "-q", "origin", `+${recordRef("gh-9")}:${recordRef("gh-9")}`]);
     const dest = join(mkdtempSync(join(h.dir, "unpack-")), "gh-9");
     const sha = sh(other, ["rev-parse", recordRef("gh-9")]);
-    expect(await unpackRecord(other, sha, dest)).toMatchObject({ ok: true });
+    expect(unpackRecord(other, sha, dest)).toMatchObject({ ok: true });
     expect(filesOf(dest)).toEqual(recordOnRemote("gh-9").files);
     expect(h.read(join(dest, "_story/rounds/01-trio/state.json"))).toBe(h.read(join(s.record(), "_story/rounds/01-trio/state.json")));
 
@@ -195,7 +195,7 @@ describe("under remote, every boundary pushes the record after the branch (B10)"
     const top = sh(other, ["mktree"], `040000 tree ${tree}\t01-bad\n`);
     const bad = sh(other, ["commit-tree", top, "-m", "bad"]);
     const badDest = join(h.dir, "unpack-bad", "gh-9");
-    const r = await unpackRecord(other, bad, badDest);
+    const r = unpackRecord(other, bad, badDest);
     expect(r.ok).toBe(false);
     expect(existsSync(badDest)).toBe(false);
   });

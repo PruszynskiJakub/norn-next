@@ -42,13 +42,48 @@ const isLink = (path: string) => {
   }
 };
 
-/** True when two skill folders hold the same files with the same bytes (sizes first, so a changed file rarely costs a read). */
-function sameFolder(a: string, b: string): boolean {
-  const fa = filesUnder(a);
+/** A bundled skill folder as read once: its files, their sizes, and their bytes once a compare needs them. */
+interface FolderCopy {
+  files: string[];
+  sizes: number[];
+  bytes(i: number): Buffer;
+}
+
+/**
+ * The bundled skill folders in `dir`, each read once on its first compare: one load compares many
+ * worktrees against them. Hold it no longer than one load, so a changed source is read again.
+ */
+export interface SkillSource {
+  dir: string;
+  folder(name: string): FolderCopy;
+}
+
+export function skillSource(dir: string): SkillSource {
+  const read = new Map<string, FolderCopy>();
+  return {
+    dir,
+    folder(name) {
+      let copy = read.get(name);
+      if (!copy) {
+        const at = join(dir, name);
+        const files = filesUnder(at);
+        const bytes: Buffer[] = [];
+        copy = { files, sizes: files.map((f) => statSync(join(at, f)).size), bytes: (i) => (bytes[i] ??= readFileSync(join(at, files[i] as string))) };
+        read.set(name, copy);
+      }
+      return copy;
+    },
+  };
+}
+
+const sourceOf = (source: string | SkillSource): SkillSource => (typeof source === "string" ? skillSource(source) : source);
+
+/** True when folder `b` holds the same files with the same bytes as the copy (sizes first, so a changed file rarely costs a read). */
+function sameFolder(a: FolderCopy, b: string): boolean {
   const fb = filesUnder(b);
-  if (fa.join("\n") !== fb.join("\n")) return false;
-  if (fa.some((f) => statSync(join(a, f)).size !== statSync(join(b, f)).size)) return false;
-  return fa.every((f) => readFileSync(join(a, f)).equals(readFileSync(join(b, f))));
+  if (a.files.join("\n") !== fb.join("\n")) return false;
+  if (a.files.some((f, i) => statSync(join(b, f)).size !== a.sizes[i])) return false;
+  return a.files.every((f, i) => readFileSync(join(b, f)).equals(a.bytes(i)));
 }
 
 export interface SkillsInstall {
@@ -62,10 +97,11 @@ export interface SkillsInstall {
 export function installSkills(root: string, sourceDir: string, names: readonly string[]): SkillsInstall {
   const dest = skillsDir(root);
   const out: SkillsInstall = { dir: dest, updated: [], unchanged: [] };
+  const source = skillSource(sourceDir);
   for (const name of names) {
     const from = join(sourceDir, name);
     const to = join(dest, name);
-    if (!isLink(to) && sameFolder(from, to)) {
+    if (!isLink(to) && sameFolder(source.folder(name), to)) {
       out.unchanged.push(name);
       continue;
     }
@@ -164,8 +200,9 @@ export function visibleSkills(dir: string): string[] {
  * The bundled skills in `skillsFolder` that differ from this norn's copies in `sourceDir` (B21).
  * Only `names` are compared, so a repo-local skill is never named; a missing skill is not drift.
  */
-export function skillsDrift(skillsFolder: string, sourceDir: string, names: readonly string[]): string[] {
-  return names.filter((n) => existsSync(join(skillsFolder, n, "SKILL.md")) && !sameFolder(join(sourceDir, n), join(skillsFolder, n)));
+export function skillsDrift(skillsFolder: string, source: string | SkillSource, names: readonly string[]): string[] {
+  const src = sourceOf(source);
+  return names.filter((n) => existsSync(join(skillsFolder, n, "SKILL.md")) && !sameFolder(src.folder(n), join(skillsFolder, n)));
 }
 
 /** The `norn_version` a team file records, or null (none, unreadable, not a version). */
@@ -185,10 +222,10 @@ export function recordedNornVersion(teamFile: string): string | null {
  * on its `.agents/skills/`) — none when the worktree's own team file records a `norn_version` newer
  * than `running`: its skills belong to the version that branch moves to.
  */
-export function worktreeSkillsDrift(root: string, sourceDir: string, names: readonly string[], running: string): string[] {
+export function worktreeSkillsDrift(root: string, source: string | SkillSource, names: readonly string[], running: string): string[] {
   const recorded = recordedNornVersion(repoConfigPath(root));
   if (recorded && versionMatch(recorded, running) === "older") return [];
-  return skillsDrift(skillsDir(root), sourceDir, names);
+  return skillsDrift(skillsDir(root), source, names);
 }
 
 export interface SkillsReport {

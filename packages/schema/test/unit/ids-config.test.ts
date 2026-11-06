@@ -10,11 +10,13 @@ import {
   isUlid,
   parseDuration,
   parseReceiptFileName,
+  parseSliceDirName,
   parseSliceFileName,
   parseSliceKey,
   parseSpecDirName,
   parseStoryKey,
   receiptFileName,
+  receiptNumber,
   sliceBranch,
   sliceKey,
   slugify,
@@ -74,6 +76,7 @@ describe("keys and names", () => {
     expect(storyBranch("gh-123", "fix-login")).toBe("gh-123-fix-login");
     expect(sliceBranch("gh-123", "3", "add-form")).toBe("gh-123/03-add-form");
     expect(receiptFileName(7, "done")).toBe("0007-done.json");
+    expect(receiptNumber(7)).toBe("0007");
     expect(parseReceiptFileName("0007-done.json")).toEqual({ n: 7, kind: "done" });
     expect(parseReceiptFileName("7-done.json")).toBeNull();
   });
@@ -84,6 +87,12 @@ describe("keys and names", () => {
     expect(parseSliceFileName("03-add-form.md")).toEqual({ nn: "03", slug: "add-form" });
     expect(parseSliceFileName("123-x.md")).toEqual({ nn: "123", slug: "x" });
     for (const bad of ["3-x.md", "03-x.txt", "03-.md", "03-x"]) expect(parseSliceFileName(bad)).toBeNull();
+    expect(parseSliceDirName("03-add-form")).toEqual({ nn: "03", slug: "add-form" });
+    expect(parseSliceDirName("123-x")).toEqual({ nn: "123", slug: "x" });
+    for (const bad of ["3-x", "1234-x", "03-", "03-Add", "03-x.md", "_story"]) expect(parseSliceDirName(bad)).toBeNull();
+    expect(parseSliceDirName("03-", { loose: true })).toEqual({ nn: "03", slug: "" });
+    expect(parseSliceDirName("03-Add form.md", { loose: true })).toEqual({ nn: "03", slug: "Add form.md" });
+    for (const bad of ["3-x", "1234-x", "03x", "_story"]) expect(parseSliceDirName(bad, { loose: true })).toBeNull();
   });
   test("git shas", () => {
     expect(isGitSha("a".repeat(40))).toBe(true);

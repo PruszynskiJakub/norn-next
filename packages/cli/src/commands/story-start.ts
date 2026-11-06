@@ -10,7 +10,7 @@
  * on at the same step and attempt.
  */
 import { existsSync, readdirSync } from "node:fs";
-import { cmd, effectiveMode, startCommandFor, stepOf } from "@norn/core";
+import { cmd, situationOf, startable, startCommandFor } from "@norn/core";
 import { parseSpecDirName } from "@norn/schema";
 import { heartbeatId, readLocalClaim } from "@norn/store";
 import type { Context } from "../context.ts";
@@ -24,13 +24,11 @@ import { refuseOnSkillsDrift } from "../runtime/skills-drift.ts";
 import { targetKey, type TargetRule } from "../runtime/target.ts";
 
 /** B28: the units a person starts — parked at an attended step, or a ready agent step that waits for a person (manual). */
-const startable: TargetRule = {
+const startableRule: TargetRule = {
   verb: "story start",
   command: (key) => cmd.storyStart(key),
   none: "Nothing waits for a person to start it",
-  applies(_key, u) {
-    return (u?.status === "parked" && u.park?.kind === "attended") || (u?.status === "ready" && u.step_type === "agent" && u.effective_mode === "manual");
-  },
+  applies: (_key, u) => !!u && startable(u),
 };
 
 /** B3: whether this heartbeat holds `story`'s claim and no story worktree of it is on disk. */
@@ -52,7 +50,7 @@ export const storyStartCommand = defineCommand({
   options: { print: { type: "boolean" } },
   positionals: { max: 1 },
   async run(ctx, args) {
-    const raw = await targetKey(ctx, args.positionals[0], args.json === true, startable);
+    const raw = await targetKey(ctx, args.positionals[0], args.json === true, startableRule);
     const story = parseUnitKey(raw).story;
     if (await worktreeGone(ctx, story)) {
       const lock = await waitForTickLock(ctx, "norn story start", `retry: ${cmd.storyStart(raw)}`);
@@ -70,11 +68,9 @@ export const storyStartCommand = defineCommand({
     if (!t.state) throw refuse(`${t.key} has not started yet`, `${cmd.tick()} (or keep ${cmd.watch()} running), then ${cmd.storyStart(t.key)} again`, "not_started");
     const st = started(t);
     await refuseIfHeldElsewhere(ctx, t.story, "story start");
-    const step = t.workflow ? stepOf(t.workflow, st.step) : null;
-    const attended = st.status === "parked" && st.park?.kind === "attended";
-    const manualReady = st.status === "ready" && step?.type === "agent" && effectiveMode(sf.mode, !!step.attended, t.obs.facts.machine.runner).mode === "manual";
-    if (!attended && !manualReady) {
-      const why = st.status === "ready" && step?.type === "agent" ? "the heartbeat starts it (auto mode)" : `it is ${st.status}${st.park ? ` (${st.park.kind})` : ""}`;
+    const situation = situationOf(st, t.workflow, sf.mode, t.obs.facts.machine.runner);
+    if (!startable(situation)) {
+      const why = st.status === "ready" && situation.step_type === "agent" ? "the heartbeat starts it (auto mode)" : `it is ${st.status}${st.park ? ` (${st.park.kind})` : ""}`;
       throw refuse(`${t.key} ${st.step}: nothing for a person to start — ${why}`, cmd.status(), "nothing_to_open");
     }
     const worktree = uf.worktree?.path ?? null;

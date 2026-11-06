@@ -82,7 +82,7 @@ function mapPr(p: GhPr): RemotePullRequest {
  * gh-195 B18: `gh pr checks --json bucket` buckets (pass, fail, pending, skipping, cancel) folded into
  * one state: a failed or cancelled check wins, then a pending one; no check at all is `none`.
  */
-export function ciOf(buckets: readonly string[]): PullRequestCi {
+function ciOf(buckets: readonly string[]): PullRequestCi {
   if (!buckets.length) return "none";
   if (buckets.some((b) => b === "fail" || b === "cancel")) return "failure";
   if (buckets.some((b) => b === "pending")) return "pending";

@@ -103,6 +103,7 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
   return {
     name: RUNNER_NAME,
     capabilities: { send: true, resume: true, open: true },
+    unavailableHint: "herdr server not reachable (start herdr)",
 
     async available() {
       const r = await exec([...base, "status", "server"]);

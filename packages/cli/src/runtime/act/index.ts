@@ -23,7 +23,6 @@ import {
   type InboxGroup,
 } from "@norn/core";
 import { deleteMailbox, reclaimLeases, writeActFailures, writeState, writeUnitMarker } from "@norn/store";
-import { appendProgress, rejectProgress } from "../report.ts";
 import { ActEnv, QueueFull, claimLost } from "./env.ts";
 import { applyReceipts, startRun, nudge, retryFresh, classify } from "./session.ts";
 import { runCheck } from "./check.ts";
@@ -204,7 +203,7 @@ export class Actor extends ActEnv {
         return classify(this, a);
       case "park": {
         const loc = this.unitLoc(a.unit);
-        this.writeReceipts(loc.runsDir, a.receipts);
+        this.writeReceipts(loc, a.receipts);
         if (a.state) this.writeUnitState(a.unit, loc.runsDir, a.state);
         await this.notify(a.notify);
         const committed = await this.commit(a.commit, a.unit, a.state);
@@ -221,21 +220,15 @@ export class Actor extends ActEnv {
         return rejectReceipt(this, a);
       case "mark_corrupt": {
         const loc = this.obs.units[a.unit.key];
-        // S2: decide says whether the state is marked (`mark_state`); a broken spec.md never is
-        let marked = false;
-        if (a.mark_state && loc?.state) {
-          const reason = `corrupt: ${a.errors.map((e) => e.file).join(", ")} failed validation (S2)`;
-          writeState(loc.runsDir, { ...loc.state, status: "corrupt", park: { kind: "corrupt", reason, since: this.nowIso() }, updated_at: this.nowIso(), last_tick_id: this.tick });
-          marked = true;
-        }
+        // S2: decide gives the corrupt state only when it may be written; a broken spec.md never is
+        const marked = a.state !== null && loc !== undefined;
+        if (a.state && loc) writeState(loc.runsDir, a.state);
         await this.notify(a.notify);
         return { ok: true, detail: { marked, errors: a.errors } };
       }
       case "import_mailbox": {
         const loc = this.unitLoc(a.unit);
-        this.writeReceipts(loc.runsDir, a.receipts);
-        // a gate rejection is a milestone in handoff.md, as when it is written locally (O6)
-        for (const r of a.receipts) if (r.receipt.kind === "reject") appendProgress(loc.handoffFile, rejectProgress(r.receipt));
+        this.writeReceipts(loc, a.receipts);
         const committed = await this.commit(a.commit, a.unit, loc.state);
         const deleted: string[] = [];
         for (const r of a.refs) {

@@ -41,7 +41,7 @@ function receiptNames(dir: string): string[] {
 }
 
 /** The newest receipt (`NNNN-<kind>`) of a story's run-state folder `base`: the story unit's, else a slice's. */
-export function lastReceiptIn(base: string): string | null {
+function lastReceiptIn(base: string): string | null {
   const units = (() => {
     try {
       return readdirSync(base, { withFileTypes: true })
@@ -185,7 +185,7 @@ function readMeta(file: string): LocalSupersededFile | null {
  * beside the stories' run state, `.<name>.drop` under `superseded/` — is deleted by the next set-aside,
  * quiet removal or tidy. Never read as a record (dot-named).
  */
-export function sweepDropped(root: string): void {
+function sweepDropped(root: string): void {
   for (const [dir, re] of [
     [machineRunsDir(root), /^\..+\.drop-[^/]+$/],
     [supersededDir(root), /^\..+\.drop$/],

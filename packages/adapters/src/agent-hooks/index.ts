@@ -9,7 +9,7 @@ import { readFile } from "node:fs/promises";
 import type { HookFact, HookEventKind } from "@norn/schema";
 import { SLICE_KEY_PATTERN, STORY_KEY_PATTERN, ULID_PATTERN, validate } from "@norn/schema";
 import type { AgentLaunchRequest } from "@norn/core";
-import { atomicWrite, readText } from "@norn/store";
+import { atomicWrite, json, readText } from "@norn/store";
 import { portError } from "../exec.ts";
 
 /** A1: every norn-installed hook command ends with this shell comment; it is the ownership marker. */
@@ -37,7 +37,7 @@ export function readJsonObject(path: string): JsonObject {
 
 /** Write `next` if its serialization differs from the file (atomically, S1); returns true when written. */
 export function writeJsonIfChanged(path: string, next: JsonObject): boolean {
-  const text = `${JSON.stringify(next, null, 2)}\n`;
+  const text = json(next);
   if (readText(path) === text) return false;
   atomicWrite(path, text);
   return true;

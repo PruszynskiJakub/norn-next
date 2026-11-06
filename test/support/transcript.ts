@@ -2,8 +2,8 @@
  * Effect transcripts (refactor Phase 0.2): what a harness scenario did to the world, in order, so a
  * structure-only refactor can show it changed nothing. Per command run through the harness:
  *   - the child processes norn spawned (argv + cwd, via store's `setSpawnObserver`): store's
- *     `spawnBounded` and sync git calls, check commands (`runShell`), `gitRemoteUrl`, adapters'
- *     `bunExec`, the headless runner's launch and doctor's probes. Not observed: the pid probes
+ *     `spawnBounded` and sync git calls, check commands (`runShell`), adapters'
+ *     `bunExec`, the headless runner's launch. Not observed: the pid probes
  *     (`ps` in store/proc.ts, the process adapter and brief, `lsof` in strays): read-only, and their
  *     argv carries live pids. In the harness the runner/remote ports are fakes, so their spawns never
  *     happen; their calls are recorded below instead.

@@ -14,17 +14,18 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { FileError, NumberedReceipt, SliceFileFacts, UnitRef } from "@norn/core";
-import { claimRef, isStoryKey, type RunStory, SPEC_FILE, validate, STORY_UNIT_DIR, type StoryFrontmatter, type UnitState, parseSliceFileName, parseSpecDirName, sliceKey, treeStoryRunStatePath } from "@norn/schema";
+import { claimRef, isClosedStatus, isStoryKey, parseSliceDirName, parseSliceFileName, parseSpecDirName, type RunStory, sliceDirName, sliceKey, SPEC_FILE, STORY_UNIT_DIR, type StoryFrontmatter, treeStoryRunStatePath, type UnitState } from "@norn/schema";
 import { baseSpecsRoot, defaultBaseRef } from "./base.ts";
 import { type LoadedConfig, loadConfig, loadWorkflows, type WorkflowListing } from "./config.ts";
 import { readSliceFile, readStoryFile } from "./frontmatter.ts";
 import { displayPath, isErrno } from "./fsx.ts";
-import { handoffPath, slicesDir, specsDir, statePath, storyFile } from "./paths.ts";
+import { handoffPath, pinnedWorkflowPath, slicesDir, specsDir, statePath, storyFile } from "./paths.ts";
 import { gitSync } from "./git.ts";
 import { recordedHeartbeatId } from "./heartbeat.ts";
 import { machineRunsDir, runStateDirIn, runStateRoundsIn, runStateSource, treeRunStateDir, treeRunStateFiles } from "./run-state.ts";
 import { listReceipts } from "./receipts.ts";
 import { localRecordRefs } from "./record-ref.ts";
+import { parseBlob } from "./refs.ts";
 import { type Handoff, type PinnedWorkflow, readHandoff, readPinnedWorkflow, readState } from "./unit.ts";
 import { readUnitMarker } from "./worktree.ts";
 
@@ -109,6 +110,8 @@ export interface RepoSnapshot {
   home: string;
   config: LoadedConfig;
   workflows: WorkflowListing;
+  /** the remote-tracking ref of the base branch records were read from; null = none */
+  base_ref: string | null;
   stories: StorySnapshot[];
   /**
    * gh-195 D16 (B29, B35): stories whose run state an older norn left in the base's tree (the fetched
@@ -178,6 +181,7 @@ export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { i
   const wf = readPinnedWorkflow(path, name);
   if (!wf.ok && wf.reason === "corrupt") errors.push(wf.error);
   const state = st.ok ? st.value : null;
+  // S2: every receipt is validated on every load, applied or not
   const all = listReceipts(path, name ? { root: name } : {});
   errors.push(...all.errors);
   const after = state?.applied_through ?? 0;
@@ -185,9 +189,9 @@ export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { i
   // until the tick applies it, the new pin matching that receipt's to_hash is expected.
   const switching = (hash: string) => all.receipts.some((r) => r.n > after && r.receipt.kind === "workflow" && r.receipt.to_hash === hash);
   if (state && wf.ok && state.workflow_hash !== wf.value.hash && !switching(wf.value.hash))
-    errors.push({ file: displayPath(join(path, "workflow.yaml"), name), errors: [{ path: "", message: "hash differs from state.workflow_hash" }] });
+    errors.push({ file: displayPath(pinnedWorkflowPath(path), name), errors: [{ path: "", message: "hash differs from state.workflow_hash" }] });
   if (st.ok && !wf.ok && wf.reason === "missing")
-    errors.push({ file: displayPath(join(path, "workflow.yaml"), name), errors: [{ path: "", message: "pinned workflow missing" }] });
+    errors.push({ file: displayPath(pinnedWorkflowPath(path), name), errors: [{ path: "", message: "pinned workflow missing" }] });
   return {
     unit,
     path,
@@ -204,13 +208,18 @@ export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { i
 
 /**
  * gh-195/06 (B34): a unit of the worktree `root`, read from its branch's tree (`<spec folder>/runs/`, an
- * older norn's) when `branch` and the machine dir holds none of its run state yet, else from `at`.
+ * older norn's) when `branch` and the machine dir holds none of its run state yet, else from `at` —
+ * `fromAt` when given, the unit as already read from `at`, with the handoff of `root`.
  */
-function readUnit(root: string, story: RunStory, unit: UnitRef, opts: { includeApplied?: boolean }, at: RunStateAt, branch: boolean): UnitSnapshot {
+function readUnit(root: string, story: RunStory, unit: UnitRef, opts: { includeApplied?: boolean }, at: RunStateAt, branch: boolean, fromAt?: UnitSnapshot): UnitSnapshot {
   if (branch && !at.tree) {
     const tree: RunStateAt = { base: treeRunStateDir(root, story), name: root, tree: true };
     const held = (base: string) => existsSync(statePath(runStateDirIn(base, unit.dir)));
     if (!held(at.base) && held(tree.base)) return { ...loadUnit(root, story, unit, { ...opts, at: tree }), tree_root: root };
+  }
+  if (fromAt) {
+    const handoffFile = handoffPath(join(root, story.spec_dir), unit.dir);
+    return { ...fromAt, handoffFile, handoff: readHandoff(handoffFile) };
   }
   return loadUnit(root, story, unit, { ...opts, at });
 }
@@ -241,7 +250,11 @@ export function loadRounds(story: StorySnapshot, opts: { includeApplied?: boolea
  * `checkout`, default `root`; `archive`: or, for a finished story this machine holds none of, the
  * record on its archive ref here, gh-195 D7, D16).
  */
-export function loadStory(root: string, specPath: string, opts: { includeApplied?: boolean; checkout?: string; archive?: () => ReadonlyMap<string, string>; branch?: boolean } = {}): StorySnapshot | null {
+export function loadStory(
+  root: string,
+  specPath: string,
+  opts: { includeApplied?: boolean; checkout?: string; archive?: () => ReadonlyMap<string, string>; branch?: boolean; units?: boolean } = {},
+): StorySnapshot | null {
   const name = specPath.split("/").at(-1) ?? "";
   const m = parseSpecDirName(name);
   if (!m) return null;
@@ -271,43 +284,42 @@ export function loadStory(root: string, specPath: string, opts: { includeApplied
   const run: RunStory = { key, spec_dir: relative(root, specPath) };
   const checkout = opts.checkout ?? root;
   // D7, D16 (B29): only a finished story's record is read from its archive ref, never written there
-  const finished = story.ok && (story.value.frontmatter.status === "done" || story.value.frontmatter.status === "dropped");
+  const finished = story.ok && isClosedStatus(story.value.frontmatter.status);
   const at = runStateSource(root, run, { checkout, ...(opts.archive && finished ? { archive: opts.archive } : {}) });
+  const base = { key, slug, root, path: specPath, spec_dir: run.spec_dir, checkout, run_state: at, frontmatter: story.ok && !frontmatter_error ? story.value.frontmatter : null, frontmatter_error, slices };
+  if (opts.units === false) return { ...base, units: [] };
   const unitOpts = opts.includeApplied ? { includeApplied: true } : {};
   // gh-195/06 (B34): a story worktree's branch may still hold an older norn's run state
   const branch = !!opts.branch;
   const units: UnitSnapshot[] = [readUnit(root, run, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, unitOpts, at, branch)];
   const runDirs = new Set([...dirs(at.base), ...(branch ? dirs(treeRunStateDir(root, run)) : [])].filter((d) => d !== STORY_UNIT_DIR));
-  for (const s of slices) runDirs.add(`${s.nn}-${s.slug}`);
+  for (const s of slices) runDirs.add(sliceDirName(s.nn, s.slug));
   for (const d of [...runDirs].sort()) {
-    const nn = /^([0-9]{2,3})-/.exec(d)?.[1];
+    const nn = parseSliceDirName(d, { loose: true })?.nn;
     if (!nn) continue;
     const sk = sliceKey(key, nn);
     units.push(readUnit(root, run, { story: key, slice: sk, dir: d, key: sk }, unitOpts, at, branch));
   }
   if (branch) units[0] = withBranchRecord(root, run, units[0] as UnitSnapshot, units);
-  return {
-    key,
-    slug,
-    root,
-    path: specPath,
-    spec_dir: run.spec_dir,
-    checkout,
-    run_state: at,
-    frontmatter: story.ok && !frontmatter_error ? story.value.frontmatter : null,
-    frontmatter_error,
-    slices,
-    units,
-  };
+  return { ...base, units };
 }
 
-/** Every story under `<root>/.agents/specs/` (only `only`'s spec folder when given). */
-function loadStories(root: string, opts: { includeApplied?: boolean; only?: string; checkout?: string; archive?: () => ReadonlyMap<string, string>; branch?: boolean } = {}): StorySnapshot[] {
+/**
+ * Every story under `<root>/.agents/specs/` (only `only`'s spec folder when given). A story `read`
+ * already holds (an earlier root's) is skipped, or with `frontmatterOf` read without its units.
+ */
+function loadStories(
+  root: string,
+  opts: { includeApplied?: boolean; only?: string; checkout?: string; archive?: () => ReadonlyMap<string, string>; branch?: boolean; read?: ReadonlyMap<string, unknown>; frontmatterOf?: boolean } = {},
+): StorySnapshot[] {
   const out: StorySnapshot[] = [];
+  const { only, read, frontmatterOf, ...load } = opts;
   for (const d of dirs(specsDir(root))) {
-    if (opts.only !== undefined && parseSpecDirName(d)?.story !== opts.only) continue;
-    const { only: _, ...read } = opts;
-    const s = loadStory(root, join(specsDir(root), d), read);
+    const key = parseSpecDirName(d)?.story;
+    if (only !== undefined && key !== only) continue;
+    const held = key !== undefined && !!read?.has(key);
+    if (held && !frontmatterOf) continue;
+    const s = loadStory(root, join(specsDir(root), d), held ? { ...load, units: false } : load);
     if (s) out.push(s);
   }
   return out;
@@ -329,8 +341,10 @@ export function loadSnapshot(opts: {
    * null = none (solo); undefined = detect from the configured git remote (base.ts).
    */
   baseRef?: string | null;
+  /** the config the caller already loaded for this repo, home and env; default loaded here */
+  config?: LoadedConfig;
 }): RepoSnapshot {
-  const config = loadConfig({ repoRoot: opts.repoRoot, home: opts.home, env: opts.env });
+  const config = opts.config ?? loadConfig({ repoRoot: opts.repoRoot, home: opts.home, env: opts.env });
   const workflows = loadWorkflows(opts.repoRoot);
   const baseRef = opts.baseRef !== undefined ? opts.baseRef : defaultBaseRef(opts.repoRoot, config.ok ? config.config.git_remote : "origin", config.ok ? config.config.base_branch : null);
   const baseRoot = baseRef ? baseSpecsRoot(opts.repoRoot, baseRef) : null;
@@ -340,7 +354,7 @@ export function loadSnapshot(opts: {
     const root = typeof entry === "string" ? entry : entry.path;
     const m = typeof entry === "string" ? readUnitMarker(root).marker : { story: entry.story, slice: null };
     if (!m || m.slice !== null) continue;
-    for (const s of loadStories(root, { includeApplied: opts.includeApplied, only: m.story, branch: true })) if (!seen.has(s.key)) seen.set(s.key, s);
+    for (const s of loadStories(root, { includeApplied: opts.includeApplied, only: m.story, branch: true, read: seen })) if (!seen.has(s.key)) seen.set(s.key, s);
   }
   const base = new Map<string, StorySnapshot>();
   // gh-195/05: the base cache is no checkout: its stories' run state is the repo's machine dir, or a
@@ -348,14 +362,15 @@ export function loadSnapshot(opts: {
   // D7: the archive refs are listed only once a finished story without run state here needs them
   let refs: Map<string, string> | undefined;
   const archive = () => (refs ??= localRecordRefs(opts.repoRoot));
-  if (baseRoot) for (const s of loadStories(baseRoot, { includeApplied: opts.includeApplied, checkout: opts.repoRoot, archive })) base.set(s.key, s);
+  // a story a worktree supplied is read from the base for its `base_status` only (R3.2), without its units
+  if (baseRoot) for (const s of loadStories(baseRoot, { includeApplied: opts.includeApplied, checkout: opts.repoRoot, archive, read: seen, frontmatterOf: true })) base.set(s.key, s);
   for (const [key, s] of base) if (!seen.has(key)) seen.set(key, { ...s, from_base: true });
-  for (const s of loadStories(opts.repoRoot, { includeApplied: opts.includeApplied, archive })) if (!seen.has(s.key)) seen.set(s.key, s);
+  for (const s of loadStories(opts.repoRoot, { includeApplied: opts.includeApplied, archive, read: seen })) if (!seen.has(s.key)) seen.set(s.key, s);
   for (const s of recordOnlyStories(opts.repoRoot, seen, { includeApplied: opts.includeApplied })) seen.set(s.key, s);
   const stories = [...seen.values()]
     .map((s) => (baseRoot ? { ...s, base_status: base.get(s.key)?.frontmatter?.status ?? null } : s))
     .sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
-  return { root: opts.repoRoot, home: config.home, config, workflows, stories, base_run_state: baseRunStateStories(baseRoot ?? opts.repoRoot) };
+  return { root: opts.repoRoot, home: config.home, config, workflows, base_ref: baseRef, stories, base_run_state: baseRunStateStories(baseRoot ?? opts.repoRoot) };
 }
 
 /**
@@ -371,20 +386,16 @@ function recordOnlyStories(root: string, seen: ReadonlyMap<string, StorySnapshot
     if (seen.has(key) || !isStoryKey(key)) continue;
     const claim = gitSync(root, ["cat-file", "blob", claimRef(key)]);
     if (claim.code !== 0) continue;
-    let blob: unknown;
-    try {
-      blob = JSON.parse(claim.stdout.toString("utf8"));
-    } catch {
-      continue;
-    }
-    if (!validate("claim", blob).ok || (blob as { heartbeat_id: string }).heartbeat_id !== hb) continue;
+    const blob = parseBlob("claim", claimRef(key), claim.stdout.toString("utf8"));
+    // a corrupt claim is skipped here, as before: observe reads the claim and reports it corrupt (S2)
+    if (!blob.ok || blob.value.heartbeat_id !== hb) continue;
     const run: RunStory = { key, spec_dir: "" };
     const at = runStateSource(root, run, { checkout: root });
     const unitOpts = opts.includeApplied ? { includeApplied: true } : {};
     const units: UnitSnapshot[] = [readUnit(root, run, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, unitOpts, at, false)];
     if (!units[0]?.state) continue;
     for (const d of dirs(at.base).filter((x) => x !== STORY_UNIT_DIR).sort()) {
-      const nn = /^([0-9]{2,3})-/.exec(d)?.[1];
+      const nn = parseSliceDirName(d, { loose: true })?.nn;
       if (nn) units.push(readUnit(root, run, { story: key, slice: sliceKey(key, nn), dir: d, key: sliceKey(key, nn) }, unitOpts, at, false));
     }
     out.push({ key, slug: "", root, path: "", spec_dir: "", checkout: root, run_state: at, frontmatter: null, frontmatter_error: null, slices: [], units, record_only: true });
@@ -405,8 +416,9 @@ export function withSliceWorktrees(
   const units = story.units.map((u) => {
     const wt = u.unit.slice ? sliceWorktree(u.unit.slice) : null;
     if (!wt) return u;
-    // gh-195/06 (B34): a slice branch may still hold an older norn's run state of the slice
-    const own = readUnit(wt, story, u.unit, opts, story.run_state, true);
+    // gh-195/06 (B34): a slice branch may still hold an older norn's run state of the slice; its run
+    // state in the machine dir is the one the story already read
+    const own = readUnit(wt, story, u.unit, opts, story.run_state, true, u.tree_root ? undefined : u);
     // …else the story branch's copy, read with the story, stays its run state
     const read = !own.tree_root && !own.state && u.tree_root ? { ...u, handoffFile: own.handoffFile, handoff: own.handoff } : own;
     return withBranchRecord(wt, story, read, [read]);

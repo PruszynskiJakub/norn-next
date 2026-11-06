@@ -13,7 +13,7 @@ describe("headless runner (real processes)", () => {
     expect(err).toMatchObject({ code: "unsupported", retryable: false });
   });
 
-  test("capabilities: no send, resume (R4.1); findSessions by the run's NORN_RUN env (R5.1)", async () => {
+  test("capabilities: no send, resume, headless (R4.1); findSessions by the run's NORN_RUN env (R5.1)", async () => {
     const proc = {
       identify: async () => null,
       isAlive: async () => true,
@@ -21,7 +21,7 @@ describe("headless runner (real processes)", () => {
       findByEnv: async (name: string, value: string) => (name === "NORN_RUN" && value === "01JRUN" ? [{ pid: 77, pid_start: "Fri Oct 23 10:00:00 2026" }] : []),
     };
     const runner = createHeadlessRunner({ logDir: tmpdir(), process: proc });
-    expect(runner.capabilities).toEqual({ send: false, resume: true });
+    expect(runner.capabilities).toEqual({ send: false, resume: true, headless: true });
     expect(await runner.findSessions?.({ run_id: "01JRUN", cwd: "/w" })).toEqual([{ session: { runner: "headless", session_id: "01JRUN", process: { pid: 77, pid_start: "Fri Oct 23 10:00:00 2026" } } }]);
     expect(await runner.findSessions?.({ run_id: "01JOTHER", cwd: "/w" })).toEqual([]);
   });

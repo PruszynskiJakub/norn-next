@@ -22,4 +22,5 @@ export * from "./labels.ts";
 export * from "./policy.ts";
 export * from "./prompt.ts";
 export * from "./time.ts";
+export * from "./verbs.ts";
 export * from "./workflow.ts";
