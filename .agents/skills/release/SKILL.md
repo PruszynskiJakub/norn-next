@@ -30,7 +30,7 @@ Each commit on main is one squashed PR, `<PR title> (#<pr>)`, whose body says `C
 | `quick`, bypass PR | your call from the diff: a change users notice goes under Changed or Fixed; docs-only, tests, CI and internal refactors are omitted |
 | `release`, `triage` (closed), Dependabot, `norn: gh-N done (PR merged)` (norn's bookkeeping, no PR) | omitted |
 
-Write the commit → section (or omitted, with why) list under Progress in the handoff, so the person sees it at `ready`.
+Write the commit → section (or omitted, with why) list under Notes in the handoff, so the person sees it at `ready`.
 
 ## 3. Write the changelog
 

@@ -3,6 +3,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { protocolLines } from "@norn/core";
 import { DEFAULT_CONFIG, type Workflow, outcomeEdge, validate } from "@norn/schema";
 import { parseWaitCondition } from "@norn/view";
 import { parse } from "yaml";
@@ -250,17 +251,19 @@ describe("skills", () => {
     expect(readSkill("norn").split("\n").length).toBeLessThanOrEqual(80);
   });
 
-  test("the norn skill names no step of any template", () => {
-    const text = readSkill("norn");
+  test("the norn skill and the brief's protocol name no step of any template", () => {
+    const text = `${readSkill("norn")}\n${protocolLines("handoffs/_story.md").join("\n")}`;
     const reserved = new Set(["test", "slice", "slices", "plan", "ready"]); // glossary nouns / plain words
     const names = new Set(workflowFiles.flatMap((f) => Object.keys(loadWorkflow(f).steps)).filter((n) => !reserved.has(n)));
     expect([...names].filter((n) => new RegExp(`\\b${n}\\b`, "i").test(text))).toEqual([]);
   });
 
-  test("the norn skill states the protocol and hard rules", () => {
-    const text = readSkill("norn");
-    for (const s of ["norn brief", "norn done", "norn ask", "norn stuck", "--handoff", "Do instead", "handoffs/<unit>.md", "Goal", "Progress", "Resume", "git push", "runs/", "gh", "glab"])
-      expect(text).toContain(s);
+  test("the norn skill sends the agent to the brief, whose protocol states the reporting and hard rules", () => {
+    const skill = readSkill("norn");
+    for (const s of ["norn brief", "norn status", "norn story start <unit>", "How to work"]) expect(skill).toContain(s);
+    const protocol = protocolLines("handoffs/_story.md").join("\n");
+    for (const s of ["`brief`", "`done`", "`ask`", "`stuck`", "--handoff", "--findings", "what to do instead", "handoffs/_story.md", "Goal", "Done means", "Easy to miss", "Not proven yet", "Notes", "Resume", "8 KB", "git push", "runs/", "gh", "glab"])
+      expect(protocol).toContain(s);
   });
 
   // The supervisor protocol states its terms; the command lint checks every command it prints
@@ -350,8 +353,9 @@ describe("skills", () => {
     // an UNTRACED row blocks, unless the verifier is agent or person: those point at QA
     expect(text).toMatch(/`UNTRACED` row is a blocking Spec finding, unless the criterion's `verifier`[^.]*`agent` or `person`/);
     for (const s of ["QA (agent)", "QA (person)", "counts as `verifier: test`"]) expect(text).toContain(s);
-    // the table goes into the handoff's Progress section
-    expect(text).toMatch(/Write the table into the handoff\*\* \(the Progress section/);
+    // the table goes into the handoff's Done means section, an UNTRACED row also under Not proven yet
+    expect(text).toMatch(/Write the table into the handoff's Done means section\*\*/);
+    expect(text).toContain("`UNTRACED` row also goes under Not proven yet");
     // a craft skill does not cite the rule ids of norn's own rules file
     expect(text).not.toMatch(/\bQV\d/);
   });
@@ -364,7 +368,7 @@ describe("skills", () => {
     expect(refine).toContain("nothing cites a story by its number");
     for (const skill of ["norn-refine", "norn-slice", "norn-review", "norn-qa", "norn-plan", "norn-pr"]) expect(readSkill(skill)).not.toMatch(/\bUS\d|US<n>/);
     // the step protocol and the interview speak in words, to a person and in files
-    expect(readSkill("norn")).toContain("## Talk in words");
+    expect(protocolLines("handoffs/_story.md").join("\n")).toContain("by what it says, not by a number or id");
     expect(readSkill("norn-interview")).toMatch(/never by a number or id/);
   });
 

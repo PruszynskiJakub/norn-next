@@ -105,7 +105,7 @@ describe("the story's handoff is handoffs/_story.md, prose only (B39)", () => {
     await tick();
     h.git(["fetch", "-q", "origin"]);
     const onBranch = h.git(["show", `origin/gh-9-prose-only:${HANDOFF}`]);
-    expect(onBranch.trimEnd()).toBe("## Goal\n\n## Progress\n\n## Resume");
+    expect(onBranch.trimEnd()).toBe("## Goal\n\n## Done means\n\n## Easy to miss\n\n## Not proven yet\n\n## Notes\n\n## Resume");
     expect(treeOf(h.root, "origin/gh-9-prose-only", SPEC).filter((p) => p.includes("/runs/"))).toEqual([]);
   });
 
@@ -136,17 +136,16 @@ describe("the story's handoff is handoffs/_story.md, prose only (B39)", () => {
       expect(sh(wt(), ["show", `${sha}:${HANDOFF}`])).not.toContain("norn:");
   });
 
-  test("AC3: at review attempt 2, `norn brief` and `norn story checkout` print the step, the counters and the last outcome above the handoff's written part", async () => {
+  test("AC3: at review attempt 2, the brief names the step and its history, its JSON the counters, and `norn story checkout` prints the status above the handoff's written part", async () => {
     const brief = await inWt(wt(), "brief");
     expect(brief.exit).toBe(0);
     const md = brief.stdout;
-    const status = ["- Step: review (attempt 2)", "- Counters: review_loop 1/3", "- Last outcome: implement.done (reported, "];
+    expect(md).toStartWith("# norn brief — gh-9 · review #2\n");
     const context = md.indexOf("## Context");
-    for (const line of status) {
-      expect(md).toContain(line);
-      expect(md.indexOf(line)).toBeLessThan(context);
-    }
     expect(md.slice(context)).toContain("Ship the prose-only handoff.");
+    expect(md.slice(context)).toContain("- review#1 reported `changes_requested`: one blocker");
+    const json = (await inWt(wt(), "brief", "--json")).value as { brief: { where: { step: string; attempt: number; counters: string; last_outcome: string } } };
+    expect(json.brief.where).toMatchObject({ step: "review", attempt: 2, counters: expect.stringContaining("review_loop 1/3"), last_outcome: expect.stringContaining("implement.done (reported, ") });
     await tick();
 
     const r = await h.norn("story", "checkout", "gh-9", "--json");
@@ -194,13 +193,14 @@ describe("a slice's handoff is handoffs/<nn>-<slug>.md on the slice branch (B39)
     const slice = handoffPath(join(sliceWt(), SPEC), "01-part-a");
     expect(existsSync(slice)).toBe(true);
     h.write(join(sliceWt(), "src/part-a.ts"), "export const a = 1;\n");
+    h.write(join(sliceWt(), SLICE_HANDOFF), "## Goal\n\nBuild part a.\n");
     expect((await inWt(sliceWt(), "done", "done", "--handoff", "part a built")).exit).toBe(0);
     await tick();
     h.git(["fetch", "-q", "origin"]);
     const sliceTree = treeOf(h.root, "origin/gh-11/01-part-a", SPEC);
     expect(sliceTree).toContain(SLICE_HANDOFF);
     expect(sliceTree.filter((p) => p.includes("/runs/"))).toEqual([]);
-    expect(h.git(["show", `origin/gh-11/01-part-a:${SLICE_HANDOFF}`])).toContain("- build#1 done: part a built");
+    expect(h.git(["show", `origin/gh-11/01-part-a:${SLICE_HANDOFF}`])).toBe("## Goal\n\nBuild part a.");
 
     await tickUntil(() => h.read(join(wt(), SPEC, "slices/01-part-a.md")).includes("status: integrated"));
     h.git(["fetch", "-q", "origin"]);
@@ -208,6 +208,6 @@ describe("a slice's handoff is handoffs/<nn>-<slug>.md on the slice branch (B39)
     expect(storyTree).toContain(STORY_HANDOFF);
     expect(storyTree).toContain(SLICE_HANDOFF);
     expect(storyTree.filter((p) => p.includes("/runs/"))).toEqual([]);
-    expect(h.git(["show", `origin/gh-11-two-handoffs:${SLICE_HANDOFF}`])).toContain("- build#1 done: part a built");
+    expect(h.git(["show", `origin/gh-11-two-handoffs:${SLICE_HANDOFF}`])).toBe("## Goal\n\nBuild part a.");
   });
 });
