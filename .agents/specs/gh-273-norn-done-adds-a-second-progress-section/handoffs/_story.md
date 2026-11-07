@@ -18,6 +18,9 @@ Fix gh-273: `norn done` (and every other `appendProgress` caller) adds a second 
   One minor finding: the Progress match is case-sensitive (`dropSection` is not), so `### progress` would still get a second section.
 - review#1 approve: appendProgress finds Progress at any heading level and ends it at the next heading as high; regression test covers levels 1-4 and edge cases, green. 1 minor finding (case-sensitive match), none blocking.
 
+- describe#1: wrote pr.md (summary diff of appendProgress, evidence W1/W2 from the unit tests, two-way door, small blast radius; case-sensitivity gap noted).
+- describe#1 done: pr.md written: appendProgress fix summary, W1/W2 evidence from unit tests (no QA), two-way door, handoff-only blast radius
+
 ## Resume
 
-Review approved; the next step is whatever the workflow runs after review.
+pr.md is written; the next step is whatever the workflow runs after describe.
