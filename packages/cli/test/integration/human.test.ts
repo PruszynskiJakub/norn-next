@@ -285,8 +285,8 @@ describe("approve (gate)", () => {
     refused(await h.norn("story", "approve", "gh-5"), "already_recorded");
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 3, counters: { loop: 1 } });
-    // The rejection is a milestone in handoff.md, so the next brief's Context carries it
-    expect(h.read(handoffPath(join(wt5(), spec5), STORY_UNIT_DIR))).toContain("- review#1 reject by tester@box: needs tests");
+    // norn writes nothing into the handoff: the next brief carries the rejection under Rework and History, from the receipt
+    expect(h.read(handoffPath(join(wt5(), spec5), STORY_UNIT_DIR))).not.toContain("needs tests");
     expect(r.value).not.toHaveProperty("warning");
 
     // A rejection without a reason would leave the agent nothing to fix: a usage error, nothing written
@@ -297,7 +297,7 @@ describe("approve (gate)", () => {
     expect(bare.value).toMatchObject({ do_instead: expect.stringContaining("pass --reason") });
     expect(h.state(runs5())).toMatchObject({ step: "review", attempt: 2, status: "parked" });
     expect((await h.norn("story", "reject", "gh-5", "--reason", "still no tests")).exit).toBe(0);
-    expect(h.read(handoffPath(join(wt5(), spec5), STORY_UNIT_DIR))).toContain("- review#2 reject by tester@box: still no tests");
+    expect(h.read(handoffPath(join(wt5(), spec5), STORY_UNIT_DIR))).not.toContain("still no tests");
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 4, counters: { loop: 2 } });
 

@@ -184,7 +184,7 @@ describe("agent steps: modes and caps", () => {
     const a = only(facts([solo()]));
     expect(a.kind).toBe("start_run");
     if (a.kind !== "start_run") return;
-    expect(a.launch).toMatchObject({ agent: "claude", cwd: "/r-worktrees/gh-1-login", prompt: "Use the norn skill, then run `norn brief`.", env: { NORN_STORY: "gh-1", NORN_RUN: a.launch.run_id, NORN_SLOT: "1", PORT_BASE: "4010" } });
+    expect(a.launch).toMatchObject({ agent: "claude", cwd: "/r-worktrees/gh-1-login", prompt: "Run `norn brief` in this worktree and do the step it gives you.", env: { NORN_STORY: "gh-1", NORN_RUN: a.launch.run_id, NORN_SLOT: "1", PORT_BASE: "4010" } });
     expect(a.receipts).toEqual([{ n: 1, receipt: expect.objectContaining({ kind: "started", how: "auto", run_id: a.launch.run_id, step: "implement", attempt: 1 }) }]);
     expect(a.state).toMatchObject({ status: "running", applied_through: 1, run: { run_id: a.launch.run_id, how: "auto" } });
     // The started receipts are committed and pushed in the launch tick

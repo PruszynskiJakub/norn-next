@@ -36,7 +36,7 @@ steps:
       (`01.AC1`), next to the story's own, so the story's QA gives each one a verdict. First check the Plan section of spec.md
       against the code on this base: when spec.md has no Plan section, or the base changed what the plan
       relies on so that it no longer holds, write no slice files, say what no longer holds in the handoff's
-      Progress and report `replan`.
+      Notes and report `replan`.
     outcomes:
       done:   { to: approve-slices, means: "slice files written against the current base; every user story is covered by some slice's acceptance" }
       replan: { to: $stuck, means: "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans with `norn story edit <story> --workflow refinement --at plan`" }

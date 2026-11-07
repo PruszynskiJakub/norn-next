@@ -239,7 +239,8 @@ describe("checkout unpacks the record from the ref and continues (B22)", () => {
 
     const brief = await B.at(s.wt(B.root), "brief");
     expect(brief.exit).toBe(0);
-    const why = brief.stdout.slice(brief.stdout.indexOf("## Why this attempt"), brief.stdout.indexOf("## Your work"));
+    const from = brief.stdout.indexOf("## Why this attempt");
+    const why = brief.stdout.slice(from, brief.stdout.indexOf("\n## ", from + 1));
     expect(why.toLowerCase()).toContain(line);
     const json = await B.at(s.wt(B.root), "brief", "--json");
     expect(json.value).toMatchObject({ brief: { where: { step: "review", attempt: 3 }, history: { rewritten: { gone, head, line } } } });

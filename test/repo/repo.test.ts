@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
+import { protocolLines } from "@norn/core";
 import { allDocs, CODE_SPAN, textFiles, URL } from "../support/docs.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
@@ -461,17 +462,19 @@ describe("test layout (AGENTS.md)", () => {
     expect(steps.some((s) => /test:integration|test:e2e/.test(s.run ?? ""))).toBe(false);
   });
 
-  test("AC7 (B21): AGENTS.md lists the three tier commands, hands back on the unit tier and the type check, and every path it names exists; the README names no test command (gh-162 B3: AGENTS.md holds them)", () => {
+  test("AC7 (B21): AGENTS.md lists the three tier commands and hands back on the unit tier and the type check, and every path it and docs/development.md name exists; the README names no test command (gh-162 B3: AGENTS.md holds them)", () => {
     const agents = readFileSync(join(ROOT, "AGENTS.md"), "utf8");
     const commands = section(agents, "Commands");
     const named = (cmd: string) => new RegExp(`^${cmd.replace(/[:]/g, "\\$&")}\\s+#`, "m").test(commands);
     expect(["bun run test", "bun run test:integration", "bun run test:e2e"].map(named)).toEqual([true, true, true]);
     expect(commands).toMatch(/The unit tier \(`bun run test`\) and the type check must pass before you hand work back/);
-    const paths = [...agents.matchAll(/`((?:packages|test|scripts)\/[\w./*-]+)`/g)].map((m) => (m[1] as string).replace(/\/\*[^/]*$/, ""));
+    // AGENTS.md is a map: most of the paths an agent is sent to are named in the contributor reference
+    const devDocs = agents + readFileSync(join(ROOT, "docs", "development.md"), "utf8");
+    const paths = [...devDocs.matchAll(/`((?:packages|test|scripts)\/[\w./*-]+)`/g)].map((m) => (m[1] as string).replace(/\/\*[^/]*$/, ""));
     expect(paths.length).toBeGreaterThan(0);
     expect(paths.filter((p) => !existsSync(join(ROOT, p)))).toEqual([]);
     // a test file named bare ("`contract.test .ts` there") must also be named by its full path, so the check above sees it
-    const bare = [...agents.matchAll(/`([\w.-]+\.test\.ts)`/g)].map((m) => m[1] as string);
+    const bare = [...devDocs.matchAll(/`([\w.-]+\.test\.ts)`/g)].map((m) => m[1] as string);
     expect(bare.filter((name) => !paths.some((p) => p.endsWith(`/${name}`)))).toEqual([]);
     const readme = readFileSync(join(ROOT, "README.md"), "utf8").split("\n").filter((l) => /^bun (run )?test\b/.test(l));
     expect(readme).toEqual([]);
@@ -814,16 +817,15 @@ describe("the new layout in product docs (B22)", () => {
     expect(reference.find((l) => l.startsWith("| `.agents/norn.config.yaml`"))).toBeDefined();
   });
 
-  test("B3: the shipped norn skill puts only runs/ off limits (gh-195/07: the handoff has no generated top)", () => {
-    const skill = readFileSync(join(PKGS, "cli", "assets", "skills", "norn", "SKILL.md"), "utf8");
-    const rules = section(skill, "Hard rules");
-    const never = rules.split("\n").filter((l) => /\bnever edit\b/i.test(l));
+  test("the brief's protocol puts only runs/ off limits; workflows and config are ordinary files", () => {
+    const rules = protocolLines(".agents/specs/gh-1-x/handoffs/_story.md");
+    const never = rules.filter((l) => /\bnever edit\b/i.test(l));
     expect(never).toHaveLength(1);
     const offLimits = (never[0] as string).split(/\.\s/)[0] as string;
     expect([...offLimits.matchAll(CODE_SPAN)].map((m) => m[0])).toEqual(["`runs/`"]);
     expect(offLimits).not.toContain("handoff");
-    expect(rules).toContain("`.agents/workflows/`");
-    expect(rules).toContain("`.agents/norn.config.yaml`");
+    expect(never[0]).toContain("`.agents/workflows/`");
+    expect(never[0]).toContain("norn config");
   });
 });
 

@@ -31,8 +31,7 @@
  *    the take (`record_lost`), the state at the restart step, attempt 1, counters at zero — then the
  *    record renamed into place and the local record ref set to it (the lease of this checkout's next
  *    record push); then the worktrees with slots, `.env.norn` and `.norn-unit`, local branches only
- *    created or moved forward. A forced take journals a Progress line in the story handoff,
- *    committed and pushed.
+ *    created or moved forward. A forced take is journaled in the claim blob and the take receipt.
  * 6. Print each unit's cursor, and its status as the next tick will have it above its handoff's
  *    written part. The next `norn tick` resumes from the run state.
  */
@@ -97,7 +96,6 @@ import {
 import type { Context } from "../context.ts";
 import { claimHeld, corruptError, failure, refuse, withExit } from "../output.ts";
 import { claimFor } from "./human.ts";
-import { appendProgress } from "./report.ts";
 import { leaseLiveness } from "./leases.ts";
 import { gitRemote } from "./observe/index.ts";
 import { equipWorktree, syncLocalBranch, type WorktreeTarget } from "./worktrees.ts";
@@ -475,9 +473,9 @@ async function restoreWorktrees(
 }
 
 /**
- * Journal a forced take: claim blob `forced_from` + a Progress line in the story's handoff
- * (prose, no heartbeat block), committed and pushed with what `more` adds; the take receipt
- * stays in the machine dir.
+ * Journal a take. A forced one is in the claim blob (`forced_from`) and the take receipt, which the
+ * brief's History shows; the handoff is the unit's state, so it gets no line. What `more` adds is
+ * committed and pushed on the story branch.
  */
 async function journalTake(
   git: GitPort,
@@ -491,28 +489,25 @@ async function journalTake(
     /** set on a forced take */
     forced_from: string | null;
     storyWt: string | null;
-    storyHandoff: string | null;
     worktrees: ReadonlyArray<{ unit: string; path: string; branch: string }>;
     more: CheckoutRecord | undefined;
   },
 ) {
   const { key, spec_dir } = run;
-  const { branch, holder, storyWt, storyHandoff } = o;
+  const { branch, holder, storyWt } = o;
   const forced = o.forced_from !== null;
   let journal: unknown = null;
   let committed: { commit: string | null; pushed: boolean | null } | null = null;
   const line = forced ? `${o.nowIso} take --force by ${holder} from ${o.forced_from}` : null;
-  const journaled = line !== null && storyHandoff !== null && existsSync(storyHandoff);
-  if (journaled) appendProgress(storyHandoff, line);
   const extra = storyWt ? o.more?.({ storyWt, spec_dir, worktrees: o.worktrees }) : undefined;
-  if (storyWt && branch && (journaled || extra?.paths.length)) {
-    const paths = [...(journaled && storyHandoff ? [relative(storyWt, storyHandoff)] : []), ...(extra?.paths ?? [])];
+  if (storyWt && branch && extra?.paths.length) {
+    const paths = [...extra.paths];
     const message = extra?.message ?? (forced ? `norn: ${key} taken with --force by ${holder}` : `norn: ${key} taken by ${holder}`);
     const sha = await git.commit(storyWt, { message, trailers: { "Norn-Story": key, "Norn-Step": "take", "Norn-Tick": ulid(o.now) }, paths });
     const pushed = remote && sha ? await git.push(storyWt, remote, `refs/heads/${branch}:refs/heads/${branch}`) : null;
     committed = { commit: sha, pushed: pushed ? pushed.ok : null };
   }
-  if (line) journal = journaled ? { line, ...committed } : { line, commit: null, note: "story has no handoff yet; journaled in the claim blob (forced_from)" };
+  if (line) journal = { line, commit: committed?.commit ?? null, note: "journaled in the claim blob (forced_from) and the take receipt" };
   return { journal, extra };
 }
 
@@ -634,14 +629,14 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
     const next = nextCursor(placedRuns, rewritten?.gone ?? null);
 
     // 5b. branches → worktrees
-    const { problems, worktrees, units, storyWt, storyHandoff } = await restoreWorktrees(ctx, ports, remote, run, branch, {
+    const { problems, worktrees, units, storyWt } = await restoreWorktrees(ctx, ports, remote, run, branch, {
       placedRuns,
       storyState: next.state,
       nowIso,
       onStoryFailed: (problems) => failure(`${problems.join("; ")}; ${held}`, `fix the story branch, then ${again} again`, "branch_diverged", { claim: blob }),
     });
 
-    const { journal, extra } = await journalTake(git, remote, run, { branch, holder, now, nowIso, forced_from: forced ? (blob.forced_from ?? null) : null, storyWt, storyHandoff, worktrees, more });
+    const { journal, extra } = await journalTake(git, remote, run, { branch, holder, now, nowIso, forced_from: forced ? (blob.forced_from ?? null) : null, storyWt, worktrees, more });
 
     const value = {
       story: key,
