@@ -96,7 +96,7 @@
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:4> "^<sha:1>" --
   spawn repo $ git rev-list --left-right --count <sha:4>...<sha:1> --
   spawn repo $ git merge-base <sha:4> <sha:1>
-  A.runner.launch title="gh-9 implement" cwd=<dir>/repo-worktrees/gh-9-add-search argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Use the norn skill, then run `norn brief`."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:3>","NORN_SLOT":"1","NORN_STORY":"gh-9"}
+  A.runner.launch title="gh-9 implement" cwd=<dir>/repo-worktrees/gh-9-add-search argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Run `norn brief` in this worktree and do the step it gives you."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:3>","NORN_SLOT":"1","NORN_STORY":"gh-9"}
   spawn repo-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
   spawn repo-worktrees/gh-9-add-search $ git add -A -- .agents/specs/gh-9-add-search/handoffs/_story.md
@@ -140,16 +140,8 @@
   spawn repo-b $ git worktree add <dir>/repo-b-worktrees/gh-9-add-search gh-9-add-search
   spawn repo-b $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo-b $ git for-each-ref "--format=%(refname) %(objectname)" refs/remotes/origin/gh-9/
-  spawn repo-b-worktrees/gh-9-add-search $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-b-worktrees/gh-9-add-search $ git diff --name-only --diff-filter=U -z
-  spawn repo-b-worktrees/gh-9-add-search $ git add -A -- .agents/specs/gh-9-add-search/handoffs/_story.md
-  spawn repo-b-worktrees/gh-9-add-search $ git diff --cached --quiet -- .agents/specs/gh-9-add-search/handoffs/_story.md
-  spawn repo-b-worktrees/gh-9-add-search $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-9-add-search/handoffs/_story.md
-  spawn repo-b-worktrees/gh-9-add-search $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-9" --trailer "Norn-Step: take" --trailer "Norn-Tick: <ulid:8>" -- .agents/specs/gh-9-add-search/handoffs/_story.md
-  spawn repo-b-worktrees/gh-9-add-search $ git rev-parse HEAD
-  spawn repo-b-worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search
   + home-repo-b/repos/repo-b-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0001-take.json
-      {"kind":"take","receipt_id":"<ulid:9>","run_id":null,"step":"implement","attempt":1,"at":"<time>","by":"human","who":"bob@repo-b","previous_holder":"tester@box","previous_heartbeat_id":"<ulid:6>","expired":false,"forced":true,"record_lost":true}
+      {"kind":"take","receipt_id":"<ulid:8>","run_id":null,"step":"implement","attempt":1,"at":"<time>","by":"human","who":"bob@repo-b","previous_holder":"tester@box","previous_heartbeat_id":"<ulid:6>","expired":false,"forced":true,"record_lost":true}
   + home-repo-b/repos/repo-b-<id>/runs/gh-9/_story/rounds/01-solo/state.json
       {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"51d9743b83bdefcffc2af22c467294a98d957b6a7fca5a1ede44a62a468c618e","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":null}
   + home-repo-b/repos/repo-b-<id>/runs/gh-9/_story/rounds/01-solo/workflow.yaml

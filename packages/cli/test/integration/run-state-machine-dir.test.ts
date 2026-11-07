@@ -129,14 +129,14 @@ describe("gh-9 runs with its run state in the machine dir", () => {
     expect(h.git(["ls-tree", "-r", "--name-only", "origin/gh-9-keep-it-local", "--", `${SPEC}/handoffs`]).trim()).toBe(HANDOFF);
   });
 
-  test("AC6: the boundary after `norn done done` holds exactly the agent's files and the handoff, with the S4 trailers", async () => {
+  test("AC6: the boundary after `norn done done` holds exactly the agent's files (norn writes nothing into the handoff), with the S4 trailers", async () => {
     const done = sh(wt(), ["log", "--format=%H %s", "-n", "30"])
       .split("\n")
       .find((l) => / implement\.done → review$/.test(l));
     expect(done).toBeDefined();
     const sha = (done as string).split(" ")[0] as string;
     const files = sh(wt(), ["show", "--name-only", "--format=", sha]).split("\n").filter(Boolean).sort();
-    expect(files).toEqual([HANDOFF, "src/feature.ts"]);
+    expect(files).toEqual(["src/feature.ts"]);
     const trailers = sh(wt(), ["show", "-s", "--format=%(trailers:only,unfold)", sha]);
     // The story's trailers (no Norn-Slice on a story unit)
     expect(trailers).toContain("Norn-Story: gh-9");

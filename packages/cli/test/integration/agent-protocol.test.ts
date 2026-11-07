@@ -5,7 +5,7 @@
  * do_instead, and `norn hook` block/allow on turn end (unattended vs attended steps).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { BriefJson } from "@norn/core";
 import { type HookTrace, STORY_UNIT_DIR, type TickTrace, ulid } from "@norn/schema";
@@ -180,7 +180,7 @@ describe("manual mode: tick → brief → done → tick", () => {
     expect(v.markdown).not.toContain("norn:header");
     expect(v.markdown).not.toContain("norn:heartbeat");
     expect(v.markdown).toContain("Use the `norn-implement` skill.");
-    expect(v.markdown).toContain(`- Run: ${runId}`);
+    expect(v.markdown).not.toContain("## Where you are"); // tool state stays in --json
     expect(v.markdown).toContain('`norn done done --handoff "…"` — every criterion has a passing test');
     expect(v.markdown).toContain("Diff: `git diff origin/main...HEAD`"); // The fetched base, not local main
     expect(readTraceFile(h.root, v.briefing)).toBe(v.markdown);
@@ -250,7 +250,23 @@ describe("manual mode: tick → brief → done → tick", () => {
     expect((await inWt(wt(), "done", "stuck", "--handoff", "x")).value).toMatchObject({ code: "use_verb", do_instead: 'norn stuck "<reason>"' });
   });
 
-  test("done writes the receipt, appends handoff progress and says end your turn; a second report is refused", async () => {
+  test("done refuses a handoff over 8 KB and writes nothing: the handoff is state, not a log", async () => {
+    const file = handoffPath(join(wt(), spec), STORY_UNIT_DIR);
+    const before = existsSync(file) ? readFileSync(file, "utf8") : null;
+    const count = receipts(runs()).length;
+    writeFileSync(file, `## Goal\n\nform\n\n## Notes\n\n${"- a pasted log line nobody needs again\n".repeat(250)}`);
+    const r = await inWt(wt(), "done", "done", "--handoff", "x", "--json");
+    expect(r.exit).toBe(3);
+    expect(r.value).toMatchObject({ code: "handoff_too_large", details: { max: 8192 } });
+    expect((r.value as { do_instead: string }).do_instead).toContain("move repros, logs and tables into an evidence folder");
+    expect(receipts(runs())).toHaveLength(count);
+    if (before === null) rmSync(file);
+    else writeFileSync(file, before);
+  });
+
+  test("done writes the receipt and says end your turn, leaving the handoff to the agent; a second report is refused", async () => {
+    const handoffFile = handoffPath(join(wt(), spec), STORY_UNIT_DIR);
+    const handoffBefore = existsSync(handoffFile) ? readFileSync(handoffFile, "utf8") : null;
     const r = await inWt(wt(), "done", "done", "--handoff", "form renders; tests added");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ ok: true, unit: "gh-9", kind: "done", outcome: "done", run_id: runId, next: "end your turn" });
@@ -258,7 +274,8 @@ describe("manual mode: tick → brief → done → tick", () => {
     expect(r.stdout).toEndWith("**End your turn now.** Do not report again; norn routes the work from here.\n");
     const file = receipts(runs()).at(-1) as string;
     expect(readReceipt(runs(), file)).toMatchObject({ kind: "done", outcome: "done", handoff: "form renders; tests added", run_id: runId, by: "agent", who: "claude" });
-    expect(h.read(handoffPath(join(wt(), spec), STORY_UNIT_DIR))).toMatch(/## Progress\n\n- implement#1 done: form renders; tests added\n\n## Resume/);
+    // norn writes nothing into the handoff: the summary lives in the receipt, which the brief lists as History
+    expect(existsSync(handoffFile) ? readFileSync(handoffFile, "utf8") : null).toBe(handoffBefore);
 
     for (const argv of [["done", "done", "--handoff", "again"], ["ask", "q?"], ["stuck", "r"], ["brief"]]) {
       const again = await inWt(wt(), ...argv);
@@ -276,7 +293,8 @@ describe("manual mode: tick → brief → done → tick", () => {
     const v = r.value as { run_id: string; started: boolean; markdown: string };
     expect(v.started).toBe(true);
     expect(v.run_id).not.toBe(runId);
-    expect(v.markdown).toContain("- implement#1 done: form renders; tests added");
+    expect(v.markdown).toContain("## History\n\nWhat happened in this unit so far, oldest first, from its receipts:\n\n");
+    expect(v.markdown).toContain("- implement#1 reported `done`: form renders; tests added");
     runId = v.run_id;
   });
 
@@ -354,7 +372,7 @@ describe("attended steps never block", () => {
     expect(b?.value).toMatchObject({ unit: "gh-10", step: "refine", started: true });
     const started = receipts(pairRuns()).filter((f) => f.endsWith("-started.json"));
     expect(readReceipt(pairRuns(), started.at(-1) as string)).toMatchObject({ kind: "started", agent_session_id: "sess-pair", worktree: pairWt() });
-    expect((b?.value as { markdown: string }).markdown).toContain("Attended step: no deadline or nudges");
+    expect((b?.value as { markdown: string }).markdown).toContain("**Attended step:** work with the person in this session, and report `done` only once they agree.");
     expect((await stop(pairWt(), "sess-pair")).value).toEqual({});
     h.clock.advance(10_000);
     await h.tick();
