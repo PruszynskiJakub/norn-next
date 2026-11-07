@@ -31,4 +31,4 @@ The spec has no frontmatter `criteria`; rows are its Wanted items.
 
 ## Resume
 
-review#1 approved (one minor note: the skill names a `major` severity its findings format does not list). Next is describe.
+describe#1 wrote pr.md in the spec folder (summary, test evidence, merge danger: two-way, agent briefs). Next is opening the pull request; nothing left to build.
