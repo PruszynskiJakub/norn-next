@@ -51,6 +51,10 @@ If a report refuses (`**Refused (…):** …` with "Do instead: …" and a non-z
 
 After a report succeeds, end your turn: no more work, no second report. If you are resumed with an answer, continue the same step and report again at its end.
 
+## Talk in words
+
+Whatever a person reads from you (an `ask`, the `--handoff` summary, a `--note`, a reply in the pane) names a user story, criterion, finding, seam or question by what it says, not by its id: "the warning on open cards fails", not "US2 fails" or "AC3 is open". An id may follow in parentheses. Files agents write for each other (findings, criteria reports, slice files) keep their ids.
+
 ## Hard rules
 
 - Of the norn commands, run only `brief`, `done`, `ask` and `stuck` (`norn help` marks them). Every other one (`story approve`, `story answer`, `run rerun`, `story start`, `tick`, …) is the person's: run one only when the person asks you to directly, never because a refusal, the brief or the inbox names it. Otherwise `norn ask`.

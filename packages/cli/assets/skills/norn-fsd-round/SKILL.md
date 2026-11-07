@@ -31,8 +31,8 @@ You supervise the stories the person named, in this checkout, until each one's c
 
 ## What you decide (delegated, always with `--delegated --reason`)
 
-- **Asks** the spec, the repo or the issue settle: `norn story answer <unit> "<answer>" --delegated --reason "fsd: spec B4 says …"`. A permission prompt the step plainly needs: its option number.
-- **Gates**: read what the gate judges (slice files against the spec's Behaviour items, the plan, the diff, the PR) and run `norn story approve <unit> --delegated --reason "…"` or `norn story reject <unit> --delegated --reason "…"`. The reason names the evidence: Behaviour items, the CI run, the merge danger.
+- **Asks** the spec, the repo or the issue settle: `norn story answer <unit> "<answer>" --delegated --reason "fsd: the spec's story on <what it says> settles it: …"`. A permission prompt the step plainly needs: its option number.
+- **Gates**: read what the gate judges (slice files against the spec's user stories, the plan, the diff, the PR) and run `norn story approve <unit> --delegated --reason "…"` or `norn story reject <unit> --delegated --reason "…"`. The reason names the evidence in words a person reads without the spec open: the user stories by what they say, the CI run, the merge danger.
 - **Before any gate, read the PR's state** (`gh pr view <branch> --json state,headRefOid,statusCheckRollup`). A PR the person merged → wait for the story to end (`--until merged`, not `--until gate`); never approve or reject it.
 - **`ready`** only on green CI for the exact head the PR shows and a clean diff (no `runs/` file, no stray `handoff.md`, `gh pr diff <branch> --name-only`). Every check in `statusCheckRollup` must have passed and belong to `headRefOid` (`gh run list --branch <branch> --json headSha,conclusion` names each run's head). CI green on an older head → wait for the new run, not on the gate. A `runs/` file in the diff → escalate.
 - **Stuck once**: read `norn run view <unit> --why --json` and the handoff, find the cause, then `norn run rerun <unit> --delegated --reason "fsd: …"` once. Stuck again at the same step → escalate with the receipts. A stuck unit does not end the round.

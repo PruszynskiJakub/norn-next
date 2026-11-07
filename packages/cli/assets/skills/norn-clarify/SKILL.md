@@ -5,7 +5,7 @@ description: Settles a spec's open questions with the person, one question per t
 
 # Clarify
 
-Without this, answers end up appended as notes ("Q1: Marta says no") and the spec contradicts itself. Answers come from the person or the people each question names; never fold in your own guess as if it were an answer.
+Without this, answers end up appended as notes ("question 1: Marta says no") and the spec contradicts itself. Answers come from the person or the people each question names; never fold in your own guess as if it were an answer.
 
 When no person is with you, settle only what the code and the docs can settle, and stop: say which questions are left and who must decide each.
 
@@ -25,7 +25,7 @@ Order what is left by dependency: a question whose answer changes others comes f
 
 Invoke the `norn-interview` skill on the person's questions. Give each with its context (what it bears on, the options, your recommendation), so they need not reread the spec. Fold each answer in as the interview read it back.
 
-An answer often opens new branches: an edge nobody thought of, a Behaviour item it now contradicts, a term it puts in doubt. Follow them to the end; they are part of this work, not the next. When an answer contradicts a decision already in the spec, say so and let the person choose which stands. When an answer grows the story well past what refinement agreed, say so and offer to put the extra part out of scope, as a follow-up story the person files.
+An answer often opens new branches: an edge nobody thought of, a user story it now contradicts, a term it puts in doubt. Follow them to the end; they are part of this work, not the next. When an answer contradicts a decision already in the spec, say so and let the person choose which stands. When an answer grows the story well past what refinement agreed, say so and offer to put the extra part out of scope, as a follow-up story the person files.
 
 ## 3. Ask the people who are not here
 
@@ -47,16 +47,16 @@ Hand the draft to the person; never send or post it yourself. In the spec the qu
 
 Write each decision into the section it affects, then delete the question. The spec reads as if it had always said so.
 
-- **Behaviour.** Add the items the answer creates, each with its example, under the next free numbers; rewrite the items it changes; strike through the ones it removes. Never renumber: later work cites the numbers.
-- **Out of scope.** "Not now" is an out-of-scope entry with its reason, not a deleted question.
-- **Problem and Solution.** Rewrite when the answer changes who the story is for or what they will see.
+- **User Stories.** Add the stories the answer creates under the next free numbers; rewrite the ones it changes; strike through the ones it removes. Never renumber: later work cites the numbers.
+- **Out of Scope.** "Not now" is an out-of-scope entry with its reason, not a deleted question.
+- **Problem Statement and Solution.** Rewrite when the answer changes who the story is for or what they will see.
 - **Glossary.** A term the answer settled goes into the project's glossary, with the person's agreement.
 
 | Weak fold                                                       | Strong fold                                                                                                                                                                                                   |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Appends "Q1: Marta says archived projects do not count." to B1. | Adds B10: "As an owner on a plan with a project limit, I want archived projects not to count, so that archiving frees a slot. Example: limit 5, 5 live → archive one → can create a new project." Deletes Q1. |
+| Appends "Marta says archived projects do not count." to the archiving story. | Adds story 10: "As an owner on a plan with a project limit, I want archived projects not to count, so that archiving frees a slot." with the example "limit 5, 5 live → archive one → can create a new project". Deletes the question. |
 
-Then read the whole spec again. An answer in one place often breaks another: an example that no longer holds, an out-of-scope entry now in scope, two items that now say the same thing. Fix them with the person.
+Then read the whole spec again. An answer in one place often breaks another: an example that no longer holds, an out-of-scope entry now in scope, two stories that now say the same thing. Fix them with the person.
 
 ## 5. Hand back
 

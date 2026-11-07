@@ -343,10 +343,10 @@ describe("skills", () => {
     expect(values.filter(([, v]) => !/^<[^>]+>$/.test(v) && parseWaitCondition(v) === null)).toEqual([]);
   });
 
-  test("norn-review traces every Behaviour item and criterion to a test, and writes the table into the handoff (gh-169)", () => {
+  test("norn-review traces every user story and criterion to a test, and writes the table into the handoff (gh-169, bypass #277)", () => {
     const text = readSkill("norn-review");
-    // the Spec axis builds the table, one row per item, a test or UNTRACED
-    for (const s of ["traceability table", "| Item | Verifier | Proven by |", "UNTRACED"]) expect(text).toContain(s);
+    // the Spec axis builds the table, one row per item with what it says in words, a test or UNTRACED
+    for (const s of ["traceability table", "| Item | What it says | Verifier | Proven by |", "UNTRACED"]) expect(text).toContain(s);
     // an UNTRACED row blocks, unless the verifier is agent or person: those point at QA
     expect(text).toMatch(/`UNTRACED` row is a blocking Spec finding, unless the criterion's `verifier`[^.]*`agent` or `person`/);
     for (const s of ["QA (agent)", "QA (person)", "counts as `verifier: test`"]) expect(text).toContain(s);
@@ -354,6 +354,16 @@ describe("skills", () => {
     expect(text).toMatch(/Write the table into the handoff\*\* \(the Progress section/);
     // a craft skill does not cite the rule ids of norn's own rules file (P7)
     expect(text).not.toMatch(/\bQV\d/);
+  });
+
+  test("norn-refine writes the to-spec layout, and agents name spec items in words to a person (bypass #277)", () => {
+    const refine = readSkill("norn-refine");
+    for (const h of ["## Problem Statement", "## Solution", "## User Stories", "## Out of Scope", "## Further Notes", "## Open questions", "## Plan"]) expect(refine).toContain(h);
+    expect(refine).not.toMatch(/^## Behaviour$/m);
+    expect(refine).toContain("`US<n>`");
+    // the step protocol and the interview speak in words; an id may only follow in parentheses
+    expect(readSkill("norn")).toContain("## Talk in words");
+    expect(readSkill("norn-interview")).toMatch(/never by an id alone/);
   });
 
   test("norn-review reads REVIEW.md, verifies each blocking candidate, and pins every finding to a file and line (gh-226)", () => {

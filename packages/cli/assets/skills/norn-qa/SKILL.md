@@ -47,10 +47,10 @@ Write everything to one directory **outside the repository** (e.g. under `$TMPDI
 - `findings.json`, when anything fails: one `blocking` finding per failing criterion, with `criterion`, `title` and `repro`, plus `file` and `line` when you know them. Whoever fixes it reads this first.
 
   ```json
-  { "findings": [ { "id": "F1", "severity": "blocking", "criterion": "B12",
+  { "findings": [ { "id": "F1", "severity": "blocking", "criterion": "US12",
       "title": "Deleting an already-deleted item deletes a newer one",
       "repro": "Create A, delete it, create B, DELETE A's id again. Expected 404; actual 204 and B is gone.",
-      "detail": "Ids are reused after delete. Evidence: B12-repro.md." } ] }
+      "detail": "Ids are reused after delete. Evidence: US12-repro.md." } ] }
   ```
 
 - one evidence file per criterion (`AC1.md`, `AC1.png`, …) and `report.md`, one line per criterion:
@@ -58,8 +58,8 @@ Write everything to one directory **outside the repository** (e.g. under `$TMPDI
   ```markdown
   | Criterion | Verdict | Evidence | Note |
   |---|---|---|---|
-  | AC1 (B3) | pass | AC1.md | |
-  | AC2 (B4) | fail | AC2.md, AC2.png | repro inside |
+  | AC1 (US3) | pass | AC1.md | |
+  | AC2 (US4) | fail | AC2.md, AC2.png | repro inside |
   ```
 
 **Redact every secret** in every file: `<REDACTED>` in text, cropped or blurred in screenshots.
