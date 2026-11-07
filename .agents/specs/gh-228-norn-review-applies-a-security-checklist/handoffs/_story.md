@@ -31,4 +31,4 @@ The spec is a quick issue with no criteria frontmatter; its two Wanted items are
 
 ## Resume
 
-Review approved; next is the workflow's step after review.
+pr.md written (describe); next is the workflow's step after describe.
