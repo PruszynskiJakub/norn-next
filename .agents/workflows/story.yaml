@@ -34,7 +34,7 @@ steps:
       relies on so that it no longer holds, write no slice files, say what no longer holds in the handoff's
       Progress and report `replan`.
     outcomes:
-      done:   { to: approve-slices, means: "slice files written against the current base; every Behaviour item is covered by some slice's acceptance" }
+      done:   { to: approve-slices, means: "slice files written against the current base; every user story is covered by some slice's acceptance" }
       replan: { to: $stuck, means: "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans with `norn story edit <story> --workflow refinement --at plan`" }
   approve-slices:
     type: gate

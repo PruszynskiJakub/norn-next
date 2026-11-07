@@ -24,7 +24,7 @@ steps:
     inputs: [spec, handoff]
     instructions: "Write the spec into the body of spec.md; keep its frontmatter unchanged. A rule change amends .agents/RULES.md directly, keeping every id; never add another rules file."
     outcomes:
-      done:      { to: plan, means: "spec complete: problem, solution, numbered Behaviour items with examples, out of scope; no open questions" }
+      done:      { to: plan, means: "spec complete: problem statement, solution, numbered user stories, out of scope; no open questions" }
       questions: { to: clarify, means: "spec written, but open questions are listed that need the person's answers" }
   clarify:
     type: agent
@@ -40,7 +40,7 @@ steps:
     inputs: [spec, handoff]
     instructions: "Write the Plan section of spec.md."
     outcomes:
-      done: { to: $done, means: "spec.md's Plan section has seams, a coverage table for every Behaviour item, prefactoring, decisions and risks" }
+      done: { to: $done, means: "spec.md's Plan section has seams, a coverage table for every user story, prefactoring, decisions and risks" }
 counters:
   # resets each time sync merges cleanly: only repeated conflicts on one base move count (W4)
   sync_conflict_loop: { max: 2, reset_on: sync.done }

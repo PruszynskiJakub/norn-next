@@ -33,7 +33,7 @@ Let the person drive. "That should not be possible" and "the header from B with 
 
 ## 4. Record and commit
 
-Fold the decision into the spec where it belongs (a Behaviour item or the Solution for what the user meets, the Plan for how it is built), and add one line under it:
+Fold the decision into the spec where it belongs (a user story or the Solution for what the user meets, the Plan for how it is built), and add one line under it:
 
 ```markdown
 Prototype: `<path>`. Question: <the question>. Verdict: <the answer, and why>.
