@@ -92,12 +92,15 @@ export function appendProgress(handoffFile: string, line: string): void {
   const body = raw === null ? "## Goal\n\n## Progress\n\n## Resume\n" : handoffProse(raw);
   const text = `- ${line.replace(/\s*\n\s*/g, " ").trim()}`;
   const lines = body.split("\n");
-  const at = lines.findIndex((l) => /^##\s+Progress\s*$/.test(l));
+  // gh-273 (O6, S9): the one Progress section at whatever heading level the agent wrote (the brief shows
+  // the handoff demoted to ###, and agents write it back in that shape); it ends at the next heading as high.
+  const at = lines.findIndex((l) => /^#{1,6}\s+Progress\s*$/.test(l));
   if (at < 0) {
     writeHandoffBody(handoffFile, `${body.replace(/\n*$/, "\n")}\n## Progress\n\n${text}\n`);
     return;
   }
-  let end = lines.findIndex((l, i) => i > at && /^##\s/.test(l));
+  const level = headingLevel(lines[at] ?? "");
+  let end = lines.findIndex((l, i) => i > at && headingLevel(l) > 0 && headingLevel(l) <= level);
   if (end < 0) end = lines.length;
   let insert = end;
   while (insert > at + 1 && (lines[insert - 1] ?? "").trim() === "") insert--;
@@ -107,6 +110,11 @@ export function appendProgress(handoffFile: string, line: string): void {
   const next = insert + block.length;
   if (next < lines.length && (lines[next] ?? "").trim() !== "") lines.splice(next, 0, "");
   writeHandoffBody(handoffFile, lines.join("\n"));
+}
+
+/** The level of a markdown ATX heading line, 0 when the line is not one. */
+function headingLevel(line: string): number {
+  return /^(#{1,6})\s/.exec(line)?.[1]?.length ?? 0;
 }
 
 /** What every successful report answers (§9.3): the receipt, then "end your turn". */
