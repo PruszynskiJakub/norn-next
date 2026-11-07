@@ -32,6 +32,7 @@ export const hookEvents = {
   PostToolUse: "tool_use",
   Notification: "waiting_input", // refined by notification_type, see NOTIFICATION_EVENTS
   Stop: "turn_end",
+  StopFailure: "waiting_input", // refined by error, see STOP_FAILURE_EVENTS
   SessionEnd: "session_end",
 } as const satisfies Record<string, HookEventKind>;
 
@@ -60,6 +61,16 @@ const NOTIFICATION_EVENTS: Record<string, HookEventKind | null> = {
   quota_auto_resume_fired: null,
   quota_auto_resume_disabled: null,
   plugin_notification: null,
+};
+
+/**
+ * Claude Code `StopFailure.error` (the turn ended on an API error; output is ignored) → event and
+ * the line a person reads. A failed login leaves the session unable to act on any prompt, so it
+ * waits on a person (`/login` in the pane) like the usage-limit wait, rather than ending a turn
+ * that would be nudged. Other errors are ignored: the idle notification still ends the turn.
+ */
+const STOP_FAILURE_EVENTS: Record<string, { event: HookEventKind; message: string }> = {
+  authentication_failed: { event: "waiting_input", message: "agent logged out — run `/login` in the pane" },
 };
 
 /** Notification without `notification_type` (older Claude Code): classify by the message text. */
@@ -103,6 +114,11 @@ export function parseHookEvent(arg: string, payload: unknown, env: Record<string
     if (!mapped) return null;
     // a permission prompt's pending command comes from the preceding PreToolUse: refineHooks
     event = mapped;
+  } else if (native === "StopFailure") {
+    const error = field(payload, "error");
+    const mapped = error === undefined || !Object.hasOwn(STOP_FAILURE_EVENTS, error) ? undefined : STOP_FAILURE_EVENTS[error];
+    if (!mapped) return null;
+    [event, message] = [mapped.event, mapped.message];
   } else if (native === "UserPromptSubmit") {
     message = field(payload, "prompt");
   } else if (native === "Stop") {

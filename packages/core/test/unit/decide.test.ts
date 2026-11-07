@@ -253,6 +253,14 @@ describe("classification", () => {
     expect(a).toMatchObject({ kind: "park", rule: "agent.ask.implicit", state: { park: { kind: "ask", reason: "Allow rm -rf?" } }, notify: { group: "answer", detail: "pending command: rm -rf build" } });
     expect(a.kind === "park" && a.receipts[0]?.receipt).toMatchObject({ kind: "ask", implicit: true, command: "rm -rf build" });
   });
+  test("a logged-out session parks on an implicit ask that says so, spending no nudge", () => {
+    const hooks = [
+      { event: "turn_start" as const, at: at(T0 - 20), agent: "claude", native: "UserPromptSubmit", cwd: "/w" },
+      { event: "waiting_input" as const, at: at(T0 - 10), agent: "claude", native: "StopFailure", cwd: "/w", message: "agent logged out — run `/login` in the pane" },
+    ];
+    const a = only(facts([solo(running(), { hooks })]));
+    expect(a).toMatchObject({ kind: "park", rule: "agent.ask.implicit", state: { park: { kind: "ask", reason: "agent logged out — run `/login` in the pane" }, nudges_used: 0 } });
+  });
   test("BS5.1 (dogfood D3): an owed commit deferred by an agent's merge never takes the unit's action", () => {
     const midMerge = (s: StoryFacts, inProgress: { operation: "merge" | null; unmerged: string[] }) => {
       const u = s.units[0]!;
