@@ -28,4 +28,4 @@ A Claude session that loses its login mid-step parks on an implicit ask that say
 
 ## Resume
 
-Review#2 approved the change on this HEAD; next is the workflow's step after review (QA / PR).
+describe#1 wrote pr.md in the spec folder (summary, test evidence, merge danger); next is the workflow's step after describe.
