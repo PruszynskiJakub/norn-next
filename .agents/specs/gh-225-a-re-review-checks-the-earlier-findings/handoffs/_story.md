@@ -12,7 +12,7 @@ The spec has no frontmatter `criteria`; rows are its Wanted items.
 | A re-review checks each earlier finding first | the brief lists the earlier review's findings and says check each, fixed or not | test | brief.test.ts › "the earlier review's findings are listed to check, fixed or not, and Inputs points at them"; "a review that does not declare last_findings keeps the earlier attempt as history only"; "no earlier findings: Last findings is none" |
 | Rework is blocking and major only | implement's brief fixes blocking and major, leaves minor and nit as notes | test | brief.test.ts › "implement's Rework sorts the findings: blocking and major to fix, minor and nit left as notes"; snapshot "rework after review findings lists them" |
 | norn-review skill source | first step checks the earlier findings; Decide says minor and nit are notes | agent | review read of `packages/cli/assets/skills/norn-review/SKILL.md` steps 1 and 6; `packages/cli/test/unit/assets.test.ts` keeps it free of norn words |
-| Suite green | `bun run test` and `bun run typecheck` | test | after merging main (implement#3): 1291 pass, tsc clean |
+| Suite green | `bun run test` and `bun run typecheck` | test | review#2 on the merged HEAD: 1291 pass, tsc clean |
 
 ## Easy to miss
 
@@ -30,6 +30,8 @@ The spec has no frontmatter `criteria`; rows are its Wanted items.
 - No schema or golden change: BriefJson is not a persisted format.
 - CI never started for ci#1 because PR #287 conflicted with main (GitHub runs no `pull_request` workflow on a conflicting PR). implement#3 merged main. The one conflict was in the norn-review skill: main renamed the handoff section "Done means" to "Proof" in step 7. Both sides were kept: the renumbered steps and the minor/nit line come from this branch, "Proof" from main. Main also drops `last_check`/`last_findings` from the markdown Inputs list; the JSON ref still says "see Earlier findings", and both of our new brief snapshots were re-recorded against main's brief text.
 
+- review#2 approved the merged HEAD with no findings. The one earlier finding (minor: the skill says "blocking (or major)" but its findings format lists only blocking | minor | nit) is still not fixed and stays a note for the person.
+
 ## Resume
 
-Nothing left in implement: the merge is committed and green. Next is CI on PR #287.
+Review approved on the merged HEAD. Next is describe, then CI on PR #287.
