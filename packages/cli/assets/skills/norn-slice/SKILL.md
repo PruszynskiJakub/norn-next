@@ -46,12 +46,12 @@ criteria:                 # one entry per Acceptance item below, same ids and ve
 One or two lines: what changes for the user when this lands, end to end.
 
 ## Scope
-User stories: US3, US4. Seams: S2. Out: anything another slice covers.
+User stories: <each one this slice makes work, in a few words>. Seams: S2. Out: anything another slice covers.
 
 ## Acceptance
-- AC1 (US3) Given <context>, when <action>, then <observable effect>. — verifier: test
-- AC2 (US4) … — verifier: agent
-- AC3 (US4) … — verifier: person, because <what only a person can check, and why>
+- AC1 Given <context>, when <action>, then <observable effect>. — verifier: test
+- AC2 … — verifier: agent
+- AC3 … — verifier: person, because <what only a person can check, and why>
 
 ## Checks
 - `bun test packages/invites`
@@ -63,7 +63,7 @@ Pointers to plan decisions (D1), traps, and any call left for the person.
 ## Rules
 
 - Never renumber or rename existing slice files; their keys are permanent. Append new numbers.
-- Every acceptance criterion cites the user stories it proves (`US<n>`; an older spec's `B<n>`) and is observable at an agreed seam, not a code detail.
+- Every acceptance criterion says in its own words what the user observes, so it can be checked without the spec open, and is observable at an agreed seam, not a code detail. Never cite a user story by number.
 - **Frontmatter `criteria`** repeats the Acceptance section as data: one `{ id, verifier }` per item, the same ids in the same order, nothing more and nothing less. Nothing reads the prose: whoever verifies gives one verdict per id listed here, so a criterion missing from the list is never checked.
 - When your instructions ask for the criteria in the story's frontmatter too, add them to spec.md's `criteria` as they say; leave every other frontmatter field as it is.
 - **Checks** are the commands the implementer runs for this slice; each runs in the repository and exits non-zero on failure. Nothing runs them for the implementer (a separate check runs the repo's own test command), so name the repo's local loop as its contributor docs give it, never a tier they keep for CI.

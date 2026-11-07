@@ -47,7 +47,7 @@ Hand the draft to the person; never send or post it yourself. In the spec the qu
 
 Write each decision into the section it affects, then delete the question. The spec reads as if it had always said so.
 
-- **User Stories.** Add the stories the answer creates under the next free numbers; rewrite the ones it changes; strike through the ones it removes. Never renumber: later work cites the numbers.
+- **User Stories.** Add the stories the answer creates; rewrite the ones it changes; delete the ones it removes. Later work cites a story by what it says, never by its number, so the list may be reordered freely.
 - **Out of Scope.** "Not now" is an out-of-scope entry with its reason, not a deleted question.
 - **Problem Statement and Solution.** Rewrite when the answer changes who the story is for or what they will see.
 - **Glossary.** A term the answer settled goes into the project's glossary, with the person's agreement.

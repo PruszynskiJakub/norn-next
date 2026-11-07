@@ -46,7 +46,7 @@ Offer a decision record only when a decision is hard to reverse, surprising with
 
 Invoke the `norn-interview` skill to agree, in this order: the seams with the coverage table, the prefactoring, then each decision.
 
-A user story that is ambiguous, contradicts another, or costs far more than the person may expect goes to them; do not plan around it. With their agreement, amend the story in the spec, keeping its number: slices, criteria and review cite it, so never renumber. If it needs someone not present, it becomes an open question again and the plan waits.
+A user story that is ambiguous, contradicts another, or costs far more than the person may expect goes to them; do not plan around it. With their agreement, amend the story in the spec. If it needs someone not present, it becomes an open question again and the plan waits.
 
 ## 6. Write the Plan
 
@@ -64,13 +64,13 @@ Done when every user story is observable at an agreed seam and the person agrees
 ## Plan
 
 ### Seams
-- **S1 <module>, through <its interface>.** Observes US1–US4, US7.
+- **S1 <module>, through <its interface>.** Observes <the user stories it covers, in a few words each>.
   Prior art: <the existing tests in this area that drive the same interface>.
 
 ### Coverage
 | User story | Seam | Test kind (unit / integration / e2e) | Notes |
 |---|---|---|---|
-| US1 an expired invite is rejected | S1 | integration | |
+| an expired invite is rejected | S1 | integration | |
 
 ### Prefactoring
 1. <the change> — <what it makes easier, for which user stories>

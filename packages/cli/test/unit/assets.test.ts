@@ -346,7 +346,7 @@ describe("skills", () => {
   test("norn-review traces every user story and criterion to a test, and writes the table into the handoff (gh-169, bypass #277)", () => {
     const text = readSkill("norn-review");
     // the Spec axis builds the table, one row per item with what it says in words, a test or UNTRACED
-    for (const s of ["traceability table", "| Item | What it says | Verifier | Proven by |", "UNTRACED"]) expect(text).toContain(s);
+    for (const s of ["traceability table", "| Criterion or story | What it says | Verifier | Proven by |", "UNTRACED"]) expect(text).toContain(s);
     // an UNTRACED row blocks, unless the verifier is agent or person: those point at QA
     expect(text).toMatch(/`UNTRACED` row is a blocking Spec finding, unless the criterion's `verifier`[^.]*`agent` or `person`/);
     for (const s of ["QA (agent)", "QA (person)", "counts as `verifier: test`"]) expect(text).toContain(s);
@@ -360,10 +360,12 @@ describe("skills", () => {
     const refine = readSkill("norn-refine");
     for (const h of ["## Problem Statement", "## Solution", "## User Stories", "## Out of Scope", "## Further Notes", "## Open questions", "## Plan"]) expect(refine).toContain(h);
     expect(refine).not.toMatch(/^## Behaviour$/m);
-    expect(refine).toContain("`US<n>`");
-    // the step protocol and the interview speak in words; an id may only follow in parentheses
+    // stories are cited by what they say, never by a number
+    expect(refine).toContain("nothing cites a story by its number");
+    for (const skill of ["norn-refine", "norn-slice", "norn-review", "norn-qa", "norn-plan", "norn-pr"]) expect(readSkill(skill)).not.toMatch(/\bUS\d|US<n>/);
+    // the step protocol and the interview speak in words, to a person and in files
     expect(readSkill("norn")).toContain("## Talk in words");
-    expect(readSkill("norn-interview")).toMatch(/never by an id alone/);
+    expect(readSkill("norn-interview")).toMatch(/never by a number or id/);
   });
 
   test("norn-review reads REVIEW.md, verifies each blocking candidate, and pins every finding to a file and line (gh-226)", () => {

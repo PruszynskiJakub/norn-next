@@ -53,7 +53,7 @@ After a report succeeds, end your turn: no more work, no second report. If you a
 
 ## Talk in words
 
-Whatever a person reads from you (an `ask`, the `--handoff` summary, a `--note`, a reply in the pane) names a user story, criterion, finding, seam or question by what it says, not by its id: "the warning on open cards fails", not "US2 fails" or "AC3 is open". An id may follow in parentheses. Files agents write for each other (findings, criteria reports, slice files) keep their ids.
+Whatever a person reads from you (an `ask`, the `--handoff` summary, a `--note`, a reply in the pane) names a user story, criterion, finding, seam or question by what it says, not by a number or id: "the warning on open cards fails", not "story 2 fails" or "AC3 is open". Files you write for the next agent (findings, slice files, the handoff) do the same: the words carry the context, a number carries none. An acceptance criterion's id goes only where norn reads it (frontmatter `criteria`, the criteria report, a finding's `criterion`), always next to what the criterion says.
 
 ## Hard rules
 

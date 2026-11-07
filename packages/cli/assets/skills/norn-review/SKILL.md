@@ -23,14 +23,14 @@ Two axes, kept apart so one cannot mask the other:
 6. **Write the table into the handoff** (the Progress section of the handoff you were given), so QA and the PR body can reuse it:
 
 ```markdown
-| Item | What it says | Verifier | Proven by |
+| Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
-| US1 / AC1 | an expired invite is rejected | test | `packages/core/test/unit/invites.test.ts` › "rejects an expired invite" |
-| US2 / AC2 | the inviter sees who joined | test | UNTRACED |
-| US3 / AC3 | the invite email reads well | person | QA (person) |
+| AC1 | an expired invite is rejected | test | `packages/core/test/unit/invites.test.ts` › "rejects an expired invite" |
+| AC2 | the inviter sees who joined | test | UNTRACED |
+| AC3 | the invite email reads well | person | QA (person) |
 ```
 
-   One row per user story (`US<n>`; an older spec's `B<n>`) and acceptance criterion; a story a criterion cites shares its row. A person reads it too: the words column is never empty. Every `UNTRACED` row has its finding.
+   One row per acceptance criterion, by its id and what it says; a user story no criterion covers gets a row of its own, in words with no id. The words column is never empty: the next reader, agent or person, has only the table. Every `UNTRACED` row has its finding.
 7. **Write the findings** as JSON to a file outside the repository (e.g. under `$TMPDIR`) unless told where, and hand that file over with your verdict. Keep the axes separate; do not merge or rerank them.
 
 ```json

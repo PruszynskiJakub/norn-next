@@ -63,7 +63,7 @@ Write the spec into the body of the story file, in the layout below, and leave i
 - can be checked on its own, so review and QA can check against it;
 - covers failures and edges as stories of their own, not as an afterthought in another story.
 
-Number the list `1.`, `2.`, … and never renumber: files agents write for each other cite a story as `US<n>` (slice criteria, review findings, QA reports). A new story takes the next free number; a removed one is struck through, not deleted.
+Number the list `1.`, `2.`, … for reading only: nothing cites a story by its number. Slices, review, QA and the PR name a story by what it says, so each story must be clear when quoted on its own.
 
 | Weak                                              | Strong                                                                                                                                        |
 | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -76,7 +76,7 @@ Number the list `1.`, `2.`, … and never renumber: files agents write for each 
 
 **Open questions** are a numbered list, each self-contained: what is undecided, why it matters (the user stories it bears on, in words), the options as you see them with your recommendation, and who can answer it.
 
-**Talking about the spec.** When you speak to the person, name a user story or question by what it says ("the warning on open cards"), never by its number alone; a number may follow in parentheses.
+**Talking about the spec.** Name a user story or question by what it says ("the warning on open cards"), never by its number, to the person and in every file.
 
 **Glossary.** When the interview settled a new term or sharpened an existing one, tell the person and, with their agreement, update the project's glossary alongside the spec. The glossary holds definitions only, never decisions or implementation.
 
@@ -106,7 +106,7 @@ The problem the user faces, from their perspective: who, when, and what it costs
 The solution, from the user's perspective: what they will do and see.
 
 ## User Stories
-A long, numbered list covering every aspect of the change. Never renumbered; agents' files cite them as US<n>.
+A long, numbered list covering every aspect of the change. Each one reads on its own: later work quotes it, never its number.
 
 1. As a <actor>, I want <feature>, so that <benefit>.
 
@@ -127,4 +127,4 @@ Numbered. Each names who can answer it. Removed once answered.
 Written by the `norn-plan` skill.
 ```
 
-Write in the project's domain vocabulary. Code names stay out because they go stale before the story lands. A spec written before this layout (`## Problem`, `## Behaviour` with `B<n>` items) is amended in its own layout: keep its headings and numbers.
+Write in the project's domain vocabulary. Code names stay out because they go stale before the story lands. A spec written before this layout (`## Problem`, `## Behaviour` with `B<n>` items) is amended in its own layout; cite its items by what they say too.

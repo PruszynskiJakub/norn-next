@@ -673,7 +673,7 @@ Single-purpose skills ported from ai-engine (the earlier norn): its skill files 
 |---|---|---|
 | `norn` | One-step protocol: brief, work in scope, keep handoff, report once, end turn, follow refusals. Only skill aware of norn. | — |
 | `norn-interview` | One question per turn until shared understanding; only talks. | done |
-| `norn-refine` | Story → spec in `spec.md`: Problem Statement, Solution, User Stories (a numbered list, cited as `US<n>` in agents' files; edges walked as stories), Out of Scope, Further Notes, Open questions. Owns the spec layout. | done / questions |
+| `norn-refine` | Story → spec in `spec.md`: Problem Statement, Solution, User Stories (a numbered list, cited by what each says, never by number; edges walked as stories), Out of Scope, Further Notes, Open questions. Owns the spec layout. | done / questions |
 | `norn-clarify` | Sort the open questions, settle them with the person, fold each answer into the section it changes. | done |
 | `norn-plan` | The `## Plan` section of `spec.md`: seams, coverage table (user story → seam), prefactoring, implementation and testing decisions, risks. Reference: `norn-codebase-design`. | done |
 | `norn-slice` | Plan → tracer-bullet slice files (`workflow`, `depends_on`, acceptance citing user story numbers, frontmatter `criteria` with id and verifier (QV1), check commands); expand–contract for wide refactors. | done |
