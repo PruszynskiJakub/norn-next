@@ -246,7 +246,7 @@ describe("Rework only when sent back", () => {
     expect(b.json.context.notes).toMatchObject({ step: "review", outcome: "approve", items: [{ title: "Raw HTML shown as row error" }] });
     expect(b.markdown).not.toContain("## Rework");
     expect(b.markdown).not.toContain("Address");
-    expect(b.markdown).toContain("### Notes from review (non-blocking)");
+    expect(b.markdown).toContain("## Non-blocking findings from review");
     expect(b.markdown).toMatchSnapshot();
   });
 
@@ -580,7 +580,7 @@ describe("the brief as a map: History from receipts, state shown only when it ma
       omitted: 0,
       command: "norn run list gh-1/02",
     });
-    expect(b.markdown).toContain("## History\n\nWhat happened in this unit so far, oldest first, from its receipts:\n\n- implement#1 asked: which database? sqlite or postgres\n");
+    expect(b.markdown).toContain("## History\n\nWhat happened so far, oldest first, from the receipts (for a story, its current round only):\n\n- implement#1 asked: which database? sqlite or postgres\n");
   });
 
   test("History shows the last 25 lines and points at the rest", () => {
@@ -588,7 +588,7 @@ describe("the brief as a map: History from receipts, state shown only when it ma
     const b = renderBrief(input(st, rs));
     expect(b.json.log?.omitted).toBe(5);
     expect(b.json.log?.lines).toHaveLength(25);
-    expect(b.markdown).toContain("- … 5 earlier (`norn run list gh-1/02`)\n- implement#1 asked: question 6\n");
+    expect(b.markdown).toContain("- … 5 earlier lines (a person sees them with `norn run list gh-1/02`)\n- implement#1 asked: question 6\n");
   });
 
   test("the first brief shows no tool state: no counters, last outcome, run id or retries; ports and the deadline stay", () => {
@@ -611,16 +611,66 @@ describe("the brief as a map: History from receipts, state shown only when it ma
     const handoff = `## Goal\n\nship it\n\n## Notes\n\n${"- a line of a pasted log that nobody needs again\n".repeat(400)}`;
     const b = renderBrief(input(st, [], { handoff }));
     expect(b.json.context.handoff_bytes).toMatchObject({ max: 8192, truncated: true });
-    expect(b.markdown).toContain("_… cut: the handoff is 20 KB; `norn done` refuses one over 8 KB._");
+    expect(b.markdown).toContain("_… cut here: the handoff is 20 KB; open the file to rewrite it._");
+    expect(b.markdown).toContain("**The handoff is 20 KB; `norn done` refuses one over 8 KB.** Before you report, open it and rewrite it");
     expect(b.markdown.length).toBeLessThan(16384 + 8000);
     const small = renderBrief(input(st, [], { handoff: "## Goal\n\nship it\n" }));
     expect(small.json.context.handoff_bytes).toMatchObject({ truncated: false });
-    expect(small.markdown).not.toContain("_… cut:");
+    expect(small.markdown).not.toContain("_… cut");
   });
 
   test("the inputs say what to read each one for", () => {
     const b = renderBrief(input(st, []));
     expect(b.markdown).toContain("- Story spec: `.agents/specs/gh-1-login/story.md` — what the story asks (its user stories) and, once planned, how it is built (its Plan)");
-    expect(b.markdown).toContain("- Handoff: `.agents/specs/gh-1-login/handoffs/02-form.md` — the unit's current state, shown under Context: keep it current here");
+    expect(b.markdown).toContain("- Handoff: `.agents/specs/gh-1-login/handoffs/02-form.md` — write the unit's current state here (shown under Context)");
+  });
+
+  test("a cut keeps this step's Resume whole and closes a code fence the cut left open", () => {
+    const log = `\`\`\`text\n${"a pasted log line nobody needs again\n".repeat(800)}\`\`\``;
+    const handoff = `## Goal\n\nship it\n\n## Notes\n\n${log}\n\n## Resume\n\nrun the failing form test next\n`;
+    const b = renderBrief(input(st, [], { handoff }));
+    const context = b.markdown.slice(b.markdown.indexOf("\n## Context\n"), b.markdown.indexOf("\n## How to work\n"));
+    expect(context.split("\n").filter((l) => l.startsWith("```")).length % 2).toBe(0);
+    expect(context).toContain("_… cut here: the handoff is");
+    expect(context).toContain("### Resume\n\nrun the failing form test next");
+    expect(b.markdown).toContain("\n## How to work\n");
+  });
+
+  test("another step's Resume is dropped before any cut, and a handoff that is one long line is cut too", () => {
+    const rs = [numbered(1, receipt({ ...st, step: "review" }, "done", { outcome: "changes_requested", handoff: "x" }))];
+    const long = `## Goal\n\n${"x".repeat(40_000)}\n\n## Resume\n\nreview: look at the form`;
+    const b = renderBrief(input(st, rs, { handoff: long }));
+    expect(b.json.context.resume_dropped).toBe("review#1");
+    expect(b.markdown).not.toContain("review: look at the form");
+    expect(b.markdown).toContain("_Resume omitted: review#1 wrote it for its own step");
+    expect(b.markdown).toContain("_… cut here:");
+    const one = renderBrief(input(st, [], { handoff: "y".repeat(40_000) }));
+    expect(one.json.context.handoff).toMatch(/^y{100}/);
+    expect((one.json.context.handoff ?? "").length).toBeLessThan(17_000);
+  });
+
+  test("an older handoff with a Progress section, or one over 8 KB, says what to do before reporting", () => {
+    const old = renderBrief(input(st, [], { handoff: "## Goal\n\nform\n\n## Progress\n\n- implement#1 done: x\n\n## Resume\n\ntest it\n" }));
+    expect(old.json.context.handoff_warning).toContain("older Progress section");
+    expect(old.markdown).toContain("## Context\n\nThis handoff has an older Progress section:");
+    const big = renderBrief(input(st, [], { handoff: `## Goal\n\nform\n\n## Progress\n\n${"- implement#1 done: a long summary of what was done\n".repeat(200)}` }));
+    expect(big.json.context.handoff_warning).toContain("`norn done` refuses one over 8 KB");
+    expect(big.json.context.handoff_warning).toContain("fold its Progress section into Notes and Not proven yet");
+    expect(renderBrief(input(st, [], { handoff: "## Goal\n\nform\n" })).json.context.handoff_warning).toBeNull();
+  });
+
+  test("Finish with names every reporting flag and what --handoff should say; Rework-only inputs get no line", () => {
+    const wf = structuredClone(SLICE_WF);
+    Object.assign(wf.steps.implement as object, { inputs: ["slice", "handoff", "last_check", "last_findings"] });
+    const b = renderBrief(input(st, [], { workflow: wf }));
+    for (const s of ["`--handoff \"…\"`: what your skill says to hand back", "`--findings <file>`", "`--evidence <dir>`", "--option \"<a>\"", "says what would unblock it", "Report exactly once, from the worktree root"]) expect(b.markdown).toContain(s);
+    expect(b.markdown).not.toContain("Last failing check");
+    expect(b.markdown).not.toContain("Last findings");
+    expect(b.json.inputs.map((i) => i.kind)).toContain("last_check");
+  });
+
+  test("History tells an implicit ask from a question the agent asked", () => {
+    const rs = [numbered(1, receipt(st, "ask", { question: "Allow bun test?", implicit: true })), numbered(2, receipt(st, "done", { outcome: "done", handoff: "  " }))];
+    expect(renderBrief(input(st, rs)).json.log?.lines).toEqual(["implement#1 waited on a prompt in its pane: Allow bun test?", "implement#1 reported `done`"]);
   });
 });

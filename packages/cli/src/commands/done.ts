@@ -76,12 +76,12 @@ function parseCriteria(text: string, file: string): CriterionVerdict[] {
  */
 function refuseLongHandoff(s: UnitSession): void {
   const raw = readText(s.handoffFile);
-  const bytes = raw === null ? 0 : handoffBytes(handoffProse(raw));
+  const bytes = raw === null ? 0 : handoffBytes(handoffProse(raw).trim());
   if (bytes <= HANDOFF_MAX_BYTES) return;
   const kb = (n: number) => `${Math.ceil(n / 1024)} KB`;
   throw refuse(
     `the handoff ${relative(s.worktree, s.handoffFile)} is ${kb(bytes)}; it may hold at most ${kb(HANDOFF_MAX_BYTES)}`,
-    `rewrite it as the unit's current state (${HANDOFF_SECTIONS.map(([h]) => h).join(", ")}): move repros, logs and tables into an evidence folder (\`--evidence <dir>\`) or a findings file and leave a one-line pointer to each, then report again`,
+    `rewrite it as the unit's current state (${HANDOFF_SECTIONS.map(([h]) => h).join(", ")}): fold an older Progress section into Notes, drop what the brief's History already says, move long repros and logs into the folder you pass with \`--evidence <dir>\` or a findings file and name the file, then report again`,
     "handoff_too_large",
     { bytes, max: HANDOFF_MAX_BYTES },
   );
