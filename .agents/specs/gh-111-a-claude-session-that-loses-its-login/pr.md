@@ -19,11 +19,11 @@ Decide is unchanged: the `waiting_input` fact takes the existing `agent.ask.impl
 
 ## Evidence
 
-No QA ran; the entries are unit tests (the test check passed, review approved with no findings).
+No QA ran; the entries are unit tests (the test check passed on this HEAD, 1292 pass; review approved with no findings).
 
 - **Adapter recognises the logged-out state**
   **Before:** `StopFailure` was not installed or mapped; the turn surfaced only as the idle notification, a `turn_end` with no receipt.
-  **After:** `claude.test.ts` › "claude StopFailure …": `parseHookEvent(stop-failure, error=authentication_failed)` → `{event: waiting_input, message: "agent logged out — run /login in the pane"}`; other errors → `null`; "claude hooks install" now lists `StopFailure`.
+  **After:** `claude.test.ts` › "claude StopFailure …": `parseHookEvent(stop-failure, error=authentication_failed)` → `{event: waiting_input, message: "agent logged out — run /login in the pane"}`; other errors → `null`; "claude hooks install" now lists `StopFailure`. The integration test "installed hook commands use event names the hook accepts" now fires `StopFailure` with `error: authentication_failed` (an empty payload maps to no fact, which failed CI on the first push).
 - **Treated like the usage-limit wait, no nudges spent**
   **Before:** `agent.silent` → nudge → … → `stuck`.
   **After:** `decide.test.ts` › "a logged-out session parks on an implicit ask…": parks on `agent.ask.implicit` with that reason, still `unit.parked.ask` 30 min later, `nudges_used` 0. `claude.test.ts` › "the idle notification after a failed login is dropped…": `refine([prompt, loggedOut, idle, idle]) == [prompt, loggedOut]` (without this, review#1 found the idle notification undid the park ~60 s later).
