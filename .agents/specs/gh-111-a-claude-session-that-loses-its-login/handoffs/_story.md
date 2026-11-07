@@ -8,9 +8,9 @@ A Claude session that loses its login mid-step parks on an implicit ask that say
 | --- | --- | --- | --- |
 | Adapter recognises the logged-out state | `StopFailure` with `error: authentication_failed` becomes a `waiting_input` fact "agent logged out — run `/login` in the pane"; other errors ignored; hook installed | test | `packages/adapters/test/unit/claude/claude.test.ts` › "claude StopFailure …" and "claude hooks install" (key list has `StopFailure`) |
 | Treated like the usage-limit wait, no nudges spent | the logged-out fact parks on `agent.ask.implicit` with that reason and spends no nudge ; the park holds through the idle notification that follows | test | `packages/adapters/test/unit/claude/claude.test.ts` › "the idle notification after a failed login is dropped…" (refineHooks); `packages/core/test/unit/decide.test.ts` › "a logged-out session parks on an implicit ask…" (still parked 30 min later, `nudges_used` 0) |
-| After the login, the run continues in the same session | a later non-wait hook or a person's answer ends the park | test | `packages/core/test/unit/decide.test.ts` › "a logged-out session parks on an implicit ask…" (a later `UserPromptSubmit` → `agent.ask.implicit.resolved`, run goes on) |
+| After the login, the run continues in the same session | the session's next prompt after `/login` ends the park and the run goes on, nudges untouched | test | `packages/core/test/unit/decide.test.ts` › "a logged-out session parks on an implicit ask…" (a later `UserPromptSubmit` → `agent.ask.implicit.resolved`, run goes on) |
 
-- `bun run test` and `bun run typecheck`: green after the rework.
+- `bun run test` (1292 pass) and `bun run typecheck`: green on the reviewed HEAD (review#2).
 
 ## Easy to miss
 
@@ -28,4 +28,4 @@ A Claude session that loses its login mid-step parks on an implicit ask that say
 
 ## Resume
 
-Review the rework (adapter `refineHooks` drop of the post-logout idle notification, plus the decide tests).
+Review#2 approved the change on this HEAD; next is the workflow's step after review (QA / PR).
