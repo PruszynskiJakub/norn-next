@@ -10,7 +10,7 @@ An open story PR follows its issue's title, so a release PR opened as "Release" 
 | Wanted: end to end | the issue renamed after open-pr: the PR is retitled once at the next sync and not again | test | `packages/cli/test/integration/pr-body.test.ts` › "story PR title" › "the issue renamed after open-pr: …, once" |
 | Port: editPullRequestTitle and PR title | gh, glab and FakeRemote rename a PR and report its title; a draft stays a draft | test | `packages/adapters/test/contract/remote.ts` › "editPullRequestTitle renames the PR, still a draft, which findPullRequest and findPullRequests then report" (the scripted glab keeps a draft in its title, as GitLab does); gh/glab unit tests › "editPullRequestTitle replaces the title"; `glab.test.ts` › "editPullRequestTitle keeps a draft MR's Draft: prefix, so the MR stays a draft" |
 | Review F2: a failed retitle is no unit failure | it neither replaces the unit's act failure nor shows as an Unblock item; the next sync retries | test | `packages/cli/test/integration/pr-body.test.ts` › "a failed rename records no failure for the story unit; the next sync tries again" |
-| Wanted: the gate's title check goes | the `ready` gate prompt no longer asks for a hand rename | agent | `.agents/workflows/release.yaml` ready prompt (read in review) |
+| Wanted: the gate's title check goes | the `ready` gate prompt no longer asks for a hand rename | agent | QA (agent); read in review #2: `.agents/workflows/release.yaml` ready prompt drops the title check, release skill step 8 says the open PR takes the title at the next sync |
 
 ## Easy to miss
 
@@ -21,7 +21,7 @@ An open story PR follows its issue's title, so a release PR opened as "Release" 
 ## Not proven yet
 
 - Not run against real gh/glab: `gh pr edit --title`, `glab mr update --title … --yes` (and that GitLab reads `Draft: ` in a title it is given), and the `title` field in `gh pr list/view --json`, the gh GraphQL node and the GitLab GraphQL node are the documented flags and fields, checked only against the scripted CLIs.
-- e2e transcripts were not run locally (CI does); a retitle fires only when the PR and issue titles differ, which they don't in the existing flows.
+- The integration tests in `pr-body.test.ts` (end to end, failed retitle) run in CI only; review #2 read them but did not run them. Review #2 ran the e2e tier locally: 74 pass, transcripts unchanged.
 
 ## Notes
 
@@ -31,7 +31,8 @@ An open story PR follows its issue's title, so a release PR opened as "Release" 
 - Review F2 chose the reviewer's second option: act does not record `retitle_pr` failures at all (they stay in the trace), so no slot of their own was needed.
 - No decide case was added for a draft prefix: the adapter now reports the bare title, so decide never sees the prefix.
 - Release skill step 8 now says the open PR takes the title at the next remote sync.
+- Review #2 approved with 2 minor findings (not blocking): the rename-back of a hand-edited PR title is not in the user docs; on GitLab, an issue titled `Draft: …` would turn a ready MR into a draft.
 
 ## Resume
 
-Review the rework of review #1 (F1 glab draft prefix, F2 retitle failure not recorded); nothing else is open.
+Review #2 approved. Next: QA of the criteria above; the gate-prompt row is an agent check.
