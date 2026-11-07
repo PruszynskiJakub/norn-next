@@ -10,7 +10,7 @@ labels:
   - norn
   - norn:wf:refinement
 workflow: refinement
-status: new
+status: active
 intake_at: 2026-11-07T10:20:30.339Z
 body_hash: b2602b599264402664956616635e6f81374086e676888e0b2632baeddffbb2ae
 ---
