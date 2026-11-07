@@ -1,7 +1,7 @@
 /**
- * gh-195/08 D2, D3: pack and unpack a story's record against real git. The pack is byte-faithful
+ * Pack and unpack a story's record against real git. The pack is byte-faithful
  * whatever the repository's conversion config (review F1); unpack never writes outside its folder
- * (F2), replaces the destination instead of merging into it (F3), and validates every JSON file (F6).
+ *, replaces the destination instead of merging into it, and validates every JSON file.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";

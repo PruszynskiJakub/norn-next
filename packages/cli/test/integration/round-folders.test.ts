@@ -1,6 +1,6 @@
 /**
- * gh-71 B30, B31, B34 (D2, D7): the story's record lives in `_story/rounds/01-<workflow>/` of its run state,
- * in the checkout's machine dir (S12, gh-195/05), with one story handoff in the worktree (`handoffs/_story.md`, gh-195/07); a story
+ * The story's record lives in `_story/rounds/01-<workflow>/` of its run state,
+ * in the checkout's machine dir, with one story handoff in the worktree (`handoffs/_story.md`, gh-195/07); a story
  * whose record is still flat is moved there by its holder's first tick, with nothing committed, and goes on
  * where it was.
  */
@@ -39,9 +39,9 @@ let h: Harness;
 const BRANCH = "gh-9-round-thing";
 const spec = `.agents/specs/${BRANCH}`;
 const wt = () => `${h.root}-worktrees/${BRANCH}`;
-/** S12: the story unit's run state, in the machine dir */
+/** The story unit's run state, in the machine dir */
 const story = () => join(storyRunStateOf(join(wt(), spec)), "_story");
-/** the story's handoff, in the worktree (gh-195/07: `handoffs/_story.md`) */
+/** the story's handoff, in the worktree (`handoffs/_story.md`) */
 const handoff = () => handoffPath(join(wt(), spec), STORY_UNIT_DIR);
 const round1 = () => join(story(), "rounds", "01-duo");
 const inWt = (...argv: string[]): Promise<CliResult> => {
@@ -92,7 +92,7 @@ describe("a new story's record is round 1 (B30, B31)", () => {
     expect(ls(join(round1(), "receipts"))[0]).toStartWith("0001-");
     expect(ls(join(round1(), "evidence", runId))).toEqual(["AC1.md"]);
     expect(h.state(round1())).toMatchObject({ workflow: "duo", step: "review" });
-    // gh-195/05 (B2), gh-195/07 (B39): the worktree and the pushed branch hold the handoff, and no runs/
+    // The worktree and the pushed branch hold the handoff, and no runs/
     expect(existsSync(join(wt(), spec, "runs"))).toBe(false);
     expect(git("ls-tree", "-r", "--name-only", `origin/${BRANCH}`, "--", spec).split("\n")).toEqual([`${spec}/${unitHandoffPath(STORY_UNIT_DIR)}`, `${spec}/spec.md`]);
   });
@@ -120,7 +120,7 @@ function writeFindings(): string {
   return f;
 }
 
-describe("a flat record moves into round 1 (B34), in the machine dir (S12)", () => {
+describe("a flat record moves into round 1 (B34), in the machine dir", () => {
   let flatHead = "";
   let flatState: unknown;
   const slice = () => runStateOf(join(wt(), spec), "01-x");
@@ -172,7 +172,7 @@ describe("a flat record moves into round 1 (B34), in the machine dir (S12)", () 
   });
 });
 
-describe("a move into round 1 that stopped partway is finished by the next round.migrate (B34, S5)", () => {
+describe("a move into round 1 that stopped partway is finished by the next round.migrate (B34)", () => {
   let flatState: unknown;
 
   test("setup: flat again, then a move stopped after evidence/ and receipts/, and a file written to the flat evidence/ after", () => {
@@ -215,7 +215,7 @@ describe("an old flat record merged into the base stays flat and reads as round 
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "merge gh-1 (older norn)"]);
     h.git(["push", "-q", "origin", "main"]);
-    // gh-195 D16: read from its archive ref, as `norn upgrade` leaves it (D14), never from the base tree
+    // Read from its archive ref, as `norn upgrade` leaves it, never from the base tree
     archiveTreeRunState(h.root, "HEAD", OLD);
     head = h.git(["rev-parse", "HEAD"]).trim();
   });

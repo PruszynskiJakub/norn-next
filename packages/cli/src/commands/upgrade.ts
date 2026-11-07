@@ -1,36 +1,16 @@
 /**
- * `norn upgrade [--json]` (gh-110 B11–B17, D6; `norn migrate` before gh-61 B30): move the main
- * checkout from the old layout to the new one (D1) and stage the moves for the person to commit. A report for a person; `--json` for data
- * (`{moves, staged, commit}`).
+ * `norn upgrade [--json]`: move the main checkout to the new layout and the running norn, staging
+ * every change for the person to commit; never commits, pushes or touches a unit worktree.
  *
- * Checks first, nothing moved on a refusal (exit 3): the main checkout only (B16), no part in both
- * places (B17), the tick lock free (B15). Then, holding the tick lock at its old place: the config and
- * workflows by `git mv` (an untracked file is moved plainly and listed as untracked), the old trace
- * dir's contents into the machine dir (copy then delete across filesystems) with its `checkout.json`,
- * norn's old trace line out of `.gitignore` (staged), the old folder removed, the old lock last.
- * Every step can run again, so a rerun finishes an interrupted run; no rollback. On the new layout:
- * nothing to move (B14; gh-61 B15: nothing to upgrade). Never commits, pushes, or touches a unit worktree.
+ * Checks first, nothing moved on a refusal (exit 3): the main checkout only, no part in both
+ * places, the tick lock free, and a binary older than the recorded `norn_version` (no override).
+ * Every step can run again, so a rerun finishes an interrupted run; there is no rollback.
+ * `norn_version` is written last. The run state an older norn left in the base's tree goes to archive
+ * refs pushed before any removal is staged; a story whose record fails validation or whose push is
+ * rejected keeps its run state. Labels are created where missing, never edited or deleted, and a
+ * remote it cannot reach or write is reported, never a refusal or a changed exit code.
  *
- * gh-61 B13, B15–B17 (D9): it also moves the repo to the running norn. In order: the main checkout and
- * the tick lock, the backward check before any write (B17: a binary older than the recorded
- * `norn_version` is refused, no override), the layout and config moves, the bundled skills rewritten
- * and relinked, and `norn_version` written last (the team file edited in place, comments kept), all
- * staged, never committed. Nothing to do: "already on norn X.Y.Z" and no change (B15).
- *
- * gh-67 GR10 (B2, B7): on every run, even with nothing else to move, last: the labels norn uses
- * created on the remote where missing (`runtime/labels.ts`); never edited or deleted, and a remote it
- * cannot reach or write is reported, never a refusal or a changed exit code.
- *
- * gh-195 D14 (B35, B36; S10 retired): then, still under the lock, the run state an older norn left in
- * the base's tree: each finished story's `<spec folder>/runs` packed as is into `refs/norn/runs/<story>`,
- * the refs pushed in one batch before anything is removed (P6), the removal of each story whose ref is on
- * the remote staged, and the `runs/**` line dropped from `.gitattributes` (staged when git tracks it,
- * kept when every story failed); a story whose record
- * fails validation or whose push is rejected keeps its run state, unstaged, and is named with the reason.
- * A rerun pushes only the refs still missing. Committing the removal is the person's (LY3).
- *
- * gh-61 B30 (D9): `norn migrate` is a deprecated alias that runs the same code and adds one line for a
- * person on stderr; it goes in the next minor.
+ * `norn migrate` is a deprecated alias that runs the same code and adds one line on stderr.
  */
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -60,27 +40,26 @@ export interface UpgradeMove {
 
 export interface UpgradeReport {
   moves: UpgradeMove[];
-  /** gh-64 D13: the config rewrite (renamed and removed keys, files changed) */
   config: { changed: string[]; renamed: ConfigMigration["renamed"]; removed: ConfigMigration["removed"] };
-  /** gh-61 B13, B16: the repo's `norn_version` before and after; `changed` when this run wrote it */
+  /** The repo's `norn_version` before and after; `changed` when this run wrote it */
   norn_version: { from: string | null; to: string | null; changed: boolean };
-  /** gh-61 B13: bundled skills rewritten in `.agents/skills/`, and those an agent's skill folder was relinked to */
+  /** Bundled skills rewritten in `.agents/skills/`, and those an agent's skill folder was relinked to */
   skills: { updated: string[]; linked: string[] };
   /** paths staged by this run, relative to the main checkout */
   staged: string[];
   /** the commit the person makes; null when nothing was staged */
   commit: string | null;
-  /** gh-195 B35, B36: each finished story whose run state was in the base's tree, and what happened to it ([] = none left) */
+  /** Each finished story whose run state was in the base's tree, and what happened to it ([] = none left) */
   run_state: BaseRecordOutcome[];
-  /** gh-195 S10 (retired): the `runs/**` line dropped from `.gitattributes`, staged or (an untracked file) not; absent = untouched */
+  /** The `runs/**` line dropped from `.gitattributes`, staged or (an untracked file) not; absent = untouched */
   gitattributes?: "staged" | "untracked";
-  /** gh-67 GR10, B15: the labels created, already there, unused and not created, or why they were not checked */
+  /** The labels created, already there, unused and not created, or why they were not checked */
   labels?: LabelsReport;
 }
 
 const COMMIT = `git commit -m "Move norn to its new layout (norn upgrade)"`;
 const CONFIG_COMMIT = `git commit -m "Move norn config to its new keys (norn upgrade)"`;
-/** gh-61 B29: a tick (or `norn watch`) holds the lock */
+/** A tick (or `norn watch`) holds the lock */
 const STOP_WATCH = "stop `norn watch` and run it again";
 const NO_CONFIG: UpgradeReport["config"] = { changed: [], renamed: [], removed: [] };
 const NO_SKILLS: UpgradeReport["skills"] = { updated: [], linked: [] };
@@ -89,16 +68,15 @@ const SKILLS_COMMIT = `git commit -m "Refresh norn's skills (norn upgrade)"`;
 const RUN_STATE_COMMIT = `git commit -m "Move norn run state to archive refs (norn upgrade)"`;
 const ATTRIBUTES_COMMIT = `git commit -m "Drop norn's runs/ line from .gitattributes (norn upgrade)"`;
 
-/** B16: refuse anywhere but the main checkout (a unit worktree, or any linked worktree). */
+/** Refuse anywhere but the main checkout (a unit worktree, or any linked worktree). */
 async function mainCheckoutOnly(ctx: Context, root: string): Promise<void> {
   const top = ctx.worktree ?? safeRealpath((await ctx.git.status(ctx.cwd)).path);
   if (top !== root) throw refuse(`${top} is not the main checkout; norn upgrade moves the main checkout only, so the move never lands in a story's branch`, `cd ${root} && ${cmd.upgrade()}`, "not_main_checkout", { main_checkout: root });
 }
 
 /**
- * B17: a part in both places, by D4 for the config and workflows. The machine files are never
- * committed, so only an interrupted run leaves them in both places: that is finished, unless one
- * name is in both (then both paths are named).
+ * A part in both places. The machine files are never committed, so only an interrupted run leaves
+ * them in both places: that is finished, unless one name is in both (then both paths are named).
  */
 function refuseBoth(root: string): void {
   const l = repoLayout(root);
@@ -132,14 +110,14 @@ async function moveLayout(ctx: Context, root: string): Promise<UpgradeReport> {
   return { moves, config: NO_CONFIG, norn_version: { from: null, to: null, changed: false }, skills: NO_SKILLS, run_state: [], staged, commit: staged.length ? COMMIT : null };
 }
 
-/** gh-64 B45: the tick lock, taken before anything changes and held through the config part. */
+/** The tick lock, taken before anything changes and held through the config part. */
 async function tickLock(ctx: Context, root: string) {
   const lock = await acquireTickLock(root, { note: "norn upgrade", now: () => ctx.clock.iso() });
   if (!lock.ok) throw refuse(`a tick is running (pid ${lock.holder.holder.pid}${lock.holder.note ? `, ${lock.holder.note}` : ""}); norn upgrade never rewrites config under a running tick`, STOP_WATCH, "tick_locked");
   return lock;
 }
 
-/** gh-64 D13 (B40–B45): the config rewrite, run holding the tick lock; stages what is committed. */
+/** The config rewrite, run holding the tick lock; stages what is committed. */
 async function migrateConfigPart(ctx: Context, root: string, report: UpgradeReport): Promise<UpgradeReport> {
   const c: ConfigMigration = migrateConfig({ root, home: ctx.home });
   if (c.stage.length) await ctx.git.stage(root, c.stage);
@@ -148,7 +126,7 @@ async function migrateConfigPart(ctx: Context, root: string, report: UpgradeRepo
 }
 
 /**
- * gh-61 B17 (D9): the repo's recorded version (the team file at whichever place the layout keeps it)
+ * The repo's recorded version (the team file at whichever place the layout keeps it)
  * and the running one; refuses before any write when the binary is older than the repo.
  */
 function versions(ctx: Context, root: string): { from: string | null; to: string | null } {
@@ -162,7 +140,7 @@ function versions(ctx: Context, root: string): { from: string | null; to: string
   return { from, to };
 }
 
-/** gh-61 B13 (D9): the bundled skills rewritten from this norn's copies and relinked, then `norn_version` last; all staged. */
+/** The bundled skills rewritten from this norn's copies and relinked, then `norn_version` last; all staged. */
 async function versionPart(ctx: Context, root: string, report: UpgradeReport, v: { from: string | null; to: string | null }): Promise<UpgradeReport> {
   // the layout and config moves are done: the config loads from its new place and keys
   ctx.reload();
@@ -187,7 +165,7 @@ async function versionPart(ctx: Context, root: string, report: UpgradeReport, v:
   const changed = v.to !== null && v.from !== v.to;
   if (changed) {
     const w = writeNornVersion(root, v.to as string);
-    // P8: a refusal, not a crash; the skills are rewritten, nothing staged yet, and a rerun finishes it
+    // A refusal, not a crash; the skills are rewritten, nothing staged yet, and a rerun finishes it
     if (!w.ok) throw refuse(`norn upgrade could not write norn_version to ${REPO_CONFIG_FILE}: ${w.error}`, `fix ${REPO_CONFIG_FILE} and run \`${cmd.upgrade()}\` again`, "config_invalid");
     stage.push(REPO_CONFIG_FILE);
   }
@@ -198,18 +176,18 @@ async function versionPart(ctx: Context, root: string, report: UpgradeReport, v:
 }
 
 /**
- * gh-195 D14 (B35, B36): the base's run state into archive refs, pushed before any removal is staged
- * (`archiveBaseRunState`); then the retired S10 line out of `.gitattributes`. Both staged, never committed.
+ * The base's run state into archive refs, pushed before any removal is staged
+ * (`archiveBaseRunState`); then its line out of `.gitattributes`. Both staged, never committed.
  */
 async function runStatePart(ctx: Context, root: string, report: UpgradeReport): Promise<UpgradeReport> {
   const remote = await gitRemote(ctx.git, root, ctx.config.git_remote);
   const run_state = await archiveBaseRunState(root, remote, { holder: machineHolder(ctx.env), at: ctx.clock.iso() });
   const moved = run_state.filter((r) => r.done !== "failed").map((r) => r.path);
-  // F4: when run state was there and none of it moved, the line stays with it
+  // When run state was there and none of it moved, the line stays with it
   if (run_state.length && !moved.length) return { ...report, run_state };
   const attributes = dropRunsAttribute(root);
   const stage = [...moved];
-  // LY3: an untracked file is edited, never staged
+  // An untracked file is edited, never staged
   if (attributes.changed && attributes.tracked) {
     await ctx.git.stage(root, [".gitattributes"]);
     stage.push(".gitattributes");
@@ -219,7 +197,7 @@ async function runStatePart(ctx: Context, root: string, report: UpgradeReport): 
   return { ...report, run_state, ...(attributes.changed ? { gitattributes: attributes.tracked ? "staged" : "untracked" } : {}), staged, commit };
 }
 
-/** gh-67 GR10 (B2): the labels, after every move, so the workflows are read from their new place. */
+/** The labels, after every move, so the workflows are read from their new place. */
 async function labelsPart(ctx: Context, root: string, report: UpgradeReport): Promise<UpgradeReport> {
   ctx.reload();
   const ports = await ctx.ports();
@@ -228,7 +206,7 @@ async function labelsPart(ctx: Context, root: string, report: UpgradeReport): Pr
   return { ...report, labels };
 }
 
-/** gh-61 B13: the one line that says what moved: the version, the skills, the config. */
+/** The one line that says what moved: the version, the skills, the config. */
 function summary(r: UpgradeReport): string {
   const v = r.norn_version;
   const parts = [v.changed ? `norn version ${v.from ?? "(none)"} → ${v.to}` : `norn version ${v.from ?? v.to}`];
@@ -247,7 +225,7 @@ function markdown(r: UpgradeReport, root: string): string {
   const config = r.config.changed.length || r.config.removed.length || r.config.renamed.length;
   const skills = r.skills.updated.length || r.skills.linked.length;
   const labels = r.labels ? ["", ...labelsLines(r.labels)] : [];
-  // B15; gh-67 B2: the labels line still shows what upgrade did on the remote
+  // The labels line still shows what upgrade did on the remote
   if (!r.moves.length && !r.staged.length && !config && !skills && !r.norn_version.changed && !r.run_state.length && !r.gitattributes)
     return [`# norn upgrade\n\nalready on norn ${r.norn_version.from ?? r.norn_version.to}: nothing to upgrade (${root} is on the new layout, its config on the new keys, its skills match and no run state is left in its tree).`, ...labels].join("\n");
   const how = { "git mv": "staged", untracked: "untracked: moved, not staged", moved: "machine-local, outside git" };
@@ -279,7 +257,7 @@ function markdown(r: UpgradeReport, root: string): string {
 async function upgrade(ctx: Context) {
   const root = ctx.root;
   await mainCheckoutOnly(ctx, root);
-  // B17: before any write, the tick lock included
+  // Before any write, the tick lock included
   const v = versions(ctx, root);
   const l = repoLayout(root);
   if (l.layout === "new") {
@@ -293,7 +271,7 @@ async function upgrade(ctx: Context) {
     }
   }
   refuseBoth(root);
-  // B45: on the old layout only an old norn ticks, under the old lock: taken before anything
+  // On the old layout only an old norn ticks, under the old lock: taken before anything
   // moves and held through the config, skills and version parts
   const lock = await acquireLock(oldTickLockPath(root), { note: "norn upgrade", now: () => ctx.clock.iso() });
   if (!lock.ok) throw refuse(`a tick is running (pid ${lock.holder.holder.pid}${lock.holder.note ? `, ${lock.holder.note}` : ""}); norn upgrade never moves the trace under a running tick`, STOP_WATCH, "tick_locked");
@@ -301,7 +279,7 @@ async function upgrade(ctx: Context) {
   try {
     report = await runStatePart(ctx, root, await versionPart(ctx, root, await migrateConfigPart(ctx, root, await moveLayout(ctx, root)), v));
   } finally {
-    // D6: the old lock file goes last
+    // The old lock file goes last
     lock.release();
   }
   removeOldLayoutDirs(root);
@@ -319,7 +297,7 @@ export const upgradeCommand = defineCommand({
   run: (ctx) => upgrade(ctx),
 });
 
-/** gh-61 B30: the old name, kept for one minor; the same code, one line on stderr. */
+/** The old name, kept for one minor; the same code, one line on stderr. */
 const MIGRATE_RENAMED = "`norn migrate` is now `norn upgrade`; the old name goes in the next minor";
 
 export const migrateCommand = defineCommand({

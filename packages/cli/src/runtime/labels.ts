@@ -1,9 +1,9 @@
 /**
- * GR10 (gh-67 B1–B18): the remote's labels against the ones norn uses. `create` (init, upgrade) makes
- * each missing one; without it (doctor) they are only listed. Never edits or deletes a label (B8, B10),
+ * The remote's labels against the ones norn uses. `create` (init, upgrade) makes
+ * each missing one; without it (doctor) they are only listed. Never edits or deletes a label,
  * and never throws for the remote's sake: no git remote, a missing or logged-out CLI or a failed call
- * comes back as `checked: false` with the reason (B11, B12, B14), a failed create as `not_created`
- * with its command (B13). A tick never calls this (B20).
+ * comes back as `checked: false` with the reason, a failed create as `not_created`
+ * with its command. A tick never calls this.
  */
 import { cmd, labelCreateCommand, labelDeleteCommand, NORN_LABEL_COLOR, type PortError, planLabels, type RemotePort, type RepoWorkflows, WF_LABEL } from "@norn/core";
 import { oneLine } from "@norn/view";
@@ -42,7 +42,7 @@ const notChecked = (e: unknown, cli: string): LabelsNotChecked => {
 };
 
 export async function remoteLabels(opts: { remote: RemotePort | null; gitRemoteUrl: string | null; intake: string; workflows: RepoWorkflows; create: boolean }): Promise<LabelsReport> {
-  // B11: a local-only repo has nothing to label
+  // A local-only repo has nothing to label
   if (!opts.gitRemoteUrl || !opts.remote) return { checked: false, reason: "no git remote", fix: null, do_instead: null };
   const remote = opts.remote;
   const cli = remote.provider;
@@ -67,17 +67,17 @@ export async function remoteLabels(opts: { remote: RemotePort | null; gitRemoteU
       created.push(l.name);
     } catch (e) {
       const code = String((e as PortError).code ?? "");
-      // a label beyond the listed page, or made meanwhile: there now, never restyled (B8)
+      // a label beyond the listed page, or made meanwhile: there now, never restyled
       if (code.endsWith("_exists")) existing.push(l.name);
       else not_created.push({ name: l.name, reason: code.endsWith("_auth") ? "permission denied" : oneLine((e as Error).message ?? String(e), Infinity), command: labelCreateCommand(cli, label(l)) });
     }
   }
-  // B5: a workflow that fails validation gets no label
+  // A workflow that fails validation gets no label
   for (const w of plan.invalid) not_created.push({ name: `${WF_LABEL}${w}`, reason: `workflow ${w} is invalid`, command: cmd.doctor() });
   return { checked: true, created, existing, missing: [], not_created, unused };
 }
 
-/** init's and upgrade's labels lines: what was created, already there, unused and not created (B15, B29). */
+/** init's and upgrade's labels lines: what was created, already there, unused and not created. */
 export function labelsLines(r: LabelsReport): string[] {
   if (!r.checked) return [`labels: not checked — ${r.reason}${r.do_instead ? `: ${r.do_instead}` : ""}`];
   const out = [`labels: ${[r.created.length ? `created ${r.created.join(", ")}` : "", r.existing.length ? `${r.existing.length} already there` : ""].filter(Boolean).join("; ") || "none"}`];
@@ -86,7 +86,7 @@ export function labelsLines(r: LabelsReport): string[] {
   return out;
 }
 
-/** doctor's warnings for labels (B16–B18): never a failed check. */
+/** doctor's warnings for labels: never a failed check. */
 export function labelsWarnings(r: LabelsReport): string[] {
   if (!r.checked) return [`labels not checked: ${r.reason}${r.fix ? ` (${r.fix})` : ""}`];
   return [

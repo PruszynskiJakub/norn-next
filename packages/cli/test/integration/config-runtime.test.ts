@@ -1,8 +1,8 @@
 /**
- * gh-64 at the CLI seam (S1), over ticks: a story's mode nearest first (B10, B25), `agent` picking
- * the coding agent with no entry (B13), the team's `workflow` key with a label still winning (B24),
- * `.env.norn` holding only the slot (B33), the recorded tick interval and the claim timing derived
- * from it (B34, B35), and a slice that still has criteria `needs` under Unblock (B38).
+ * gh-64 at the CLI seam, over ticks: a story's mode nearest first, `agent` picking
+ * the coding agent with no entry, the team's `workflow` key with a label still winning,
+ * `.env.norn` holding only the slot, the recorded tick interval and the claim timing derived
+ * from it, and a slice that still has criteria `needs` under Unblock.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
@@ -36,13 +36,13 @@ describe("mode, agent and workflow over ticks (B10, B13, B24, B25, B33)", () => 
   beforeAll(async () => {
     h = await createHarness();
     h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
-    // B25: a workflow's own mode
+    // A workflow's own mode
     h.write(join(workflowsDir(h.root), "careful.yaml"), `mode: manual\n${SOLO.replace("name: solo", "name: careful")}`);
-    // B13: a step naming a built-in agent that has no entry and is not `agent`
+    // A step naming a built-in agent that has no entry and is not `agent`
     h.write(join(workflowsDir(h.root), "gem.yaml"), SOLO.replace("name: solo", "name: gem").replace("skill: norn-implement", "skill: norn-implement\n    agent: gemini"));
-    // B24: the team's entry workflow; B10, B13: my mode and agent, no agents entry
+    // The team's entry workflow; B10, B13: my mode and agent, no agents entry
     h.config("workflow: solo\nmode: auto\nagent: codex\n");
-    // B1, B13: init sets up the agents in use, so it runs once the workflows name them
+    // Init sets up the agents in use, so it runs once the workflows name them
     expect((await h.norn("init")).exit).toBe(0);
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "norn"]);
@@ -110,7 +110,7 @@ describe("the agent command a launch runs (B14, B15)", () => {
       h.clock.advance(10_000);
       await h.tick();
     }
-    // B15: an empty args list replaces the built-in one whole
+    // An empty args list replaces the built-in one whole
     h.config("workflow: solo\nmode: auto\nagents: { claude: { args: [] } }\n");
     h.remote.issues = [issue(1, "One"), issue(2, "Two")];
     h.clock.advance(6 * 60_000); // past the next sync
@@ -204,7 +204,7 @@ describe("the tick interval and claim timing (B34, B35)", () => {
   });
 });
 
-describe("norn init sets up the agents in use only (B1, B13)", () => {
+describe("norn init sets up the agents in use only (B13)", () => {
   const AGENT_DIRS = [".claude", ".codex", ".gemini", ".opencode"];
   const present = (h: Harness) => AGENT_DIRS.filter((d) => existsSync(join(h.root, d)));
 

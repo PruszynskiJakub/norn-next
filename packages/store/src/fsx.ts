@@ -1,19 +1,19 @@
 /**
- * Low-level file primitives (S1): atomic writes (temp in the same dir → fsync → rename),
+ * Low-level file primitives: atomic writes (temp in the same dir → fsync → rename),
  * exclusive creates (temp → fsync → link, which fails with EEXIST atomically), and
- * validated reads that return a typed `corrupt` result instead of throwing (S2).
+ * validated reads that return a typed `corrupt` result instead of throwing.
  */
 import { closeSync, cpSync, existsSync, fsyncSync, linkSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import type { FileError } from "@norn/core";
 import { type SchemaError, type SchemaName, type SchemaType, validate } from "@norn/schema";
 
-/** Result of reading a persisted file. `missing` is not an error; `corrupt` marks the unit (S2). */
+/** Result of reading a persisted file. `missing` is not an error; `corrupt` marks the unit. */
 export type ReadResult<T> =
   | { ok: true; value: T; raw: string }
   | { ok: false; reason: "missing" }
   | { ok: false; reason: "corrupt"; error: FileError }
-  /** B38 (D12): a story or slice whose criteria still carry the removed `needs`; not corrupt, `norn upgrade` fixes it */
+  /** A story or slice whose criteria still carry the removed `needs`; not corrupt, `norn upgrade` fixes it */
   | { ok: false; reason: "needs_removed"; error: FileError };
 
 let tmpSeq = 0;
@@ -49,7 +49,7 @@ function writeTemp(path: string, data: string | Uint8Array, mode = 0o644): strin
   return tmp;
 }
 
-/** Atomically replace `path` with `data` (S1). Creates parent dirs; `mode` for executables (R8.1 shim). */
+/** Atomically replace `path` with `data`. Creates parent dirs; `mode` for executables (the norn shim). */
 export function atomicWrite(path: string, data: string | Uint8Array, mode?: number): void {
   const tmp = writeTemp(path, data, mode);
   try {
@@ -62,7 +62,7 @@ export function atomicWrite(path: string, data: string | Uint8Array, mode?: numb
 }
 
 /**
- * Append `data` to `path` and fsync it before returning (R5.4: a `tick.start` line must survive
+ * Append `data` to `path` and fsync it before returning (a `tick.start` line must survive
  * a crash during act). Ordinary appends skip the fsync; this one is for lines that explain a crash.
  */
 export function appendDurable(path: string, data: string): void {
@@ -80,7 +80,7 @@ export function appendDurable(path: string, data: string): void {
   if (created) fsyncDir(dirname(path));
 }
 
-/** fsync every file under `dir`, and the folders (S1: what a rename puts in place is on disk first). */
+/** fsync every file under `dir`, and the folders, so what a rename puts in place is on disk first. */
 export function fsyncTree(dir: string): void {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, e.name);
@@ -99,7 +99,7 @@ export function fsyncTree(dir: string): void {
 
 /**
  * Copy directory `from` into `to` (merging over what `to` already holds) so that `to` is never
- * seen half-copied (S1): the merge is built in a temp dir beside `to`, fsynced, then renamed into
+ * seen half-copied: the merge is built in a temp dir beside `to`, fsynced, then renamed into
  * place. A copy that fails leaves `to` as it was and no temp dir behind.
  */
 export function atomicCopyDir(from: string, to: string): void {
@@ -160,14 +160,14 @@ export function json(value: unknown): string {
 
 /**
  * One line of JSON: for the files norn commits under runs/ (receipts, state.json), so they
- * add one diff line each, not one per field (gh-108). Readers parse either form.
+ * add one diff line each, not one per field. Readers parse either form.
  * Machine-local files keep `json()`: lease handover compares the raw text it wrote.
  */
 export function jsonLine(value: unknown): string {
   return `${JSON.stringify(value)}\n`;
 }
 
-/** `mode` 0o600 for a file only its owner may read (a check order, C5). */
+/** `mode` 0o600 for a file only its owner may read (a check order). */
 export function atomicWriteJson(path: string, value: unknown, mode?: number): void {
   atomicWrite(path, json(value), mode);
 }
@@ -216,7 +216,7 @@ export function validated<N extends SchemaName>(
   return r.ok ? { ok: true, value: r.value, raw } : { ok: false, reason: "corrupt", error: fileError(path, r.errors, root) };
 }
 
-/** Read + parse + validate a JSON file (S1, S2). */
+/** Read + parse + validate a JSON file. */
 export function readJsonFile<N extends SchemaName>(name: N, path: string, root?: string): ReadResult<SchemaType<N>> {
   const raw = readText(path);
   if (raw === null) return { ok: false, reason: "missing" };

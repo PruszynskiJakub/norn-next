@@ -24,7 +24,7 @@ import { SessionInfo } from "./receipt.ts";
  * - parked: waiting for a human in the normal flow (ask, gate, attended step)
  * - stuck: needs `norn run rerun` ($stuck, exhausted, remote change, missing step)
  * - done: reached `$done`
- * - corrupt: a file of this unit failed validation (S2); never guessed past
+ * - corrupt: a file of this unit failed validation; never guessed past
  */
 export const UnitStatus = Type.Union([
   Type.Literal("ready"),
@@ -57,24 +57,24 @@ export const ParkInfo = Type.Object(
     /** receipt that caused the park (ask, stuck, classify) */
     receipt_id: Type.Optional(Ulid),
     /**
-     * ask park from a permission prompt: the pending command, e.g. `Bash(rm -rf build)` (§10, O1);
-     * a `workflow` park of a rejected round receipt: the edit to run again (gh-71 B1, AC12)
+     * ask park from a permission prompt: the pending command, e.g. `Bash(rm -rf build)`;
+     * a `workflow` park of a rejected round receipt: the edit to run again
      */
     command: Type.Optional(NonEmpty),
     /**
-     * R6.1 (A14): an implicit ask (classified from facts, not `norn ask`) and the fact that raised it:
+     * An implicit ask (classified from facts, not `norn ask`) and the fact that raised it:
      * the pane (`waiting_input`) or a hook. A later fact showing the agent moved on resolves it, and
      * agent reports are accepted while parked on it.
      */
     implicit: Type.Optional(Type.Union([Type.Literal("pane"), Type.Literal("hook")])),
-    /** R6.2: the prompt's choices as the runner parsed them from the pane, in display order */
+    /** The prompt's choices as the runner parsed them from the pane, in display order */
     options: Type.Optional(Type.Array(NonEmpty)),
-    /** R6.2: how a choice is made: by its number, or by arrow keys from the `cursor` option */
+    /** How a choice is made: by its number, or by arrow keys from the `cursor` option */
     choice: Type.Optional(PromptChoice),
-    /** L1 (A7): the full pane text of the prompt — shown by `inbox --details` and `why`, not in titles */
+    /** The full pane text of the prompt — shown by `inbox --details` and `why`, not in titles */
     screen: Type.Optional(NonEmpty),
     /**
-     * W4 (gh-212): an `exhausted` park from a counted edge: the counter that ran out, the outcome whose
+     * An `exhausted` park from a counted edge: the counter that ran out, the outcome whose
      * edge it guards and that edge's target — so the way out (`run rerun --step <to> --reset <counter>`)
      * is read from state, never parsed from `reason`
      */
@@ -100,11 +100,10 @@ export const RunInfo = Type.Object(
     agent_session_id: Type.Optional(NonEmpty),
     process: Type.Optional(ProcessIdentity),
     transcript: Type.Optional(NonEmpty),
-    /** R7.1: `user@host` that launched the run (from its `started` receipt); absent = this machine (older runs) */
+    /** `user@host` that launched the run (from its `started` receipt); absent = this machine (older runs) */
     machine: Type.Optional(NonEmpty),
-    /** R7.1: heartbeat that launched the run */
     heartbeat_id: Type.Optional(Ulid),
-    /** R9.1 (A11): when the launch prompt was re-sent (once per run) after a SessionStart with no turn start */
+    /** When the launch prompt was re-sent (once per run) after a SessionStart with no turn start */
     prompt_resent_at: Type.Optional(IsoTime),
   },
   { additionalProperties: false },
@@ -124,7 +123,7 @@ export const LastOutcome = Type.Object(
 export type LastOutcome = Static<typeof LastOutcome>;
 
 /**
- * `runs/<unit>/state.json` — the commit point, written last (S5).
+ * `runs/<unit>/state.json` — the commit point, written last.
  * `step` is the cursor: a step name, or `$done` once finished.
  */
 export const UnitState = Type.Object(
@@ -145,28 +144,28 @@ export const UnitState = Type.Object(
     step_entered_at: IsoTime,
     status: UnitStatus,
     park: Type.Union([ParkInfo, Type.Null()]),
-    /** Workflow counters (W4): name → times its edge was taken. Live only here. */
+    /** Workflow counters: name → times its edge was taken. Live only here. */
     counters: Type.Record(CounterName, NonNegInt),
-    /** Within-step limits used since step entry (C1); reset on entry. */
+    /** Within-step limits used since step entry; reset on entry. */
     nudges_used: NonNegInt,
     retries_used: NonNegInt,
-    /** Number of the last applied receipt; 0 = none (S6). */
+    /** Number of the last applied receipt; 0 = none. */
     applied_through: NonNegInt,
     run: Type.Union([RunInfo, Type.Null()]),
     last_outcome: Type.Union([LastOutcome, Type.Null()]),
     /**
-     * gh-71 D2 (B1, B33): the story's round — on the story unit, the round this record is; on a slice, the
+     * The story's round — on the story unit, the round this record is; on a slice, the
      * story round that started it. Absent = 1.
      */
     round: Type.Optional(PosInt),
     /**
-     * gh-71 D1 (B32, RD3): a round the person ended unfinished with `norn story edit --force` — the step it
+     * A round the person ended unfinished with `norn story edit --force` — the step it
      * was left at and the `round` receipt that ended it. Absent = the round finished at `$done` (or runs).
      */
     ended: Type.Optional(
       Type.Object({ by: Type.Literal("person"), at: StepName, receipt_id: Ulid }, { additionalProperties: false }),
     ),
-    /** Story unit only: who starts unattended agent steps (MO1). */
+    /** Story unit only: who starts unattended agent steps. */
     mode: Type.Optional(Mode),
     created_at: IsoTime,
     updated_at: IsoTime,

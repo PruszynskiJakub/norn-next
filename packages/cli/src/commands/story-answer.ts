@@ -1,15 +1,15 @@
 /**
- * `norn story answer [<story|unit>] "<text>"` (B24, O2, C3): answer the question a unit is parked on. Without
- * a unit: the worktree's, else a pick of the units parked on a question (B54, B57). Writes an
+ * `norn story answer [<story|unit>] "<text>"`: answer the question a unit is parked on. Without
+ * a unit: the worktree's, else a pick of the units parked on a question. Writes an
  * `answer` receipt at the unit's cursor; the next tick delivers it into the same session or a
- * fresh one from the handoff (B2). Claim free: acquired here (T8); held elsewhere: mailbox (T9).
+ * fresh one from the handoff. Claim free: acquired here; held elsewhere: mailbox.
  *
- * R6.2/R6.3 (H3, A4): an implicit ask from a pane prompt (permission or trust dialog) of a session
+ * An implicit ask from a pane prompt (permission or trust dialog) of a session
  * on this machine is answered here and now, with the keystrokes the prompt expects — the option
  * number + enter (arrows + enter for unnumbered menus), else the text + enter. The receipt is
  * written only after the keys went in (`delivered: true`, so the tick does not type them again).
  * A failed delivery writes no receipt, keeps the unit parked, is kept as the unit's act failure
- * (R4.3) and names how to reach the pane.
+ * and names how to reach the pane.
  */
 import { cmd, isParked, nextCommand, optionIndex, optionsLine, promptKeys, type SessionRef } from "@norn/core";
 import { type Receipt, ulid, type UnitState } from "@norn/schema";
@@ -26,7 +26,7 @@ const asks = (st: UnitState) => isParked(st, "ask");
 export const storyAnswerCommand = defineCommand({
   name: "story answer",
   version: "acts",
-  summary: "Answer the question a unit is parked on (B24, O2); a prompt in an agent's pane gets the keys it expects (R6.2)",
+  summary: "Answer the question a unit is parked on; a prompt in an agent's pane gets the keys it expects",
   usage: 'norn story answer [<story|unit>] "<text>" [--reason "…" --delegated]   (a choice prompt: the option number, e.g. "1")',
   options: { reason: { type: "string" }, ...DELEGATED_OPTION },
   optionHelp: { '--reason "…"': "why this answer, kept on the answer receipt", ...DELEGATED_HELP },
@@ -37,7 +37,7 @@ export const storyAnswerCommand = defineCommand({
     if (!text) throw usageError("the answer is empty", 'norn story answer <unit> "<text>"');
     const d = delegation(ctx, args, "story answer");
     const key = await targetKey(ctx, unit, args.json === true, parkedOn("ask", "story answer", "Nothing waits for an answer", (k) => cmd.storyAnswer(k)));
-    // gh-195 B20: a `local` story held elsewhere: the step its last boundary led to, checked by the holder
+    // A `local` story held elsewhere: the step its last boundary led to, checked by the holder
     const t = await resolveTarget(ctx, key, asks, { stepOnly: (t, step) => stepOnlyReceipt(ctx, t, step, "answer", { answer: text, ...delegatedFields(d) }) });
     const out = await runHumanVerb(ctx, t, {
       verb: "story answer",
@@ -53,11 +53,11 @@ export const storyAnswerCommand = defineCommand({
   },
 });
 
-/** R6.2/R6.3: type the answer into the pane prompt the unit is parked on, when its session is here. */
+/** Type the answer into the pane prompt the unit is parked on, when its session is here. */
 async function typeIntoPrompt(ctx: Context, t: Target, st: UnitState, route: Route, receipt: Receipt, text: string): Promise<Receipt> {
   const park = st.park;
   const run = st.run;
-  // a mailbox answer is typed by the holder's tick (SessionInput keys); a hook-only ask takes text from the tick (B2)
+  // a mailbox answer is typed by the holder's tick (SessionInput keys); a hook-only ask takes text from the tick
   if (route.via !== "local" || park?.kind !== "ask" || park.implicit !== "pane" || !run?.session) return receipt;
   if (run.machine && run.machine !== machineHolder(ctx.env)) return receipt;
   const runner = runnerFor(await ctx.ports(), run.session);
@@ -65,7 +65,7 @@ async function typeIntoPrompt(ctx: Context, t: Target, st: UnitState, route: Rou
   const session: SessionRef = { runner: run.session.runner, session_id: run.session.session_id, ...(run.session.pane_id ? { pane_id: run.session.pane_id } : {}), ...(run.process ? { process: run.process } : {}) };
   const reach = runner.reach?.(session) ?? null;
   const fail = (reason: string) => {
-    // R4.3/R6.3: the unit stays parked; the failure is the unit's, shown on its Answer item
+    // The unit stays parked; the failure is the unit's, shown on its Answer item
     const failures = readActFailures(ctx.root);
     failures[t.key] = { effect: "answer", rule: "answer.keys", reason: `answer to ${t.key} not delivered: ${reason}`, at: ctx.clock.iso(), tick_id: ulid(ctx.clock.now()), step: st.step, attempt: st.attempt, session: { runner: session.runner, session_id: session.session_id, ...(session.pane_id ? { pane_id: session.pane_id } : {}) } };
     writeActFailures(ctx.root, failures);
@@ -75,7 +75,7 @@ async function typeIntoPrompt(ctx: Context, t: Target, st: UnitState, route: Rou
   // the prompt as it is now: the agent may have moved on, or the menu may differ from the parked one
   const pane = await runner.paneState(session).catch(() => null);
   if (pane && pane.alive && pane.state !== "waiting_input" && pane.state !== "unknown")
-    throw refuse(`${t.key}'s agent no longer waits on the prompt (pane is ${pane.state})`, `${cmd.tick()} (it records that the agent moved on, R6.1)`, "prompt_gone");
+    throw refuse(`${t.key}'s agent no longer waits on the prompt (pane is ${pane.state})`, `${cmd.tick()} (it records that the agent moved on)`, "prompt_gone");
   const prompt = pane?.state === "waiting_input" && pane.prompt ? pane.prompt : { options: park.options ?? [], choice: park.choice ?? null };
   if (prompt.options.length && optionIndex(prompt.options, text) === null)
     throw usageError(`'${text}' is not one of the prompt's options: ${optionsLine(prompt.options)}`, cmd.storyAnswer(t.key, "1"), "not_an_option");

@@ -43,7 +43,7 @@ const input = (st: UnitState, receipts: NumberedReceipt[], over: Partial<BriefIn
   ...over,
 });
 
-describe("renderBrief (B3)", () => {
+describe("renderBrief", () => {
   test("first run of implement", () => {
     const b = renderBrief(input(stateFor(SLICE, SLICE_WF), []));
     expect(b.json.rework).toBeNull();
@@ -108,20 +108,20 @@ describe("renderBrief (B3)", () => {
     expect(b.markdown).toMatchSnapshot();
   });
 
-  test("declared inputs, entered from review: findings shown, a failing check settled by a later pass is not (B6)", () => {
+  test("declared inputs, entered from review: findings shown, a failing check settled by a later pass is not", () => {
     const wf = structuredClone(SLICE_WF);
     (wf.steps.implement as { inputs?: unknown }).inputs = ["slice", "last_check", "last_findings"];
     const { st, rs } = history(stateFor(SLICE, wf), wf, started, done("done"), (s) =>
       receipt(s, "check", { outcome: "fail", command: "bun test", exit_code: 2, duration_ms: 1, output_tail: "boom" }, "norn"), started, done("done"), (s) =>
       receipt(s, "check", { outcome: "pass", command: "bun test", exit_code: 0, duration_ms: 1, output_tail: "" }, "norn"), started, done("changes_requested", { findings: [{ severity: "major", title: "Edge case" }] }));
     const b = renderBrief(input(st, rs, { workflow: wf }));
-    // the failing check was fixed by a later pass: it is not rework (B6)
+    // the failing check was fixed by a later pass: it is not rework
     expect(b.json.rework?.check).toBeNull();
     expect(b.json.rework?.findings?.items[0]?.title).toBe("Edge case");
     expect(b.json.inputs.map((i) => i.kind)).toEqual(["slice", "last_check", "last_findings"]);
   });
 
-  test("declared last_check shows only the failure after the previous attempt, not an older one (B6)", () => {
+  test("declared last_check shows only the failure after the previous attempt, not an older one", () => {
     const wf = structuredClone(SLICE_WF);
     (wf.steps.implement as { inputs?: unknown }).inputs = ["last_check"];
     const fail = (tailText: string) => (s: UnitState) => receipt(s, "check", { outcome: "fail", command: "bun test", exit_code: 1, duration_ms: 1, output_tail: tailText }, "norn");
@@ -130,7 +130,7 @@ describe("renderBrief (B3)", () => {
     expect(b.json.rework?.check?.output_tail).toBe("new");
   });
 
-  test("declared inputs drop findings and checks that a later pass settled; a gate reject shows its comment (B6)", () => {
+  test("declared inputs drop findings and checks that a later pass settled; a gate reject shows its comment", () => {
     const wf = structuredClone(SLICE_WF);
     (wf.steps.implement as { inputs?: unknown }).inputs = ["last_check", "last_findings"];
     const check = (outcome: "pass" | "fail") => (s: UnitState) => receipt(s, "check", { outcome, command: "bun test", exit_code: outcome === "pass" ? 0 : 1, duration_ms: 1, output_tail: outcome }, "norn");
@@ -165,7 +165,7 @@ describe("renderBrief (B3)", () => {
   });
 });
 
-/** SLICE_WF with implement declaring the rework inputs (B6), as the shipped workflows do. */
+/** SLICE_WF with implement declaring the rework inputs, as the shipped workflows do. */
 const DECLARED = (() => {
   const wf = structuredClone(SLICE_WF);
   (wf.steps.implement as { inputs?: unknown }).inputs = ["slice", "last_check", "last_findings"];
@@ -177,7 +177,7 @@ const ABS_UNIT = "/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs
 const QA_FAIL = "QA via curl: FAIL B12 'delete already-deleted -> 404': ids of deleted items are reused, so a retried DELETE removes a newer item. Repro in B12-repro.md.";
 const refOf = (b: ReturnType<typeof renderBrief>, kind: string) => b.json.inputs.find((i) => i.kind === kind)?.ref;
 
-describe("Rework only when sent back (B3, B6, W4)", () => {
+describe("Rework only when sent back", () => {
   test("qa.fail without findings: the handoff verbatim and the absolute evidence dir with its files", () => {
     const { st, rs } = history(at_("qa", { implement: 1, review: 1, qa: 1 }), DECLARED, started, done("fail", { handoff: QA_FAIL, evidence: EVIDENCE }));
     expect(st).toMatchObject({ step: "implement", attempt: 2 });
@@ -250,7 +250,7 @@ describe("Rework only when sent back (B3, B6, W4)", () => {
     expect(b.markdown).toMatchSnapshot();
   });
 
-  test("test.fail after the qa rework round: the check only; qa's failure was settled by the previous attempt (B6)", () => {
+  test("test.fail after the qa rework round: the check only; qa's failure was settled by the previous attempt", () => {
     const fail = (s: UnitState) => receipt(s, "check", { outcome: "fail", command: "bun test", exit_code: 1, duration_ms: 1, output_tail: "✗ ids not reused", log: `logs/${RUN}.log` }, "norn");
     const { st, rs } = history(at_("qa", { implement: 1, review: 1, qa: 1 }), DECLARED, started, done("fail", { handoff: QA_FAIL, findings: [{ severity: "blocking", title: "Deleted ids are reused" }] }), started, done("done"), fail);
     expect(st).toMatchObject({ step: "implement", attempt: 3 });
@@ -279,7 +279,7 @@ describe("Rework only when sent back (B3, B6, W4)", () => {
   });
 });
 
-describe("Checks since the last report (B3, gh-170)", () => {
+describe("Checks since the last report", () => {
   const UNIT = "/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form";
   const check = (outcome: "pass" | "fail", extra: Record<string, unknown> = {}) => (s: UnitState) =>
     receipt(s, "check", { outcome, command: "bun test", exit_code: outcome === "pass" ? 0 : 1, duration_ms: 83_400, output_tail: "ok", ...extra }, "norn");
@@ -313,7 +313,7 @@ describe("Checks since the last report (B3, gh-170)", () => {
   });
 });
 
-describe("Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1)", () => {
+describe("Re-entry, fresh sessions, handoff and criteria", () => {
   const died = (s: UnitState) => receipt(s, "classify", { outcome: "died", rule: "agent.died", route: "retry", detail: "launch_unknown" }, "norn");
   const pass = (s: UnitState) => receipt(s, "check", { outcome: "pass", command: "bun test", exit_code: 0, duration_ms: 1, output_tail: "" }, "norn");
   const QA_WF = (() => {
@@ -440,7 +440,7 @@ describe("golden replays (norn-sandbox-todoist)", () => {
   });
 });
 
-describe("Rulings (F28, O2): gate reasons as story-level notes", () => {
+describe("Rulings (F28): gate reasons as story-level notes", () => {
   const SLICE1 = sliceUnit("gh-1", "01", "list");
   const gateAt = (unit: UnitRef) => stateFor(unit, SLICE_WF, { step: "human-qa", attempt: 1 });
   const ruling = (unit: UnitRef, kind: "approve" | "reject", comment: string | undefined, atMs: number, head?: string) => ({
@@ -467,11 +467,11 @@ describe("Rulings (F28, O2): gate reasons as story-level notes", () => {
     const b = renderBrief(input(stateFor(SLICE, SLICE_WF), [], { rulings }));
     expect(b.json.rulings).toEqual(rulings);
     expect(b.markdown).toContain("## Rulings");
-    // C2/QV5a: rulings answer questions; they never stand in for a criterion's verdict on new code
+    // Rulings answer questions; they never stand in for a criterion's verdict on new code
     expect(b.markdown).toContain("A ruling never turns a criterion into `pass`");
     expect(b.markdown).toContain("At most a ruling informs a `person` verdict");
     expect(b.markdown).not.toContain("settle the questions");
-    // each ruling is tied to the head it judged (C2)
+    // each ruling is tied to the head it judged
     expect(b.markdown).toContain(`- gh-1/01 human-qa#1 approve by jakub@mac (2026-10-23T11:00:00.000Z) at head \`${HEAD}\`:\n  > AC6 wins over B6: keep the raw count`);
     const unheaded = renderBrief(input(stateFor(SLICE, SLICE_WF), [], { rulings: storyRulings([ruling(SLICE1, "reject", "older", Date.parse("2026-10-23T09:00:00Z"))]) }));
     expect(unheaded.markdown).toContain("(2026-10-23T09:00:00.000Z) at head not recorded:");

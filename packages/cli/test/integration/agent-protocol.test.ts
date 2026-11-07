@@ -1,5 +1,5 @@
 /**
- * Agent protocol verbs through the CLI (B3–B6, MO3, MO4, §9.3, A2–A4): a manual-mode story
+ * Agent protocol verbs through the CLI: a manual-mode story
  * (tick marks the step ready → `norn brief` in the worktree starts the run → `norn done` →
  * tick advances), rework findings in the next brief, exactly-once reports, refusals with
  * do_instead, and `norn hook` block/allow on turn end (unattended vs attended steps).
@@ -71,7 +71,7 @@ const inWt = (cwd: string, ...argv: string[]): Promise<CliResult> => runChecked(
 const hook = (cwd: string, event: string, payload: Record<string, unknown>, ...flags: string[]) =>
   runChecked(["hook", event, ...flags], { ...h.deps, cwd, env: env(), stdin: JSON.stringify({ session_id: "sess-1", transcript_path: "/tmp/t.jsonl", cwd, ...payload }) });
 const stop = (cwd: string, session_id = "sess-1") => hook(cwd, "stop", { hook_event_name: "Stop", stop_hook_active: false, session_id });
-/** B5 (D3): the lines of a unit's hook file (`_story` for the story unit) */
+/** The lines of a unit's hook file (`_story` for the story unit) */
 const hookFileLines = (story: string, unit = "_story") => {
   const file = join(machineDir(h.root), "hooks", story, `${unit}.jsonl`);
   return existsSync(file) ? h.read(file).split("\n").filter(Boolean) : [];
@@ -83,7 +83,7 @@ const dayHookLines = () =>
     .sort()
     .flatMap((n) => h.read(join(machineDir(h.root), n)).split("\n"))
     .filter((l) => l.startsWith('{"type":"hook"'));
-/** the trace files `run` opens through the trace-read observer, each once, by kind (B4, B8–B10) */
+/** the trace files `run` opens through the trace-read observer, each once, by kind */
 async function opened(run: () => Promise<unknown>): Promise<Record<TraceFileRead["kind"], string[]>> {
   const seen: TraceFileRead[] = [];
   const prev = setTraceReadObserver((r) => seen.push(r));
@@ -120,7 +120,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () => {
+describe("manual mode: tick → brief → done → tick", () => {
   let runId = "";
 
   test("the tick marks the agent step ready and never launches (manual)", async () => {
@@ -152,7 +152,7 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(JSON.parse(json.stdout)).toMatchObject({ code: "no_run", do_instead: expect.stringContaining("norn brief") });
   });
 
-  test("hook in a ready step without a run never blocks; the fact lands in the trace (A2)", async () => {
+  test("hook in a ready step without a run never blocks; the fact lands in the trace", async () => {
     const r = await hook(wt(), "post-tool-use", { hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "norn brief" } });
     expect(r).toMatchObject({ exit: 0, value: {} });
     expect((await stop(wt())).value).toEqual({});
@@ -160,7 +160,7 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(hooks.map((e) => e.fact.event)).toEqual(["tool_use", "turn_end"]);
     expect(hooks[0]?.fact).toMatchObject({ agent: "claude", native: "PostToolUse", story: "gh-9", agent_session_id: "sess-1", command: "norn brief" });
     expect(hooks.some((e) => e.blocked)).toBe(false);
-    // B5, B7: the same lines land in gh-9's hook file, run id or not (no run yet), and `norn run list` shows them
+    // The same lines land in gh-9's hook file, run id or not (no run yet), and `norn run list` shows them
     expect(hooks.every((e) => !e.fact.run_id)).toBe(true);
     expect(hookFileLines("gh-9")).toEqual(dayHookLines());
     expect(hookFileLines("gh-9")).toHaveLength(2);
@@ -168,7 +168,7 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(trace.stdout).toContain(hooks[0]?.id as string);
   });
 
-  test("first brief starts the run: started receipt with session + PID; briefing stored (B4)", async () => {
+  test("first brief starts the run: started receipt with session + PID; briefing stored", async () => {
     const before = receipts(runs());
     const r = await inWt(wt(), "brief");
     expect(r.exit).toBe(0);
@@ -182,9 +182,9 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(v.markdown).toContain("Use the `norn-implement` skill.");
     expect(v.markdown).toContain(`- Run: ${runId}`);
     expect(v.markdown).toContain('`norn done done --handoff "…"` — every criterion has a passing test');
-    expect(v.markdown).toContain("Diff: `git diff origin/main...HEAD`"); // F33: the fetched base, not local main
+    expect(v.markdown).toContain("Diff: `git diff origin/main...HEAD`"); // The fetched base, not local main
     expect(readTraceFile(h.root, v.briefing)).toBe(v.markdown);
-    // O4: the trace links the run to its briefing, and `norn run list` shows it
+    // The trace links the run to its briefing, and `norn run list` shows it
     const linked = readTrace(h.root, { unit: "gh-9", types: ["briefing"] }).events;
     expect(linked.at(-1)).toMatchObject({ type: "briefing", unit: "gh-9", run_id: runId, step: "implement", attempt: 1, briefing: v.briefing });
     const timeline = (await h.norn("run", "list", "gh-9", "--events")).value as { steps: Array<{ step: string; paths: { briefings: string[] }; events: Array<{ source: string; ref: string; summary: string }> }> };
@@ -209,7 +209,7 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(receipts(runs()).filter((f) => f.endsWith("-started.json"))).toHaveLength(1);
   });
 
-  test("Stop in an unattended step whose run has not reported → blocked with the report instruction (A4)", async () => {
+  test("Stop in an unattended step whose run has not reported → blocked with the report instruction", async () => {
     const r = await stop(wt());
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ decision: "block", reason: expect.stringContaining("norn done <done>") });
@@ -230,13 +230,13 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(readTrace(h.root).errors.map((e) => e.file)).toContainEqual(expect.stringMatching(/\.jsonl:\d+$/));
 
     expect(await openedDays(() => h.norn("run", "list", "gh-9"))).toEqual(days());
-    // B8, B9: the blocked-hook count and the tick's hook facts come from the unit's hook file, no day file
+    // The blocked-hook count and the tick's hook facts come from the unit's hook file, no day file
     expect(await openedDays(() => stop(wt()))).toEqual([]);
     expect(await openedDays(() => h.tick())).toEqual([]);
     expect(await openedDays(() => h.norn("status", "--history"))).toEqual(days());
   });
 
-  test("the tick applies the started receipt: running, how manual (MO3)", async () => {
+  test("the tick applies the started receipt: running, how manual", async () => {
     h.clock.advance(10_000);
     await h.tick();
     expect(h.state(runs())).toMatchObject({ status: "running", run: { run_id: runId, how: "manual", agent_session_id: "sess-1" } });
@@ -296,7 +296,7 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     expect(existsSync(join(runs(), "evidence", runId, "AC1.md"))).toBe(true);
   });
 
-  test("back in implement, the brief shows the findings as Rework (B3, B6)", async () => {
+  test("back in implement, the brief shows the findings as Rework", async () => {
     h.clock.advance(10_000);
     await h.tick();
     expect(h.state(runs())).toMatchObject({ step: "implement", attempt: 2, counters: { review_loop: 1 } });
@@ -318,7 +318,7 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
     h.clock.advance(10_000);
     await h.tick();
     expect(h.state(runs())).toMatchObject({ status: "running", step: "implement", attempt: 2 });
-    // the answer resumes the same run: one more report is allowed (B2)
+    // the answer resumes the same run: one more report is allowed
     const v = (await inWt(wt(), "brief", "--json")).value as { started: boolean; brief: BriefJson };
     expect(v.started).toBe(false);
     expect(v.brief.context.answers).toEqual([{ question: "Which expiry?", answer: "24h" }]);
@@ -340,21 +340,21 @@ describe("manual mode: tick → brief → done → tick (MO3, B3, §9.3)", () =>
   });
 });
 
-describe("attended steps never block (MO4)", () => {
+describe("attended steps never block", () => {
   test("brief starts the attended run; Stop is allowed without a report; done completes it", async () => {
     await tickUntil(() => h.state(pairRuns())?.step === "refine");
     expect(h.state(pairRuns())).toMatchObject({ status: "parked", park: { kind: "attended" } });
-    // B10: hook facts of two units in the trace; the brief takes the session from its own unit's only
+    // Hook facts of two units in the trace; the brief takes the session from its own unit's only
     const tool = (cwd: string, session_id: string) => hook(cwd, "pre-tool-use", { hook_event_name: "PreToolUse", session_id, tool_name: "Bash", tool_input: { command: "ls" } });
     await tool(pairWt(), "sess-pair");
     h.clock.advance(1_000);
     await tool(wt(), "sess-other");
     let b: CliResult | undefined;
-    expect(await openedDays(async () => (b = await inWt(pairWt(), "brief", "--json")))).toEqual([]); // B10: no day file
+    expect(await openedDays(async () => (b = await inWt(pairWt(), "brief", "--json")))).toEqual([]); // No day file
     expect(b?.value).toMatchObject({ unit: "gh-10", step: "refine", started: true });
     const started = receipts(pairRuns()).filter((f) => f.endsWith("-started.json"));
     expect(readReceipt(pairRuns(), started.at(-1) as string)).toMatchObject({ kind: "started", agent_session_id: "sess-pair", worktree: pairWt() });
-    expect((b?.value as { markdown: string }).markdown).toContain("Attended step: no deadline or nudges (MO4)");
+    expect((b?.value as { markdown: string }).markdown).toContain("Attended step: no deadline or nudges");
     expect((await stop(pairWt(), "sess-pair")).value).toEqual({});
     h.clock.advance(10_000);
     await h.tick();
@@ -367,7 +367,7 @@ describe("attended steps never block (MO4)", () => {
   });
 });
 
-describe("norn hook robustness (A3)", () => {
+describe("norn hook robustness", () => {
   test("outside a unit worktree: no-op, nothing traced", async () => {
     const before = readTrace(h.root, { types: ["hook"] }).events.length;
     const hookFiles = () => (existsSync(join(machineDir(h.root), "hooks")) ? readdirSync(join(machineDir(h.root), "hooks"), { recursive: true }).map(String).sort() : []);
@@ -375,7 +375,7 @@ describe("norn hook robustness (A3)", () => {
     const r = await hook(h.root, "stop", { hook_event_name: "Stop" });
     expect(r).toMatchObject({ exit: 0, value: {} });
     expect(readTrace(h.root, { types: ["hook"] }).events.length).toBe(before);
-    expect(hookFiles()).toEqual(files); // B6: no hook file either
+    expect(hookFiles()).toEqual(files); // No hook file either
   });
 
   test("garbage stdin, unknown events and unknown agents never fail", async () => {
@@ -384,7 +384,7 @@ describe("norn hook robustness (A3)", () => {
     expect((await hook(wt(), "stop", { hook_event_name: "Stop" }, "--agent", "nope")).value).toEqual({});
   });
 
-  test("--agent picks the adapter even when another one also knows the event (A2)", async () => {
+  test("--agent picks the adapter even when another one also knows the event", async () => {
     const before = readTrace(h.root, { types: ["hook"] }).events.length;
     const facts = () => readTrace(h.root, { types: ["hook"] }).events.slice(before) as Array<{ fact: { agent: string; event: string } }>;
     await hook(wt(), "session-start", { session_id: "s-codex" }, "--agent", "codex");
@@ -395,7 +395,7 @@ describe("norn hook robustness (A3)", () => {
     ]);
   });
 
-  test("installed hook commands use event names the hook accepts (A1/A2)", async () => {
+  test("installed hook commands use event names the hook accepts", async () => {
     const settings = JSON.parse(h.read(join(h.root, ".claude/settings.json"))) as { hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>> };
     const before = readTrace(h.root, { types: ["hook"] }).events.length;
     for (const [native, groups] of Object.entries(settings.hooks)) {
@@ -410,15 +410,15 @@ describe("norn hook robustness (A3)", () => {
     expect(readTrace(h.root, { types: ["hook"] }).events.length - before).toBe(Object.keys(settings.hooks).length);
   });
 
-  test("blocks are bounded per run (P5)", async () => {
-    // a fresh unattended run in gh-9: a person moves the unit back to implement
+  test("blocks are bounded per run", async () => {
+    // a fresh unattended run in A person moves the unit back to implement
     h.report(runs(), "unstick", { to: "implement" }, "human");
     h.clock.advance(10_000);
     await h.tick();
     const b = (await inWt(wt(), "brief", "--json")).value as { run_id: string };
     const hookEvents = () => (readTrace(h.root, { types: ["hook"] }).events as HookTrace[]).filter((e) => e.fact.run_id === b.run_id);
     // an idle_prompt Notification is a turn end too (§10 silent), but Claude cannot refuse it:
-    // never traced blocked, never counted toward MAX_STOP_BLOCKS (A4)
+    // never traced blocked, never counted toward MAX_STOP_BLOCKS
     for (let i = 0; i < 2; i++) {
       const idle = await hook(wt(), "notification", { hook_event_name: "Notification", notification_type: "idle_prompt", message: "Claude is waiting for your input" });
       expect(idle).toMatchObject({ exit: 0, value: {} });
@@ -432,7 +432,7 @@ describe("norn hook robustness (A3)", () => {
     expect(gem.value).toMatchObject({ decision: "deny" });
     expect(hookEvents().at(-1)).toMatchObject({ blocked: true, fact: { agent: "gemini", native: "AfterAgent", event: "turn_end" } });
     const results: string[] = [];
-    // B9: the count comes from gh-9's hook file only; no day file is opened
+    // The count comes from gh-9's hook file only; no day file is opened
     expect(await openedDays(async () => {
       for (let i = 0; i < 4; i++) results.push(((await stop(wt())).value as { decision?: string }).decision ?? "allow");
     })).toEqual([]);
@@ -440,7 +440,7 @@ describe("norn hook robustness (A3)", () => {
     expect(b.run_id).toMatch(/^[0-9A-Z]{26}$/);
   });
 
-  test("a Claude permission prompt parks the unit and shows the pending command in norn inbox (§10, O1)", async () => {
+  test("a Claude permission prompt parks the unit and shows the pending command in norn inbox", async () => {
     h.clock.advance(10_000);
     await h.tick();
     expect(h.state(runs())).toMatchObject({ status: "running", step: "implement" });

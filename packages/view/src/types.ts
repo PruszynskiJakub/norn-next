@@ -1,5 +1,5 @@
 /**
- * ProjectView: the read model front ends consume (X1). Plain JSON — no functions,
+ * ProjectView: the read model front ends consume. Plain JSON — no functions,
  * Dates or Maps — so `norn story list --json`, a web cockpit and a Herdr pane share it.
  */
 import type { FileError, Inbox, InboxEntry, PullRequestCi, StoryNote } from "@norn/core";
@@ -8,12 +8,12 @@ import type { LeaseKind, Mode, ParkKind, ResolvedConfig, SliceStatus, StoryStatu
 export interface CounterView {
   name: string;
   value: number;
-  /** W4 limit from the pinned workflow; null when the workflow declares none */
+  /** limit from the pinned workflow; null when the workflow declares none */
   max: number | null;
 }
 
 export interface ClaimView {
-  /** none / mine (this user@machine or heartbeat) / other / expired / corrupt (T2) */
+  /** none / mine (this user@machine or heartbeat) / other / expired / corrupt */
   state: "none" | "mine" | "other" | "expired" | "corrupt";
   holder: string | null;
   expires_at: string | null;
@@ -32,19 +32,16 @@ export interface UnitView {
   url: string | null;
   /** pinned workflow name, else the frontmatter/config workflow the unit would start with */
   workflow: string;
-  /**
-   * gh-71 B28: the story round — on the story, the round it is in (its workflow is `workflow`); on a
-   * slice, the round that started it. null when not started.
-   */
+  /** on the story, the round it is in; on a slice, the round that started it; null when not started */
   round: number | null;
-  /** story mode (MO1) */
+  /** story mode */
   mode: Mode;
-  /** MO2: manual when the step is attended or no runner is configured */
+  /** Manual when the step is attended or no runner is configured */
   effective_mode: Mode;
-  /** auto requested but running manual (MO2) */
+  /** auto requested but running manual */
   mode_downgraded: boolean;
   claim: ClaimView;
-  /** `not_started` when there is no state.json; `corrupt` when a file failed validation (S2) */
+  /** `not_started` when there is no state.json; `corrupt` when a file failed validation */
   status: UnitStatus | "not_started";
   /** cursor step (`$done` once finished); null when not started */
   step: string | null;
@@ -53,20 +50,20 @@ export interface UnitView {
   attempt: number | null;
   counters: CounterView[];
   park: { kind: ParkKind; reason: string; since: string } | null;
-  /** C5: the check step's `norn check-run` holds its lease; `since` is then the lease's */
+  /** The check step's `norn check-run` holds its lease; `since` is then the lease's */
   check_running?: true;
   /** ISO time the unit entered its current situation (park, run start, step entry) */
   since: string | null;
   /** compact age of `since`, e.g. `12m` */
   age: string | null;
   last_outcome: { step: string; outcome: string; at: string } | null;
-  /** next command for a person or agent (S9) */
+  /** next command for a person or agent */
   next: string | null;
   updated_at: string | null;
   errors: FileError[];
-  /** R4.3: the last act effect that failed for the unit on this checkout, while it still applies */
+  /** The last act effect that failed for the unit on this checkout, while it still applies */
   act_failure: { effect: string; reason: string; at: string; tick_id: string } | null;
-  /** steps after the cursor in the pinned workflow's step order (0 at the last step); null when not started or unknown. Sorts the cockpit's in-flight stories (O1) */
+  /** steps after the cursor in the pinned workflow's step order (0 at the last step); null when not started or unknown. Sorts the cockpit's in-flight stories */
   steps_left: number | null;
 }
 
@@ -79,7 +76,7 @@ export interface SliceView extends UnitView {
   integrated: boolean;
 }
 
-/** BS1/BS3: how the story branch stands against its base, and the last base merge on record. */
+/** How the story branch stands against its base, and the last base merge on record. */
 export interface BaseSyncView {
   /** base branch name (e.g. `main`) */
   branch: string;
@@ -92,7 +89,7 @@ export interface BaseSyncView {
   last_update: { sha: string; base_sha: string; at: string; step: string } | null;
 }
 
-/** C1: the story PR as this checkout's last remote sync saw it (`trace/pr.json`). */
+/** The story PR as this checkout's last remote sync saw it (`trace/pr.json`). */
 export interface PrView {
   number: number;
   url: string;
@@ -102,10 +99,10 @@ export interface PrView {
   seen_at: string;
 }
 
-/** gh-196 D1: the receipt kinds a `--delegated` command writes (approve, reject, answer, run rerun, a new round). */
+/** The receipt kinds a `--delegated` command writes (approve, reject, answer, run rerun, a new round). */
 export type DelegatedKind = "approve" | "reject" | "answer" | "unstick" | "round";
 
-/** gh-196 D5 (B21, B22, B34): a decision a supervisor made on the person's behalf (a `delegated` receipt). */
+/** A decision a supervisor made on the person's behalf (a `delegated` receipt). */
 export interface DelegatedDecision {
   /** story or slice key */
   unit: string;
@@ -123,15 +120,15 @@ export interface DelegatedDecision {
 
 export interface StoryView extends UnitView {
   slice: null;
-  /** gh-196 D5: the story's delegated decisions over its rounds and slices, oldest first */
+  /** The story's delegated decisions over its rounds and slices, oldest first */
   delegated: DelegatedDecision[];
-  /** story branch (GR3); null for a story held from its record alone, which has none (B33) */
+  /** story branch; null for a story held from its record alone, which has none */
   branch: string | null;
   /** the story PR as last seen here; null = none seen (or no sync yet) */
   pr: PrView | null;
-  /** NT2: open notes of the story and its slices, in the order they were left */
+  /** Open notes of the story and its slices, in the order they were left */
   notes: StoryNote[];
-  /** BS1/BS3: base sync state; null = no measurement and no base merge on record */
+  /** Base sync state; null = no measurement and no base merge on record */
   base_sync: BaseSyncView | null;
   /** coarse frontmatter status; null if spec.md is unreadable */
   story_status: StoryStatus | null;
@@ -159,28 +156,28 @@ export interface RunView {
   /** newest hook fact for this run in the trace window */
   last_hook_at: string | null;
   /**
-   * R4.4: the run's last classification at its step (`stalled`, `silent`, `timeout`, …), so a frozen
-   * agent is never shown as plain `alive`; null when the tick has not classified this run
+   * last classification at its step (`stalled`, `silent`, `timeout`, …), so a frozen agent never
+   * shows as plain `alive`; null = not classified
    */
   classified: { outcome: string; at: string } | null;
-  /** R7.1: machine that launched the run, when recorded */
+  /** Machine that launched the run, when recorded */
   machine: string | null;
 }
 
-/** R5.5 (N3): this checkout's heartbeat as `heartbeat.json` records it. */
+/** This checkout's heartbeat as `heartbeat.json` records it. */
 export interface HeartbeatView {
   holder: string;
   /** ISO time the last tick finished here; null = never */
   last_tick_at: string | null;
   /** compact age of last_tick_at */
   age: string | null;
-  /** gh-78: how long the last tick took, in ms; absent when not recorded */
+  /** How long the last tick took, in ms; absent when not recorded */
   last_tick_ms?: number;
   /** older than 3 × watch interval (or never) while a held story has a unit in auto mode */
   down: boolean;
   /**
-   * gh-196 (B8, B9): a tick ran here within 3 × watch interval, whatever mode the stories are in:
-   * a supervisor checks the watch before any story is in auto, where `down` cannot fire yet
+   * a tick ran here within 3 × watch interval in any mode: lets a supervisor check the watch before
+   * any story is in auto, where `down` cannot fire
    */
   up: boolean;
 }
@@ -211,7 +208,6 @@ export interface ProjectView {
   /** user@machine the view was built for (claim `mine`) */
   holder: string;
   runner: string | null;
-  /** R5.5: this checkout's heartbeat */
   heartbeat: HeartbeatView;
   stories: StoryView[];
   inbox: Inbox;
@@ -219,13 +215,13 @@ export interface ProjectView {
   runs: RunView[];
   /** units finished within the last 24 h, newest first */
   recently_done: RecentDone[];
-  /** gh-195 D6 (B17–B19): stories another heartbeat holds that this checkout has no copy of */
+  /** Stories another heartbeat holds that this checkout has no copy of */
   elsewhere: ElsewhereView[];
   /** config, workflow or lease files that failed to read */
   errors: FileError[];
 }
 
-/** A unit's standing from a story's record ref (B17). */
+/** A unit's standing from a story's record ref. */
 export interface RecordUnitView {
   key: string;
   slice: string | null;
@@ -235,11 +231,7 @@ export interface RecordUnitView {
   counters: CounterView[];
 }
 
-/**
- * gh-195 D6 (B10, B13, B17–B19): a story held by another heartbeat, read from local refs only: its
- * claim, the remote-tracking story branch and the record ref as the last tick fetched them. Data only
- * (P8): `formatElsewhere` writes the sentences.
- */
+/** A story held by another heartbeat, read from local refs only. Data only: `formatElsewhere` writes the sentences. */
 export interface ElsewhereView {
   key: string;
   title: string;
@@ -255,15 +247,15 @@ export interface ElsewhereView {
   branch: string | null;
   /** the remote-tracking story branch's head */
   head: { sha: string; subject: string; at: string } | null;
-  /** B18, B19: the step the story's last boundary commit ended; null = no boundary pushed yet */
+  /** The step the story's last boundary commit ended; null = no boundary pushed yet */
   last_boundary: string | null;
   /**
-   * the record ref: its commit and time, and its units. `current`: kept current by the holder (the
-   * policy is `remote`); false = it shows the record as of `at` (B13). Null = no ref here.
+   * the record ref's commit, time and units; `current` = kept current by the holder (policy
+   * `remote`), false = as of `at`; null = no ref here
    */
   record: { sha: string; at: string; holder: string | null; current: boolean; units: RecordUnitView[]; errors: FileError[] } | null;
   pr: PrView | null;
-  /** B18: the CI state of the PR's head as the last sync saw it; null = not observed */
+  /** The CI state of the PR's head as the last sync saw it; null = not observed */
   ci: PullRequestCi | null;
 }
 
@@ -281,11 +273,11 @@ export interface StepWho {
   tick_id: string | null;
 }
 
-/** One visit of a unit to a step: `norn run list` row (O4). Paths are absolute. */
+/** One visit of a unit to a step: `norn run list` row. Paths are absolute. */
 export interface StepRow {
   unit: string;
   slice: string | null;
-  /** gh-71 B29: the story round the row belongs to (a slice's: the round that started it); absent = 1 */
+  /** The story round the row belongs to (a slice's: the round that started it); absent = 1 */
   round?: number;
   step: string;
   attempt: number;
@@ -300,12 +292,12 @@ export interface StepRow {
   outcome: string | null;
   /** step (or `$done`) the unit moved to */
   to: string | null;
-  /** W4 counter bumped by the edge taken */
+  /** counter bumped by the edge taken */
   counter: { name: string; value: number; max: number } | null;
   who: StepWho[];
   /** full reason text: handoff, check result, gate comment, classify detail */
   reason: string | null;
-  /** gh-196 D5 (B21): a person's decision in this row was made by a supervisor on their behalf */
+  /** A person's decision in this row was made by a supervisor on their behalf */
   delegated?: true;
   /** time a person was waited on: the whole step for gates, ask → answer otherwise */
   wait_ms: number;
@@ -341,13 +333,15 @@ export interface UnitTraceSummary {
 }
 
 /**
- * Where a trace's record paths point (F36): a story worktree, the main checkout, or — for a
+ * Where a trace's record paths point: a story worktree, the main checkout, or — for a
  * story with no worktree whose records the checkout does not have — the cached copy of the
  * base branch in the machine dir (replaced when `origin/<base>` moves; `ref` is the live source).
  */
 export interface TraceRecords {
-  /** gh-195/05 (S12): `machine` = the checkout's machine dir holds the run state (`root` its story folder) */
-  /** gh-195 D7, D16 (B29): `archive` = a finished story's record from its archive ref, unpacked into the machine dir's cache (`root`) */
+  /**
+   * `machine`: the machine dir holds the run state (`root` its story folder); `archive`: a finished
+   * story's record from its archive ref, unpacked into the machine dir's cache
+   */
   source: "machine" | "worktree" | "checkout" | "archive";
   root: string;
   /** archive: the record ref (`refs/norn/runs/<story>`) */
@@ -356,31 +350,30 @@ export interface TraceRecords {
   commit?: string;
 }
 
-/** `norn run list <unit>`: rows of the unit (and, for a story, its slices interleaved). */
-/** QV8: criteria reports of the units shown (`norn done --criteria`), counted from the trace. */
+/** Criteria reports of the units shown (`norn done --criteria`), counted from the trace. */
 export interface CriteriaSummary {
   reports: number;
   verdicts: { pass: number; fail: number; person: number; unverified: number };
-  /** reports whose unit declared no frontmatter `criteria` (QV4: coverage not checked) */
+  /** reports whose unit declared no frontmatter `criteria`, so coverage was not checked */
   unchecked_coverage: number;
 }
 
-/** gh-71 B29, B32 (D10): one round of a story, as `norn run list` heads its rows. */
+/** One round of a story, as `norn run list` heads its rows. */
 export interface RoundView {
   n: number;
   workflow: string;
   /** how it ended: finished by its workflow (`at: $done`) or by the person with `--force` at a step; null = the round under way */
   ended: { by: "workflow" | "person"; at: string } | null;
-  /** gh-196 D5 (B34): the reason of a supervisor's `--delegated` decision that started this round; absent = the person's own */
+  /** The reason of a supervisor's `--delegated` decision that started this round; absent = the person's own */
   delegated_reason?: string;
 }
 
 export interface TraceView extends UnitTraceSummary {
-  /** gh-71 B29: a story's rounds, oldest first (set by loadTraceView for a story; a flat record is round 1, B36) */
+  /** A story's rounds, oldest first (set by loadTraceView for a story; a flat record is round 1) */
   rounds?: RoundView[];
   /** set by loadTraceView */
   records?: TraceRecords;
-  /** QV8: set by loadTraceView when the trace holds criteria reports for the units shown */
+  /** Set by loadTraceView when the trace holds criteria reports for the units shown */
   criteria?: CriteriaSummary;
   steps: StepRow[];
   /** the story first, then each slice shown */

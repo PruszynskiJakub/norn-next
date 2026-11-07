@@ -1,7 +1,7 @@
 /**
  * Housekeeping and machine checks: agent leases outlive the launching tick so max_agents holds
- * across ticks (K1, K3), orphans reported by every tick and cleaned by `norn tidy` (K5), the
- * GR6 record on the base branch, and `norn doctor` (A7).
+ * across ticks, orphans reported by every tick and cleaned by `norn tidy`, the
+ * GR6 record on the base branch, and `norn doctor`.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, utimesSync } from "node:fs";
@@ -50,7 +50,7 @@ async function boot(h: Harness) {
   h.git(["push", "-q", "origin", "main"]);
 }
 
-describe("max_agents holds across ticks when the runner reports no process (K1, K3)", () => {
+describe("max_agents holds across ticks when the runner reports no process", () => {
   let h: Harness;
   beforeAll(async () => {
     h = await createHarness();
@@ -95,7 +95,7 @@ describe("max_agents holds across ticks when the runner reports no process (K1, 
   });
 });
 
-describe("orphans (K5): reported by every tick, cleaned by norn tidy", () => {
+describe("orphans: reported by every tick, cleaned by norn tidy", () => {
   let h: Harness;
   beforeAll(async () => {
     h = await createHarness();
@@ -181,7 +181,7 @@ describe("GR6 record on the base branch", () => {
     expect(await markStoryOnBase(opts(h))).toMatchObject({ state: "deferred" });
   });
 
-  test("after the merge: committed in a throwaway worktree and pushed to the base branch; main checkout untouched (story.md an older norn wrote, GR2)", async () => {
+  test("after the merge: committed in a throwaway worktree and pushed to the base branch; main checkout untouched (story.md an older norn wrote)", async () => {
     // a merged story PR: the spec folder reaches main on the remote (not pulled here)
     const other = join(h.dir, "merger");
     h.git(["clone", "-q", h.remoteDir, other], h.dir);
@@ -216,7 +216,7 @@ describe("GR6 record on the base branch", () => {
   });
 });
 
-describe("norn doctor (A7)", () => {
+describe("norn doctor", () => {
   let h: Harness;
   const main = join(import.meta.dir, "../../src/main.ts");
   beforeAll(async () => {
@@ -243,10 +243,10 @@ describe("norn doctor (A7)", () => {
     expect(v.agents[0]).toMatchObject({ name: "claude", tier: "blocking", hooks_installed: true, binary: { command: "claude" }, hook_fires: { ok: true, recorded: 1 } });
     expect(v.remote).toEqual({ ok: true, provider: "gh", user: "tester", git_remote: { name: "origin", url: h.remoteDir } });
     expect(v.runner).toMatchObject({ ok: true, available: true });
-    // R8.2: `command -v norn` in a throwaway runner session resolves to this norn's shim
+    // `command -v norn` in a throwaway runner session resolves to this norn's shim
     const shim = join(h.home, "bin", "norn");
     expect(v.runner).toMatchObject({ norn_on_path: { ok: true, expected: shim, resolved: shim } });
-    // R7.3: the harness names its machine with NORN_MACHINE — a test aid doctor warns about
+    // The harness names its machine with NORN_MACHINE — a test aid doctor warns about
     expect(r.value).toMatchObject({ machine: { holder: "tester@box", override: "box" }, warnings: expect.arrayContaining([expect.stringContaining("NORN_MACHINE=box")]) });
   });
 
@@ -291,7 +291,7 @@ describe("norn doctor: a fresh repository", () => {
   afterAll(() => h.cleanup());
 
   test("no git remote fails the remote check with the command that adds one", async () => {
-    // gh-64 B31: the git remote follows what main tracks, so a renamed remote is still found; remove it
+    // The git remote follows what main tracks, so a renamed remote is still found; remove it
     h.git(["remote", "remove", "origin"]);
     try {
       const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
@@ -308,7 +308,7 @@ describe("norn doctor: a fresh repository", () => {
     }
   });
 
-  test("in manual mode an unavailable runner is a warning, not a failed check (MO2)", async () => {
+  test("in manual mode an unavailable runner is a warning, not a failed check", async () => {
     h.runner.availableResult = false;
     const env = { ...h.deps.env, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` };
     try {
@@ -331,11 +331,11 @@ describe("norn doctor: a fresh repository", () => {
   });
 });
 
-describe("norn doctor: the cockpit plugin hint (HC11)", () => {
+describe("norn doctor: the cockpit plugin hint", () => {
   test("links this checkout's plugins/herdr when norn runs from source, else installs it from GitHub", () => {
     const repo = join(import.meta.dir, "..", "..", "..", "..");
-    expect(pluginLinkHint(assetsDir())).toBe(`herdr plugin link ${join(repo, "plugins", "herdr")} (optional: the cockpit of norn status --watch, HC9)`);
-    expect(pluginLinkHint("/nowhere/a/b/c")).toBe("herdr plugin install PruszynskiJakub/norn-next/plugins/herdr (optional: the cockpit of norn status --watch, HC9)");
+    expect(pluginLinkHint(assetsDir())).toBe(`herdr plugin link ${join(repo, "plugins", "herdr")} (optional: the cockpit of norn status --watch)`);
+    expect(pluginLinkHint("/nowhere/a/b/c")).toBe("herdr plugin install PruszynskiJakub/norn-next/plugins/herdr (optional: the cockpit of norn status --watch)");
   });
 });
 
@@ -362,7 +362,7 @@ steps:
   });
   afterAll(() => h.cleanup());
 
-  test("a clean checkout: workflows and config valid, exit 0, nothing changed (B9)", async () => {
+  test("a clean checkout: workflows and config valid, exit 0, nothing changed", async () => {
     expect(status()).toBe("");
     const r = await runChecked(["doctor"], { ...h.deps, env: env() });
     expect(r.value).toMatchObject({
@@ -380,7 +380,7 @@ steps:
     expect(status()).toBe("");
   });
 
-  test("a workflow with an uncounted cycle is named with the cycle and its path; non-zero (B7)", async () => {
+  test("a workflow with an uncounted cycle is named with the cycle and its path; non-zero", async () => {
     const file = join(workflowsDir(h.root), "loop.yaml");
     h.write(file, LOOP);
     try {
@@ -392,7 +392,7 @@ steps:
       });
       expect(r.stdout).toMatch(/^norn doctor: 1 check failed \(workflow loop\)/);
       expect(r.stdout).toMatch(/FAIL workflow loop +\.agents\/workflows\/loop\.yaml/);
-      expect(r.stdout).toContain("! /steps/a: cycle without a counter: a.done → b.again → a (W4)");
+      expect(r.stdout).toContain("! /steps/a: cycle without a counter: a.done → b.again → a");
     } finally {
       rmSync(file);
     }
@@ -412,7 +412,7 @@ steps:
     }
   });
 
-  test("a workflow naming a skill its agent lacks: doctor names it, and a tick refuses it for the same reason (B7)", async () => {
+  test("a workflow naming a skill its agent lacks: doctor names it, and a tick refuses it for the same reason", async () => {
     const file = join(workflowsDir(h.root), "nope.yaml");
     h.write(file, NOPE);
     const reason = "skill 'norn-nope' is not installed for agent 'claude'";
@@ -441,7 +441,7 @@ steps:
     }
   });
 
-  test("a config value of the wrong type names the file, the key and why; non-zero (B8)", async () => {
+  test("a config value of the wrong type names the file, the key and why; non-zero", async () => {
     const file = repoConfigPath(h.root);
     h.write(file, "provider: gh\nworkflow: 7\n");
     try {
@@ -536,14 +536,14 @@ steps:
   });
 });
 
-describe("norn doctor: the repo's norn version and drifted skills (gh-61 B5, B23–B25, D12)", () => {
+describe("norn doctor: the repo's norn version and drifted skills (B23–B25, D12)", () => {
   let h: Harness;
   let bin: string;
   const main = join(import.meta.dir, "../../src/main.ts");
   // the machine group passes: an agent binary on PATH and hooks that fire through this norn
   const env = () => ({ ...h.deps.env, PATH: `${bin}:${h.deps.env?.PATH ?? process.env.PATH}`, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` });
   const as = (version: string) => ({ ...h.deps, env: env(), version });
-  // --repo: no agent on PATH (B25)
+  // --repo: no agent on PATH
   const bare = (version: string) => ({ ...h.deps, env: { ...h.deps.env, PATH: "/usr/bin:/bin" }, version });
   const atVersion = (v: string | null) => h.config(v === null ? CONFIG : `${CONFIG}norn_version: ${v}\n`);
   /** Edit a bundled skill for the length of `fn`, then put it back. */
@@ -855,7 +855,7 @@ describe("trace retention: norn tidy prunes old hook files, briefings and transc
   /** gh-3 merged 30 days ago, gh-4 touched two days ago, gh-9 live since 20 days ago; runs that ended 20 days ago and yesterday. */
   const stage = () => {
     for (const d of ["hooks", "briefings", "transcripts"]) rmSync(join(trace(), d), { recursive: true, force: true });
-    // S12: the machine dir's runs/ holds the live units' run state; only an older norn's session logs go
+    // The machine dir's runs/ holds the live units' run state; only an older norn's session logs go
     for (const n of existsSync(join(trace(), "runs")) ? readdirSync(join(trace(), "runs")) : []) if (n.endsWith(".log")) safeUnlink(join(trace(), "runs", n));
     for (const n of readdirSync(trace())) if (/^\d{4}-\d{2}-\d{2}(\.chunks)?\.jsonl$/.test(n)) safeUnlink(join(trace(), n)); // the ticks' day pairs, pruned by 08's tests
     put("hooks/gh-3/_story.jsonl", 30, "a".repeat(40));

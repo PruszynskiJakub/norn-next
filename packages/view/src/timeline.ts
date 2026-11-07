@@ -1,4 +1,4 @@
-/** Per-unit timeline (O4): receipts and trace events merged, time-ordered, one line each. */
+/** Per-unit timeline: receipts and trace events merged, time-ordered, one line each. */
 import type { NumberedReceipt } from "@norn/core";
 import type { Receipt, TraceEvent } from "@norn/schema";
 import type { TimelineEntry } from "./types.ts";
@@ -16,7 +16,7 @@ function cut(text: string, max: number): string {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
-/** gh-196 D5 (B21): how a receipt a supervisor sent on the person's behalf is marked. */
+/** How a receipt a supervisor sent on the person's behalf is marked. */
 export const DELEGATED_MARK = "delegated (supervisor)";
 const delegatedMark = (r: Receipt): string => (r.delegated ? ` — ${DELEGATED_MARK}` : "");
 /** A decision's tail: its delegated mark, then its reason (`--reason`) when it has one. */
@@ -65,7 +65,7 @@ export function receiptSummary(r: Receipt, max = MAX): string {
     case "take":
       return oneLine(`taken by ${r.who ?? r.by}${r.previous_holder ? ` from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired claim)" : ""}` : " (claim was free)"}`);
     case "update":
-      return oneLine(`update by ${r.who ?? r.by}: ${r.from} → ${r.to} (BS9)`);
+      return oneLine(`update by ${r.who ?? r.by}: ${r.from} → ${r.to}`);
     case "round":
       return oneLine(`new round by ${r.who ?? r.by}: ${r.workflow} at ${r.to}${r.forced ? " (forced)" : ""}${decisionSuffix(r)}`);
   }
@@ -75,7 +75,7 @@ export function receiptEntry(nr: NumberedReceipt): TimelineEntry {
   return { at: nr.receipt.at, source: "receipt", kind: nr.receipt.kind, summary: receiptSummary(nr.receipt), ref: nr.file.split("/").at(-1) ?? String(nr.n) };
 }
 
-/** B4: the trace event types a timeline shows (`traceEntries` maps every other type to nothing), so a timeline read skips the rest unparsed. */
+/** The trace event types a timeline shows (`traceEntries` maps every other type to nothing), so a timeline read skips the rest unparsed. */
 export const TIMELINE_TYPES: Array<TraceEvent["type"]> = ["tick", "hook", "reject", "briefing", "foreign_commits", "take", "criteria"];
 
 /** Unit key a trace event belongs to, per decision for ticks (exact match, not prefix). */
@@ -107,15 +107,15 @@ export function traceEntries(ev: TraceEvent, unit: string, max = MAX): TimelineE
       return [{ at: ev.at, source: "briefing", kind: "briefing", summary: oneLine(`briefing for run ${ev.run_id} at ${ev.step}#${ev.attempt}: ${ev.briefing}`), ref: ev.briefing }];
     case "foreign_commits":
       if (ev.unit !== unit) return [];
-      // Q6: commits on norn's branches that norn did not make (a hand merge, a conflict fix). Placed
+      // Commits on norn's branches that norn did not make (a hand merge, a conflict fix). Placed
       // at the commit time; the tick that noticed them may be much later.
       return ev.commits.map((c) => ({ at: c.at || ev.at, source: "foreign" as const, kind: "foreign_commit", summary: oneLine(`foreign commit on ${c.branch} (not made by norn): ${c.sha.slice(0, 12)} ${c.subject} (${c.author})`), ref: c.sha }));
     case "take":
-      // R10.1: a takeover, forced or not, with the claim it replaced
+      // A takeover, forced or not, with the claim it replaced
       if (ev.unit !== unit) return [];
       return [{ at: ev.at, source: "take", kind: "take", summary: oneLine(`take by ${ev.holder}${ev.previous_holder ? ` from ${ev.previous_holder}${ev.forced ? " (forced)" : ev.expired ? " (expired claim)" : ""}` : " (claim was free)"}`), ref: ev.id }];
     case "criteria": {
-      // QV8: a criteria report, counted
+      // A criteria report, counted
       if (ev.unit !== unit) return [];
       const v = ev.verdicts;
       const summary = `criteria at ${ev.step}#${ev.attempt} (${ev.outcome}): ${v.pass} pass, ${v.fail} fail, ${v.person} person, ${v.unverified} unverified${ev.rule === "criteria.unchecked_coverage" ? " · coverage unchecked: no frontmatter criteria" : ""}`;
@@ -123,10 +123,10 @@ export function traceEntries(ev: TraceEvent, unit: string, max = MAX): TimelineE
     }
     case "tick.start":
     case "tick.end":
-      // R5.4: bracket records of a tick; its `tick` record carries the decisions (a crashed tick: `norn run view --why`)
+      // Bracket records of a tick; its `tick` record carries the decisions (a crashed tick: `norn run view --why`)
       return [];
     case "local_file":
-      // S2: a machine-local cache read as empty; belongs to no unit
+      // A machine-local cache read as empty; belongs to no unit
       return [];
   }
 }

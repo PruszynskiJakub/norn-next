@@ -1,7 +1,7 @@
 /**
- * Herdr side of the cockpit (`norn status --watch`, HC6–HC15): find the agent pane of a run,
+ * Herdr side of the cockpit (`norn status --watch`): find the agent pane of a run,
  * focus it or its workspace, label it in Herdr's sidebar, open a pane that runs a command. Presentation only — none
- * of this is a fact for decide (HC13).
+ * of this is a fact for decide.
  *
  * Command mapping:
  * - listAgents  → `herdr agent list`                                  (pane, cwd, agent session id)
@@ -11,9 +11,9 @@
  * - label       → `herdr pane report-metadata <pane> --source norn --title T --state-label S=L… --ttl-ms N`
  * - openCommand → `herdr pane split [--current] --direction right --cwd C --no-focus`, `herdr pane run <pane> <cmd>`
  * - openBelow   → `herdr pane split [--current] --direction down --ratio 0.3 --cwd C --no-focus`, `herdr pane rename <pane> T`, `herdr pane run <pane> <cmd>`
- * - pluginLinked → `herdr plugin list --json`                         (HC11: is norn's plugin linked and enabled)
- * - listPanes   → `herdr pane list`                                   (K7: each pane with its tab, workspace, cwd)
- * - closePane / closeTab / closeWorkspace → `herdr pane|tab|workspace close <id>` (K7; not found = already gone)
+ * - pluginLinked → `herdr plugin list --json`                         (is norn's plugin linked and enabled)
+ * - listPanes   → `herdr pane list`                                   (each pane with its tab, workspace, cwd)
+ * - closePane / closeTab / closeWorkspace → `herdr pane|tab|workspace close <id>` (not found = already gone)
  * - openWorkspace → `herdr workspace create --cwd C --label L --focus|--no-focus`, `herdr pane run <root pane> <cmd>` (orient)
  * - reportWorkspace → `herdr workspace report-metadata <w> --source norn --token name=value… --ttl-ms N` (sidebar `$name` rows)
  * - moveWorkspace → socket API `workspace.move {workspace_id, insert_index}` (no CLI verb reorders workspaces)
@@ -34,7 +34,6 @@ export interface HerdrAgent {
   agent_session_id: string | null;
 }
 
-/** HC15: a Herdr workspace with the panes in it. */
 export interface HerdrWorkspace {
   workspace_id: string;
   label: string;
@@ -43,7 +42,7 @@ export interface HerdrWorkspace {
   cwds: string[];
 }
 
-/** K7: where a pane sits — its tab and workspace — with its working directory and agent status. */
+/** Where a pane sits — its tab and workspace — with its working directory and agent status. */
 export interface HerdrPaneSpot {
   pane_id: string;
   tab_id: string;
@@ -54,7 +53,7 @@ export interface HerdrPaneSpot {
   status: string;
 }
 
-/** HC3: where a run lives, as the inbox item carries it. */
+/** Where a run lives, as the inbox item carries it. */
 export interface RunReach {
   worktree: string | null;
   agent_session_id: string | null;
@@ -76,13 +75,12 @@ export interface HerdrCockpit {
   label(paneId: string, label: PaneLabel): Promise<void>;
   /** split a pane beside the caller (focus stays put) and run `command` in it */
   openCommand(cwd: string, command: string, title?: string): Promise<{ pane_id: string }>;
-  /** B12: split a short pane below the caller (focus stays put) and run `command` in it */
+  /** Split a short pane below the caller (focus stays put) and run `command` in it */
   openBelow(cwd: string, command: string, title?: string): Promise<{ pane_id: string }>;
-  /** HC11: norn's plugin (`PLUGIN_ID`) is linked — enabled or not; null = not linked */
+  /** Norn's plugin (`PLUGIN_ID`) is linked — enabled or not; null = not linked */
   pluginLinked(): Promise<{ enabled: boolean; root: string | null } | null>;
-  /** K7: every pane with its tab and workspace */
   listPanes(): Promise<HerdrPaneSpot[]>;
-  /** K7: close one pane, tab or workspace; one that is already gone is not an error */
+  /** Close one pane, tab or workspace; one that is already gone is not an error */
   closePane(paneId: string): Promise<void>;
   closeTab(tabId: string): Promise<void>;
   closeWorkspace(workspaceId: string): Promise<void>;
@@ -154,9 +152,9 @@ function unixSocketCall(path: string, timeoutMs = 5_000): HerdrSocketCall {
     });
 }
 
-/** Metadata source id norn's labels are written under (HC12). */
+/** Metadata source id norn's labels are written under. */
 const LABEL_SOURCE = "norn";
-/** Id of norn's Herdr plugin (`plugins/herdr/herdr-plugin.toml`, HC9). */
+/** Id of norn's Herdr plugin (`plugins/herdr/herdr-plugin.toml`). */
 const PLUGIN_ID = "norn";
 
 interface ListedAgent {
@@ -186,7 +184,7 @@ export const inside = (cwd: string, worktree: string) => {
 };
 
 /**
- * HC6: the agent pane of a run — its recorded pane id when Herdr still hosts an agent there, else the
+ * The agent pane of a run — its recorded pane id when Herdr still hosts an agent there, else the
  * agent whose session id is the run's, else the one agent working in the unit worktree. Several
  * candidates → null: the cockpit says so instead of guessing.
  */
@@ -205,8 +203,8 @@ export function findAgentPane(agents: readonly HerdrAgent[], reach: RunReach | u
 }
 
 /**
- * HC15: the workspace of a run — the one holding its recorded pane, else the one workspace with a
- * pane in the unit worktree. Several candidates → null, as for panes (HC6).
+ * The workspace of a run — the one holding its recorded pane, else the one workspace with a
+ * pane in the unit worktree. Several candidates → null, as for panes.
  */
 export function findWorkspace(workspaces: readonly HerdrWorkspace[], reach: RunReach | undefined): string | null {
   if (!reach) return null;
@@ -220,12 +218,11 @@ export function findWorkspace(workspaces: readonly HerdrWorkspace[], reach: RunR
 
 export function createHerdrCockpit(opts: HerdrCockpitOptions = {}): HerdrCockpit {
   const env = opts.env ?? process.env;
-  // the cockpit answers keystrokes: a hung herdr must not hang it (H11); its errors keep the raw stderr
+  // the cockpit answers keystrokes: a hung herdr must not hang it; its errors keep the raw stderr
   const herdr = herdrCaller(opts.exec ?? bunExec, { ...opts, timeoutMs: 10_000, errors: "raw" });
   const socket = opts.socket ?? unixSocketCall(herdrSocketPath(env, opts.session));
   let requests = 0;
 
-  /** K7: close one thing; one already gone is not an error. */
   async function close(kind: "pane" | "tab" | "workspace", id: string): Promise<void> {
     try {
       await herdr([kind, "close", id]);

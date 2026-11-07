@@ -1,5 +1,5 @@
 /**
- * loadRunView (B44): one run of a unit — its step row of the timeline (step, attempt, outcome,
+ * loadRunView: one run of a unit — its step row of the timeline (step, attempt, outcome,
  * durations, who, reason, receipts). A unit key means its latest run; a run id is looked up in
  * the timelines of every story. Local files only, like loadTraceView.
  */
@@ -12,7 +12,7 @@ export interface RunDetail extends StepRow {
   story: string;
   /** the agent session of the row (the one asked for by a run id, else its latest); null for a gate or check */
   run_id: string | null;
-  /** gh-196 D5 (B34): the row's round, when a supervisor started it with `--delegated` (its reason shows in `run view`) */
+  /** The row's round, when a supervisor started it with `--delegated` (its reason shows in `run view`) */
   delegated_round?: RoundView;
 }
 

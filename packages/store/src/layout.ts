@@ -1,9 +1,9 @@
 /**
- * gh-110 D4: which layout a main checkout is on, part by part. Three parts each have an old place
- * (before gh-110) and a new one (D1): the repo config, the repo workflows (a folder with at least one
+ * Which layout a main checkout is on, part by part. Three parts each have an old place
+ * and a new one: the repo config, the repo workflows (a folder with at least one
  * workflow file) and the machine-local files (a non-empty folder). *both*: any part in both places;
  * *old*: not both, and some part at its old place; *new*: otherwise. Reads only; never looks at a unit
- * worktree's own files (B21) — callers pass the main checkout.
+ * worktree's own files — callers pass the main checkout.
  */
 import { existsSync, readdirSync } from "node:fs";
 import { extname, join, relative } from "node:path";

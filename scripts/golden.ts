@@ -1,5 +1,5 @@
 /**
- * The golden decisions corpus (refactor Phase 0.1): `packages/core/test/golden/*.json`, replayed by
+ * The golden decisions corpus: `packages/core/test/golden/*.json`, replayed by
  * `packages/core/test/unit/golden.test.ts`, which wants each case's recorded decisions exactly. Two modes,
  * so that what changes in the corpus is a diff a reviewer can read:
  *
@@ -13,7 +13,7 @@
  *     Adding cases. Runs the test files that build a harness (cli integration and test/e2e, each with its
  *     tier's config) with `NORN_GOLDEN_OUT` set, so each harness repo's ticks are harvested on cleanup
  *     (`test/support/golden-harvest.ts`):
- *     decide's inputs as `norn why` replays them (O5) and the decisions the tick recorded (R5.4), temp
+ *     decide's inputs as `norn why` replays them and the decisions the tick recorded, temp
  *     paths normalised. Existing cases are never touched. A harvested case is added, smallest
  *     `stableKey` first, only when it brings a rule that fewer than `N` (default 2) cases fire —
  *     counting the existing corpus — and its `stableKey` is not in the corpus yet. Cases are named by
@@ -30,7 +30,7 @@ import { decide, type RepoWorkflows } from "../packages/core/src/decide/index.ts
 import type { Facts } from "../packages/core/src/facts.ts";
 
 const ROOT = join(import.meta.dir, "..");
-/** Where the harness test files live (gh-118 D12), each with the config of its tier: the root bunfig ignores both folders. */
+/** Where the harness test files live, each with the config of its tier: the root bunfig ignores both folders. */
 const HARVEST_TIERS: Array<{ dir: string; config: string }> = [
   { dir: join("packages", "cli", "test", "integration"), config: "bunfig.integration.toml" },
   { dir: join("test", "e2e"), config: "bunfig.e2e.toml" },
@@ -105,7 +105,7 @@ export function decisionChanges(before: RecordedDecision[], after: RecordedDecis
   return { gone: minus(b, a), came: minus(a, b) };
 }
 
-/** decide's output as the trace records it: JSON-safe (`tick.start` decisions, R5.4). */
+/** decide's output as the trace records it: JSON-safe (`tick.start` decisions). */
 function decideRecorded(c: GoldenCase): RecordedDecision[] {
   const ds = decide(c.facts, c.workflows, c.config);
   return JSON.parse(JSON.stringify(ds.map((d) => ({ unit: d.unit, rule: d.rule, action: d.action })))) as RecordedDecision[];
@@ -145,7 +145,7 @@ export function harvestFiles(): string[] {
   );
 }
 
-/** The command that runs one harvested test file (repo-relative) with its tier's config and the tiers' 20 s timeout (D7). */
+/** The command that runs one harvested test file (repo-relative) with its tier's config and the tiers' 20 s timeout. */
 export function harvestCommand(file: string): string[] {
   const tier = HARVEST_TIERS.find(({ dir }) => file.startsWith(`${dir}/`));
   if (!tier) throw new Error(`${file} is not in a harvest tier (${HARVEST_TIERS.map((t) => t.dir).join(", ")})`);

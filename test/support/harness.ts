@@ -41,7 +41,7 @@ export class FakeRemote implements RemotePort {
   readonly provider = "gh" as const;
   issues: RemoteIssue[] = [];
   prs: RemotePullRequest[] = [];
-  /** PR number → body as last written (GR9) */
+  /** PR number → body as last written */
   bodies = new Map<number, string>();
   calls: string[] = [];
   async whoami() {
@@ -71,7 +71,7 @@ export class FakeRemote implements RemotePort {
     this.calls.push(`prs? ${branches.join(",")}`);
     return new Map(branches.map((b) => [b, [...this.prs].reverse().find((p) => p.head === b) ?? null] as const));
   }
-  /** gh-195 B18: PR number → the CI state of its head; unset = none */
+  /** PR number → the CI state of its head; unset = none */
   ci = new Map<number, PullRequestCi>();
   /** set → `pullRequestCi` throws it */
   ciError: Error | null = null;
@@ -91,7 +91,7 @@ export class FakeRemote implements RemotePort {
     this.calls.push(`pr~ ${n}`);
     this.bodies.set(n, body);
   }
-  /** set → `createIssue` throws it (B22) */
+  /** set → `createIssue` throws it */
   createError: Error | null = null;
   async createIssue(o: { title: string; body: string; labels: string[]; assignee: string }) {
     this.calls.push(`issue+ ${o.title}`);
@@ -109,14 +109,14 @@ export class FakeRemote implements RemotePort {
     this.calls.push(`raw ${o.commit} ${o.path}`);
     return `https://github.com/o/r/blob/${o.commit}/${o.path.split("/").map(encodeURIComponent).join("/")}?raw=true`;
   }
-  /** set → `replaceIssueLabel` throws it, changing nothing (B20) */
+  /** set → `replaceIssueLabel` throws it, changing nothing */
   labelError: Error | null = null;
   async replaceIssueLabel(n: number, o: { remove: string; add: string }) {
     this.calls.push(`label ${n} -${o.remove} +${o.add}`);
     if (this.labelError) throw this.labelError;
     this.issues = this.issues.map((i) => (i.number === n ? { ...i, labels: [...i.labels.filter((l) => l !== o.remove && l !== o.add), o.add] } : i));
   }
-  /** GR10: the labels defined on the repository */
+  /** The labels defined on the repository */
   labels: RemoteLabel[] = [];
   /** set → `listLabels` throws it (GR10: init, upgrade and doctor report labels not checked) */
   listLabelsError: Error | null = null;
@@ -139,28 +139,28 @@ export class FakeRemote implements RemotePort {
 
 export class FakeRunner implements RunnerPort {
   readonly name = "fake";
-  /** R4.1: a pane runner by default; tests flip these to model headless or capability-less runners */
+  /** A pane runner by default; tests flip these to model headless or capability-less runners */
   capabilities: RunnerCapabilities = { send: true, resume: true };
   launches: LaunchSpec[] = [];
-  /** R8.2: doctor's throwaway session process */
+  /** Doctor's throwaway session process */
   doctor: ReturnType<typeof Bun.spawn> | null = null;
   sent: Array<{ session: SessionRef; text: string }> = [];
   killed: SessionRef[] = [];
   pane: PaneState = { alive: true, state: "working", since: null };
-  /** set → `send` throws it (R4.3) */
+  /** set → `send` throws it */
   sendError: Error | null = null;
-  /** R5.1: sessions `findSessions` reports */
+  /** Sessions `findSessions` reports */
   found: RunnerSessionInfo[] = [];
   /** what `available` answers (doctor tests flip it) */
   availableResult = true;
   async available() {
     return this.availableResult;
   }
-  /** R6.2: keystrokes typed into prompts; `keysError` set → `sendKeys` throws it (R6.3) */
+  /** Keystrokes typed into prompts; `keysError` set → `sendKeys` throws it */
   keyed: Array<{ session: SessionRef; keys: PromptKey[] }> = [];
   keysError: Error | null = null;
   async launch(spec: LaunchSpec): Promise<SessionRef> {
-    // R8.2: doctor's throwaway session really runs its command (a pane would) — under a PATH a login
+    // Doctor's throwaway session really runs its command (a pane would) — under a PATH a login
     // shell reset (R8.1: the launcher puts this norn first again); it runs until doctor kills it
     if (spec.title === "norn doctor") {
       this.doctor = Bun.spawn(spec.argv, { cwd: spec.cwd, env: { ...process.env, ...spec.env, PATH: "/usr/bin:/bin" }, stdout: "ignore", stderr: "ignore" });
@@ -183,7 +183,7 @@ export class FakeRunner implements RunnerPort {
   async findSessions() {
     return this.found;
   }
-  /** runs once when observe reads the pane — models another writer acting mid-tick (B11) */
+  /** runs once when observe reads the pane — models another writer acting mid-tick */
   onPaneState: (() => Promise<void>) | null = null;
   async paneState() {
     const hook = this.onPaneState;
@@ -209,7 +209,7 @@ export class FakeNotifier implements NotifierPort {
 }
 
 /**
- * D2: the terminal, scripted. `tty: false` is "no TTY"; each `pick` takes the next answer (null = the
+ * The terminal, scripted. `tty: false` is "no TTY"; each `pick` takes the next answer (null = the
  * person left), each `confirm` the next of `confirms` (default N), each `ask` the next of `lines`, each
  * `edit` the next of `edited` (else the text unchanged).
  */
@@ -260,7 +260,7 @@ export const hostEnv = () => ({ ...Object.fromEntries(Object.entries(process.env
 
 export function sh(cwd: string, args: string[], input?: string): string {
   // not Bun.spawnSync with pipes: under load it now and then returns exit 0 with an empty stdout (spawnSyncCaptured)
-  // gh-215: bounded like every spawnSync in the spawning tiers (spawn-sync-bound.ts), with a message naming the call
+  // Bounded like every spawnSync in the spawning tiers (spawn-sync-bound.ts), with a message naming the call
   const timeoutMs = spawnSyncTimeoutMs();
   const r = spawnSyncCaptured(["git", ...args], { cwd, timeoutMs, ...(input === undefined ? {} : { stdin: new TextEncoder().encode(input) }) });
   if (r.exitedDueToTimeout) throw new Error(`git ${args.join(" ")} (${cwd}): timed out after ${timeoutMs} ms (killed)`);
@@ -282,22 +282,22 @@ export interface Harness {
   notifier: FakeNotifier;
   deps: CliDeps;
   norn(...argv: string[]): Promise<CliResult>;
-  /** a story or slice as `norn story list --json` shows it (B15); undefined when not listed */
+  /** a story or slice as `norn story list --json` shows it; undefined when not listed */
   listed(key: string): Promise<Listed | undefined>;
-  /** one `norn tick`; throws unless it exits 0. Waits for the `norn check-run`s it started (C5), so the next tick applies their receipts */
+  /** one `norn tick`; throws unless it exits 0. Waits for the `norn check-run`s it started, so the next tick applies their receipts */
   tick(...flags: string[]): Promise<TickReport>;
   /** wait for every `norn check-run` a tick started to end */
   checksDone(): Promise<void>;
   git(args: string[], cwd?: string): string;
   write(path: string, text: string): void;
   /**
-   * gh-64: write config the way a person splits it — the team keys (`provider`, `base_branch`,
+   * Write config the way a person splits it — the team keys (`provider`, `base_branch`,
    * `workflow`, `slice_workflow`) into `.agents/norn.config.yaml`, your keys (`mode`, `agent`,
    * `agents`) into `.agents/norn.config.local.yaml`, machine keys into the user file. A repo file
    * left without keys is removed; the user file is only written, never removed.
    */
   config(yaml: string): void;
-  /** gh-61: record the running binary's version as the team file's `norn_version`, keeping its other keys (a repo set up with this norn) */
+  /** Record the running binary's version as the team file's `norn_version`, keeping its other keys (a repo set up with this norn) */
   recordVersion(): void;
   read(path: string): string;
   state(runsDir: string): UnitState | null;
@@ -314,13 +314,13 @@ export interface Harness {
 export const T0 = Date.parse("2099-01-15T10:00:00.000Z");
 
 /**
- * B7: no command norn prints names a removed command (B5). Every command a cli suite runs through the
+ * No command norn prints names a removed command. Every command a cli suite runs through the
  * harness (`h.norn`, `h.tick`, `runChecked`) is checked here — its stdout (markdown or JSON: inbox items, `do_instead`, briefs, decide
  * details) and stderr — so a printed old verb fails the test that printed it.
  */
 export function printsNoRemovedCommand(argv: readonly string[], r: CliResult): CliResult {
   const old = nameRemoved(r.stdout) ?? nameRemoved(r.stderr ?? "");
-  if (old) throw new Error(`\`norn ${argv.join(" ")}\` printed the removed command \`${old}\` (B7):\n${r.stdout}${r.stderr ?? ""}`);
+  if (old) throw new Error(`\`norn ${argv.join(" ")}\` printed the removed command \`${old}\`:\n${r.stdout}${r.stderr ?? ""}`);
   return r;
 }
 
@@ -349,7 +349,7 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
   sh(seed, ["commit", "-q", "-m", "init"]);
   sh(seed, ["push", "-q", remoteDir, "main"]);
   sh(dir, ["clone", "-q", remoteDir, root]);
-  // S12 (gh-195/05): the test names run state in the checkout's machine dir before any command binds it
+  // The test names run state in the checkout's machine dir before any command binds it
   bindNornHome(root, home);
   sh(root, ["config", "user.email", "t@example.com"]);
   sh(root, ["config", "user.name", "Tester"]);
@@ -433,7 +433,7 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
   return h;
 }
 
-/** gh-110 D4: the three layout parts, each with its old place (spelled out: what a person had) and its new one. */
+/** The three layout parts, each with its old place (spelled out: what a person had) and its new one. */
 export type LayoutPartName = "config" | "workflows" | "machine files";
 export const oldNornDir = (root: string) => join(root, ".agents/norn");
 export function layoutPlaces(root: string): Record<LayoutPartName, { old: string; new: string }> {
@@ -444,7 +444,7 @@ export function layoutPlaces(root: string): Record<LayoutPartName, { old: string
   };
 }
 
-/** S1: a repo on the old layout, built by moving `init`'s files (and the machine dir) back to their old places. */
+/** A repo on the old layout, built by moving `init`'s files (and the machine dir) back to their old places. */
 export function toOldLayout(root: string, parts: LayoutPartName[] = ["config", "workflows", "machine files"]): void {
   const places = layoutPlaces(root);
   for (const p of parts) {
@@ -466,15 +466,15 @@ export function toNewLayout(root: string): void {
 }
 
 /**
- * gh-195/06 (B34): a unit as an older norn left it: its run state moved from the machine dir back into
+ * A unit as an older norn left it: its run state moved from the machine dir back into
  * `<spec folder>/runs/<unit>` in `worktree`, and its handoff from `handoffs/<unit>.md` to
- * `runs/<unit>/handoff.md` under an older norn's generated header and heartbeat blocks (gh-195/07, B8),
+ * `runs/<unit>/handoff.md` under an older norn's generated header and heartbeat blocks,
  * committed on the worktree's branch with norn's trailers, then pushed to `push` (a remote name) when given.
- * - `flat`: the story's one round folded back into `_story/` itself, the record of a norn before rounds (RD7).
- * - `broken`: a receipt that fails validation committed with it (S2).
+ * - `flat`: the story's one round folded back into `_story/` itself, the record of a norn before rounds.
+ * - `broken`: a receipt that fails validation committed with it.
  * - `interrupted`: a move that stopped partway, its copy already in the machine dir: `"after copy"`
  *   with runs/ still in the worktree, `"after removal"` with runs/ deleted from the worktree and the
- *   handoff back at `handoffs/<unit>.md` but neither committed (S1).
+ * handoff back at `handoffs/<unit>.md` but neither committed.
  */
 export function toBranchRunState(
   worktree: string,
@@ -515,7 +515,7 @@ export function toBranchRunState(
 }
 
 /**
- * gh-195 D14 (B35): what `norn upgrade` does to a finished story an older norn left on the base: the
+ * What `norn upgrade` does to a finished story an older norn left on the base: the
  * `<spec folder>/runs` subtree at `rev` in `root` packed as is by store's `treeRecordCommit` (the
  * code `norn upgrade` packs with) and pushed to the story's archive ref on `remote`, nothing removed.
  * Returns the record commit.
@@ -530,7 +530,7 @@ export function archiveTreeRunState(root: string, rev: string, specDir: string, 
 }
 
 /**
- * gh-195 D16 (B35): finished stories as an older norn merged them into the base: the gh-1 fixture's
+ * Finished stories as an older norn merged them into the base: the gh-1 fixture's
  * spec, slices and `runs/` copied into each of `specDirs` in `root`, committed and pushed to `main`.
  */
 export function toBaseRunState(root: string, specDirs: readonly string[], remote = "origin"): void {
@@ -545,7 +545,7 @@ export function olderNornHandoffBlocks(story: string, unit: string): string {
   return [HANDOFF_HEADER_BEGIN, `- Story: ${story} · Unit: ${unit}`, "- Step: implement (attempt 1)", HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, "- story.start: story at implement", HANDOFF_LOG_END].join("\n");
 }
 
-/** What `norn init` does for skills (SK1), for setups that write their own config instead: `.agents/skills/` linked from Claude's folder. */
+/** What `norn init` does for skills, for setups that write their own config instead: `.agents/skills/` linked from Claude's folder. */
 export function installBundledSkills(root: string): void {
   const names = bundledSkills();
   installSkills(root, join(assetsDir(), "skills"), names);

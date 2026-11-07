@@ -23,7 +23,7 @@ describe("process port", () => {
   });
 });
 
-describe("process port: find by env (R5.1)", () => {
+describe("process port: find by env", () => {
   const ps = readFileSync(join(import.meta.dir, "fixtures/ps-env-darwin.txt"), "utf8");
 
   test("argv per platform: BSD `-E`, procps `e`", () => {

@@ -1,5 +1,5 @@
 /**
- * `norn story reopen` (B40–B42, B55, D4, D5): a close is not final. Reopen re-claims the story here,
+ * `norn story reopen`: a close is not final. Reopen re-claims the story here,
  * restores its worktrees from the pushed branches, sets `spec.md` back to `active` in one commit,
  * and brings each unit back at its step — a unit that was running comes back stuck (`reopened`).
  */
@@ -181,7 +181,7 @@ describe("story reopen (B40, B41, B55)", () => {
     h.git(["fetch", "-q", "origin"]);
     expect(h.git(["rev-list", "--count", `${closedAt}..origin/${BRANCH}`])).toBe("1");
     expect(h.git(["show", `origin/${BRANCH}:${SPEC}/spec.md`])).toContain("status: active");
-    // D4: the person's stuck receipt on the unit that was running
+    // The person's stuck receipt on the unit that was running
     const files = readdirSync(join(sliceRuns("02-list"), "receipts")).sort();
     const last = JSON.parse(readFileSync(join(sliceRuns("02-list"), "receipts", files.at(-1) as string), "utf8"));
     expect(last).toMatchObject({ kind: "stuck", by: "human", reason: "reopened", step: "implement" });
@@ -265,7 +265,7 @@ steps:
   const TSPEC = `.agents/specs/${TBRANCH}`;
   let g: Harness;
   const wt = () => `${g.root}-worktrees/${TBRANCH}`;
-  // S12: the story's rounds in the checkout's machine dir (named from the main checkout: the worktree goes away)
+  // The story's rounds in the checkout's machine dir (named from the main checkout: the worktree goes away)
   const round = (n: string) => join(storyRunStateOf(join(g.root, TSPEC)), "_story/rounds", n);
   const MAILBOX = "refs/norn/inbox/gh-8/01JAAAAAAAAAAAAAAAAAAAAAAA";
   const gtick = async () => {
@@ -312,13 +312,13 @@ steps:
     // the record is on the remote branch, marked closed
     g.git(["fetch", "-q", "origin"]);
     expect(g.git(["show", `origin/${TBRANCH}:${TSPEC}/spec.md`])).toContain("status: dropped");
-    // gh-195/05 (B1, B2): the branch carries no run state; this machine keeps it in its machine dir
+    // The branch carries no run state; this machine keeps it in its machine dir
     expect(g.git(["ls-tree", "-r", "--name-only", `origin/${TBRANCH}`, "--", `${TSPEC}/runs`]).trim()).toBe("");
     expect(g.state(round("01-tri"))).toMatchObject({ step: "$done", status: "done" });
     // this machine is cleaned up
     expect(existsSync(wt())).toBe(false);
     expect(g.git(["branch", "--list", TBRANCH])).toBe("");
-    // gh-195 B29, B31: only the archive ref is left, holding the final record
+    // Only the archive ref is left, holding the final record
     expect(g.git(["for-each-ref", "--format=%(refname)", "refs/norn/"])).toBe("refs/norn/runs/gh-8");
     expect(g.git(["ls-remote", "origin", "refs/norn/*"]).split("\n").map((l) => l.split("\t")[1])).toEqual(["refs/norn/runs/gh-8"]);
     expect(g.git(["ls-remote", "origin", recordRef("gh-8")]).split("\t")[0]).toBe(g.git(["rev-parse", recordRef("gh-8")]));

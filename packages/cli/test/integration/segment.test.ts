@@ -19,7 +19,7 @@ describe("norn status --segment", () => {
   beforeAll(async () => {
     c = await createHarness();
     expect((await c.norn("init")).exit).toBe(0);
-    c.recordVersion(); // gh-61 B5: a repo set up with this norn shows no version hint
+    c.recordVersion(); // A repo set up with this norn shows no version hint
     c.git(["add", "-A"]);
     c.git(["commit", "-q", "-m", "norn init"]);
     c.git(["push", "-q", "origin", "main"]);
@@ -47,7 +47,7 @@ describe("norn status --segment", () => {
 
   test("inside Herdr: a token on each orient workspace of this repo, none on another repo's", async () => {
     const ws = (id: string, label: string, cwd: string): herdr.HerdrWorkspace => ({ workspace_id: id, label, pane_ids: [`${id}:p1`], cwds: [cwd] });
-    // w3 is another repo's gh-5: not ours, never labelled or moved
+    // w3 is another repo's Not ours, never labelled or moved
     const h = fakeHerdr([], [ws("w1", "repo", c.root), ws("w2", "gh-6 orient", `${c.root}-worktrees/gh-6-export-report`), ws("w3", "gh-5 orient", "/other-repo-worktrees/gh-5-x"), ws("w4", "gh-5 orient", wt())]);
     const r = await runChecked(["status", "--segment", "--json", "--ttl", "20s"], { ...c.deps, herdr: h.cockpit });
     expect(r.value).toMatchObject({ tokens: 2, moves: 0 });

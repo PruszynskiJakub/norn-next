@@ -1,4 +1,4 @@
-/** git adapter against real temp repos with a bare remote (X4). */
+/** git adapter against real temp repos with a bare remote. */
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -104,7 +104,7 @@ describe("git adapter: branches, worktrees, commits", () => {
     expect(await git.branchExists(R.root, "gh-1-story")).toBe(false);
   });
 
-  test("commit with trailers (S4), nothing to commit, paths, log", async () => {
+  test("commit with trailers, nothing to commit, paths, log", async () => {
     expect(await git.commit(R.root, { message: "noop", trailers: {} })).toBeNull();
     writeFileSync(join(R.root, "a.txt"), "two\n");
     writeFileSync(join(R.root, "b.txt"), "b\n");
@@ -155,7 +155,7 @@ describe("git adapter: remote", () => {
     expect(net.ok).toBe(false);
   });
 
-  test("refs, blobs and CAS push (T2, T3)", async () => {
+  test("refs, blobs and CAS push", async () => {
     const ref = "refs/norn/claims/gh-3";
     const blob = async (content: string) => (await bunExec(["git", "hash-object", "-w", "--stdin"], { cwd: R.root, env: ENV, stdin: content })).stdout.trim();
     const remoteRefs = async () => (await sh(R.root, "ls-remote", "--refs", "origin", "refs/norn/*")).split("\n").filter(Boolean).map((l) => l.split("\t")[1]);
@@ -185,7 +185,7 @@ describe("git adapter: remote", () => {
   });
 });
 
-describe("git adapter: base sync (BS1, BS3)", () => {
+describe("git adapter: base sync", () => {
   /** story worktree on gh-5-s cut from main and pushed; returns its path */
   async function story(): Promise<string> {
     const wt = join(R.base, "story");
@@ -242,7 +242,7 @@ describe("git adapter: base sync (BS1, BS3)", () => {
     expect(await git.outgoingConflictMarkers(wt, "origin", "refs/heads/gh-5-s")).toEqual([]);
   });
 
-  /** H1: a resolve agent's merge left mid-way: a.txt conflicts, MERGE_HEAD set, markers in the work tree */
+  /** A resolve agent's merge left mid-way: a.txt conflicts, MERGE_HEAD set, markers in the work tree */
   async function midMerge(): Promise<{ wt: string; base: string; head: string }> {
     const wt = await story();
     writeFileSync(join(wt, "a.txt"), "story side\n");
@@ -300,7 +300,7 @@ describe("git adapter: base sync (BS1, BS3)", () => {
   });
 });
 
-describe("git adapter: network timeouts (H11)", () => {
+describe("git adapter: network timeouts", () => {
   test("fetch, push and ls-remote have the network timeout; local calls have none", async () => {
     const seen: Array<[string, number | undefined]> = [];
     const timed = createGit({ exec: async (argv, opts) => (seen.push([argv[1] as string, opts?.timeoutMs]), { code: 0, stdout: "", stderr: "" }) });

@@ -1,5 +1,5 @@
 /**
- * Assets embedded in a compiled binary (X3). In the source tree and the npm bundle there are none;
+ * Assets embedded in a compiled binary. In the source tree and the npm bundle there are none;
  * `scripts/build.ts --bin` replaces this whole module with a generated one that lists every file
  * under `packages/cli/assets` (imported `with { type: "file" }`) and a content hash of them.
  */

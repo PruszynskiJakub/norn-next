@@ -9,13 +9,13 @@ const codes = (v: unknown, skills?: string[]) => {
   return r.issues.map((i) => i.code);
 };
 
-describe("validateWorkflowDefinition (W5)", () => {
+describe("validateWorkflowDefinition", () => {
   test("rules §11 slice example and the story fixture are valid", () => {
     expect(validateWorkflowDefinition(SLICE_WF, { skills: ["implement", "review", "qa", "merge"] })).toEqual({ ok: true, workflow: SLICE_WF, issues: [] });
     expect(validateWorkflowDefinition(STORY_WF).ok).toBe(true);
   });
 
-  test("every uncounted elementary cycle is listed with its path (W4)", () => {
+  test("every uncounted elementary cycle is listed with its path", () => {
     const wf = clone(SLICE_WF) as any;
     wf.steps.review.outcomes.changes_requested = { to: "implement" };
     wf.steps.test.outcomes.fail = "implement";
@@ -25,7 +25,7 @@ describe("validateWorkflowDefinition (W5)", () => {
       ["implement", "test"],
       ["implement", "test", "review"],
     ]);
-    expect(cycles[1]?.message).toBe("cycle without a counter: implement.done → test.pass → review.changes_requested → implement (W4)");
+    expect(cycles[1]?.message).toBe("cycle without a counter: implement.done → test.pass → review.changes_requested → implement");
   });
 
   test("a cycle with one counted edge among parallel edges is still uncounted via the other", () => {
@@ -39,7 +39,7 @@ describe("validateWorkflowDefinition (W5)", () => {
       counters: { c: { max: 1 } },
     };
     const r = validateWorkflowDefinition(wf);
-    expect(r.issues.map((i) => i.message)).toEqual(["cycle without a counter: a.again → b.done → a (W4)"]);
+    expect(r.issues.map((i) => i.message)).toEqual(["cycle without a counter: a.again → b.done → a"]);
   });
 
   test("self-loop without counter is a cycle", () => {
@@ -62,7 +62,7 @@ describe("validateWorkflowDefinition (W5)", () => {
     expect(codes({ name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { ok: "$done", exhausted: "$done" } } } })).toEqual(["reserved_outcome"]);
   });
 
-  test("a step's skill must be installed for the agent that runs it (W5, SK1)", () => {
+  test("a step's skill must be installed for the agent that runs it", () => {
     const wf = { name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { ok: "b" } }, b: { type: "agent", skill: "t", agent: "codex", outcomes: { ok: "$done" } } } };
     const check = (visible: Record<string, string[]>) => validateWorkflowDefinition(wf, { agentSkills: { agent: "claude", visible } }).issues.map((i) => i.path);
     expect(check({ claude: ["s"], codex: ["t"] })).toEqual([]);
@@ -95,12 +95,12 @@ describe("elementaryCycles (Johnson)", () => {
   });
 });
 
-describe("checkWorkflowLevel (W8)", () => {
+describe("checkWorkflowLevel", () => {
   test("slices/open-pr only on a story, integrate only on a slice", () => {
     expect(checkWorkflowLevel(STORY_WF, "story")).toEqual([]);
     expect(checkWorkflowLevel(STORY_WF, "slice").map((i) => i.path)).toEqual(["/steps/slices", "/steps/open-pr"]);
     expect(checkWorkflowLevel(SLICE_WF, "slice")).toEqual([]);
-    expect(checkWorkflowLevel(SLICE_WF, "story")[0]?.message).toBe("step 'integrate' (git: integrate) runs only on a slice, not on a story (W8)");
+    expect(checkWorkflowLevel(SLICE_WF, "story")[0]?.message).toBe("step 'integrate' (git: integrate) runs only on a slice, not on a story");
   });
 });
 

@@ -1,11 +1,11 @@
-/** observe: a unit's run facts — its run windows (C4), hook facts refined per agent (A2), the live or unknown run (R5.1, R5.3, B3). */
+/** observe: a unit's run facts — its run windows, hook facts refined per agent, the live or unknown run. */
 import type { AgentAdapter, Ports, RunFacts, UnitFacts, WorktreeFacts } from "@norn/core";
 import { type HookFact, treeStoryRunStatePath } from "@norn/schema";
 import { baseUnitFacts, handoffPath, type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot } from "@norn/store";
 import type { DatedCommit } from "./git-facts.ts";
 import { runnerFor } from "../../wiring.ts";
 
-/** A2: each agent adapter's own pass over a run's hook facts (`refineHooks`), once per adapter name. */
+/** Each agent adapter's own pass over a run's hook facts (`refineHooks`), once per adapter name. */
 function refineHooks(agents: Record<string, AgentAdapter>, hooks: HookFact[]): HookFact[] {
   const seen = new Set<string>();
   let out = hooks;
@@ -17,13 +17,13 @@ function refineHooks(agents: Record<string, AgentAdapter>, hooks: HookFact[]): H
   return out;
 }
 
-/** Receipt kinds a run writes, from its start to its end (C4). */
+/** Receipt kinds a run writes, from its start to its end. */
 const RUN_KINDS = ["started", "done", "ask", "stuck", "classify", "answer"] as const;
 
 /**
- * C4: the time spans (ms epoch) of every run of the unit — from its first to its last receipt, and
+ * The time spans (ms epoch) of every run of the unit — from its first to its last receipt, and
  * open-ended for the run the unit is still in (running, or parked on an ask). An agent launched by
- * norn commits only inside them; a person's commit outside them stays foreign (Q6).
+ * norn commits only inside them; a person's commit outside them stays foreign.
  */
 export function runWindows(story: StorySnapshot, u: UnitSnapshot): Array<[number, number]> {
   const spans = new Map<string, [number, number]>();
@@ -46,20 +46,20 @@ export const duringRun = (c: DatedCommit, windows: ReadonlyArray<[number, number
 };
 
 export interface LocalRunEnv {
-  /** this machine's `user@host` (R7.2) */
+  /** this machine's `user@host` */
   holder: string;
   /** this machine's available runner */
   runner: Ports["runner"];
   now: number;
 }
 
-/** The unit's facts: what store read from its receipts (`LocalUnit`), extended with its worktree and run (R5.1, R5.3, B3). */
+/** The unit's facts: what store read from its receipts (`LocalUnit`), extended with its worktree and run. */
 export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUnit, worktree: WorktreeFacts | null, hooks: HookFact[], env: LocalRunEnv): Promise<UnitFacts> {
   const now = env.now;
   const u = lu.snapshot;
   const st = u.state;
-  // gh-195 D8 (B5): norn's one file in the worktree is the unit's handoff; its run state is in the machine dir
-  // (S12). The agent's own files are not counted: they are dirty all through a live session, and
+  // Norn's one file in the worktree is the unit's handoff; its run state is in the machine dir.
+  // The agent's own files are not counted: they are dirty all through a live session, and
   // recover.commit would commit them under it
   const handoff = handoffPath(story.spec_dir, u.unit.dir);
   const dirty = worktree?.status ? [...worktree.status.staged, ...worktree.status.unstaged, ...worktree.status.untracked] : [];
@@ -69,7 +69,7 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
   const unknown = lu.unknown_launch;
   let run: RunFacts | null = null;
   if (unknown && st) {
-    // R5.1: look for the run: its hook facts, runner sessions in its worktree, processes with its NORN_RUN
+    // Look for the run: its hook facts, runner sessions in its worktree, processes with its NORN_RUN
     const r = unknown.receipt;
     const runId = r.run_id as string;
     const mine = refineHooks(ports.agents, hooks.filter((h) => h.run_id === runId));
@@ -95,12 +95,12 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
   } else if (liveRun(st) && st?.run) {
     const r = st.run;
     const session = r.session ? { runner: r.session.runner, session_id: r.session.session_id, ...(r.session.pane_id ? { pane_id: r.session.pane_id } : {}), ...(r.process ? { process: r.process } : {}) } : null;
-    // R7.2 (N5): a pid or pane id from another machine means nothing in this machine's tables
+    // A pid or pane id from another machine means nothing in this machine's tables
     const foreign = !!r.machine && r.machine !== env.holder;
     const process_alive = r.process && !foreign ? await ports.process.isAlive(r.process).catch(() => null) : null;
     const runner = foreign ? null : runnerFor(ports, session);
     const pane = session && runner ? await runner.paneState(session).catch(() => null) : null;
-    // A2: a Claude permission prompt names no command; its adapter takes it from the preceding
+    // A Claude permission prompt names no command; its adapter takes it from the preceding
     // PreToolUse (other agents' facts pass through unchanged) so the implicit ask and inbox show it
     const mine = refineHooks(ports.agents, runHooks(hooks, r, worktree?.path ?? null));
     const last = mine.at(-1);
@@ -116,7 +116,7 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
       last_activity_at: acts.length ? Math.min(Math.max(...acts), now) : null,
       transcript: [...mine].reverse().find((h) => h.transcript)?.transcript ?? r.transcript ?? null,
     };
-    // B3: a gone process's first output lines (its run log) say why it never got going
+    // A gone process's first output lines (its run log) say why it never got going
     const own = runnerFor(ports, session);
     if (session && (process_alive === false || pane?.alive === false) && own?.output) {
       const output = await own.output(session).catch(() => null);
@@ -134,10 +134,10 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
 }
 
 /**
- * gh-195/06 (B34, D13): the run state an older norn left on the unit's own branch, as store read it from
+ * The run state an older norn left on the unit's own branch, as store read it from
  * the worktree; or, when the worktree holds none of it any more, a removal of it git status still shows
  * uncommitted (a move that stopped after deleting the files, or whose commit failed or was deferred):
- * the move is not done until its commit lands, so the next move only finishes it (S1, S5).
+ * the move is not done until its commit lands, so the next move only finishes it.
  */
 function branchRecord(story: StorySnapshot, u: UnitSnapshot, worktree: WorktreeFacts | null): Pick<UnitFacts, "branch_record"> {
   if (u.branch_record) return { branch_record: structuredClone(u.branch_record) };

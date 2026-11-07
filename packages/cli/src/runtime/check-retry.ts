@@ -1,5 +1,5 @@
 /**
- * gh-213 (O2a): what `run view` says about a unit a check's fail sent back: the check, when it failed,
+ * What `run view` says about a unit a check's fail sent back: the check, when it failed,
  * the rerun that retries it, and whether the work changed since — so a person or a supervisor tells a
  * glitch from a real failure without reading git themselves.
  */
@@ -11,7 +11,7 @@ export interface CheckRetry {
   /** when that check failed (its receipt's `at`) */
   failed_at: string;
   /**
-   * a commit since that fail's boundary commit (S4), or an uncommitted change in the worktree, touches a
+   * a commit since that fail's boundary commit, or an uncommitted change in the worktree, touches a
    * path outside the spec's `handoffs/` (and an older layout's `runs/`); null when it cannot be told
    * (no worktree here, no such boundary commit)
    */

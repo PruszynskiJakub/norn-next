@@ -1,5 +1,5 @@
 /**
- * Seam S1 (gh-195): another machine on the harness's remote — its own clone, norn home, user@machine and
+ * Seam S1: another machine on the harness's remote — its own clone, norn home, user@machine and
  * runner, sharing the harness's bare remote, fake issue provider and clock.
  */
 import { mkdirSync } from "node:fs";

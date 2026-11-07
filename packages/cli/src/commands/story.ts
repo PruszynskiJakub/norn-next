@@ -1,5 +1,5 @@
 /**
- * `norn story <verb>` (B2, B15–B42): the stories of this repository — `list`, `view`, `wait`, `chat`, `create`, `take`,
+ * `norn story <verb>`: the stories of this repository — `list`, `view`, `wait`, `chat`, `create`, `take`,
  * the decisions `answer`, `approve`, `reject`, `update-branch`, `start` an attended step, `edit` mode or
  * workflow, and the team verbs `checkout`, `handoff`, `close`, `reopen`, `reset`.
  */

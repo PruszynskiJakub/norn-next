@@ -1,5 +1,5 @@
 /**
- * The one-time backfill of the per-unit hook files (B11, B12, D5): a norn upgraded while runs are
+ * The one-time backfill of the per-unit hook files: a norn upgraded while runs are
  * live finds their hook lines only in the day files, so the first tick of the per-unit hook files
  * copies them over, once per unit, deduplicated by event id. `trace/hooks/backfill.json` records
  * when that tick ran (`since`) and the units done; it is never pruned.
@@ -10,18 +10,18 @@ import { readLocalJson } from "./local-json.ts";
 import { hookBackfillPath } from "./paths.ts";
 import { appendMissingUnitHooks, dayHookLines, type HookUnit } from "./trace.ts";
 
-/** A unit with a live run (or an unknown launch, R5.1) and when that run began. */
+/** A unit with a live run (or an unknown launch) and when that run began. */
 export interface BackfillRun {
   unit: HookUnit & { key: string };
   started_at: string;
 }
 
 /**
- * D5: copy the hook lines of each live run that began before the backfill's `since` and whose unit
+ * Copy the hook lines of each live run that began before the backfill's `since` and whose unit
  * is not yet `done` from the day files (from the earliest such run's start) into its unit's hook
  * file, then record those units as done. The first call writes `backfill.json` with `since` = `now`.
- * Runs begun after `since` need nothing: no day file is read for them (B11). A crash before `done`
- * is written just copies again next time, deduplicated by event id (B12). Run under the tick lock.
+ * Runs begun after `since` need nothing: no day file is read for them. A crash before `done`
+ * is written just copies again next time, deduplicated by event id. Run under the tick lock.
  */
 export function backfillHookFiles(root: string, runs: readonly BackfillRun[], now: string): void {
   const path = hookBackfillPath(root);

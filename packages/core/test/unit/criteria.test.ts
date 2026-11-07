@@ -1,6 +1,6 @@
 /**
- * Honest QA and notes (QV1–QV8, NT1–NT4): the pure checks
- * `norn done` runs on a criteria report, and — replayed through decide (X4) — the human-qa gate's
+ * Honest QA and notes: the pure checks
+ * `norn done` runs on a criteria report, and — replayed through decide — the human-qa gate's
  * inbox item listing what a person checks, note items and their acknowledgement by `approve`.
  */
 import { describe, expect, test } from "bun:test";
@@ -49,7 +49,7 @@ const PERSON: CriterionVerdict = { id: "AC3", verdict: "person", how: "compare a
 const check = (outcome: string, report: CriterionVerdict[] | null, criteria: Criterion[] | null = CRITERIA, notes: Array<{ text: string; criterion?: string }> = [], step: AgentStep = QA) =>
   checkReport({ step, step_name: "qa", outcome, report, criteria, notes });
 
-describe("criteria report checks (QV3–QV5, NT1)", () => {
+describe("criteria report checks", () => {
   test("B36: criteria carry id and verifier only; a pass is accepted from any agent", () => {
     expect(check("pass", [PASS("AC1"), PASS("AC2"), PASS("AC3")])).toEqual({ ok: true, worst: "pass", coverage: "checked" });
     expect(check("unverified", [PASS("AC1"), UNVERIFIED, PASS("AC3")])).toEqual({ ok: true, worst: "unverified", coverage: "checked" });
@@ -134,7 +134,7 @@ function afterReport(report: Receipt, notes: NumberedReceipt[] = []) {
 const doneReceipt = (outcome: string, extra: Record<string, unknown>): Receipt =>
   ({ kind: "done", receipt_id: deriveUlid("01JDDDDDDDDDDDDDDDDDDDDDDD", 1), run_id: null, step: "qa", attempt: 1, at: at(), by: "agent", who: "claude", outcome, handoff: "checked what I could", ...extra }) as Receipt;
 
-describe("the gate a person checks (QV6, QV7)", () => {
+describe("the gate a person checks", () => {
   test("8: done unverified → human-qa; the gate item lists the unverified and person criteria with reason and how", () => {
     const { state, inbox } = afterReport(doneReceipt("unverified", { criteria: [PASS("AC1"), UNVERIFIED, PERSON] }));
     expect(state).toMatchObject({ step: "human-qa", status: "parked", park: { kind: "gate" } });
@@ -171,7 +171,7 @@ describe("the gate a person checks (QV6, QV7)", () => {
     });
     expect(brief.json.rework?.decision?.judged?.criteria?.map((c) => c.id)).toEqual(["AC2", "AC3"]);
     expect(brief.markdown).toContain("- **AC2** unverified — reason: no browser in this session; how: open /today");
-    // QV3/QV5: the finish commands take the report and say which verdict each outcome needs
+    // The finish commands take the report and say which verdict each outcome needs
     expect(brief.json.finish.slice(0, 4)).toEqual([
       { command: 'norn done pass --criteria <file> --handoff "…"', means: "every criterion observed with evidence", verdict: "pass" },
       { command: 'norn done fail --criteria <file> --handoff "…"', means: "a criterion fails; repro in findings", verdict: "fail" },
@@ -183,7 +183,7 @@ describe("the gate a person checks (QV6, QV7)", () => {
   });
 });
 
-describe("notes for a person (NT1–NT3)", () => {
+describe("notes for a person", () => {
   const withNote = doneReceipt("pass", { criteria: [PASS("AC1"), PASS("AC2"), PASS("AC3")], notes: [{ text: "kept whitespace inside backticks", criterion: "AC3" }, { text: "copy says 'Today' not 'today'" }] });
   const id1 = `note:${withNote.receipt_id}:1`;
   const id2 = `note:${withNote.receipt_id}:2`;
@@ -220,7 +220,7 @@ describe("notes for a person (NT1–NT3)", () => {
   });
 });
 
-describe("the Notes group (NT2, NT5)", () => {
+describe("the Notes group", () => {
   const slice = { story: "gh-1", slice: "gh-1/01", dir: "01-a", key: "gh-1/01" };
   const sliceNote = doneReceipt("pass", { criteria: [PASS("AC1"), PASS("AC2"), PASS("AC3")], notes: [{ text: "title length is measured after trimming" }, { text: "counted after trimming", criterion: "AC3" }] });
   /** the story unit at `storyStep`, the slice waiting at its human-qa gate with two notes of its own */

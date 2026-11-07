@@ -31,7 +31,7 @@ function expectBlocked(start: () => unknown): string {
   return message;
 }
 
-describe("unit guard (B4)", () => {
+describe("unit guard", () => {
   test("Bun.spawn throws at once, naming the argv, the test file and test/integration/ (AC1)", () => {
     expect(expectBlocked(() => Bun.spawn(["git", "rev-parse", "HEAD"]))).toBe(MESSAGE);
   });

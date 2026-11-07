@@ -1,5 +1,5 @@
 /**
- * gh-195/10 (B22–B24, B33; T5, T5a): `norn story checkout` on another machine fetches the story's
+ * `norn story checkout` on another machine fetches the story's
  * record from `refs/norn/runs/<story>`, unpacks it into its own machine dir and continues where the
  * story was. A branch that moved ahead of the record's `Norn-Branch-Commit` is fine; a rewritten
  * branch restarts the step as a new attempt, saying why. A story without a branch skips the check.
@@ -151,7 +151,7 @@ function withHarness() {
   afterAll(() => h.cleanup());
 }
 
-describe("checkout unpacks the record from the ref and continues (B22, T5)", () => {
+describe("checkout unpacks the record from the ref and continues (B22)", () => {
   withHarness();
 
   test("AC1: after A's handoff at review#2, B holds the claim, the branches and the record, prints status and handoff, and its next tick resumes review#2 with the same counters", async () => {
@@ -171,7 +171,7 @@ describe("checkout unpacks the record from the ref and continues (B22, T5)", () 
     expect(files.filter((f) => !f.endsWith("-take.json"))).toEqual(remoteFiles(s.sha));
     expect(files.filter((f) => f.endsWith("-take.json"))).toHaveLength(1);
     expect(state(s.runs(B.root))).toMatchObject({ step: "review", attempt: 2, counters: { review_loop: 1 } });
-    // the status above the handoff's written part (B7)
+    // the status above the handoff's written part
     const story = v.units.find((u) => u.unit === s.key);
     expect(story?.step).toBe("review");
     expect(story?.handoff).toContain("review");
@@ -338,7 +338,7 @@ describe("a story held only from its record (B33, 10-R3-F2)", () => {
     const status = await B.norn("status", "--json");
     const groups = (status.value as { groups: Record<string, Array<{ story: string; title: string; command: string }>> }).groups;
     const items = Object.entries(groups).flatMap(([g, list]) => list.filter((i) => i.story === s.key).map((i) => ({ group: g, title: i.title, command: i.command })));
-    expect(items).toEqual([{ group: "check", title: `review #2: held here from its record; ${s.key} has no branch, so nothing runs (B33)`, command: `norn story view ${s.key}` }]);
+    expect(items).toEqual([{ group: "check", title: `review #2: held here from its record; ${s.key} has no branch, so nothing runs`, command: `norn story view ${s.key}` }]);
     const listed = ((await B.norn("story", "list", "--json")).value as { stories: Array<{ key: string; step: string; attempt: number; branch: string | null; claim: { state: string } }> }).stories.find((x) => x.key === s.key);
     expect(listed).toMatchObject({ step: "review", attempt: 2, branch: null, claim: { state: "mine" } });
 
@@ -364,7 +364,7 @@ function badRecord(key: string): { commit: string; blob: string } {
   return { commit, blob };
 }
 
-describe("a record checkout cannot take takes nothing: no claim, no worktree, no run state (review F1, S2)", () => {
+describe("a record checkout cannot take takes nothing: no claim, no worktree, no run state (review F1)", () => {
   withHarness();
 
   async function expectNothingTaken(B: Clone, s: Awaited<ReturnType<typeof handedOverAtReview2>>, r: CliResult, code: string) {

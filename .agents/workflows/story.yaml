@@ -1,10 +1,10 @@
-# Story workflow — repo-local copy of the shipped one (W1), with this repo's check commands and its
+# Story workflow — repo-local copy of the shipped one, with this repo's check commands and its
 # ci.yml wait. Delivers a story a refinement round planned: sync, cut slices against the current base,
 # approve them, run the slices, update, check, QA the whole story once, describe, open the draft PR,
 # wait for its CI, and wait for a person at ready. The local check runs the unit tier and the type
 # check; CI runs every tier, integration and e2e sharded.
 # A story waiting at human-qa or ready goes back through update when the base moved under it in a way
-# that conflicts (BS6–BS8, base.stale: conflict).
+# that conflicts (base.stale: conflict).
 name: story
 description: Slice a planned story against the current base, run the slices, verify the story, open the draft PR, wait for CI.
 start: sync
@@ -96,7 +96,7 @@ steps:
     action: open-pr
     outcomes: { done: ci }
   # waits for the PR's CI (a detached check run, so the tick is not blocked): the ci.yml run of the
-  # PR's head commit, up to 5m for it to appear, else fail (#125); a red run's failed
+  # PR's head commit, up to 5m for it to appear, else fail; a red run's failed
   # log becomes last_check for implement, whose rework goes back through open-pr to the new head
   ci:
     type: check
@@ -127,10 +127,10 @@ counters:
   ci_loop: { max: 3 }
   qa_loop: { max: 2 }
   ready_loop: { max: 2 }
-  # reset each time their update merges cleanly: only repeated conflicts on one base move count (W4)
+  # reset each time their update merges cleanly: only repeated conflicts on one base move count
   sync_conflict_loop: { max: 2, reset_on: sync.done }
   base_conflict_loop: { max: 2, reset_on: update.done }
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
-# update-branch re-enters update, not sync (the default would be the first update step, BS9)
+# update-branch re-enters update, not sync (the default would be the first update step)
 base: { stale: conflict, step: update }

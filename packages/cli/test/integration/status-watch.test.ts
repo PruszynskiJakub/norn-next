@@ -1,8 +1,8 @@
 /**
- * `norn status --watch` (B11, CP5–CP13): raw keys over the cockpit model, every action a CLI
- * verb (X1), stays open until q; `--json` prints the model, `--pane` splits a Herdr pane for it (B12),
- * labels agent panes inside Herdr (HC12); outside a repository it shows the last one (CP13).
- * `norn run attach [<unit>] [--next]` focuses a unit's agent pane (B46, B47, HC10). `cockpit` is gone (B5).
+ * `norn status --watch`: raw keys over the cockpit model, every action a CLI
+ * verb, stays open until q; `--json` prints the model, `--pane` splits a Herdr pane for it,
+ * labels agent panes inside Herdr; outside a repository it shows the last one.
+ * `norn run attach [<unit>] [--next]` focuses a unit's agent pane. `cockpit` is gone.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { appendFileSync, mkdtempSync, rmSync } from "node:fs";
@@ -53,10 +53,10 @@ afterAll(() => c.cleanup());
 
 const model = async (h: herdr.HerdrCockpit | null = null) => (await runChecked(["status", "--watch", "--json"], { ...c.deps, herdr: h })).value as CockpitModel;
 
-describe("norn status --watch --json (CP5)", () => {
+describe("norn status --watch --json", () => {
   test("prints the model once: what needs you, then each other story once; no places outside Herdr", async () => {
     const m = await model();
-    // both stories need you, so neither has a story row of its own (CP2)
+    // both stories need you, so neither has a story row of its own
     expect(m.rows.map((r) => [r.kind, r.tab, r.group, r.unit])).toEqual([
       ["item", "now", "your_turn", "gh-5"],
       ["item", "now", "answer", "gh-6"],
@@ -67,7 +67,7 @@ describe("norn status --watch --json (CP5)", () => {
   });
 });
 
-describe("keys (CP7)", () => {
+describe("keys", () => {
   test("parseKeys: arrows, pages, enter, esc, backspace, letters, ⌃c", () => {
     expect(parseKeys("j\x1b[A\x1b[B\x1b[5~\x1b[6~\r\x7f\x15\x04\x1b\x03")).toEqual([
       { kind: "char", char: "j" },
@@ -123,7 +123,7 @@ describe("keys (CP7)", () => {
   });
 });
 
-describe("the preview (CP3)", () => {
+describe("the preview", () => {
   test("sections, one line per slice, every line within the column; a gate's notes only under NOTES", async () => {
     const m = await model();
     const row = m.rows[1] as CockpitModel["rows"][number];
@@ -166,7 +166,7 @@ describe("the preview (CP3)", () => {
   });
 });
 
-describe("norn status --watch (B11, CP6–CP8)", () => {
+describe("norn status --watch (B11)", () => {
   test("a session: trace shown, answer typed and sent, a refused key, quit; stays open after each action", async () => {
     const frames: string[] = [];
     const r = await runChecked(["status", "--watch", "--interval", "1h"], { ...c.deps, herdr: null, env: { ...c.deps.env, COLUMNS: "160", LINES: "40" }, input: keys("j", "v", "\x1b", "y", "a", "CSV only\r", "q"), log: (l) => frames.push(l) });
@@ -176,11 +176,11 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
     expect(frames[4]).toContain("no y here: gh-6");
     expect(frames[5]).toContain("Your answer (answer gh-6):");
     expect(frames[6]).toContain("ok: norn story answer gh-6");
-    await c.tick(); // the answer receipt is applied by the tick (S5)
+    await c.tick(); // the answer receipt is applied by the tick
     expect(c.state(runs(6))?.park).toBeNull();
   });
 
-  test("the backlog lists open norn issues not assigned to you; t assigns one and it leaves the backlog (CP2, GR1)", async () => {
+  test("the backlog lists open norn issues not assigned to you; t assigns one and it leaves the backlog", async () => {
     const before = c.remote.issues;
     c.remote.issues = [...before, { ...issue(7, "Sort the list"), assignees: [] }, { ...issue(8, "Someone else's"), assignees: ["someone-else"] }, { ...issue(9, "Not ours", ["other"]), assignees: [] }];
     try {
@@ -204,7 +204,7 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
     }
   });
 
-  test("SIGINT/SIGTERM end it (CP6): the abort signal stops the loop while it waits", async () => {
+  test("SIGINT/SIGTERM end it: the abort signal stops the loop while it waits", async () => {
     const abort = new AbortController();
     async function* waiting() {
       await new Promise(() => {}); // the person types nothing
@@ -235,7 +235,7 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
     expect(shell).toEqual([[process.platform === "darwin" ? "open" : "xdg-open", "https://github.com/o/r/issues/5"]]);
   });
 
-  test("outside a repository it shows the last one a cockpit ran in (CP13)", async () => {
+  test("outside a repository it shows the last one a cockpit ran in", async () => {
     expect(readCockpitFile(c.home).last_repo).toBe(c.root);
     const away = mkdtempSync(join(tmpdir(), "norn-away-"));
     try {
@@ -250,7 +250,7 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
     }
   });
 
-  test("norn pane and norn pick are gone (CP10)", async () => {
+  test("norn pane and norn pick are gone", async () => {
     for (const name of ["pane", "pick"]) expect((await c.norn(name)).value).toMatchObject({ code: "unknown_command" });
   });
 
@@ -262,7 +262,7 @@ describe("norn status --watch (B11, CP6–CP8)", () => {
     for (const flag of [["--pane"], ["--interval", "5s"]]) expect((await c.norn("status", ...flag, "--json")).value).toMatchObject({ error: `${flag[0]} needs --watch`, do_instead: "norn status --watch" });
   });
 
-  test("norn cockpit, with any flags, is an unknown command (B5)", async () => {
+  test("norn cockpit, with any flags, is an unknown command", async () => {
     for (const args of [["cockpit"], ["cockpit", "--json"], ["cockpit", "--next"], ["cockpit", "--open"]]) {
       const r = await c.norn(...args);
       expect(r.exit).toBe(2);
@@ -293,7 +293,7 @@ describe("norn status --watch --pane (B12)", () => {
   });
 });
 
-describe("run attach (B46, B47, HC10), labels (HC12) and the agent place (HC6, HC15)", () => {
+describe("run attach (B46, B47), labels and the agent place", () => {
   test("an attended agent waiting for its person: run attach focuses its pane; the cockpit labels it", async () => {
     const env = { ...c.deps.env, NORN_AGENT_PID: String(process.pid), NORN_AGENT_SESSION_ID: "sess-5" };
     const brief = await runChecked(["brief", "--json"], { ...c.deps, cwd: wt(5), env });
@@ -305,7 +305,7 @@ describe("run attach (B46, B47, HC10), labels (HC12) and the agent place (HC6, H
     const agents: herdr.HerdrAgent[] = [{ pane_id: "w9:p5", workspace_id: "w9", agent: "claude", status: "idle", cwd: wt(5), agent_session_id: "sess-5" }];
 
     c.clock.advance(30_000);
-    // B47: no Your turn agent yet → nothing to attach
+    // No Your turn agent yet → nothing to attach
     const none = await runChecked(["run", "attach", "--next", "--json"], { ...c.deps, herdr: fakeHerdr(agents).cockpit });
     expect(none.exit).toBe(3);
     expect(none.value).toMatchObject({ code: "nothing_to_attach" });
@@ -317,7 +317,7 @@ describe("run attach (B46, B47, HC10), labels (HC12) and the agent place (HC6, H
     expect(next.value).toMatchObject({ focused: "w9:p5", item: expect.stringMatching(new RegExp(`^attended:gh-5:${runId}:`)) });
     expect(h.calls).toEqual(["focus w9:p5"]);
 
-    // B46: by unit — its live pane is focused; a unit with no live pane is refused with its start command
+    // By unit — its live pane is focused; a unit with no live pane is refused with its start command
     const byUnit = fakeHerdr(agents);
     const att = await runChecked(["run", "attach", "gh-5", "--json"], { ...c.deps, herdr: byUnit.cockpit });
     expect(att.exit).toBe(0);
@@ -331,7 +331,7 @@ describe("run attach (B46, B47, HC10), labels (HC12) and the agent place (HC6, H
     // outside Herdr there is no pane to focus
     expect((await runChecked(["run", "attach", "gh-5", "--json"], { ...c.deps, herdr: null })).value).toMatchObject({ code: "nothing_to_attach" });
 
-    // without a target: only units with a live pane are offered (B57), a script is refused with them (B60)
+    // without a target: only units with a live pane are offered, a script is refused with them
     const ask = new FakeInteraction();
     const picked = await runChecked(["run", "attach"], { ...c.deps, herdr: fakeHerdr(agents).cockpit, interaction: ask });
     expect(picked.exit).toBe(0);

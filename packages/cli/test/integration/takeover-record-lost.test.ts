@@ -1,5 +1,5 @@
 /**
- * gh-195/11 (B25, B26; D10, T5): a takeover with no record. A holder that left no `refs/norn/runs/<story>`
+ * A takeover with no record. A holder that left no `refs/norn/runs/<story>`
  * (a `local` holder that died or went offline, its claim expired or taken with `--force`) — or a holder
  * whose own machine dir was wiped — is taken over from the branch alone: `story checkout` starts a new
  * round of the frontmatter's workflow, pinned fresh from the branch, at the step the story's last
@@ -149,7 +149,7 @@ describe("checkout with the record lost starts a new round from the branch (B25,
     await B.tick();
     expect(state(s.runs(B.root))).toMatchObject({ step: "implement", attempt: 1, status: "ready", counters: { review_loop: 0 } });
 
-    // AC2: the brief says the record was lost and to check the branch first
+    // The brief says the record was lost and to check the branch first
     const brief = await B.at(s.wt(B.root), "brief");
     expect(brief.exit).toBe(0);
     const why = brief.stdout.slice(brief.stdout.indexOf("## Why this attempt"), brief.stdout.indexOf("## Your work"));
@@ -248,7 +248,7 @@ describe("a wiped machine dir on the holder recovers as any takeover (B26)", () 
     expect(state(s.runs(h.root))).toMatchObject({ step: "implement", attempt: 1, status: "running" });
   });
 
-  test("AC4: with a ref: checkout --force on A unpacks it and continues where it was (gh-195/10)", async () => {
+  test("AC4: with a ref: checkout --force on A unpacks it and continues where it was", async () => {
     const s = await heldThenSilent(14, "wiped-ref", 1);
     expect((await h.norn("story", "handoff", s.key)).exit).toBe(0);
     const sha = remoteRef(recordRef(s.key)) as string;
@@ -266,7 +266,7 @@ describe("a wiped machine dir on the holder recovers as any takeover (B26)", () 
 });
 
 
-describe("a lost-record checkout that cannot start the round takes nothing (review#1 S1, S3–S5)", () => {
+describe("a lost-record checkout that cannot start the round takes nothing (review#1 S1)", () => {
   withHarness();
 
   /** B's checkout was refused: no claim of B's on the remote, no run state on B. */
@@ -305,7 +305,7 @@ describe("a lost-record checkout that cannot start the round takes nothing (revi
     expect(remoteRef(recordRef(s.key))).toBe(record);
   });
 
-  test("S3: a story file on the branch that does not parse is refused (S2), not read as not started", async () => {
+  test("S3: a story file on the branch that does not parse is refused, not read as not started", async () => {
     const s = await heldThenSilent(21, "bad-spec", 0);
     onBranch(s, (wt) => writeFileSync(join(wt, s.spec, "spec.md"), "---\nstatus: [unclosed\n---\n# broken\n"));
     expire(s.key);

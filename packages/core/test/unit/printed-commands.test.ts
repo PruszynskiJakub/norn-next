@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { cmd, nameRemoved, upgradeBackward, versionMismatch } from "@norn/core";
 
-// B7: every command norn prints is built by one `cmd` builder. This table pins each builder's
+// Every command norn prints is built by one `cmd` builder. This table pins each builder's
 // string for a sample unit, so renaming a command is one reviewed diff of this table and the module.
-// B5, B7: none of them names a removed command.
+// None of them names a removed command.
 const U = "gh-12/03";
 const S = "gh-12";
 const today: Record<keyof typeof cmd, [string, ...string[]]> = {
@@ -70,7 +70,7 @@ const today: Record<keyof typeof cmd, [string, ...string[]]> = {
   watch: ["norn watch", cmd.watch(), "norn watch --interval 30s", cmd.watch({ interval: "30s" }), "norn watch --max-ticks 10", cmd.watch({ maxTicks: 10 })],
 };
 
-describe("printed commands (B7)", () => {
+describe("printed commands", () => {
   test("the table covers every builder the module exports", () => {
     expect(Object.keys(today).sort()).toEqual(Object.keys(cmd).sort());
   });
@@ -79,7 +79,7 @@ describe("printed commands (B7)", () => {
       for (let i = 0; i < pairs.length; i += 2) expect(pairs[i + 1]).toBe(pairs[i]);
     });
   }
-  test("no builder prints a removed command (B5)", () => {
+  test("no builder prints a removed command", () => {
     for (const [name, pairs] of Object.entries(today)) for (const printed of pairs) expect({ name, removed: nameRemoved(printed) }).toEqual({ name, removed: null });
   });
   test("the removed-command check catches each old verb, and not its new spelling", () => {
@@ -89,7 +89,7 @@ describe("printed commands (B7)", () => {
   });
 });
 
-describe("the version refusal (gh-61 B6, B7, D3)", () => {
+describe("the version refusal (D3)", () => {
   test("an older binary is told which norn to install", () => {
     expect(versionMismatch("0.19.0", "0.18.1")).toEqual({ match: "older", needs: "0.19.x", error: "this repo needs norn 0.19.x (you run 0.18.1)", do_instead: "install norn 0.19.x" });
     expect(versionMismatch("0.18.2", "0.18.1")).toEqual({ match: "older", needs: "0.18.2 or a later 0.18.x", error: "this repo needs norn 0.18.2 or a later 0.18.x (you run 0.18.1)", do_instead: "install norn 0.18.2 or a later 0.18.x" });

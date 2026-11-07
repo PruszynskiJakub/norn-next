@@ -1,6 +1,6 @@
 /**
- * Repo workflows for decide (W1, W5): every `.agents/workflows/*` file parsed, schema- and
- * graph-validated (incl. that each referenced skill is installed for its agent), with its exact text for pinning (S7).
+ * Repo workflows for decide: every `.agents/workflows/*` file parsed, schema- and
+ * graph-validated (incl. that each referenced skill is installed for its agent), with its exact text for pinning.
  */
 import { readdirSync } from "node:fs";
 import { basename, extname, join } from "node:path";
@@ -9,7 +9,7 @@ import { validateWorkflowDefinition } from "@norn/core";
 import { type WorkflowListing, visibleSkills } from "@norn/store";
 import { assetsDir } from "./assets.ts";
 
-/** Skills shipped with norn (§16), installed by `norn init` (SK1). */
+/** Skills shipped with norn, installed by `norn init`. */
 export function bundledSkills(env?: Record<string, string | undefined>): string[] {
   return listDirs(join(assetsDir(env), "skills"));
 }
@@ -25,7 +25,7 @@ function listDirs(dir: string): string[] {
   }
 }
 
-/** W5 (SK1): the skills each configured agent can see in its own skill folder, links followed. */
+/** The skills each configured agent can see in its own skill folder, links followed. */
 export function agentSkills(agents: Record<string, AgentAdapter>, root: string): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   for (const [name, a] of Object.entries(agents)) {
@@ -39,7 +39,7 @@ export function agentSkills(agents: Record<string, AgentAdapter>, root: string):
 }
 
 /**
- * W5 (D7): the repo workflows validated exactly as a tick validates them, against the skills each
+ * The repo workflows validated exactly as a tick validates them, against the skills each
  * configured agent can see. The one validator observe and `norn doctor` share; never copy its rules.
  */
 export function checkedRepoWorkflows(listing: WorkflowListing, root: string, config: { agent: string }, agents: Record<string, AgentAdapter>): RepoWorkflows {

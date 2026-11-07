@@ -1,12 +1,12 @@
 /**
- * gh-162: the docs lint. Each check is a pure matcher over a line or a file's text, tested on strings
+ * The docs lint. Each check is a pure matcher over a line or a file's text, tested on strings
  * first, then swept over the real doc set expecting no hits; each hit names file, line and the fix.
  */
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { SLICE_NN_PATTERN } from "@norn/schema";
-import { allDocs, CODE_SPAN, RULES_FILE, textFiles, URL, userDocs } from "../support/docs.ts";
+import { allDocs, CODE_SPAN, textFiles, URL, userDocs } from "../support/docs.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const rel = (f: string) => relative(ROOT, f);
@@ -14,70 +14,37 @@ const read = (f: string) => readFileSync(f, "utf8");
 
 // ---------------------------------------------------------------------------------------------- rules
 
-/** A rule is defined by a list line starting with its id (`- S5 …`, `  - BS10.1 …`, `- **X1** …`). */
-function definedIds(text: string): string[] {
-  return [...text.matchAll(/^\s*-\s+\**([A-Z]{1,3}\d+(?:\.\d+)?[a-z]?)\b/gm)].map((m) => m[1] as string);
-}
-
-/** Every id defined more than once, each named once (B27: an id has one definition). */
-function duplicateIds(ids: readonly string[]): string[] {
-  return [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
-}
-
-/** B24 (D8): every rule id the PRD and the four SPEC files defined when gh-162 folded them. */
-const PINNED_IDS = "G1 G2 G3 G4 G5 G6 P1 P2 P3 P4 P5 P6 P7 P8 ID1 ID2 MO1 MO2 MO3 MO5 MO4 LY1 LY2 LY3 S1 S2 S3 S4 S5 S6 S7 S8 S9 S10 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 A1 A2 A3 A4 A5 A6 A7 B1 B2 B3 B4 B5 B6 B7 B8 B9 C1 C2 C3 C4 C5 QV1 QV2 QV3 QV4 QV5 QV5a QV6 QV7 QV8 NT1 NT2 NT3 NT4 NT5 NT6 W1 W2 W3 W4 W5 W6 W7 W8 W9 RD1 RD2 RD3 RD4 RD5 RD6 RD7 RD8 GR1 GR2 GR3 GR4 GR5 GR6 GR6b GR7 GR7a GR6a GR8 GR9 BS0 BS1 BS2 BS3 BS4 BS5 BS6 BS7 BS8 BS9 BS10 T1 T2 T3 T4 T5 T6 T6a T7 T7a T7b T7c T8 T9 T10 K1 K2 K2a K3 K4 K4.1 K5 K6 K7 O1 O2 O3 O4 O5 O6 O7 SK1 SK2 X1 X2 X3 X4 R1.1 R1.2 R1.3 R2.1 R2.2 R2.3 R3.1 R3.2 R3.3 R3.4 R4.1 R4.2 R4.3 R4.4 R5.1 R5.2 R5.3 R5.4 R5.5 R6.1 R6.2 R6.3 R7.1 R7.2 R7.3 R8.1 R8.2 R9.1 R10.1 BS3.3a BS5.1 BS5.2 BS10.1 BS10.2 BS11 CP1 CP2 CP3 CP4 CP5 CP6 CP7 CP8 CP9 CP10 CP11 CP13 CP12 OR1 OR2 OR3 OR4 SG1 SG2 SG3 HC1 HC2 HC3 HC4 HC5 HC6 HC7 HC8 HC9 HC10 HC11 HC12 HC13 HC14 HC15 HC16".split(" ");
-
-describe("rules file (B23, B24, B27, B31)", () => {
-  test("matcher: ids at the start of a list line, nested or bold", () => {
-    expect(definedIds("- S5 state last\n  - BS10.1 nested\n- **X1** bold\ntext R5.1 is cited, not defined")).toEqual(["S5", "BS10.1", "X1"]);
-    expect(duplicateIds(["S5", "Z9", "S6", "Z9", "Z9"])).toEqual(["Z9"]);
-  });
-
-  test("the rules file exists; the PRD and SPEC files do not", () => {
-    expect(existsSync(join(ROOT, RULES_FILE))).toBe(true);
-    const old = readdirSync(join(ROOT, ".agents")).filter((n) => n === ["PRD", "md"].join(".") || /^SPEC-.*\.md$/.test(n));
-    expect(old).toEqual([]);
-  });
-
-  test("every pinned rule id is defined exactly once in the rules file", () => {
-    const ids = definedIds(read(join(ROOT, RULES_FILE)));
-    const count = (id: string) => ids.filter((i) => i === id).length;
-    expect(PINNED_IDS.filter((id) => count(id) !== 1).map((id) => `${id} is defined ${count(id)} times in ${RULES_FILE}`)).toEqual([]);
-  });
-
-  test("no rule id, pinned or new, is defined twice", () => {
-    const ids = definedIds(read(join(ROOT, RULES_FILE)));
-    expect(duplicateIds(ids).map((id) => `${id} is defined more than once in ${RULES_FILE}: keep one definition`)).toEqual([]);
-    expect(ids.length).toBeGreaterThanOrEqual(PINNED_IDS.length);
-  });
-
-  test("no file names the old PRD or a SPEC file, outside CHANGELOG and story specs", () => {
-    const OLD = new RegExp(["\\bPRD\\b", "SPEC-[a-z]"].join("|"));
+describe("no rules file", () => {
+  test("there is no rules file, PRD or SPEC file, and no tracked text outside CHANGELOG and story specs names one", () => {
+    const names = [".agents/RULES.md", "RULES.md"];
+    expect(names.filter((n) => existsSync(join(ROOT, n)))).toEqual([]);
+    expect(readdirSync(join(ROOT, ".agents")).filter((n) => n === ["PRD", "md"].join(".") || /^SPEC-.*\.md$/.test(n))).toEqual([]);
+    const OLD = new RegExp(["\\bPRD\\b", "SPEC-[a-z]", ["RULES", "md"].join("\\.")].join("|"));
     const skip = (f: string) => rel(f) === "CHANGELOG.md" || rel(f).startsWith(".agents/specs/") || f === import.meta.path;
     const hits = textFiles(ROOT, [".md", ".ts", ".yaml", ".yml", ".json", ".toml", ".sh", ".html"])
       .filter((f) => !skip(f))
-      .flatMap((f) => read(f).split("\n").flatMap((l, i) => (OLD.test(l) ? [`${rel(f)}:${i + 1} → name ${RULES_FILE} instead: ${l.trim()}`] : [])));
+      .flatMap((f) => read(f).split("\n").flatMap((l, i) => (OLD.test(l) ? [`${rel(f)}:${i + 1}: ${l.trim()}`] : [])));
     expect(hits).toEqual([]);
   });
 });
 
 // ------------------------------------------------------------------------------------------- handoff
 
-/** gh-195 B39 (D9): a unit's handoff, `<spec folder>/handoffs/_story.md` or `handoffs/<nn>-<slug>.md`. */
+/** A unit's handoff, `<spec folder>/handoffs/_story.md` or `handoffs/<nn>-<slug>.md`. */
 /** The slice number part of a slice handoff's name, from the schema's own pattern (`^[0-9]{2,3}$` today). */
 const SLICE_NN = SLICE_NN_PATTERN.replace(/^\^|\$$/g, "");
 const UNIT_HANDOFF = new RegExp(`^\\.agents/specs/[^/]+/handoffs/(?:_story|${SLICE_NN}-[a-z0-9]+(?:-[a-z0-9]+)*)\\.md$`);
-/** An older norn's handoff, `runs/<unit>/handoff.md` in a spec folder: moved to `handoffs/` at the unit's next boundary (B34). */
+/** An older norn's handoff, `runs/<unit>/handoff.md` in a spec folder: moved to `handoffs/` at the unit's next boundary. */
 const OLD_HANDOFF = /^\.agents\/specs\/[^/]+\/(?:.*\/)?runs\//;
 
-/** gh-34 B34, gh-195 B39: a handoff tracked anywhere but a spec folder's `handoffs/` (or an older norn's `runs/`). */
+/** A handoff tracked anywhere but a spec folder's `handoffs/` (or an older norn's `runs/`). */
 function strayHandoff(relPath: string): boolean {
   const parts = relPath.split("/");
   if (parts.at(-2) === "handoffs") return !UNIT_HANDOFF.test(relPath);
   return parts.at(-1) === "handoff.md" && !OLD_HANDOFF.test(relPath);
 }
 
-describe("no stray handoff (B34, gh-195 B39)", () => {
+describe("no stray handoff (B34)", () => {
   test("matcher", () => {
     expect(strayHandoff("handoff.md")).toBe(true);
     expect(strayHandoff("docs/handoff.md")).toBe(true);
@@ -107,7 +74,7 @@ describe("no stray handoff (B34, gh-195 B39)", () => {
 
 const VERSION = /\bv?\d+\.\d+\.\d+\b|\bas of (?:release\b|v?\d+\.\d+\b)/i;
 
-/** B38 (D6): a norn version named in a doc line; the README's release badge is the one allowed. */
+/** A norn version named in a doc line; the README's release badge is the one allowed. */
 function versionHit(line: string): boolean {
   if (line.includes("badge/release-v")) return false;
   return VERSION.test(line.replace(URL, " "));
@@ -157,13 +124,13 @@ function anchors(text: string): Set<string> {
   return out;
 }
 
-/** The relative links of one line: `[text](target)`, skipping URLs with a scheme (B37) and code spans. */
+/** The relative links of one line: `[text](target)`, skipping URLs with a scheme and code spans. */
 function relativeLinks(line: string): string[] {
   const prose = line.replace(CODE_SPAN, " ");
   return [...prose.matchAll(/\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)].map((m) => m[1] as string).filter((t) => !/^[a-z][a-z0-9+.-]*:/i.test(t));
 }
 
-/** B36: what is wrong with one link from `from`, or undefined. */
+/** What is wrong with one link from `from`, or undefined. */
 function linkProblem(from: string, target: string, readText: (path: string) => string | undefined): string | undefined {
   const [path, anchor] = target.split("#") as [string, string | undefined];
   const file = path === "" ? from : resolve(dirname(from), decodeURIComponent(path));
@@ -173,7 +140,7 @@ function linkProblem(from: string, target: string, readText: (path: string) => s
   return undefined;
 }
 
-/** D5: every markdown file but dependencies, story specs and CHANGELOG. */
+/** Every markdown file but dependencies, story specs and CHANGELOG. */
 function linkedDocs(): string[] {
   return textFiles(ROOT, [".md"]).filter((f) => !rel(f).startsWith(".agents/specs/") && rel(f) !== "CHANGELOG.md");
 }
@@ -247,7 +214,7 @@ function commandTable(reference: string): Map<string, Set<string>> {
 /** The flags norn takes with no command (cli.ts). */
 const GLOBAL_FLAGS = new Set(["version", "help", "json"]);
 
-/** B35 (D4): the problems of the `norn …` commands in one piece of code (an inline span or a code line). */
+/** The problems of the `norn …` commands in one piece of code (an inline span or a code line). */
 function commandHits(code: string, table: Map<string, Set<string>>): string[] {
   const hits: string[] = [];
   // each `norn` starts its own mention: a second one on the line is checked on its own
@@ -348,7 +315,7 @@ describe("commands and flags the docs name exist (B35)", () => {
     expect(mentions.length).toBeGreaterThan(0);
   });
 
-  // gh-196 prefactor (B16): the bundled skills print commands an agent runs as written
+  // The bundled skills print commands an agent runs as written
   test("every norn command and flag in the bundled skills exists", () => {
     const dir = join(ROOT, "packages/cli/assets/skills");
     const files = readdirSync(dir).flatMap((s) => readdirSync(join(dir, s)).filter((f) => f.endsWith(".md")).map((f) => join(dir, s, f)));

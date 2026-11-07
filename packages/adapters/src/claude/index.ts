@@ -1,9 +1,8 @@
 /**
- * Claude Code agent adapter (first-class, `blocking` tier). Implements AgentAdapter from
- * packages/core/src/ports.ts.
+ * Claude Code agent adapter (first-class, `blocking` tier).
  *
- * Hooks (A1, A2) go into `<repo>/.claude/settings.json`; each runs `<hookCommand> <arg> # norn-owned`.
- * `Stop` is the blocking one (A4): `norn hook stop` decides, `hookResponse` encodes
+ * Hooks go into `<repo>/.claude/settings.json`; each runs `<hookCommand> <arg> # norn-owned`.
+ * `Stop` is the blocking one: `norn hook stop` decides, `hookResponse` encodes
  * `{"decision":"block","reason":…}` per https://docs.claude.com/en/docs/claude-code/hooks.
  */
 import { join } from "node:path";
@@ -39,12 +38,12 @@ export const hookEvents = {
 const TOOL_EVENTS = new Set(["PreToolUse", "PostToolUse"]);
 
 /**
- * A2: Claude Code `Notification.notification_type` → normalized event; `null` = ignore.
+ * Claude Code `Notification.notification_type` → normalized event; `null` = ignore.
  * Types and timing per https://code.claude.com/docs/en/hooks (Notification matchers):
  * - `idle_prompt` fires ~60 s after Claude *finished responding*: the turn ended, nobody asked
- *   anything → `turn_end` (§10 silent → nudge), never an Answer.
+ *   anything → `turn_end` (silent → nudge), never an Answer.
  * - permission / MCP elicitation dialogs / background-agent questions / a usage-limit wait that
- *   needs Enter really wait on a person → `permission_prompt` / `waiting_input` (§10 implicit ask).
+ *   needs Enter really wait on a person → `permission_prompt` / `waiting_input` (implicit ask).
  * - the rest are informational. Unknown future types are ignored rather than parking a unit.
  */
 const NOTIFICATION_EVENTS: Record<string, HookEventKind | null> = {
@@ -129,7 +128,7 @@ export function parseHookEvent(arg: string, payload: unknown, env: Record<string
 }
 
 /**
- * §10: give each Claude `permission_prompt` fact the tool call it is asking about. The
+ * Give each Claude `permission_prompt` fact the tool call it is asking about. The
  * Notification payload names no command; Claude Code runs PreToolUse *before* its permission
  * check, so the pending call is the latest tool fact of the same session — if that is a
  * PreToolUse (a later PostToolUse means it already ran). Sets `tool` and `command` as
@@ -151,7 +150,7 @@ function refineHooks(hooks: readonly HookFact[]): HookFact[] {
   });
 }
 
-/** A4: only `Stop` (turn_end) can be blocked; everything else (incl. idle_prompt turn_end) is acknowledged silently. */
+/** Only `Stop` (turn_end) can be blocked; everything else (incl. idle_prompt turn_end) is acknowledged silently. */
 export function hookResponse(fact: HookFact, decision: HookDecision): HookResponse {
   if (fact.event === "turn_end" && fact.native === "Stop" && decision.block) {
     return { stdout: `${JSON.stringify({ decision: "block", reason: decision.reason ?? "Report with norn done/ask/stuck before ending the turn." })}\n`, exit_code: 0 };
@@ -160,8 +159,8 @@ export function hookResponse(fact: HookFact, decision: HookDecision): HookRespon
 }
 
 /**
- * B5/B2: interactive `claude [opts] -- "<prompt>"`, headless `claude -p`, resume `--resume <id>`.
- * B3: `--` ends the options, so a variadic flag in the configured args (`--allowedTools a b`) cannot
+ * Interactive `claude [opts] -- "<prompt>"`, headless `claude -p`, resume `--resume <id>`.
+ * `--` ends the options, so a variadic flag in the configured args (`--allowedTools a b`) cannot
  * take the prompt as one more value.
  */
 export function launchCommand(req: AgentLaunchRequest): { argv: string[]; env: Record<string, string> } {
@@ -174,7 +173,7 @@ export function launchCommand(req: AgentLaunchRequest): { argv: string[]; env: R
 }
 
 /**
- * C4: last assistant text in a Claude Code JSONL transcript. One API message is split over
+ * Last assistant text in a Claude Code JSONL transcript. One API message is split over
  * several lines (one per content block) sharing `message.id`; their text blocks are joined.
  * Sidechain (subagent) lines are ignored.
  */

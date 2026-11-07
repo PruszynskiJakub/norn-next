@@ -1,5 +1,5 @@
 /**
- * What stops `norn story reset` (GR7a) without `--force`: a story PR, a started slice, a story
+ * What stops `norn story reset` without `--force`: a story PR, a started slice, a story
  * branch whose own commits since intake change files outside its spec folder, or such changes not
  * yet committed in the story worktree. A story that only went through triage has none of these.
  */

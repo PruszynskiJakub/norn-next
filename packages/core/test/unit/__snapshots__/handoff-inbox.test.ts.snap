@@ -1,6 +1,6 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`handoff.md (S9, O6) status block is rendered from state 1`] = `
+exports[`handoff.md status block is rendered from state 1`] = `
 "<!-- norn:status — generated from state.json, do not edit -->
 - Story: gh-1 · Slice: gh-1/02
 - Workflow: slice · Step: review (attempt 2)

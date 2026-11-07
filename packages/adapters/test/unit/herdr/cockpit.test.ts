@@ -24,7 +24,7 @@ function fakeExec(rules: Array<[string, ExecResult]>) {
 
 const item = { id: "attended:gh-1:R:t", group: "your_turn" as const, story: "gh-1", slice: null, step: "refine", title: "refine: the agent is waiting for you", command: "cd /wt", since: "2026-10-25T12:00:00.000Z" };
 
-describe("herdr cockpit (HC6, HC12)", () => {
+describe("herdr cockpit", () => {
   test("listAgents reads `herdr agent list`: foreground cwd and the agent's own session id", async () => {
     const { exec } = fakeExec([["agent list", ok(agentList)]]);
     const agents = await createHerdrCockpit({ exec }).listAgents();
@@ -81,7 +81,7 @@ test("openBelow splits a short pane below the caller without focus, names it, ru
   expect(await createHerdrCockpit({ exec: none.exec, env: {} }).openBelow("/repo", "x").catch((e) => e)).toMatchObject({ code: "launch_failed" });
 });
 
-test("listWorkspaces pairs `herdr workspace list` with each pane's cwd; focusWorkspace argv (HC15)", async () => {
+test("listWorkspaces pairs `herdr workspace list` with each pane's cwd; focusWorkspace argv", async () => {
   const { exec, calls } = fakeExec([
     ["workspace list", ok(workspaceList)],
     ["pane list", ok(paneList)],
@@ -106,7 +106,7 @@ test("listWorkspaces pairs `herdr workspace list` with each pane's cwd; focusWor
   expect(findWorkspace(ws, undefined)).toBeNull();
 });
 
-test("listPanes reads each pane's tab, workspace, cwd and status; close calls treat a missing target as gone (K7)", async () => {
+test("listPanes reads each pane's tab, workspace, cwd and status; close calls treat a missing target as gone", async () => {
   const gone = (what: string): ExecResult => ({ code: 1, stdout: "", stderr: JSON.stringify({ error: { code: `${what}_not_found`, message: "not found" } }) });
   const { exec, calls } = fakeExec([
     ["pane list", ok(paneList)],
@@ -177,13 +177,13 @@ test("openWorkspace, reportWorkspace argv; moveWorkspace over the socket API", a
   expect(herdrSocketPath({ HOME: "/h" })).toBe("/h/.config/herdr/herdr.sock");
 });
 
-test("pluginLinked reads `herdr plugin list --json` (HC11)", async () => {
+test("pluginLinked reads `herdr plugin list --json`", async () => {
   const list = (plugins: unknown[]) => fakeExec([["plugin list --json", ok({ id: "cli:plugin", result: { plugins } })]]).exec;
   expect(await createHerdrCockpit({ exec: list([{ plugin_id: "jpruszynski.github-issues", enabled: true }]) }).pluginLinked()).toBeNull();
   expect(await createHerdrCockpit({ exec: list([{ plugin_id: "norn", enabled: false, plugin_root: "/src/norn/plugins/herdr" }]) }).pluginLinked()).toEqual({ enabled: false, root: "/src/norn/plugins/herdr" });
 });
 
-describe("herdr notifier (HC14)", () => {
+describe("herdr notifier", () => {
   test("a toast with the request sound for items that need a person", () => {
     expect(herdrNotifyArgv(item)).toEqual(["herdr", "notification", "show", "norn · Your turn · gh-1 · refine", "--body", "refine: the agent is waiting for you\ncd /wt", "--sound", "request"]);
     expect(herdrNotifyArgv({ ...item, group: "unclaimed" }, { session: "s" }).slice(0, 3)).toEqual(["herdr", "--session", "s"]);

@@ -1,6 +1,6 @@
 /**
  * RunnerPort contract (ports.ts; R4.1, R5.1, MO5, C2): what decide and act may assume of any
- * runner — the headless adapter, the harness's FakeRunner, and any third-party runner (X2).
+ * runner — the headless adapter, the harness's FakeRunner, and any third-party runner.
  * `make` returns a fresh runner; `cwd` is a directory a session may run in.
  */
 import { describe, expect } from "bun:test";
@@ -8,13 +8,13 @@ import type { LaunchSpec, RunnerPort } from "@norn/core";
 import { type ContractOptions, contractTest, expectPortError } from "./suite.ts";
 
 export type RunnerContractTest =
-  | "name and capabilities are well-formed; openForPerson is present iff capabilities.open (MO5); a headless runner cannot send"
+  | "name and capabilities are well-formed; openForPerson is present iff capabilities.open; a headless runner cannot send"
   | "available() answers a boolean"
   | "launch returns a session of this runner that is alive, and its pane state says so"
   | "kill ends the session, and killing it again is harmless"
-  | "send delivers when capabilities.send, else rejects with a PortError (R4.1)"
+  | "send delivers when capabilities.send, else rejects with a PortError"
   | "reach and output, when present, answer a string (output: or null)"
-  | "findSessions, when present, reports only sessions of this runner (R5.1)";
+  | "findSessions, when present, reports only sessions of this runner";
 
 export interface RunnerSubject {
   runner: RunnerPort;
@@ -33,7 +33,7 @@ export function runnerContract(name: string, make: () => RunnerSubject, opts: Co
       return { cwd, argv: ["sh", "-c", "exec sleep 30"], env: { NORN_RUN: run_id, NORN_STORY: "gh-1", NORN_SLICE: "01-contract" }, title: "gh-1/01 contract", run_id };
     };
 
-    t("name and capabilities are well-formed; openForPerson is present iff capabilities.open (MO5); a headless runner cannot send", async () => {
+    t("name and capabilities are well-formed; openForPerson is present iff capabilities.open; a headless runner cannot send", async () => {
       const { runner } = make();
       expect(typeof runner.name).toBe("string");
       expect(runner.name.length).toBeGreaterThan(0);
@@ -75,7 +75,7 @@ export function runnerContract(name: string, make: () => RunnerSubject, opts: Co
       await runner.kill(s);
     });
 
-    t("send delivers when capabilities.send, else rejects with a PortError (R4.1)", async () => {
+    t("send delivers when capabilities.send, else rejects with a PortError", async () => {
       const { runner, cwd } = make();
       const s = await runner.launch(spec(cwd));
       try {
@@ -101,7 +101,7 @@ export function runnerContract(name: string, make: () => RunnerSubject, opts: Co
       }
     });
 
-    t("findSessions, when present, reports only sessions of this runner (R5.1)", async () => {
+    t("findSessions, when present, reports only sessions of this runner", async () => {
       const { runner, cwd } = make();
       if (!runner.findSessions) return; // optional: a runner without it finds nothing
       const s = await runner.launch(spec(cwd));

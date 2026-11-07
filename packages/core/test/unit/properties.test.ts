@@ -1,5 +1,5 @@
 /**
- * Property tests for receipt application (S5, S6, W3, W4, C1) and the one-action rule (O5).
+ * Property tests for receipt application and the one-action rule.
  *
  * A seeded in-repo PRNG (mulberry32) builds random workflows — agent, check, gate and git steps,
  * forward edges to the next step and counted back edges with small `max` — and random receipt
@@ -10,11 +10,11 @@
  * decide rules the random Facts reached.
  *
  * Invariants:
- *   - counters never exceed their max (W4), and the set of counters is the declared one
- *   - every state is schema-valid and its status agrees with its park (S2, §10)
- *   - applying all receipts in one batch equals applying them one at a time (S6)
- *   - applying the same receipts twice — or a prefix, then all of them (crash replay) — changes nothing (S6)
- *   - decide emits at most one action per unit per tick (O5), over Facts built from random states
+ * - counters never exceed their max, and the set of counters is the declared one
+ * - every state is schema-valid and its status agrees with its park
+ * - applying all receipts in one batch equals applying them one at a time
+ * - applying the same receipts twice — or a prefix, then all of them (crash replay) — changes nothing
+ * - decide emits at most one action per unit per tick, over Facts built from random states
  *   - `routeOf` agrees with `applyReceipts` on generated states, limits included (BUG-2, refactor
  *     plan 1.2): applying a classify receipt in a batch sends the unit where the route recorded by
  *     the in-memory apply says. `whereSent` reads the result the way `routeOf` does, so this only
@@ -89,9 +89,9 @@ const STEP_NAMES = ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"];
 const LIMITS = { deadline: "60m", nudges: 2, retries: 1, stalled: "15m" };
 
 /**
- * A valid workflow (W5): steps in a line, each with a forward edge to the next (the last to
- * `$done`), plus counted back edges (to itself or an earlier step), so every cycle is counted (W4)
- * and `$done` is reachable. Git actions fit the unit level (W8).
+ * A valid workflow: steps in a line, each with a forward edge to the next (the last to
+ * `$done`), plus counted back edges (to itself or an earlier step), so every cycle is counted
+ * and `$done` is reachable. Git actions fit the unit level.
  */
 function randomWorkflow(rng: Rng, name: string, level: "story" | "slice"): Workflow {
   const n = rng.range(2, 5);
@@ -109,7 +109,7 @@ function randomWorkflow(rng: Rng, name: string, level: "story" | "slice"): Workf
       forward.push(`${self}.done`);
       if (rng.chance(0.6)) outcomes.rework = counted(i);
       if (rng.chance(0.3)) outcomes.partial = next;
-      // C1: a step may override a classified route
+      // A step may override a classified route
       if (rng.chance(0.2)) outcomes[rng.pick(OVERRIDABLE_ROUTES)] = rng.pick([next, "$stuck"]);
       const step: Record<string, unknown> = { type: "agent", skill: "work", outcomes };
       if (rng.chance(0.5)) step.nudges = rng.range(0, 2);
@@ -166,7 +166,7 @@ function randomReceipt(g: Gen, st: UnitState, wf: Workflow): Receipt {
   const { rng } = g;
   const head = (by: "agent" | "human" | "norn") => ({ receipt_id: g.id(), run_id: st.run?.run_id ?? null, step: st.step, attempt: st.attempt, at: atK(g), by });
   const r = pickReceipt(g, st, wf, head);
-  if (rng.chance(0.05) && r.kind !== "mode" && r.kind !== "take") return { ...r, attempt: (r.attempt ?? st.attempt) + 1 } as Receipt; // stale (T9)
+  if (rng.chance(0.05) && r.kind !== "mode" && r.kind !== "take") return { ...r, attempt: (r.attempt ?? st.attempt) + 1 } as Receipt; // stale
   return r;
 }
 
@@ -255,7 +255,7 @@ function expectCounters(st: UnitState, wf: Workflow): void {
   expect(Object.keys(st.counters).sort()).toEqual(Object.keys(declared).sort());
   for (const [name, spec] of Object.entries(declared)) {
     const v = st.counters[name] as number;
-    if (!(Number.isInteger(v) && v >= 0 && v <= spec.max)) throw new Error(`counter ${name} = ${v}, max ${spec.max} (W4)`);
+    if (!(Number.isInteger(v) && v >= 0 && v <= spec.max)) throw new Error(`counter ${name} = ${v}, max ${spec.max}`);
   }
 }
 
@@ -264,7 +264,7 @@ function expectWellFormed(st: UnitState): void {
   if (!v.ok) throw new Error(`state fails its schema: ${JSON.stringify(v.errors)}\n${JSON.stringify(st)}`);
   const parkedLike = st.status === "parked" || st.status === "stuck";
   if (parkedLike !== (st.park !== null)) throw new Error(`status ${st.status} with park ${JSON.stringify(st.park)}`);
-  // GR7: a finished story whose issue changed (closed, unassigned) is parked `remote` at `$done`
+  // A finished story whose issue changed (closed, unassigned) is parked `remote` at `$done`
   const remoteAtDone = st.step === "$done" && st.status === "stuck" && st.park?.kind === "remote";
   if ((st.step === "$done") !== (st.status === "done") && !remoteAtDone) throw new Error(`step ${st.step} with status ${st.status}`);
   if (st.status === "running" && !st.run) throw new Error(`running without a run: ${JSON.stringify(st.last_outcome)}`);
@@ -308,7 +308,7 @@ function episode(rng: Rng, seed: number, unit: UnitRef = sliceUnit("gh-1", "01",
   return { wf, initial, receipts, states, steps };
 }
 
-/** Where `applyReceipts` sent the unit for one applied receipt, in `route` terms (§10). */
+/** Where `applyReceipts` sent the unit for one applied receipt, in `route` terms. */
 function whereSent(res: ApplyResult): string | null {
   if (res.route) return res.route;
   if (res.advance) return res.advance.to;
@@ -317,7 +317,7 @@ function whereSent(res: ApplyResult): string | null {
   return null;
 }
 
-/** C1/W4: the outcome hit a limit — a counted edge, nudges or retries with no room left. */
+/** The outcome hit a limit — a counted edge, nudges or retries with no room left. */
 const exhausted = (res: ApplyResult) => res.state.status === "stuck" && res.state.park?.kind === "exhausted";
 
 /** Applied classify receipts whose recorded route disagrees with where apply sent the unit. */
@@ -335,7 +335,7 @@ function routeMismatches(ep: Episode, filter: (res: ApplyResult) => boolean) {
 
 // ================================================================= apply properties
 
-describe("applyReceipts properties (S6, W4, C1)", () => {
+describe("applyReceipts properties", () => {
   test("the generators make valid workflows and receipts, and reach every step type, park kind and limit", () => {
     const seen = new Set<string>();
     forSeeds(0, (rng, seed) => {
@@ -408,7 +408,7 @@ describe("applyReceipts properties (S6, W4, C1)", () => {
         route: null,
         deliver: null,
       });
-      // S6: state.json written after receipts 1..k, then the tick replays all of them
+      // State.json written after receipts 1..k, then the tick replays all of them
       const k = rng.int(ep.receipts.length + 1);
       const prefix = applyReceipts(ep.initial, ep.receipts.slice(0, k), ctx);
       const replay = applyReceipts(prefix.state, ep.receipts, ctx);
@@ -446,7 +446,7 @@ describe("applyReceipts properties (S6, W4, C1)", () => {
   });
 });
 
-// ================================================================= decide: one action per unit (O5)
+// ================================================================= decide: one action per unit
 
 const KEYS = ["gh-1", "gh-2", "gh-3"];
 
@@ -458,7 +458,7 @@ function randomUnit(rng: Rng, seed: number, unit: UnitRef, level: "story" | "sli
   const uf = unitFacts(unit, fresh ? null : ep.wf, st);
   if (!st) return { uf, wf: ep.wf };
   if (rng.chance(0.25)) {
-    // receipts written since the last tick (C2), built against the cursor
+    // receipts written since the last tick, built against the cursor
     const g: Gen = { rng, id: idsFor(seed + 7919), tick: 100 };
     let cur = st;
     for (let i = 0; i < rng.range(1, 2); i++) {
@@ -533,7 +533,7 @@ function randomFacts(rng: Rng, seed: number): { f: Facts; workflows: RepoWorkflo
   return { f: { ...f, machine }, workflows, config };
 }
 
-describe("decide properties (O5, W4)", () => {
+describe("decide properties", () => {
   test("at most one action per unit, and every state it writes keeps counters within max", () => {
     const rules = new Set<string>();
     forSeeds(6, (rng, seed) => {

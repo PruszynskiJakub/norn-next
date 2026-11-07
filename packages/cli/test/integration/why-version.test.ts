@@ -1,5 +1,5 @@
 /**
- * O5: every tick trace records the norn that wrote it (`norn_version`), and `norn run view --why` on a tick
+ * Every tick trace records the norn that wrote it (`norn_version`), and `norn run view --why` on a tick
  * another version recorded still replays and diffs it, labelled `recorded by norn <X>`, with the
  * same exit code as for a tick this version recorded.
  */
@@ -71,7 +71,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("norn_version on tick traces (O5)", () => {
+describe("norn_version on tick traces", () => {
   test("every tick record carries this norn's package version and stays schema-valid", () => {
     const all = ticks();
     expect(all.length).toBeGreaterThan(0);
@@ -126,7 +126,7 @@ describe("norn_version on tick traces (O5)", () => {
   });
 });
 
-describe("the running version is a dependency (gh-61 B6, Prefactor 1)", () => {
+describe("the running version is a dependency (Prefactor 1)", () => {
   test("without the option, --version prints the package version", async () => {
     const r = await h.norn("--version");
     expect(r.exit).toBe(0);
@@ -162,7 +162,7 @@ describe("the running version is a dependency (gh-61 B6, Prefactor 1)", () => {
 
 describe("why on a tick the trace no longer keeps (B20, D10)", () => {
   const DAY = 86_400_000;
-  /** A ulid of time `ms` exactly: `ulid()` is monotonic per process, so it never goes back 40 days. */
+  /** A ulid of time `ms` exactly: `ulid` is monotonic per process, so it never goes back 40 days. */
   const ulidAt = (ms: number) => {
     const A = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
     let time = "";

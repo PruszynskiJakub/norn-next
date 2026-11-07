@@ -1,5 +1,5 @@
 /**
- * `norn run <verb>` (B2, B43–B53): the runs of a unit — `list` its step timeline, `view` one run,
+ * `norn run <verb>`: the runs of a unit — `list` its step timeline, `view` one run,
  * `attach` to its agent pane, `rerun` a stuck or parked unit, `cancel` a running one.
  */
 import { defineNoun } from "../command.ts";

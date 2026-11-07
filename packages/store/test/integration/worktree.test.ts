@@ -11,7 +11,7 @@ function repo(): string {
   return root;
 }
 
-describe("worktree files (A3, K4)", () => {
+describe("worktree files", () => {
   test("ensureExcluded appends the missing entries once, keeping the user's lines", async () => {
     const root = repo();
     const info = join(root, ".git", "info");

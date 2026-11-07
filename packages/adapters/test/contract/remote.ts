@@ -9,25 +9,25 @@ import { type ContractOptions, contractTest } from "./suite.ts";
 
 export type RemoteContractTest =
   | "provider and whoami"
-  | "listAssignedIssues: open issues assigned to the user with the label, nothing else (GR1)"
+  | "listAssignedIssues: open issues assigned to the user with the label, nothing else"
   | "getIssue: the listed issue, closed ones too; null when missing"
   | "findPullRequest: null for a branch without one"
-  | "openDraftPullRequest opens a draft the branch then finds (GR6)"
+  | "openDraftPullRequest opens a draft the branch then finds"
   | "findPullRequest picks the newest of a branch's PRs"
-  | "findPullRequests: every branch's PR as findPullRequest finds it, null without one (gh-186)"
+  | "findPullRequests: every branch's PR as findPullRequest finds it, null without one"
   | "pullRequestCi: none, pending, failure and success of a PR's head (B18)"
   | "createIssue opens an issue with the labels and assignee, which intake then lists (B18)"
   | "newIssueUrl: the remote's new-issue page with the labels filled in (B23)"
-  | "rawFileUrl: a commit's file served raw, its path segments encoded (gh-195 B28)"
+  | "rawFileUrl: a commit's file served raw, its path segments encoded"
   | "replaceIssueLabel swaps one label for another (B19)"
   | "replaceIssueLabel adds the new label when the old one is not on the issue (B19)"
   | "replaceIssueLabel rejects with a PortError when the provider fails, changing nothing (B20)"
-  | "listLabelledIssues: open issues with the label, whoever they are assigned to (GR1, CP2)"
-  | "assignIssue adds the assignee, and intake then lists the issue (GR1)"
-  | "listLabels: the repository's labels with colour and description (GR10)"
-  | "createLabel defines a label that listLabels then lists, leaving the others alone (GR10)"
-  | "createLabel rejects a name already taken with an _exists PortError, editing nothing (GR10)"
-  | "listLabels and createLabel reject with a PortError when the provider fails (GR10)";
+  | "listLabelledIssues: open issues with the label, whoever they are assigned to"
+  | "assignIssue adds the assignee, and intake then lists the issue"
+  | "listLabels: the repository's labels with colour and description"
+  | "createLabel defines a label that listLabels then lists, leaving the others alone"
+  | "createLabel rejects a name already taken with an _exists PortError, editing nothing"
+  | "listLabels and createLabel reject with a PortError when the provider fails";
 
 export interface SeedIssue {
   number: number;
@@ -41,11 +41,11 @@ export interface SeedIssue {
 export interface RemoteSubject {
   port: RemotePort;
   seed(issues: SeedIssue[]): void;
-  /** from now on, the provider fails every label edit (B20), label listings and creations included (GR10) */
+  /** from now on, the provider fails every label edit, label listings and creations included */
   failLabelEdits(): void;
-  /** the labels defined on the repository (GR10), replacing any seeded before */
+  /** the labels defined on the repository, replacing any seeded before */
   seedLabels(labels: RemoteLabel[]): void;
-  /** gh-195 B18: the CI state the provider reports for PR `number`'s head from now on */
+  /** The CI state the provider reports for PR `number`'s head from now on */
   setCi(number: number, ci: PullRequestCi): void;
 }
 
@@ -94,7 +94,7 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       expect(me.length).toBeGreaterThan(0);
     });
 
-    t("listAssignedIssues: open issues assigned to the user with the label, nothing else (GR1)", async () => {
+    t("listAssignedIssues: open issues assigned to the user with the label, nothing else", async () => {
       const { port, me } = await seeded();
       const issues = await port.listAssignedIssues({ label: "norn" });
       expect(issues.map((i) => i.number)).toEqual([1]);
@@ -118,7 +118,7 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       expect(await port.findPullRequest("gh-1-no-pr-here")).toBeNull();
     });
 
-    t("openDraftPullRequest opens a draft the branch then finds (GR6)", async () => {
+    t("openDraftPullRequest opens a draft the branch then finds", async () => {
       const { port } = await seeded();
       const pr = await port.openDraftPullRequest({ head: "gh-1-add-login", base: "main", title: "Add login", body: "Closes #1" });
       expectPrShape(pr);
@@ -146,7 +146,7 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       expect((await port.findPullRequest("gh-1-add-login"))?.number).toBe(second.number);
     });
 
-    t("findPullRequests: every branch's PR as findPullRequest finds it, null without one (gh-186)", async () => {
+    t("findPullRequests: every branch's PR as findPullRequest finds it, null without one", async () => {
       const { port } = await seeded();
       expect(await port.findPullRequests([])).toEqual(new Map());
       await port.openDraftPullRequest({ head: "gh-1-add-login", base: "main", title: "first", body: "" });
@@ -181,7 +181,7 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       expect((await port.listAssignedIssues({ label: "norn" })).map((i) => i.number)).toEqual([1]); // nothing created
     });
 
-    t("rawFileUrl: a commit's file served raw, its path segments encoded (gh-195 B28)", async () => {
+    t("rawFileUrl: a commit's file served raw, its path segments encoded", async () => {
       const { port } = await seeded();
       const commit = "0123456789abcdef0123456789abcdef01234567";
       const url = await port.rawFileUrl({ commit, path: "_story/rounds/01-story/evidence/01ABC/after shot.png" });
@@ -191,7 +191,7 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       expect((await port.listAssignedIssues({ label: "norn" })).map((i) => i.number)).toEqual([1]); // nothing created
     });
 
-    t("listLabelledIssues: open issues with the label, whoever they are assigned to (GR1, CP2)", async () => {
+    t("listLabelledIssues: open issues with the label, whoever they are assigned to", async () => {
       const { port, seed, me } = await seeded();
       seed([...world(me), { number: 6, title: "Nobody's yet", body: "", state: "open", assignees: [], labels: ["norn"] }]);
       const issues = await port.listLabelledIssues({ label: "norn" });
@@ -202,7 +202,7 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       expect(await port.listLabelledIssues({ label: "no-such-label" })).toEqual([]);
     });
 
-    t("assignIssue adds the assignee, and intake then lists the issue (GR1)", async () => {
+    t("assignIssue adds the assignee, and intake then lists the issue", async () => {
       const { port, seed, me } = await seeded();
       seed([...world(me), { number: 6, title: "Nobody's yet", body: "", state: "open", assignees: [], labels: ["norn"] }]);
       await port.assignIssue(6, me);
@@ -217,14 +217,14 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       { name: "auth", color: "EDEDED", description: "" },
     ];
 
-    t("listLabels: the repository's labels with colour and description (GR10)", async () => {
+    t("listLabels: the repository's labels with colour and description", async () => {
       const { port, seedLabels } = await seeded();
       seedLabels(defined);
       const labels = await port.listLabels();
       expect([...labels].sort((a, b) => a.name.localeCompare(b.name))).toEqual([...defined].sort((a, b) => a.name.localeCompare(b.name)));
     });
 
-    t("createLabel defines a label that listLabels then lists, leaving the others alone (GR10)", async () => {
+    t("createLabel defines a label that listLabels then lists, leaving the others alone", async () => {
       const { port, seedLabels } = await seeded();
       seedLabels(defined);
       await port.createLabel({ name: "norn:wf:quick", color: "5319E7", description: "Make a small change" });
@@ -234,7 +234,7 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       expect(labels).toHaveLength(3);
     });
 
-    t("createLabel rejects a name already taken with an _exists PortError, editing nothing (GR10)", async () => {
+    t("createLabel rejects a name already taken with an _exists PortError, editing nothing", async () => {
       const { port, seedLabels } = await seeded();
       seedLabels(defined);
       const err = await port.createLabel({ name: "norn", color: "5319E7", description: "other" }).then(
@@ -245,7 +245,7 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
       expect((await port.listLabels()).find((l) => l.name === "norn")).toEqual(defined[0]!);
     });
 
-    t("listLabels and createLabel reject with a PortError when the provider fails (GR10)", async () => {
+    t("listLabels and createLabel reject with a PortError when the provider fails", async () => {
       const { port, seedLabels, failLabelEdits } = await seeded();
       seedLabels(defined);
       failLabelEdits();

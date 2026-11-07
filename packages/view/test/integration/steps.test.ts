@@ -1,5 +1,5 @@
 /**
- * Step timeline (O4, X1): `norn trace` rows per (step, attempt) with entry/exit, duration,
+ * Step timeline: `norn trace` rows per (step, attempt) with entry/exit, duration,
  * outcome, who and the reason, built from real receipts and trace lines of the dogfood
  * sandbox (gh-1 story + slice 03, copied into fixtures/gh-1; trace facts stripped).
  */
@@ -21,7 +21,7 @@ afterEach(() => {
 function seed(opts: { trace?: boolean } = {}): string {
   const repo = mkdtempSync(join(tmpdir(), "norn-steps-"));
   dirs.push(repo);
-  // gh-195 D16: run state is read from the machine dir (S12), never from a tree's runs/
+  // Run state is read from the machine dir, never from a tree's runs/
   cpSync(join(FIX, "spec"), join(repo, SPEC), { recursive: true, filter: (src) => src !== join(FIX, "spec", "runs") });
   bindNornHome(repo, join(repo, ".home"));
   cpSync(join(FIX, "spec", "runs"), storyRunStateDir(repo, { key: "gh-1", spec_dir: SPEC }), { recursive: true });

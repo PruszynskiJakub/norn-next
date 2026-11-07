@@ -64,7 +64,7 @@
       "anyOf": [
         {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         {

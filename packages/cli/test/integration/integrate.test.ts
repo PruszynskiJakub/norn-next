@@ -1,4 +1,4 @@
-/** W2 integrate, BS3 update and BS3.3a remote sync (runtime/integrate.ts) against real temp repos with a bare remote (X4). */
+/** W2 integrate, BS3 update and BS3.3a remote sync (runtime/integrate.ts) against real temp repos with a bare remote. */
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -57,7 +57,7 @@ beforeEach(async () => {
   R = await setup();
 });
 
-describe("integrate (W2, K6)", () => {
+describe("integrate", () => {
   async function storyAndSlice() {
     const story = join(R.base, "story");
     const slice = join(R.base, "slice");
@@ -106,7 +106,7 @@ describe("integrate (W2, K6)", () => {
     expect(await git.fastForward(story, "gh-4/01-a")).toEqual({ ok: false });
   });
 
-  test("conflict resolved by merging the story branch stays resolved (gh-80)", async () => {
+  test("conflict resolved by merging the story branch stays resolved", async () => {
     const { story, slice } = await storyAndSlice();
     writeFileSync(join(story, "a.txt"), "story side\n");
     await git.commit(story, { message: "story edit", trailers: {} });
@@ -124,7 +124,7 @@ describe("integrate (W2, K6)", () => {
     expect((await git.status(story)).clean).toBe(true);
   });
 
-  test("the resolution stays when the story branch moves on after the merge step (gh-80)", async () => {
+  test("the resolution stays when the story branch moves on after the merge step", async () => {
     const { story, slice } = await storyAndSlice();
     writeFileSync(join(story, "a.txt"), "story side\n");
     await git.commit(story, { message: "story edit", trailers: {} });
@@ -145,7 +145,7 @@ describe("integrate (W2, K6)", () => {
   });
 });
 
-describe("update and remote sync (BS3, BS3.3a)", () => {
+describe("update and remote sync (BS3.3a)", () => {
   /** story worktree on gh-5-s cut from main and pushed; returns its path */
   async function story(): Promise<string> {
     const wt = join(R.base, "story");
@@ -272,7 +272,7 @@ describe("update and remote sync (BS3, BS3.3a)", () => {
     expect(await run(wt, base, null)).toMatchObject({ outcome: "done", merged: true });
   });
 
-  /** H1: a resolve agent's merge left mid-way: a.txt conflicts, MERGE_HEAD set, markers in the work tree */
+  /** A resolve agent's merge left mid-way: a.txt conflicts, MERGE_HEAD set, markers in the work tree */
   async function midMerge(): Promise<{ wt: string; base: string; head: string }> {
     const wt = await story();
     writeFileSync(join(wt, "a.txt"), "story side\n");

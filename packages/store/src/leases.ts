@@ -1,8 +1,8 @@
 /**
- * Machine-wide leases in `~/.norn/leases/` (K1, K3). Worktree env files (K4) live in worktree.ts.
+ * Machine-wide leases in `~/.norn/leases/`. Worktree env files live in worktree.ts.
  *
  * Every lease is a numbered file `<kind>-<n>.json` created exclusively, so caps are
- * enforced atomically: agent/check leases use n ∈ 1..max_agents (checks follow max_agents, gh-64); slot
+ * enforced atomically: agent/check leases use n ∈ 1..max_agents (checks follow max_agents); slot
  * leases use n = slot number ∈ slots.min..slots.max. A file whose holder is dead is
  * reclaimed (moved aside only if unchanged since judged dead).
  *
@@ -93,7 +93,7 @@ function sameOwner(a: LeaseFile, req: LeaseRequest): boolean {
 }
 
 /**
- * Take the lowest free number in range (K1, K3). Idempotent: a live lease of the same
+ * Take the lowest free number in range. Idempotent: a live lease of the same
  * kind for the same unit (slot) or run (agent/check) is returned as is. Dead holders in
  * the way are reclaimed.
  */
@@ -133,7 +133,7 @@ export async function acquireLease(home: string, req: LeaseRequest): Promise<Lea
   return { ok: false, reason: "full", holders: after.live.filter((e) => e.lease.kind === req.kind) };
 }
 
-/** Agent (or check) lease within a machine cap (K1): numbers 1..max. */
+/** Agent (or check) lease within a machine cap: numbers 1..max. */
 export function acquireRunLease(
   home: string,
   kind: "agent" | "check",
@@ -143,7 +143,7 @@ export function acquireRunLease(
   return acquireLease(home, { ...req, kind, range: { min: 1, max } });
 }
 
-/** Port slot for a worktree (K4): slot ∈ [min, max], port_base = base + slot × ports_per_slot. */
+/** Port slot for a worktree: slot ∈ [min, max], port_base = base + slot × ports_per_slot. */
 export function acquireSlotLease(
   home: string,
   req: Omit<LeaseRequest, "kind" | "range" | "portBase" | "run_id"> & { run_id?: string | null },
@@ -163,7 +163,7 @@ export function updateLease(home: string, file: string, lease: LeaseFile): void 
   atomicWriteJson(join(leasesDir(home), file), lease);
 }
 
-/** Hand a held lease over (K1): rewrite it only while it is still exactly `from`; false when it was released or changed meanwhile. */
+/** Hand a held lease over: rewrite it only while it is still exactly `from`; false when it was released or changed meanwhile. */
 export function handOverLease(home: string, file: string, from: LeaseFile, to: LeaseFile): boolean {
   assertValid("lease", to);
   return replaceIfUnchanged(join(leasesDir(home), file), json(from), json(to));
@@ -183,8 +183,8 @@ export async function releaseStoryLeases(home: string, repo: string, story: stri
 }
 
 /**
- * Take a run's lease over for `holder` (K1): the process that does the run's work holds it, so the
- * lease dies with that process (K3). Only while the lease validates (S2) and still names `runId`; false otherwise.
+ * Take a run's lease over for `holder`: the process that does the run's work holds it, so the
+ * lease dies with that process. Only while the lease validates and still names `runId`; false otherwise.
  */
 export function claimRunLease(home: string, file: string, runId: string, holder: ProcessIdentity): boolean {
   if (!LEASE_NAME.test(file)) throw new Error(`not a lease file: ${file}`);
@@ -200,8 +200,8 @@ export function claimRunLease(home: string, file: string, runId: string, holder:
 }
 
 /**
- * Release a run's own lease (K1): remove the file only while it validates (S2) and still names
- * `runId`; one reclaimed (K3) and taken by another run, or one gone already, stays as it is.
+ * Release a run's own lease: remove the file only while it validates and still names
+ * `runId`; one reclaimed and taken by another run, or one gone already, stays as it is.
  */
 export function releaseRunLease(home: string, file: string, runId: string): boolean {
   if (!LEASE_NAME.test(file)) throw new Error(`not a lease file: ${file}`);
@@ -213,7 +213,7 @@ export function releaseRunLease(home: string, file: string, runId: string): bool
   return removeIfUnchanged(path, raw);
 }
 
-/** Remove the named lease files whose holders are (still) dead, or that are unreadable (K3). */
+/** Remove the named lease files whose holders are (still) dead, or that are unreadable. */
 export async function reclaimLeases(home: string, files: string[], liveness: LeaseLiveness = defaultLeaseLiveness()): Promise<string[]> {
   const removed: string[] = [];
   for (const file of files) {

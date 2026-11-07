@@ -1,6 +1,6 @@
 /**
- * gh-79 (H1, S2, S5): a rebase stopped on conflicts in a story worktree. An older norn kept `runs/` on the
- * branch, so the rebase rewound it to an older state.json; S12 (gh-195/05, B2) keeps run state in the
+ * A rebase stopped on conflicts in a story worktree. An older norn kept `runs/` on the
+ * branch, so the rebase rewound it to an older state.json; S12 keeps run state in the
  * machine dir, so the rebase leaves it alone. The tick still holds the unit while the rebase is in
  * progress (H1: nothing is written or committed through it), and after `git rebase --abort` the unit
  * goes on where it was, not `corrupt`.
@@ -83,7 +83,7 @@ describe("gh-79: a tick mid-rebase", () => {
 
   test("mid-rebase the run state is not rewound, and the tick writes nothing", async () => {
     expect(() => sh(wt(), ["rebase", "old"])).toThrow(/conflict/i);
-    expect(h.state(runs())).toMatchObject({ step: "second", applied_through: 2 }); // S12: not on the branch, so not rewound
+    expect(h.state(runs())).toMatchObject({ step: "second", applied_through: 2 }); // Not on the branch, so not rewound
     h.clock.advance(5 * 60_000); // first's 1m deadline (from the run's start) is long past
     const r = await h.tick();
     expect(acted(r)).toEqual([]);

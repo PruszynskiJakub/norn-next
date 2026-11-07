@@ -1,5 +1,5 @@
 /**
- * gh-61 B8, B5 (D5, D7): `norn status`, `status --segment` and the read model show a binary that
+ * `norn status`, `status --segment` and the read model show a binary that
  * does not fit the repo's `norn_version` at the top of the inbox, and a hint when the repo records
  * none; the inbox the view shows equals `buildInbox` over observe's Facts.
  */
@@ -28,7 +28,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("the norn version in status (gh-61 B8, B5)", () => {
+describe("the norn version in status", () => {
   test("B8: binary 0.18.1 in a repo at 0.19.0 → status exits 0 with the mismatch on top", async () => {
     h.config("norn_version: 0.19.0\n");
     const r = await h.norn("status");

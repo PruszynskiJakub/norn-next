@@ -1,4 +1,4 @@
-/** Bounded child processes (H11): a hung network call is killed with its whole process group. */
+/** Bounded child processes: a hung network call is killed with its whole process group. */
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

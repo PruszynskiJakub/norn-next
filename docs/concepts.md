@@ -1,6 +1,6 @@
 # Concepts
 
-How norn works, for someone who has run a first story (the [README](../README.md) shows how). Every command and key named here is listed in [Reference](reference.md); the precise rules, with their ids, are in [`.agents/RULES.md`](../.agents/RULES.md).
+How norn works, for someone who has run a first story (the [README](../README.md) shows how). Every command and key named here is listed in [Reference](reference.md).
 
 ## Code decides, agents do
 

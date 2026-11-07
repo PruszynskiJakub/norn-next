@@ -1,6 +1,6 @@
 /**
- * `norn story create` (B18–B23, D3): the issue is created on the remote with the `norn` label (and
- * the workflow's), assigned to the person, and taken in at once by the same intake `sync` runs (GR1);
+ * `norn story create`: the issue is created on the remote with the `norn` label (and
+ * the workflow's), assigned to the person, and taken in at once by the same intake `sync` runs;
  * it is not started. A terminal is prompted for the title and the body; a script is refused. `--web`
  * opens the remote's new-issue page instead and creates nothing.
  */

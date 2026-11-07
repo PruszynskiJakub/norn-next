@@ -1,12 +1,12 @@
 /**
- * `norn story start [<unit>] [--print]` (B28, MO5, O1): open an agent on the unit's step for a person — the
+ * `norn story start [<unit>] [--print]`: open an agent on the unit's step for a person — the
  * step a person starts (an attended step, or a ready agent step in manual mode). When this machine's
  * runner opens terminals for a person (`capabilities.open`, e.g. Herdr: a focused tab in the unit
  * worktree) it does that; otherwise, or with `--print`, it prints the start command. The agent's
- * `norn brief` starts the run, as when a person types the command (MO3); start records nothing itself.
- * Without a target a person picks from the units a person can start (B57).
- * gh-195/05 (B3): a story worktree this checkout removed while it holds the story's claim is made again
- * first (as `norn story checkout` makes it): its run state is in the machine dir (S12), so the unit goes
+ * `norn brief` starts the run, as when a person types the command; start records nothing itself.
+ * Without a target a person picks from the units a person can start.
+ * A story worktree this checkout removed while it holds the story's claim is made again
+ * first (as `norn story checkout` makes it): its run state is in the machine dir, so the unit goes
  * on at the same step and attempt.
  */
 import { existsSync, readdirSync } from "node:fs";
@@ -22,7 +22,7 @@ import { parseUnitKey } from "../runtime/args.ts";
 import { refuseIfHeldElsewhere, resolveTarget, started } from "../runtime/human.ts";
 import { targetKey, type TargetRule } from "../runtime/target.ts";
 
-/** B28: the units a person starts — parked at an attended step, or a ready agent step that waits for a person (manual). */
+/** The units a person starts — parked at an attended step, or a ready agent step that waits for a person (manual). */
 const startableRule: TargetRule = {
   verb: "story start",
   command: (key) => cmd.storyStart(key),
@@ -30,9 +30,9 @@ const startableRule: TargetRule = {
   applies: (_key, u) => !!u && startable(u),
 };
 
-/** B3: whether this heartbeat holds `story`'s claim and no story worktree of it is on disk. */
+/** Whether this heartbeat holds `story`'s claim and no story worktree of it is on disk. */
 async function worktreeGone(ctx: Context, story: string): Promise<boolean> {
-  // a claim norn cannot read is said, never taken for "no claim" (review F8)
+  // a claim norn cannot read is said, never taken for "no claim"
   const claim = await readLocalClaim(ctx.root, story);
   if (claim.state !== "present" || claim.blob.heartbeat_id !== heartbeatId(ctx.root, ctx.clock.now())) return false;
   const parent = `${ctx.root}-worktrees`;
@@ -43,7 +43,7 @@ async function worktreeGone(ctx: Context, story: string): Promise<boolean> {
 export const storyStartCommand = defineCommand({
   name: "story start",
   version: "acts",
-  summary: "Open an agent on the step a person starts: a Herdr tab in the unit worktree, or the command to run (B28, MO5)",
+  summary: "Open an agent on the step a person starts: a Herdr tab in the unit worktree, or the command to run",
   usage: "norn story start [<story|slice>] [--print]",
   optionHelp: { "--print": "print the start command instead of opening a terminal" },
   options: { print: { type: "boolean" } },

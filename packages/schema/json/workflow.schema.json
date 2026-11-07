@@ -162,7 +162,7 @@
                   "type": "string"
                 },
                 "attended": {
-                  "description": "Worked with a person; always started by a person (MO4)",
+                  "description": "Worked with a person; always started by a person",
                   "type": "boolean"
                 },
                 "deadline": {
@@ -172,12 +172,12 @@
                 },
                 "nudges": {
                   "minimum": 0,
-                  "description": "Max nudges in the same session (C1)",
+                  "description": "Max nudges in the same session",
                   "type": "integer"
                 },
                 "retries": {
                   "minimum": 0,
-                  "description": "Max fresh-session retries after died (C1)",
+                  "description": "Max fresh-session retries after died",
                   "type": "integer"
                 },
                 "criteria": {
@@ -212,7 +212,7 @@
                             },
                             "means": {
                               "minLength": 1,
-                              "description": "Shown to the agent in the brief (B3)",
+                              "description": "Shown to the agent in the brief",
                               "type": "string"
                             },
                             "verdict": {
@@ -297,7 +297,7 @@
                             },
                             "means": {
                               "minLength": 1,
-                              "description": "Shown to the agent in the brief (B3)",
+                              "description": "Shown to the agent in the brief",
                               "type": "string"
                             },
                             "verdict": {
@@ -347,7 +347,7 @@
                             },
                             "means": {
                               "minLength": 1,
-                              "description": "Shown to the agent in the brief (B3)",
+                              "description": "Shown to the agent in the brief",
                               "type": "string"
                             },
                             "verdict": {
@@ -425,7 +425,7 @@
                             },
                             "means": {
                               "minLength": 1,
-                              "description": "Shown to the agent in the brief (B3)",
+                              "description": "Shown to the agent in the brief",
                               "type": "string"
                             },
                             "verdict": {
@@ -475,7 +475,7 @@
                             },
                             "means": {
                               "minLength": 1,
-                              "description": "Shown to the agent in the brief (B3)",
+                              "description": "Shown to the agent in the brief",
                               "type": "string"
                             },
                             "verdict": {
@@ -525,7 +525,7 @@
                             },
                             "means": {
                               "minLength": 1,
-                              "description": "Shown to the agent in the brief (B3)",
+                              "description": "Shown to the agent in the brief",
                               "type": "string"
                             },
                             "verdict": {
@@ -620,7 +620,7 @@
                             },
                             "means": {
                               "minLength": 1,
-                              "description": "Shown to the agent in the brief (B3)",
+                              "description": "Shown to the agent in the brief",
                               "type": "string"
                             },
                             "verdict": {
@@ -670,7 +670,7 @@
                             },
                             "means": {
                               "minLength": 1,
-                              "description": "Shown to the agent in the brief (B3)",
+                              "description": "Shown to the agent in the brief",
                               "type": "string"
                             },
                             "verdict": {
@@ -744,7 +744,7 @@
                             },
                             "means": {
                               "minLength": 1,
-                              "description": "Shown to the agent in the brief (B3)",
+                              "description": "Shown to the agent in the brief",
                               "type": "string"
                             },
                             "verdict": {
@@ -794,7 +794,7 @@
                             },
                             "means": {
                               "minLength": 1,
-                              "description": "Shown to the agent in the brief (B3)",
+                              "description": "Shown to the agent in the brief",
                               "type": "string"
                             },
                             "verdict": {

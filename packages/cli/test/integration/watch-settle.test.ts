@@ -35,7 +35,7 @@ interface Line {
   follow_up?: true;
 }
 
-describe("watch settles at once after a tick that changed run state (H12)", () => {
+describe("watch settles at once after a tick that changed run state", () => {
   let h: Harness;
   const runs = () => runStateOf(join(`${h.root}-worktrees/gh-7-settle-me`, ".agents/specs/gh-7-settle-me"));
 
@@ -117,7 +117,7 @@ describe("watch settles at once after a tick that changed run state (H12)", () =
   });
 });
 
-describe("pauseUntilWake (H13)", () => {
+describe("pauseUntilWake", () => {
   let h: Harness;
   beforeAll(async () => {
     h = await createHarness();
@@ -165,7 +165,7 @@ describe("pauseUntilWake (H13)", () => {
   });
 });
 
-describe("settleStep bounds the chain (H12)", () => {
+describe("settleStep bounds the chain", () => {
   test("at most SETTLE_TICKS ticks run at once in a row; a quiet tick or the bound resets it", () => {
     let settling = 0;
     const now: boolean[] = [];

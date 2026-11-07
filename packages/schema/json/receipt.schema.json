@@ -25,14 +25,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -87,7 +87,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -415,14 +415,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -477,7 +477,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -560,14 +560,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -622,7 +622,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -670,14 +670,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -732,7 +732,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -761,7 +761,7 @@
         },
         "ask_receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "delivered": {
@@ -790,14 +790,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -852,7 +852,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -887,7 +887,7 @@
           "type": "array",
           "items": {
             "pattern": "^note:[0-9A-HJKMNP-TV-Z]{26}:[1-9][0-9]*$",
-            "description": "note:<receipt_id>:<n> (NT2)",
+            "description": "note:<receipt_id>:<n>",
             "type": "string"
           }
         }
@@ -911,14 +911,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -973,7 +973,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -1023,14 +1023,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -1085,7 +1085,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -1146,14 +1146,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -1208,7 +1208,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -1281,14 +1281,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -1343,7 +1343,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -1430,14 +1430,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -1492,7 +1492,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -1597,7 +1597,7 @@
         },
         "heartbeat_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         }
       }
@@ -1624,14 +1624,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -1686,7 +1686,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -1845,14 +1845,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -1907,7 +1907,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -1977,14 +1977,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -2039,7 +2039,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -2077,7 +2077,7 @@
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -2136,14 +2136,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -2198,7 +2198,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {
@@ -2279,14 +2279,14 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "run_id": {
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -2341,7 +2341,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "slice": {

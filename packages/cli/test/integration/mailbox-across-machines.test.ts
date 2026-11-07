@@ -1,5 +1,5 @@
 /**
- * gh-195/13 (B20, B21; D12, T9): the mailbox between machines once run state stays on the holder's. Clone A
+ * The mailbox between machines once run state stays on the holder's. Clone A
  * holds the stories; clone B, another clone of the same bare remote with its own norn home, user and
  * machine name, answers and approves them. Under `local` B stamps its receipt with the step the last
  * boundary commit led to (`Norn-Next`) and no attempt, and says the holder checks it; under `remote` it
@@ -90,7 +90,7 @@ function cloneOf(name: string, user: string, machine: string): Clone {
   };
   return { root, norn: (...argv) => runChecked(argv, deps) };
 }
-/** The team switches its record policy: committed and pushed on A, pulled on B (B12). */
+/** The team switches its record policy: committed and pushed on A, pulled on B. */
 function setPolicy(policy: "local" | "remote") {
   h.write(repoConfigPath(h.root), teamConfig(policy));
   h.git(["commit", "-q", "-am", `record.policy ${policy}`]);
@@ -201,7 +201,7 @@ describe("under local (B20)", () => {
     expect(blob).toMatchObject({ kind: "answer", step: "review" });
     expect(blob).not.toHaveProperty("attempt");
 
-    // the holder matches it by step alone, and keeps it with the attempt it matched (S6)
+    // the holder matches it by step alone, and keeps it with the attempt it matched
     await tick("--sync");
     expect(mailbox("gh-21")).toBe("");
     await tick();

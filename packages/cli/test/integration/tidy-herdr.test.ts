@@ -1,5 +1,5 @@
 /**
- * K7: `norn tidy` closes what runs that reported done left in Herdr — the run's tab, or only its pane
+ * `norn tidy` closes what runs that reported done left in Herdr — the run's tab, or only its pane
  * when the tab holds something else, and the workspace when nothing else is left; never a pane that
  * moved out of the run's worktree, one still working, or a run that ended any other way.
  */
@@ -16,7 +16,7 @@ import { runStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(30_000);
 
-describe("norn tidy closes Herdr panes of runs that reported done (K7)", () => {
+describe("norn tidy closes Herdr panes of runs that reported done", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-3-third`;
   const runsDir = () => runStateOf(join(wt(), ".agents/specs/gh-3-third"));
@@ -73,7 +73,7 @@ describe("norn tidy closes Herdr panes of runs that reported done (K7)", () => {
   });
 
   test("Herdr as the runner: --dry-run lists, tidy closes the done run's workspace only", async () => {
-    // gh-64 B29: Herdr is the runner when norn runs inside it
+    // Herdr is the runner when norn runs inside it
     (h.deps.env as Record<string, string>).HERDR_ENV = "1";
     const panes = [spot("w4:t1.p1", wt()), spot("w5:t1.p1", wt()), spot("w6:t1.p1", wt(), "working"), spot("w7:t1.p1", wt())];
     const dry = paneHerdr(panes);

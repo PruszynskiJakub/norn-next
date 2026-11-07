@@ -1,12 +1,12 @@
 /**
- * act (H4): perform every decided Action. Ordering per actions.ts (P6, S5, S6, S8):
+ * act: perform every decided Action, in the order core's actions.ts defines:
  *   1. write `receipts` (numbered by decide; replay-safe by receipt_id),
  *   2. the external effect (launch, send, kill, command, git, remote),
  *   3. `state.json` last (the commit point),
- *   4. regenerate the handoff header (S9) and commit + push at the step boundary.
+ *   4. regenerate the handoff header and commit + push at the step boundary.
  * `run_check` / `run_git` write their result receipt after the effect (next free number); the
  * next tick applies it. A failing effect stops the action before state is written; the next
- * tick re-decides. Every action is reported as an `ActionResult` for the trace (O4).
+ * tick re-decides. Every action is reported as an `ActionResult` for the trace.
  */
 import { relative } from "node:path";
 import {
@@ -33,19 +33,19 @@ import { startUnit, markDone, rejectReceipt, claim, renewAll, intake, mirror, cl
 export interface ActRecord {
   decision: Decision;
   result: ActionResult;
-  /** gh-78: how long act took over the action (a batched renewal: the batch's time) */
+  /** How long act took over the action (a batched renewal: the batch's time) */
   ms: number;
-  /** gh-78: a claim renewal pushed in the tick's one batch (its `ms` is the batch's) */
+  /** A claim renewal pushed in the tick's one batch (its `ms` is the batch's) */
   batched?: boolean;
 }
 
-/** Inbox groups that need a person; their new items are notified once (O3). */
+/** Inbox groups that need a person; their new items are notified once. */
 const NOTIFY_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "unclaimed"];
 
-/** R4.3: effects that reach an agent session; one succeeding clears a failed one of the unit. */
+/** Effects that reach an agent session; one succeeding clears a failed one of the unit. */
 const DELIVERY = new Set(["nudge", "answer", "resume", "launch"]);
 
-/** R4.3: the external effect an action performs, as named in an act failure. */
+/** The external effect an action performs, as named in an act failure. */
 function effectOf(a: Action): string {
   switch (a.kind) {
     case "nudge":
@@ -61,13 +61,11 @@ function effectOf(a: Action): string {
 }
 
 export class Actor extends ActEnv {
-  // ------------------------------------------------------------ dispatch
-
   async run(decisions: Decision[]): Promise<ActRecord[]> {
     const out: ActRecord[] = [];
-    // R1.2: a story's renewal runs before its other actions; once it loses the CAS, nothing else of
-    // that story is done this tick (R2.2: a checkout without the claim writes and pushes nothing)
-    // gh-195 D4 (B10): a record push comes after everything else, so after the tick's branch pushes
+    // A story's renewal runs before its other actions; once it loses the CAS, nothing else of
+    // that story is done this tick (a checkout without the claim writes and pushes nothing).
+    // A record push comes after everything else, so after the tick's branch pushes
     const renewals = decisions.filter((d) => isSideAction(d.action) && !isTailAction(d.action));
     const order = [...renewals, ...decisions.filter((d) => !isSideAction(d.action)), ...decisions.filter((d) => isTailAction(d.action))];
     const lost = new Set<string>();
@@ -88,7 +86,7 @@ export class Actor extends ActEnv {
       } else
         try {
           result = renewed.get(d) ?? (await this.perform(d.action));
-          // R4.3: an action whose effect failed is never ok, even when its state was written
+          // An action whose effect failed is never ok, even when its state was written
           if (result.ok && this.effectErrors.length) result = { ...result, ok: false, error: this.effectErrors.map((f) => f.reason).join("; ") };
         } catch (e) {
           counted = !(e instanceof QueueFull);
@@ -104,7 +102,7 @@ export class Actor extends ActEnv {
     return decisions.map((d) => out.find((r) => r.decision === d) as ActRecord);
   }
 
-  /** T4, H5: every renewal due this tick in one CAS batch (one push); a failed batch fails each. */
+  /** Every renewal due this tick in one CAS batch (one push); a failed batch fails each. */
   private async renewals(ds: Decision[]): Promise<Map<Decision, ActionResult>> {
     if (ds.length === 0) return new Map();
     let results: ActionResult[];
@@ -117,7 +115,7 @@ export class Actor extends ActEnv {
   }
 
   /**
-   * R4.3: remember a unit's failed effect (inbox Unblock item, status), or forget it once an effect of
+   * Remember a unit's failed effect (inbox Unblock item, status), or forget it once an effect of
    * the same family succeeds for the unit. Claim and repo-level actions are not unit failures.
    */
   private recordFailure(d: Decision, result: ActionResult): void {
@@ -145,12 +143,11 @@ export class Actor extends ActEnv {
   }
 
   /**
-   * gh-195 B14: a failed record push is owed, not a failure of the unit: the next tick pushes it. 08-F4:
-   * one refused as stale (another checkout pushed the ref) would fail the same way every tick, so it is
+   * A failed record push is owed, not a failure of the unit: the next tick pushes it. One
+   * refused as stale (another checkout pushed the ref) would fail the same way every tick, so it is
    * remembered with the lease it used (effect `record_push`) in the story's own slot, never the story
-   * unit's (review F2): decide holds the push until the record ref here changes, and the inbox shows one
-   * Check item. A push that lands, or one that fails another way (its lease was another, review#2 F6),
-   * clears it.
+   * unit's: decide holds the push until the record ref here changes, and the inbox shows one
+   * Check item. A push that lands, or one that fails another way (its lease was another), clears it.
    */
   private recordPushFailure(a: Extract<Action, { kind: "push_record" }>, rule: string, result: ActionResult): void {
     const key = recordPushSlot(a.unit.story);
@@ -167,7 +164,7 @@ export class Actor extends ActEnv {
     this.failuresChanged = true;
   }
 
-  /** review F2: a refused record push is forgotten once the story is not held here under `remote` (observe reports no `record`). */
+  /** A refused record push is forgotten once the story is not held here under `remote` (observe reports no `record`). */
   private dropRecordPushSlots(): void {
     const observed = new Set(this.obs.facts.stories.filter((s) => s.record).map((s) => recordPushSlot(s.key)));
     for (const [key, f] of Object.entries(this.failures))
@@ -220,9 +217,9 @@ export class Actor extends ActEnv {
         return markDone(this, a);
       case "commit_push": {
         const loc = this.unitLoc(a.unit);
-        // #265 (S12, gh-195 D8): what recover.commit owes is the unit's handoff, norn's one file in the worktree
+        // What recover.commit owes is the unit's handoff, norn's one file in the worktree
         // (observe's `uncommitted`); its run state is in the machine dir, never staged in the worktree (outside
-        // the repository), and the agent's own files are never committed under a live session (R2.1)
+        // the repository), and the agent's own files are never committed under a live session
         const rel = relative(a.commit.cwd, loc.handoffFile);
         return { ok: true, detail: await this.commit(a.commit, a.unit, loc.state, [rel]) };
       }
@@ -230,7 +227,7 @@ export class Actor extends ActEnv {
         return rejectReceipt(this, a);
       case "mark_corrupt": {
         const loc = this.obs.units[a.unit.key];
-        // S2: decide gives the corrupt state only when it may be written; a broken spec.md never is
+        // Decide gives the corrupt state only when it may be written; a broken spec.md never is
         const marked = a.state !== null && loc !== undefined;
         if (a.state && loc) writeState(loc.runsDir, a.state);
         await this.notify(a.notify);
@@ -284,9 +281,9 @@ export class Actor extends ActEnv {
   }
 
   /**
-   * O3: the observed facts with this tick's local effects applied — unit states written, claims
+   * The observed facts with this tick's local effects applied — unit states written, claims
    * acquired, merged stories cleaned up. Every state.json act wrote is the validated value it
-   * wrote (S5), so this equals a fresh local observe for the inbox without re-reading every
+   * wrote, so this equals a fresh local observe for the inbox without re-reading every
    * worktree; items resolved this tick drop out and items created this tick appear.
    */
   postActFacts(): Facts {
@@ -296,7 +293,7 @@ export class Actor extends ActEnv {
       const c = this.claimed.get(s.key);
       if (c) s.claim = { state: "mine", blob: c.blob, sha: c.sha };
       for (const u of s.units) {
-        // R4.3: failures recorded or cleared this tick
+        // Failures recorded or cleared this tick
         const failure = this.failures[u.unit.key];
         if (failure) u.act_failure = failure;
         else delete u.act_failure;
@@ -310,7 +307,7 @@ export class Actor extends ActEnv {
   }
 
   /**
-   * New inbox items needing a person (gates entered by apply, etc.). O3: pass facts observed
+   * New inbox items needing a person (gates entered by apply, etc.). Pass facts observed
    * after act, so items resolved this tick are not notified and new ones are not a tick late.
    */
   async notifyInbox(facts: Facts = this.obs.facts): Promise<void> {
@@ -318,7 +315,7 @@ export class Actor extends ActEnv {
     for (const g of NOTIFY_GROUPS) for (const item of inbox.groups[g]) await this.notify(item);
   }
 
-  /** GR6: retry owed base-branch records, at most once per `remote.sync_interval` each (H5). */
+  /** Retry owed base-branch records, at most once per `remote.sync_interval` each. */
   retryRecords(): Promise<Array<{ story: string; state: string; reason?: string }>> {
     return retryRecords(this);
   }

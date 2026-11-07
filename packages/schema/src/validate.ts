@@ -49,7 +49,7 @@ export const SCHEMAS = {
   "resolved-config": ResolvedConfig,
   "cli-error": CliError,
   "criteria-report": CriteriaReport,
-  // machine-local files of one checkout (its machine dir, B5), read through store readLocalJson (S2, BUG-4)
+  // machine-local files of one checkout (its machine dir), read through store readLocalJson
   "local-remote": LocalRemoteFile,
   "local-notified": LocalNotifiedFile,
   "local-records": LocalRecordsFile,

@@ -1,5 +1,5 @@
 /**
- * OpenCode agent adapter (M4, `hooks` tier — no blocking turn end, so A4 does not apply).
+ * OpenCode agent adapter (`hooks` tier: it cannot block a turn end).
  * OpenCode has no hook config; norn installs a norn-owned plugin file
  * `<repo>/.opencode/plugins/norn.js` that forwards events to `<hookCommand> <arg>` with a JSON
  * payload on stdin (shape below, normalized by parseHookEvent).
@@ -60,7 +60,7 @@ export const NornPlugin = async ({ directory }) => ({
 });
 `;
 }
-// TODO(M4): verify `chat.message` / `permission.asked` property names against the current OpenCode plugin types.
+// TODO: verify `chat.message` / `permission.asked` property names against the current OpenCode plugin types.
 
 function readPlugin(repoRoot: string): string | null {
   try {
@@ -105,9 +105,9 @@ export function launchCommand(req: AgentLaunchRequest): { argv: string[]; env: R
 }
 
 /**
- * C4: OpenCode keeps sessions in its storage dir, not one transcript; this reads an
+ * OpenCode keeps sessions in its storage dir, not one transcript; this reads an
  * `opencode export <session>` JSON file: `{messages:[{info:{role}, parts:[{type:"text",text}]}]}`.
- * TODO(M4): hooks carry no transcript path — the CLI must export the session first.
+ * TODO: hooks carry no transcript path — the CLI must export the session first.
  */
 export async function lastAssistantMessage(transcriptPath: string): Promise<string | null> {
   const doc = await readJsonFile(transcriptPath);
@@ -121,7 +121,7 @@ export async function lastAssistantMessage(transcriptPath: string): Promise<stri
   return null;
 }
 
-/** OpenCode skills: `.opencode/skills`. TODO(M4): confirm singular vs plural dir. */
+/** OpenCode skills: `.opencode/skills`. TODO: confirm singular vs plural dir. */
 export const skillDir = (repoRoot: string) => join(repoRoot, ".opencode", "skills");
 
 export const opencodeAgent: AgentAdapter = {

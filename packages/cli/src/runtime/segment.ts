@@ -1,7 +1,7 @@
 /**
  * `norn status --segment`: one plain line for Herdr's tab bar (`tab_bar_right`), and the presentation
  * of norn's orient workspaces — a sidebar token per story and needs-you-first order. Pure: a view
- * and Herdr's workspaces in, the line, tokens and moves out. Presentation only, never a fact (HC13).
+ * and Herdr's workspaces in, the line, tokens and moves out. Presentation only, never a fact.
  */
 import { basename } from "node:path";
 import { herdr } from "@norn/adapters";
@@ -9,7 +9,7 @@ import { type InboxGroup, isVersionMismatchItem } from "@norn/core";
 import { inboxItemsInOrder, type ProjectView } from "@norn/view";
 import { GROUP_MARK } from "./cockpit.ts";
 
-/** Groups the segment counts, in O1 order, with the word shown after the count. */
+/** Groups the segment counts, in inbox order, with the word shown after the count. */
 const COUNTED: Array<[InboxGroup, string]> = [
   ["your_turn", "your turn"],
   ["answer", "answer"],
@@ -24,7 +24,7 @@ const NEEDS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock
 
 /** e.g. `norn·todoist-app ● 1 approve ◐ 2 running`; calm when nothing waits: `norn·todoist-app ✓ nothing waits`. */
 export function segmentLine(view: ProjectView): string {
-  // gh-61 D7 (B8): a binary that does not fit the repo's norn version is named first, not counted
+  // A binary that does not fit the repo's norn version is named first, not counted
   const mismatch = view.inbox.groups.unblock.find(isVersionMismatchItem);
   const count = (g: InboxGroup) => view.inbox.groups[g].filter((i) => !isVersionMismatchItem(i)).length;
   const head = `norn·${basename(view.repo)}${mismatch ? ` ! ${mismatch.title.split(": ")[0]}` : ""}`;

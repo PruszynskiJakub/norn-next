@@ -1,11 +1,11 @@
 /**
- * `norn story view [<story|slice>] [--web] [--json]` (B16, B17, D6): one story at a glance — its
+ * `norn story view [<story|slice>] [--web] [--json]`: one story at a glance — its
  * slices with their workflow and step, the PR and its state, open notes, what waits for the person
- * (@norn/view orientReport, X1). Read only: no receipt, run or claim. Markdown by default, `--json`
- * for data (P8): the orient report extended with the slice steps and PR state. In a slice worktree
- * it views that slice's story (B55). The chat agent (`norn story chat`, `NORN_ORIENT=1`) sees its
+ * (@norn/view orientReport). Read only: no receipt, run or claim. Markdown by default, `--json`
+ * for data: the orient report extended with the slice steps and PR state. In a slice worktree
+ * it views that slice's story. The chat agent (`norn story chat`, `NORN_ORIENT=1`) sees its
  * rules first. `--web` opens the story's PR in the browser, or its issue when there is no PR. A story
- * another machine holds shows its claim, branch, PR and record (gh-195 D6, B17–B19).
+ * another machine holds shows its claim, branch, PR and record.
  */
 import { cmd } from "@norn/core";
 import { formatElsewhere, formatStoryView, orientReport } from "@norn/view";
@@ -30,7 +30,7 @@ export const storyViewCommand = defineCommand({
     const { key, story, slice } = parseUnitKey(raw);
     const view = await projectView(ctx);
     const report = orientReport(view, key, ctx.config.provider);
-    // gh-195 D6 (B17–B19): a story another machine holds, from its claim, branch and record ref as fetched last
+    // A story another machine holds, from its claim, branch and record ref as fetched last
     const elsewhere = report ? null : view.elsewhere.find((e) => e.key === story);
     if (elsewhere && !opt.bool(args, "web")) return rendered(elsewhere, formatElsewhere(elsewhere));
     if (!report) throw refuse(`unknown story ${story}`, cmd.status(), "unknown_unit");

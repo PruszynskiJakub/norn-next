@@ -1,13 +1,13 @@
 /**
  * Headless runner (RunnerPort): starts the agent's non-interactive command as a detached
- * background process in the unit worktree, env included (A6), stdout+stderr appended to a log
- * file in the machine dir. Liveness is pid + start time (K3), so a reused pid never counts.
+ * background process in the unit worktree, env included, stdout+stderr appended to a log
+ * file in the machine dir. Liveness is pid + start time, so a reused pid never counts.
  *
- * There is no pane to type into: `send` throws PortError `unsupported`. Per B2 the caller then
+ * There is no pane to type into: `send` throws PortError `unsupported`. The caller then
  * continues the same agent session by launching `AgentAdapter.launchCommand({ resume })` through
- * this runner, or starts a fresh session from the handoff — capabilities `send: false, resume: true`
- * (R4.1), and `headless`: agents launch their non-interactive command. `findSessions` looks for a run's process by its `NORN_RUN` env (R5.1). `output` is the head
- * of the run's log (B3).
+ * this runner, or starts a fresh session from the handoff (capabilities `send: false, resume: true,
+ * headless`: agents launch their non-interactive command). `findSessions` looks for a run's process
+ * by its `NORN_RUN` env. `output` is the head of the run's log.
  */
 import { closeSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -20,7 +20,7 @@ import { createProcessPort } from "../process/index.ts";
 export const RUNNER_NAME = "headless";
 
 export interface HeadlessRunnerOptions {
-  /** directory for `<run_id>.log` (default: the machine dir's `sessions/`, D9, gh-195 D1) */
+  /** directory for `<run_id>.log` (default: the machine dir's `sessions/`) */
   logDir: string;
   process?: ProcessPort;
   /** grace between SIGTERM and SIGKILL (default 3000 ms) */
@@ -47,7 +47,7 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
     },
 
     async findSessions(q) {
-      // the run's process carries NORN_RUN (A6); its session id is the run id, as launch records it
+      // the run's process carries NORN_RUN; its session id is the run id, as launch records it
       const procs = proc.findByEnv ? await proc.findByEnv("NORN_RUN", q.run_id).catch(() => []) : [];
       return procs.map((p) => ({ session: { runner: RUNNER_NAME, session_id: q.run_id, process: p } }));
     },
@@ -74,7 +74,7 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
     },
 
     async output(session) {
-      // B3: the head of the run's log — why a run that exited at once never started
+      // The head of the run's log — why a run that exited at once never started
       try {
         return headOf(readFileSync(logPath(opts.logDir, session.session_id), "utf8"), OUTPUT_LINES);
       } catch {
@@ -83,11 +83,11 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
     },
 
     async send() {
-      throw portError("unsupported", "headless sessions take no input; resume via the agent's resume command (B2)");
+      throw portError("unsupported", "headless sessions take no input; resume via the agent's resume command");
     },
 
     async paneState(session): Promise<PaneState> {
-      // No screen to read: report liveness only, never a completion signal (C2).
+      // No screen to read: report liveness only, never a completion signal.
       return { alive: await this.isAlive(session), state: "unknown", since: null };
     },
 

@@ -1,6 +1,5 @@
 /**
- * gh adapter — implements RemotePort (packages/core/src/ports.ts) over the GitHub `gh` CLI's
- * JSON output, run in the repository directory. Story key for issue n is `gh-<n>` (§5.1).
+ * gh adapter over the GitHub `gh` CLI's JSON output, run in the repository directory.
  */
 import type { PullRequestCi, RemoteFactory, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
@@ -79,7 +78,7 @@ function mapPr(p: GhPr): RemotePullRequest {
 }
 
 /**
- * gh-195 B18: `gh pr checks --json bucket` buckets (pass, fail, pending, skipping, cancel) folded into
+ * `gh pr checks --json bucket` buckets (pass, fail, pending, skipping, cancel) folded into
  * one state: a failed or cancelled check wins, then a pending one; no check at all is `none`.
  */
 function ciOf(buckets: readonly string[]): PullRequestCi {
@@ -89,12 +88,12 @@ function ciOf(buckets: readonly string[]): PullRequestCi {
   return "success";
 }
 
-/** How many branches one GraphQL query asks for (gh-186): one alias each. */
+/** How many branches one GraphQL query asks for: one alias each. */
 const PRS_PER_QUERY = 50;
 const PR_NODE = "number url state isDraft headRefName headRefOid baseRefName mergedAt mergeCommit { oid } mergedBy { login }";
 
 /**
- * gh-186: one aliased `pullRequests(headRefName:)` per branch, newest first like `gh pr list`,
+ * One aliased `pullRequests(headRefName:)` per branch, newest first like `gh pr list`,
  * every state. Branch names go in as JSON string literals, which GraphQL reads the same way.
  */
 export function prsQuery(branches: readonly string[]): string {
@@ -107,7 +106,7 @@ export function createGh(opts: GhOptions): RemotePort {
   const bin = opts.bin ?? "gh";
   const env = { GH_PROMPT_DISABLED: "1", NO_COLOR: "1", ...(opts.env ?? {}) };
   const repo = opts.repo ? ["-R", opts.repo] : [];
-  // H11: every gh call reaches the remote, so every one is bounded
+  // Every gh call reaches the remote, so every one is bounded
   const run = (args: string[]) => exec([bin, ...args], { cwd: opts.cwd, env, timeoutMs: NETWORK_TIMEOUT_MS });
   const json = async <T>(args: string[]): Promise<T> => parseJson<T>(okOrThrow(await run(args), `gh ${args[0]} ${args[1]}`, "gh"), `gh ${args[0]}`, "gh");
 
@@ -119,17 +118,15 @@ export function createGh(opts: GhOptions): RemotePort {
       return out;
     },
     async listAssignedIssues({ label }) {
-      // GR1
       const rows = await json<GhIssue[]>(["issue", "list", ...repo, "--assignee", "@me", "--label", label, "--state", "open", "--limit", "500", "--json", ISSUE_FIELDS]);
       return rows.map(mapIssue);
     },
     async listLabelledIssues({ label }) {
-      // CP2: the backlog — any assignee or none
+      // The backlog — any assignee or none
       const rows = await json<GhIssue[]>(["issue", "list", ...repo, "--label", label, "--state", "open", "--limit", "500", "--json", ISSUE_FIELDS]);
       return rows.map(mapIssue);
     },
     async assignIssue(number, assignee) {
-      // GR1
       okOrThrow(await run(["issue", "edit", String(number), ...repo, "--add-assignee", assignee]), "gh issue edit", "gh");
     },
     async getIssue(number) {
@@ -143,7 +140,7 @@ export function createGh(opts: GhOptions): RemotePort {
       return rows[0] ? mapPr(rows[0]) : null;
     },
     async findPullRequests(branches) {
-      // gh-186: one `gh api graphql` per PRS_PER_QUERY branches instead of one `gh pr list` per branch
+      // One `gh api graphql` per PRS_PER_QUERY branches instead of one `gh pr list` per branch
       const out = new Map<string, RemotePullRequest | null>();
       const [owner, name] = opts.repo ? opts.repo.split("/") : ["{owner}", "{repo}"];
       const unique = [...new Set(branches)];
@@ -178,11 +175,9 @@ export function createGh(opts: GhOptions): RemotePort {
       return mapPr(pr);
     },
     async editPullRequestBody(number, body) {
-      // GR9
       okOrThrow(await run(["pr", "edit", String(number), ...repo, "--body", body]), "gh pr edit", "gh");
     },
     async createIssue({ title, body, labels, assignee }) {
-      // B18
       const out = okOrThrow(
         await run(["issue", "create", ...repo, "--title", title, "--body", body, ...labels.flatMap((l) => ["--label", l]), "--assignee", assignee]),
         "gh issue create",
@@ -193,28 +188,27 @@ export function createGh(opts: GhOptions): RemotePort {
       return mapIssue(await json<GhIssue>(["issue", "view", m[1] as string, ...repo, "--json", ISSUE_FIELDS]));
     },
     async newIssueUrl({ labels }) {
-      // B23
       const { url } = await json<{ url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--json", "url"]);
       return `${url}/issues/new?labels=${encodeURIComponent(labels.join(","))}`;
     },
     async rawFileUrl({ commit, path }) {
-      // gh-195 D5 (B28): `blob/…?raw=true` redirects to the raw file, which GitHub renders inline
+      // `blob/…?raw=true` redirects to the raw file, which GitHub renders inline
       const { url } = await json<{ url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--json", "url"]);
       return `${url}/blob/${commit}/${encodePath(path)}?raw=true`;
     },
     async replaceIssueLabel(number, { remove, add }) {
-      // B19: gh refuses `--remove-label` for a label the repository lacks, so remove only one the issue carries
+      // `gh` refuses `--remove-label` for a label the repository lacks, so remove only one the issue carries
       const { labels } = await json<Pick<GhIssue, "labels">>(["issue", "view", String(number), ...repo, "--json", "labels"]);
       const removing = (labels ?? []).some((l) => l.name === remove) ? ["--remove-label", remove] : [];
       okOrThrow(await run(["issue", "edit", String(number), ...repo, ...removing, "--add-label", add]), "gh issue edit", "gh");
     },
     async listLabels() {
-      // GR10: gh lists 30 by default
+      // `gh` lists 30 by default
       const rows = await json<Array<{ name: string; color?: string; description?: string | null }>>(["label", "list", ...repo, "--limit", "1000", "--json", "name,color,description"]);
       return rows.map((l): RemoteLabel => ({ name: l.name, color: (l.color ?? "").replace(/^#/, "").toUpperCase(), description: l.description ?? "" }));
     },
     async createLabel({ name, color, description }) {
-      // GR10: never `--force`, which would restyle an existing label
+      // Never `--force`, which would restyle an existing label
       const r = await run(["label", "create", name, ...repo, "--color", color, "--description", description]);
       if (r.code !== 0 && /already exists/i.test(r.stderr)) throw portError("gh_exists", `gh label create: label ${name} already exists`);
       okOrThrow(r, "gh label create", "gh");

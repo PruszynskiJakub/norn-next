@@ -1,8 +1,8 @@
 /**
- * `norn story start` (B28, MO5, O1): a person opens an agent on the step only a person starts —
+ * `norn story start`: a person opens an agent on the step only a person starts —
  * refused before the story starts and while the step is not theirs; prints the start command when
  * the runner cannot open a terminal or with `--print`, opens one through the runner when it can.
- * Without a target a person picks from the units a person can start (B57–B59).
+ * Without a target a person picks from the units a person can start.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
@@ -69,11 +69,11 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("norn story start (B28, MO5)", () => {
+describe("norn story start (B28)", () => {
   const wt = () => `${h.root}-worktrees/gh-7-add-login-form`;
   const norn = (deps: Partial<CliDeps>, ...argv: string[]) => runChecked(argv, { ...h.deps, ...deps });
 
-  test("taken in, not started: refused with the command that starts it; the inbox says so (GR2, O1)", async () => {
+  test("taken in, not started: refused with the command that starts it; the inbox says so", async () => {
     await h.tick();
     h.clock.advance(10_000);
     const r = await h.norn("story", "start", "gh-7");
@@ -90,7 +90,7 @@ describe("norn story start (B28, MO5)", () => {
     h.clock.advance(10_000);
     await h.tick();
     const inbox = (await h.norn("status")).value as { groups: { your_turn: Array<{ story: string; command: string; detail?: string }> } };
-    // gh-64 B14: claude's built-in args stay
+    // Claude's built-in args stay
     const start = `cd ${wt()} && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'`;
     expect(inbox.groups.your_turn).toMatchObject([{ story: "gh-7", command: start }]);
     const r = await h.norn("story", "start", "gh-7", "--json");
@@ -104,7 +104,7 @@ describe("norn story start (B28, MO5)", () => {
     expect(term.picks.map((p) => p.choices.map((c) => c.value))).toEqual([["gh-7"]]);
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ unit: "gh-7", step: "refine" });
-    // a script is refused with only that unit (B60)
+    // a script is refused with only that unit
     const script = await norn({ interaction: new FakeInteraction(false) }, "story", "start");
     expect(script.exit).toBe(2);
     expect(script.value).toMatchObject({ code: "target_required", do_instead: "norn story start gh-7" });

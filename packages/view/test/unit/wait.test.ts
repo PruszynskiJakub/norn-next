@@ -6,7 +6,7 @@ const view = (story: Record<string, unknown> = {}, slices: Array<Record<string, 
   ({ stories: [{ ...unit("gh-7"), pr: null, story_status: "active", ...story, slices }] }) as unknown as ProjectView;
 const park = (kind: string) => ({ status: "parked", park: { kind, reason: "r", since: "2026-11-03T00:00:00.000Z" } });
 
-describe("story wait conditions (gh-175)", () => {
+describe("story wait conditions", () => {
   test("parses each condition and refuses anything else", () => {
     for (const c of ["step=review", "gate", "ask", "stuck", "done", "merged"]) expect(formatWaitCondition(parseWaitCondition(c)!)).toBe(c);
     for (const c of ["", "step=", "Done", "sync.done", "$done", "not done", "step"]) expect(parseWaitCondition(c)).toBeNull();

@@ -1,5 +1,5 @@
 /**
- * This machine's name in claims, run records and the inbox (R7.2): `user@host`. `NORN_MACHINE`
+ * This machine's name in claims, run records and the inbox: `user@host`. `NORN_MACHINE`
  * overrides the host; `@` and whitespace become `_` so the name stays one token.
  */
 import { hostname, userInfo } from "node:os";

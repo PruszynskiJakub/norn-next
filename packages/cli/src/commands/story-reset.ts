@@ -1,16 +1,16 @@
 /**
- * `norn story reset [<story>] [--yes] [--force]` (GR7a): take a story back to before intake —
+ * `norn story reset [<story>] [--yes] [--force]`: take a story back to before intake —
  * remove its worktrees, its local and remote branches (the record goes with them), leases, mailbox
- * refs (T9) and the claim. The remote issue is left alone, so the next sync takes it in again from the current base
- * while it is assigned and labelled (GR1, GR2).
+ * refs and the claim. The remote issue is left alone, so the next sync takes it in again from the current base
+ * while it is assigned and labelled.
  *
- * Refused first, before anything changes: a claim another machine holds (B38); work a reset would
+ * Refused first, before anything changes: a claim another machine holds; work a reset would
  * delete — a PR, a started slice, changes outside the spec folder (`resetBlockers`) — unless
- * `--force`. Then consent: `--yes`, or y at the terminal; without a terminal it is refused (B36, B37).
+ * `--force`. Then consent: `--yes`, or y at the terminal; without a terminal it is refused.
  *
- * Order: claim it if free (T7) → delete the remote branches, stopping on the first failure with
+ * Order: claim it if free → delete the remote branches, stopping on the first failure with
  * everything here still in place → remove worktrees, local branches, leases → delete the mailbox
- * refs, as GR6 does → delete the claim ref.
+ * refs → delete the claim ref.
  */
 import { existsSync } from "node:fs";
 import { cmd } from "@norn/core";
@@ -26,7 +26,7 @@ import { claimIfFree, refuseOthers } from "./story-close.ts";
 export const storyResetCommand = defineCommand({
   name: "story reset",
   version: "acts",
-  summary: "Reset a story to before intake: remove its worktrees, local and remote branches, record and claim; the issue stays (GR7a)",
+  summary: "Reset a story to before intake: remove its worktrees, local and remote branches, record and claim; the issue stays",
   usage: "norn story reset [<story>] [--yes] [--force]",
   options: { yes: { type: "boolean" }, force: { type: "boolean" } },
   optionHelp: {
@@ -43,7 +43,7 @@ export const storyResetCommand = defineCommand({
       if (blockers.length && !force) throw refuse(`${key} holds work a reset would delete: ${blockers.join("; ")}`, `${cmd.storyClose(key)} keeps it; ${cmd.storyReset(key, { force: true })} deletes it`, "has_work", { blockers });
     };
     await withStory(ctx, key, cmd.storyReset(key), async (obs, story) => blocked(await resetBlockers(obs, story)));
-    // B36: ask before taking the tick lock again, so an open prompt never blocks tick or watch
+    // Ask before taking the tick lock again, so an open prompt never blocks tick or watch
     if (!opt.bool(args, "yes")) {
       const terminal = ctx.terminal(json);
       if (!terminal) throw refuse(`resetting ${key} deletes its branches and record; there is no terminal to ask in`, "pass --yes", "confirm_required");
@@ -90,7 +90,7 @@ export const storyResetCommand = defineCommand({
         deleted.push(b);
       }
       const leases = await releaseStoryLeases(ctx.home, obs.root, key);
-      // a receipt left for the old run would only be rejected later (T9); delete it with the claim, as GR6 does
+      // a receipt left for the old run would only be rejected later; delete it with the claim
       if (obs.remote) await fetchNornRefs(obs.root, obs.remote).catch(() => undefined);
       const mailbox: string[] = [];
       for (const m of await listMailbox(obs.root, key).catch(() => [])) if ((await deleteMailbox(obs.root, obs.remote, m.ref, m.sha)).ok) mailbox.push(m.ref);

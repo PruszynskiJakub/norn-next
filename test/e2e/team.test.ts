@@ -1,8 +1,8 @@
 /**
- * Team handoff (M3): clone A runs a slice until it parks on `ask`, hands it over (T6, B34);
- * clone B checks the story out from git alone (T5, B33), briefs and continues. Then a CAS race between
+ * Team handoff: clone A runs a slice until it parks on `ask`, hands it over;
+ * clone B checks the story out from git alone, briefs and continues. Then a CAS race between
  * two checkouts (T3: one wins, the other gets "held by X since Y"), `story checkout --force` journaled,
- * and `story close` (GR7, B35–B39).
+ * and `story close`.
  * Real git: two clones of one bare remote; each clone has its own ~/.norn and heartbeat.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -102,7 +102,7 @@ function wrap(root: string, deps: CliDeps, runner: FakeRunner): Clone {
       const checks: Promise<void>[] = [];
       const r = await runChecked(["tick", ...flags], { ...deps, onCheckStarted: (exited) => void checks.push(exited) });
       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
-      await Promise.all(checks); // the check-run receipt is the next tick's to apply (C5)
+      await Promise.all(checks); // the check-run receipt is the next tick's to apply
       return r.value as TickReport;
     },
   };
@@ -135,7 +135,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("two clones hand a story over through git (T5, T6)", () => {
+describe("two clones hand a story over through git", () => {
   test("clone A: intake → plan → slice implement asks a question and parks", async () => {
     expect((await A.norn("init")).exit).toBe(0);
     h.config(CONFIG);
@@ -175,11 +175,11 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     expect(state(sliceRuns(h.root))).toMatchObject({ step: "implement", status: "parked", park: { kind: "ask" } });
 
     // the agent's Resume notes, not committed yet (S9: context for the next person)
-    const handoff = handoffPath(join(sliceWt(h.root), SPEC), "01-form"); // gh-195/07: handoffs/<unit>.md on the slice branch, apart from the run state
+    const handoff = handoffPath(join(sliceWt(h.root), SPEC), "01-form"); // Handoffs/<unit>.md on the slice branch, apart from the run state
     h.write(handoff, `${readFileSync(handoff, "utf8")}\n## Resume\nForm done; use blue unless told otherwise.\n`);
   });
 
-  test("clone A hands over from its slice worktree: handoff committed, branches pushed, then the claim ref deleted (T6, B34, B55)", async () => {
+  test("clone A hands over from its slice worktree: handoff committed, branches pushed, then the claim ref deleted (B34, B55)", async () => {
     const r = await A.at(sliceWt(h.root), "story", "handoff");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ story: "gh-7", released: true, pushed: ["gh-7-add-login-form", "gh-7/01-form"] });
@@ -189,7 +189,7 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     expect((await A.norn("story", "handoff", "gh-7")).exit).toBe(3);
   });
 
-  test("clone B takes from git alone: claim, worktrees with slots, cursor and handoff printed (T5)", async () => {
+  test("clone B takes from git alone: claim, worktrees with slots, cursor and handoff printed", async () => {
     B = cloneOf(h, "repo-b", "bob");
     step();
     const r = await B.norn("story", "checkout", "gh-7");
@@ -201,7 +201,7 @@ describe("two clones hand a story over through git (T5, T6)", () => {
       ["gh-7", storyWt(B.root), 1],
       ["gh-7/01", sliceWt(B.root), 2],
     ]);
-    // gh-195/10 (B22): A's handoff pushed the record to its ref; B unpacked it into its machine dir
+    // A's handoff pushed the record to its ref; B unpacked it into its machine dir
     expect(v.units.find((u) => u.unit === "gh-7/01")).toMatchObject({ step: "implement", status: "parked" });
     expect(v.units.find((u) => u.unit === "gh-7/01")?.handoff).toContain("use blue unless told otherwise");
     expect(readFileSync(join(sliceWt(B.root), "form.txt"), "utf8")).toBe("form v1\n");
@@ -209,13 +209,13 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     expect(readFileSync(join(sliceWt(B.root), ".env.norn"), "utf8")).toContain("NORN_SLOT=2");
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).not.toBe("");
 
-    // R10.1 (M8): the take is in the record — a `take` receipt on the story unit (in B's machine dir,
+    // The take is in the record — a `take` receipt on the story unit (in B's machine dir,
     // never pushed: S12) and a trace event
     const file = (r.value as { receipt: { file: string } }).receipt.file;
     expect(file).toMatch(/^\d{4}-take\.json$/);
     const rec = JSON.parse(readFileSync(join(storyRuns(B.root), "receipts", file), "utf8"));
     expect(rec).toMatchObject({ kind: "take", by: "human", who: "bob@repo-b", previous_holder: null, previous_heartbeat_id: null, expired: false });
-    // S12, D8: neither branch carries it, nor any run state, and under `local` no record push followed the take
+    // Neither branch carries it, nor any run state, and under `local` no record push followed the take
     for (const b of ["gh-7-add-login-form", "gh-7/01-form"]) expect(sh(B.root, ["ls-tree", "-r", "--name-only", b]).split("\n").filter((f) => f.endsWith("-take.json") || f.includes(`${SPEC}/runs/`))).toEqual([]);
     expect(h.git(["ls-remote", "origin", "refs/norn/runs/gh-7"]).split("\t")[0]).toBe(sh(B.root, ["rev-parse", "refs/norn/runs/gh-7"]));
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"]).split("\t")[0]).toBe(sh(B.root, ["rev-parse", "gh-7-add-login-form"]));
@@ -223,7 +223,7 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     expect(JSON.stringify(trace.value)).toContain("take by bob@repo-b (claim was free)");
 
     // clone A now sees the claim held elsewhere: its copy of the record, handed over cleanly, goes
-    // quietly (gh-195 D11, B27), then it does nothing to the story (T7)
+    // quietly, then it does nothing to the story
     step();
     const a = await A.tick("--sync");
     expect(a.decisions.filter((d) => d.unit.startsWith("gh-7"))).toEqual([{ unit: "gh-7", rule: "record.released", kind: "set_aside_record", ok: true }]);
@@ -236,7 +236,7 @@ describe("two clones hand a story over through git (T5, T6)", () => {
   test("clone B answers, briefs and continues the slice to its gate", async () => {
     expect((await B.norn("story", "answer", "gh-7/01", "Blue.")).exit).toBe(0);
     step();
-    // the story unit applies the take receipt (R10.1) alongside the slice's answer
+    // the story unit applies the take receipt alongside the slice's answer
     expect(kinds(await B.tick())).toEqual(["gh-7 apply_receipts", "gh-7/01 apply_receipts"]);
     const brief = await B.at(sliceWt(B.root), "brief");
     expect(brief.exit).toBe(0);
@@ -252,12 +252,12 @@ describe("two clones hand a story over through git (T5, T6)", () => {
     step();
     expect(kinds(await B.tick())).toEqual(["gh-7/01 apply_receipts"]);
     expect(state(sliceRuns(B.root))).toMatchObject({ step: "human-qa", status: "parked", park: { kind: "gate" } });
-    // B pushed its step boundaries (S8, T7)
+    // B pushed its step boundaries
     expect(sh(B.root, ["rev-parse", "gh-7/01-form"])).toBe(h.git(["ls-remote", "origin", "refs/heads/gh-7/01-form"]).split("\t")[0] as string);
   });
 });
 
-describe("claim races (T3) and forced takes (T5)", () => {
+describe("claim races and forced takes", () => {
   let C: Clone;
   test("after B's claim expires, two concurrent takes: exactly one wins, the other is told who holds it", async () => {
     C = cloneOf(h, "repo-c", "carol");
@@ -272,7 +272,7 @@ describe("claim races (T3) and forced takes (T5)", () => {
     const winner = ra.exit === 0 ? "tester@box" : "carol@repo-c";
     expect((lost[0]?.value as { error: string }).error).toMatch(new RegExp(`^held by ${winner} since \\d{4}-`));
     expect((won[0]?.value as { taken_from: { holder: string; expired: boolean } }).taken_from).toMatchObject({ holder: "bob@repo-b", expired: true });
-    // R10.1: the winner's take receipt names the expired holder
+    // The winner's take receipt names the expired holder
     const winRoot = ra.exit === 0 ? A.root : C.root;
     const file = (won[0]?.value as { receipt: { file: string } }).receipt.file;
     expect(JSON.parse(readFileSync(join(storyRuns(winRoot), "receipts", file), "utf8"))).toMatchObject({ kind: "take", previous_holder: "bob@repo-b", expired: true });
@@ -305,7 +305,7 @@ describe("claim races (T3) and forced takes (T5)", () => {
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-7"])).not.toBe("");
   });
 
-  test("the old take, release and drop are unknown commands; nothing is dropped (B5)", async () => {
+  test("the old take, release and drop are unknown commands; nothing is dropped", async () => {
     for (const name of ["take", "release", "drop"]) {
       const r = await B.norn(name, "gh-7");
       expect(r.exit).toBe(2);
@@ -355,7 +355,7 @@ describe("claim races (T3) and forced takes (T5)", () => {
     expect((await B.norn("story", "checkout", "gh-7", "--force")).exit).toBe(0);
   });
 
-  test("story close --yes from the slice worktree pushes first, then removes worktrees, local branches, slots and the claim; the record stays; issue and PRs untouched (GR7, B35, B55)", async () => {
+  test("story close --yes from the slice worktree pushes first, then removes worktrees, local branches, slots and the claim; the record stays; issue and PRs untouched (B35, B55)", async () => {
     h.write(join(sliceWt(B.root), "wip.txt"), "unfinished\n");
     const calls = h.remote.calls.length;
     const r = await B.at(sliceWt(B.root), "story", "close", "--yes");
@@ -427,7 +427,7 @@ describe("story close asks at the terminal (B36)", () => {
     expect(h2.remote.issues[0]?.state).toBe("open");
   });
 
-  test("an unreadable pushed spec.md is refused story_corrupt, never taken as open (S2, B39)", async () => {
+  test("an unreadable pushed spec.md is refused story_corrupt, never taken as open (B39)", async () => {
     const tmp = `${h2.root}-corrupt`;
     h2.git(["fetch", "-q", "origin"]);
     h2.git(["worktree", "add", "-q", "--detach", tmp, "origin/gh-8-add-logout"]);

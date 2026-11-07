@@ -1,6 +1,6 @@
-# Quick workflow — repo-local copy of the shipped one (W1, W9: label norn:wf:quick), with this repo's
+# Quick workflow — repo-local copy of the shipped one (label norn:wf:quick), with this repo's
 # check commands and its ci.yml wait. For refactors, docs, chores, other small changes and the fix of
-# a bug `reproduce` confirmed. A story workflow without `slices` (W8): every step works in the story
+# a bug `reproduce` confirmed. A story workflow without `slices`: every step works in the story
 # worktree. Sync, implement, update, check, review, describe, open the draft PR, wait for its CI, and
 # wait for a person at ready; the person merges the PR. The local check runs the unit tier and the
 # type check; CI runs every tier, integration and e2e sharded.
@@ -31,7 +31,7 @@ steps:
       A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the
       suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Progress and
       the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
-      changing any code, then fix the cause and cite the rule ids the fix enforces.
+      changing any code, then fix the cause.
       Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
       Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (its .norn-unit marker) and a dev build run there would act on its claim and on its run state (state.json, receipts) in the checkout's machine dir.
       Run `bun run test` (the unit tier) after each change, and the type check; the integration and e2e tiers run in CI, which the `ci` check waits for, so do not run them before handing back.
@@ -72,7 +72,7 @@ steps:
     action: open-pr
     outcomes: { done: ci }
   # waits for the PR's CI (a detached check run, so the tick is not blocked): the ci.yml run of the
-  # PR's head commit, up to 5m for it to appear, else fail (#125); a red run's failed
+  # PR's head commit, up to 5m for it to appear, else fail; a red run's failed
   # log becomes last_check for implement, whose rework goes back through open-pr to the new head
   ci:
     type: check
@@ -102,10 +102,10 @@ counters:
   ci_loop: { max: 3 }
   review_loop: { max: 3 }
   ready_loop: { max: 2 }
-  # reset each time their update merges cleanly: only repeated conflicts on one base move count (W4)
+  # reset each time their update merges cleanly: only repeated conflicts on one base move count
   sync_conflict_loop: { max: 2, reset_on: sync.done }
   base_conflict_loop: { max: 2, reset_on: update.done }
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
-# update-branch re-enters update, not sync (the default would be the first update step, BS9)
+# update-branch re-enters update, not sync (the default would be the first update step)
 base: { stale: conflict, step: update }

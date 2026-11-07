@@ -1,6 +1,6 @@
 /**
- * The generated part of docs/reference.md (gh-162 B8–B13): every command and verb with its usage and
- * options, every config key with the files that take it, its type (read off the file schemas, gh-64) and built-in default, the shipped workflows and the exit
+ * The generated part of docs/reference.md: every command and verb with its usage and options, every
+ * config key with the files that take it, its type (read off the file schemas) and built-in default, the shipped workflows and the exit
  * codes, rendered from the cli's own registry, the built-in config and the shipped assets. Pure: the
  * caller passes the workflow files' text. `bun run docs:emit` writes it between the markers; a unit
  * test fails when the file is stale.
@@ -45,7 +45,7 @@ interface ConfigRow {
 
 const props = (s: Schema): Record<string, Schema> | undefined => s.properties as Record<string, Schema> | undefined;
 
-/** A schema's type in words, read off the schema itself (B9), never off a default value. */
+/** A schema's type in words, read off the schema itself, never off a default value. */
 function typeName(s: Schema): string {
   if (Array.isArray(s.anyOf)) {
     const branches = s.anyOf as Schema[];
@@ -67,7 +67,7 @@ function typeName(s: Schema): string {
 }
 
 /**
- * Every key a config file can hold (B9), walked from the file's schema: a map's own keys nest
+ * Every key a config file can hold, walked from the file's schema: a map's own keys nest
  * (`notify.ntfy`, `agents.claude.model`), and a map-or-null both nests and has a row of its own.
  */
 function configRows(s: Schema, path: string[], defaults: unknown): ConfigRow[] {
@@ -84,10 +84,10 @@ function configRows(s: Schema, path: string[], defaults: unknown): ConfigRow[] {
 
 const at = (v: unknown, k: string): unknown => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>)[k] : undefined);
 
-/** How the table names each file (gh-64 B1): `~/.norn/config.yaml`, the local file, the team file. */
+/** How the table names each file: `~/.norn/config.yaml`, the local file, the team file. */
 export const FILE_LABEL: Record<ConfigFileKind, string> = { user: "user", local: "local", repo: "team" };
 
-/** Keys whose value, when no file sets it, is derived from the repo, not a fixed built-in default (gh-64 B22, B23). */
+/** Keys whose value, when no file sets it, is derived from the repo, not a fixed built-in default. */
 const DERIVED_DEFAULT: Record<string, string> = {
   provider: "derived from the remote URL",
   base_branch: "derived: the remote's default branch",
@@ -148,7 +148,7 @@ export function renderReference(input: ReferenceInput): string {
   return out.join("\n");
 }
 
-/** `doc` with the text between the markers replaced by `block`; prose around them is kept (B12). */
+/** `doc` with the text between the markers replaced by `block`; prose around them is kept. */
 export function replaceReference(doc: string, block: string): string {
   const start = doc.indexOf(REFERENCE_START);
   const end = doc.indexOf(REFERENCE_END);

@@ -1,7 +1,7 @@
 /**
- * Closed stories (D5): a story is closed when its spec file on its pushed story branch (the local one
- * without a remote) says `dropped`. `story close` refuses a closed story (B39); `story reopen`
- * acts only on one (B42) and offers only those (B55).
+ * Closed stories: a story is closed when its spec file on its pushed story branch (the local one
+ * without a remote) says `dropped`. `story close` refuses a closed story; `story reopen`
+ * acts only on one and offers only those.
  */
 import { LEGACY_SPEC_FILE, parseSliceFileName, type SliceFrontmatter, sliceBranch, sliceKey, SPEC_FILE, specDir, STORY_KEY_PATTERN, type StoryFrontmatter } from "@norn/schema";
 import { parseSliceFile, parseStoryFile } from "@norn/store";
@@ -31,7 +31,7 @@ export async function pushedStory(ctx: Context, key: string, again: string): Pro
     rev = `refs/remotes/${remote}/${branch}`;
   }
   const spec_dir = specDir(key, branch.slice(key.length + 1));
-  // GR2: spec.md, or story.md for a story an older norn intook
+  // spec.md, or story.md for a story an older norn intook
   let path = `${spec_dir}/${SPEC_FILE}`;
   let text = await ctx.git.show(ctx.root, rev, path);
   if (text === null) {
@@ -40,14 +40,14 @@ export async function pushedStory(ctx: Context, key: string, again: string): Pro
   }
   if (text === null) return null;
   const doc = parseStoryFile(text, `${rev}:${path}`);
-  // S2: an unreadable record is never guessed open or closed
+  // An unreadable record is never guessed open or closed
   if (!doc.ok) throw failure(`${rev}:${path} is unreadable (${doc.reason})`, `fix ${path} on ${branch}, then ${again} again`, "story_corrupt");
   return { key, branch, rev, spec_dir, frontmatter: doc.value.frontmatter };
 }
 
 export const isClosed = (s: PushedStory | null): boolean => s?.frontmatter.status === "dropped";
 
-/** B55: the closed stories, from the story branches on the remote (local ones without a remote), by key. */
+/** The closed stories, from the story branches on the remote (local ones without a remote), by key. */
 export async function closedStories(ctx: Context, again: (key: string) => string): Promise<string[]> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   const re = new RegExp(`${STORY_KEY_PATTERN.slice(0, -1)}-[a-z0-9][a-z0-9-]*$`);

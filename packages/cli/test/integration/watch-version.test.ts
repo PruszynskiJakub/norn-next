@@ -1,8 +1,8 @@
 /**
- * gh-61 B11 (D8): `norn watch` checks the repo's norn version again before every tick. A tick it may
+ * `norn watch` checks the repo's norn version again before every tick. A tick it may
  * not run is skipped with one JSON line carrying the B6 refusal; the person is notified once per
  * mismatch; `watch` keeps running and resumes by itself when the version matches again. Driven
- * through `runCli` with the harness, as a binary of any version (S1).
+ * through `runCli` with the harness, as a binary of any version.
  */
 import { afterEach, beforeEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";

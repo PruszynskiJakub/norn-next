@@ -1,5 +1,5 @@
 /**
- * Machine-local files of a unit worktree (A3, K4): `.env.norn` (slot env), the `.norn-unit`
+ * Machine-local files of a unit worktree: `.env.norn` (slot env), the `.norn-unit`
  * marker, and the shared `info/exclude` entries that keep both out of commits.
  */
 import { readdirSync } from "node:fs";
@@ -12,7 +12,7 @@ import { envNornPath, unitMarkerPath, WORKTREE_LOCAL_FILES } from "./paths.ts";
 
 /**
  * `.env.norn` and `.norn-unit` are machine-local: add them to the repo's shared `info/exclude`
- * (the common dir, so every worktree sees it). S1: rewritten atomically, appending only the
+ * (the common dir, so every worktree sees it). Rewritten atomically, appending only the
  * missing lines.
  */
 export async function ensureExcluded(root: string): Promise<void> {
@@ -25,7 +25,7 @@ export async function ensureExcluded(root: string): Promise<void> {
   atomicWrite(path, `${text}${text && !text.endsWith("\n") ? "\n" : ""}# norn (machine-local worktree files)\n${missing.join("\n")}\n`);
 }
 
-/** B33: `.env.norn` values for a slot, only NORN_SLOT and PORT_BASE (slot `n` from port `4000 + 10·n`). */
+/** `.env.norn` values for a slot, only NORN_SLOT and PORT_BASE (slot `n` from port `4000 + 10·n`). */
 export function slotEnv(slot: number): Record<string, string> {
   return { NORN_SLOT: String(slot), PORT_BASE: String(SLOTS.port_base + slot * SLOTS.ports_per_slot) };
 }
@@ -38,7 +38,7 @@ function quote(v: string): string {
 
 /** Write `.env.norn` (dotenv syntax, written by norn; do not edit). */
 export function writeEnvNorn(worktree: string, env: Record<string, string>): void {
-  const lines = ["# written by norn (K4); do not edit"];
+  const lines = ["# written by norn; do not edit"];
   for (const [k, v] of Object.entries(env)) {
     if (!ENV_KEY.test(k)) throw new Error(`bad env key: ${k}`);
     lines.push(`${k}=${quote(v)}`);
@@ -75,14 +75,14 @@ export interface UnitMarker {
   spec_dir: string;
 }
 
-/** Write `.norn-unit` (A3): `key=value` lines, so hooks can read it without JSON. */
+/** Write `.norn-unit`: `key=value` lines, so hooks can read it without JSON. */
 export function writeUnitMarker(worktree: string, m: UnitMarker): void {
   const lines = [`repo=${m.repo}`, `story=${m.story}`, `slice=${m.slice ?? ""}`, `unit=${m.unit}`, `spec_dir=${m.spec_dir}`];
   atomicWrite(unitMarkerPath(worktree), `${lines.join("\n")}\n`);
 }
 
 /**
- * gh-195/05 (B2): the marker of a unit worktree of `repo` that lost it (`git clean -fdx` removes the
+ * The marker of a unit worktree of `repo` that lost it (`git clean -fdx` removes the
  * ignored `.norn-unit`), from its folder name and checked-out branch, as norn made both: the story
  * worktree `<repo>-worktrees/<id>-<slug>` on branch `<id>-<slug>`, a slice's `<story worktree>--<nn>-<slug>`
  * on `<id>/<nn>-<slug>`. null when the folder is no unit worktree norn names so.
@@ -124,7 +124,7 @@ export interface ScannedWorktrees {
 }
 
 /**
- * GR3 + A3: the unit worktrees beside the repo, found without git — what a read-only view (X1)
+ * The unit worktrees beside the repo, found without git — what a read-only view
  * uses where observe lists `git worktree`. A story worktree is `<repo>-worktrees/<story>-<slug>`
  * (`storyDirName`), a slice worktree `<that>--<nn>-<slug>` (`sliceDirName`); a folder counts only
  * when its name has that shape (schema key patterns) and its `.norn-unit` marker names the same

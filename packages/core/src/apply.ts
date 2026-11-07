@@ -1,8 +1,8 @@
 /**
- * Receipt application (S5, S6, W3, W4, §10): a pure fold of numbered receipts over
+ * Receipt application: a pure fold of numbered receipts over
  * `UnitState` given the unit's pinned workflow. Receipts numbered ≤ applied_through are
  * skipped, so re-applying after a crash is idempotent. Receipts whose step/attempt do not
- * match the cursor are rejected (T9), never applied.
+ * match the cursor are rejected, never applied.
  */
 import {
   type AgentStep,
@@ -22,7 +22,6 @@ import { stepLimits } from "./policy.ts";
 import { waitsForBaseUpdate } from "./verbs.ts";
 
 export interface ApplyContext {
-  /** the unit's pinned workflow (S7) */
   workflow: Workflow;
   /** ISO time of this tick (facts.now) */
   now: string;
@@ -34,24 +33,24 @@ export interface Advance {
   outcome: string;
   to: string;
   counter?: { name: string; value: number; max: number };
-  /** W4 (C3): counters reset to 0 by taking this edge (their `reset_on`), journaled with the advance */
+  /** Counters reset to 0 by taking this edge (their `reset_on`), journaled with the advance */
   reset?: string[];
   /**
-   * gh-195 B18, B19: a person's receipt moved the cursor (a workflow switch, an unstick, an update),
+   * A person's receipt moved the cursor (a workflow switch, an unstick, an update),
    * not a step's outcome: no step ended, so its commit is no boundary (no `Norn-Outcome`). Absent = an outcome's edge.
    */
   moved?: true;
 }
 
 /**
- * T5a (gh-195 B24): why a takeover restarts the step — the same words in `norn story checkout`'s output,
+ * Why a takeover restarts the step — the same words in `norn story checkout`'s output,
  * the take's log and the brief's "Why this attempt". `gone` is the record's `Norn-Branch-Commit`.
  */
 export const branchRewrittenLine = (story: string, gone: string, step: string, attempt: number): string =>
   `the branch of ${story} was rewritten since the record (${gone} is gone); restarting ${step} as attempt ${attempt}`;
 
 /**
- * gh-195 B25 (D10): what a takeover with the record lost says — in `norn story checkout`'s output, the
+ * What a takeover with the record lost says — in `norn story checkout`'s output, the
  * take's log and the brief's "Why this attempt". `holder` is the claim's holder the record was on
  * (null: the claim was free, its holder unknown).
  */
@@ -59,7 +58,7 @@ export const recordLostLine = (story: string, holder: string | null, step: strin
   `the run record of ${story} was on ${holder ?? "the machine that last held it"} and is lost; restarting ${step} from the branch`;
 
 /**
- * T5b (gh-195 B25, D10): the step a takeover with the record lost restarts, from the story unit's last
+ * The step a takeover with the record lost restarts, from the story unit's last
  * boundary commit on the branch (`last`, store `lastBoundary`: the newest with `Norn-Outcome`; its
  * `Norn-Step` it ended and its `Norn-Next`): the step that boundary moved the cursor to when `wf` has it;
  * else (`$done`, or another round's step) the step it ended when `wf` has that; else, or with no
@@ -71,11 +70,11 @@ export function restartStepOf(wf: Workflow, last: { ended: string; next: string 
 }
 
 /**
- * T5a (gh-195 B24): what applying take receipt `r` at cursor `st` does about a rewritten branch.
+ * What applying take receipt `r` at cursor `st` does about a rewritten branch.
  * `restart`: the cursor is the one the record was written at, or one a session already ran in — it
  * judged code that is gone, so the step is entered again as a new attempt. `fresh`: the record's own
- * receipts just entered this attempt and nothing ran in it yet, so it is the restart as it is (review#2
- * F4: attempts and visits count once, GR8). `null`: nothing to restart (no rewrite, `$done`, stuck).
+ * receipts just entered this attempt and nothing ran in it yet, so it is the restart as it is
+ * (attempts and visits count once). `null`: nothing to restart (no rewrite, `$done`, stuck).
  */
 export function rewriteRestart(st: UnitState, r: Receipt, wf: Workflow): "restart" | "fresh" | null {
   if (r.kind !== "take" || !r.rewritten || st.status === "stuck" || st.status === "corrupt" || stepOf(wf, st.step) === null) return null;
@@ -96,17 +95,17 @@ export interface ApplyResult {
   rejected: Rejection[];
   /** last edge taken, if the cursor moved */
   advance: Advance | null;
-  /** in-step route of the last receipt: nudge the same session, or retry in a fresh one (C1, B2) */
+  /** in-step route of the last receipt: nudge the same session, or retry in a fresh one */
   route: "nudge" | "retry" | null;
-  /** answer text to type into the live session (B2), set when the last receipt was an answer */
+  /** answer text to type into the live session, set when the last receipt was an answer */
   deliver: string | null;
-  /** one line per applied receipt, for the commit message (O6: never written into the handoff) */
+  /** one line per applied receipt, for the commit message (never written into the handoff) */
   log: string[];
 }
 
 const SOURCE = { agent: "reported", human: "human", norn: "classified" } as const;
 
-/** First state of a unit: cursor entered at `workflow.start` (S7). */
+/** First state of a unit: cursor entered at `workflow.start`. */
 export function initialState(args: {
   unit: UnitRef;
   workflow: Workflow;
@@ -115,9 +114,9 @@ export function initialState(args: {
   now: string;
   mode?: UnitState["mode"];
   tick_id?: string | null;
-  /** gh-71 B9: the step to enter instead of `workflow.start` */
+  /** The step to enter instead of `workflow.start` */
   at?: string;
-  /** gh-71 D2: the story round (story unit) or the round that started the slice; omitted = 1 */
+  /** The story round (story unit) or the round that started the slice; omitted = 1 */
   round?: number;
 }): UnitState {
   const { unit, workflow, now } = args;
@@ -162,7 +161,7 @@ function enterStep(prev: UnitState, wf: Workflow, name: string, now: string): Un
   st.run = null;
   st.park = null;
   st.status = "ready";
-  if (!step) return park(st, "workflow", `step '${name}' does not exist in workflow ${wf.name} (S7)`, now, "stuck");
+  if (!step) return park(st, "workflow", `step '${name}' does not exist in workflow ${wf.name}`, now, "stuck");
   if (step.type === "gate") return park(st, "gate", step.prompt ?? `approve or reject ${name}`, now);
   if (step.type === "agent" && step.attended) return park(st, "attended", `attended step ${name}: work with the agent in the worktree`, now);
   return st;
@@ -177,7 +176,7 @@ function park(st: UnitState, kind: ParkKind, reason: string, at: string, status:
 const stuckPark = (st: UnitState, kind: ParkKind, reason: string, at: string, receipt_id?: string) =>
   park(st, kind, reason, at, "stuck", receipt_id);
 
-/** Apply every receipt numbered above `state.applied_through`, ascending (S6). Pure. */
+/** Apply every receipt numbered above `state.applied_through`, ascending. Pure. */
 export function applyReceipts(state: UnitState, receipts: readonly NumberedReceipt[], ctx: ApplyContext): ApplyResult {
   const out: ApplyResult = { state, applied: [], rejected: [], advance: null, route: null, deliver: null, log: [] };
   for (const nr of [...receipts].sort((a, b) => a.n - b.n)) {
@@ -208,16 +207,16 @@ type Step1 =
 function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   const wf = ctx.workflow;
   if (r.kind === "mode") {
-    // mode is story-level, not bound to a step (MO1)
+    // mode is story-level, not bound to a step
     return { state: { ...st, mode: r.mode }, log: `mode ${r.previous} → ${r.mode}` };
   }
   if (r.kind === "take") {
-    // R10.1: a takeover is a record, not a cursor move — applied at any cursor, like mode
+    // A takeover is a record, not a cursor move — applied at any cursor, like mode
     const from = r.previous_holder ? ` from ${r.previous_holder}${r.forced ? " (forced)" : r.expired ? " (expired)" : ""}` : "";
-    // gh-195 B25: a take whose record was lost already is the new round's first entry: nothing to move
+    // A take whose record was lost already is the new round's first entry: nothing to move
     const log = `taken by ${r.who ?? r.by}${from}${r.record_lost ? `; ${recordLostLine(st.story, r.previous_holder, r.step)}` : ""}`;
-    // T5a (gh-195 B24): the record judged code that is gone — the step the cursor is at when the take
-    // applies (after the record's own unapplied receipts, review F3) starts again as a new attempt,
+    // The record judged code that is gone — the step the cursor is at when the take
+    // applies (after the record's own unapplied receipts) starts again as a new attempt,
     // counters and history kept; never at `$done` or stuck (`rewriteRestart`)
     const how = rewriteRestart(st, r, wf);
     if (!how || !r.rewritten) return { state: st, log };
@@ -225,9 +224,9 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
     const line = `${log}; ${branchRewrittenLine(st.story, r.rewritten.gone, next.step, next.attempt)}`;
     return how === "restart" ? { state: next, log: line, advance: { from: st.step, outcome: "take", to: st.step } } : { state: next, log: line };
   }
-  if (st.status === "corrupt") return { reject: "unit is corrupt (S2)" };
+  if (st.status === "corrupt") return { reject: "unit is corrupt" };
   if (r.slice !== undefined && r.slice !== st.slice) return { reject: `receipt for unit ${r.slice ?? st.story}, not ${st.slice ?? st.story}` };
-  // BS9: `norn story update-branch` may re-enter a story unit that is done (PR unmerged), at a gate, or stuck
+  // `norn story update-branch` may re-enter a story unit that is done (PR unmerged), at a gate, or stuck
   if (r.kind === "update") return updateFrom(st, r, ctx);
   if (st.step === "$done") return { reject: "unit is done" };
   if (r.step !== st.step || r.attempt !== st.attempt)
@@ -240,7 +239,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
     return { state: next, log: `workflow → ${r.name} at ${r.to}`, advance: { from: st.step, outcome: "workflow", to: r.to, moved: true } };
   }
   if (r.kind === "unstick") return unstick(st, r, ctx);
-  if (!step) return { reject: `step '${st.step}' no longer exists (S7); use ${cmd.runRerun(undefined, { step: "<step>" })}` };
+  if (!step) return { reject: `step '${st.step}' no longer exists; use ${cmd.runRerun(undefined, { step: "<step>" })}` };
   if (st.status === "stuck") return { reject: `unit is stuck: ${st.park?.reason ?? "unknown"}; use ${cmd.runRerun()}` };
   const lastOutcome = (outcome: string): LastOutcome => ({
     step: st.step,
@@ -255,7 +254,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       if (step.type !== "agent") return { reject: `${st.step} is a ${step.type} step, not an agent step` };
       if (!r.run_id) return { reject: "started receipt without run_id" };
       if (st.run?.run_id === r.run_id) return { state: { ...st, run: runFrom(st, r) }, log: `run ${r.run_id} updated` };
-      if (st.status === "running" && st.run) return { reject: `step ${st.step}#${st.attempt} already has run ${st.run.run_id} (MO3)` };
+      if (st.status === "running" && st.run) return { reject: `step ${st.step}#${st.attempt} already has run ${st.run.run_id}` };
       if (st.status === "parked" && st.park?.kind !== "attended") return { reject: `unit is parked on ${st.park?.kind}` };
       return {
         state: { ...st, status: "running", park: null, run: runFrom(st, r) },
@@ -277,7 +276,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       const parked = park(st, "ask", r.question, r.at, "parked", r.receipt_id);
       if (r.command && parked.park) parked.park.command = r.command;
       if (r.implicit && parked.park) {
-        // R6.1/R6.2: what the tick needs to resolve the implicit ask or type an answer into the prompt
+        // What the tick needs to resolve the implicit ask or type an answer into the prompt
         parked.park.implicit = r.choice || r.screen ? "pane" : "hook";
         if (r.options?.length) parked.park.options = r.options;
         if (r.choice) parked.park.choice = r.choice;
@@ -291,7 +290,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
     case "stuck": {
       if (step.type !== "agent") return { reject: `${st.step} is a ${step.type} step; stuck is for agent steps` };
       if (st.run && r.run_id && st.run.run_id !== r.run_id) return { reject: `stale run ${r.run_id}` };
-      // B51 (D4): a person's stuck (`norn run cancel`) ends the run here; the step's `stuck` edge is the agent's
+      // A person's stuck (`norn run cancel`) ends the run here; the step's `stuck` edge is the agent's
       if (r.by !== "human" && edgeOf(wf, st.step, "stuck")) return take(st, "stuck", r, ctx, lastOutcome("stuck"));
       return {
         state: { ...stuckPark(st, "stuck", r.reason, r.at, r.receipt_id), last_outcome: lastOutcome("stuck") },
@@ -302,9 +301,9 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       if (st.status !== "parked" || st.park?.kind !== "ask")
         return { reject: st.park?.kind === "gate" ? "gate needs approve or reject" : "unit is not waiting for an answer" };
       const resumed: UnitState = { ...st, park: null };
-      // R6.1: the agent moved on by itself; R6.2: `norn story answer` already typed it — nothing to deliver
+      // The agent moved on by itself, or `norn story answer` already typed it: nothing to deliver
       if ((r.by === "agent" || r.delivered) && st.run) return { state: { ...resumed, status: "running" }, log: `answered: ${r.answer}` };
-      // B2: same session while it lives; manual runs get the answer from the person; else fresh session from the handoff
+      // Same session while it lives; manual runs get the answer from the person; else fresh session from the handoff
       if (st.run?.session)
         return { state: { ...resumed, status: "running" }, log: `answered: ${r.answer}`, deliver: r.answer };
       if (st.run?.how === "manual") return { state: { ...resumed, status: "running" }, log: `answered: ${r.answer}` };
@@ -322,7 +321,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
     case "classify":
       return classify(st, r, step, ctx, lastOutcome(r.outcome));
     case "round":
-      // gh-71 D1: a round receipt starts a new round folder; decide applies it alone (round.start)
+      // A round receipt starts a new round folder; decide applies it alone (round.start)
       return { reject: "a round receipt is applied by round.start, not in a round" };
   }
 }
@@ -346,10 +345,10 @@ function runFrom(st: UnitState, r: ReceiptOf<"started">): NonNullable<UnitState[
 }
 
 /**
- * gh-213 (O2a): the check step whose fail sent the unit to the step it is at, while that fail is still
+ * The check step whose fail sent the unit to the step it is at, while that fail is still
  * its last outcome and the step has not ended (ready to launch or running); null otherwise. A rerun at
  * that check (`norn run rerun <unit> --step <check>`) retries it on the same code without a cancel first:
- * applying it moves the cursor off the run, and decide stops the run's session (S7/O2).
+ * applying it moves the cursor off the run, and decide stops the run's session.
  */
 export function checkRetryOf(wf: Workflow, st: UnitState): string | null {
   const last = st.last_outcome;
@@ -374,9 +373,9 @@ function unstick(st: UnitState, r: ReceiptOf<"unstick">, ctx: ApplyContext): Ste
 }
 
 /**
- * BS9: a person sends the story unit back to its base-update step — from `$done` (the PR is not
- * merged), a gate, or stuck; gh-61 B22: or from an agent step held by drifted skills (the receipt names
- * them, so a replay decides the same). Counters are unchanged; the ready gate is passed again later (F35).
+ * A person sends the story unit back to its base-update step — from `$done` (the PR is not
+ * merged), a gate, or stuck; or from an agent step held by drifted skills (the receipt names
+ * them, so a replay decides the same). Counters are unchanged; the ready gate is passed again later.
  */
 function updateFrom(st: UnitState, r: ReceiptOf<"update">, ctx: ApplyContext): Step1 {
   if (st.slice !== null) return { reject: `${cmd.storyUpdateBranch()} is for the story unit` };
@@ -388,7 +387,7 @@ function updateFrom(st: UnitState, r: ReceiptOf<"update">, ctx: ApplyContext): S
   return { state: next, log: `update by ${r.who ?? r.by}: ${st.step} → ${r.to}`, advance: { from: st.step, outcome: "update", to: r.to, moved: true } };
 }
 
-/** Take the declared edge for `outcome` at the cursor (W3), counting it (W4). */
+/** Take the declared edge for `outcome` at the cursor, counting it. */
 function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, last: LastOutcome): Step1 {
   const wf = ctx.workflow;
   const from = st.step;
@@ -403,10 +402,10 @@ function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, las
     const max = wf.counters?.[edge.counter]?.max ?? 0;
     const value = st.counters[edge.counter] ?? 0;
     if (value + 1 > max) {
-      // W4: the edge is not taken; the outcome becomes `exhausted` → $stuck
+      // The edge is not taken; the outcome becomes `exhausted` → $stuck
       const reason = `${edge.counter} ${value}/${max} at ${from}.${outcome}`;
       const parked = stuckPark(st, "exhausted", reason, r.at, r.receipt_id);
-      // gh-212: the way out is the edge's target with the counter reset; record it, never parse `reason`
+      // The way out is the edge's target with the counter reset; record it, never parse `reason`
       if (parked.park) parked.park.counter = { name: edge.counter, max, outcome, to: edge.to };
       return {
         state: { ...parked, last_outcome: { ...last, outcome: "exhausted", source: "classified" } },
@@ -416,7 +415,7 @@ function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, las
     counters = { ...st.counters, [edge.counter]: value + 1 };
     counter = { name: edge.counter, value: value + 1, max };
   }
-  // W4 (C3): counters declaring `reset_on: <from>.<outcome>` start over (e.g. base_conflict_loop on update.done)
+  // Counters declaring `reset_on: <from>.<outcome>` start over (e.g. base_conflict_loop on update.done)
   const reset = Object.entries(wf.counters ?? {})
     .filter(([name, c]) => c.reset_on === `${from}.${outcome}` && (counters[name] ?? 0) > 0)
     .map(([name]) => name);
@@ -434,7 +433,7 @@ function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, las
   return { state: enterStep(base, wf, edge.to, ctx.now), log, advance };
 }
 
-/** Tick-classified outcomes (§10, C1). Agent routes: nudge / retry / park, unless the step overrides them. */
+/** Tick-classified outcomes. Agent routes: nudge / retry / park, unless the step overrides them. */
 function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<ReturnType<typeof stepOf>>, ctx: ApplyContext, last: LastOutcome): Step1 {
   const o = r.outcome;
   if (o === "exhausted") {
@@ -444,13 +443,13 @@ function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<Ret
   if (step.type !== "agent") {
     if (!(CLASSIFIED_OUTCOMES[step.type] as readonly string[]).includes(o))
       return { reject: `outcome '${o}' cannot be classified for a ${step.type} step` };
-    // BS3: a git step that cannot run (dirty worktree, diverged branch) parks under Unblock with the reason
+    // A git step that cannot run (dirty worktree, diverged branch) parks under Unblock with the reason
     if (step.type === "git" && o === "stuck") {
       const reason = r.detail ?? `${st.step}: stuck`;
       return { state: { ...stuckPark(st, "stuck", reason, r.at, r.receipt_id), last_outcome: last }, log: `${st.step} stuck: ${reason}` };
     }
     if (step.type === "gate") {
-      // BS6: only `stale` is tick-classified at a gate, and only through a declared route
+      // Only `stale` is tick-classified at a gate, and only through a declared route
       if (o !== "stale" || st.park?.kind !== "gate" || !edgeOf(ctx.workflow, st.step, o)) return { reject: `outcome '${o}' cannot be classified at gate ${st.step}` };
       return take({ ...st, park: null, status: "ready" }, o, r, ctx, last);
     }
@@ -467,7 +466,7 @@ function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
     case "silent":
     case "timeout":
     case "stalled": {
-      // R4.2: no way to deliver a nudge (runner neither types nor resumes) — decide routed it to a
+      // No way to deliver a nudge (runner neither types nor resumes) — decide routed it to a
       // fresh session, counted as a retry, not a nudge
       if (r.route === "retry") return retryRoute(st, step, r, ctx, withLast, o);
       const max = stepLimits(ctx.workflow, step).nudges;
@@ -491,7 +490,7 @@ function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
   }
 }
 
-/** C1 retry: a fresh session for the same step while retries last, else exhausted. */
+/** Retry: a fresh session for the same step while retries last, else exhausted. */
 function retryRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ctx: ApplyContext, withLast: (s: UnitState) => UnitState, o: string): Step1 {
   const max = stepLimits(ctx.workflow, step).retries;
   if (st.retries_used < max)
@@ -505,7 +504,7 @@ function retryRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
 }
 
 /**
- * The route a classify receipt records (§10, C1, W4), read from what applying it actually did:
+ * The route a classify receipt records, read from what applying it actually did:
  * the in-step route (`nudge` / `retry`) when there is one, else the edge taken, else `$stuck` when
  * the unit stopped (an exhausted counter, nudges or retries included), else `park` for an ask.
  * Receipt writers apply the receipt in memory first and record this, so the route never disagrees

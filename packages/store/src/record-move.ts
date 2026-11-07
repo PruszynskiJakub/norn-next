@@ -1,9 +1,9 @@
 /**
- * gh-195/06 (B34, D13): move the run state an older norn left on a unit's branch (`<spec folder>/runs/`
- * in its worktree) into the machine dir (S12). The copy is built and validated beside its target, then
- * put in place atomically (S1); a record that fails validation is not copied (S2). Removing it from the
+ * Move the run state an older norn left on a unit's branch (`<spec folder>/runs/`
+ * in its worktree) into the machine dir. The copy is built and validated beside its target, then
+ * put in place atomically; a record that fails validation is not copied. Removing it from the
  * worktree, and so from the branch, comes only after every copy is in place; each unit's old handoff
- * moves to `handoffs/<unit>.md` first, its generated blocks dropped (gh-195/07, D13 step 2, B8).
+ * moves to `handoffs/<unit>.md` first, its generated blocks dropped.
  */
 import { cpSync, existsSync, readdirSync, rmSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -15,7 +15,7 @@ import { listReceipts } from "./receipts.ts";
 import { treeRunStateDir, treeRunStateFiles } from "./run-state.ts";
 import { handoffProse, readPinnedWorkflow, readState } from "./unit.ts";
 
-/** The files of a record folder that fail validation: each state, pinned workflow and receipt of it and of its rounds (S2). */
+/** The files of a record folder that fail validation: each state, pinned workflow and receipt of it and of its rounds. */
 export function recordErrors(dir: string, root?: string): FileError[] {
   const errors: FileError[] = [];
   const folders = [dir];
@@ -34,10 +34,10 @@ export function recordErrors(dir: string, root?: string): FileError[] {
 
 /**
  * Copy one unit's record folder `from` (in a worktree's tree) to `to` (in the machine dir), leaving its
- * old handoff (`handoff`, the unit's `treeHandoffFile` there; `moveTreeHandoffs` moves it) out. A flat record (RD7: `state.json` directly in the folder) lands as it is in `to`, which
+ * old handoff (`handoff`, the unit's `treeHandoffFile` there; `moveTreeHandoffs` moves it) out. A flat record (`state.json` directly in the folder) lands as it is in `to`, which
  * decide names as the story's round 1. Nothing is copied when `to` already holds its state (an earlier
- * move that stopped after the copy, S5): returns false then. Throws, copying nothing, when a file of
- * the record fails validation (S2).
+ * move that stopped after the copy): returns false then. Throws, copying nothing, when a file of
+ * the record fails validation.
  */
 export function copyTreeRecord(from: string, to: string, handoff: string): boolean {
   if (existsSync(statePath(to))) return false;
@@ -55,7 +55,7 @@ export function copyTreeRecord(from: string, to: string, handoff: string): boole
       },
     });
     const errors = recordErrors(staging);
-    if (errors.length) throw new Error(`${displayPath(from)} failed validation (S2): ${errors.map((e) => e.file.replace(staging, from)).join(", ")}`);
+    if (errors.length) throw new Error(`${displayPath(from)} failed validation: ${errors.map((e) => e.file.replace(staging, from)).join(", ")}`);
     atomicCopyDir(staging, to);
   } finally {
     rmSync(staging, { recursive: true, force: true });
@@ -82,10 +82,10 @@ export function removeTreeRunState(root: string, story: RunStory): string[] {
 }
 
 /**
- * gh-195/07 (B8, B39, D13 step 2): move each unit's old handoff in the tree of `root`
+ * Move each unit's old handoff in the tree of `root`
  * (`runs/<unit>/handoff.md`) to `handoffs/<unit>.md`, an older norn's generated header and heartbeat
  * blocks dropped and its prose kept as written. A handoff already at its new place is kept (a move that
- * stopped after writing it, S5). Returns the new handoffs, absolute and sorted; the old ones go with
+ * stopped after writing it). Returns the new handoffs, absolute and sorted; the old ones go with
  * `removeTreeRunState`.
  */
 export function moveTreeHandoffs(root: string, story: RunStory): string[] {

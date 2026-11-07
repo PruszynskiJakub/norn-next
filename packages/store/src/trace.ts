@@ -1,12 +1,12 @@
 /**
- * Trace (O4, B4, machine-local): `<norn home>/repos/<id>/<YYYY-MM-DD>.jsonl` — one JSONL file
+ * Trace (machine-local): `<norn home>/repos/<id>/<YYYY-MM-DD>.jsonl` — one JSONL file
  * per UTC day holding every event (tick, hook, reject, briefing) in append order. Day files keep
  * appends cheap and let old days be deleted wholesale; `trace <unit>` / `why <unit>`
  * filter by unit while reading. Briefings and transcript snapshots are separate files
  * under `briefings/<run_id>/` and `transcripts/<run_id>/`, referenced by trace-relative path. A tick's
  * facts are chunks in `<day>.chunks.jsonl` beside its day file, which the day-file pattern never
  * matches; `tick-trace.ts` writes and reads them.
- * Each hook event fired in a unit worktree is also kept in that unit's hook file under `hooks/` (D3),
+ * Each hook event fired in a unit worktree is also kept in that unit's hook file under `hooks/`,
  * which is where every reader of a unit's hooks reads them.
  */
 import { appendFileSync, existsSync, mkdirSync, readdirSync, rmSync, type Stats, statSync, utimesSync } from "node:fs";
@@ -42,7 +42,7 @@ export function traceFileName(at: string): string {
 
 /**
  * Validate and append one event as a single line (O_APPEND, one write). Returns the trace-relative file.
- * Only `tick.start` is fsynced (R5.4): it is the line that explains a tick that died during act, so it
+ * Only `tick.start` is fsynced: it is the line that explains a tick that died during act, so it
  * must reach disk before act starts. Every other event is diagnostic and skips the fsync.
  */
 export function appendTrace(root: string, event: TraceEvent): string {
@@ -58,16 +58,16 @@ export function appendTrace(root: string, event: TraceEvent): string {
   return name;
 }
 
-/** B4 (D2): one trace line, `type` first, so a reader can skip a line by its prefix without parsing it. */
+/** One trace line, `type` first, so a reader can skip a line by its prefix without parsing it. */
 function traceLine(event: TraceEvent): string {
   const { type, ...rest } = event;
   return `${JSON.stringify({ type, ...rest })}\n`;
 }
 
 /**
- * B5 (D3, A2): append a hook event to its unit's hook file, then the same line to the day file —
+ * Append a hook event to its unit's hook file, then the same line to the day file —
  * both unsynced appends, like every diagnostic line. Then the hook file's mtime is moved forward to the
- * fact's time, never back, so the tick's "written within the stalled window" (D4, `unitHooksChangedAt`)
+ * fact's time, never back, so the tick's "written within the stalled window" (`unitHooksChangedAt`)
  * is on the clock the facts carry. Returns the day file's trace-relative name.
  */
 export function appendHookTrace(root: string, unit: HookUnit, event: HookTrace): string {
@@ -127,7 +127,7 @@ function unitMatches(candidate: string | undefined | null, unit: string): boolea
 }
 
 /**
- * The unit a recorded tick decision belongs to. Intake decisions are keyed by the new story (F5);
+ * The unit a recorded tick decision belongs to. Intake decisions are keyed by the new story;
  * ticks recorded before that carry unit `*`, with the story key in the action.
  */
 export function decisionUnit(d: { unit: string; action: unknown }): string {
@@ -155,13 +155,11 @@ function eventMatchesUnit(ev: TraceEvent, unit: string): boolean {
   }
 }
 
-// ---------------------------------------------------------------- day-file lines (B4)
-
 /** One trace file a reader opened: what the trace-read observer sees. */
 export interface TraceFileRead {
   /** absolute path of the file */
   file: string;
-  /** a day file, or a unit's hook file (D3) */
+  /** a day file, or a unit's hook file */
   kind: "day" | "hook";
 }
 
@@ -170,7 +168,7 @@ export type TraceReadObserver = (read: TraceFileRead) => void;
 let readObserver: TraceReadObserver | null = null;
 
 /**
- * Test hook (B4, B8–B10), modelled on `setSpawnObserver`: call `fn` with each day file a trace reader
+ * Test hook, modelled on `setSpawnObserver`: call `fn` with each day file a trace reader
  * opens (`readTrace` and every reader built on it, `readHookFacts`) and each unit hook file `readUnitHooks`
  * opens. `null` (the default) turns it off. Returns the observer it replaced. It only watches; one that throws is ignored.
  */
@@ -208,8 +206,8 @@ function prefixType(line: string): string | null {
 }
 
 /**
- * The one day-file line reader (B4): the non-blank lines of every day file from `sinceDay` on,
- * oldest file first. With `types`, a line whose prefix names another type is skipped unparsed (D2);
+ * The one day-file line reader: the non-blank lines of every day file from `sinceDay` on,
+ * oldest file first. With `types`, a line whose prefix names another type is skipped unparsed;
  * a line without a type prefix is always yielded for the caller to parse. Throws when the trace dir
  * cannot be listed or a file cannot be read, unless `quiet` (a file that went away is skipped either way).
  */
@@ -253,7 +251,7 @@ export function readTrace(root: string, q: TraceQuery = {}): TraceRead {
     try {
       parsed = JSON.parse(text);
     } catch (e) {
-      // D2: a line that names no type is garbage only to a reader of every type
+      // A line that names no type is garbage only to a reader of every type
       if (!q.types || type !== null) out.errors.push({ file: `${name}:${n}`, errors: [{ path: "", message: `invalid JSON: ${(e as Error).message}` }] });
       continue;
     }
@@ -273,7 +271,7 @@ export function readTrace(root: string, q: TraceQuery = {}): TraceRead {
   return out;
 }
 
-/** Latest tick that decided something for `unit` (for `norn run view --why`, O5). */
+/** Latest tick that decided something for `unit` (for `norn run view --why`). */
 export function lastTickFor(root: string, unit: string): TickTrace | null {
   const { events } = readTrace(root, { unit, types: ["tick"] });
   return (events.at(-1) as TickTrace | undefined) ?? null;
@@ -286,7 +284,7 @@ export function findTick(root: string, tickId: string): TickTrace | null {
 }
 
 /**
- * R5.4 (N2): a tick that wrote `tick.start` but neither its `tick` record nor `tick.end` — it died
+ * A tick that wrote `tick.start` but neither its `tick` record nor `tick.end` — it died
  * during act. Null when the tick is unknown or finished.
  */
 export function findCrashedTick(root: string, tickId: string): TickStartTrace | null {
@@ -296,17 +294,15 @@ export function findCrashedTick(root: string, tickId: string): TickStartTrace | 
   return start && !mine.some((e) => e.type !== "tick.start") ? start : null;
 }
 
-/** R5.4: ticks that decided something for `unit` and died during act, oldest first. */
+/** Ticks that decided something for `unit` and died during act, oldest first. */
 export function crashedTicksFor(root: string, unit: string): TickStartTrace[] {
   const { events } = readTrace(root, { types: ["tick.start", "tick", "tick.end"] });
   const ended = new Set(events.filter((e) => e.type === "tick" || e.type === "tick.end").map((e) => (e as { tick_id: string }).tick_id));
   return events.filter((e): e is TickStartTrace => e.type === "tick.start" && !ended.has(e.tick_id) && eventMatchesUnit(e, unit));
 }
 
-// ---------------------------------------------------------------- hook lines (A2, A4): fast scans
-
 /**
- * Hook facts appended by `norn hook` (A2), read from trace day files since `since`, oldest first.
+ * Hook facts appended by `norn hook`, read from trace day files since `since`, oldest first.
  * A fast scan: only hook lines are parsed, and neither they nor the facts are schema-checked (the
  * trace is diagnostic: an unreadable file or a bad line is skipped).
  */
@@ -316,7 +312,7 @@ export function readHookFacts(root: string, since: string): HookFact[] {
   return out.sort((a, b) => a.at.localeCompare(b.at));
 }
 
-/** The hook events of the day files at `since` or later, in file order: a fast scan like `readHookFacts` (D5 backfills from it). */
+/** The hook events of the day files at `since` or later, in file order: a fast scan like `readHookFacts` (the hook-file backfill reads it). */
 export function* dayHookLines(root: string, since: string): Generator<HookTrace> {
   for (const { text } of dayFileLines(root, { sinceDay: since, types: ["hook"], quiet: true })) {
     const ev = hookLine(text, since);
@@ -334,15 +330,15 @@ function hookLine(text: string, since: string): HookTrace | null {
   }
 }
 
-/** A unit whose hook events are read or written (D3): its story, and its slice for a slice unit. */
+/** A unit whose hook events are read or written: its story, and its slice for a slice unit. */
 export interface HookUnit {
   story: string;
   slice?: string | null;
 }
 
 /**
- * The hook events in a unit's hook file at `since` or later (B5): duplicate event ids dropped, sorted by
- * the fact's time (D3). A fast scan like `readHookFacts`: nothing is schema-checked, bad lines are skipped.
+ * The hook events in a unit's hook file at `since` or later: duplicate event ids dropped, sorted by
+ * the fact's time. A fast scan like `readHookFacts`: nothing is schema-checked, bad lines are skipped.
  */
 function unitHookLines(root: string, unit: HookUnit, since: string): HookTrace[] {
   const file = hookFilePath(root, unit);
@@ -365,7 +361,7 @@ function unitHookLines(root: string, unit: HookUnit, since: string): HookTrace[]
 }
 
 /**
- * A2/A4 (B8–B10): the hook events of each unit in `units` since `since`, oldest first, in the order
+ * The hook events of each unit in `units` since `since`, oldest first, in the order
  * given — one read for every caller of a unit's hooks (the tick's local facts, `brief`, `hook`'s
  * blocked count). Each unit's own hook file only: no day file is read.
  */
@@ -374,7 +370,7 @@ export function readUnitHooks(root: string, units: readonly HookUnit[], since: s
 }
 
 /**
- * D5 (B11, B12): append to the unit's hook file the events whose id it does not hold yet, in one
+ * Append to the unit's hook file the events whose id it does not hold yet, in one
  * append — never a rewrite, so a concurrent `norn hook` append is never lost. Returns how many it appended.
  */
 export function appendMissingUnitHooks(root: string, unit: HookUnit, events: readonly HookTrace[]): number {
@@ -387,7 +383,7 @@ export function appendMissingUnitHooks(root: string, unit: HookUnit, events: rea
   return missing.length;
 }
 
-/** D4: when the unit's hook file was last written (ms, the time of its last appended fact), or null when it has none. */
+/** When the unit's hook file was last written (ms, the time of its last appended fact), or null when it has none. */
 export function unitHooksChangedAt(root: string, unit: HookUnit): number | null {
   try {
     return statSync(hookFilePath(root, unit)).mtimeMs;
@@ -396,13 +392,11 @@ export function unitHooksChangedAt(root: string, unit: HookUnit): number | null 
   }
 }
 
-/** A4: hook events of `runId` that norn blocked, counted in its unit's hooks since the day the run began. */
+/** Hook events of `runId` that norn blocked, counted in its unit's hooks since the day the run began. */
 export function blockedHookCount(root: string, unit: HookUnit, runId: string): number {
   const day = new Date(ulidTime(runId)).toISOString().slice(0, 10);
   return (readUnitHooks(root, [unit], day)[0] ?? []).filter((e) => e.blocked && e.fact.run_id === runId).length;
 }
-
-// ---------------------------------------------------------------- retention (D12): whole day pairs
 
 /** One day of the trace: its day file and, where present, its chunks file (trace-relative, sorted). */
 export interface TraceDay {
@@ -415,7 +409,7 @@ export interface TraceDay {
 const DAY_PAIR_FILE = /^(\d{4}-\d{2}-\d{2})(?:\.chunks)?\.jsonl$/;
 
 /**
- * D12: the day pairs (`<day>.jsonl`, `<day>.chunks.jsonl`) dated before `beforeDay` (`YYYY-MM-DD`),
+ * The day pairs (`<day>.jsonl`, `<day>.chunks.jsonl`) dated before `beforeDay` (`YYYY-MM-DD`),
  * oldest first, with the bytes each holds. Nothing else in the trace dir is a day pair: `workflows/`,
  * briefings, transcripts, caches and locks are never listed.
  */
@@ -445,14 +439,12 @@ export function traceDaysBefore(root: string, beforeDay: string): TraceDay[] {
   return [...days.values()].sort((a, b) => (a.day < b.day ? -1 : 1));
 }
 
-/** D12: delete the files of these day pairs (deleted wholesale: a day pair is self-contained). */
+/** Delete the files of these day pairs (deleted wholesale: a day pair is self-contained). */
 export function deleteTraceDays(root: string, days: TraceDay[]): void {
   for (const d of days) for (const f of d.files) safeUnlink(join(machineDir(root), f));
 }
 
-// ---------------------------------------------------------------- retention (D12): hook files and run dirs
-
-/** A unit's hook file (D3), as tidy weighs it: the unit, its trace-relative path, its size and last write. */
+/** A unit's hook file, as tidy weighs it: the unit, its trace-relative path, its size and last write. */
 export interface HookFileEntry {
   story: string;
   /** null = the story unit */
@@ -465,7 +457,7 @@ export interface HookFileEntry {
 
 const HOOK_FILE = /^(\d+|_story)\.jsonl$/;
 
-/** D12: every unit hook file under `hooks/`, sorted by path. */
+/** Every unit hook file under `hooks/`, sorted by path. */
 export function listHookFiles(root: string): HookFileEntry[] {
   const out: HookFileEntry[] = [];
   for (const story of listDir(hooksDir(root))) {
@@ -482,8 +474,8 @@ export function listHookFiles(root: string): HookFileEntry[] {
 }
 
 /**
- * One run's side files (B4, C4): its `briefings/<run>/` and `transcripts/<run>/`, and the session log an
- * older norn's headless runner wrote at `runs/<run>.log` (gh-195 D1), their size and newest write.
+ * One run's side files: its `briefings/<run>/` and `transcripts/<run>/`, and the session log an
+ * older norn's headless runner wrote at `runs/<run>.log`, their size and newest write.
  */
 export interface RunTraceEntry {
   run_id: string;
@@ -494,7 +486,7 @@ export interface RunTraceEntry {
   newestMs: number;
 }
 
-/** D12: the runs that have briefings, transcripts or an old session log, sorted by run id. */
+/** The runs that have briefings, transcripts or an old session log, sorted by run id. */
 export function listRunTraces(root: string): RunTraceEntry[] {
   const runs = new Map<string, RunTraceEntry>();
   for (const kind of ["briefings", "transcripts"]) {
@@ -515,7 +507,7 @@ export function listRunTraces(root: string): RunTraceEntry[] {
       runs.set(run, e);
     }
   }
-  // gh-195 D1: session logs moved to `sessions/`; the ones an older norn left in `runs/` are pruned with their run
+  // Session logs moved to `sessions/`; the ones an older norn left in `runs/` are pruned with their run
   for (const name of listDir(machineRunsDir(root))) {
     const run = OLD_SESSION_LOG.exec(name)?.[1];
     const st = run ? statOrNull(join(machineRunsDir(root), name)) : null;
@@ -532,7 +524,7 @@ export function listRunTraces(root: string): RunTraceEntry[] {
 
 const OLD_SESSION_LOG = /^(.+)\.log$/;
 
-/** D12: delete these trace-relative files and dirs, then a story's `hooks/<story>/` left empty. */
+/** Delete these trace-relative files and dirs, then a story's `hooks/<story>/` left empty. */
 export function deleteTracePaths(root: string, rels: readonly string[]): void {
   for (const rel of rels) {
     rmSync(join(machineDir(root), safeRel(rel)), { recursive: true, force: true });
@@ -558,12 +550,10 @@ function statOrNull(path: string): Stats | null {
   }
 }
 
-/** Whether the trace still holds the day file of the UTC day of `at` (D10: a gone day means pruned). */
+/** Whether the trace still holds the day file of the UTC day of `at` (a gone day means pruned). */
 export function hasTraceDay(root: string, at: string): boolean {
   return existsSync(join(machineDir(root), traceFileName(at)));
 }
-
-// ---------------------------------------------------------------- side files (B4, C4)
 
 const briefingRelPath = (runId: string, id: string) => `briefings/${runId}/${id}.md`;
 const transcriptRelPath = (runId: string, id: string) => `transcripts/${runId}/${id}.txt`;
@@ -583,11 +573,10 @@ export function readTraceFile(root: string, rel: string): string | null {
   return readText(join(machineDir(root), safeRel(rel)));
 }
 
-/** Store the exact briefing of a run (B4). */
+/** Store the exact briefing of a run. */
 export function writeBriefing(root: string, runId: string, id: string, text: string): string {
   return writeTraceFile(root, briefingRelPath(runId, id), text);
 }
-/** Store a transcript snapshot (C4). */
 export function writeTranscriptSnapshot(root: string, runId: string, id: string, text: string): string {
   return writeTraceFile(root, transcriptRelPath(runId, id), text);
 }

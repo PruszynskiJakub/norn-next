@@ -1,4 +1,4 @@
-/** norn's own process setup: the repo's workflows, config and skills load as norn would load them (W5, SK1). */
+/** norn's own process setup: the repo's workflows, config and skills load as norn would load them. */
 import { describe, expect, test } from "bun:test";
 import { cpSync, existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -25,7 +25,7 @@ function newLayoutCopy(): string {
 const AGENTS_SKILLS = join(ROOT, ".agents", "skills");
 const CLAUDE_SKILLS = join(ROOT, ".claude", "skills");
 
-/** Workflows that end in `integrate` run on slices (W8); every other one is a story workflow. */
+/** Workflows that end in `integrate` run on slices; every other one is a story workflow. */
 const SLICE_WORKFLOWS = new Set(["slice"]);
 const PERSON_ONLY_SKILLS = ["issue", "release-start"];
 

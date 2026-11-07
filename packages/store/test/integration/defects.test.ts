@@ -75,7 +75,7 @@ withZombie("BUG-3 a tick lock held by a zombie is reclaimed", async () => {
   expect(got.ok && got.release()).toBe(true);
 });
 
-withZombie("BUG-3 an integrate lock held by a zombie is reclaimed (K6)", async () => {
+withZombie("BUG-3 an integrate lock held by a zombie is reclaimed", async () => {
   const { pid, lstart } = z!;
   const repo = mkdtempSync(join(tmpdir(), "norn-zombie-"));
   holdBy(integrateLockPath(repo, "gh-12"), pid, lstart);
@@ -91,7 +91,7 @@ test("a lock held by a live process is not reclaimed (default liveness)", async 
   expect(got).toMatchObject({ ok: false, holder: { holder: me } });
 });
 
-test("a lock held by a reused pid (other start time) is reclaimed (K3)", async () => {
+test("a lock held by a reused pid (other start time) is reclaimed", async () => {
   const path = join(mkdtempSync(join(tmpdir(), "norn-lock-")), "tick.lock");
   const me = localProcess.self();
   holdBy(path, me.pid, "Thu Jan 1 00:00:00 1970");

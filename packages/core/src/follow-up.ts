@@ -1,13 +1,8 @@
 /**
- * H12 (bypass #265): which performed actions leave the next tick something to do at once. decide does
- * one thing per unit per tick (H3), so a tick that applies a receipt, writes a git step's `classify`
- * receipt or starts a unit leaves the follow-up (the next step's start, the receipt's apply) to the
- * next tick. `norn watch` runs that tick at once instead of after its interval, up to a bound.
- *
- * Kinds that only wait on someone else afterwards — an agent launched or nudged (`start_run`, `nudge`,
- * `retry_fresh`), a detached check started (`run_check`: the receipt the detached `norn check-run` writes wakes watch, H13), a person asked
- * (`park`, `notify`), a renewal or a release, housekeeping — leave nothing for an immediate tick.
- * Pure: read from the decided action alone, never from prose (P8).
+ * Which performed actions leave the next tick something to do at once. decide does one thing per
+ * unit per tick, so `norn watch` runs the follow-up tick at once instead of after its interval.
+ * Kinds that only wait on someone else (an agent launched, a detached check whose receipt wakes
+ * watch, a person asked, a renewal, housekeeping) leave nothing for an immediate tick.
  */
 import type { Action } from "./actions.ts";
 

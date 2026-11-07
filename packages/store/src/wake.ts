@@ -1,9 +1,9 @@
 /**
- * H13 (bypass #265): the wake file `wake` in the checkout's machine dir (S12). Every receipt appended
+ * The wake file `wake` in the checkout's machine dir. Every receipt appended
  * through `appendReceipt` (`norn done`/`ask`/`stuck`, `norn story answer`, a finished `norn check-run`, …)
- * rewrites it atomically (S1) with `<pid> <ulid>`, so a sleeping `norn watch` that watches the machine dir
+ * rewrites it atomically with `<pid> <ulid>`, so a sleeping `norn watch` that watches the machine dir
  * wakes and ticks within about a second instead of at its next interval. The content is a stamp, never a
- * fact: decide never reads it, and a missing or stale one only means watch waits its interval (H5).
+ * fact: decide never reads it, and a missing or stale one only means watch waits its interval.
  */
 import { existsSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -12,7 +12,6 @@ import { atomicWrite, readText } from "./fsx.ts";
 import { checkoutFilePath } from "./paths.ts";
 
 export const WAKE_FILE = "wake";
-/** The wake file of a machine dir. */
 export const wakePath = (machine: string): string => join(machine, WAKE_FILE);
 
 /** The machine dir holding a unit's run-state folder (`<machine dir>/runs/<story>/…`), or null when it is in none. */

@@ -27,7 +27,7 @@ const running = (p: Partial<UnitState> = {}): Partial<UnitState> => ({
   ...p,
 });
 
-describe("BUG-1: a resumed run's own agent lease and max_agents (K1)", () => {
+describe("BUG-1: a resumed run's own agent lease and max_agents", () => {
   // max_agents 1, so the run's own lease alone fills the cap
   const ownLease: LeaseFile = { version: 1, kind: "agent", repo: "/r", story: "gh-1", slice: null, run_id: RUN, holder: { pid: 7, pid_start: "x" }, created_at: at() };
   const cfg = { ...CONFIG, max_agents: 1 };

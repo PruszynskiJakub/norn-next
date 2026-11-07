@@ -1,5 +1,5 @@
 /**
- * `norn story take <story>` (GR1, CP4): assign an open issue that carries the intake label
+ * `norn story take <story>`: assign an open issue that carries the intake label
  * to the person — the cockpit's backlog take — so the next sync takes it in. Nothing is taken in, and
  * nothing is written locally, by the verb itself.
  */
@@ -42,7 +42,7 @@ beforeEach(() => {
   h.remote.issues = [issue(12), issue(13, { assignees: ["someone-else"] }), issue(14, { state: "closed" }), issue(15, { labels: ["other"] })];
 });
 
-describe("story take (GR1, CP4)", () => {
+describe("story take", () => {
   test("assigns the issue to the person; the next sync takes it in", async () => {
     const r = await h.norn("story", "take", "gh-12");
     expect(r.exit).toBe(0);

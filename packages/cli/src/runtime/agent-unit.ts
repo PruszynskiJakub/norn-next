@@ -1,6 +1,6 @@
 /**
- * Shared by the agent-protocol verbs (`brief`, `done`, `ask`, `stuck`, `hook`; §9): locate the
- * unit worktree (A3) and load its runs/<unit>/ (S1, S2). The rules over the loaded unit (live run,
+ * Shared by the agent-protocol verbs (`brief`, `done`, `ask`, `stuck`, `hook`): locate the
+ * unit worktree and load its runs/<unit>/. The rules over the loaded unit (live run,
  * standing report, implicit ask, agent work) live in core `agent-unit.ts`.
  */
 import { existsSync } from "node:fs";
@@ -21,13 +21,13 @@ export interface UnitSession extends AgentUnit {
   specPath: string;
   /** absolute runs/<unit>/ inside the worktree */
   runsDir: string;
-  /** the unit's handoff, from its own resolver (gh-195 prefactor 2) */
+  /** the unit's handoff, from its own resolver */
   handoffFile: string;
 }
 
 const unitRefOf = (m: UnitMarker): UnitRef => ({ story: m.story, slice: m.slice, dir: m.unit, key: m.slice ?? m.story });
 
-/** A3: the verbs work only inside a unit worktree. */
+/** The verbs work only inside a unit worktree. */
 function requireWorktree(ctx: Context, verb: string): { worktree: string; marker: UnitMarker } {
   if (ctx.worktree && ctx.unit) return { worktree: ctx.worktree, marker: ctx.unit };
   const found = findUnitMarker(safeRealpath(ctx.cwd));
@@ -42,7 +42,7 @@ function requireWorktree(ctx: Context, verb: string): { worktree: string; marker
 /** Set in the environment of an orient agent (`norn story chat`): its hooks are not facts of any run. */
 export const ORIENT_ENV = "NORN_ORIENT";
 
-/** Load the unit of the current worktree; refuses when not started, corrupt (S2) or workflow missing. */
+/** Load the unit of the current worktree; refuses when not started, corrupt or workflow missing. */
 export function loadUnitSession(ctx: Context, verb: string, at?: { worktree: string; marker: UnitMarker }): UnitSession {
   // orient: the agent beside a person is no run of the unit, so it cannot start or report one
   if (ctx.env[ORIENT_ENV] === "1" && verb !== "hook")
@@ -52,9 +52,9 @@ export function loadUnitSession(ctx: Context, verb: string, at?: { worktree: str
   const specPath = join(worktree, marker.spec_dir);
   const snap = loadUnit(worktree, { key: marker.story, spec_dir: marker.spec_dir }, unit, { includeApplied: true });
   if (snap.errors.length || snap.state?.status === "corrupt")
-    throw corruptError(`unit ${unit.key} is corrupt (S2): ${snap.errors.map((e) => e.file).join(", ") || "state.json"}`, `stop and tell the person: ${cmd.runView(unit.key, { why: true })}`, snap.errors);
+    throw corruptError(`unit ${unit.key} is corrupt: ${snap.errors.map((e) => e.file).join(", ") || "state.json"}`, `stop and tell the person: ${cmd.runView(unit.key, { why: true })}`, snap.errors);
   if (!snap.state) throw refuse(`unit ${unit.key} has not started yet`, `${cmd.tick()} (or wait for the heartbeat), then run it again`, "not_started");
-  if (!snap.workflow) throw corruptError(`unit ${unit.key} has no pinned workflow (S7)`, `stop and tell the person: ${cmd.runView(unit.key, { why: true })}`);
+  if (!snap.workflow) throw corruptError(`unit ${unit.key} has no pinned workflow`, `stop and tell the person: ${cmd.runView(unit.key, { why: true })}`);
   return {
     root: safeRealpath(marker.repo),
     worktree,
@@ -79,7 +79,7 @@ export function refuseUnlessAgentWork(s: UnitSession, verb: string): void {
 }
 
 /**
- * A2, MO3: the agent session running `norn <verb>` here, from the hooks that fired in this worktree just
+ * The agent session running `norn <verb>` here, from the hooks that fired in this worktree just
  * before — the PreToolUse of this very call when it names the verb, else the latest fact with a session —
  * or `NORN_AGENT_SESSION_ID`. Also its transcript and agent.
  */
@@ -97,13 +97,13 @@ export function callerSession(ctx: Context, s: UnitSession, verb: string): { age
   return out;
 }
 
-/** MO3 (gh-92): refuse when another agent session than the run's own runs `norn <verb>` on it. */
+/** Refuse when another agent session than the run's own runs `norn <verb>` on it. */
 export function refuseForeignSession(ctx: Context, s: UnitSession, run_id: string, verb: string): void {
   const no = foreignSessionRefusal(s, run_id, callerSession(ctx, s, verb).agent_session_id ?? null, verb);
   if (no) throw refuse(no.error, no.do_instead, no.code);
 }
 
-/** The story's mode (MO1): stored in the story unit's state, which lives in the story worktree. */
+/** The story's mode: stored in the story unit's state, which lives in the story worktree. */
 export function unitStoryMode(_ctx: Context, s: UnitSession, config: ResolvedConfig): Mode {
   if (s.unit.slice === null) return storyMode(s.state, s.workflow, config);
   const slug = basename(s.marker.spec_dir).slice(s.unit.story.length + 1);
@@ -114,19 +114,19 @@ export function unitStoryMode(_ctx: Context, s: UnitSession, config: ResolvedCon
   return storyMode(st.ok ? st.value : null, wf.ok ? wf.value.workflow : null, config);
 }
 
-/** `who` for agent receipts: the run's agent, else the step's, else the default (A6). */
+/** `who` for agent receipts: the run's agent, else the step's, else the default. */
 export function agentName(s: UnitSession, config: ResolvedConfig): string {
   const step = cursorStep(s);
   return s.state.run?.agent ?? (step?.type === "agent" ? step.agent : undefined) ?? config.agent;
 }
 
-/** QV1/QV4: the unit's frontmatter `criteria` — its slice file, or spec.md for the story unit; null = none declared. */
+/** The unit's frontmatter `criteria` — its slice file, or spec.md for the story unit; null = none declared. */
 export function unitCriteria(s: UnitSession): Criterion[] | null {
   const file = s.unit.slice ? join(s.specPath, "slices", `${s.unit.dir}.md`) : storyFile(s.specPath);
   const r = s.unit.slice ? readSliceFile(file, s.worktree) : readStoryFile(file, s.worktree);
   if (r.ok) return r.value.frontmatter.criteria ?? null;
   if (r.reason === "missing") return null;
-  // B38 (D12): a slice or story still carrying criteria `needs` is refused, not corrupt
+  // A slice or story still carrying criteria `needs` is refused, not corrupt
   if (r.reason === "needs_removed") throw refuse(r.error.errors[0]?.message ?? "`needs` was removed", cmd.upgrade(), "needs_removed");
-  throw corruptError(`${file} failed validation (S2): its criteria cannot be checked`, `stop and tell the person: ${cmd.runView(s.unit.key, { why: true })}`, r.error ? [r.error] : []);
+  throw corruptError(`${file} failed validation: its criteria cannot be checked`, `stop and tell the person: ${cmd.runView(s.unit.key, { why: true })}`, r.error ? [r.error] : []);
 }

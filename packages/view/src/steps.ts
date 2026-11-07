@@ -1,5 +1,5 @@
 /**
- * Step timeline (O4, X1): one row per (step, attempt) a unit visited — when it was entered and
+ * Step timeline: one row per (step, attempt) a unit visited — when it was entered and
  * left, how long it took, how it ended, who acted (agent run, norn tick, person) and why.
  * Built from durable receipts, refined by the trace's tick decisions when they are still there
  * (the trace is gitignored and may be pruned). Pure: inputs in, plain JSON out.
@@ -285,7 +285,7 @@ export function buildStepTimeline(input: StepTimelineInput, opts: StepTimelineOp
   for (const nr of receipts) {
     const r = nr.receipt;
     if (r.step === "$done" || r.step === "$stuck") continue;
-    // a step-only mailbox receipt (gh-195 B20) is stamped with the attempt it matched when imported (T9)
+    // a step-only mailbox receipt is stamped with the attempt it matched when imported
     seg(r.step, r.attempt ?? 1).receipts.push(nr);
   }
   // The cursor step, entered but not yet reported on.
@@ -328,7 +328,7 @@ export function buildStepTimeline(input: StepTimelineInput, opts: StepTimelineOp
         entries.push({ e, seg: null });
       }
     // Foreign commits are always shown on their row: they change the branch behind norn's back.
-    // So are takeovers (R10.1): who holds the story changed.
+    // So are takeovers: who holds the story changed.
     const shown = opts.events || opts.all ? entries : entries.filter(({ e }) => e.source === "foreign" || e.source === "take" || (e.source === "receipt" && e.kind === "take"));
     {
       for (const { e, seg: s } of shown) {

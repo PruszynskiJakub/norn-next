@@ -1,5 +1,5 @@
 /**
- * gh-110 B17–B21 (D4, D5): the code knows one layout. On a main checkout still on the old layout every
+ * gh-110 B17–B21: the code knows one layout. On a main checkout still on the old layout every
  * command refuses and names `norn upgrade`; with a part in both places it refuses naming both paths;
  * `doctor` reports it as a failed check; `hook` stays out of the agent's way; and a unit worktree's own
  * old files are never looked at. The old paths are spelled out in the harness: what a person had.

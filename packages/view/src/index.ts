@@ -1,7 +1,7 @@
 /**
- * @norn/view — read model for front ends (X1): `loadProjectView()` → stories, slices,
+ * @norn/view — read model for front ends: `loadProjectView()` → stories, slices,
  * inbox, runs, recently done; `loadTimelines()` → per-unit timelines (the one read of the trace
- * window, D1); plus pure terminal formatters. Local reads only,
+ * window); plus pure terminal formatters. Local reads only,
  * never writes. Front ends read through here and write only through CLI verbs.
  */
 export * from "./cockpit.ts";

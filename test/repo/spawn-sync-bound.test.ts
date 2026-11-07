@@ -1,5 +1,5 @@
 /**
- * gh-215: the spawning tiers' `Bun.spawnSync` bound, against a recording stand-in for the real call (no child
+ * The spawning tiers' `Bun.spawnSync` bound, against a recording stand-in for the real call (no child
  * starts). The fixture tests in packages/cli/test/integration/harness-git-timeout.test.ts prove it under bun test.
  */
 import { expect, test } from "bun:test";

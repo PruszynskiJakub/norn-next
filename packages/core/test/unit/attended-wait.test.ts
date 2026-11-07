@@ -28,7 +28,7 @@ function refining(run: RunFacts | null, patch: Partial<UnitState> = {}) {
 
 const inboxAt = (now: number, uf: ReturnType<typeof refining>, config = CONFIG) => buildInbox(facts([storyFacts("gh-1", [uf])], {}, now), config);
 
-describe("attended wait (HC1)", () => {
+describe("attended wait", () => {
   test("starts at the first trailing waiting hook; idle_prompt does not restart it", () => {
     const uf = refining(runFacts([hook("turn_start", T0), hook("tool_use", T0 + MIN), hook("turn_end", T0 + 2 * MIN), hook("turn_end", T0 + 3 * MIN, "Notification")]));
     expect(attendedWaitSince(uf)).toBe(T0 + 2 * MIN);
@@ -62,7 +62,7 @@ describe("attended wait (HC1)", () => {
   });
 });
 
-describe("attended wait in the inbox (HC2, HC3)", () => {
+describe("attended wait in the inbox", () => {
   const waiting = refining(runFacts([hook("turn_start", T0), hook("turn_end", T0 + MIN)]));
 
   test("stays under Running until the fixed 2-minute attended wait has passed (B27)", () => {

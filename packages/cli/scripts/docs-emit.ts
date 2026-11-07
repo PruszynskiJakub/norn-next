@@ -1,4 +1,4 @@
-/** Rewrites the generated block of docs/reference.md (gh-162 B10). Run: bun run docs:emit */
+/** Rewrites the generated block of docs/reference.md. Run: bun run docs:emit */
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { COMMANDS, NOUNS } from "../src/commands/index.ts";

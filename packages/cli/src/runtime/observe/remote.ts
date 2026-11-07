@@ -1,4 +1,4 @@
-/** observe: what the remote says about a story — the git remote, the fetched base ref, PR merges by ancestry (P2), the ready head (F35/C5). */
+/** observe: what the remote says about a story — the git remote, the fetched base ref, PR merges by ancestry, the ready head. */
 import type { GitPort, RemotePullRequest } from "@norn/core";
 import { onlyNornCommitsSince } from "@norn/store";
 import { commitOf } from "./git-facts.ts";
@@ -17,7 +17,7 @@ export async function trackingRef(git: GitPort, root: string, remote: string | n
 }
 
 /**
- * P2 (F34): is the PR head (or, when its sha is unknown here, the story branch head) an ancestor of
+ * Is the PR head (or, when its sha is unknown here, the story branch head) an ancestor of
  * the fetched base? Then the work is merged whatever the PR state says.
  */
 export async function mergedByAncestry(git: GitPort, root: string, remote: string | null, branch: string, pr: RemotePullRequest, baseRef: string): Promise<boolean> {
@@ -26,7 +26,7 @@ export async function mergedByAncestry(git: GitPort, root: string, remote: strin
   return git.isAncestor(root, head, baseRef).catch(() => false);
 }
 
-/** F35/C5: the story's ready approval (store), and `ready_head_norn` when the known PR head moved past it by norn's own commits of the story only. */
+/** The story's ready approval (store), and `ready_head_norn` when the known PR head moved past it by norn's own commits of the story only. */
 export async function readyHead(root: string, story: string, ready: { sha: string; at: string } | undefined, prHead: string | undefined): Promise<{ ready_head_sha?: string; ready_approved_at?: string; ready_head_norn?: string }> {
   if (!ready) return {};
   const sha = ready.sha;

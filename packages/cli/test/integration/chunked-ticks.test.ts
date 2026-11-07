@@ -1,5 +1,5 @@
 /**
- * Tick facts stored as chunks (O4, O5; gh-107 B13, B17, B18, B21, B22, B35): a quiet tick writes a tick
+ * Tick facts stored as chunks: a quiet tick writes a tick
  * line and no chunk, `norn run view --why` replays a chunked tick from facts equal to the ones observe produced,
  * a full-facts tick an older norn wrote (before or after chunked ones) replays as before, a missing
  * chunk is a corrupt trace entry, and the golden harvest reads chunked ticks as it read full ones.
@@ -42,7 +42,7 @@ const dir = () => machineDir(h.root);
 const bytes = () => readdirSync(dir()).filter((n) => n.endsWith(".jsonl")).reduce((sum, n) => sum + statSync(join(dir(), n)).size, 0);
 const chunksFile = () => join(dir(), `${h.clock.iso().slice(0, 10)}.chunks.jsonl`);
 
-/** A tick line as the previous norn wrote it: full facts, workflow sources under `trace/workflows/` (B18). */
+/** A tick line as the previous norn wrote it: full facts, workflow sources under `trace/workflows/`. */
 function fullTick(root: string, t: TickTrace, tickId: string): TickTrace {
   const read = readTickInputs(h.root, t);
   if (!read.ok) throw new Error(JSON.stringify(read));
@@ -70,7 +70,7 @@ beforeAll(async () => {
   }
   const runId = h.state(runs())?.run?.run_id as string;
   expect(runId).toBeTruthy();
-  // a live run with 70 hook facts: two hook blocks (B14)
+  // a live run with 70 hook facts: two hook blocks
   for (let i = 0; i < 70; i++) {
     h.clock.advance(1_000);
     appendHookTrace(h.root, { story: "gh-9" }, { type: "hook", id: ulid(h.clock.now()), fact: { event: "tool_use", at: h.clock.iso(), agent: "claude", native: "PostToolUse", cwd: wt(), story: "gh-9", run_id: runId } });
@@ -80,7 +80,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("chunked tick facts (O4, O5)", () => {
+describe("chunked tick facts", () => {
   test("B13: a quiet tick a minute later adds a tick line and no chunk, under 5 KB with its chunks", async () => {
     h.clock.advance(60_000);
     await h.tick();

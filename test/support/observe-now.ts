@@ -1,4 +1,4 @@
-/** Observe a harness repo now, as a tick's observe would; shared by the observe snapshots (e2e) and integration tests (gh-118 B16). */
+/** Observe a harness repo now, as a tick's observe would; shared by the observe snapshots (e2e) and integration tests. */
 import { ulid } from "@norn/schema";
 import { Context, observe, type Observed } from "../../packages/cli/src/index.ts";
 import type { Harness } from "./harness.ts";

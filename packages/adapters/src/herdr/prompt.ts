@@ -1,5 +1,5 @@
 /**
- * R6.2, L1 (A4, A7): read the prompt an agent is blocked on off its pane screen (`pane read`).
+ * Read the prompt an agent is blocked on off its pane screen (`pane read`).
  * Recognizes the choice dialogs of terminal agents (Claude Code permission and trust prompts):
  *
  *   ╌╌╌╌╌╌╌╌╌╌╌╌╌                      ← separator above the dialog

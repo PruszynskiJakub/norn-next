@@ -1,5 +1,5 @@
 /**
- * gh-196 (B2, B21, B22, B23, B34; D1–D5, SK3): a supervisor's decisions, sent with `--delegated --reason`,
+ * A supervisor's decisions, sent with `--delegated --reason`,
  * are recorded as the person's (by stays human, decide unchanged) but marked delegated, and the views
  * show them apart: `run list` marks the row, `story view` lists them in a Delegated section, `status`
  * counts them per story. Without a reason, or inside a unit worktree, a delegated command is refused.
@@ -40,7 +40,7 @@ let h: Harness;
 const SLUGS: Record<number, string> = { 1: "gh-1-pay-invoices", 2: "gh-2-send-receipts", 3: "gh-3-archive-invoices" };
 const wt = (n: number) => `${h.root}-worktrees/${SLUGS[n]}`;
 const spec = (n: number) => join(wt(n), `.agents/specs/${SLUGS[n]}`);
-// gh-195 S12: a unit's run state is in the checkout's machine dir (the current round for the story)
+// A unit's run state is in the checkout's machine dir (the current round for the story)
 const runs = (n: number) => runStateOf(spec(n));
 const tick = async () => {
   h.clock.advance(10_000);
@@ -95,13 +95,13 @@ describe("refusals", () => {
     expect(h.state(runs(1))?.park?.kind).toBe("gate");
   });
 
-  test("a delegated command inside a unit worktree is refused: a step agent never supervises (B2, SK3)", async () => {
+  test("a delegated command inside a unit worktree is refused: a step agent never supervises", async () => {
     const r = await norn({ cwd: wt(1) }, "story", "approve", "gh-1", "--delegated", "--reason", "fsd: looks fine");
     expect(r.exit).toBe(3);
     expect(r.value).toMatchObject({ code: "delegated_in_unit" });
   });
 
-  test("gh-224: a step agent's plain approve or reject in a unit worktree is refused, never recorded as the person's (§6, SK3)", async () => {
+  test("gh-224: a step agent's plain approve or reject in a unit worktree is refused, never recorded as the person's", async () => {
     const agent = { cwd: wt(1), env: { ...h.deps.env, NORN_RUN: "01J0000000000000000000000" } };
     for (const argv of [
       ["story", "approve", "gh-1"],
@@ -160,10 +160,10 @@ describe("delegated decisions are recorded apart from the person's (B21, B22, B3
     const r = await h.norn("story", "edit", "gh-1", "--workflow", "asks", "--delegated", "--reason", "fsd: one seam, no contract change");
     expect(r.exit).toBe(0);
     await until(() => (h.state(join(storyRunStateOf(spec(1)), "_story/rounds/02-asks"))?.round ?? 0) === 2);
-    // B34: the new round's heading in the step timeline carries the mark and the reason
+    // The new round's heading in the step timeline carries the mark and the reason
     expect((await h.norn("run", "list", "gh-1")).stdout).toContain("round 2 · asks — delegated (supervisor): fsd: one seam, no contract change");
     expect((await h.norn("run", "list", "gh-1")).stdout).toContain("round 1 · gated · finished\n");
-    // B34: run view shows the round start's reason too
+    // Run view shows the round start's reason too
     expect((await h.norn("run", "view", "gh-1")).stdout).toContain("round    2 · asks — delegated (supervisor): fsd: one seam, no contract change");
     expect(((await h.norn("run", "view", "gh-1", "--json")).value as { delegated_round?: { delegated_reason?: string } }).delegated_round?.delegated_reason).toBe("fsd: one seam, no contract change");
   });
@@ -188,14 +188,14 @@ describe("delegated decisions are recorded apart from the person's (B21, B22, B3
     const s = await h.norn("status", "--json");
     expect((s.value as { delegated_counts: Record<string, number> }).delegated_counts).toEqual({ "gh-1": 2, "gh-2": 1 });
     expect((await h.norn("status")).stdout).toContain("gh-1 2 delegated");
-    // D5: a delegated decision is never an inbox item
+    // A delegated decision is never an inbox item
     const inbox = JSON.stringify((s.value as { groups: unknown }).groups);
     expect(inbox).not.toContain("delegated");
     expect(inbox).not.toContain("fsd:");
   });
 });
 
-describe("the supervisor's watch check reads status --json (B8, B9)", () => {
+describe("the supervisor's watch check reads status --json", () => {
   test("heartbeat.up says whether a watch ticks here, before any story is in auto: never ticked → false, a tick → true, stale → false", async () => {
     const fresh = await createHarness();
     try {
@@ -230,7 +230,7 @@ describe("a suspected flake goes back to its check, and a delegated reject (B42,
   });
 });
 
-describe("earlier rounds are read from their folders on each load (S2)", () => {
+describe("earlier rounds are read from their folders on each load", () => {
   test("a failing receipt in an earlier round is reported in story list's errors, never skipped", async () => {
     const round1 = join(storyRunStateOf(spec(1)), "_story/rounds/01-gated/receipts");
     h.write(join(round1, "0099-approve.json"), "{ not json");

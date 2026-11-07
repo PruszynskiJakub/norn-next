@@ -1,6 +1,6 @@
 /**
- * Runtime regressions from the audit: notifications from post-act facts (O3), answers to a gone
- * session resume the agent session (B2), `unstick --to` kills the live run (S7/O2), and the GR6
+ * Runtime regressions from the audit: notifications from post-act facts, answers to a gone
+ * session resume the agent session, `unstick --to` kills the live run, and the GR6
  * base-branch record retried on later ticks until it lands.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";

@@ -1,6 +1,6 @@
 /**
- * Validated reads of machine-local files (S2, BUG-4): the caches and bookkeeping norn keeps in the
- * checkout's machine dir (B5). A missing file reads as `fallback`; an unreadable one, invalid JSON, or a
+ * Validated reads of machine-local files: the caches and bookkeeping norn keeps in the
+ * checkout's machine dir. A missing file reads as `fallback`; an unreadable one, invalid JSON, or a
  * value of the wrong shape (`@norn/schema` local-* schemas) also reads as `fallback`, never as a
  * cast of whatever was there, and leaves a `local_file` trace event naming the file. The next
  * write replaces the file, so a bad cache heals itself.

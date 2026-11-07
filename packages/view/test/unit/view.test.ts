@@ -19,7 +19,7 @@ describe("formatters", () => {
     expect(stepTitle(null, "done")).toBe("done");
   });
 
-  test("formatInbox: Notes after Running, its header naming each story's clearing approval once (NT5)", () => {
+  test("formatInbox: Notes after Running, its header naming each story's clearing approval once", () => {
     const note = (id: string, story: string, cleared_by: string) => ({ id, group: "notes", story, slice: null, step: "qa", title: `qa note on ${story}: x`, command: `norn run view ${story} --receipt r`, since: "", age: "1m", cleared_by });
     const run = { id: "r", group: "running", story: "gh-3", slice: null, step: "qa", title: "qa #1 (auto)", command: "norn run list gh-3", since: "", age: "1m" };
     const notes = [note("a", "gh-1", "cleared by gh-1 human-qa approval"), note("b", "gh-1", "cleared by gh-1 human-qa approval"), note("c", "gh-2", "cleared when the story is done")];
@@ -27,7 +27,7 @@ describe("formatters", () => {
     const out = formatInbox(v).split("\n");
     expect(out.indexOf("Running (1) · agents and checks at work")).toBe(0);
     expect(out).toContain("Notes (3) · agents' notes for you, no action needed · cleared by gh-1 human-qa approval; cleared when the story is done");
-    // NT6: the header line alone, with the command that lists them; `notes` lists them
+    // The header line alone, with the command that lists them; `notes` lists them
     const at = out.indexOf("Notes (3) · agents' notes for you, no action needed · cleared by gh-1 human-qa approval; cleared when the story is done");
     expect(out[at + 1]).toBe("      $ norn status --notes");
     expect(out.some((l) => l.includes("qa note on"))).toBe(false);

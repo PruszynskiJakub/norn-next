@@ -12,13 +12,13 @@ import {
 } from "./common.ts";
 import { Verdict } from "./criteria.ts";
 
-/** Full outcome edge: `{ to, counter?, means? }` (W3, W4). */
+/** Full outcome edge: `{ to, counter?, means? }`. */
 export const OutcomeEdge = Type.Object(
   {
     to: Target,
     counter: Type.Optional(CounterName),
-    means: Type.Optional(Type.String({ minLength: 1, description: "Shown to the agent in the brief (B3)" })),
-    /** QV5: reportable only when the worst verdict of the `--criteria` report is this one (agent steps) */
+    means: Type.Optional(Type.String({ minLength: 1, description: "Shown to the agent in the brief" })),
+    /** Reportable only when the worst verdict of the `--criteria` report is this one (agent steps) */
     verdict: Type.Optional(Verdict),
   },
   { additionalProperties: false },
@@ -43,9 +43,9 @@ function fixedOutcomes<const K extends string>(keys: readonly K[]) {
 }
 
 /**
- * Named input kinds of an agent step (B3, B6). `{ file }` is relative to the spec folder. `record`
- * (gh-195 D5, B28): each unit's receipts and evidence folders in the machine dir, and the record path
- * to link evidence by.
+ * Named input kinds of an agent step. `{ file }` is relative to the spec folder. `record`:
+ * each unit's receipts and evidence folders in the machine dir, and the record path to link
+ * evidence by.
  */
 export const InputKind = Type.Union([
   Type.Literal("spec"),
@@ -77,15 +77,15 @@ export const AgentStep = Type.Object(
     inputs: Type.Optional(Type.Array(StepInput, { uniqueItems: true })),
     agent: Type.Optional(Type.String({ minLength: 1, description: "Name from config.agents; default config.agent" })),
     model: Type.Optional(NonEmpty),
-    attended: Type.Optional(Type.Boolean({ description: "Worked with a person; always started by a person (MO4)" })),
+    attended: Type.Optional(Type.Boolean({ description: "Worked with a person; always started by a person" })),
     deadline: Type.Optional(Duration),
-    nudges: Type.Optional(Type.Integer({ minimum: 0, description: "Max nudges in the same session (C1)" })),
-    retries: Type.Optional(Type.Integer({ minimum: 0, description: "Max fresh-session retries after died (C1)" })),
-    /** QV3: `required` makes `norn done --criteria <file>` mandatory */
+    nudges: Type.Optional(Type.Integer({ minimum: 0, description: "Max nudges in the same session" })),
+    retries: Type.Optional(Type.Integer({ minimum: 0, description: "Max fresh-session retries after died" })),
+    /** `required` makes `norn done --criteria <file>` mandatory */
     criteria: Type.Optional(Type.Literal("required")),
     /**
      * Declared outcomes. May also override classified routes by naming
-     * `silent`, `died`, `timeout`, `stalled`, `ask`, `stuck` (C1).
+     * `silent`, `died`, `timeout`, `stalled`, `ask`, `stuck`.
      */
     outcomes: openOutcomes(),
   },
@@ -110,14 +110,14 @@ export const GateStep = Type.Object(
     type: Type.Literal("gate"),
     ...common,
     prompt: Type.Optional(Type.String({ description: "What the person decides; shown in inbox" })),
-    /** `stale` (BS6): tick-classified on a story gate when the base moved under the story (BS7) */
+    /** `stale`: tick-classified on a story gate when the base moved under the story */
     outcomes: fixedOutcomes(["approve", "reject", "stale"] as const),
   },
   { additionalProperties: false },
 );
 export type GateStep = Static<typeof GateStep>;
 
-/** W2: `update` (BS3) merges the base into the story branch; story units only (W8). */
+/** `update` merges the base into the story branch; story units only. */
 export const GitAction = Type.Union([Type.Literal("integrate"), Type.Literal("push"), Type.Literal("open-pr"), Type.Literal("update")]);
 export type GitAction = Static<typeof GitAction>;
 
@@ -150,7 +150,7 @@ export const CounterSpec = Type.Object(
   {
     max: PosInt,
     /**
-     * W4 (C3): taking the edge `<step>.<outcome>` resets this counter to 0, journaled in the
+     * Taking the edge `<step>.<outcome>` resets this counter to 0, journaled in the
      * advance (trace, commit) and the classify receipt. E.g. `base_conflict_loop` resets on
      * `update.done`: each base move is a fresh attempt, only repeated failures on one move count.
      */
@@ -160,12 +160,12 @@ export const CounterSpec = Type.Object(
 );
 export type CounterSpec = Static<typeof CounterSpec>;
 
-/** BS7/BS9: when a waiting story counts as stale, and the step `norn story update-branch` re-enters. */
+/** When a waiting story counts as stale, and the step `norn story update-branch` re-enters. */
 export const BaseSync = Type.Object(
   {
     /** `conflict` (default): a merge of the base would conflict; `behind`: the base has any commit the story lacks */
     stale: Type.Optional(Type.Union([Type.Literal("conflict"), Type.Literal("behind")])),
-    /** step `norn story update-branch` re-enters (BS9); default: the first step with `action: update` */
+    /** step `norn story update-branch` re-enters; default: the first step with `action: update` */
     step: Type.Optional(StepName),
   },
   { additionalProperties: false },
@@ -177,9 +177,9 @@ export const Workflow = Type.Object(
     $schema: Type.Optional(Type.String()),
     name: Type.String({ pattern: "^[a-z][a-z0-9_-]*$" }),
     description: Type.Optional(Type.String()),
-    /** MO1, B25 (W2a): how stories in this workflow run, unless `norn story edit` sets the story's own */
+    /** How stories in this workflow run, unless `norn story edit` sets the story's own */
     mode: Type.Optional(Mode),
-    /** B26, D17 (W2a): limits for every step that does not set its own; `stalled` only here */
+    /** Limits for every step that does not set its own; `stalled` only here */
     defaults: Type.Optional(
       Type.Object(
         {
@@ -204,7 +204,7 @@ export const Workflow = Type.Object(
 );
 export type Workflow = Static<typeof Workflow>;
 
-/** Classified outcomes the tick may decide per step type (§10). */
+/** Classified outcomes the tick may decide per step type. */
 export const CLASSIFIED_OUTCOMES = {
   agent: ["silent", "died", "timeout", "stalled", "ask", "exhausted"],
   check: ["pass", "fail", "exhausted"],
@@ -213,7 +213,6 @@ export const CLASSIFIED_OUTCOMES = {
   slices: ["done", "stuck", "exhausted"],
 } as const satisfies Record<StepType, readonly string[]>;
 
-/** Normalize a bare target string to a full edge. */
 export function outcomeEdge(spec: OutcomeSpec): OutcomeEdge {
   return typeof spec === "string" ? { to: spec } : spec;
 }

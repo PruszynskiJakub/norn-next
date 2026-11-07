@@ -18,15 +18,13 @@ function sortKeys(v: unknown): unknown {
   return v;
 }
 
-/** sha256 hex of a string (pure computation, no IO). */
 export function sha256(text: string): string {
   return new Bun.CryptoHasher("sha256").update(text).digest("hex");
 }
 
 /**
- * Stable hash of a parsed workflow: sha256 of its canonical JSON, so YAML formatting and
- * key order never change it. (state.json's `workflow_hash` is the sha256 of the pinned
- * file text, see @norn/store; use this one to compare workflow *meaning*.)
+ * Hash of a parsed workflow's canonical JSON, so YAML formatting and key order never change it.
+ * state.json's `workflow_hash` hashes the pinned file text instead; use this one to compare meaning.
  */
 export function workflowHash(workflow: Workflow): string {
   return sha256(canonicalJson(workflow));

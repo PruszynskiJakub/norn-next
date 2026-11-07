@@ -36,7 +36,7 @@ describe("initialState", () => {
   });
 });
 
-describe("transitions (W3, W4)", () => {
+describe("transitions", () => {
   test("done → next step; check fail goes back, counted; re-entry bumps attempt", () => {
     const r = run(stateFor(SLICE, SLICE_WF), SLICE_WF, started, done("done"), check("fail"));
     expect(r.state).toMatchObject({ step: "implement", attempt: 2, status: "ready", counters: { test_loop: 1 }, applied_through: 3 });
@@ -53,7 +53,7 @@ describe("transitions (W3, W4)", () => {
     expect(r.state).toMatchObject({ step: "review", status: "stuck", counters: { review_loop: 3 } });
     expect(r.state.park).toMatchObject({ kind: "exhausted", reason: "review_loop 3/3 at review.changes_requested" });
     expect(r.state.last_outcome?.outcome).toBe("exhausted");
-    // gh-212 (W4): the counter and its edge's target are in state, for the way out
+    // The counter and its edge's target are in state, for the way out
     expect(r.state.park?.counter).toEqual({ name: "review_loop", max: 3, outcome: "changes_requested", to: "implement" });
   });
 
@@ -65,7 +65,7 @@ describe("transitions (W3, W4)", () => {
   });
 });
 
-describe("rejections and idempotence (S6, T9)", () => {
+describe("rejections and idempotence", () => {
   test("stale step/attempt is rejected and skipped past, never applied", () => {
     const st = stateFor(SLICE, SLICE_WF);
     const stale = { ...done("done")(st), attempt: 7 };
@@ -105,7 +105,7 @@ describe("rejections and idempotence (S6, T9)", () => {
 });
 
 describe("universal reports and human receipts", () => {
-  test("ask parks; answer resumes the same session and delivers the text (B2)", () => {
+  test("ask parks; answer resumes the same session and delivers the text", () => {
     const withSession = (s: UnitState) => ({ ...started(s), how: "auto" as const, session: { runner: "herdr", session_id: "s1" } });
     const asked = run(stateFor(SLICE, SLICE_WF), SLICE_WF, withSession, (s) => receipt(s, "ask", { question: "Which DB?" }));
     expect(asked.state).toMatchObject({ status: "parked", park: { kind: "ask", reason: "Which DB?" } });
@@ -114,7 +114,7 @@ describe("universal reports and human receipts", () => {
     expect(answered.deliver).toBe("Postgres");
   });
 
-  test("answer without a live session resumes as ready for a fresh session; restart never answers (C3)", () => {
+  test("answer without a live session resumes as ready for a fresh session; restart never answers", () => {
     const auto = (s: UnitState) => ({ ...started(s), how: "auto" as const });
     const asked = run(stateFor(SLICE, SLICE_WF), SLICE_WF, auto, (s) => receipt(s, "ask", { question: "Q" }));
     const again = run(asked.state, SLICE_WF, (s) => ({ ...auto(s), run_id: "01JGGGGGGGGGGGGGGGGGGGGGGG" }));
@@ -170,14 +170,14 @@ describe("universal reports and human receipts", () => {
     expect(r.state.mode).toBe("auto");
   });
 
-  test("workflow switch enters the target step (S7)", () => {
+  test("workflow switch enters the target step", () => {
     const st = stateFor(SLICE, SLICE_WF);
     const r = run(st, SLICE_WF, (s) => receipt(s, "workflow", { name: "slice2", from_hash: st.workflow_hash, to_hash: "b".repeat(64), to: "review" }, "human"));
     expect(r.state).toMatchObject({ workflow: "slice2", workflow_hash: "b".repeat(64), step: "review" });
   });
 });
 
-describe("classified outcomes (C1)", () => {
+describe("classified outcomes", () => {
   const live = run(stateFor(storyUnit(), SOLO_WF), SOLO_WF, (s) => ({ ...started(s), how: "auto" as const, session: { runner: "herdr", session_id: "s" } })).state;
 
   test("silent nudges up to step.nudges, then $stuck as exhausted", () => {
@@ -210,7 +210,7 @@ describe("classified outcomes (C1)", () => {
   });
 });
 
-describe("take receipts (R10.1)", () => {
+describe("take receipts", () => {
   test("applied at any cursor without moving it, even on a stuck unit", () => {
     const stuck = stateFor(storyUnit(), SOLO_WF, { status: "stuck", park: { kind: "stuck", reason: "x", since: at() } });
     const take = receipt(stuck, "take", { previous_holder: "ann@pc", previous_heartbeat_id: null, expired: true, who: "bob@mac" }, "human");
@@ -222,7 +222,7 @@ describe("take receipts (R10.1)", () => {
   });
 });
 
-describe("restartStepOf: the step a takeover with the record lost restarts (T5b, gh-195 B25)", () => {
+describe("restartStepOf: the step a takeover with the record lost restarts (T5b)", () => {
   const wf: Workflow = {
     name: "rv",
     start: "implement",

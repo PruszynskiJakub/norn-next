@@ -30,7 +30,7 @@
     },
     "heartbeat_id": {
       "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-      "description": "ULID (ID2)",
+      "description": "ULID",
       "type": "string"
     },
     "acquired_at": {
@@ -52,7 +52,7 @@
       "anyOf": [
         {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         {

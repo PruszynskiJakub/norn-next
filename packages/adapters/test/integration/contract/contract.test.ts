@@ -23,7 +23,7 @@ import { runnerContract } from "../../contract/runner.ts";
 import { makeZombie, zombieUnsupported } from "../../contract/zombie.ts";
 
 processContract("process adapter (createProcessPort)", () => createProcessPort());
-// store's own ProcessPort guards leases and the tick lock (K3, H1)
+// store's own ProcessPort guards leases and the tick lock
 processContract("store localProcess", () => localProcess);
 
 // the zombie the K3 test needs is made even under load: the shell must not reap it before its exec

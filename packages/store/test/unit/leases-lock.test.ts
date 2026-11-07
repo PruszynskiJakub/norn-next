@@ -21,7 +21,7 @@ const A: ProcessIdentity = { pid: 101, pid_start: "a" };
 const B: ProcessIdentity = { pid: 202, pid_start: "b" };
 const unit = { repo: "/r", story: "gh-12", slice: "gh-12/01" };
 
-describe("tick lock (H1)", () => {
+describe("tick lock", () => {
   test("exclusive while holder alive; reclaimed when dead; release", async () => {
     const repo = tmp();
     const alive = new Set([A.pid]);
@@ -45,7 +45,7 @@ describe("tick lock (H1)", () => {
   });
 });
 
-describe("leases (K1, K3, K4)", () => {
+describe("leases", () => {
   test("agent leases capped, idempotent per run, dead holders reclaimed", async () => {
     const home = tmp();
     const alive = new Set([A.pid, B.pid]);
@@ -65,7 +65,7 @@ describe("leases (K1, K3, K4)", () => {
     expect(releaseLease(home, "agent-2.json")).toBe(true);
     expect(readdirSync(leasesDir(home))).toEqual(["agent-1.json"]);
   });
-  test("a lease is handed over only while it is unchanged: one released meanwhile stays released (K1)", async () => {
+  test("a lease is handed over only while it is unchanged: one released meanwhile stays released", async () => {
     const home = tmp();
     const r = await acquireRunLease(home, "check", 1, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", holder: A, liveness: () => true });
     if (!r.ok) throw new Error("no lease");
@@ -77,16 +77,16 @@ describe("leases (K1, K3, K4)", () => {
     expect(handOverLease(home, r.entry.file, to, { ...to, holder: A })).toBe(false);
     expect(readdirSync(leasesDir(home))).toEqual([]);
   });
-  test("a run releases its lease only while it still names its run: one reclaimed by another run stays (K3)", async () => {
+  test("a run releases its lease only while it still names its run: one reclaimed by another run stays", async () => {
     const home = tmp();
     const r = await acquireRunLease(home, "check", 1, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", holder: A, liveness: () => true });
     if (!r.ok) throw new Error("no lease");
-    rmSync(join(leasesDir(home), r.entry.file)); // reclaimed (K3) ...
+    rmSync(join(leasesDir(home), r.entry.file)); // reclaimed...
     const other = await acquireRunLease(home, "check", 1, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB2", holder: B, liveness: () => true });
-    expect(other).toMatchObject({ ok: true, entry: { file: r.entry.file } }); // ... and taken by another run
+    expect(other).toMatchObject({ ok: true, entry: { file: r.entry.file } }); //... and taken by another run
     expect(releaseRunLease(home, r.entry.file, "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1")).toBe(false);
     expect(readdirSync(leasesDir(home))).toEqual([r.entry.file]);
-    writeFileSync(join(leasesDir(home), r.entry.file), '{"run_id":"01JBQ6ZK3E8Y4V5W6X7Y8Z9AB2"'); // unreadable (S2): not this run's to remove
+    writeFileSync(join(leasesDir(home), r.entry.file), '{"run_id":"01JBQ6ZK3E8Y4V5W6X7Y8Z9AB2"'); // unreadable: not this run's to remove
     expect(releaseRunLease(home, r.entry.file, "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB2")).toBe(false);
     rmSync(join(leasesDir(home), r.entry.file));
     const mine = await acquireRunLease(home, "check", 1, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", holder: A, liveness: () => true });
@@ -95,7 +95,7 @@ describe("leases (K1, K3, K4)", () => {
     expect(readdirSync(leasesDir(home))).toEqual([]);
     expect(releaseRunLease(home, r.entry.file, "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1")).toBe(false); // gone already
   });
-  test("a run takes its own lease over, never another run's (K1)", async () => {
+  test("a run takes its own lease over, never another run's", async () => {
     const home = tmp();
     const r = await acquireRunLease(home, "check", 1, { ...unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9AB1", holder: A, liveness: () => true });
     if (!r.ok) throw new Error("no lease");
@@ -111,7 +111,7 @@ describe("leases (K1, K3, K4)", () => {
   test("slot leases: range, port base, worktree liveness by default, reclaim", async () => {
     const home = tmp();
     const wt = tmp();
-    // B33: slots are fixed at 1–9, slot n from port 4000 + 10·n
+    // Slots are fixed at 1–9, slot n from port 4000 + 10·n
     const s = await acquireSlotLease(home, { ...unit, worktree: wt, holder: A });
     expect(s).toMatchObject({ ok: true, entry: { n: 1, lease: { slot: 1, port_base: 4010, worktree: wt } } });
     const same = await acquireSlotLease(home, { ...unit, worktree: wt, holder: B });

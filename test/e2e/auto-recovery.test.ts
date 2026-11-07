@@ -1,5 +1,5 @@
 /**
- * Auto-mode recovery end to end (§13.1), one clone each:
+ * Auto-mode recovery end to end, one clone each:
  *   - R4.2/R4.3: a failed nudge send is `ok: false`, an Unblock item and shown in status; a runner
  *     without `send` resumes the agent session with the nudge text
  *   - R5.1–R5.3: a `started` receipt without state is adopted when the runner finds the run, `died`
@@ -90,7 +90,7 @@ describe("R4: nudges that can be delivered (acceptance 5)", () => {
 
     const inbox = (await h.norn("status")).value as Inbox;
     expect(inbox.groups.unblock).toEqual([expect.objectContaining({ story: "gh-9", step: "implement", title: "nudge to gh-9 not delivered: agent p-1 is blocked by a dialog", command: `norn run view gh-9 --why --tick ${r.tick_id}` })]);
-    // notified once, from the tick that failed (O3)
+    // notified once, from the tick that failed
     expect(h.notifier.items.filter((i) => i.id === `failed:gh-9:${r.tick_id}`)).toHaveLength(1);
     const status = (await h.listed("gh-9")) as ProjectView["stories"][number];
     expect(status.act_failure).toMatchObject({ effect: "nudge", tick_id: r.tick_id });
@@ -283,7 +283,7 @@ describe("R7: a run from another machine (acceptance 10)", () => {
     expect(st.run).toMatchObject({ machine: "tester@box", heartbeat_id: expect.any(String) });
     // the run was launched by ann's heartbeat on her machine; this checkout holds the story now
     const foreign: UnitState = { ...st, run: { ...(st.run as NonNullable<UnitState["run"]>), machine: "ann@pc", heartbeat_id: "01JFFFFFFFFFFFFFFFFFFFFFFF", process: { pid: 999_999_99, pid_start: "gone" } } };
-    writeState(runs(h), foreign); // S12: in the machine dir, nothing to commit
+    writeState(runs(h), foreign); // In the machine dir, nothing to commit
     h.runner.pane = { alive: false, state: "unknown", since: null };
     h.clock.advance(10_000);
     expect(rules(await h.tick())).toEqual(["gh-9 agent.running.foreign"]);

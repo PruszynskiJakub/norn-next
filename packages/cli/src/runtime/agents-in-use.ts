@@ -1,5 +1,5 @@
 /**
- * B1, B13: wiring builds every built-in agent so a step may name any of them; what a person sets up
+ * Wiring builds every built-in agent so a step may name any of them; what a person sets up
  * (`norn init`'s hooks and skills) and checks (`norn doctor`) covers only the agents in use: the
  * default agent, each agent entry a config file sets (not the built-in ones) and each agent a repo
  * workflow step names. An agent nobody uses is never installed nor failed for being absent.

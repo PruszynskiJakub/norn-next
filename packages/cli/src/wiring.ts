@@ -1,5 +1,5 @@
 /**
- * Adapter wiring: the built-in registry from @norn/adapters (gh-64: no third-party adapters).
+ * Adapter wiring: the built-in registry from @norn/adapters (no third-party adapters).
  * Ports are built from the resolved config; tests inject replacements through `CliDeps.ports`.
  */
 import { claude, codex, gemini, gh, git, glab, headless, herdr, notify, opencode, proc } from "@norn/adapters";
@@ -25,16 +25,16 @@ export function defaultRegistry(): AdapterRegistry {
   };
 }
 
-/** D15: the file a setting came from, for an adapter error ("built-in" and "derived" name none). */
+/** The file a setting came from, for an adapter error ("built-in" and "derived" name none). */
 export type SourceOf = (key: string) => string | null;
 
 function adapterError(e: unknown, what: string, file: string | null): never {
   const message = `${what}: ${(e as Error).message}`;
-  // B7: a config error, so exit 6 under the title "Config error"
+  // A config error, so exit 6 under the title "Config error"
   throw new CliFailure({ error: message, do_instead: file ? `fix it in ${file}` : "check the setting with `norn config`", code: "config_invalid" }, ExitCode.config);
 }
 
-/** B47 (D15): a notifier whose send fails (an unreachable URL) says which file set it. */
+/** A notifier whose send fails (an unreachable URL) says which file set it. */
 function namingFile(n: NotifierPort, file: string | null): NotifierPort {
   return {
     name: n.name,
@@ -49,15 +49,15 @@ function namingFile(n: NotifierPort, file: string | null): NotifierPort {
 }
 
 /**
- * Build every port (X2: built-in adapters only). The runner is the detected one (B29); notifiers
- * come from `notify` (D9: `os` unless false, `ntfy`, `webhook`) plus Herdr's inside Herdr (B20).
- * An adapter that fails to build names the file its setting came from (D15). `overrides` replace
+ * Build every port from the built-in adapters. The runner is the detected one; notifiers
+ * come from `notify` (`os` unless false, `ntfy`, `webhook`) plus Herdr's inside Herdr.
+ * An adapter that fails to build names the file its setting came from. `overrides` replace
  * whole ports (tests, embedding).
  */
 export async function buildPorts(registry: AdapterRegistry, actx: AdapterContext, config: ResolvedConfig, overrides: Partial<Ports> = {}, sourceOf: SourceOf = () => null): Promise<Ports> {
   const agents: Record<string, AgentAdapter> = {};
   if (overrides.agents) Object.assign(agents, overrides.agents);
-  // B13: every built-in agent is usable without an entry, so a step may name any of them
+  // Every built-in agent is usable without an entry, so a step may name any of them
   for (const name of new Set([...Object.keys(registry.agents), config.agent, ...Object.keys(config.agents)])) {
     if (agents[name]) continue;
     const f = registry.agents[name];

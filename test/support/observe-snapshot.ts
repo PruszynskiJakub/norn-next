@@ -20,7 +20,7 @@ import { type Harness, T0 } from "./harness.ts";
 import { REPO_ROOT } from "./repo-root.ts";
 import { textNormaliser } from "./transcript.ts";
 
-/** Where the pinned observe snapshots live, named from the repo root (gh-118 B19). */
+/** Where the pinned observe snapshots live, named from the repo root. */
 export const OBSERVE_SNAPSHOTS_DIR = join(REPO_ROOT, "test", "e2e", "observe-snapshots");
 
 /**

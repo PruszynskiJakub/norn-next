@@ -1,5 +1,5 @@
 /**
- * Base sync through the CLI runtime with real git (BS0–BS11): a sibling merge into main is merged into the story branch by `git: update` with a
+ * Base sync through the CLI runtime with real git: a sibling merge into main is merged into the story branch by `git: update` with a
  * `Norn-Tick` merge commit; a conflicting one goes to `resolve` and back; a story waiting at `ready`
  * goes back through update when the base moves into a conflict; `norn update` re-enters a done story;
  * a PR merged into another branch parks the story; `base_branch: develop` is used throughout.
@@ -71,9 +71,9 @@ function siblingMerge(h: Harness, file: string, text: string, branch = "main"): 
 }
 
 /**
- * gh-195/07 (B6): a person's note in the story's handoff, uncommitted, so a norn commit that is not a step's
+ * A person's note in the story's handoff, uncommitted, so a norn commit that is not a step's
  * boundary (an update, an answer) has something of its own to carry: norn writes nothing into the handoff
- * any more, and only a story unit's boundary is committed with nothing changed (gh-195 D17).
+ * any more, and only a story unit's boundary is committed with nothing changed.
  */
 function noteInHandoff(wt: string, specDir: string, note: string): void {
   const file = handoffPath(join(wt, specDir), STORY_UNIT_DIR);
@@ -117,7 +117,7 @@ describe("base sync with real git", () => {
     expect(kinds(await h.tick())).toEqual(["gh-7 remote.intake"]);
     const sibling = siblingMerge(h, "b.txt", "b\n");
     step();
-    await h.tick("--sync"); // claim; the base is fetched with the sync (P2)
+    await h.tick("--sync"); // claim; the base is fetched with the sync
     const seen = await until(() => h.state(runs())?.step === "test", "test");
     expect(seen).toContain("gh-7 git.update");
     expect(h.git(["log", "--merges", "--format=%H"], wt()).split("\n").filter(Boolean)).toHaveLength(1);
@@ -125,7 +125,7 @@ describe("base sync with real git", () => {
     expect(log[0]).toBe(`Update gh-7 from main (${sibling.slice(0, 7)})`);
     expect(log[1]).toContain(sibling);
     expect(log[2]).toMatch(/^[0-9A-Z]{26}$/);
-    // pushed at the step boundary (S8)
+    // pushed at the step boundary
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"]).split("\t")[0]).toBe(h.git(["rev-parse", "HEAD"], wt()));
     const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ id: string }>> };
     expect(inbox.groups.check?.filter((i) => i.id.startsWith("foreign:"))).toEqual([]);
@@ -160,7 +160,7 @@ describe("base sync with real git", () => {
     expect(json.rework?.base).toMatchObject({ sha: sibling, conflicts: ["a.txt"] });
     expect(sh(wt(), ["status", "--porcelain"])).toBe("");
 
-    // the agent merges the base in the story worktree, resolves by intent, commits (BS5)
+    // the agent merges the base in the story worktree, resolves by intent, commits
     const merge = Bun.spawnSync(["git", "merge", "--no-ff", sibling], { cwd: wt() });
     expect(merge.exitCode).not.toBe(0);
     writeFileSync(join(wt(), "a.txt"), "story side\nbase side\n");
@@ -270,7 +270,7 @@ describe("BS3.3a (dogfood D4): a person's push to the branch of a $done story", 
   }, 60_000);
 });
 
-describe("base_branch: develop (BS0, 7b)", () => {
+describe("base_branch: develop (7b)", () => {
   let h: Harness;
   beforeAll(async () => {
     h = await createHarness();
@@ -306,7 +306,7 @@ describe("base_branch: develop (BS0, 7b)", () => {
   }, 60_000);
 });
 
-describe("PR items between syncs and in the read model (C1), ready approval voided by norn update (C5)", () => {
+describe("PR items between syncs and in the read model, ready approval voided by norn update", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-9-pay-by-card`;
   const runs = () => runStateOf(join(wt(), ".agents/specs/gh-9-pay-by-card"));
@@ -344,7 +344,7 @@ describe("PR items between syncs and in the read model (C1), ready approval void
     writeFileSync(join(wt(), "a.txt"), "story side\n");
     h.git(["add", "-A"], wt());
     h.git(["commit", "-q", "-m", "story edits a", "--trailer", "Norn-Tick: 01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC"], wt());
-    // C5: the $done commit after the approval carries this note (a boundary: it would be made without it too, D17)
+    // The $done commit after the approval carries this note (a boundary: it would be made without it too, D17)
     noteInHandoff(wt(), ".agents/specs/gh-9-pay-by-card", "approved with a.txt as it is");
     expect((await h.norn("story", "approve", "gh-9")).exit).toBe(0);
     await until(() => h.state(runs())?.status === "done", "done");
@@ -509,7 +509,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     // BS5.2 (dogfood D5): norn's owed commit is clean, but pushing it would publish the agent's merge
     // commit with markers — the push is held: ok:false, an Unblock item naming file and commit
     expect((await h.norn("story", "answer", "gh-11", "1")).exit).toBe(0);
-    // the agent's note in its handoff is what norn's owed commit carries (gh-195/07, B6)
+    // the agent's note in its handoff is what norn's owed commit carries
     noteInHandoff(wt(), ".agents/specs/gh-11-merge-safely", "merged main; markers left in a.txt");
     h.runner.pane = { alive: true, state: "working", since: null };
     h.clock.advance(10_000);
@@ -532,7 +532,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready");
     const why = (await h.norn("run", "view", "gh-11", "--why", "--transition", "resolve.done")).stdout;
     expect(why).toContain(`by merge commit ${merge}`);
-    // the agent's merge and fix-up, made during its run, are not foreign (C4)
+    // the agent's merge and fix-up, made during its run, are not foreign
     const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ id: string }>> };
     expect(inbox.groups.check?.filter((i) => i.id.startsWith("foreign:"))).toEqual([]);
   }, 60_000);
@@ -552,13 +552,13 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
   }, 60_000);
 });
 
-describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run rerun --step resolve (BS5, W4)", () => {
+describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run rerun --step resolve", () => {
   let h: Harness;
   const wt = () => `${h.root}-worktrees/gh-12-conflict-twice`;
   const runs = () => runStateOf(join(wt(), ".agents/specs/gh-12-conflict-twice"));
   const inWt = (...argv: string[]) => runChecked(argv, { ...h.deps, cwd: wt() });
   const lastClassify = () => {
-    // S12: the receipts are in the machine dir, not in git
+    // The receipts are in the machine dir, not in git
     const file = `receipts/${readdirSync(join(runs(), "receipts")).sort().filter((f) => f.endsWith("-classify.json")).at(-1) as string}`;
     return JSON.parse(readFileSync(join(runs(), file), "utf8"));
   };
@@ -618,7 +618,7 @@ describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run r
     await h.tick();
     expect(h.state(runs())).toMatchObject({ step: "update", status: "stuck" });
 
-    // a person sends it to resolve: the brief still names the base, and done still verifies it (BS5)
+    // a person sends it to resolve: the brief still names the base, and done still verifies it
     expect((await h.norn("run", "rerun", "gh-12", "--step", "resolve", "--reset", "base_conflict_loop")).exit).toBe(0);
     await until(() => h.state(runs())?.step === "resolve" && h.state(runs())?.status === "running", "resolve running again");
     const b = await inWt("brief", "--json");
@@ -629,7 +629,7 @@ describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run r
   }, 60_000);
 });
 
-describe("gh-252 (SK1): a story in flight keeps running on its worktree's skills after the base moves to new ones", () => {
+describe("gh-252: a story in flight keeps running on its worktree's skills after the base moves to new ones", () => {
   const HELD = `name: held
 start: work
 steps:

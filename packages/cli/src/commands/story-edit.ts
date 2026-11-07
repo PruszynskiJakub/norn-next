@@ -1,21 +1,21 @@
 /**
  * `norn story edit [<unit>] --auto|--manual | --workflow <name> [--at <step>]`.
  *
- * `--auto|--manual` (B30, §6, MO1): switch who starts unattended agent steps. Writes a `mode`
+ * `--auto|--manual`: switch who starts unattended agent steps. Writes a `mode`
  * receipt on the story unit; the next tick stores it in `runs/_story/state.json`. A running agent is
- * not stopped (MO3). Needs the claim here (T8); mode never goes through the mailbox. Mode is per
- * story: a slice target, or a slice worktree, means its story (B55).
+ * not stopped. Needs the claim here; mode never goes through the mailbox. Mode is per
+ * story: a slice target, or a slice worktree, means its story.
  *
- * `--workflow <name> [--at <step>] [--force]` (B31, B32, W9, S7). Before the unit starts: set `workflow:` in its
+ * `--workflow <name> [--at <step>] [--force]`. Before the unit starts: set `workflow:` in its
  * story/slice frontmatter. A started slice: only with `--at`; journals a `workflow` receipt (from/to
  * hash) and re-pins its `workflow.yaml` to the new workflow, which the next tick applies by entering
- * `--at`. A started story (gh-71 D1, D3, D4): starts a new round — refused while the claim is held
+ * `--at`. A started story: starts a new round — refused while the claim is held
  * elsewhere, for an unknown workflow or step, or while the round is unfinished without `--force` (with it:
  * while an agent runs a step of the round or a slice is unfinished); otherwise writes only a `round`
  * receipt into the current round, which the next tick applies (`round.start`). Runs under the tick lock
  * so no tick sees a pin without its receipt.
  *
- * `--at <step>` alone (gh-71 B15, B16, D4, RD4): move the cursor of the current, unfinished round to a step
+ * `--at <step>` alone: move the cursor of the current, unfinished round to a step
  * of its own pinned workflow, journaled as a `workflow` receipt with the same workflow and hash; counters
  * are kept. A finished round is refused: a new one starts with `--workflow`.
  */
@@ -39,16 +39,16 @@ const editable = (verb: "mode" | "workflow"): TargetRule => ({
   command: (key) => (verb === "mode" ? cmd.storyEdit(key, { mode: "auto" }) : cmd.storyEdit(key, { workflow: "<name>" })),
   none: "No story is open to edit",
   applies(_key, u) {
-    // gh-71 B6: a story whose round is finished takes --workflow (a new round)
+    // A story whose round is finished takes --workflow (a new round)
     if (verb === "mode") return !!u && u.status !== "done" && u.slice === null;
     return !!u && (u.status !== "done" || u.slice === null);
   },
 });
 
 async function editMode(ctx: Context, raw: string, mode: Mode) {
-  // B55: mode is per story (MO1) — a slice means its story
+  // Mode is per story — a slice means its story
   const t = await resolveTarget(ctx, parseUnitKey(raw).story);
-  // T9: refused before anything (even a no-op) is computed from a possibly stale local copy
+  // Refused before anything (even a no-op) is computed from a possibly stale local copy
   const claim = await refuseIfHeldElsewhere(ctx, t.story, "story edit");
   let current: Mode = ctx.config.mode;
   const out = await runHumanVerb(ctx, t, {
@@ -73,7 +73,7 @@ async function editMode(ctx: Context, raw: string, mode: Mode) {
 }
 
 /**
- * gh-71 D3 (B12, B13, RD3): what `--force` may not end — an agent running a step of the round (it would
+ * What `--force` may not end — an agent running a step of the round (it would
  * keep writing to the branch), or a slice of the story that is not integrated or dropped.
  */
 function refuseWhileWorking(story: StoryFacts, st: UnitState): void {
@@ -91,14 +91,14 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
     const obs = t.obs;
     const sf = t.story_facts;
     if (!obs || !sf) throw refuse(`${t.story} is not in this checkout`, cmd.storyCheckout(t.story), "story_not_local");
-    // gh-71 D3 (B18): a new round is refused first while another clone holds the story's claim
+    // A new round is refused first while another clone holds the story's claim
     const round = !t.slice && !!t.state;
-    // gh-196 D1: a supervisor delegates only a round start (B34); a slice switch or a pre-start choice stays the person's
-    // gh-196 D3 (B34): the reason lives only on the round receipt, so outside a round start it is refused, never dropped
-    // P8: the unit's state says no, so this is a refusal, not a usage error
+    // A supervisor delegates only a round start; a slice switch or a pre-start choice stays the person's
+    // The reason lives only on the round receipt, so outside a round start it is refused, never dropped
+    // The unit's state says no, so this is a refusal, not a usage error
     if ((d.delegated || d.reason !== undefined) && !round)
       throw refuse(`--delegated/--reason apply only to a new round of a started story; ${t.key} is ${t.slice ? "a slice" : "not started"}`, cmd.storyEdit(t.key, { workflow: name }), "not_a_round_start");
-    // gh-195 S12: a non-holder has no run state of the story, so a claim seen held elsewhere is checked first too
+    // A non-holder has no run state of the story, so a claim seen held elsewhere is checked first too
     const claim = round || (!t.slice && sf.claim.state === "other") ? await refuseIfHeldElsewhere(ctx, t.story, "story edit") : undefined;
     const listed = Object.keys(obs.workflows).sort();
     const loaded = obs.workflows[name];
@@ -106,7 +106,7 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
     const level = t.slice ? "slice" : "story";
     const issues = loaded.workflow ? [...loaded.issues, ...checkWorkflowLevel(loaded.workflow, level)] : loaded.issues;
     if (!loaded.workflow || issues.length)
-      throw refuse(`workflow '${name}' cannot run on a ${level}: ${issues.map((i) => i.message).join("; ") || "invalid"}`, "fix the workflow file (W5, W8)", "invalid_workflow", issues);
+      throw refuse(`workflow '${name}' cannot run on a ${level}: ${issues.map((i) => i.message).join("; ") || "invalid"}`, "fix the workflow file", "invalid_workflow", issues);
     const wf = loaded.workflow;
     const loc = obs.stories[t.story];
     const sliceFile = t.slice ? sf.slices.find((s) => s.key === t.slice) : null;
@@ -119,8 +119,8 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
     };
 
     if (!t.state) {
-      // W9: before start the choice lives in frontmatter
-      if (at !== undefined) throw refuse(`${t.key} has not started; --at applies only to a running unit (S7)`, cmd.storyEdit(t.key, { workflow: name }), "not_started");
+      // Before start the choice lives in frontmatter
+      if (at !== undefined) throw refuse(`${t.key} has not started; --at applies only to a running unit`, cmd.storyEdit(t.key, { workflow: name }), "not_started");
       if (sf.claim.state === "other") throw claimHeld(sf.claim.blob, `ask ${sf.claim.blob.holder} to run it, or ${cmd.storyCheckout(t.story, { force: true })}`);
       if (t.slice ? !sliceFile?.frontmatter : !sf.frontmatter) throw refuse(`${t.key}'s frontmatter is missing or invalid`, cmd.storyView(t.story), "frontmatter");
       const previous = t.slice ? (sliceFile?.frontmatter?.workflow ?? null) : (sf.frontmatter?.workflow ?? null);
@@ -131,7 +131,7 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
     const steps = `<${Object.keys(wf.steps).join("|")}>`;
     const toHash = sha256(loaded.source);
     if (round) {
-      // gh-71 D3 (B9): the step the new round starts at must be one of the workflow's
+      // The step the new round starts at must be one of the workflow's
       const to = at ?? wf.start;
       if (!stepOf(wf, to)) throw refuse(`no step '${to}' in workflow ${name}`, cmd.storyEdit(t.key, { workflow: name, at: steps }), "unknown_step");
       const out = await runHumanVerb(ctx, t, {
@@ -140,13 +140,13 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
         ...(claim ? { claim } : {}),
         check(t, st) {
           if (roundFinished(st)) return;
-          // gh-71 D3 (B10): an unfinished round is ended only on purpose
+          // An unfinished round is ended only on purpose
           if (!force)
             throw refuse(`${t.story}'s ${st.workflow} round is not finished; pass --force to end it and start a ${name} round`, cmd.storyEdit(t.story, { workflow: name, force: true, ...(at ? { at } : {}) }), "round_unfinished");
           refuseWhileWorking(sf, st);
         },
-        // gh-71 D1 (P6, S5): only the receipt; the next tick ends the round and starts the next one.
-        // B14: `--force` on a finished round is the same edit as without it
+        // Only the receipt; the next tick ends the round and starts the next one.
+        // `--force` on a finished round is the same edit as without it
         build: (t, st) => humanReceipt(ctx, t, st, "round", { workflow: name, workflow_hash: toHash, to, forced: !roundFinished(st), left_at: st.step, ...delegatedFields(d) }),
       });
       return { unit: t.key, workflow: name, previous: t.state.workflow, started: true, round: (t.state.round ?? 1) + 1, to, receipt: out.receipt, delivered: out.delivered, next: out.next };
@@ -156,11 +156,11 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
       mailbox: false,
       check(t, st) {
         if (st.status === "done") throw refuse(`${t.key} is done`, cmd.storyView(t.story), "unit_done");
-        // B32, S7: the step a started unit lands on is always explicit
-        if (at === undefined) throw refuse(`${t.key} already runs workflow ${st.workflow}; switching a started unit needs --at <step> (S7)`, cmd.storyEdit(t.key, { workflow: name, at: steps }), "needs_to");
+        // The step a started unit lands on is always explicit
+        if (at === undefined) throw refuse(`${t.key} already runs workflow ${st.workflow}; switching a started unit needs --at <step>`, cmd.storyEdit(t.key, { workflow: name, at: steps }), "needs_to");
         if (!stepOf(wf, at)) throw refuse(`no step '${at}' in workflow ${name}`, cmd.storyEdit(t.key, { workflow: name, at: steps }), "unknown_step");
       },
-      // P6: the journal entry first, then the re-pin; state.json moves on the next tick (S5)
+      // The journal entry first, then the re-pin; state.json moves on the next tick
       build: (t, st) => humanReceipt(ctx, t, st, "workflow", { name, from_hash: st.workflow_hash, to_hash: toHash, to: at as string }),
     });
     pinWorkflow(t.runsDir as string, loaded.source, { replace: true });
@@ -176,24 +176,24 @@ async function moveCursor(ctx: Context, raw: string, at: string) {
   const lock = await waitForTickLock(ctx, "norn story edit --at", "retry when it finishes");
   try {
     const t = await resolveTarget(ctx, key.key);
-    if (!t.state) throw refuse(`${t.key} has not started; --at applies only to a running unit (S7)`, cmd.storyEdit(t.key, { workflow: "<name>" }), "not_started");
-    // gh-71 D3 (B18, T9): refused first while another clone holds the story's claim
+    if (!t.state) throw refuse(`${t.key} has not started; --at applies only to a running unit`, cmd.storyEdit(t.key, { workflow: "<name>" }), "not_started");
+    // Refused first while another clone holds the story's claim
     const claim = await refuseIfHeldElsewhere(ctx, t.story, "story edit");
     const out = await runHumanVerb(ctx, t, {
       verb: "story edit",
       mailbox: false,
       claim,
       check(t, st) {
-        // gh-71 B16 (RD4): a finished round is never revived; the next one starts with --workflow
+        // A finished round is never revived; the next one starts with --workflow
         if (t.slice === null && roundFinished(st))
           throw refuse(`${t.story}'s ${st.workflow} round is finished; start a new round with ${cmd.storyEdit(t.story, { workflow: "<name>" })}`, cmd.storyEdit(t.story, { workflow: "<name>" }), "round_finished");
         if (st.status === "done") throw refuse(`${t.key} is done`, cmd.storyView(t.story), "unit_done");
-        // gh-71 B15 (D4): a step of the round's own pinned workflow
+        // A step of the round's own pinned workflow
         const steps = t.workflow ? Object.keys(t.workflow.steps) : [];
         if (!t.workflow || !stepOf(t.workflow, at))
           throw refuse(`no step '${at}' in ${t.key}'s ${st.workflow} workflow`, cmd.storyEdit(t.key, { at: `<${steps.join("|")}>` }), "unknown_step");
       },
-      // gh-71 D4: journaled as today's workflow receipt, same workflow and hash; the tick enters `at`, counters kept
+      // Journaled as a workflow receipt, same workflow and hash; the tick enters `at`, counters kept
       build: (t, st) => humanReceipt(ctx, t, st, "workflow", { name: st.workflow, from_hash: st.workflow_hash, to_hash: st.workflow_hash, to: at }),
     });
     return { unit: out.unit, workflow: t.state.workflow, started: true, to: at, ...(t.slice === null ? { round: t.state.round ?? 1 } : {}), receipt: out.receipt, delivered: out.delivered, next: out.next };
@@ -205,13 +205,13 @@ async function moveCursor(ctx: Context, raw: string, at: string) {
 export const storyEditCommand = defineCommand({
   name: "story edit",
   version: "acts",
-  summary: "Switch a story between auto and manual mode, or choose a unit's workflow (B30–B32, MO1, W9, S7)",
+  summary: "Switch a story between auto and manual mode, or choose a unit's workflow",
   usage: USAGE,
   optionHelp: {
-    "--auto": "the heartbeat starts the story's agent steps (MO1)",
-    "--manual": "a person starts the story's agent steps (MO1)",
+    "--auto": "the heartbeat starts the story's agent steps",
+    "--manual": "a person starts the story's agent steps",
     "--workflow <name>": "the unit's workflow: set before it starts; on a started story, the next round's; on a started slice, switched with --at",
-    "--at <step>": "with --workflow: the step the new round (story) or the switched slice lands on (S7); alone: move the current round's cursor to that step",
+    "--at <step>": "with --workflow: the step the new round (story) or the switched slice lands on; alone: move the current round's cursor to that step",
     "--force": "with --workflow on a story (not a slice): end its unfinished round (recorded as ended by you) and start the new one",
     '--reason "…"': "with --workflow on a started story: why this workflow, kept on the round receipt",
     ...DELEGATED_HELP,
@@ -231,10 +231,10 @@ export const storyEditCommand = defineCommand({
     const d = delegation(ctx, args, "story edit");
     if (!auto && !manual && workflow === undefined && at === undefined) throw usageError("story edit: nothing to change (pass --auto, --manual, --workflow <name> or --at <step>)", USAGE);
     const raw = await targetKey(ctx, args.positionals[0], args.json === true, editable(auto || manual ? "mode" : "workflow"));
-    // gh-71 RD3: --force ends a story's round; a slice switches in place (D4) and has no round to end
+    // --force ends a story's round; a slice switches in place and has no round to end
     if (force && parseUnitKey(raw).slice !== null) throw usageError("story edit: --force applies to a story, not a slice", USAGE);
     if (workflow !== undefined) return editWorkflow(ctx, raw, workflow, at, force, d);
-    // gh-71 B15 (D3): --at alone moves the cursor inside the current round
+    // --at alone moves the cursor inside the current round
     if (at !== undefined) return moveCursor(ctx, raw, at);
     return editMode(ctx, raw, auto ? "auto" : "manual");
   },

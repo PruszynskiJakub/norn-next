@@ -1,4 +1,4 @@
-/** observe: git facts of the repository — story bases (BS0, BS1), intake-only branches (R3.1), foreign commits (Q6), orphan branches (K5), worktrees. */
+/** observe: git facts of the repository — story bases, intake-only branches, foreign commits, orphan branches, worktrees. */
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { type ForeignCommit, type GitInProgress, type GitPort, isIntakeCommit, type Ports, type StoryBase, type StoryFacts, type WorktreeFacts, type WorktreeStatus } from "@norn/core";
@@ -19,11 +19,11 @@ function newestMtime(dir: string, paths: string[]): number | null {
   return max === null ? null : Math.floor(max);
 }
 
-/** BS0: the base ref of every story — the fetched `<remote>/<base>`, or the local base branch without a remote. */
+/** The base ref of every story — the fetched `<remote>/<base>`, or the local base branch without a remote. */
 export const storyBaseRef = (remote: string | null, base: string) => (remote ? `refs/remotes/${remote}/${base}` : `refs/heads/${base}`);
 
 /**
- * BS1: the story branch against its base ref. Measured (divergence, and `git merge-tree` when the
+ * The story branch against its base ref. Measured (divergence, and `git merge-tree` when the
  * story is behind) only when the pair (head, base sha) is not the cached one (`trace/base.json`).
  * Absent when the story is finished, its branch or the base ref is missing, or git fails.
  */
@@ -61,7 +61,7 @@ export async function storyBase(
 }
 
 /**
- * R3.1: does the local story branch hold nothing beyond its intake commit — read off the commits'
+ * Does the local story branch hold nothing beyond its intake commit — read off the commits'
  * trailers (`isIntakeCommit`), never their subjects. Not observed without the branch or the base ref.
  */
 export async function intakeOnly(git: GitPort, root: string, baseRef: string | null, branch: string, story: string, refs: Map<string, string>): Promise<{ intake_only?: boolean }> {
@@ -76,13 +76,13 @@ export async function commitOf(git: GitPort, root: string, rev: string): Promise
   return git.revParse(root, `${rev}^{commit}`);
 }
 
-/**
- * Q6: commits on `branch` (first-parent, not on the base) made after the newest norn commit — one
- * carrying a `Norn-Tick` trailer. A branch with no norn commit in that range reports none.
- */
-/** C4: a found commit with its committer date (ISO), compared with the unit's run windows; not part of the facts. */
+/** A found commit with its committer date (ISO), compared with the unit's run windows; not part of the facts. */
 export type DatedCommit = ForeignCommit & { committed_at?: string };
 
+/**
+ * Commits on `branch` (first-parent, not on the base) made after the newest norn commit — one
+ * carrying a `Norn-Tick` trailer. A branch with no norn commit in that range reports none.
+ */
 export async function foreignCommits(git: GitPort, root: string, remote: string | null, branch: string, baseRef: string | null, refs?: Map<string, string>): Promise<DatedCommit[]> {
   const local = `refs/heads/${branch}`;
   const tracking = remote ? `refs/remotes/${remote}/${branch}` : null;
@@ -121,7 +121,7 @@ const STORY_BRANCH = /^((?:gh|gl)-\d+)-[a-z0-9][a-z0-9-]*$/;
 const SLICE_BRANCH = /^((?:gh|gl)-\d+)\/(\d+)-([a-z0-9][a-z0-9-]*)$/;
 
 /**
- * K5: local branches of norn's shape that no unit needs any more — not checked out in a worktree,
+ * Local branches of norn's shape that no unit needs any more — not checked out in a worktree,
  * and their story is unknown here or finished (done/dropped), or (slice branches) their slice is
  * integrated/dropped. Reported every tick; `norn tidy` deletes the ones whose commits are kept elsewhere.
  */
@@ -150,7 +150,7 @@ export function findOrphanBranches(refs: ReadonlyMap<string, string>, worktrees:
 
 export async function worktreeFacts(ports: Ports, path: string): Promise<WorktreeFacts | null> {
   if (!existsSync(path)) return null;
-  // H1/BS5.1: an agent's merge (or rebase) in progress defers norn's commits; decide must know it
+  // An agent's merge (or rebase) in progress defers norn's commits; decide must know it
   const [status, last_commit_at, in_progress]: [WorktreeStatus | null, number | null, GitInProgress | null] = await Promise.all([
     ports.git.status(path).catch(() => null),
     ports.git.lastCommitTime(path).catch(() => null),

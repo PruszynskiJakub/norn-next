@@ -1,5 +1,5 @@
 /**
- * `norn config <verb>` (K2, gh-64 B46): `list` every setting in effect, with or without a key, with
+ * `norn config <verb>`: `list` every setting in effect, with or without a key, with
  * its value and source (`built-in`, `derived` with the reason, `user`, `local`, `repo`), grouped by
  * the file it belongs in; `get <key>` that setting, or every setting under it (`agents`, `claim`);
  * `set` and `unset` one value in the user, local or team file (`config-edit.ts`).
@@ -63,7 +63,7 @@ export const configNoun = defineNoun({
 });
 
 function showConfig(ctx: Context, key?: string) {
-  void ctx.config; // refuses a config with problems (B7), so the load below is ok
+  void ctx.config; // refuses a config with problems, so the load below is ok
   const loaded = ctx.loaded as Extract<LoadedConfig, { ok: true }>;
   const files = {
     user: { path: loaded.paths.user, exists: existsSync(loaded.paths.user) },

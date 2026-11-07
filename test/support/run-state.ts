@@ -1,5 +1,5 @@
 /**
- * S12 (gh-195/05): name a fixture's run-state folder from the spec folder a test already has. A unit's
+ * Name a fixture's run-state folder from the spec folder a test already has. A unit's
  * run state is `<machine dir>/runs/<story>/<unit>` of the checkout the spec folder's root belongs to
  * (store's `runStateDir`); the story's key comes from the spec folder's name.
  */

@@ -1,6 +1,6 @@
 /**
- * Reporting verbs (§9.3): `norn done`, `norn ask`, `norn stuck`. One report per run, written
- * as an immutable receipt (P6, S6) that the next tick applies; the agent then ends its turn.
+ * Reporting verbs: `norn done`, `norn ask`, `norn stuck`. One report per run, written
+ * as an immutable receipt that the next tick applies; the agent then ends its turn.
  */
 import { relative } from "node:path";
 import { type Receipt, type ReceiptOf, receiptNumber, ulid } from "@norn/schema";
@@ -27,11 +27,10 @@ export function reportTarget(ctx: Context, verb: string): ReportTarget {
   }
   refuseUnlessAgentWork(s, verb);
   if (!run) throw refuse(`no run of ${s.state.step}#${s.state.attempt} has started in this worktree`, `${cmd.brief()} (it starts the run), do the step, then report`, "no_run");
-  refuseForeignSession(ctx, s, run.run_id, verb); // MO3: only the run's own session reports it
+  refuseForeignSession(ctx, s, run.run_id, verb);
   return { s, run_id: run.run_id, agent: agentName(s, ctx.config) };
 }
 
-/** Common receipt header for an agent report. */
 export function reportHeader(ctx: Context, t: ReportTarget) {
   const now = ctx.clock.now();
   return {
@@ -47,7 +46,7 @@ export function reportHeader(ctx: Context, t: ReportTarget) {
 }
 
 export function writeReport(t: ReportTarget, receipt: Receipt) {
-  // R6.1 (A14): a report while parked on an implicit ask is the agent moving on — an `answer`
+  // A report while parked on an implicit ask is the agent moving on — an `answer`
   // (`by: "agent"`) closes the ask first, so the tick applies the report at a running cursor
   const ask = implicitAskOpen(t.s);
   if (ask) {
@@ -70,15 +69,15 @@ export function writeReport(t: ReportTarget, receipt: Receipt) {
   return { n: r.n, file: relative(t.s.worktree, r.file) };
 }
 
-/** Progress line of a gate rejection (O6), e.g. `human-qa#1 reject: AC7 shows raw HTML`. */
+/** Progress line of a gate rejection, e.g. `human-qa#1 reject: AC7 shows raw HTML`. */
 export function rejectProgress(r: Receipt): string {
   const comment = r.kind === "reject" ? r.comment?.trim() : undefined;
   return `${r.step}#${r.attempt} reject${r.who ? ` by ${r.who}` : ""}: ${comment || "(no comment given)"}`;
 }
 
 /**
- * O6: a gate rejection is a milestone of its unit. Every writer of a unit's receipts calls this once
- * they are written (P6: receipt first) — act's `writeReceipts` and a person's local delivery — so each
+ * A gate rejection is a milestone of its unit. Every writer of a unit's receipts calls this once
+ * they are written (receipt first): act's `writeReceipts` and a person's local delivery — so each
  * `reject` among them appends its progress line to the handoff whichever route brought it.
  */
 export function receiptsWritten(handoffFile: string | null, receipts: readonly Receipt[]): void {
@@ -86,13 +85,13 @@ export function receiptsWritten(handoffFile: string | null, receipts: readonly R
   for (const r of receipts) if (r.kind === "reject") appendProgress(handoffFile, rejectProgress(r));
 }
 
-/** The agent's milestone (O6): one line appended to the Progress section of handoff.md. */
+/** The agent's milestone: one line appended to the Progress section of handoff.md. */
 export function appendProgress(handoffFile: string, line: string): void {
   const raw = readText(handoffFile);
   const body = raw === null ? "## Goal\n\n## Progress\n\n## Resume\n" : handoffProse(raw);
   const text = `- ${line.replace(/\s*\n\s*/g, " ").trim()}`;
   const lines = body.split("\n");
-  // gh-273 (O6, S9): the one Progress section at whatever heading level the agent wrote (the brief shows
+  // The one Progress section at whatever heading level the agent wrote (the brief shows
   // the handoff demoted to ###, and agents write it back in that shape); it ends at the next heading as high.
   const at = lines.findIndex((l) => /^#{1,6}\s+Progress\s*$/.test(l));
   if (at < 0) {
@@ -117,7 +116,6 @@ function headingLevel(line: string): number {
   return /^(#{1,6})\s/.exec(line)?.[1]?.length ?? 0;
 }
 
-/** What every successful report answers (§9.3): the receipt, then "end your turn". */
 /** The reply to a report: the receipt as data, and markdown that tells the agent to end its turn. */
 export function reported(t: ReportTarget, kind: string, written: { n: number; file: string }, extra: Record<string, unknown>, summary: string[]) {
   const value = {

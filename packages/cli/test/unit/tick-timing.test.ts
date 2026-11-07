@@ -1,4 +1,4 @@
-/** gh-78 (O4): a tick record says where the tick spent its time. */
+/** A tick record says where the tick spent its time. */
 import { describe, expect, test } from "bun:test";
 import type { Decision, Facts } from "@norn/core";
 import { validate } from "@norn/schema";

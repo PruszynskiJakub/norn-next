@@ -1,7 +1,7 @@
 /**
- * Runtime paths beyond the happy flow: repo discovery from a worktree (A3), throttled sync (H5),
- * silent → nudge into the same session (C1, B2), died → fresh session (C1), watch releasing
- * claims on a clean exit (T6), PR merged cleanup (GR6), uninstall, and check timeouts (C5).
+ * Runtime paths beyond the happy flow: repo discovery from a worktree, throttled sync,
+ * silent → nudge into the same session, died → fresh session, watch releasing
+ * claims on a clean exit, PR merged cleanup, uninstall, and check timeouts.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
@@ -57,7 +57,7 @@ describe("runtime", () => {
   });
   afterAll(() => h.cleanup());
 
-  test("remote calls are throttled (H5); `norn sync` forces one", async () => {
+  test("remote calls are throttled; `norn sync` forces one", async () => {
     expect(acted(await h.tick())).toEqual(["gh-9 intake_story"]);
     const calls = h.remote.calls.length;
     h.clock.advance(10_000);
@@ -79,14 +79,14 @@ describe("runtime", () => {
     expect(h.state(runs())).toMatchObject({ step: "implement" });
   });
 
-  test("outside a repository the command refuses with do_instead (§9.3)", async () => {
+  test("outside a repository the command refuses with do_instead", async () => {
     const away = realpathSync(mkdtempSync(join(tmpdir(), "norn-away-")));
     const r = await runChecked(["tick"], { ...h.deps, cwd: away });
     expect(r.exit).toBe(3);
     expect(r.value).toMatchObject({ code: "not_in_repo", do_instead: expect.any(String) });
   });
 
-  test("turn ended without a receipt → silent → nudge into the same session (C1, B2)", async () => {
+  test("turn ended without a receipt → silent → nudge into the same session", async () => {
     for (let i = 0; i < 3 && h.state(runs())?.status !== "running"; i++) {
       h.clock.advance(10_000);
       await h.tick();
@@ -105,7 +105,7 @@ describe("runtime", () => {
     expect(readdirSync(join(runs(), "receipts")).some((f) => f.endsWith("-classify.json"))).toBe(true);
   });
 
-  test("pane gone → died → old session killed, fresh session launched (C1)", async () => {
+  test("pane gone → died → old session killed, fresh session launched", async () => {
     h.runner.pane = { alive: false, state: "unknown", since: null };
     h.clock.advance(10_000);
     const r = await h.tick();
@@ -116,7 +116,7 @@ describe("runtime", () => {
     expect(h.state(runs())).toMatchObject({ status: "running", retries_used: 1, run: { session: { session_id: "s-2" } } });
   });
 
-  test("a stale receipt is rejected into the trace (T9); done → $done, a finished round (gh-71 D6)", async () => {
+  test("a stale receipt is rejected into the trace; done → $done, a finished round", async () => {
     const st = h.state(runs());
     appendReceipt(runs(), { kind: "done", receipt_id: ulid(h.clock.now()), run_id: st?.run?.run_id ?? null, step: "implement", attempt: 7, at: h.clock.iso(), by: "agent", outcome: "done", handoff: "old" });
     h.report(runs(), "done", { outcome: "done", handoff: "fixed" });
@@ -127,7 +127,7 @@ describe("runtime", () => {
     expect(rejects).toMatchObject([{ type: "reject", unit: "gh-9", reason: "stale: receipt for implement#7, cursor at implement#1" }]);
   });
 
-  test("a receipt failing validation marks the unit corrupt and notifies once (S2, O3)", async () => {
+  test("a receipt failing validation marks the unit corrupt and notifies once", async () => {
     h.write(join(runs(), "receipts", "0042-done.json"), "{ not json");
     h.clock.advance(10_000);
     expect(acted(await h.tick())).toEqual(["gh-9 mark_corrupt"]);
@@ -139,7 +139,7 @@ describe("runtime", () => {
     rmSync(join(runs(), "receipts", "0042-done.json"));
   });
 
-  test("PR merged → worktree, branches, claim ref and slot removed; a unit parked at merge time recorded done (GR6, gh-88)", async () => {
+  test("PR merged → worktree, branches, claim ref and slot removed; a unit parked at merge time recorded done", async () => {
     const parked = h.state(runs());
     if (!parked) throw new Error("no state");
     writeState(runs(), { ...parked, status: "parked", park: { kind: "gate", reason: "PR ready?", since: h.clock.iso() } });
@@ -174,7 +174,7 @@ describe("watch", () => {
   });
   afterAll(() => h.cleanup());
 
-  test("loops ticks and releases held claims on a clean exit (T6)", async () => {
+  test("loops ticks and releases held claims on a clean exit", async () => {
     await h.tick(); // intake
     h.clock.advance(1000);
     await h.tick(); // claim
@@ -220,7 +220,7 @@ describe("watch", () => {
   });
 });
 
-describe("check runner (C5)", () => {
+describe("check runner", () => {
   test("a timeout kills the process group and has no exit code", async () => {
     const r = await runShell("echo start; sleep 5; echo never", { cwd: tmpdir(), env: process.env, timeoutMs: 200 });
     expect(r).toMatchObject({ exit_code: null, timed_out: true });

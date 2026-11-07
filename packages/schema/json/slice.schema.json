@@ -61,7 +61,7 @@
       }
     },
     "criteria": {
-      "description": "Acceptance criteria as data (QV1); the prose Acceptance section stays the spec",
+      "description": "Acceptance criteria as data; the prose Acceptance section stays the spec",
       "type": "array",
       "items": {
         "additionalProperties": false,

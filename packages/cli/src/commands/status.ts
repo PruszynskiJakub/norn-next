@@ -1,22 +1,20 @@
 /**
- * `norn status [--json] [--details] [--notes] [--history [--since <iso|duration>]]` (B9, B10, O1):
+ * `norn status [--json] [--details] [--notes] [--history [--since <iso|duration>]]`:
  * what needs a person, grouped by action — Your turn, Answer, Approve, Unblock, Check, Unclaimed,
  * Running, Notes, Recently done — each item with its reason, age and the exact command that resolves
- * it. Read only via @norn/view (X1); text for a person, `--json` for data. `--details` adds each item's
- * full text (L1: an implicit ask's whole pane screen). Notes show as one summary line; `--notes` lists
- * them (NT6). The JSON always carries every item. `--history` lists every item that needed a person,
- * with appeared_at / resolved_at / resolved_by, paired from the inbox changes each tick records (O4).
- * The story table this command printed before is `norn story list` (B15); the first `status` on a
- * checkout says so once on stderr (B13).
+ * it. Read only via @norn/view; text for a person, `--json` for data. `--details` adds each item's
+ * full text (an implicit ask's whole pane screen). Notes show as one summary line; `--notes` lists
+ * them. The JSON always carries every item. `--history` lists every item that needed a person,
+ * with appeared_at / resolved_at / resolved_by, paired from the inbox changes each tick records.
+ * The first `status` on a checkout says once on stderr that the story table is `norn story list`.
  *
- * `--watch [--interval 5s] [--pane]` (B11, B12): the live cockpit full screen (`runtime/status-watch.ts`);
+ * `--watch [--interval 5s] [--pane]`: the live cockpit full screen (`runtime/status-watch.ts`);
  * `--pane` runs it in a Herdr pane split below the caller; `--watch --json` prints the cockpit model.
  *
- * `--segment [--ttl 30s]` (B14, only in `help --all`): one plain line for Herdr's tab bar
+ * `--segment [--ttl 30s]` (only in `help --all`): one plain line for Herdr's tab bar
  * (`tab_bar_right`, run in the focused pane's cwd; outside a repository it prints an empty line).
  * Inside Herdr it also writes a `norn` sidebar token on each `<story> orient` workspace and moves
- * those workspaces so the ones that need you come first — presentation only, never a fact (HC13);
- * a prototype choice, see AGENTS.md.
+ * those workspaces so the ones that need you come first — presentation only, never a fact.
  */
 import { parseDuration } from "@norn/schema";
 import { firstNotice, type InboxHistoryItem, inboxHistory } from "@norn/store";
@@ -30,7 +28,7 @@ import { statusWatch } from "../runtime/status-watch.ts";
 import { isOrientWorkspace, planWorkspaceMoves, segmentLine, storyToken } from "../runtime/segment.ts";
 import { cmd } from "@norn/core";
 
-/** B13: told once per checkout, to a person (never under `--json`). */
+/** Told once per checkout, to a person (never under `--json`). */
 const MOVED_NOTICE = "`norn status` now shows what needs you; the story listing moved to `norn story list`.";
 
 function sinceOf(raw: string | undefined, now: number): string | undefined {
@@ -63,19 +61,18 @@ async function inbox(ctx: Context, args: ParsedArgs) {
   if (opt.str(args, "since") !== undefined) throw usageError("--since goes with --history", cmd.status({ since: "1d" }));
   const view = await projectView(ctx);
   const details = opt.bool(args, "details");
-  // gh-196 D5 (B22): a count per story of what a supervisor decided on the person's behalf, never an inbox item
-  // gh-196 D5 (B22): `delegated_counts`, apart from story view's `delegated` decisions
+  // A count per story of what a supervisor decided on the person's behalf: never an inbox item, apart from story view's `delegated` decisions
   const delegated_counts = delegatedCounts(view);
   const text = `${formatInbox(view, { details, notes: opt.bool(args, "notes"), home: ctx.env.HOME })}${formatDelegatedCounts(delegated_counts)}`;
-  // gh-196 (B8, B9): the heartbeat as data, so a supervisor sees a missing watch before anything is in auto
+  // The heartbeat as data, so a supervisor sees a missing watch before anything is in auto
   const heartbeat = view.heartbeat;
   if (details) return rendered({ ...view.inbox, delegated_counts, heartbeat }, text);
-  // L1 (A7): an item's full text (an implicit ask's pane screen) only with --details
+  // An item's full text (an implicit ask's pane screen) only with --details
   const groups = Object.fromEntries(Object.entries(view.inbox.groups).map(([g, items]) => [g, items.map(({ full: _full, ...it }) => it)]));
   return rendered({ ...view.inbox, groups, delegated_counts, heartbeat }, text);
 }
 
-/** The orient workspaces' tokens and order; failures are ignored (presentation, HC13). */
+/** The orient workspaces' tokens and order; failures are ignored (presentation only). */
 async function presentOrientWorkspaces(ctx: Context, view: ProjectView, ttlMs: number): Promise<{ tokens: number; moves: number }> {
   const cockpit = cockpitHerdr(ctx);
   if (!cockpit) return { tokens: 0, moves: 0 };
@@ -129,7 +126,7 @@ async function segment(ctx: Context, ttlRaw: string) {
 export const statusCommand = defineCommand({
   name: "status",
   version: "reads",
-  summary: "What needs you, grouped by action, with the command to resolve each item; --history for when items came and went (O1)",
+  summary: "What needs you, grouped by action, with the command to resolve each item; --history for when items came and went",
   usage: "norn status [--json] [--details] [--notes] [--history [--since <iso|duration>]] | norn status --watch [--interval 5s] [--pane]",
   markdown: true,
   optionHelp: {

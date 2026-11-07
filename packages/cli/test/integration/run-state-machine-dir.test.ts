@@ -1,5 +1,5 @@
 /**
- * gh-195/05 (S12, B2–B5, D8): a unit started on this build keeps its state, receipts, pinned workflow,
+ * A unit started on this build keeps its state, receipts, pinned workflow,
  * logs and evidence at `<machine dir>/runs/<story>/<unit>/`, never in its worktree or on its branch; a
  * boundary commit carries only the agent's work and the handoff.
  */
@@ -65,7 +65,7 @@ const status = (cwd: string) =>
     .split("\n")
     .filter(Boolean)
     .map((l) => l.replace(/^\s*\S{1,2}\s+/, ""));
-/** S12: nothing but the agent's own files and the unit's handoff ever shows in git */
+/** Nothing but the agent's own files and the unit's handoff ever shows in git */
 const onlyWorkAndHandoff = (cwd: string, handoff: string) => {
   expect(status(cwd).filter((p) => p !== handoff && (p.includes("/runs/") || p.endsWith("/runs")))).toEqual([]);
 };
@@ -97,7 +97,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("gh-9 runs with its run state in the machine dir (S12, B2, B5)", () => {
+describe("gh-9 runs with its run state in the machine dir", () => {
   const HANDOFF = `${SPEC}/${unitHandoffPath(STORY_UNIT_DIR)}`;
 
   test("AC1: through implement and review, git status never shows a run-state file; they are under <machine dir>/runs/gh-9/_story/", async () => {
@@ -120,7 +120,7 @@ describe("gh-9 runs with its run state in the machine dir (S12, B2, B5)", () => 
     expect((await inWt(wt(), "done", "approve", "--handoff", "looks right")).exit).toBe(0);
     await tickUntil(() => h.state(runs())?.step === "$done");
     onlyWorkAndHandoff(wt(), HANDOFF);
-    // every kind of run-state file, in the machine dir; no runs/ in the worktree or on the branch, the handoff under handoffs/ (gh-195/07)
+    // every kind of run-state file, in the machine dir; no runs/ in the worktree or on the branch, the handoff under handoffs/
     expect(readdirSync(runs()).sort()).toEqual(["evidence", "receipts", "state.json", "workflow.yaml"]);
     expect(readdirSync(join(runs(), "receipts")).some((f) => f.endsWith("-check.json"))).toBe(true);
     expect(existsSync(join(wt(), SPEC, "runs"))).toBe(false);
@@ -138,7 +138,7 @@ describe("gh-9 runs with its run state in the machine dir (S12, B2, B5)", () => 
     const files = sh(wt(), ["show", "--name-only", "--format=", sha]).split("\n").filter(Boolean).sort();
     expect(files).toEqual([HANDOFF, "src/feature.ts"]);
     const trailers = sh(wt(), ["show", "-s", "--format=%(trailers:only,unfold)", sha]);
-    // S4: the story's trailers (no Norn-Slice on a story unit)
+    // The story's trailers (no Norn-Slice on a story unit)
     expect(trailers).toContain("Norn-Story: gh-9");
     expect(trailers).toContain("Norn-Step: implement");
     expect(trailers).toMatch(/^Norn-Tick: [0-9A-HJKMNP-TV-Z]{26}$/m);
@@ -149,7 +149,7 @@ describe("gh-9 runs with its run state in the machine dir (S12, B2, B5)", () => 
   });
 });
 
-describe("a worktree is disposable (B2, B3)", () => {
+describe("a worktree is disposable", () => {
   const SPEC10 = ".agents/specs/gh-10-ask-me";
   const wt10 = () => `${h.root}-worktrees/gh-10-ask-me`;
   const runs10 = () => runStateOf(join(h.root, SPEC10));
@@ -175,7 +175,7 @@ describe("a worktree is disposable (B2, B3)", () => {
     const before = h.state(runs10());
     sh(wt10(), ["clean", "-fdx", "-q"]);
     expect(existsSync(unitMarkerPath(wt10()))).toBe(false);
-    // H2: observe reads the unit by the marker its folder and branch name, and writes nothing
+    // Observe reads the unit by the marker its folder and branch name, and writes nothing
     const obs = await observeNow(h);
     expect(obs.facts.unmarked?.map((w) => w.path)).toEqual([wt10()]);
     expect(obs.facts.stories.find((s) => s.key === "gh-10")?.units[0]?.state).toMatchObject({ step: "implement", status: "parked" });
@@ -207,7 +207,7 @@ describe("a worktree is disposable (B2, B3)", () => {
     expect(await uncommitted()).toBe(false);
   });
 
-  test("#265: recover.commit commits the dirty handoff alone: never a run-state path from the machine dir, never the agent's files (S12, R2.1)", async () => {
+  test("#265: recover.commit commits the dirty handoff alone: never a run-state path from the machine dir, never the agent's files", async () => {
     const handoff = handoffPath(join(wt10(), SPEC10), STORY_UNIT_DIR);
     const rel = `${SPEC10}/${unitHandoffPath(STORY_UNIT_DIR)}`;
     const text = h.read(handoff);
@@ -242,7 +242,7 @@ describe("a worktree is disposable (B2, B3)", () => {
     expect(same(await asked())).toEqual(same(before));
   });
 
-  test("AC4: a receipt in the machine dir that fails validation makes gh-10 corrupt (S2), and gh-9 is not", async () => {
+  test("AC4: a receipt in the machine dir that fails validation makes gh-10 corrupt, and gh-9 is not", async () => {
     writeFileSync(join(runs10(), "receipts", "0099-done.json"), "{}\n");
     const r = await tick();
     expect(r.decisions.find((d) => d.unit === "gh-10")?.rule).toBe("unit.corrupt");
@@ -253,14 +253,14 @@ describe("a worktree is disposable (B2, B3)", () => {
   });
 });
 
-describe("parallel slices and a crash between a receipt and state (B4: S3, S6)", () => {
+describe("parallel slices and a crash between a receipt and state (B4: S3)", () => {
   const SPEC11 = ".agents/specs/gh-11-two-parts";
   const wt11 = () => `${h.root}-worktrees/gh-11-two-parts`;
   const story11 = () => runStateOf(join(h.root, SPEC11));
   const part = (nn: string) => runStateOf(join(h.root, SPEC11), `${nn}-part-${nn === "01" ? "a" : "b"}`);
   const sliceWt = (nn: string) => `${wt11()}--${nn}-part-${nn === "01" ? "a" : "b"}`;
 
-  test("AC5: two slices running at once each write only their own <machine dir>/runs/gh-11/<nn>-<slug>/ (S3)", async () => {
+  test("AC5: two slices running at once each write only their own <machine dir>/runs/gh-11/<nn>-<slug>/", async () => {
     h.remote.issues = [...h.remote.issues, issue(11, "Two parts", ["norn", "norn:wf:split"])];
     await h.tick("--sync");
     await tickUntil(() => h.state(story11())?.step === "plan");
@@ -284,7 +284,7 @@ describe("parallel slices and a crash between a receipt and state (B4: S3, S6)",
     for (const nn of ["01", "02"]) onlyWorkAndHandoff(sliceWt(nn), `${SPEC11}/${unitHandoffPath(`${nn}-part-${nn === "01" ? "a" : "b"}`)}`);
   });
 
-  test("AC5: a receipt written but its state.json not (a crash between them) is re-applied by the next tick (S6)", async () => {
+  test("AC5: a receipt written but its state.json not (a crash between them) is re-applied by the next tick", async () => {
     // the done receipts above are on disk, state.json not yet past them: the crash point
     const st = h.state(part("01"));
     expect(st?.step).toBe("build");
@@ -292,7 +292,7 @@ describe("parallel slices and a crash between a receipt and state (B4: S3, S6)",
     expect(h.state(part("01"))?.applied_through).toBeGreaterThan(st?.applied_through ?? 0);
   });
 
-  test("AC5: a tick while a detached check run is writing its receipt waits; a crash's leftovers are ignored; the next tick applies the receipt once (S1, S6)", async () => {
+  test("AC5: a tick while a detached check run is writing its receipt waits; a crash's leftovers are ignored; the next tick applies the receipt once", async () => {
     const SPEC12 = ".agents/specs/gh-12-held-check";
     const runs12 = () => runStateOf(join(h.root, SPEC12));
     const go = join(h.dir, "go-12");
@@ -318,8 +318,8 @@ describe("parallel slices and a crash between a receipt and state (B4: S3, S6)",
     const n = String((st?.applied_through ?? 0) + 1).padStart(4, "0");
     const receipts = join(runs12(), "receipts");
     mkdirSync(receipts, { recursive: true });
-    // the check run mid-write: its reservation taken, its receipt not there yet (S6); a crashed earlier
-    // writer left a half-written temp receipt and a half-written temp state.json (S1)
+    // the check run mid-write: its reservation taken, its receipt not there yet; a crashed earlier
+    // writer left a half-written temp receipt and a half-written temp state.json
     writeFileSync(join(receipts, `.${n}.reserve`), "01M6CRASHED0000000000000000\n");
     writeFileSync(join(receipts, `.${n}-check.json.1.1.0.tmp`), '{"kind":"che');
     writeFileSync(join(runs12(), ".state.json.1.1.0.tmp"), '{"version":1,"st');

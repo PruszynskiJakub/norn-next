@@ -1,9 +1,9 @@
 /**
- * `norn story create [--title "…"] [--body "…" | --body-file <f>] [--workflow <name>] [--web]`
- * (B18–B23, D3): create the issue on the remote with the intake label (and `norn:wf:<name>`),
- * assigned to the person, then run the intake `sync` runs (GR1) — the story is taken in, not started.
+ * `norn story create [--title "…"] [--body "…" | --body-file <f>] [--workflow <name>] [--web]`:
+ * create the issue on the remote with the intake label (and `norn:wf:<name>`),
+ * assigned to the person, then run the intake `sync` runs — the story is taken in, not started.
  * Without `--title` a terminal is prompted for the title and the body (`$EDITOR`); a script is
- * refused (D2). The workflow is checked and the body read before any remote call, and a remote
+ * refused. The workflow is checked and the body read before any remote call, and a remote
  * failure stops before any local write. `--web` opens the remote's new-issue page instead.
  */
 import { readFileSync } from "node:fs";
@@ -19,14 +19,14 @@ import { runTick } from "../runtime/tick.ts";
 export const storyCreateCommand = defineCommand({
   name: "story create",
   version: "acts",
-  summary: "Create a story's issue on the remote, assigned to you, and take it in (GR1)",
+  summary: "Create a story's issue on the remote, assigned to you, and take it in",
   usage: `norn story create [--title "…"] [--body "…" | --body-file <f>] [--workflow <name>] [--web]`,
   markdown: true,
   optionHelp: {
     "--title": "the issue title; prompted at a terminal when left out",
     "--body": "the issue body; at a terminal without --title, written in $EDITOR",
     "--body-file <f>": "read the body from a file",
-    "--workflow <name>": "label the issue norn:wf:<name> so intake picks that workflow (W9)",
+    "--workflow <name>": "label the issue norn:wf:<name> so intake picks that workflow",
     "--web": "open the remote's new-issue page with the labels filled in; creates nothing",
   },
   options: {
@@ -39,7 +39,7 @@ export const storyCreateCommand = defineCommand({
   async run(ctx, args) {
     const workflow = opt.str(args, "workflow");
     if (workflow !== undefined) {
-      // B21: before anything is created
+      // Before anything is created
       const listed = Object.keys(loadWorkflows(ctx.root).workflows).sort();
       if (!listed.includes(workflow))
         throw refuse(`no workflow '${workflow}' in ${WORKFLOWS_DIR}/ (available: ${listed.join(", ") || "none"})`, cmd.storyCreate({ workflow: `<${listed.join("|")}>` }), "unknown_workflow", { workflows: listed });
@@ -48,7 +48,6 @@ export const storyCreateCommand = defineCommand({
     const remote = requireRemote((await ctx.ports()).remote);
 
     if (opt.bool(args, "web")) {
-      // B23
       const url = await remote.newIssueUrl({ labels }).catch((e) => Promise.reject(remoteFailed(e)));
       const opened = await openLink(ctx, url);
       if (opened.code !== 0) throw failure(`could not open ${url}: ${opened.stderr.trim() || `exit ${opened.code}`}`, `open ${url} in a browser`, "open_failed");
@@ -60,14 +59,14 @@ export const storyCreateCommand = defineCommand({
     try {
       created = await remote.createIssue({ title, body, labels, assignee: await remote.whoami() });
     } catch (e) {
-      throw remoteFailed(e); // B22: nothing written locally yet
+      throw remoteFailed(e); // Nothing written locally yet
     }
     const story = storyKey(created.provider, created.number);
     const made = { story, url: created.url, number: created.number, labels: created.labels };
     const later = (error: string) =>
-      // B22: the issue exists, so a failed intake is no failure of this command; a retry would create it twice
+      // The issue exists, so a failed intake is no failure of this command; a retry would create it twice
       rendered({ ...made, taken_in: false, intake_error: error, do_instead: cmd.sync() }, `${story}\n\nCreated ${created.url}, but the intake did not run: ${error}\nIt is taken in by the next tick, or now with \`${cmd.sync()}\` — do not create it again.\n`);
-    // GR1: the same intake `norn sync` runs
+    // The same intake `norn sync` runs
     let report;
     try {
       report = await runTick(ctx, { sync: "force" });
@@ -80,7 +79,7 @@ export const storyCreateCommand = defineCommand({
   },
 });
 
-/** B18–B20: the title and body from the flags, else from the terminal; a script without a title is refused. */
+/** The title and body from the flags, else from the terminal; a script without a title is refused. */
 async function issueText(ctx: Context, args: ParsedArgs): Promise<{ title: string; body: string }> {
   const bodyFlag = opt.str(args, "body");
   const bodyFile = opt.str(args, "body-file");

@@ -1,4 +1,4 @@
-# Refinement workflow — example installed by `norn init`; edit freely (W1).
+# Refinement workflow — example installed by `norn init`; edit freely.
 # Brings the story up to date with its base, so the spec and plan are written against the current
 # code, then refines the spec, settles its open questions and plans it, all with a person (attended).
 # It cuts no slices and has no gate: starting the next round (`norn story edit <story> --workflow story`
@@ -44,5 +44,5 @@ steps:
     outcomes:
       done: { to: $done, means: "spec.md's Plan section has seams, a coverage table for every user story, prefactoring, decisions and risks" }
 counters:
-  # resets each time sync merges cleanly: only repeated conflicts on one base move count (W4)
+  # resets each time sync merges cleanly: only repeated conflicts on one base move count
   sync_conflict_loop: { max: 2, reset_on: sync.done }

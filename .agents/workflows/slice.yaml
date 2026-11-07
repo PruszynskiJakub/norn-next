@@ -1,4 +1,4 @@
-# Slice workflow — repo-local copy of the shipped one (W1), with this repo's check command.
+# Slice workflow — repo-local copy of the shipped one, with this repo's check command.
 # Build test-first, check, review, integrate; no QA of its own (the story's qa checks every criterion).
 name: slice
 description: Build one slice test-first, check and review it, and integrate it into the story branch.

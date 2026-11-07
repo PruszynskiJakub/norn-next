@@ -1,5 +1,5 @@
 /**
- * Regression for a flaky hang (gh-181, gh-165): under `bun test --parallel` (bun 1.3.13), a child started
+ * Regression for a flaky hang: under `bun test --parallel` (bun 1.3.13), a child started
  * with node's `child_process.spawn` in a freshly isolated test file sometimes never emits `exit`, `close`
  * or `error`, so a call that waits for it hangs until the test times out (1–4 % of files). store's
  * `spawnBounded` and cli's `runShell` start children with `Bun.spawn`, which always reports the exit.

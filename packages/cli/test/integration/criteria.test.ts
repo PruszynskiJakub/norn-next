@@ -1,5 +1,5 @@
 /**
- * Honest QA and notes through the CLI (QV1–QV8, NT1–NT3):
+ * Honest QA and notes through the CLI:
  * a manual-mode story whose qa step requires a criteria report. `norn done` refuses a report that
  * misses a frontmatter criterion, an outcome the worst verdict contradicts, a missing report; an
  * `unverified` report goes to human-qa, whose inbox item says how to check; notes become Check items
@@ -98,7 +98,7 @@ beforeAll(async () => {
   h.git(["push", "-q", "origin", "main"]);
   h.remote.issues = [issue(4, "Today view")];
   await tickUntil(at("qa", "ready"), "intake");
-  // QV1: story-level criteria in spec.md frontmatter (the slice skill's job), committed like agent work
+  // Story-level criteria in spec.md frontmatter (the slice skill's job), committed like agent work
   const file = join(wt(), spec, "spec.md");
   h.write(file, h.read(file).replace(/\n---\n/, "\ncriteria:\n  - { id: AC1, verifier: test }\n  - { id: AC2, verifier: agent }\n  - { id: AC3, verifier: person }\n---\n"));
   h.git(["add", "-A"], wt());
@@ -142,7 +142,7 @@ describe("criteria reports and notes through norn done", () => {
     expect(done.criteria.map((c: { id: string; verdict: string }) => `${c.id} ${c.verdict}`)).toEqual(["AC1 pass", "AC2 unverified", "AC3 person"]);
     expect(done.notes).toEqual([{ text: "kept whitespace inside backticks", criterion: "AC1" }]);
 
-    // QV8, B37: the trace counts per verdict, with no split by capability; norn run list sums it
+    // The trace counts per verdict, with no split by capability; norn run list sums it
     const ev = readTrace(h.root, { unit: "gh-4", types: ["criteria"] }).events as CriteriaTrace[];
     expect(ev.at(-1)).toMatchObject({ unit: "gh-4", rule: "criteria.checked", outcome: "unverified", verdicts: { pass: 1, fail: 0, person: 1, unverified: 1 } });
     expect(ev.at(-1)?.unverified_needs).toBeUndefined();
@@ -153,17 +153,17 @@ describe("criteria reports and notes through norn done", () => {
     const gate = g.approve?.find((i) => i.step === "human-qa");
     expect(gate?.detail).toContain("AC2 unverified (no browser in this session) — how: open /today, add 'buy milk p1', expect red flag");
     expect(gate?.detail).toContain("AC3 person — how: compare against Figma frame 12");
-    expect(gate?.full).toBeUndefined(); // L1: the long form only with --details
+    expect(gate?.full).toBeUndefined(); // The long form only with --details
     const details = ((await h.norn("status", "--details")).value as { groups: Record<string, Item[]> }).groups;
     expect(details.approve?.find((i) => i.step === "human-qa")?.full).toContain("Criteria for a person to check:\n- AC2 unverified");
 
-    // NT2: the note is a Check item whose command explains the report
+    // The note is a Check item whose command explains the report
     const [n] = await notes();
     expect(n).toMatchObject({ id: `note:${done.receipt_id}:1`, title: "qa note on gh-4 (AC1): kept whitespace inside backticks", command: `norn run view gh-4 --receipt ${done.receipt_id}` });
     const why = await h.norn("run", "view", "gh-4", "--why", "--receipt", done.receipt_id);
     expect(why.exit).toBe(0);
     expect(why.value).toMatchObject({ trigger: { kind: "done", outcome: "unverified", reason: expect.stringContaining("Notes for a person:\n1. (AC1) kept whitespace inside backticks") } });
-    // B45: the receipt names its unit; the same JSON without it
+    // The receipt names its unit; the same JSON without it
     expect((await h.norn("run", "view", "--receipt", done.receipt_id)).value).toEqual(why.value);
   });
 
@@ -174,7 +174,7 @@ describe("criteria reports and notes through norn done", () => {
     expect(await notes()).toHaveLength(1);
 
     const pass = report("pass", [PASS("AC1"), PASS("AC2"), PASS("AC3")]);
-    // B36: done accepts a pass on any criterion from any agent
+    // Done accepts a pass on any criterion from any agent
     expect((await inWt("done", "pass", "--handoff", "all observed", "--criteria", pass, "--note", "copy says 'Today', spec says 'today'")).exit).toBe(0);
     await tickUntil(at("ready", "parked"), "ready");
     expect((await notes()).map((i) => i.title)).toEqual(["qa note on gh-4 (AC1): kept whitespace inside backticks", "qa note on gh-4: copy says 'Today', spec says 'today'"]);

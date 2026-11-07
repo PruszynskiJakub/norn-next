@@ -1,5 +1,5 @@
 /**
- * Identifiers (§5.1) and naming rules shared by every package.
+ * Identifiers and naming rules shared by every package.
  * Pure functions only; no IO.
  */
 import {
@@ -11,8 +11,6 @@ import {
   STORY_KEY_PATTERN,
   ULID_PATTERN,
 } from "./common.ts";
-
-// ---------------------------------------------------------------- ULID
 
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const ULID_RE = new RegExp(ULID_PATTERN);
@@ -52,7 +50,7 @@ export function ulid(now: number = Date.now()): string {
 /**
  * Deterministic ULID derived from a seed ULID and an index: same timestamp as the
  * seed, randomness from sha256(seed:index). Lets the pure `decide` mint receipt and
- * run ids from `tick_id` so `norn run view --why` replays to identical actions (O5).
+ * run ids from `tick_id` so `norn run view --why` replays to identical actions.
  */
 export function deriveUlid(seed: string, index: number): string {
   if (!isUlid(seed)) throw new Error(`not a ULID: ${seed}`);
@@ -74,8 +72,6 @@ export function ulidTime(id: string): number {
   return t;
 }
 
-// ---------------------------------------------------------------- keys
-
 export type KeyPrefix = "gh" | "gl";
 
 /** A label as the provider CLI creates it: colour hex without `#`. */
@@ -89,9 +85,8 @@ interface LabelWords {
 export interface ProviderCommands {
   cli: string;
   key_prefix: KeyPrefix;
-  /** shows the branch's pull (merge) request */
   prView(branch: string): string;
-  /** creates a label; `quote` makes one shell word */
+  /** `quote` makes one shell word */
   labelCreate(label: LabelWords, quote: (s: string) => string): string;
   /** an example first story: an issue labelled `label`, assigned to the person; null = none given */
   issueCreate: ((label: string) => string) | null;
@@ -171,21 +166,17 @@ export function storyOf(unitKey: string): string {
   throw new Error(`not a story or slice key: ${unitKey}`);
 }
 
-// ---------------------------------------------------------------- git
-
 const GIT_SHA_RE = new RegExp(GIT_SHA_PATTERN);
 /** A full git commit id (`GitSha`). */
 export function isGitSha(s: unknown): s is string {
   return typeof s === "string" && GIT_SHA_RE.test(s);
 }
 
-// ---------------------------------------------------------------- slugs
-
 const SLUG_MAX = 40;
 const TRANSLIT: Record<string, string> = { ł: "l", Ł: "l", ß: "ss", æ: "ae", ø: "o", đ: "d", þ: "th" };
 
 /**
- * Slug rule (ID1): lowercase ASCII, `[a-z0-9]` words joined by `-`, at most
+ * Slug rule: lowercase ASCII, `[a-z0-9]` words joined by `-`, at most
  * 40 chars cut at a word boundary, `untitled` if nothing remains. Frozen at creation.
  */
 export function slugify(title: string, max = SLUG_MAX): string {
@@ -208,10 +199,8 @@ export function slugify(title: string, max = SLUG_MAX): string {
   return out || "untitled";
 }
 
-// ---------------------------------------------------------------- naming (§7, GR3)
-
 export const STORY_UNIT_DIR = "_story";
-/** Repo-relative folder holding every story's spec folder (§7). */
+/** Repo-relative folder holding every story's spec folder. */
 export const SPECS_DIR = ".agents/specs";
 
 const SPEC_DIR_RE = /^((?:gh|gl)-[1-9][0-9]*)-([a-z0-9]+(?:-[a-z0-9]+)*)$/;
@@ -248,25 +237,22 @@ export function parseSliceDirName(name: string, opts: { loose?: boolean } = {}):
   return m ? { nn: m[1] as string, slug: m[2] as string } : null;
 }
 /**
- * The folder that holds every story's run state: `runs/` in the checkout's machine dir (S12, gh-195 D1:
- * `<machine dir>/runs/<story>/<unit>/`), and, in a spec folder of an older norn's tree, the folder that
- * held its units' records and still holds the units' handoffs (gh-195/05: the handoff stays there until
- * gh-195/07 moves it to `handoffs/`).
+ * The folder that holds every story's run state: `runs/` in the checkout's machine dir
+ * (`<machine dir>/runs/<story>/<unit>/`); in a spec folder of an older norn's tree, the folder
+ * that held its units' records and handoffs.
  */
 export const RUNS_DIR = "runs";
 /**
- * gh-71 D2 (B30, B36), gh-195 D7: a unit's record folder relative to the story's run-state folder,
- * `<unit>` (`_story` or `<nn>-<slug>`): `UnitFacts.record` for a slice or a flat story record. The one
- * place that names it: store's run-state resolver (`run-state.ts`) resolves it under a root,
- * `runStatePath` below joins it to the story, and pure decide compares against it as is. Nothing else
- * builds this path by hand (gh-195 prefactor 1).
+ * A unit's record folder relative to the story's run-state folder, `<unit>` (`_story` or
+ * `<nn>-<slug>`): `UnitFacts.record` for a slice or a flat story record. The one place that
+ * names it; nothing else builds this path by hand.
  */
 export function unitRecordPath(unit: string): string {
   return unit;
 }
-/** gh-71 B30: the folder under `_story/` that holds the story's rounds. */
+/** The folder under `_story/` that holds the story's rounds. */
 export const ROUNDS_DIR = "rounds";
-/** gh-71 B30: a round's folder name, `01-triage` (two digits from 01). */
+/** A round's folder name, `01-triage` (two digits from 01). */
 export function roundDirName(n: number, workflow: string): string {
   return `${String(n).padStart(2, "0")}-${workflow}`;
 }
@@ -275,66 +261,58 @@ export function parseRoundDirName(name: string): { n: number; workflow: string }
   const m = ROUND_DIR_RE.exec(name);
   return m ? { n: Number(m[1]), workflow: m[2] as string } : null;
 }
-/** gh-195 D9 (B39): the folder of a spec that holds its units' handoffs, `<spec folder>/handoffs/`. */
+/** The folder of a spec that holds its units' handoffs, `<spec folder>/handoffs/`. */
 export const HANDOFFS_DIR = "handoffs";
 /**
- * gh-195 prefactor 2 (B6, B39): a unit's handoff relative to its spec folder, keyed by the unit, never by
- * its record folder. The one place that names it: store's `handoffPath` resolves it under a spec folder.
- * gh-195/07 (D9, B39): `handoffs/_story.md` for the story (one file across rounds), `handoffs/<nn>-<slug>.md`
- * for a slice, each on its unit's branch; prose only (B6), its run state is in the machine dir (S12).
+ * A unit's handoff relative to its spec folder, keyed by the unit, never by its record folder:
+ * `handoffs/_story.md` for the story (one file across rounds), `handoffs/<nn>-<slug>.md` for a
+ * slice, each on its unit's branch.
  */
 export function unitHandoffPath(unit: string): string {
   return `${HANDOFFS_DIR}/${unit}.md`;
 }
 /**
- * gh-195/07 (B8, B34, D13 step 2): where an older norn kept a unit's handoff in its tree, `runs/<unit>/handoff.md`
- * (the story's above its round folders, gh-71 B31); read only by the move that takes it to `unitHandoffPath`.
+ * Where an older norn kept a unit's handoff in its tree, `runs/<unit>/handoff.md` (the story's
+ * above its round folders); read only by the move that takes it to `unitHandoffPath`.
  */
 export function treeHandoffPath(unit: string): string {
   return `${RUNS_DIR}/${unit}/handoff.md`;
 }
-/** gh-71 B30: a story round's record folder relative to the story's run-state folder, `_story/rounds/01-triage`. */
+/** A story round's record folder relative to the story's run-state folder, `_story/rounds/01-triage`. */
 export function roundRecordPath(n: number, workflow: string): string {
   return `${unitRecordPath(STORY_UNIT_DIR)}/${ROUNDS_DIR}/${roundDirName(n, workflow)}`;
 }
 /**
- * gh-195 D7: a unit's record as observe resolved it, relative to the story's run-state folder. A record
+ * A unit's record as observe resolved it, relative to the story's run-state folder. A record
  * an older norn wrote into facts named it from the spec folder (`runs/_story/rounds/01-story`); it reads
  * as the same unit's record (`_story/rounds/01-story`).
  */
 export const normalRecord = (record: string): string => record.replace(new RegExp(`^${RUNS_DIR}/`), "");
-/**
- * gh-195 prefactor 1: the story a unit's run state belongs to, as the run-state resolver takes it: its
- * key and its root-relative spec folder (`.agents/specs/<id>-<slug>`).
- */
+/** The story a unit's run state belongs to: its key and its root-relative spec folder (`.agents/specs/<id>-<slug>`). */
 export interface RunStory {
   key: string;
   spec_dir: string;
 }
 /**
- * gh-195 prefactor 1, S12 (B2, B4): the pure half of the run-state resolver — where a unit's run state
- * sits relative to the checkout's machine dir, `runs/<story>/<unit>`, for a story and a unit (store's
- * `runStateFile` resolves such a path). A relative path is not looked at on disk, so the story unit is
- * `runs/<story>/_story` here, not its round (store's `runStateDir` resolves that). Nothing outside here
- * and store's `run-state.ts` joins a story with `runs/` (test/repo/repo.test.ts).
+ * The pure half of the run-state resolver: where a unit's run state sits relative to the
+ * checkout's machine dir, `runs/<story>/<unit>`. A relative path is not looked at on disk, so the
+ * story unit is `runs/<story>/_story` here, not its round (store's `runStateDir` resolves that).
+ * Nothing outside here and store's `run-state.ts` joins a story with `runs/` (test/repo/repo.test.ts).
  */
 export const runStatePath = (story: RunStory, unit: string): string => `${storyRunStatePath(story)}/${unitRecordPath(unit)}`;
-/**
- * gh-195 prefactor 1 (review F1): a unit's run-state folder relative to the machine dir from its record,
- * the unit's path inside the story's run state as observe resolved it (`UnitFacts.record`, e.g. `_story/rounds/01-story`).
- */
+/** A unit's run-state folder relative to the machine dir, from its record as observe resolved it (`UnitFacts.record`, e.g. `_story/rounds/01-story`). */
 export const recordRunStatePath = (story: RunStory, record: string): string => `${storyRunStatePath(story)}/${normalRecord(record)}`;
-/** gh-195 prefactor 1: round `n`'s run-state folder relative to the machine dir (`runs/<story>/_story/rounds/NN-<wf>`). */
+/** Round `n`'s run-state folder relative to the machine dir (`runs/<story>/_story/rounds/NN-<wf>`). */
 export const roundRunStatePath = (story: RunStory, n: number, workflow: string): string => `${storyRunStatePath(story)}/${roundRecordPath(n, workflow)}`;
-/** gh-195 prefactor 1, S12: the folder relative to the machine dir that holds every unit's run state of a story (`runs/<story>`). */
+/** The folder relative to the machine dir that holds every unit's run state of a story (`runs/<story>`). */
 export const storyRunStatePath = (story: RunStory): string => `${RUNS_DIR}/${story.key}`;
 /**
- * gh-195/05: where an older norn kept a unit's record in a git tree, relative to its root
+ * Where an older norn kept a unit's record in a git tree, relative to its root
  * (`<spec folder>/runs/<unit>`): what is read from a branch or base tree an older norn wrote (the
- * mailbox's step stamp, the run state `norn upgrade` moves off the base, gh-195 D16).
+ * mailbox's step stamp, the run state `norn upgrade` moves off the base).
  */
 export const treeRunStatePath = (story: RunStory, unit: string): string => `${treeStoryRunStatePath(story)}/${unitRecordPath(unit)}`;
-/** gh-195/05: the folder of an older norn's tree that held every unit's record of a story (`<spec folder>/runs`). */
+/** The folder of an older norn's tree that held every unit's record of a story (`<spec folder>/runs`). */
 export const treeStoryRunStatePath = (story: RunStory): string => `${story.spec_dir}/${RUNS_DIR}`;
 /** Slice branch: `gh-123/03-add-form`. */
 export function sliceBranch(story: string, nn: string, slug: string): string {
@@ -343,11 +321,11 @@ export function sliceBranch(story: string, nn: string, slug: string): string {
 export function specDir(story: string, slug: string): string {
   return `${SPECS_DIR}/${storyDirName(story, slug)}`;
 }
-/** GR2: the story's spec file in its spec folder: the mirrored issue, then the refined spec. */
+/** The story's spec file in its spec folder: the mirrored issue, then the refined spec. */
 export const SPEC_FILE = "spec.md";
-/** The name older norn releases wrote; still read when a spec folder has no `spec.md` (GR2). */
+/** The name older norn releases wrote; still read when a spec folder has no `spec.md`. */
 export const LEGACY_SPEC_FILE = "story.md";
-/** GR9: the story PR body an agent writes, in the spec folder. */
+/** The story PR body an agent writes, in the spec folder. */
 export const PR_BODY_FILE = "pr.md";
 export const CLAIMS_PREFIX = "refs/norn/claims/";
 export function claimRef(story: string): string {
@@ -360,15 +338,15 @@ export function mailboxPrefix(story: string): string {
 export function mailboxRef(story: string, id: string): string {
   return `${mailboxPrefix(story)}${id}`;
 }
-/** gh-195 D2 (B10): the ref holding a story's record, one commit per push whose tree is its run-state folder. */
+/** The ref holding a story's record, one commit per push whose tree is its run-state folder. */
 export const RECORD_REF_PREFIX = "refs/norn/runs/";
 export function recordRef(story: string): string {
   return `${RECORD_REF_PREFIX}${story}`;
 }
 
-/** A receipt's number as its file name spells it: 7 → `0007` (S6). */
+/** A receipt's number as its file name spells it: 7 → `0007`. */
 export const receiptNumber = (n: number): string => String(n).padStart(4, "0");
-/** Receipt file name `NNNN-<kind>.json` (S6). */
+/** Receipt file name `NNNN-<kind>.json`. */
 export function receiptFileName(n: number, kind: string): string {
   if (!Number.isInteger(n) || n < 1 || n > 9999) throw new RangeError(`bad receipt number: ${n}`);
   return `${receiptNumber(n)}-${kind}.json`;
@@ -377,8 +355,6 @@ export function parseReceiptFileName(name: string): { n: number; kind: string } 
   const m = /^(\d{4})-([a-z]+)\.json$/.exec(name);
   return m ? { n: Number(m[1]), kind: m[2] as string } : null;
 }
-
-// ---------------------------------------------------------------- durations
 
 const DURATION_RE = new RegExp(DURATION_PATTERN);
 const UNIT_MS = { ms: 1, s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 } as const;

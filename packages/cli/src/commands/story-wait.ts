@@ -1,12 +1,12 @@
 /**
- * `norn story wait <story|slice> --until <condition> [--timeout <d>] [--interval <d>]` (gh-175, P8):
+ * `norn story wait <story|slice> --until <condition> [--timeout <d>] [--interval <d>]`:
  * blocks until the condition holds on the unit's state as this checkout sees it, then prints that
  * state as JSON — for a supervisor (a person's script or an agent) that guides a story from
  * outside. Conditions are `@norn/view`'s `parseWaitCondition`: `step=<name>`, `gate`, `ask`,
- * `stuck`, `done` (the round ended), `merged`. Read only (X1): it ticks nothing, so something else
+ * `stuck`, `done` (the round ended), `merged`. Read only: it ticks nothing, so something else
  * (`norn watch`, cron) moves the story; the PR state is what the last sync tick saw.
  *
- * Exit codes tell the endings apart, so a caller branches on the code, never on text (P8): 0 the
+ * Exit codes tell the endings apart, so a caller branches on the code, never on text: 0 the
  * condition holds, `timeout` (7) the time ran out or the wait was stopped (the state is printed all
  * the same), `usage` (2) a bad condition or duration, `refused` (3) an unknown story or slice.
  */

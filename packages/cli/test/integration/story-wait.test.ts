@@ -1,5 +1,5 @@
 /**
- * `norn story wait <story> --until <condition> [--timeout <d>]` (gh-175, P8): blocks until the
+ * `norn story wait <story> --until <condition> [--timeout <d>]`: blocks until the
  * story's state meets the condition, then prints that state as JSON; the exit code tells met (0),
  * timed out (7), a bad condition (2) and an unknown story (3) apart. The conditions themselves are
  * covered on `@norn/view`'s `waitMet` (packages/view/test/unit/wait.test.ts).

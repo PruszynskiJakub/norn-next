@@ -1,5 +1,5 @@
 /**
- * Durable records (GR6, F36): the spec folders as they are on the fetched base branch
+ * Durable records: the spec folders as they are on the fetched base branch
  * (`refs/remotes/<remote>/<base>`), never the person's possibly stale local `main`. A story whose
  * worktree was removed after its PR merged is still listed from here.
  *
@@ -98,7 +98,7 @@ export function baseSpecsRoot(repoRoot: string, ref: string): string | null {
 }
 
 /**
- * BS1: story key → the last `story.base` measured on this checkout (`trace/base.json`, machine-local).
+ * Story key → the last `story.base` measured on this checkout (`trace/base.json`, machine-local).
  * Observe reruns `git merge-tree` only when the pair (story head, base sha) differs from the cached
  * one; views show the last measurement (stale inbox items, merge-item detail) without running git.
  */
@@ -113,7 +113,7 @@ export function writeBaseFacts(repoRoot: string, cache: BaseFactsCache): void {
 }
 
 /**
- * C1 (BS10, BS11, F35): story key → the story PR as the last remote sync of this checkout saw it
+ * Story key → the story PR as the last remote sync of this checkout saw it
  * (`trace/pr.json`, machine-local), with the observation time. PRs are fetched only on sync ticks;
  * the ticks between and the read model (`norn status`, `norn story list`) show the PR items from this.
  */
@@ -129,7 +129,7 @@ export function writePrFacts(repoRoot: string, cache: PrFactsCache): void {
 }
 
 /**
- * gh-71 D5: story key → the story issue as the last remote sync of this checkout saw it
+ * Story key → the story issue as the last remote sync of this checkout saw it
  * (`issue.json`, machine-local), with the observation time. Issues are fetched only on sync ticks;
  * the ticks between and the read model show the finished-round Check item from this.
  */

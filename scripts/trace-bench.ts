@@ -1,7 +1,7 @@
 /**
- * Trace benchmark (gh-107 B1, B2, B10): how the cockpit (`norn status --watch`), `norn status` and `norn brief` fare
+ * Trace benchmark: how the cockpit (`norn status --watch`), `norn status` and `norn brief` fare
  * over a large trace against the same repo with an empty one. Footprint and timing are not asserted
- * in the suite (see the gh-107 spec, Plan); QA runs this.
+ * in the suite; QA runs this.
  *
  * It writes a throwaway repo under $TMPDIR with one story whose unit has a live run, a synthetic
  * trace like the reported one (day files of ~650 KB tick lines, the live run's hook facts in

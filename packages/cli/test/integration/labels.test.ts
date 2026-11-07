@@ -1,7 +1,7 @@
 /**
  * gh-67 GR10 at the CLI seam: `norn init` and `norn upgrade` create the labels norn uses on the
  * remote (the harness's FakeRemote), never edit or delete one, and never fail for the remote's sake;
- * `norn doctor` warns about missing and unused ones and `doctor --repo` never looks (A7).
+ * `norn doctor` warns about missing and unused ones and `doctor --repo` never looks.
  */
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
@@ -49,7 +49,7 @@ function addWorkflow(h: Harness, name: string, text?: string) {
   h.write(join(workflowsDir(h.root), `${name}.yaml`), text ?? quick.replace(/^name: quick$/m, `name: ${name}`));
 }
 
-describe("norn init creates the labels norn uses (GR10)", () => {
+describe("norn init creates the labels norn uses", () => {
   test("B1, B6, B9, B15: every label is created with the norn colour and a description, listed in the report and --json", async () => {
     const h = await createHarness();
     try {
@@ -63,7 +63,7 @@ describe("norn init creates the labels norn uses (GR10)", () => {
       expect(h.remote.labels.find((l) => l.name === "norn")?.description).toBe("norn takes in issues assigned to you with this label");
       expect(h.remote.labels.find((l) => l.name === "norn:wf:triage")?.description).toStartWith("Check an issue still holds");
       expect(text(r)).toContain(`labels: created ${ALL.join(", ")}`);
-      // B29: norn made the labels, so the next steps do not ask for them
+      // Norn made the labels, so the next steps do not ask for them
       expect(r.stdout).not.toContain("gh label create");
       const json = (await h.norn("init", "--json")).value as { labels: LabelsReport };
       expect(json.labels).toEqual({ checked: true, created: [], existing: ALL, missing: [], not_created: [], unused: [] });
@@ -135,7 +135,7 @@ describe("norn init creates the labels norn uses (GR10)", () => {
   });
 });
 
-describe("norn upgrade creates what is missing, on every run (GR10)", () => {
+describe("norn upgrade creates what is missing, on every run", () => {
   test("B2, B4, B7: a new workflow's label is created even with nothing else to upgrade; a second run creates nothing", async () => {
     const h = await inited();
     try {
@@ -184,7 +184,7 @@ describe("norn upgrade creates what is missing, on every run (GR10)", () => {
   });
 });
 
-describe("norn doctor checks the labels (A7, GR10)", () => {
+describe("norn doctor checks the labels", () => {
   type Doctor = { ok: boolean; warnings: string[]; labels?: LabelsReport };
   const doctor = (h: Harness, ...args: string[]) => runChecked(["doctor", "--json", ...args], h.deps);
 
@@ -232,8 +232,8 @@ describe("norn doctor checks the labels (A7, GR10)", () => {
   });
 });
 
-describe("a tick never creates a label (GR10)", () => {
-  test("B20: norn:wf:reproduce missing and a reproduce round starts → the label swap warns (RD5); the tick creates no label", async () => {
+describe("a tick never creates a label", () => {
+  test("B20: norn:wf:reproduce missing and a reproduce round starts → the label swap warns; the tick creates no label", async () => {
     const h = await inited();
     try {
       sh(h.root, ["push", "-q", "origin", "main"]);

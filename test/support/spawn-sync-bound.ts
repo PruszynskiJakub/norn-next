@@ -1,5 +1,5 @@
 /**
- * gh-215: a bound on every `Bun.spawnSync` in the spawning tiers (integration, e2e). bun test (1.3.13)
+ * A bound on every `Bun.spawnSync` in the spawning tiers (integration, e2e). bun test (1.3.13)
  * cannot cut a test stuck in `Bun.spawnSync` at its per-test timeout once its file has run another
  * `spawnSync`, so one child that never exits (a harness `sh()`, norn's own in-process `gitSync`, which
  * has no timeout for local git subcommands by H11, or a test file's direct call) blocked its worker and
@@ -18,7 +18,7 @@ export function spawnSyncTimeoutMs(): number {
 type SpawnSync = (...args: unknown[]) => unknown;
 
 /**
- * `real` with a default timeout: `Bun.spawnSync(cmd, options)` and `Bun.spawnSync({ cmd, ...options })`
+ * `real` with a default timeout: `Bun.spawnSync(cmd, options)` and `Bun.spawnSync({ cmd,...options })`
  * that set no `timeout` get `timeoutMs()` and `killSignal: "SIGKILL"`; a call that sets its own keeps it.
  */
 export function boundSpawnSync(real: SpawnSync, timeoutMs: () => number = spawnSyncTimeoutMs): SpawnSync {

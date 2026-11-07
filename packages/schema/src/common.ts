@@ -1,6 +1,6 @@
 import { type Static, Type } from "@sinclair/typebox";
 
-/** Words a step may not be named (W7). Step names also may not start with `$`. */
+/** Words a step may not be named. Step names also may not start with `$`. */
 export const RESERVED_STEP_NAMES = [
   "done",
   "stuck",
@@ -20,9 +20,9 @@ export const SLICE_KEY_PATTERN = "^(gh|gl)-[1-9][0-9]*/[0-9]{2,3}$";
 export const SLUG_PATTERN = "^[a-z0-9]+(-[a-z0-9]+)*$";
 /** `<nn>-<slug>` folder of a slice unit, or `_story`. */
 export const UNIT_DIR_PATTERN = "^(_story|[0-9]{2,3}-[a-z0-9]+(-[a-z0-9]+)*)$";
-/** e.g. `30s`, `10m`, `1h30m`, `500ms`. */
 /** A git commit id: SHA-1 (40) or SHA-256 (64) hex. */
 export const GIT_SHA_PATTERN = "^[0-9a-f]{40,64}$";
+/** e.g. `30s`, `10m`, `1h30m`, `500ms`. */
 export const DURATION_PATTERN = "^([0-9]+(ms|s|m|h|d))+$";
 const IDENT = "[a-z][a-z0-9_-]*";
 export const STEP_NAME_PATTERN = `^(?!(${RESERVED_STEP_NAMES.join("|")})$)${IDENT}$`;
@@ -30,7 +30,7 @@ export const OUTCOME_NAME_PATTERN = `^${IDENT}$`;
 export const COUNTER_NAME_PATTERN = `^${IDENT}$`;
 export const TARGET_PATTERN = `^(\\$done|\\$stuck|(?!(${RESERVED_STEP_NAMES.join("|")})$)${IDENT})$`;
 
-export const Ulid = Type.String({ pattern: ULID_PATTERN, description: "ULID (ID2)" });
+export const Ulid = Type.String({ pattern: ULID_PATTERN, description: "ULID" });
 export const IsoTime = Type.String({ format: "date-time", description: "ISO-8601 timestamp, UTC" });
 export const Duration = Type.String({ pattern: DURATION_PATTERN, description: "Duration like 30s, 10m, 1h30m" });
 export const GitSha = Type.String({ pattern: GIT_SHA_PATTERN });
@@ -55,7 +55,7 @@ export type RemoteProvider = Static<typeof RemoteProvider>;
 export const Mode = Type.Union([Type.Literal("manual"), Type.Literal("auto")]);
 export type Mode = Static<typeof Mode>;
 
-/** Opaque process identity: PID plus OS start time, for liveness checks (K3). */
+/** Opaque process identity: PID plus OS start time, for liveness checks. */
 export const ProcessIdentity = Type.Object(
   {
     pid: PosInt,
@@ -86,6 +86,6 @@ export function TaggedUnion<T extends import("@sinclair/typebox").TObject[]>(
   });
 }
 
-/** R6.2: how a pane prompt takes a choice — the option's number, or arrow keys from `cursor` (0-based). */
+/** How a pane prompt takes a choice — the option's number, or arrow keys from `cursor` (0-based). */
 export const PromptChoice = Type.Object({ numbered: Type.Boolean(), cursor: NonNegInt }, { additionalProperties: false });
 export type PromptChoice = Static<typeof PromptChoice>;

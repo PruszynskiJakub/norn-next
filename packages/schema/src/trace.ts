@@ -1,7 +1,7 @@
 import { type Static, Type } from "@sinclair/typebox";
 import { IsoTime, NonEmpty, NonNegInt, SliceKey, StoryKey, TaggedUnion, Ulid } from "./common.ts";
 
-/** Normalized agent lifecycle facts reported by hooks (A2). */
+/** Normalized agent lifecycle facts reported by hooks. */
 export const HookEventKind = Type.Union([
   Type.Literal("session_start"),
   Type.Literal("turn_start"),
@@ -50,16 +50,16 @@ export const TickUnitRecord = Type.Object(
         ok: Type.Boolean(),
         error: Type.Optional(Type.String()),
         detail: Type.Optional(Type.Unknown()),
-        /** gh-71 B20: an effect that failed without failing the action (a label not updated) */
+        /** An effect that failed without failing the action (a label not updated) */
         warnings: Type.Optional(Type.Array(Type.String())),
-        /** gh-78: how long act took over this action (a batched claim renewal: the batch's time); absent on older traces */
+        /** How long act took over this action (a batched claim renewal: the batch's time); absent on older traces */
         ms: Type.Optional(NonNegInt),
       },
       { additionalProperties: false },
     ),
-    /** trace-relative path of the stored briefing (B4) */
+    /** trace-relative path of the stored briefing */
     briefing: Type.Optional(NonEmpty),
-    /** trace-relative path of a transcript snapshot (C4) */
+    /** trace-relative path of a transcript snapshot */
     transcript: Type.Optional(NonEmpty),
   },
   { additionalProperties: false },
@@ -67,13 +67,13 @@ export const TickUnitRecord = Type.Object(
 export type TickUnitRecord = Static<typeof TickUnitRecord>;
 
 /**
- * O1/O4 inbox history: an inbox item (needing a person) appeared in, or left, the inbox after this
+ * Inbox history: an inbox item (needing a person) appeared in, or left, the inbox after this
  * tick's act. `norn status --history` pairs them into appeared_at / resolved_at / resolved_by.
  */
 export const InboxChange = Type.Object(
   {
     event: Type.Union([Type.Literal("appeared"), Type.Literal("resolved")]),
-    /** inbox item id (stable per item, O3) */
+    /** inbox item id, stable per item */
     id: NonEmpty,
     group: NonEmpty,
     story: NonEmpty,
@@ -92,13 +92,13 @@ export const InboxChange = Type.Object(
 );
 export type InboxChange = Static<typeof InboxChange>;
 
-/** gh-78: a tick's slowest phase (`observe.<phase>`, `decide`, `act <kind> <unit>`, `after`) and its time. */
+/** A tick's slowest phase (`observe.<phase>`, `decide`, `act <kind> <unit>`, `after`) and its time. */
 export const TickSlowest = Type.Object({ phase: NonEmpty, ms: NonNegInt }, { additionalProperties: false });
 export type TickSlowest = Static<typeof TickSlowest>;
 
 /**
- * gh-78 (O4): where a tick spent its time. Diagnostic only: outside `facts` and the decisions'
- * `action`, so decide never reads it and `--why` replays ignore it (O5).
+ * Where a tick spent its time. Diagnostic only: outside `facts` and the decisions'
+ * `action`, so decide never reads it and `--why` replays ignore it.
  */
 export const TickTiming = Type.Object(
   {
@@ -110,7 +110,7 @@ export const TickTiming = Type.Object(
     after_ms: NonNegInt,
     /** observe's phases (`worktrees`, `base_fetch`, `local`, `sync.*`, `runner`, `stories`, …) in ms */
     observe: Type.Record(Type.String(), NonNegInt),
-    /** remote calls made by the sync, counted per call (`list_issues`, `get_issue`, `find_prs` (gh-186: one per batch of PRs), `pr_ci`) */
+    /** remote calls made by the sync, counted per call (`list_issues`, `get_issue`, `find_prs` (one per batch of PRs), `pr_ci`) */
     calls: Type.Optional(Type.Record(Type.String(), NonNegInt)),
     slowest: TickSlowest,
   },
@@ -118,7 +118,7 @@ export const TickTiming = Type.Object(
 );
 export type TickTiming = Static<typeof TickTiming>;
 
-/** gh-78: observe's remote sync outcome, as `norn tick` prints it. */
+/** Observe's remote sync outcome, as `norn tick` prints it. */
 export const TickSync = Type.Object({ ran: Type.Boolean(), ok: Type.Boolean(), error: Type.Optional(Type.String()) }, { additionalProperties: false });
 export type TickSync = Static<typeof TickSync>;
 
@@ -128,17 +128,17 @@ export const TickTrace = Type.Object(
     tick_id: Ulid,
     at: IsoTime,
     heartbeat_id: Type.Union([Ulid, Type.Null()]),
-    /** the norn that recorded this tick (`@norn/cli` version); `norn run view --why` labels a replay by another version (O5). Absent on older traces. */
+    /** the norn that recorded this tick (`@norn/cli` version); `norn run view --why` labels a replay by another version. Absent on older traces. */
     norn_version: Type.Optional(NonEmpty),
     duration_ms: NonNegInt,
-    /** Facts snapshot (the `Facts` type of @norn/core); replayed by `norn run view --why` (O5). */
+    /** Facts snapshot (the `Facts` type of @norn/core); replayed by `norn run view --why`. */
     facts: Type.Record(Type.String(), Type.Unknown()),
     decisions: Type.Array(TickUnitRecord),
-    /** inbox items that appeared or were resolved by this tick (O1 history); absent = none */
+    /** inbox items that appeared or were resolved by this tick; absent = none */
     inbox: Type.Optional(Type.Array(InboxChange)),
-    /** gh-78: observe's remote sync outcome; absent on older traces */
+    /** Observe's remote sync outcome; absent on older traces */
     sync: Type.Optional(TickSync),
-    /** gh-78: where the tick spent its time; absent on older traces */
+    /** Where the tick spent its time; absent on older traces */
     timing: Type.Optional(TickTiming),
   },
   { additionalProperties: false },
@@ -150,7 +150,7 @@ export const HookTrace = Type.Object(
     type: Type.Literal("hook"),
     id: Ulid,
     fact: HookFact,
-    /** Whether `norn hook` blocked the event (A4) and why. */
+    /** Whether `norn hook` blocked the event and why. */
     blocked: Type.Optional(Type.Boolean()),
     reason: Type.Optional(Type.String()),
   },
@@ -158,7 +158,7 @@ export const HookTrace = Type.Object(
 );
 export type HookTrace = Static<typeof HookTrace>;
 
-/** Receipts refused at apply time (stale step/attempt, T9) or files failing validation. */
+/** Receipts refused at apply time (stale step/attempt) or files failing validation. */
 export const RejectTrace = Type.Object(
   {
     type: Type.Literal("reject"),
@@ -174,7 +174,7 @@ export const RejectTrace = Type.Object(
 );
 export type RejectTrace = Static<typeof RejectTrace>;
 
-/** Links a run to the exact briefing `norn brief` stored for it (B4, O4); one per brief call. */
+/** Links a run to the exact briefing `norn brief` stored for it; one per brief call. */
 export const BriefingTrace = Type.Object(
   {
     type: Type.Literal("briefing"),
@@ -192,7 +192,7 @@ export const BriefingTrace = Type.Object(
 );
 export type BriefingTrace = Static<typeof BriefingTrace>;
 
-/** Commits on a story/slice branch that norn did not make (Q6); one event per newly seen sha. */
+/** Commits on a story/slice branch that norn did not make; one event per newly seen sha. */
 export const ForeignCommitsTrace = Type.Object(
   {
     type: Type.Literal("foreign_commits"),
@@ -212,7 +212,7 @@ export const ForeignCommitsTrace = Type.Object(
 );
 export type ForeignCommitsTrace = Static<typeof ForeignCommitsTrace>;
 
-/** R10.1 (M8): a `norn story checkout` of a story, forced or not, with the claim it replaced. */
+/** A `norn story checkout` of a story, forced or not, with the claim it replaced. */
 export const TakeTrace = Type.Object(
   {
     type: Type.Literal("take"),
@@ -232,7 +232,7 @@ export const TakeTrace = Type.Object(
 export type TakeTrace = Static<typeof TakeTrace>;
 
 /**
- * R5.4 (N2): written after decide, before act — so a tick that dies during act still leaves its
+ * Written after decide, before act — so a tick that dies during act still leaves its
  * decisions (and the receipts they number) in the trace. `norn run view --why` reports a `tick.start` with no
  * `tick.end` as "tick crashed during act". No facts snapshot: the full `tick` record carries those.
  */
@@ -249,7 +249,7 @@ export const TickStartTrace = Type.Object(
 );
 export type TickStartTrace = Static<typeof TickStartTrace>;
 
-/** R5.4: written after the tick's `tick` record — the tick finished act. */
+/** Written after the tick's `tick` record — the tick finished act. */
 export const TickEndTrace = Type.Object(
   {
     type: Type.Literal("tick.end"),
@@ -258,7 +258,7 @@ export const TickEndTrace = Type.Object(
     duration_ms: NonNegInt,
     /** actions that ended `ok: false` */
     failed: NonNegInt,
-    /** gh-78: the tick's slowest phase, so a slow tick is explained from this line alone; absent on older traces */
+    /** The tick's slowest phase, so a slow tick is explained from this line alone; absent on older traces */
     slowest: Type.Optional(TickSlowest),
   },
   { additionalProperties: false },
@@ -266,9 +266,9 @@ export const TickEndTrace = Type.Object(
 export type TickEndTrace = Static<typeof TickEndTrace>;
 
 /**
- * QV2–QV4, QV8: a `norn done --criteria` report, counted per verdict (`norn run list` sums them). `rule` is
+ * A `norn done --criteria` report, counted per verdict (`norn run list` sums them). `rule` is
  * `criteria.unchecked_coverage` when the unit's frontmatter had no `criteria` to check coverage
- * against (QV4), else `criteria.checked`.
+ * against, else `criteria.checked`.
  */
 export const CriteriaTrace = Type.Object(
   {
@@ -285,7 +285,7 @@ export const CriteriaTrace = Type.Object(
     rule: Type.Union([Type.Literal("criteria.checked"), Type.Literal("criteria.unchecked_coverage")]),
     /** count per verdict */
     verdicts: Type.Object({ pass: NonNegInt, fail: NonNegInt, person: NonNegInt, unverified: NonNegInt }, { additionalProperties: false }),
-    /** read only: traces from before gh-64 counted `unverified` per criteria `needs` (B37: no longer written) */
+    /** read only: older traces counted `unverified` per criteria `needs`; no longer written */
     unverified_needs: Type.Optional(Type.Record(Type.String(), NonNegInt)),
   },
   { additionalProperties: false },
@@ -293,7 +293,7 @@ export const CriteriaTrace = Type.Object(
 export type CriteriaTrace = Static<typeof CriteriaTrace>;
 
 /**
- * S2 (BUG-4): a machine-local file (a cache in the machine dir) was unreadable or of the wrong shape
+ * A machine-local file (a cache in the machine dir) was unreadable or of the wrong shape
  * and read as empty. Logged once per process per file content; the next write replaces the file.
  */
 export const LocalFileTrace = Type.Object(
@@ -301,7 +301,7 @@ export const LocalFileTrace = Type.Object(
     type: Type.Literal("local_file"),
     id: Ulid,
     at: IsoTime,
-    /** D10: absolute path, e.g. `~/.norn/repos/<id>/remote.json` (machine-local files live outside the repo) */
+    /** Absolute path, e.g. `~/.norn/repos/<id>/remote.json` (machine-local files live outside the repo) */
     file: NonEmpty,
     /** the local schema it failed, e.g. `local-remote` */
     schema: NonEmpty,

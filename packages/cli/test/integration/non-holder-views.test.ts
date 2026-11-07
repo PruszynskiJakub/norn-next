@@ -1,5 +1,5 @@
 /**
- * gh-195/12 (B10, B13, B17–B19, B30; D6): what a machine that does not hold a story sees of it. Clone
+ * What a machine that does not hold a story sees of it. Clone
  * A holds the stories; clone B, another clone of the same bare remote with its own norn home, user and
  * machine name, ticks and views. Under `remote` B shows the step, attempt and counters from the record
  * ref; under `local` the claim, the branch, the last boundary, the PR with its CI and where the run

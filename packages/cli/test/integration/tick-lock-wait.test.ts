@@ -1,7 +1,7 @@
 /**
- * gh-174 (H1): a person command that needs the tick lock waits for a running tick, up to 60s, then
- * runs as it does today (B1–B12); `tick`, `migrate` and `story edit --auto|--manual` do not wait
- * (B13–B15). Time is faked through the injected `sleep`, which advances the fake clock; the test
+ * A person command that needs the tick lock waits for a running tick, up to 60s, then
+ * runs as it does today; `tick`, `migrate` and `story edit --auto|--manual` do not wait
+ *. Time is faked through the injected `sleep`, which advances the fake clock; the test
  * process holds the lock itself, so it is a live holder.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -82,7 +82,7 @@ async function run(argv: string[], opts: { onSleep?: (n: number) => Promise<void
 }
 
 const runsSnapshot = () => {
-  // S12: the story's run state, in the machine dir
+  // The story's run state, in the machine dir
   const dir = storyRunStateOf(join(wt6(), spec6));
   return readdirSync(dir, { recursive: true, withFileTypes: true })
     .filter((e) => e.isFile())
@@ -194,7 +194,7 @@ describe("waiting for a running tick (tidy)", () => {
   });
 });
 
-describe("judged after the wait (B5, B6)", () => {
+describe("judged after the wait", () => {
   test("B6: a refusal comes right after the wait", async () => {
     const lock = await hold();
     const { r, logs } = await run(["story", "edit", "gh-6", "--workflow", "gated", "--json"], { onSleep: () => void lock.release() });

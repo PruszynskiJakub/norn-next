@@ -1,5 +1,5 @@
 /**
- * The checkout's machine dir, `<norn home>/repos/<folder>-<hash8>/` (B5, D1–D3): its `checkout.json`
+ * The checkout's machine dir, `<norn home>/repos/<folder>-<hash8>/`: its `checkout.json`
  * names the checkout it belongs to, so `norn doctor` can tell a dir orphaned by a moved repo folder.
  */
 import { existsSync, readdirSync } from "node:fs";
@@ -8,7 +8,7 @@ import { atomicWriteJson } from "./fsx.ts";
 import { readLocalJson } from "./local-json.ts";
 import { checkoutFilePath, checkoutOf, machineDir, machineReposDir } from "./paths.ts";
 
-/** Write `checkout.json` in `root`'s machine dir when it is missing or names another checkout (a dir adopted after a move, D3). */
+/** Write `checkout.json` in `root`'s machine dir when it is missing or names another checkout (a dir adopted after a move). */
 export function ensureCheckoutFile(root: string): void {
   const path = checkoutFilePath(machineDir(root));
   const checkout = checkoutOf(root).checkout;
@@ -16,14 +16,13 @@ export function ensureCheckoutFile(root: string): void {
 }
 
 export interface OrphanedMachineDir {
-  /** the orphaned machine dir */
   dir: string;
   /** the checkout path its `checkout.json` names, which no longer exists */
   checkout: string;
 }
 
 /**
- * D3: machine dirs in `home` whose `checkout.json` names a path with `root`'s folder name that no longer
+ * Machine dirs in `home` whose `checkout.json` names a path with `root`'s folder name that no longer
  * exists — left behind when this repo folder moved. Reads only.
  */
 export function orphanedMachineDirs(home: string, root: string): OrphanedMachineDir[] {

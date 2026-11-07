@@ -1,14 +1,13 @@
 /**
- * decide (H3): `(facts, repo workflows, config) → Decision[]`, pure and deterministic.
- * At most one action per unit per tick; every decision records the rule that fired (O5).
+ * decide: `(facts, repo workflows, config) → Decision[]`, pure and deterministic.
+ * At most one action per unit per tick; every decision records the rule that fired.
  * Ids come from `deriveUlid(facts.tick_id, i)` and times from `facts.now`, so `norn run view --why`
  * replays to identical output.
  *
- * Order per story: claim (T3–T6; a due renewal is a side action, R1.1) → corrupt (S2) → remote
- * lifecycle (GR6–GR8) → mailbox (T9),
- * then per unit: receipts (C2: receipts always win over runner facts) → workflow drift (S7)
- * → recovery commit → step semantics by type (§6, §10, W2). Ready steps are served in
- * queue order (K1): oldest story by intake, then slice number.
+ * Order per story: claim (a due renewal is a side action) → corrupt → remote lifecycle → mailbox,
+ * then per unit: receipts (always win over runner facts) → workflow drift → recovery commit →
+ * step semantics by type. Ready steps are served in queue order: oldest story by intake, then
+ * slice number.
  */
 import {
   type ResolvedConfig,
@@ -33,22 +32,21 @@ import { decideStory } from "./story.ts";
 export { LAUNCH_PROMPT_MS } from "./agent.ts";
 export { isSideAction, isTailAction } from "./receipts.ts";
 
-/** A repo workflow as loaded by the caller: parsed + validated (W5) with the exact file text. */
 export interface LoadedWorkflow {
   name: string;
   /** null when the file failed schema validation */
   workflow: Workflow | null;
-  /** exact file text, pinned verbatim at unit start (S7) */
+  /** exact file text, pinned verbatim at unit start */
   source: string;
-  /** validateWorkflowDefinition issues (incl. skills); non-empty = refused (W5) */
+  /** validateWorkflowDefinition issues (incl. skills); non-empty = refused */
   issues: WorkflowIssue[];
 }
 export type RepoWorkflows = Readonly<Record<string, LoadedWorkflow>>;
 
-/** W9: the issue label that picks a story's workflow at intake (`norn:wf:<name>`). */
+/** The issue label that picks a story's workflow at intake (`norn:wf:<name>`). */
 export { WF_LABEL };
 
-/** The decision that is the unit's one action this tick (O5), else its side action, else null. */
+/** The decision that is the unit's one action this tick, else its side action, else null. */
 export function unitDecision<D extends { unit: string; action: { kind: string; op?: unknown } }>(decisions: readonly D[], unit: string, unitOf: (d: D) => string = (d) => d.unit): D | null {
   const mine = decisions.filter((d) => unitOf(d) === unit);
   return mine.find((d) => !isSideAction(d.action)) ?? mine[0] ?? null;
@@ -58,20 +56,18 @@ export function decide(facts: Facts, workflows: RepoWorkflows, config: ResolvedC
   const ctx = new Ctx(facts, workflows, config);
   const deadFiles = facts.machine.dead_lease_files ?? [];
   if (deadFiles.length) ctx.emit({ kind: "reclaim_leases", unit: null, rule: "leases.reclaim", files: [...deadFiles] });
-  // gh-195/05 (B2, H2): observe read these units by an inferred marker; act writes it back, traced
+  // Observe read these units by an inferred marker; act writes it back, traced
   if (facts.unmarked?.length) ctx.emit({ kind: "restore_markers", unit: null, rule: "worktree.marker", worktrees: structuredClone(facts.unmarked) });
   for (const story of queueOrder(facts.stories)) decideStory(ctx, story);
   intake(ctx);
   return ctx.decisions;
 }
 
-/** K1: oldest story by intake first (unknown intake last), then key. */
+/** Oldest story by intake first (unknown intake last), then key. */
 function queueOrder(stories: readonly StoryFacts[]): StoryFacts[] {
   const at = (s: StoryFacts) => (s.frontmatter ? epoch(s.frontmatter.intake_at) : Number.POSITIVE_INFINITY);
   return [...stories].sort((a, b) => at(a) - at(b) || a.key.localeCompare(b.key));
 }
-
-// ================================================================= repo level
 
 function intake(ctx: Ctx): void {
   const { facts, config } = ctx;

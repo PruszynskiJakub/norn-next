@@ -1,5 +1,5 @@
 /**
- * gh-252 (SK1): a session started by hand is held to the rule a launched one is — `norn brief`,
+ * A session started by hand is held to the rule a launched one is — `norn brief`,
  * `norn story start` and `norn story chat` start it with the worktree's skill copies, even when a
  * bundled one differs from this norn's (gh-61 B20's refusal is gone). B21: a repo-local skill never
  * counts either.
@@ -55,7 +55,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("brief, story start and story chat never refuse on drifted skills (gh-252)", () => {
+describe("brief, story start and story chat never refuse on drifted skills", () => {
   test("AC3 (B21): a repo-local skill that differs is not refused", async () => {
     h.write(join(wt(), ".agents/skills/release/SKILL.md"), "---\nname: release\n---\nours, edited\n");
     for (const [name, run] of Object.entries(sessionCommands())) {

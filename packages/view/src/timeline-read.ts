@@ -1,7 +1,7 @@
 /**
- * loadTimelines (O4, X1, D1): every unit's timeline — its receipts and the trace events of the
- * 14-day window, merged — for a front end that shows timelines. The project view carries none
- * (B1–B3): the cockpit, status and inbox never read the trace; only a caller that asks reads it here.
+ * loadTimelines: every unit's timeline — its receipts and the trace events of the
+ * 14-day window, merged — for a front end that shows timelines. The project view carries none:
+ * the cockpit, status and inbox never read the trace; only a caller that asks reads it here.
  * Local files only, no writes.
  */
 import type { FileError } from "@norn/core";

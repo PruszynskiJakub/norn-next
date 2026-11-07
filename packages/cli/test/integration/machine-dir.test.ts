@@ -1,5 +1,5 @@
 /**
- * The checkout's machine-local files live in `<norn home>/repos/<folder>-<hash8>/` (B5, B6, D1–D3):
+ * The checkout's machine-local files live in `<norn home>/repos/<folder>-<hash8>/`:
  * trace, locks, heartbeat and caches, shared by every unit worktree, never in the working tree or
  * `.git`; `norn doctor` warns about a machine dir orphaned by a moved repo folder.
  */
@@ -56,13 +56,13 @@ function machineFilesUnder(dir: string, machine: string): string[] {
   return (readdirSync(dir, { recursive: true }) as string[]).filter((p) => !p.startsWith(`.git${"/"}objects`) && (names.has(basename(p)) || p.endsWith(".jsonl")));
 }
 
-describe("machine-local files in the norn home (B5, B6)", () => {
+describe("machine-local files in the norn home", () => {
   let h: Harness;
   let machine: string;
   const wt = () => `${h.root}-worktrees/gh-4-four`;
   beforeAll(async () => {
     h = await createHarness();
-    // B6: what the home already holds before norn uses repos/
+    // What the home already holds before norn uses repos/
     mkdirSync(h.home, { recursive: true });
     writeFileSync(userConfigPath(h.home), "max_agents: 3\n");
     await boot(h);

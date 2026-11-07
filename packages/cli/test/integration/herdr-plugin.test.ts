@@ -1,11 +1,11 @@
-/** The herdr plugin (HC9): its manifest, and its scripts run through `sh` against stub norn and herdr binaries. */
+/** The herdr plugin: its manifest, and its scripts run through `sh` against stub norn and herdr binaries. */
 import { describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { REPO_ROOT as ROOT } from "../../../../test/support/repo-root.ts";
 
-describe("herdr plugin (HC9)", () => {
+describe("herdr plugin", () => {
   test("the manifest parses, has the pick pane and the open/next/pick actions, and names only scripts that exist", () => {
     const dir = join(ROOT, "plugins", "herdr");
     const m = Bun.TOML.parse(readFileSync(join(dir, "herdr-plugin.toml"), "utf8")) as {

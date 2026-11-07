@@ -1,5 +1,5 @@
 /**
- * Configuration in three files (K2, gh-64): the user file `~/.norn/config.yaml` (this machine
+ * Configuration in three files: the user file `~/.norn/config.yaml` (this machine
  * and your defaults), the local file `.agents/norn.config.local.yaml` (you, in this repo) and the
  * team file `.agents/norn.config.yaml`. Each takes its own keys; everything else is built in,
  * derived or fixed. `resolveConfig` merges them with the derived values into the one
@@ -11,24 +11,22 @@ import { parseDuration } from "./ids.ts";
 import { check, type SchemaError } from "./check.ts";
 import { VERSION_PATTERN } from "./version.ts";
 
-// ---------------------------------------------------------------- names and fixed values
-
-/** The coding agents norn ships (X2: no third-party agents). */
+/** The coding agents norn ships; there are no third-party agents. */
 export const AGENT_NAMES = ["claude", "codex", "opencode", "gemini"] as const;
 export type AgentName = (typeof AGENT_NAMES)[number];
 export const isAgentName = (n: unknown): n is AgentName => typeof n === "string" && (AGENT_NAMES as readonly string[]).includes(n);
 
-/** B33: slots 1–9, 10 ports each, slot `n` from port `4000 + 10·n`. */
+/** Slots 1–9, 10 ports each, slot `n` from port `4000 + 10·n`. */
 export const SLOTS = { min: 1, max: 9, port_base: 4000, ports_per_slot: 10 } as const;
-/** B30: the label marking issues norn takes in (GR1). */
+/** The label marking issues norn takes in. */
 export const ISSUE_LABEL = "norn";
-/** B32: how often the remote is synced (GR1); `norn sync` forces one. */
+/** How often the remote is synced; `norn sync` forces one. */
 export const SYNC_INTERVAL = "5m";
-/** B27, HC2: an attended run waiting this long for its person shows under Your turn. */
+/** An attended run waiting this long for its person shows under Your turn. */
 export const ATTENDED_WAIT = "2m";
-/** B34: the tick interval when none is recorded. */
+/** The tick interval when none is recorded. */
 export const DEFAULT_INTERVAL = "30s";
-/** W2a: the limits of a step whose workflow and step set none. */
+/** The limits of a step whose workflow and step set none. */
 export const BUILT_IN_LIMITS = { deadline: "60m", nudges: 2, retries: 1, stalled: "15m" } as const;
 
 /** Where each file lives, as a person names it in a message. */
@@ -39,14 +37,12 @@ export const CONFIG_FILES = {
 } as const;
 export type ConfigFileKind = keyof typeof CONFIG_FILES;
 
-// ---------------------------------------------------------------- the three file schemas
-
 export const Url = Type.String({ pattern: "^https?://\\S+$", description: "http or https URL" });
 
 export const AgentEntry = Type.Object(
   {
     model: Type.Optional(NonEmpty),
-    /** replaces the built-in list whole (B15) */
+    /** replaces the built-in list whole */
     args: Type.Optional(Type.Array(Type.String())),
   },
   { additionalProperties: false },
@@ -82,7 +78,7 @@ export type Notify = Static<typeof Notify>;
 export const TraceConfig = Type.Object(
   {
     /**
-     * D11: how much trace `norn tidy` keeps, a duration like `14d`. A plain string here: the form and
+     * How much trace `norn tidy` keeps, a duration like `14d`. A plain string here: the form and
      * the 14-day minimum are checked where the value is used (`norn tidy` refuses, `norn doctor` warns).
      */
     retain: Type.Optional(Type.String({ minLength: 1, description: "Duration like 14d, at least 14d (checked by norn tidy and norn doctor)" })),
@@ -90,7 +86,7 @@ export const TraceConfig = Type.Object(
   { additionalProperties: false },
 );
 
-/** gh-195 B9 (S11): where a story's record goes at each step boundary: kept on the holder's machine, or pushed to `refs/norn/runs/<story>`. */
+/** Where a story's record goes at each step boundary: kept on the holder's machine, or pushed to `refs/norn/runs/<story>`. */
 export const RECORD_POLICIES = ["local", "remote"] as const;
 export type RecordPolicy = (typeof RECORD_POLICIES)[number];
 export const RecordConfig = Type.Object(
@@ -130,13 +126,12 @@ export const RepoConfig = Type.Object(
   {
     $schema: Type.Optional(Type.String()),
     provider: Type.Optional(RemoteProvider),
-    /** BS0: the branch stories are cut from and PR'd into; unset = the remote's default branch */
+    /** The branch stories are cut from and PR'd into; unset = the remote's default branch */
     base_branch: Type.Optional(Type.Union([NonEmpty, Type.Null()])),
     workflow: Type.Optional(Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "workflow a new story starts in (default triage)" })),
     slice_workflow: Type.Optional(Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "workflow a new slice starts in (default slice)" })),
-    /** gh-61 B1–B4 (D4, K8): the norn version the repo needs; written by `norn upgrade` and `norn init` only */
+    /** The norn version this repo needs; written by `norn upgrade` and `norn init` only */
     norn_version: Type.Optional(Type.String({ pattern: VERSION_PATTERN, description: "the norn version this repo needs, X.Y.Z (written by norn upgrade and norn init)" })),
-    /** gh-195 B9 (S11): the team's record policy */
     record: Type.Optional(RecordConfig),
   },
   { $id: "https://norn.dev/schema/repo-config.json", title: "norn team config", additionalProperties: false },
@@ -151,8 +146,6 @@ export interface ConfigFiles {
   repo?: RepoConfig;
 }
 
-// ---------------------------------------------------------------- the resolved config
-
 const RunnerName = Type.Union([Type.Literal("herdr"), Type.Literal("headless")]);
 
 /** Every setting in effect: the files merged over the built-in values, plus what norn derives. */
@@ -162,26 +155,26 @@ export const ResolvedConfig = Type.Object(
     agent: Type.String({ minLength: 1 }),
     agents: Type.Record(Type.String(), AgentEntry),
     mode: Mode,
-    /** B29: detected (herdr inside Herdr or when installed, else headless) */
+    /** Detected (herdr inside Herdr or when installed, else headless) */
     runner: Type.Object({ adapter: RunnerName }, { additionalProperties: false }),
     provider: RemoteProvider,
     label: NonEmpty,
-    /** B31: derived git remote */
+    /** Derived git remote */
     git_remote: NonEmpty,
     sync_interval: Duration,
     base_branch: Type.Union([NonEmpty, Type.Null()]),
     workflow: NonEmpty,
     slice_workflow: NonEmpty,
-    /** gh-61 B4 (D4): the team file's `norn_version`; null when none is recorded */
+    /** The team file's `norn_version`; null when none is recorded */
     norn_version: Type.Union([Type.String({ pattern: VERSION_PATTERN }), Type.Null()]),
     max_agents: Type.Integer({ minimum: 1, maximum: 9 }),
     notify: Type.Object({ os: Type.Boolean(), ntfy: Type.Optional(Url), webhook: Type.Optional(Url) }, { additionalProperties: false }),
-    /** B34: the tick interval the checkout's heartbeat records */
+    /** The tick interval the checkout's heartbeat records */
     interval: Duration,
-    /** B35: derived from `interval` */
+    /** Derived from `interval` */
     claim: Type.Object({ lease: Duration, renew: Duration }, { additionalProperties: false }),
     trace: Type.Object({ retain: Type.String({ minLength: 1 }) }, { additionalProperties: false }),
-    /** gh-195 B9, B12: the team's record policy, read at every tick */
+    /** The team's record policy, read at every tick */
     record: Type.Object({ policy: Type.Union(RECORD_POLICIES.map((p) => Type.Literal(p))) }, { additionalProperties: false }),
   },
   { additionalProperties: false },
@@ -189,12 +182,13 @@ export const ResolvedConfig = Type.Object(
 export type ResolvedConfig = Static<typeof ResolvedConfig>;
 
 /**
- * Built-in agent entries. Claude sessions run in Claude Code's `auto` permission mode (AGENTS.md
- * decision; per-step permission profiles are not built, docs/limitations.md). A file's entry merges over this field by field; `args` replaces whole (B14, B15).
+ * Built-in agent entries. Claude sessions run in Claude Code's `auto` permission mode so unattended
+ * sessions park on permission prompts far less often (per-step permission profiles are not built).
+ * A file's entry merges over this field by field; `args` replaces whole.
  */
 export const BUILT_IN_AGENTS: Record<string, AgentEntry> = { claude: { args: ["--permission-mode", "auto"] } };
 
-/** What norn derives from the machine and the repo (D1); gathered by the cli context. */
+/** What norn derives from the machine and the repo; gathered by the cli context. */
 export interface ConfigDerived {
   runner: { adapter: "herdr" | "headless"; reason: string };
   /** the URL of the derived git remote; null when the repo has none */
@@ -240,8 +234,6 @@ export interface RunnerConfig {
 }
 export type NotifierConfig = RunnerConfig;
 
-// ---------------------------------------------------------------- problems
-
 export type ConfigProblemCode = "config_invalid" | "config_wrong_file" | "config_moved";
 
 export interface ConfigProblem {
@@ -259,7 +251,7 @@ export const problemText = (p: ConfigProblem) => `\`${CONFIG_FILES[p.file]}\`: $
 
 const UPGRADE = "; run `norn upgrade`";
 
-/** B39: every old or moved key and what replaced it (D2: checked first). */
+/** Every old or moved key and what replaced it; checked before any other problem. */
 const MOVED: Record<string, string> = {
   default_agent: "`default_agent` is now `agent`",
   default_mode: "`default_mode` is now `mode`",
@@ -302,9 +294,9 @@ function rightFile(key: string): string | null {
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 /**
- * B5–B8, B17, B19, B39, B53 (D2): the problems of one file's parsed YAML, in order moved, wrong
+ * The problems of one file's parsed YAML, in order moved, wrong
  * file, invalid. `null` / empty means the file sets nothing. What the moved and wrong-file passes
- * leave is checked against the file's own schema (the one an editor uses, B50). Pure.
+ * leave is checked against the file's own schema (the one an editor uses). Pure.
  */
 export function checkConfigFile(file: ConfigFileKind, value: unknown): ConfigProblem[] {
   if (value === null || value === undefined) return [];
@@ -348,7 +340,7 @@ export function checkConfigFile(file: ConfigFileKind, value: unknown): ConfigPro
   return out;
 }
 
-/** B39: an agent entry's removed fields are moved problems; the rest goes on to the schema. */
+/** An agent entry's removed fields are moved problems; the rest goes on to the schema. */
 function withoutMovedAgentFields(v: unknown, add: (code: ConfigProblemCode, key: string, message: string) => void): unknown {
   if (!isMap(v)) return v;
   const agents: Record<string, unknown> = {};
@@ -393,7 +385,7 @@ const INVALID: Record<string, string> = {
   $schema: "`$schema` must be a path or URL",
 };
 
-/** D2: one schema error as a config_invalid problem on the key it names, in a person's words. */
+/** One schema error as a config_invalid problem on the key it names, in a person's words. */
 function invalidProblem(e: SchemaError): { key: string; message: string } {
   const segs = e.path.split("/").filter(Boolean);
   const unknown = /^unknown property '(.+)'$/.exec(e.message)?.[1];
@@ -409,8 +401,6 @@ function invalidProblem(e: SchemaError): { key: string; message: string } {
   const message = INVALID[pattern]?.replace("*", segs[1] ?? "*") ?? `\`${key}\` ${e.message}`;
   return { key, message };
 }
-
-// ---------------------------------------------------------------- resolving and explaining
 
 export type ConfigSource = "built-in" | "derived" | "user" | "local" | "repo";
 
@@ -429,7 +419,7 @@ export interface ResolvedConfigResult {
   problems: ConfigProblem[];
 }
 
-/** B22, B54 (D7): the provider a remote URL names; null = a host that is neither; "local" = a path. */
+/** The provider a remote URL names; null = a host that is neither; "local" = a path. */
 function providerFromUrl(url: string): { provider: "gh" | "glab"; host: string } | { provider: null; host: string } | "local" {
   const m = /^(?:[a-z+]+:\/\/)?(?:[^@/\s]+@)?([^/:\s]+)[:/]/i.exec(url);
   if (!m || url.startsWith("/") || url.startsWith(".") || url.startsWith("file:")) return "local";
@@ -456,17 +446,16 @@ function durationText(ms: number): string {
   return parts.join("") || "0s";
 }
 
-/** B35: lease = the larger of 10 minutes and 4 × interval, renewed every third of it. */
+/** Lease = the larger of 10 minutes and 4 × interval, renewed every third of it. */
 function claimTiming(interval: string): { lease: string; renew: string } {
   const lease = Math.max(10 * 60_000, 4 * parseDuration(interval));
   return { lease: durationText(lease), renew: durationText(lease / 3) };
 }
 
 /**
- * Merge the three files over the built-in values with what norn derived (K2, B2–B4, B10–B17,
- * B22, B29, B31, B34, B35, B46, B54). The nearer file wins for your keys (local over user); maps
- * merge key by key, lists and scalars replace. Problems of every file come back with a config
- * that still holds the valid values. Pure.
+ * Merge the three files over the built-in values with what norn derived. The nearer file wins
+ * for your keys (local over user); maps merge key by key, lists and scalars replace. Problems of
+ * every file come back with a config that still holds the valid values. Pure.
  */
 export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = NO_DERIVED): ResolvedConfigResult {
   const problems: ConfigProblem[] = [];
@@ -503,7 +492,7 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
 
   const mode = personal<ResolvedConfig["mode"]>("mode", "manual");
   const agent = personal<string>("agent", "claude");
-  // B14–B16: an entry merges field by field over the built-in one, then the user file's, then the local file's
+  // An entry merges field by field over the built-in one, then the user file's, then the local file's
   const agents: Record<string, AgentEntry> = {};
   const names = new Set([...Object.keys(BUILT_IN_AGENTS), ...Object.keys((clean.user.agents as object) ?? {}), ...Object.keys((clean.local.agents as object) ?? {})]);
   for (const name of [...names].sort()) {
@@ -528,7 +517,7 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
   }
 
   entry("runner", derived.runner.adapter, "derived", derived.runner.reason);
-  // B22, B54 (D7): provider from the team file, else the remote URL's host
+  // Provider from the team file, else the remote URL's host
   let provider: "gh" | "glab" = "gh";
   if (clean.repo.provider !== undefined) {
     provider = clean.repo.provider as "gh" | "glab";
@@ -551,7 +540,6 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
   const workflow = team<string>("workflow", "triage");
   const slice_workflow = team<string>("slice_workflow", "slice");
   const norn_version = team<string | null>("norn_version", null);
-  // gh-195 B9: the record policy, a team key; local unless the team file says remote
   const recordPolicy = team<RecordPolicy>("record.policy", "local");
 
   const max_agents = machine<number>("max_agents", 9);
@@ -594,7 +582,7 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
 }
 
 /**
- * The file a dotted key may be set in (`norn config set`, D4): `ok`, or the problem of setting it
+ * The file a dotted key may be set in (`norn config set`): `ok`, or the problem of setting it
  * there (moved, wrong file, unknown). Read off the same rules as loading. Pure.
  */
 export function configKeyProblem(file: ConfigFileKind, key: string): ConfigProblem | null {
@@ -628,7 +616,7 @@ export function configKeyProblem(file: ConfigFileKind, key: string): ConfigProbl
 
 /**
  * A resolved config an older norn recorded in a tick's replay block, in today's shape, so
- * `norn run view --why` replays it (O5). Fields already in today's names pass through. Pure.
+ * `norn run view --why` replays it. Fields already in today's names pass through. Pure.
  */
 export function legacyConfig(recorded: unknown): ResolvedConfig {
   const c = { ...(recorded as Record<string, unknown>) };

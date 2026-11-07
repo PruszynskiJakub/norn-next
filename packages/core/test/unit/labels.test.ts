@@ -5,7 +5,7 @@ import { labelCreateCommand, labelDeleteCommand, NORN_LABEL_COLOR, planLabels, T
 const wf = (name: string, valid = true, description?: string) => ({ name, valid, ...(description ? { description } : {}) });
 const SHIPPED = ["triage", "reproduce", "refinement", "story", "slice", "quick"].map((n) => wf(n));
 
-describe("planLabels (GR10)", () => {
+describe("planLabels", () => {
   test("B1, B6: a bare remote misses the intake label, one per workflow and the twelve triage labels", () => {
     const plan = planLabels({ intake: "norn", workflows: SHIPPED, remote: [] });
     expect(plan.missing.map((l) => l.name)).toEqual([

@@ -11,8 +11,8 @@ function view(patch: Partial<UnitState>, receipts: NumberedReceipt[] = [], unapp
   return { unit, state: stateFor(unit, SLICE_WF, patch), workflow: SLICE_WF, receipts, unapplied };
 }
 
-describe("agent-unit rules (§9)", () => {
-  test("currentRun: the applied run, else an unapplied started receipt (MO3)", () => {
+describe("agent-unit rules", () => {
+  test("currentRun: the applied run, else an unapplied started receipt", () => {
     expect(currentRun(view({ status: "running", run: RUN }))).toEqual({ run_id: RUN.run_id, applied: true });
     const st = stateFor(unit, SLICE_WF);
     const started = numbered(1, receipt({ ...st, run: RUN }, "started"));
@@ -20,7 +20,7 @@ describe("agent-unit rules (§9)", () => {
     expect(currentRun(view({}))).toBeNull();
   });
 
-  test("standingReport: an agent ask stands until answered; implicit asks never count (§9.3)", () => {
+  test("standingReport: an agent ask stands until answered; implicit asks never count", () => {
     const st = stateFor(unit, SLICE_WF, { run: RUN });
     const ask = numbered(1, receipt(st, "ask", { question: "q" }));
     expect(standingReport(view({ run: RUN }, [ask]), RUN.run_id)?.n).toBe(1);
@@ -30,7 +30,7 @@ describe("agent-unit rules (§9)", () => {
     expect(standingReport(view({ run: RUN }, [implicit]), RUN.run_id)).toBeNull();
   });
 
-  test("implicitAsk / implicitAskOpen (R6.1)", () => {
+  test("implicitAsk / implicitAskOpen", () => {
     const st = stateFor(unit, SLICE_WF, { run: RUN });
     const ask = numbered(1, receipt(st, "ask", { question: "q", implicit: true }));
     const parked: Partial<UnitState> = { status: "parked", run: RUN, park: { kind: "ask", reason: "q", since: at(), receipt_id: ask.receipt.receipt_id } };
@@ -53,7 +53,7 @@ describe("agent-unit rules (§9)", () => {
     expect(agentWorkRefusal(view({ status: "parked", park: { kind: "attended", reason: "r", since: at() } }), "done")).toBeNull();
   });
 
-  test("a run belongs to the session that started it: another session is refused, an unknown one is not (MO3, gh-92)", () => {
+  test("a run belongs to the session that started it: another session is refused, an unknown one is not", () => {
     const owned = { ...RUN, agent_session_id: "sess-A" };
     expect(runAgentSession(view({ status: "running", run: owned }), RUN.run_id)).toBe("sess-A");
     const st = stateFor(unit, SLICE_WF);

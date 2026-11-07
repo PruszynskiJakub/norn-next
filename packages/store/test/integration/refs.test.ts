@@ -38,7 +38,7 @@ function blob(holder: string, hb: string, expiresIn = 600_000): ClaimBlob {
   return { version: 1, story: "gh-12", holder, heartbeat_id: hb, acquired_at: AT, renewed_at: AT, expires_at: iso(NOW + expiresIn), last_tick_id: null };
 }
 
-describe("claims (T2–T6)", () => {
+describe("claims", () => {
   test("acquire via CAS; second machine refused with holder; renew; expiry; release", async () => {
     const { a, b } = await setup();
     const hbA = ulid();
@@ -107,7 +107,7 @@ describe("claims (T2–T6)", () => {
   });
 });
 
-describe("batched renewals (T4, H5)", () => {
+describe("batched renewals", () => {
   const STORIES = ["gh-1", "gh-2", "gh-3"];
   async function claimed(a: string, hb: string) {
     const out: Array<{ blob: ClaimBlob; expected: string }> = [];
@@ -188,7 +188,7 @@ describe("batched renewals (T4, H5)", () => {
   });
 });
 
-describe("mailbox (T9)", () => {
+describe("mailbox", () => {
   test("non-holder posts; holder fetches, lists, deletes", async () => {
     const { a, b } = await setup();
     const answer: Receipt = { kind: "answer", receipt_id: ulid(), run_id: null, step: "plan", attempt: 1, at: AT, by: "human", who: "ola@pc", answer: "pg" };
@@ -208,12 +208,12 @@ describe("mailbox (T9)", () => {
   });
 });
 
-describe("readLocalStoryRefs (T2, T9)", () => {
+describe("readLocalStoryRefs", () => {
   test("reads every claim and mailbox as readLocalClaim and listMailbox do, corrupt ones included, in two git calls", async () => {
     const { a } = await setup();
     const hb = ulid();
     expect((await acquireClaim(a, null, blob("jakub@mac", hb), { now: NOW })).ok).toBe(true);
-    // gh-1: a claim that is no JSON; gh-2: a claim ref at a tree (no blob); gh-12's mailbox: a good item and a bad one
+    // A claim that is no JSON; A claim ref at a tree (no blob); gh-12's mailbox: a good item and a bad one
     const junk = await gitOk(a, ["hash-object", "-w", "--stdin"], "not json");
     await gitOk(a, ["update-ref", "refs/norn/claims/gh-1", junk.trim()]);
     const tree = await gitOk(a, ["mktree"], "");

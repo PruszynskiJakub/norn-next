@@ -1,9 +1,9 @@
 /**
  * `norn help`: the commands grouped for a person, "Start here" first; `--json` for the list as data.
- * A noun is one row naming its verbs; `norn help <noun>` lists the verbs (B2), `norn help <noun> <verb>`
- * shows one verb (B4). A hidden group is printed only by `norn help --all`.
- * An agent may run it too, so it says up front which commands an agent runs (the B3–B6 protocol)
- * and marks every command and bundled skill (§16) with who it is for.
+ * A noun is one row naming its verbs; `norn help <noun>` lists the verbs, `norn help <noun> <verb>`
+ * shows one verb. A hidden group is printed only by `norn help --all`.
+ * An agent may run it too, so it says up front which commands an agent runs and marks every
+ * command and bundled skill with who it is for.
  */
 import type { Command, Noun } from "../command.ts";
 import { defineCommand, opt } from "../command.ts";
@@ -13,7 +13,7 @@ import { bundledSkills } from "../runtime/workflows.ts";
 /** Who runs a command: a person, the agent doing a step, the agent's hooks or a tick (never by hand). */
 export type CommandFor = "person" | "agent" | "hooks" | "tick";
 
-/** B14: `status --segment` is a mode of `status` that only Herdr runs, so it is a row of its own in `help --all`. */
+/** `status --segment` is a mode of `status` that only Herdr runs, so it is a row of its own in `help --all`. */
 const SEGMENT = {
   name: "status --segment",
   summary: "One line for Herdr's tab bar; sorts and marks the orient workspaces",
@@ -22,8 +22,8 @@ const SEGMENT = {
 };
 
 /**
- * Help tiers in print order (B1): Core, Setup, Background, then the agent protocol. A command missing
- * here lands in "Other" (for a person). A `hidden` tier only with `--all` (B3): what norn, Herdr or the
+ * Help tiers in print order: Core, Setup, Background, then the agent protocol. A command missing
+ * here lands in "Other" (for a person). A `hidden` tier only with `--all`: what norn, Herdr or the
  * hooks run, never a person by hand. `help` itself is the footer, not a row.
  */
 export const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; commands: readonly string[]; hidden?: boolean }> = [
@@ -39,7 +39,7 @@ export const HELP_GROUPS: ReadonlyArray<{ title: string; for: CommandFor; comman
 /** Not a row of `norn help`: the footer says how to use it. */
 const UNLISTED = new Set(["help"]);
 
-/** How a bundled skill is used (§16): only an agent loads skills; some steps also need a person with it. */
+/** How a bundled skill is used: only an agent loads skills; some steps also need a person with it. */
 export type SkillFor = "protocol" | "step" | "attended" | "reference" | "supervisor";
 
 /** Skill groups in print order; a skill missing here lands in "Other skills" (a step skill). */
@@ -48,7 +48,7 @@ const SKILL_GROUPS: ReadonlyArray<{ title: string; for: SkillFor; skills: readon
   { title: "step skills, the agent works alone", for: "step", skills: ["norn-implement", "norn-review", "norn-qa", "norn-merge", "norn-slice", "norn-pr", "norn-diagnose"] },
   { title: "step skills, a person works with the agent", for: "attended", skills: ["norn-refine", "norn-clarify", "norn-plan", "norn-interview", "norn-qa-person", "norn-prototype"] },
   { title: "references other skills read, never a step", for: "reference", skills: ["norn-tdd", "norn-codebase-design"] },
-  // gh-196 D6 (SK3): a person starts these in the main checkout; never a step
+  // A person starts these in the main checkout; never a step
   { title: "supervisors a person starts in the main checkout, never a step", for: "supervisor", skills: ["norn-fsd-round", "norn-fsd"] },
 ];
 
@@ -58,7 +58,7 @@ const AGENT_NOTE = [
   "(the `norn` skill says how). Every other command is the person's: run one only when the person asks you to directly.",
 ];
 
-/** Spec ids such as `(A1, SK1, W1)` or `(§9.3)` mean nothing to a newcomer; the JSON keeps them. */
+/** Drops a parenthesised spec id a summary may still carry. */
 export const plainSummary = (summary: string): string =>
   summary.replace(/\s*\((?:(?:§[\d.]+|[A-Z]{1,3}\d+(?:\.\d+)?[a-z]?)(?:[–-][A-Z]{0,3}\d+)?(?:,\s*)?)+\)/g, "");
 
@@ -75,7 +75,7 @@ type Row = { name: string; summary: string };
 
 const verbName = (n: Noun, v: Command) => v.name.slice(n.name.length + 1);
 
-/** A noun's verbs in the order `norn <noun>` lists them: by group when it has groups (B2). */
+/** A noun's verbs in the order `norn <noun>` lists them: by group when it has groups. */
 const verbsInOrder = (n: Noun): string[] => n.groups?.flatMap((g) => g.verbs) ?? n.verbs.map((v) => verbName(n, v));
 
 const nounRow = (n: Noun): Row => ({ name: n.name, summary: `${n.summary} (${verbsInOrder(n).join(", ")})` });
@@ -113,7 +113,7 @@ function formatCommandHelp(c: Command): string {
   return `norn ${c.name} — ${plainSummary(c.summary)}\n\n    ${c.usage}${options}${note}`;
 }
 
-/** B2: `norn <noun>` — its verbs, under their group titles when the noun has groups. */
+/** `norn <noun>` — its verbs, under their group titles when the noun has groups. */
 function formatNounHelp(n: Noun): string {
   const width = Math.max(...n.verbs.map((v) => v.name.length)) + 2;
   const line = (v: Command) => `  norn ${v.name.padEnd(width)}${plainSummary(v.summary)}`;
@@ -146,7 +146,7 @@ export const helpCommand = defineCommand({
     }
     if (noun) return rendered({ ...nounHelp(noun), for: commandFor(noun.name) }, formatNounHelp(noun));
     const c = name ? findCommand(name) : undefined;
-    // B5: an unknown name, or a word after a plain command, is a usage error, as it is for `norn <name>`
+    // An unknown name, or a word after a plain command, is a usage error, as it is for `norn <name>`
     if (name && (!c || verb)) throw usageError(`Unknown command: ${args.positionals.join(" ")}`, "norn help", "unknown_command");
     if (c) return rendered({ ...helpFor(c), for: commandFor(c.name) }, formatCommandHelp(c));
     const skills = bundledSkills(ctx.env);
@@ -157,7 +157,7 @@ export const helpCommand = defineCommand({
     const entries = [...COMMANDS.map((c) => ({ ...helpFor(c), for: commandFor(c.name) })), ...NOUNS.map((n) => ({ ...nounHelp(n), for: commandFor(n.name) })), segment];
     const hidden = new Set(HELP_GROUPS.filter((g) => g.hidden).flatMap((g) => g.commands).filter((n) => !shown.has(n)));
     const commands = entries.filter((c) => !hidden.has(c.command) && !UNLISTED.has(c.command));
-    // B1: the tree as data, tier by tier, in print order
+    // The tree as data, tier by tier, in print order
     const tree = tiers.map((g) => ({ title: g.title, for: g.for, commands: g.commands.filter((n) => commands.some((c) => c.command === n)) }));
     return rendered(
       { tiers: tree, commands, skills: skills.map((s) => ({ skill: s, for: skillFor(s) })) },

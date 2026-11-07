@@ -1,5 +1,5 @@
 /**
- * Auto-mode recovery in decide and the inbox (R4, R5, R7):
+ * Auto-mode recovery in decide and the inbox:
  *   - R4.2: a nudge is typed (`send`), else resumed (`--resume` + nudge text), else a counted retry
  *   - R4.3: a failed act effect is an Unblock item while it applies
  *   - R5.1/R5.2: a run whose `started` receipt was never applied is adopted when found, `died` after

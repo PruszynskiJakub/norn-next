@@ -1,13 +1,13 @@
 /**
- * Raw on-disk snapshot of one repository for observe (H2): config, repo workflows, and
+ * Raw on-disk snapshot of one repository for observe: config, repo workflows, and
  * per story its frontmatter, slice files, and per unit state.json, pinned workflow,
  * unapplied receipts and handoff. Data only — Facts composition happens in the CLI.
  *
- * Specs live in story worktrees (§7); pass them as `storyRoots`. Roots are scanned in
+ * Specs live in story worktrees; pass them as `storyRoots`. Roots are scanned in
  * order — storyRoots, then the fetched base branch (`<remote>/<base>`, base.ts: the durable record
- * once a worktree is gone, F36), then repoRoot (solo repos and unpushed stories) — and the first
+ * once a worktree is gone), then repoRoot (solo repos and unpushed stories) — and the first
  * root holding a story wins. The main checkout's local `main` is never preferred over the fetched base.
- * R3.4 (N1): a story worktree supplies only the story its `.norn-unit` marker names; a copy of
+ * A story worktree supplies only the story its `.norn-unit` marker names; a copy of
  * another story's record in it (cut from a later base) is never read. Roots without a story marker
  * supply nothing.
  */
@@ -31,9 +31,9 @@ import { readUnitMarker } from "./worktree.ts";
 
 export interface UnitSnapshot {
   unit: UnitRef;
-  /** absolute record folder (`runStateDir`): `<machine dir>/runs/<story>/<unit>/`, the story's current round folder (gh-71 B30, S12) */
+  /** absolute record folder (`runStateDir`): `<machine dir>/runs/<story>/<unit>/`, the story's current round folder */
   path: string;
-  /** the record folder relative to the story's run-state folder (gh-71 D2, gh-195 D7), e.g. `_story/rounds/01-story` */
+  /** the record folder relative to the story's run-state folder, e.g. `_story/rounds/01-story` */
   record: string;
   /** null = not started (no state.json) or corrupt (see errors) */
   state: UnitState | null;
@@ -42,22 +42,22 @@ export interface UnitSnapshot {
   unapplied: NumberedReceipt[];
   /** every valid receipt, when `includeApplied` */
   receipts?: NumberedReceipt[];
-  /** absolute path of the unit's handoff, from its own resolver (`handoffPath`, gh-195 prefactor 2), not from `path` */
+  /** absolute path of the unit's handoff, from its own resolver (`handoffPath`), not from `path` */
   handoffFile: string;
   handoff: Handoff | null;
-  /** files of this unit failing validation → unit is corrupt (S2) */
+  /** files of this unit failing validation → unit is corrupt */
   errors: FileError[];
   /**
-   * gh-195/06 (B34): the unit worktree whose tree (an older norn's `<spec folder>/runs/`, on its branch)
+   * The unit worktree whose tree (an older norn's `<spec folder>/runs/`, on its branch)
    * this unit's run state was read from, the machine dir holding none of it yet. Absent = the machine dir.
    */
   tree_root?: string;
-  /** gh-195/06 (B34, D13): run state an older norn left on this unit's own branch, still to move off it; absent = none */
+  /** Run state an older norn left on this unit's own branch, still to move off it; absent = none */
   branch_record?: BranchRecord;
 }
 
 /**
- * gh-195/06 (B34, D13): run state an older norn left in `<spec folder>/runs/` of a unit worktree, on its
+ * Run state an older norn left in `<spec folder>/runs/` of a unit worktree, on its
  * branch. The unit whose worktree it is carries it.
  */
 export interface BranchRecord {
@@ -82,9 +82,9 @@ export interface StorySnapshot {
   path: string;
   /** root-relative spec folder `.agents/specs/<id>-<slug>` */
   spec_dir: string;
-  /** gh-195/05 (S12): the checkout whose machine dir holds the story's run state */
+  /** The checkout whose machine dir holds the story's run state */
   checkout: string;
-  /** gh-195/05: where the story's units' run state was read from (`runStateSource`) */
+  /** Where the story's units' run state was read from (`runStateSource`) */
   run_state: RunStateAt;
   frontmatter: StoryFrontmatter | null;
   frontmatter_error: FileError | null;
@@ -94,12 +94,12 @@ export interface StorySnapshot {
   /** read from the fetched base branch copy (no worktree, not in the main checkout): `root` is read-only */
   from_base?: boolean;
   /**
-   * gh-195 B33 (review#2 F1): a story this checkout holds whose record is in its machine dir but whose
+   * A story this checkout holds whose record is in its machine dir but whose
    * spec is in no tree here — it has no branch. No frontmatter, no spec folder; its units are its run state.
    */
   record_only?: boolean;
   /**
-   * R3.2: `status` of the story's record on the fetched base branch, whatever root it was read from;
+   * `status` of the story's record on the fetched base branch, whatever root it was read from;
    * null = not on the base; absent = no base ref.
    */
   base_status?: StoryFrontmatter["status"] | null;
@@ -114,7 +114,7 @@ export interface RepoSnapshot {
   base_ref: string | null;
   stories: StorySnapshot[];
   /**
-   * gh-195 D16 (B29, B35): stories whose run state an older norn left in the base's tree (the fetched
+   * Stories whose run state an older norn left in the base's tree (the fetched
    * base branch, the main checkout without one), never read: `norn upgrade` moves it to archive refs.
    * Ascending; [] = none.
    */
@@ -122,9 +122,9 @@ export interface RepoSnapshot {
 }
 
 /**
- * gh-195 D16 (B35): the stories whose spec folder in the tree `root` (the base cache, or a checkout)
+ * The stories whose spec folder in the tree `root` (the base cache, or a checkout)
  * still holds `runs/` from an older norn, by key, ascending. The one place that notices them: once the
- * removal `norn upgrade` stages is committed (gh-195/17), it finds none.
+ * removal `norn upgrade` stages is committed, it finds none.
  */
 export function baseRunStateStories(root: string): string[] {
   const out: string[] = [];
@@ -154,20 +154,20 @@ function files(path: string): string[] {
   }
 }
 
-/** Where a story's run state is read from, as `loadUnit` takes it (gh-195/05, `runStateSource`). */
+/** Where a story's run state is read from, as `loadUnit` takes it (`runStateSource`). */
 export interface RunStateAt {
   /** the folder holding the story's units' run state */
   base: string;
-  /** the root a file error or a receipt names a path from; none = absolute (the machine dir, S12) */
+  /** the root a file error or a receipt names a path from; none = absolute (the machine dir) */
   name?: string;
-  /** an older norn's record in a unit worktree's branch tree (gh-195/06), not the machine dir */
+  /** an older norn's record in a unit worktree's branch tree, not the machine dir */
   tree: boolean;
-  /** gh-195 D7 (B29): the archive ref's record commit this finished story's run state was unpacked from; absent = not the archive */
+  /** The archive ref's record commit this finished story's run state was unpacked from; absent = not the archive */
   archive?: string;
 }
 
 /**
- * One unit's run state (gh-195 prefactor 1: found through the resolver; S12: in the machine dir of the
+ * One unit's run state (found through the resolver, in the machine dir of the
  * checkout `root` belongs to), with its handoff from the worktree `root`.
  */
 export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { includeApplied?: boolean; path?: string; at?: RunStateAt } = {}): UnitSnapshot {
@@ -181,11 +181,11 @@ export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { i
   const wf = readPinnedWorkflow(path, name);
   if (!wf.ok && wf.reason === "corrupt") errors.push(wf.error);
   const state = st.ok ? st.value : null;
-  // S2: every receipt is validated on every load, applied or not
+  // Every receipt is validated on every load, applied or not
   const all = listReceipts(path, name ? { root: name } : {});
   errors.push(...all.errors);
   const after = state?.applied_through ?? 0;
-  // S7: `norn story edit --workflow --at` re-pins workflow.yaml right after journaling a workflow receipt;
+  // `norn story edit --workflow --at` re-pins workflow.yaml right after journaling a workflow receipt;
   // until the tick applies it, the new pin matching that receipt's to_hash is expected.
   const switching = (hash: string) => all.receipts.some((r) => r.n > after && r.receipt.kind === "workflow" && r.receipt.to_hash === hash);
   if (state && wf.ok && state.workflow_hash !== wf.value.hash && !switching(wf.value.hash))
@@ -207,7 +207,7 @@ export function loadUnit(root: string, story: RunStory, unit: UnitRef, opts: { i
 }
 
 /**
- * gh-195/06 (B34): a unit of the worktree `root`, read from its branch's tree (`<spec folder>/runs/`, an
+ * A unit of the worktree `root`, read from its branch's tree (`<spec folder>/runs/`, an
  * older norn's) when `branch` and the machine dir holds none of its run state yet, else from `at` —
  * `fromAt` when given, the unit as already read from `at`, with the handoff of `root`.
  */
@@ -224,7 +224,7 @@ function readUnit(root: string, story: RunStory, unit: UnitRef, opts: { includeA
   return loadUnit(root, story, unit, { ...opts, at });
 }
 
-/** gh-195/06 (B34): the run state left on the branch of the worktree `root`, carried by its unit; the move copies the units read from there. */
+/** The run state left on the branch of the worktree `root`, carried by its unit; the move copies the units read from there. */
 function withBranchRecord(root: string, story: RunStory, owner: UnitSnapshot, units: readonly UnitSnapshot[]): UnitSnapshot {
   const { branch_record: _, ...rest } = owner;
   if (!treeRunStateFiles(root, story).length) return rest;
@@ -233,7 +233,7 @@ function withBranchRecord(root: string, story: RunStory, owner: UnitSnapshot, un
 }
 
 /**
- * gh-71 B29, B36: the story's rounds, oldest first, each its own record folder read as a unit snapshot
+ * The story's rounds, oldest first, each its own record folder read as a unit snapshot
  * (every receipt when `includeApplied`). A flat record from an older norn is its one round, round 1;
  * [] when the story has not started. Read only.
  */
@@ -246,9 +246,9 @@ export function loadRounds(story: StorySnapshot, opts: { includeApplied?: boolea
 }
 
 /**
- * Read one spec folder (spec.md, slices/) and its units' run state (S12: in the machine dir of
+ * Read one spec folder (spec.md, slices/) and its units' run state (in the machine dir of
  * `checkout`, default `root`; `archive`: or, for a finished story this machine holds none of, the
- * record on its archive ref here, gh-195 D7, D16).
+ * record on its archive ref here).
  */
 export function loadStory(
   root: string,
@@ -283,13 +283,13 @@ export function loadStory(
 
   const run: RunStory = { key, spec_dir: relative(root, specPath) };
   const checkout = opts.checkout ?? root;
-  // D7, D16 (B29): only a finished story's record is read from its archive ref, never written there
+  // Only a finished story's record is read from its archive ref, never written there
   const finished = story.ok && isClosedStatus(story.value.frontmatter.status);
   const at = runStateSource(root, run, { checkout, ...(opts.archive && finished ? { archive: opts.archive } : {}) });
   const base = { key, slug, root, path: specPath, spec_dir: run.spec_dir, checkout, run_state: at, frontmatter: story.ok && !frontmatter_error ? story.value.frontmatter : null, frontmatter_error, slices };
   if (opts.units === false) return { ...base, units: [] };
   const unitOpts = opts.includeApplied ? { includeApplied: true } : {};
-  // gh-195/06 (B34): a story worktree's branch may still hold an older norn's run state
+  // A story worktree's branch may still hold an older norn's run state
   const branch = !!opts.branch;
   const units: UnitSnapshot[] = [readUnit(root, run, { story: key, slice: null, dir: STORY_UNIT_DIR, key }, unitOpts, at, branch)];
   const runDirs = new Set([...dirs(at.base), ...(branch ? dirs(treeRunStateDir(root, run)) : [])].filter((d) => d !== STORY_UNIT_DIR));
@@ -329,8 +329,8 @@ export function loadSnapshot(opts: {
   repoRoot: string;
   /**
    * story worktrees, scanned before repoRoot: a path (read for the story its marker names) or a story
-   * key and the path the caller already matched it to (gh-195/05, B2: observe read a marker `git clean`
-   * took from the worktree's folder and branch, and writes nothing, H2)
+   * key and the path the caller already matched it to (observe infers a marker `git clean`
+   * took from the worktree's folder and branch, and writes nothing)
    */
   storyRoots?: Array<string | { story: string; path: string }>;
   home?: string;
@@ -349,7 +349,7 @@ export function loadSnapshot(opts: {
   const baseRef = opts.baseRef !== undefined ? opts.baseRef : defaultBaseRef(opts.repoRoot, config.ok ? config.config.git_remote : "origin", config.ok ? config.config.base_branch : null);
   const baseRoot = baseRef ? baseSpecsRoot(opts.repoRoot, baseRef) : null;
   const seen = new Map<string, StorySnapshot>();
-  // R3.4: a story worktree is read only for the story its marker names
+  // A story worktree is read only for the story its marker names
   for (const entry of opts.storyRoots ?? []) {
     const root = typeof entry === "string" ? entry : entry.path;
     const m = typeof entry === "string" ? readUnitMarker(root).marker : { story: entry.story, slice: null };
@@ -357,12 +357,12 @@ export function loadSnapshot(opts: {
     for (const s of loadStories(root, { includeApplied: opts.includeApplied, only: m.story, branch: true, read: seen })) if (!seen.has(s.key)) seen.set(s.key, s);
   }
   const base = new Map<string, StorySnapshot>();
-  // gh-195/05: the base cache is no checkout: its stories' run state is the repo's machine dir, or a
-  // finished story's archive ref (D7, D16: never the base tree's runs/ of an older norn)
-  // D7: the archive refs are listed only once a finished story without run state here needs them
+  // The base cache is no checkout: its stories' run state is the repo's machine dir, or a
+  // finished story's archive ref (never the base tree's runs/ of an older norn)
+  // The archive refs are listed only once a finished story without run state here needs them
   let refs: Map<string, string> | undefined;
   const archive = () => (refs ??= localRecordRefs(opts.repoRoot));
-  // a story a worktree supplied is read from the base for its `base_status` only (R3.2), without its units
+  // a story a worktree supplied is read from the base for its `base_status` only, without its units
   if (baseRoot) for (const s of loadStories(baseRoot, { includeApplied: opts.includeApplied, checkout: opts.repoRoot, archive, read: seen, frontmatterOf: true })) base.set(s.key, s);
   for (const [key, s] of base) if (!seen.has(key)) seen.set(key, { ...s, from_base: true });
   for (const s of loadStories(opts.repoRoot, { includeApplied: opts.includeApplied, archive, read: seen })) if (!seen.has(s.key)) seen.set(s.key, s);
@@ -374,8 +374,8 @@ export function loadSnapshot(opts: {
 }
 
 /**
- * gh-195 B33 (review#2 F1): the stories this checkout holds (its local claim ref names this checkout's
- * heartbeat, ID2) with run state in the machine dir and a spec in no tree here: a story without a
+ * The stories this checkout holds (its local claim ref names this checkout's
+ * heartbeat) with run state in the machine dir and a spec in no tree here: a story without a
  * branch, taken over from its record. Read from the run state alone (`record_only`).
  */
 function recordOnlyStories(root: string, seen: ReadonlyMap<string, StorySnapshot>, opts: { includeApplied?: boolean }): StorySnapshot[] {
@@ -387,7 +387,7 @@ function recordOnlyStories(root: string, seen: ReadonlyMap<string, StorySnapshot
     const claim = gitSync(root, ["cat-file", "blob", claimRef(key)]);
     if (claim.code !== 0) continue;
     const blob = parseBlob("claim", claimRef(key), claim.stdout.toString("utf8"));
-    // a corrupt claim is skipped here, as before: observe reads the claim and reports it corrupt (S2)
+    // a corrupt claim is skipped here: observe reads the claim and reports it corrupt
     if (!blob.ok || blob.value.heartbeat_id !== hb) continue;
     const run: RunStory = { key, spec_dir: "" };
     const at = runStateSource(root, run, { checkout: root });
@@ -404,8 +404,8 @@ function recordOnlyStories(root: string, seen: ReadonlyMap<string, StorySnapshot
 }
 
 /**
- * A slice runs in its own worktree (§7, GR3), so its handoff is there, not in the story root the
- * snapshot read (its run state is in the machine dir either way, S12). Each slice unit for which
+ * A slice runs in its own worktree, so its handoff is there, not in the story root the
+ * snapshot read (its run state is in the machine dir either way). Each slice unit for which
  * `sliceWorktree` names a worktree is re-read with that worktree's handoff; other units are kept as read.
  */
 export function withSliceWorktrees(
@@ -416,7 +416,7 @@ export function withSliceWorktrees(
   const units = story.units.map((u) => {
     const wt = u.unit.slice ? sliceWorktree(u.unit.slice) : null;
     if (!wt) return u;
-    // gh-195/06 (B34): a slice branch may still hold an older norn's run state of the slice; its run
+    // A slice branch may still hold an older norn's run state of the slice; its run
     // state in the machine dir is the one the story already read
     const own = readUnit(wt, story, u.unit, opts, story.run_state, true, u.tree_root ? undefined : u);
     // …else the story branch's copy, read with the story, stays its run state

@@ -1,7 +1,7 @@
 /**
  * The repo root: the nearest folder above this file whose package.json declares workspaces. Test
  * helpers name their pinned outputs from it, not from their own folder, so a helper and its outputs
- * can move apart and stay byte-identical (gh-118 B18, B19).
+ * can move apart and stay byte-identical.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

@@ -1,8 +1,8 @@
 /**
- * gh-61 B5–B10, B12 (D1, D2): a binary that does not match the main checkout's `norn_version` is refused
+ * gh-61 B5–B10, B12: a binary that does not match the main checkout's `norn_version` is refused
  * by every command that acts (exit 3, `version_mismatch`, before it writes, launches or pushes anything);
  * reading, setup and reporting commands keep working; a repo without the key works as today; a config
- * error comes first. Driven through `runCli` with the harness, as a binary of any version (S1).
+ * error comes first. Driven through `runCli` with the harness, as a binary of any version.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -66,7 +66,7 @@ async function tickUntil(h: Harness, pred: () => boolean, max = 10): Promise<voi
 
 const NEEDS_019 = { error: "this repo needs norn 0.19.x (you run 0.18.1)", do_instead: "install norn 0.19.x", code: "version_mismatch" };
 
-describe("commands that act refuse a mismatched binary (B6, B7, D1, D2)", () => {
+describe("commands that act refuse a mismatched binary (D1, D2)", () => {
   let h: Harness;
   const team = () => repoConfigPath(h.root);
 
@@ -185,8 +185,8 @@ describe("commands that act refuse a mismatched binary (B6, B7, D1, D2)", () => 
     for (const a of argv) {
       const matching = await as(h, "0.19.0", [...a, "--json"]);
       const mismatched = await as(h, "0.18.1", [...a, "--json"]);
-      // doctor runs, but its own version check fails on a mismatch and exits 1 (B23); upgrade (and
-      // migrate) is not guarded, but never moves the version back, so an older binary is refused by it (B17)
+      // doctor runs, but its own version check fails on a mismatch and exits 1; upgrade (and
+      // migrate) is not guarded, but never moves the version back, so an older binary is refused by it
       const expected = a[0] === "doctor" ? 1 : a[0] === "upgrade" || a[0] === "migrate" ? 3 : matching.exit;
       expect({ a, exit: mismatched.exit }).toEqual({ a, exit: expected });
       expect((mismatched.value as { code?: string } | null)?.code).not.toBe("version_mismatch");
@@ -262,7 +262,7 @@ describe("a step in flight can finish (B10)", () => {
   });
 });
 
-describe("the main checkout's team file decides (B12), no key works as today (B5), a config error comes first (B3)", () => {
+describe("the main checkout's team file decides (B12), no key works as today, a config error comes first", () => {
   let h: Harness;
   beforeAll(async () => {
     h = await createHarness({ version: "0.18.1" });

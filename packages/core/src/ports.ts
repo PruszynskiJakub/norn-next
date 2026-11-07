@@ -1,5 +1,5 @@
 /**
- * Adapter contracts (X2). @norn/core defines them; @norn/adapters implements them;
+ * Adapter contracts. @norn/core defines them; @norn/adapters implements them;
  * @norn/cli wires them. Everything here is types only — no IO, no implementation.
  *
  * Conventions for every port:
@@ -24,18 +24,14 @@ export interface PortError extends Error {
   retryable: boolean;
 }
 
-// ============================================================= Clock
-
 export interface Clock {
   /** ms since epoch */
   now(): number;
-  /** ISO-8601 of now() */
+  /** ISO-8601 of now */
   iso(): string;
 }
 
-// ============================================================= Process
-
-/** Liveness of an OS process by PID + start time (K3, MO3). */
+/** Liveness of an OS process by PID + start time. */
 export interface ProcessPort {
   /** Identity of a live pid, or null if gone. */
   identify(pid: number): Promise<ProcessIdentity | null>;
@@ -43,13 +39,11 @@ export interface ProcessPort {
   isAlive(proc: ProcessIdentity): Promise<boolean>;
   self(): ProcessIdentity;
   /**
-   * R5.1: live processes whose environment holds `name=value` (e.g. `NORN_RUN=<run_id>`), where the
+   * Live processes whose environment holds `name=value` (e.g. `NORN_RUN=<run_id>`), where the
    * OS lets this user read it; [] when it does not. Optional: ports without it never find any.
    */
   findByEnv?(name: string, value: string): Promise<ProcessIdentity[]>;
 }
-
-// ============================================================= Git
 
 export interface WorktreeStatus {
   path: string;
@@ -76,7 +70,7 @@ export interface WorktreeInfo {
 
 export interface CommitSpec {
   message: string;
-  /** git trailers (S4): Norn-Story, Norn-Slice, Norn-Step, Norn-Tick */
+  /** git trailers: Norn-Story, Norn-Slice, Norn-Step, Norn-Tick */
   trailers: Record<string, string>;
   /** paths to stage (relative to cwd); omitted = all changes (`git add -A`) */
   paths?: string[];
@@ -97,11 +91,11 @@ export type PushResult =
 
 export type RebaseResult = { ok: true; head: string } | { ok: false; conflict: true; files: string[] };
 
-/** BS3: a merge commit made, or a conflicting merge aborted with the conflicting paths. */
+/** A merge commit made, or a conflicting merge aborted with the conflicting paths. */
 export type MergeResult = { ok: true; head: string } | { ok: false; conflict: true; files: string[] };
 
 /**
- * H1 (S1, BS5): an operation git is in the middle of in a worktree — a merge (`MERGE_HEAD`), a
+ * An operation git is in the middle of in a worktree — a merge (`MERGE_HEAD`), a
  * rebase, a cherry-pick or a revert — and the unmerged paths. `operation: null` and `unmerged: []`
  * = none: a commit there would not conclude anyone's merge.
  */
@@ -110,14 +104,14 @@ export interface GitInProgress {
   unmerged: string[];
 }
 
-/** H1: a line that looks like a conflict marker (`<<<<<<< `, `>>>>>>> `, `||||||| `). */
+/** A line that looks like a conflict marker (`<<<<<<< `, `>>>>>>> `, `||||||| `). */
 export interface ConflictMarker {
   path: string;
   line: number;
 }
 
 /**
- * BS5.2 (dogfood D5): a file the outgoing commits of a branch changed whose content at the pushed
+ * A file the outgoing commits of a branch changed whose content at the pushed
  * head still holds both an opening (`<<<<<<< `) and a closing (`>>>>>>> `) conflict marker, and the
  * newest outgoing commit that changed it.
  */
@@ -126,11 +120,11 @@ export interface OutgoingMarkers {
   commit: string | null;
 }
 
-/** PortError codes of `GitPort.commit` (H1): nothing is committed in either case. */
+/** PortError codes of `GitPort.commit`: nothing is committed in either case. */
 export const GIT_IN_PROGRESS = "git_operation_in_progress";
 export const GIT_CONFLICT_MARKERS = "git_conflict_markers";
 
-/** BS1: how two commits relate — `ahead` = commits only in `a`, `behind` = commits only in `b`. */
+/** How two commits relate — `ahead` = commits only in `a`, `behind` = commits only in `b`. */
 export interface Divergence {
   merge_base: string | null;
   ahead: number;
@@ -168,7 +162,7 @@ export interface GitPort {
   /** commits in range, newest first */
   log(cwd: string, range: string, limit?: number): Promise<Array<{ sha: string; subject: string; at: number; trailers: Record<string, string> }>>;
   /**
-   * Q6/C4: the first-parent line of `rev` (not reachable from `exclude`), newest first, at most
+   * The first-parent line of `rev` (not reachable from `exclude`), newest first, at most
    * `limit` commits, each with its author, ISO author and committer dates and the value of the
    * `trailer` trailer ("" when absent).
    */
@@ -206,32 +200,32 @@ export interface GitPort {
   /** Add a worktree at path on branch; create the branch from `from` if given. */
   worktreeAdd(cwd: string, path: string, branch: string, opts?: { from?: string }): Promise<void>;
   worktreeRemove(cwd: string, path: string, opts?: { force?: boolean }): Promise<void>;
-  /** Add a worktree at path with a detached HEAD at `rev` (GR6: the throwaway record worktree). */
+  /** Add a worktree at path with a detached HEAD at `rev` (the throwaway record worktree). */
   worktreeAddDetached(cwd: string, path: string, rev: string): Promise<void>;
   /** Forget worktrees whose directory is gone (`git worktree prune`). */
   worktreePrune(cwd: string): Promise<void>;
 
   /**
-   * Commit; returns the new sha, or null when nothing to commit. H1: never concludes an operation in
+   * Commit; returns the new sha, or null when nothing to commit. Never concludes an operation in
    * progress — throws PortError `git_operation_in_progress` (nothing staged) while `inProgress` reports
    * one, since git cannot commit some paths without concluding a merge; throws `git_conflict_markers`
    * (nothing committed) when a staged file gains both `<<<<<<< ` and `>>>>>>> ` lines.
    */
   commit(cwd: string, spec: CommitSpec): Promise<string | null>;
-  /** H1: the operation git is in the middle of in cwd's worktree, and its unmerged paths. */
+  /** The operation git is in the middle of in cwd's worktree, and its unmerged paths. */
   inProgress(cwd: string): Promise<GitInProgress>;
   /**
-   * H1/BS5: conflict-marker lines in tracked files — of the work tree, or of `rev` — limited to
+   * Conflict-marker lines in tracked files — of the work tree, or of `rev` — limited to
    * `paths` when given ([] = none checked).
    */
   conflictMarkers(cwd: string, opts?: { paths?: string[]; rev?: string }): Promise<ConflictMarker[]>;
   /**
-   * BS5.2: files changed by the commits of `rev` that are on no `remote` ref yet (merge commits
+   * Files changed by the commits of `rev` that are on no `remote` ref yet (merge commits
    * against their first parent) which still hold conflict markers at `rev`; [] = safe to push.
    */
   outgoingConflictMarkers(cwd: string, remote: string, rev: string): Promise<OutgoingMarkers[]>;
   /**
-   * BS5: the merge commit that brought `base` into `head` — the oldest merge on the ancestry path
+   * The merge commit that brought `base` into `head` — the oldest merge on the ancestry path
    * `base..head` — or null when there is none (`base` not merged, or reached without a merge).
    */
   baseMergeCommit(cwd: string, base: string, head: string): Promise<string | null>;
@@ -243,22 +237,20 @@ export interface GitPort {
   fastForward(cwd: string, onto: string): Promise<{ ok: boolean }>;
   /** Rebase current branch of cwd onto `onto`; aborts and reports files on conflict. */
   rebase(cwd: string, onto: string): Promise<RebaseResult>;
-  /** Is `ancestor` an ancestor of `descendant`? */
   isAncestor(cwd: string, ancestor: string, descendant: string): Promise<boolean>;
-  /** BS1: merge base of `a` and `b`, and the commits only in each (`rev-list --left-right --count a...b`). */
+  /** Merge base of `a` and `b`, and the commits only in each (`rev-list --left-right --count a...b`). */
   divergence(cwd: string, a: string, b: string): Promise<Divergence>;
   /**
-   * BS1: paths a merge of `theirs` into `ours` would conflict in, without touching any worktree
+   * Paths a merge of `theirs` into `ours` would conflict in, without touching any worktree
    * (`git merge-tree --write-tree --name-only --no-messages`, git ≥ 2.38); [] = a clean merge.
    */
   mergeTree(cwd: string, ours: string, theirs: string): Promise<string[]>;
   /**
-   * BS3: `git merge --no-ff <rev>` in cwd, committed with `spec.message` and its trailers (S4). On a
+   * `git merge --no-ff <rev>` in cwd, committed with `spec.message` and its trailers. On a
    * conflict the merge is aborted (`git merge --abort`) and the conflicting paths are reported.
    */
   merge(cwd: string, rev: string, spec: Pick<CommitSpec, "message" | "trailers">): Promise<MergeResult>;
 
-  // --- refs and blobs (claims T2, mailbox T9)
   readRef(cwd: string, ref: string): Promise<string | null>;
   /** Does `ref` (or any revision) resolve here (`git rev-parse --verify --quiet`)? */
   hasRef(cwd: string, ref: string): Promise<boolean>;
@@ -267,11 +259,9 @@ export interface GitPort {
   /** Names of the branches on `remote` whose ref matches `pattern` (`git ls-remote --heads <remote> <pattern>`, e.g. `refs/heads/gh-7-*`). */
   remoteBranches(cwd: string, remote: string, pattern: string): Promise<string[]>;
   updateRef(cwd: string, update: RefUpdate): Promise<boolean>;
-  /** Push one ref with CAS (`--force-with-lease=<ref>:<expected>`, T3); sha null deletes. */
+  /** Push one ref with CAS (`--force-with-lease=<ref>:<expected>`); sha null deletes. */
   pushRef(cwd: string, remote: string, update: RefUpdate): Promise<PushResult>;
 }
-
-// ============================================================= Remote (issue provider)
 
 export interface RemoteIssue {
   provider: RemoteProvider;
@@ -286,7 +276,7 @@ export interface RemoteIssue {
 }
 
 /**
- * The story PR/MR as the remote reports it (GR6). `is_draft`/`head_sha`/merge fields are the
+ * The story PR/MR as the remote reports it. `is_draft`/`head_sha`/merge fields are the
  * StoryFacts.pr contract. `merged_at` is null/absent until merged.
  */
 export interface RemotePullRequest {
@@ -305,21 +295,21 @@ export interface RemotePullRequest {
   head?: string;
   /**
    * @deprecated older name of `base_branch`; no adapter writes it any more, but a PR cached
-   * (`pr.json`) by an older norn may carry only this. Read through `prBaseBranch`; dropped in 0.11.0.
+   * (`pr.json`) by an older norn may carry only this. Read through `prBaseBranch`.
    */
   base?: string;
-  /** BS11: the branch the PR targets (merges into); GR6 cleanup only when it is the story's base branch */
+  /** The branch the PR targets (merges into); merge cleanup only when it is the story's base branch */
   base_branch?: string;
 }
 
 /**
- * gh-195 B18: the CI state of a PR's head as the provider reports it — `pending` while any check or
+ * The CI state of a PR's head as the provider reports it — `pending` while any check or
  * the pipeline still runs, `failure` when one failed or was cancelled, `success` when all passed
  * (skipped ones count as passed), `none` when no check or pipeline reports on it.
  */
 export type PullRequestCi = "pending" | "success" | "failure" | "none";
 
-/** GR10: a label defined on the remote repository (not one on an issue). `color` is hex without `#`. */
+/** A label defined on the remote repository (not one on an issue). `color` is hex without `#`. */
 export interface RemoteLabel {
   name: string;
   color: string;
@@ -331,52 +321,50 @@ export interface RemotePort {
   readonly provider: RemoteProvider;
   /** login of the authenticated user */
   whoami(): Promise<string>;
-  /** open issues assigned to the user carrying `label` (GR1) */
+  /** open issues assigned to the user carrying `label` */
   listAssignedIssues(opts: { label: string }): Promise<RemoteIssue[]>;
-  /** CP2: open issues carrying `label`, whoever they are assigned to (none, the user, others) — the backlog */
+  /** Open issues carrying `label`, whoever they are assigned to (none, the user, others) — the backlog */
   listLabelledIssues(opts: { label: string }): Promise<RemoteIssue[]>;
-  /** GR1: add `assignee` (a login) to issue `number`'s assignees; the next intake lists it */
+  /** Add `assignee` (a login) to issue `number`'s assignees; the next intake lists it */
   assignIssue(number: number, assignee: string): Promise<void>;
   /** null if not found */
   getIssue(number: number): Promise<RemoteIssue | null>;
   /** latest PR/MR whose head is `branch`, any state; null if none */
   findPullRequest(branch: string): Promise<RemotePullRequest | null>;
   /**
-   * gh-186 (GR1, H5): `findPullRequest` for every branch at once, in one provider round trip (or a
+   * `findPullRequest` for every branch at once, in one provider round trip (or a
    * few for many branches), so a sync costs O(1) PR calls instead of one per story. Every branch
    * asked is a key: its latest PR/MR, any state, or null if none.
    */
   findPullRequests(branches: readonly string[]): Promise<Map<string, RemotePullRequest | null>>;
-  /** gh-195 B18: the CI state of PR `number`'s head (checks on GitHub, the head pipeline on GitLab) */
+  /** The CI state of PR `number`'s head (checks on GitHub, the head pipeline on GitLab) */
   pullRequestCi(number: number): Promise<PullRequestCi>;
   openDraftPullRequest(opts: { head: string; base: string; title: string; body: string }): Promise<RemotePullRequest>;
-  /** GR9: replace the body of an open PR/MR */
+  /** Replace the body of an open PR/MR */
   editPullRequestBody(number: number, body: string): Promise<void>;
-  /** B18 (D3): open an issue with these labels, assigned to `assignee` (a login) */
+  /** Open an issue with these labels, assigned to `assignee` (a login) */
   createIssue(opts: { title: string; body: string; labels: string[]; assignee: string }): Promise<RemoteIssue>;
-  /** B23 (D3): the remote's new-issue page in the browser with `labels` filled in; creates nothing */
+  /** The remote's new-issue page in the browser with `labels` filled in; creates nothing */
   newIssueUrl(opts: { labels: string[] }): Promise<string>;
   /**
-   * gh-195 D5 (B28): the URL of file `path` of commit `commit` on the repository, served raw so a PR
+   * The URL of file `path` of commit `commit` on the repository, served raw so a PR
    * body's markdown renders an image inline (GitHub `<repo>/blob/<commit>/<path>?raw=true`, GitLab
    * `<repo>/-/raw/<commit>/<path>`). Each path segment is URL-encoded. Changes nothing.
    */
   rawFileUrl(opts: { commit: string; path: string }): Promise<string>;
   /**
-   * B19: replace label `remove` on issue `number` with `add`; when `remove` is not on the issue,
-   * `add` is still added. Throws PortError when the provider fails (B20: the caller warns).
+   * Replace label `remove` on issue `number` with `add`; when `remove` is not on the issue,
+   * `add` is still added. Throws PortError when the provider fails (the caller warns).
    */
   replaceIssueLabel(number: number, labels: { remove: string; add: string }): Promise<void>;
-  /** GR10: every label defined on the repository. Throws PortError when the provider fails. */
+  /** Every label defined on the repository. Throws PortError when the provider fails. */
   listLabels(): Promise<RemoteLabel[]>;
   /**
-   * GR10: define a new label on the repository (`color` hex without `#`). Never edits an existing
+   * Define a new label on the repository (`color` hex without `#`). Never edits an existing
    * one: a name already taken rejects with a PortError whose code ends in `_exists`.
    */
   createLabel(label: RemoteLabel): Promise<void>;
 }
-
-// ============================================================= Runner
 
 /** Where a run's agent lives (pane, headless process). Stored in state.json as SessionInfo. */
 export interface SessionRef {
@@ -397,7 +385,7 @@ export interface LaunchSpec {
 }
 
 /**
- * Pane state as the runner sees it. One fact among several (P4, C2):
+ * Pane state as the runner sees it. One fact among several:
  * `idle`/`done` never completes a step by itself.
  */
 export interface PaneState {
@@ -407,12 +395,12 @@ export interface PaneState {
   since: number | null;
   /** e.g. visible permission prompt text (the full screen) */
   detail?: string;
-  /** R6.2 / L1: the prompt the agent waits on, as the runner parsed it from `detail`; absent = not recognized */
+  /** The prompt the agent waits on, as the runner parsed it from `detail`; absent = not recognized */
   prompt?: PanePrompt;
 }
 
 /**
- * R6.2, L1 (A4, A7): a prompt read off the pane — a permission or trust dialog. `question` is the
+ * A prompt read off the pane — a permission or trust dialog. `question` is the
  * question block alone (no code, no footer); `command` the first line of the pending command, if
  * shown; `options` the choices in display order; `choice` how one is picked (number or arrows).
  */
@@ -423,24 +411,24 @@ export interface PanePrompt {
   choice: PromptChoice | null;
 }
 
-/** R6.2: keystrokes for a prompt: literal text, or a named key (`enter`, `down`, `up`, `esc`). */
+/** Keystrokes for a prompt: literal text, or a named key (`enter`, `down`, `up`, `esc`). */
 export type PromptKey = { text: string } | { key: "enter" | "down" | "up" | "esc" };
 
 /**
- * R4.1: what a runner can do with a session besides launching it. `send`: type into a live session
- * (pane runners). `resume`: continue a finished agent session by its id (`--resume`, B2) — a new
- * launch through this runner. Decide picks the nudge/answer delivery from these (R4.2).
+ * What a runner can do with a session besides launching it. `send`: type into a live session
+ * (pane runners). `resume`: continue a finished agent session by its id (`--resume`) — a new
+ * launch through this runner. Decide picks the nudge/answer delivery from these.
  */
 export interface RunnerCapabilities {
   send: boolean;
   resume: boolean;
-  /** MO5: `openForPerson` opens a terminal a person works in; absent = false */
+  /** `openForPerson` opens a terminal a person works in; absent = false */
   open?: boolean;
   /** sessions have no terminal: the agent runs its non-interactive command (`AgentLaunchRequest.headless`); absent = false */
   headless?: boolean;
 }
 
-/** MO5: a terminal for a person in `cwd`, running `command` (the start command a person would type). */
+/** A terminal for a person in `cwd`, running `command` (the start command a person would type). */
 export interface PersonOpenSpec {
   cwd: string;
   /** tab or window label */
@@ -450,7 +438,7 @@ export interface PersonOpenSpec {
   env: Record<string, string | undefined>;
 }
 
-/** R5.1: a session the runner sees in a unit worktree (a candidate for an unrecorded run). */
+/** A session the runner sees in a unit worktree (a candidate for an unrecorded run). */
 export interface RunnerSessionInfo {
   session: SessionRef;
   /** agent-tool session id the runner reports for it (herdr `agent_session`), if any */
@@ -460,7 +448,7 @@ export interface RunnerSessionInfo {
 export interface RunnerPort {
   readonly name: string;
   readonly capabilities: RunnerCapabilities;
-  /** doctor's error when `available()` is false; absent = `<name> runner not available` */
+  /** doctor's error when `available` is false; absent = `<name> runner not available` */
   readonly unavailableHint?: string;
   /** Usable on this machine now (binary present, server reachable). */
   available(): Promise<boolean>;
@@ -468,34 +456,32 @@ export interface RunnerPort {
   /** Type text into the session; `submit` presses enter. */
   send(session: SessionRef, text: string, opts?: { submit?: boolean }): Promise<void>;
   /**
-   * R6.2: press keys in the session as they are — for a prompt the agent is blocked on (a choice
+   * Press keys in the session as they are — for a prompt the agent is blocked on (a choice
    * menu takes no pasted prompt). Optional: runners without it cannot answer pane prompts.
    */
   sendKeys?(session: SessionRef, keys: PromptKey[]): Promise<void>;
-  /** R6.3, R9.1: the command a person runs to reach the session (e.g. attach to the pane); absent = none */
+  /** The command a person runs to reach the session (e.g. attach to the pane); absent = none */
   reach?(session: SessionRef): string;
   paneState(session: SessionRef): Promise<PaneState>;
   isAlive(session: SessionRef): Promise<boolean>;
   kill(session: SessionRef): Promise<void>;
   /**
-   * R5.1: live agent sessions that could belong to run `run_id` working in `cwd` — panes whose
+   * Live agent sessions that could belong to run `run_id` working in `cwd` — panes whose
    * checkout path is `cwd`, processes carrying `NORN_RUN=<run_id>`. Reports candidates only; the
    * caller decides which one (if any) is the run. Optional: runners without it find nothing.
    */
   findSessions?(q: { run_id: string; cwd: string }): Promise<RunnerSessionInfo[]>;
   /**
-   * B3: the first lines the session printed (headless: its run log), for a run that died before it
+   * The first lines the session printed (headless: its run log), for a run that died before it
    * got going — the reason (bad args, a missing prompt) is usually there. Optional; null = nothing.
    */
   output?(session: SessionRef): Promise<string | null>;
   /**
-   * MO5 (`norn story start`): open a focused terminal a person works in, running `spec.command`. Records
-   * no session: the agent's `norn brief` starts the run (MO3). Present iff `capabilities.open`.
+   * `norn story start`: open a focused terminal a person works in, running `spec.command`. Records
+   * no session: the agent's `norn brief` starts the run. Present iff `capabilities.open`.
    */
   openForPerson?(spec: PersonOpenSpec): Promise<{ pane_id: string | null }>;
 }
-
-// ============================================================= Agent adapter
 
 export type HookTier = "blocking" | "hooks" | "none";
 
@@ -506,21 +492,21 @@ export interface HookInstallResult {
 
 export interface AgentLaunchRequest {
   cwd: string;
-  /** first prompt (B5): "Use the norn skill, then run `norn brief`." */
+  /** first prompt: "Use the norn skill, then run `norn brief`." */
   prompt: string;
   model?: string;
-  /** agent-tool session id to resume in the same session (B2) */
+  /** agent-tool session id to resume in the same session */
   resume?: string;
   /** true = non-interactive one-shot run (headless runner, e.g. `claude -p`); default interactive pane */
   headless?: boolean;
-  /** NORN_HOME, NORN_STORY, NORN_SLICE, NORN_RUN (A6) */
+  /** NORN_HOME, NORN_STORY, NORN_SLICE, NORN_RUN */
   env: Record<string, string>;
   config: { command?: string; args?: string[]; env?: Record<string, string> };
 }
 
 /** What `norn hook` should answer to the agent tool. */
 export interface HookDecision {
-  /** refuse turn end (A4); only honoured by `blocking` tier adapters */
+  /** refuse turn end; only honoured by `blocking` tier adapters */
   block: boolean;
   /** instruction shown to the agent when blocked */
   reason?: string;
@@ -538,8 +524,8 @@ export interface AgentAdapter {
   /** doctor: what a person sets up in the agent tool before its hooks run; absent = nothing */
   readonly setupNote?: string;
   /**
-   * A1: add/update norn-owned hooks in the repo's agent config; each runs
-   * `<hookCommand> <event> --agent <agent>` so `norn hook` never has to guess the agent (A2).
+   * Add/update norn-owned hooks in the repo's agent config; each runs
+   * `<hookCommand> <event> --agent <agent>` so `norn hook` never has to guess the agent.
    * `agent` is the configured agent name (default: the adapter's `name`). Idempotent.
    */
   installHooks(repoRoot: string, hookCommand: string, agent?: string): Promise<HookInstallResult>;
@@ -554,7 +540,7 @@ export interface AgentAdapter {
   /**
    * Optional pure pass over one run's hook facts (trace order) that fills in what a single hook
    * payload cannot carry: Claude's permission prompt takes its pending command from the preceding
-   * PreToolUse (A2, §10). Returns the same facts in the same order; only facts whose `agent` is
+   * PreToolUse. Returns the same facts in the same order; only facts whose `agent` is
    * this adapter's `name` may change.
    */
   refineHooks?(hooks: readonly HookFact[]): HookFact[];
@@ -562,39 +548,37 @@ export interface AgentAdapter {
   hookResponse(fact: HookFact, decision: HookDecision): HookResponse;
   /** Native hook event names → normalized kinds this adapter emits. */
   readonly hookEvents: Readonly<Record<string, HookEventKind>>;
-  /** SK1: the repo folder this agent reads skills from; `norn init` links the bundled skills there. */
+  /** The repo folder this agent reads skills from; `norn init` links the bundled skills there. */
   skillDir(repoRoot: string): string;
   /** argv + extra env to start (or resume) an agent session. */
   launchCommand(req: AgentLaunchRequest): { argv: string[]; env: Record<string, string> };
-  /** C4: last assistant message from a transcript file; null if unreadable/none. */
+  /** Last assistant message from a transcript file; null if unreadable/none. */
   lastAssistantMessage(transcriptPath: string): Promise<string | null>;
 }
-
-// ============================================================= Notifier
 
 export type InboxGroup = "your_turn" | "answer" | "approve" | "unblock" | "check" | "unclaimed" | "running" | "notes" | "recently_done";
 
 export interface InboxItem {
-  /** stable id: one notification per id ever (O3) — receipt_id or a derived key */
+  /** stable id: one notification per id ever — receipt_id or a derived key */
   id: string;
   group: InboxGroup;
   story: string;
   slice: string | null;
   step: string | null;
-  /** gh-71 B28: the story's round and its workflow, next to the step; absent = the story has not started (or no story) */
+  /** The story's round and its workflow, next to the step; absent = the story has not started (or no story) */
   round?: { n: number; workflow: string };
   /** question, reason or gate prompt */
   title: string;
   detail?: string;
   /** exact command that resolves it, e.g. `norn story answer gh-123/03 "..."` */
   command: string;
-  /** L1: long text behind the item (an implicit ask's full pane screen) — shown only on request (`inbox --details`) */
+  /** Long text behind the item (an implicit ask's full pane screen) — shown only on request (`inbox --details`) */
   full?: string;
   since: string;
   url?: string;
-  /** HC3: where the unit's current run lives (nulls = unknown), for front ends that find its pane (HC6) */
+  /** Where the unit's current run lives (nulls = unknown), for front ends that find its pane */
   reach?: { worktree: string | null; agent_session_id: string | null; pane_id: string | null };
-  /** NT5: a Notes item's clearing hint, e.g. `cleared by gh-1 human-qa approval` */
+  /** A Notes item's clearing hint, e.g. `cleared by gh-1 human-qa approval` */
   cleared_by?: string;
 }
 
@@ -602,8 +586,6 @@ export interface NotifierPort {
   readonly name: string;
   notify(item: InboxItem): Promise<void>;
 }
-
-// ============================================================= Factories (wiring, X2)
 
 export interface AdapterContext {
   repoRoot: string;

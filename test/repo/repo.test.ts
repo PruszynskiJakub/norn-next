@@ -1,9 +1,9 @@
-/** Repo-wide rules: dependency direction (§17) and banned glossary synonyms (§5). */
+/** Repo-wide rules: dependency direction and banned glossary synonyms. */
 import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { allDocs, CODE_SPAN, RULES_FILE, textFiles, URL } from "../support/docs.ts";
+import { allDocs, CODE_SPAN, textFiles, URL } from "../support/docs.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const PKGS = join(ROOT, "packages");
@@ -45,7 +45,7 @@ describe("dependency direction", () => {
     }
   });
 
-  /** Root test code (`test/`, `scripts/`) may import any package, by name, only when the root declares it (gh-118 B15). */
+  /** Root test code (`test/`, `scripts/`) may import any package, by name, only when the root declares it. */
   function undeclaredRootImports(root: string): { file: string; dep: string }[] {
     const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
     const declared = new Set(Object.keys(manifest.devDependencies ?? {}));
@@ -81,7 +81,7 @@ describe("dependency direction", () => {
 });
 
 /**
- * Banned synonyms (§5). Only unambiguous ones are linted; "state"/"status"/"lease" are context-dependent.
+ * Banned synonyms. Only unambiguous ones are linted; "state"/"status"/"lease" are context-dependent.
  * Word boundaries keep identifiers like `run_job` or `tasks_total` clear (`_` is a word character).
  */
 const BANNED: Array<[RegExp, string]> = [
@@ -107,12 +107,12 @@ const GLOSSARY_FILES = (): string[] => [
   ...textFiles(join(PKGS, "cli", "assets"), DOCS),
   ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
   ...textFiles(join(PKGS, "schema", "json"), DOCS),
-  // gh-162 B7: every doc (README, CONTRIBUTING, docs/, the Herdr plugin README, AGENTS.md, the rules file)
+  // Every doc (README, CONTRIBUTING, docs/, the Herdr plugin README, AGENTS.md)
   ...allDocs(ROOT).filter((f) => !f.includes("/plugins/")),
 ];
 
 /**
- * gh-64 B52 (S5): the docs a person reads describe only the new config keys and files. A removed or
+ * The docs a person reads describe only the new config keys and files. A removed or
  * renamed key named in any of them is a hit. CHANGELOG and story specs keep their history; `norn upgrade`'s
  * own messages and the moved-key table name old keys on purpose and live in sources, not here.
  */
@@ -123,11 +123,11 @@ const CONFIG_DOCS = (): string[] => [
   ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
   join(PKGS, "cli", "src", "commands", "help.ts"),
   ...textFiles(join(PKGS, "view", "src"), [".ts"]),
-  // gh-162 B7: the README, CONTRIBUTING, docs/, the Herdr plugin README, AGENTS.md and the rules file
+  // The README, CONTRIBUTING, docs/, the Herdr plugin README and AGENTS.md
   ...allDocs(ROOT),
 ];
 
-describe("config docs (gh-64 B52)", () => {
+describe("config docs", () => {
   test("help, the view, every doc, the init templates and skills name no removed config key or check", () => {
     const hits: string[] = [];
     for (const f of CONFIG_DOCS())
@@ -175,7 +175,7 @@ function bunfig(name: string): { root?: string; preload?: string[]; pathIgnorePa
   return (Bun.TOML.parse(readFileSync(join(ROOT, name), "utf8")) as { test?: object }).test ?? {};
 }
 
-/** Every `*.test.ts` under `root`, relative to it; skips node_modules and dot folders. */
+/** Every `*.test .ts` under `root`, relative to it; skips node_modules and dot folders. */
 function testFilesUnder(root: string, dir = root): string[] {
   return readdirSync(dir)
     .flatMap((n) => {
@@ -227,7 +227,7 @@ function supportClosure(root: string, seeds: readonly string[]): Set<string> {
   return closure;
 }
 
-/** gh-118 B15 (D13): the cli harness, which spawns real git; the transcript and observe snapshot helpers import it. */
+/** The cli harness, which spawns real git; the transcript and observe snapshot helpers import it. */
 const SPAWNING_HELPERS = ["test/support/harness.ts", ...PINNED_HELPERS];
 /** store's git functions: the module, by path, and the names `@norn/store` exports from it that run git. */
 const STORE_GIT = "packages/store/src/git.ts";
@@ -236,7 +236,7 @@ const STORE_GIT_EXPORTS = ["fetchNornRefs", "onlyNornCommitsSince"];
 const STORE_NAMED = /\bimport\s*(?:type\s+)?\{([^}]*)\}\s*from\s*["']@norn\/store["']/g;
 
 /**
- * B15: imports in unit tests (packages/<pkg>/test/unit/, test/repo/) under `root` of the cli harness, a
+ * Imports in unit tests (packages/<pkg>/test/unit/, test/repo/) under `root` of the cli harness, a
  * helper that imports it, or store's git functions. Fake herdr and the golden harvest stay allowed.
  */
 function spawningUnitImports(root: string): Array<{ file: string; import: string }> {
@@ -259,7 +259,7 @@ function spawningUnitImports(root: string): Array<{ file: string; import: string
 }
 
 /**
- * B16: imports of the transcript recorder or the observe snapshot helpers outside test/e2e/ (and the
+ * Imports of the transcript recorder or the observe snapshot helpers outside test/e2e/ (and the
  * helpers' own folder, test/support/), in package tests and root test code under `root`. An import is
  * matched by the path it resolves to; a support helper that imports a pinned one (transitively) is pinned too.
  */
@@ -281,7 +281,7 @@ function pinnedHelperImports(root: string): Array<{ file: string; import: string
     );
 }
 
-/** Adapters (folders of packages/adapters/src under `root`) with no `*.test.ts` in test/unit/<adapter>/ nor test/integration/<adapter>/. */
+/** Adapters (folders of packages/adapters/src under `root`) with no `*.test .ts` in test/unit/<adapter>/ nor test/integration/<adapter>/. */
 function adaptersWithoutTests(root: string): string[] {
   const test = join(root, "packages", "adapters", "test");
   const hasTests = (dir: string) => existsSync(dir) && testFilesUnder(dir).length > 0;
@@ -294,7 +294,7 @@ function adaptersWithoutTests(root: string): string[] {
 
 const TIER_FOLDERS = "unit/, integration/, test/e2e/, test/repo/";
 
-/** gh-118 B14: every `*.test.ts` under `root` that sits in no tier folder, as the repo rule's message. */
+/** Every `*.test .ts` under `root` that sits in no tier folder, as the repo rule's message. */
 function untieredTests(root: string): string[] {
   const tiered = (f: string) => /^packages\/[^/]+\/test\/(unit|integration)\//.test(f) || /^test\/(e2e|repo)\//.test(f);
   return testFilesUnder(root)
@@ -365,7 +365,7 @@ describe("test layout (AGENTS.md)", () => {
     ]);
   });
 
-  test("AC1 (B7): the old split scripts are gone from package.json and from every live file", () => {
+  test("AC1: the old split scripts are gone from package.json and from every live file", () => {
     // spelled in pieces so this file is not itself a hit
     const old = [["test", "fast"].join(":"), ["test", "cli"].join(":")];
     const scripts = rootScripts();
@@ -399,12 +399,12 @@ describe("test layout (AGENTS.md)", () => {
 
   const UNIT_ONLY = "bun install --frozen-lockfile && bun run test && bun run typecheck";
 
-  test("AC2 (B8): the test check of quick, story and slice runs the unit tier, then the type check, in 15 m; the integration tier runs only in CI (bypass #259)", () => {
+  test("AC2: the test check of quick, story and slice runs the unit tier, then the type check, in 15 m; the integration tier runs only in CI (bypass #259)", () => {
     const checks = DELIVERY.map((wf) => ({ wf, run: workflowSteps(wf).test?.run, timeout: workflowSteps(wf).test?.timeout }));
     expect(checks).toEqual(DELIVERY.map((wf) => ({ wf, run: UNIT_ONLY, timeout: "15m" })));
   });
 
-  test("AC3 (B9): the implement step of quick, story and slice names bun run test as the loop, and the integration and e2e tiers in CI", () => {
+  test("AC3: the implement step of quick, story and slice names bun run test as the loop, and the integration and e2e tiers in CI", () => {
     const says = DELIVERY.map((wf) => {
       const text = workflowSteps(wf).implement?.instructions ?? "";
       return {
@@ -470,7 +470,7 @@ describe("test layout (AGENTS.md)", () => {
     const paths = [...agents.matchAll(/`((?:packages|test|scripts)\/[\w./*-]+)`/g)].map((m) => (m[1] as string).replace(/\/\*[^/]*$/, ""));
     expect(paths.length).toBeGreaterThan(0);
     expect(paths.filter((p) => !existsSync(join(ROOT, p)))).toEqual([]);
-    // a test file named bare ("`contract.test.ts` there") must also be named by its full path, so the check above sees it
+    // a test file named bare ("`contract.test .ts` there") must also be named by its full path, so the check above sees it
     const bare = [...agents.matchAll(/`([\w.-]+\.test\.ts)`/g)].map((m) => m[1] as string);
     expect(bare.filter((name) => !paths.some((p) => p.endsWith(`/${name}`)))).toEqual([]);
     const readme = readFileSync(join(ROOT, "README.md"), "utf8").split("\n").filter((l) => /^bun (run )?test\b/.test(l));
@@ -493,7 +493,7 @@ describe("test layout (AGENTS.md)", () => {
     const scripts = rootScripts();
     // ends in flags, so `bun run <script> <file>` appends the file as bun test's own path filter
     expect(scripts[script]).toBe(`bun test --config=${config} ${parallel} --timeout=20000`);
-    // the unit guard is the unit tier's alone (B4); --parallel workers also load the root preloads, so the tier says it spawns
+    // the unit guard is the unit tier's alone; --parallel workers also load the root preloads, so the tier says it spawns
     expect(bunfig(config).preload).toEqual(["./test/preload.ts", "./test/support/spawning-tier-preload.ts"]);
     const all = testFilesUnder(ROOT);
     const selected = tierSelection(config);
@@ -529,9 +529,9 @@ describe("test layout (AGENTS.md)", () => {
     put("test/support/harness.ts", `export const h = 1;\n`);
     put("packages/cli/test/integration/c.test.ts", `import "../../../../test/support/transcript.ts";\nimport { h } from "../../../../test/support/harness.ts";\n`);
     put("packages/cli/test/integration/d.test.ts", `import { s } from "../../../../test/support/records.ts";\n`);
-    // only the support helpers count: an adapter's own transcript.ts is another module
+    // only the support helpers count: an adapter's own transcript .ts is another module
     put("packages/adapters/test/claude/e.test.ts", `import { t } from "../../src/agent-hooks/transcript.ts";\n`);
-    // test/repo/ is a unit tier (D6): only the file holding this rule is exempt, not its folder
+    // test/repo/ is a unit tier: only the file holding this rule is exempt, not its folder
     put("test/repo/f.test.ts", `import { t } from "../support/transcript.ts";\n`);
     expect(pinnedHelperImports(root)).toEqual([
       { file: "packages/cli/test/integration/a.test.ts", import: "../../../../test/support/transcript.ts" },
@@ -595,7 +595,7 @@ describe("test layout (AGENTS.md)", () => {
     }
   });
 
-  test("release goes prepare → open-pr → ci → ready, a red CI goes $stuck, and a base commit makes it stale (BS7)", () => {
+  test("release goes prepare → open-pr → ci → ready, a red CI goes $stuck, and a base commit makes it stale", () => {
     const { start, steps, counters, base } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", "release.yaml"), "utf8")) as {
       start: string;
       steps: Record<string, { type: string; run?: string; outcomes: Record<string, unknown> }>;
@@ -614,21 +614,21 @@ describe("test layout (AGENTS.md)", () => {
   });
 });
 
-/** The `ci` check script of a repo workflow, as norn runs it (`sh -c`, packages/cli/src/runtime/shell.ts). */
+/** The `ci` check script of a repo workflow, as norn runs it (`sh -c`, packages/cli/src/runtime/shell .ts). */
 function ciScript(wf: string): string {
   const { steps } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as { steps: Record<string, { run?: string }> };
   return steps.ci?.run ?? "";
 }
 
 describe("the ci check waits for the ci.yml run of the PR's head commit (#125)", () => {
-  // The script's behaviour runs through `sh` in packages/cli/test/integration/ci-check.test.ts (the unit tier cannot spawn, B4).
+  // The script's behaviour runs through `sh` in packages/cli/test/integration/ci-check.test .ts (the unit tier cannot spawn, B4).
   test("quick, story and release run the same script", () => {
     expect(ciScript("quick")).toContain("gh run watch");
     expect([ciScript("story"), ciScript("release")]).toEqual([ciScript("quick"), ciScript("quick")]);
   });
 });
 
-describe("intake by kind (W9)", () => {
+describe("intake by kind", () => {
   type Wf = { start: string; steps: Record<string, { type: string; skill?: string; instructions?: string; outcomes: Record<string, unknown> }> };
   const workflow = (wf: string) => Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as Wf;
 
@@ -649,7 +649,7 @@ describe("intake by kind (W9)", () => {
     expect(targets("reproduce", "reproduce")).toEqual({ reproduced: "$done", cannot_reproduce: "$done" });
   });
 
-  test("the repo's copies of the shipped workflows have the same steps and edges (W1)", () => {
+  test("the repo's copies of the shipped workflows have the same steps and edges", () => {
     const shipped = (wf: string) => Bun.YAML.parse(readFileSync(join(PKGS, "cli", "assets", "workflows", `${wf}.yaml`), "utf8")) as Wf;
     const shape = (w: Wf) => ({ start: w.start, steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { type: step.type, skill: step.skill, outcomes: step.outcomes }])) });
     for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(workflow(wf)) }).toEqual({ wf, ...shape(shipped(wf)) });
@@ -676,7 +676,7 @@ describe("release metadata", () => {
 });
 
 /**
- * B5, B8, B71: commands this release removed. A hit is `norn <old>` (or the plugin's `"$NORN" <old>`)
+ * Commands this release removed. A hit is `norn <old>` (or the plugin's `"$NORN" <old>`)
  * anywhere in a line: prose, comments, code spans, strings and scripts alike. Prose that names a thing
  * with an article ("a norn workflow", "the norn cockpit") is not a command and is left out first. Also
  * hit: `norn status <key>` (now `story view`) and the flags that changed what an old command did
@@ -713,7 +713,7 @@ const OLD_COMMAND_FILES = (): string[] => [
   ...textFiles(join(ROOT, ".agents", "skills"), DOCS),
 ];
 
-describe("removed commands (B5, B8, B71)", () => {
+describe("removed commands (B71)", () => {
   test("matcher: commands anywhere in a line; a named thing (`a norn workflow`), new names and other flags are not hits", () => {
     expect(oldCommandHits("run `norn unstick gh-1` then")).toEqual(["norn unstick"]);
     expect(oldCommandHits(`  hint: "norn inbox",`)).toEqual(["norn inbox"]);
@@ -734,7 +734,7 @@ describe("removed commands (B5, B8, B71)", () => {
     expect(() => removedCommands("export const OLD = [];")).toThrow("REMOVED_COMMANDS not found");
   });
 
-  test("no removed command in sources, assets, plugins, skills, README, CONTRIBUTING, AGENTS.md, docs/ and the rules file", () => {
+  test("no removed command in sources, assets, plugins, skills, README, CONTRIBUTING, AGENTS.md and docs/", () => {
     const hits: string[] = [];
     for (const f of OLD_COMMAND_FILES()) {
       const rel = relative(ROOT, f);
@@ -742,26 +742,16 @@ describe("removed commands (B5, B8, B71)", () => {
         .split("\n")
         .forEach((line, i) => {
           if (OLD_COMMAND_ALLOW.some(([file, text]) => file === rel && line.trim() === text)) return;
-          for (const old of oldCommandHits(line)) hits.push(`${rel}:${i + 1} → \`${old}\` was removed (B5): ${line.trim()}`);
+          for (const old of oldCommandHits(line)) hits.push(`${rel}:${i + 1} → \`${old}\` was removed: ${line.trim()}`);
         });
     }
     expect(hits).toEqual([]);
   });
-
-  test("the rules file's command table (§15) is the noun tree", () => {
-    const rules = readFileSync(join(ROOT, RULES_FILE), "utf8");
-    const s15 = rules.slice(rules.search(/^## 15\b/m), rules.search(/^## 16\b/m));
-    for (const verb of ["create", "list", "view", "answer", "approve", "reject", "update-branch", "start", "chat", "edit", "checkout", "handoff", "close", "reopen"])
-      expect(s15).toContain(`norn story ${verb}`);
-    for (const verb of ["list", "view", "attach", "rerun", "cancel"]) expect(s15).toContain(`norn run ${verb}`);
-    expect(s15).toContain("norn status");
-    expect(rules).toContain("through `norn story edit <unit> --workflow <name> --at <step>`");
-  });
 });
 
 /**
- * gh-110 B22 (D12): no product doc or shipped text sends anyone to the old `.agents/norn/` folder. Scanned:
- * README, the rules file, everything under packages/cli/assets, package sources (`norn help` and every message
+ * No product doc or shipped text sends anyone to the old `.agents/norn/` folder. Scanned:
+ * README, everything under packages/cli/assets, package sources (`norn help` and every message
  * are built there), and AGENTS.md's Layout and "Where the contracts live". Not scanned, until the
  * follow-up story migrates this repo: AGENTS.md's other sections, CONTRIBUTING.md and the
  * `.agents/skills/norn*` copies (this repo's own process text).
@@ -770,7 +760,7 @@ const OLD_DIR = /\.agents\/(norn|\*)\//;
 
 /** Lines allowed to name the old folder, by file and a substring of the line, with why. */
 const OLD_DIR_ALLOW: Array<[file: string, text: string, why: string]> = [
-  ["packages/store/src/paths.ts", "export const OLD_", "the old layout's places, only refused and moved from (gh-110 D4)"],
+  ["packages/store/src/paths.ts", "export const OLD_", "the old layout's places, only refused and moved from"],
 ];
 
 /** The text of `## <title>` up to the next `## ` heading. */
@@ -795,7 +785,7 @@ function productDocs(): Array<[file: string, text: string]> {
   ];
 }
 
-describe("the new layout in product docs (gh-110 B3, B22)", () => {
+describe("the new layout in product docs (B22)", () => {
   test("matcher: the old folder and its parts are hits; the new config file and other .agents folders are not", () => {
     for (const hit of ["`.agents/norn/config.yaml`", "in .agents/norn/workflows/", ".agents/*/trace/x.jsonl", "(.agents/norn/)"]) expect(OLD_DIR.test(hit)).toBe(true);
     for (const miss of ["`.agents/norn.config.yaml`", ".agents/workflows/", ".agents/skills/norn/SKILL.md", ".agents/specs/gh-1-x/"]) expect(OLD_DIR.test(miss)).toBe(false);
@@ -806,7 +796,7 @@ describe("the new layout in product docs (gh-110 B3, B22)", () => {
     expect(section("# x\n## A\na\n## B\nb", "A")).toBe("\n## A\na");
   });
 
-  test("the docs, the rules file, shipped assets, package sources and AGENTS.md's Layout and contracts name no `.agents/norn/`", () => {
+  test("the docs, shipped assets, package sources and AGENTS.md's Layout and contracts name no `.agents/norn/`", () => {
     const hits: string[] = [];
     for (const [file, text] of productDocs()) {
       text.split("\n").forEach((line, i) => {
@@ -822,16 +812,6 @@ describe("the new layout in product docs (gh-110 B3, B22)", () => {
     const reference = readFileSync(join(ROOT, "docs", "reference.md"), "utf8").split("\n");
     expect(concepts.find((l) => l.startsWith("**Workflows are data.**"))).toContain("`.agents/workflows/`");
     expect(reference.find((l) => l.startsWith("| `.agents/norn.config.yaml`"))).toBeDefined();
-  });
-
-  test("the rules file's §7 layout and ID2 describe the machine dir and its id", () => {
-    const rules = readFileSync(join(ROOT, RULES_FILE), "utf8");
-    const s7 = rules.slice(rules.search(/^## 7\b/m), rules.search(/^## 8\b/m));
-    expect(s7).toContain("norn.config.yaml");
-    expect(s7).toContain("workflows/");
-    expect(s7).toContain("repos/<id>/");
-    const id2 = rules.split("\n").find((l) => l.startsWith("- ID2 ")) ?? "";
-    expect(id2).toContain("repos/<id>/");
   });
 
   test("B3: the shipped norn skill puts only runs/ off limits (gh-195/07: the handoff has no generated top)", () => {
@@ -929,19 +909,19 @@ const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
 const SPAWN_ALLOW: Counts = {};
 
 /**
- * (g) B1, B2, B5: norn's paths under a repo are spelled only by store's path module (paths.ts), so a
+ * (g) B1, B2, B5: norn's paths under a repo are spelled only by store's path module (paths .ts), so a
  * layout change is a change there. Counts lines of package sources and tests (root test/support and test/e2e too) that spell `.agents/norn`
  * (or join `".agents", "norn"`) outside a comment; messages name paths through its `REPO_CONFIG_FILE` and
- * `WORKFLOWS_DIR` (gh-110 D11). Allowed: tests asserting text a person sees.
+ * `WORKFLOWS_DIR`. Allowed: tests asserting text a person sees.
  */
 const NORN_PATH = /\.agents\/norn\b|["'`]\.agents["'`]\s*,\s*["'`]norn["'`]/;
 const NORN_PATH_ALLOW: Record<string, [number, string]> = {
-  "packages/store/src/paths.ts": [6, "the path module, and the old layout's places (gh-110 D4)"],
+  "packages/store/src/paths.ts": [6, "the path module, and the old layout's places"],
   "packages/schema/src/config.ts": [2, "the config files as messages name them (gh-64 B5: an error names the right file)"],
-  "test/support/harness.ts": [1, "the old layout's places as a person had them, spelled independently of store (gh-110 S1)"],
-  "packages/cli/test/integration/upgrade.test.ts": [7, "the old paths as a person had them and as `git status` and the report show them (gh-110 S1, gh-64 B40)"],
+  "test/support/harness.ts": [1, "the old layout's places as a person had them, spelled independently of store"],
+  "packages/cli/test/integration/upgrade.test.ts": [7, "the old paths as a person had them and as `git status` and the report show them"],
   "packages/cli/test/integration/config.test.ts": [9, "messages: the config errors and `norn config` name the files as a person sees them (gh-64 B5–B7, B39, B54)"],
-  "test/e2e/slice-workflow.test.ts": [5, "message: init's config row; the files init writes, as a person sees them (gh-64 B9, B50, B55)"],
+  "test/e2e/slice-workflow.test.ts": [5, "message: init's config row; the files init writes, as a person sees them (B50, B55)"],
   "packages/cli/test/integration/layout.test.ts": [1, "the layout test: the repo config file as a person sees it"],
   "packages/core/test/unit/printed-commands.test.ts": [1, "not a path read: a string the removed-command matcher must pass"],
 };
@@ -960,7 +940,7 @@ function nornPathLines(): Counts {
   return out;
 }
 
-/** Action kinds: the `kind` literals of actions.ts; emitted ones appear as `kind: "…"` in decide. */
+/** Action kinds: the `kind` literals of actions .ts; emitted ones appear as `kind: "…"` in decide. */
 function literalKinds(text: string): Set<string> {
   return new Set([...text.matchAll(/\bkind:\s*"([a-z_]+)"/g)].map((m) => m[1] as string));
 }
@@ -985,7 +965,7 @@ function decideText(): string {
     .join("\n");
 }
 
-/** act sources: act.ts before 6.3, an act/ folder after. */
+/** act sources: act .ts before 6.3, an act/ folder after. */
 function actText(): string {
   const runtime = join(PKGS, "cli", "src", "runtime");
   const dir = join(runtime, "act");
@@ -1043,7 +1023,7 @@ describe("ratchet lints", () => {
   });
 });
 
-describe("one resolver for a unit's record folder (gh-71 D2, B30, B36)", () => {
+describe("one resolver for a unit's record folder (B30, B36)", () => {
   /** Where a unit's record path may be named: the pure name in schema and store's path module. */
   const RESOLVERS = ["packages/schema/src/ids.ts", "packages/store/src/paths.ts"];
   /** A `runs` path segment built by hand: the bare literal (`join(…, "runs", …)`) or `runs/${…}` in a template. */
@@ -1075,7 +1055,7 @@ describe("one resolver for a unit's record folder (gh-71 D2, B30, B36)", () => {
   });
 });
 
-describe("the run-state resolver takes the checkout, the story and the unit (gh-195 prefactor 1, B2, B4)", () => {
+describe("the run-state resolver takes the checkout, the story and the unit (gh-195 prefactor 1)", () => {
   /** The resolver: its pure half in schema (paths relative to a root), its on-disk half in store. */
   const RESOLVER = ["packages/schema/src/ids.ts", "packages/store/src/run-state.ts"];
   /** The record's names: the folder, the unit's and round's record paths, decide's observed record. */
@@ -1213,7 +1193,7 @@ describe("the run-state resolver takes the checkout, the story and the unit (gh-
     expect(builds(src)).toEqual([0, 4, 10]);
   });
 
-  test("matcher (S12, gh-195/05): the machine dir joined with runs/ is a hit; the resolver's machine-dir calls are not", () => {
+  test("matcher: the machine dir joined with runs/ is a hit; the resolver's machine-dir calls are not", () => {
     const src = [
       'const a = join(machineDir(root), "runs");',
       "const b = join(machineDir(root), RUNS_DIR, story);",
@@ -1230,14 +1210,14 @@ describe("the run-state resolver takes the checkout, the story and the unit (gh-
       .flatMap((p) => {
         const src = readFileSync(p, "utf8");
         const lines = src.split("\n");
-        // S12 (gh-195/05): the machine dir's `runs/` is run state too, so no exception remains
+        // The machine dir's `runs/` is run state too, so no exception remains
         return builds(src).map((i) => `${relative(ROOT, p)}:${i + 1}: ${lines[i]?.trim()}`);
       });
     expect(hits).toEqual([]);
   });
 });
 
-describe("the running version is a dependency (gh-61 B6, Prefactor 1)", () => {
+describe("the running version is a dependency (Prefactor 1)", () => {
   // only the default wiring reads the package version; every command takes `ctx.version`, so a test can run the CLI as any binary
   const WIRING = "packages/cli/src/context.ts";
   const readsConstant = (text: string) => /\bNORN_VERSION\b|["']\.{1,2}\/(?:\.\.\/)*version\.ts["']|["'](?:\.\.\/)+package\.json["']/.test(text);
@@ -1299,8 +1279,8 @@ describe("one resolver for a unit's handoff (gh-195 prefactor 2, B6, B39)", () =
   });
 });
 
-describe("superseded records replace unpushed runs and orphaned/ (gh-195 D11, B27, AC4)", () => {
-  test("no package source, golden case, rule case, shipped asset, plugin, emitted schema or doc in the doc set but the rules names unpushed_runs, orphaned/ or work not in the record", () => {
+describe("superseded records replace unpushed runs and orphaned/ (B27, AC4)", () => {
+  test("no package source, golden case, rule case, shipped asset, plugin, emitted schema or doc in the doc set names unpushed_runs, orphaned/ or work not in the record", () => {
     const GONE = /unpushed_runs|unpushedRuns|UnpushedRuns|orphaned\/|copyToOrphaned|orphanedDir\b|work (?:on \S+ is )?not in the record/;
     const scanned = [
       ...files(PKGS).filter((p) => p.includes("/src/") || p.endsWith("/test/rule-cases.ts")),
@@ -1310,8 +1290,8 @@ describe("superseded records replace unpushed runs and orphaned/ (gh-195 D11, B2
       ...textFiles(join(PKGS, "cli", "assets"), DOCS),
       ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
       ...textFiles(join(PKGS, "schema", "json"), DOCS),
-      // and every doc but the rules file, whose T7a and R2.3 name what gh-195 replaced on purpose
-      ...allDocs(ROOT).filter((f) => !f.endsWith(RULES_FILE)),
+      // and every doc
+      ...allDocs(ROOT),
     ];
     const hits = scanned.flatMap((p) =>
       readFileSync(p, "utf8")

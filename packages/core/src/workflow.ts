@@ -1,7 +1,4 @@
-/**
- * Workflow load-time validation (W1–W8) and per-unit level checks (W8). Pure.
- * Graph helpers here are reused by apply/decide (`stepOf`, `edgeOf`).
- */
+/** Workflow load-time validation and per-unit level checks. */
 import {
   type OutcomeEdge,
   outcomeEdge,
@@ -41,13 +38,13 @@ export interface ValidateOptions {
   /** known skill names; omitted = skill existence not checked */
   skills?: Iterable<string>;
   /**
-   * W5: skills each configured agent can see (its installed skill folder). A step's skill must be
+   * Skills each configured agent can see (its installed skill folder). A step's skill must be
    * visible to the agent that runs it (`step.agent ?? agent`); an agent not listed is not checked.
    */
   agentSkills?: { agent: string; visible: Readonly<Record<string, Iterable<string>>> };
 }
 
-/** Outcomes an agent step may declare to override a classified route (C1). `exhausted` always goes to `$stuck` (W7). */
+/** Outcomes an agent step may declare to override a classified route. `exhausted` always goes to `$stuck`. */
 export const OVERRIDABLE_ROUTES = ["silent", "died", "timeout", "stalled", "ask", "stuck"] as const;
 
 const isReservedStep = (name: string) => name.startsWith("$") || (RESERVED_STEP_NAMES as readonly string[]).includes(name);
@@ -66,7 +63,6 @@ export function edgesOf(wf: Workflow): Edge[] {
   );
 }
 
-/** Declared edge for `step.outcome`, or null. */
 export function edgeOf(wf: Workflow, step: string, outcome: string): OutcomeEdge | null {
   const spec = (wf.steps[step]?.outcomes as Record<string, Parameters<typeof outcomeEdge>[0] | undefined> | undefined)?.[outcome];
   return spec === undefined ? null : outcomeEdge(spec);
@@ -77,8 +73,8 @@ export function stepOf(wf: Workflow, name: string): Step | null {
 }
 
 /**
- * Validate a parsed workflow document (W5): schema, reserved names, targets, counters,
- * skills, reachability of `$done`, and every elementary cycle has a counted edge (W4).
+ * Validate a parsed workflow document: schema, reserved names, targets, counters,
+ * skills, reachability of `$done`, and every elementary cycle has a counted edge.
  */
 export function validateWorkflowDefinition(input: unknown, opts: ValidateOptions = {}): WorkflowCheck {
   const issues: WorkflowIssue[] = [];
@@ -86,7 +82,7 @@ export function validateWorkflowDefinition(input: unknown, opts: ValidateOptions
   if (rawSteps && typeof rawSteps === "object")
     for (const name of Object.keys(rawSteps))
       if (isReservedStep(name))
-        issues.push({ code: "reserved_name", path: `/steps/${name}`, message: `step name '${name}' is reserved (W7)` });
+        issues.push({ code: "reserved_name", path: `/steps/${name}`, message: `step name '${name}' is reserved` });
 
   const schema = validate("workflow", input);
   if (!schema.ok) {
@@ -128,18 +124,18 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
         issues.push({
           code: "reserved_outcome",
           path: `/steps/${name}/outcomes/exhausted`,
-          message: "'exhausted' always routes to $stuck and cannot be declared (W7)",
+          message: "'exhausted' always routes to $stuck and cannot be declared",
         });
     }
   }
-  // W4 (C3): `reset_on` names a declared edge `<step>.<outcome>`
+  // `reset_on` names a declared edge `<step>.<outcome>`
   for (const [name, c] of Object.entries(counters)) {
     if (c.reset_on === undefined) continue;
     const [from, outcome] = c.reset_on.split(".") as [string, string];
     if (!edgeOf(wf, from, outcome))
       issues.push({ code: "unknown_reset", path: `/counters/${name}/reset_on`, message: `counter '${name}' resets on '${c.reset_on}', but step '${from}' declares no outcome '${outcome}'` });
   }
-  // BS9: `base.step` names the step `norn story update-branch` re-enters
+  // `base.step` names the step `norn story update-branch` re-enters
   if (wf.base?.step !== undefined && !stepOf(wf, wf.base.step))
     issues.push({ code: "unknown_target", path: "/base/step", message: `base.step '${wf.base.step}' does not exist` });
   for (const e of edgesOf(wf)) {
@@ -148,12 +144,12 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
       issues.push({ code: "unknown_target", path, message: `${e.from}.${e.outcome} → unknown step '${e.to}'` });
     if (e.counter && !Object.hasOwn(counters, e.counter))
       issues.push({ code: "unknown_counter", path, message: `counter '${e.counter}' is not declared in counters` });
-    // QV5: a verdict gates what an agent reports with `norn done`; elsewhere nothing could check it
+    // A verdict gates what an agent reports with `norn done`; elsewhere nothing could check it
     if (e.verdict !== undefined && (wf.steps[e.from]?.type !== "agent" || (OVERRIDABLE_ROUTES as readonly string[]).includes(e.outcome)))
-      issues.push({ code: "verdict", path, message: `${e.from}.${e.outcome} declares verdict '${e.verdict}', but only outcomes an agent reports with norn done can be gated by a verdict (QV5)` });
+      issues.push({ code: "verdict", path, message: `${e.from}.${e.outcome} declares verdict '${e.verdict}', but only outcomes an agent reports with norn done can be gated by a verdict` });
   }
 
-  // every step can reach $done (W5): reverse search from $done
+  // every step can reach $done: reverse search from $done
   const reach = new Set<string>(["$done"]);
   const edges = edgesOf(wf);
   for (let grew = true; grew; ) {
@@ -167,7 +163,7 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
   for (const s of steps)
     if (!reach.has(s)) issues.push({ code: "cannot_reach_done", path: `/steps/${s}`, message: `step '${s}' cannot reach $done` });
 
-  // W4: a cycle is uncounted iff it is a cycle of the subgraph of uncounted edges
+  // A cycle is uncounted iff it is a cycle of the subgraph of uncounted edges
   const uncounted = new Map<string, Map<string, string>>();
   for (const e of edges) {
     if (e.counter || e.to.startsWith("$") || !stepOf(wf, e.to)) continue;
@@ -181,7 +177,7 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
     issues.push({
       code: "uncounted_cycle",
       path: `/steps/${cycle[0]}`,
-      message: `cycle without a counter: ${hops.join(" → ")} → ${cycle[0]} (W4)`,
+      message: `cycle without a counter: ${hops.join(" → ")} → ${cycle[0]}`,
       cycle,
     });
   }
@@ -228,7 +224,7 @@ export function elementaryCycles(nodes: readonly string[], adj: ReadonlyMap<stri
 
 export type UnitLevel = "story" | "slice";
 
-/** W8: `slices`, `git: open-pr` and `git: update` (BS3) only on a story; `git: integrate` only on a slice. Checked at unit start. */
+/** `slices`, `git: open-pr` and `git: update` only on a story; `git: integrate` only on a slice. Checked at unit start. */
 export function checkWorkflowLevel(wf: Workflow, level: UnitLevel): WorkflowIssue[] {
   const issues: WorkflowIssue[] = [];
   for (const [name, step] of Object.entries(wf.steps)) {
@@ -239,20 +235,20 @@ export function checkWorkflowLevel(wf: Workflow, level: UnitLevel): WorkflowIssu
       issues.push({
         code: "level",
         path: `/steps/${name}`,
-        message: `step '${name}' (${what}) runs only on a ${storyOnly ? "story" : "slice"}, not on a ${level} (W8)`,
+        message: `step '${name}' (${what}) runs only on a ${storyOnly ? "story" : "slice"}, not on a ${level}`,
       });
   }
   return issues;
 }
 
-/** BS9: the step `norn story update-branch` re-enters — `base.step`, else the first step with `action: update`; null = none. */
+/** The step `norn story update-branch` re-enters — `base.step`, else the first step with `action: update`; null = none. */
 export function baseUpdateStep(wf: Workflow): string | null {
   if (wf.base?.step) return stepOf(wf, wf.base.step) ? wf.base.step : null;
   return Object.entries(wf.steps).find(([, s]) => s.type === "git" && s.action === "update")?.[0] ?? null;
 }
 
 /**
- * BS7: is the story stale against its base under this workflow? `conflict` (default): a merge of
+ * Is the story stale against its base under this workflow? `conflict` (default): a merge of
  * the base would conflict; `behind`: the base has any commit the story lacks.
  */
 export function isStale(wf: Workflow | null, base: { behind: number; conflicts: readonly string[] } | undefined): boolean {

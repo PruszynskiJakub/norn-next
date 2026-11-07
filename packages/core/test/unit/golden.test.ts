@@ -61,7 +61,7 @@ const DECIDE_SRC = readdirSync(DECIDE_DIR)
 const LITERALS = [...new Set([...DECIDE_SRC.matchAll(/"([a-z_]+(?:\.[a-z_-]+)+)"/g)].map((m) => m[1] as string))].sort();
 
 /**
- * Rules routeOutcome takes as `c.rule` and only ever emits with a suffix (C1): the classify
+ * Rules routeOutcome takes as `c.rule` and only ever emits with a suffix: the classify
  * receipt records the bare id, the decision `${rule}.<suffix>`.
  */
 const ROUTED = ["agent.died", "agent.died.foreign", "agent.died.launch_unknown", "agent.silent", "agent.silent.launch_prompt", "agent.stalled", "agent.timeout"];

@@ -1,4 +1,4 @@
-/** Skills on disk (SK1): one committed copy in `.agents/skills/`, linked from each agent's folder. */
+/** Skills on disk: one committed copy in `.agents/skills/`, linked from each agent's folder. */
 import { describe, expect, test } from "bun:test";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";

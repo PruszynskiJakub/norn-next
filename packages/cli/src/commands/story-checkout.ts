@@ -1,4 +1,4 @@
-/** `norn story checkout [<story>] [--force]` (B33, T5, M3): continue a story on this machine from git alone (`runtime/checkout.ts`). */
+/** `norn story checkout [<story>] [--force]`: continue a story on this machine from git alone (`runtime/checkout.ts`). */
 import { cmd } from "@norn/core";
 import { defineCommand, opt } from "../command.ts";
 import { waitForTickLock } from "../runtime/tick-lock.ts";
@@ -8,7 +8,7 @@ import { aStory, resolveStory } from "../runtime/target.ts";
 export const storyCheckoutCommand = defineCommand({
   name: "story checkout",
   version: "acts",
-  summary: "Take a story over on this machine: claim it, check out its branches, print the handoff (B33, T5)",
+  summary: "Take a story over on this machine: claim it, check out its branches, print the handoff",
   usage: "norn story checkout [<story>] [--force]",
   options: { force: { type: "boolean" } },
   optionHelp: { "--force": "take over a claim another machine still holds (journaled in the claim and the handoff)" },

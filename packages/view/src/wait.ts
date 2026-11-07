@@ -1,6 +1,6 @@
 /**
- * `norn story wait <story|slice> --until <condition>` (gh-175, P8): what a supervisor waits for, and
- * whether the read model shows it. Pure: a ProjectView in, the unit's state and a verdict out (X1).
+ * `norn story wait <story|slice> --until <condition>`: what a supervisor waits for, and
+ * whether the read model shows it. Pure: a ProjectView in, the unit's state and a verdict out.
  *
  * Conditions: `step=<name>` (the unit's cursor is at that step), `gate` (parked at a gate), `ask`
  * (parked on a question), `stuck`, `done` (the round ended: `$done`), `merged` (the story PR merged,
@@ -35,7 +35,7 @@ export interface WaitUnit {
   next: string | null;
 }
 
-/** The state `story wait` checks and prints (P8: data only). */
+/** The state `story wait` checks and prints (data only). */
 export interface WaitState {
   /** the key asked for (story or slice) */
   key: string;

@@ -1,7 +1,7 @@
 /**
- * Gemini CLI agent adapter (M4, `blocking` tier). Hooks share Claude Code's shape and live in
+ * Gemini CLI agent adapter (`blocking` tier). Hooks share Claude Code's shape and live in
  * `<repo>/.gemini/settings.json`. `AfterAgent` is the turn end; `{"decision":"deny","reason":…}`
- * makes Gemini retry the turn with `reason` as the prompt (A4). See geminicli.com/docs/hooks.
+ * makes Gemini retry the turn with `reason` as the prompt. See geminicli.com/docs/hooks.
  */
 import { join } from "node:path";
 import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookDecision, HookResponse } from "@norn/core";
@@ -83,8 +83,8 @@ export function launchCommand(req: AgentLaunchRequest): { argv: string[]; env: R
 }
 
 /**
- * C4: Gemini chat recording is one JSON file `{sessionId, messages:[{type:"user"|"gemini", content}]}`.
- * TODO(M4): format is not documented; JSONL with the same message objects is accepted too.
+ * Gemini chat recording is one JSON file `{sessionId, messages:[{type:"user"|"gemini", content}]}`.
+ * TODO: format is not documented; JSONL with the same message objects is accepted too.
  */
 export async function lastAssistantMessage(transcriptPath: string): Promise<string | null> {
   const doc = await readJsonFile(transcriptPath);

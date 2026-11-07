@@ -1,7 +1,7 @@
 /**
- * `norn story take <story>` (GR1, CP4): assign an open issue carrying the intake label to the
- * person, so the next sync takes it in. Assigning is how the person chooses when intake takes an issue in
- * (GR1, GR2 starts it at once); this is the cockpit backlog's take on an issue row. It writes nothing
+ * `norn story take <story>`: assign an open issue carrying the intake label to the
+ * person, so the next sync takes it in. Assigning is how the person chooses when intake takes an issue
+ * in; this is the cockpit backlog's take on an issue row. It writes nothing
  * locally and takes nothing in itself.
  */
 import { cmd } from "@norn/core";
@@ -13,7 +13,7 @@ import { projectView } from "../runtime/human.ts";
 export const storyTakeCommand = defineCommand({
   name: "story take",
   version: "acts",
-  summary: "Assign a labelled issue to you, so the next sync takes it in (GR1)",
+  summary: "Assign a labelled issue to you, so the next sync takes it in",
   usage: "norn story take <story>",
   markdown: true,
   positionals: { max: 1 },
@@ -30,7 +30,7 @@ export const storyTakeCommand = defineCommand({
       const issue = await remote.getIssue(parts.number);
       if (!issue) throw refuse(`no issue #${parts.number} on the remote`, cmd.status(), "no_issue");
       if (issue.state !== "open") throw refuse(`issue #${parts.number} is closed`, `reopen it on the remote first: ${issue.url}`, "issue_closed");
-      // GR1: intake lists only issues with the label
+      // Intake lists only issues with the label
       if (!issue.labels.includes(label)) throw refuse(`issue #${parts.number} has no '${label}' label, so intake would not take it in`, `add the '${label}' label: ${issue.url}`, "not_labelled");
       const me = await remote.whoami();
       if (!issue.assignees.includes(me)) await remote.assignIssue(parts.number, me);

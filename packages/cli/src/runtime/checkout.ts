@@ -1,39 +1,40 @@
 /**
- * Story checkout (T5, M3): continue a story on this machine from git alone. The command is
+ * Story checkout: continue a story on this machine from git alone. The command is
  * `norn story checkout`; a later reopen restores through the same steps.
  *
- * One transaction (gh-195/10 review#2): every check that needs the remote or can fail comes before
+ * One transaction: every check that needs the remote or can fail comes before
  * the claim, and after the claim only local steps, the take receipt first — so a refusal takes
  * nothing, and no failure leaves a held story a tick would start over or resume on a stale cursor.
  *
  * Before the claim (a refusal changes nothing here or on the remote):
- * 1. The claim as on the remote (T3): held by another heartbeat and unexpired → refused "held by X
+ * 1. The claim as on the remote: held by another heartbeat and unexpired → refused "held by X
  *    since Y" unless `--force`.
- * 2. The story's record, `refs/norn/runs/<story>` alone (gh-195 D6): its objects fetched (no local ref
- *    yet) and staged beside its place in the machine dir with every file validated (S1, S2). A
+ * 2. The story's record, `refs/norn/runs/<story>` alone: its objects fetched (no local ref
+ *    yet) and staged beside its place in the machine dir with every file validated. A
  *    checkout that holds the claim and the run state already keeps its own (nothing staged), unless the
- *    remote record continues from the one it last had: then its copy is older (10-R3-F1). A local copy not kept is never replaced whole: in
- *    step 5 it is set aside as superseded (gh-195 D11), or removed quietly when it is a record this
- *    machine pushed.
+ *    remote record continues from the one it last had: then its copy is older. A local copy not kept
+ *    is never replaced whole: in step 5 it is set aside as superseded, or removed quietly when it is
+ *    a record this machine pushed.
  * 3. The story and slice branches fetched; a local story branch that diverged from the remote one is
  *    refused (norn never resets work). The record's `Norn-Branch-Commit` is checked against the story
- *    branch head (T5a): an ancestor continues (B23), else the branch was rewritten (B24) and the step
- *    restarts as a new attempt, once per gone commit. A story without a branch skips it (B33).
+ *    branch head: an ancestor continues, else the branch was rewritten and the step
+ *    restarts as a new attempt, once per gone commit. A story without a branch skips it.
  *    No record at all — none on the ref, none of this checkout's own — for a story the branch shows
- *    started: the record is lost (B25, B26; gh-195 D10). The new round is read off the branch head here:
+ *    started: the record is lost. The new round is read off the branch head here:
  *    the frontmatter's workflow (a missing or invalid one is refused) and the step its last boundary led to (`Norn-Next`).
  * Then:
  * 4. Claim by CAS (`--force` records `forced_from` in the claim blob); the remote record ref must
- *    still be the one staged (review#2 F5: a still-running holder may have pushed): if it moved, the
+ *    still be the one staged (a still-running holder may have pushed): if it moved, the
  *    claim is given back and the command refused.
- * 5. Locally: the `take` trace event and receipt (R10.1, carrying the rewrite), written into the staged
+ * 5. Locally: the `take` trace event and receipt (carrying the rewrite), written into the staged
  *    record — with the record lost, into a new round staged empty: the workflow pinned from the branch,
- *    the take (`record_lost`), the state at the restart step, attempt 1, counters at zero — then the record renamed into place and the local record ref set to it (the lease of this
- *    checkout's next record push, 09-F4); then the worktrees with slots, `.env.norn` and `.norn-unit`
- *    (K4, A3), local branches only created or moved forward. A forced take journals a Progress line in
- *    the story handoff, committed and pushed.
- * 6. Print each unit's cursor, and its status (S9) as the next tick will have it above its handoff's
- *    written part (gh-195 D9, B7). The next `norn tick` resumes from the run state.
+ *    the take (`record_lost`), the state at the restart step, attempt 1, counters at zero — then the
+ *    record renamed into place and the local record ref set to it (the lease of this checkout's next
+ *    record push); then the worktrees with slots, `.env.norn` and `.norn-unit`, local branches only
+ *    created or moved forward. A forced take journals a Progress line in the story handoff,
+ *    committed and pushed.
+ * 6. Print each unit's cursor, and its status as the next tick will have it above its handoff's
+ *    written part. The next `norn tick` resumes from the run state.
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -120,13 +121,13 @@ type Rewritten = { gone: string; head: string };
 type TakeFacts = { holder: string; now: string; previous_holder: string | null; previous_heartbeat_id: string | null; expired: boolean; forced: boolean };
 
 /**
- * R10.1: write the `take` receipt on the story unit at its cursor (next free number) in `runsDir` — the
+ * Write the `take` receipt on the story unit at its cursor (next free number) in `runsDir` — the
  * staged record (before it is placed) or the machine dir's. A story unit not started yet has no cursor
  * to put it on; the take is then only in the trace and the claim blob.
  */
 function takeReceipt(runsDir: string, t: TakeFacts & { rewritten: Rewritten | null; record_lost: boolean }, at?: UnitState): { receipt: string | null; note?: string } {
   const st = at ? { ok: true as const, value: at } : readState(runsDir);
-  if (!st.ok) return { receipt: null, note: st.reason === "missing" ? "story unit not started; the take is in the trace" : "story state unreadable (S2); the take is in the trace" };
+  if (!st.ok) return { receipt: null, note: st.reason === "missing" ? "story unit not started; the take is in the trace" : "story state unreadable; the take is in the trace" };
   const r: ReceiptOf<"take"> = {
     kind: "take",
     receipt_id: ulid(Date.parse(t.now)),
@@ -148,7 +149,7 @@ function takeReceipt(runsDir: string, t: TakeFacts & { rewritten: Rewritten | nu
 }
 
 /**
- * T5a, B7 (review#2 F4, F7): the story unit as the next tick will have it — its receipts not applied yet,
+ * The story unit as the next tick will have it — its receipts not applied yet,
  * the take last, applied as the tick does (core `applyReceipts`) — and, when that take restarts the step,
  * the line saying so. A pending `round` receipt is applied by the tick alone, and the receipts after it
  * (the take among them) are rejected into the trace: the round it starts is fresh, nothing to restart.
@@ -167,11 +168,11 @@ function nextCursor(runsDir: string, gone: string | null): { state: UnitState | 
   return { state: after, restarted: restarts && gone ? branchRewrittenLine(st.value.story, gone, after.step, after.attempt) : null };
 }
 
-/** What checkout takes of the story's record (T5, T5a). */
+/** What checkout takes of the story's record. */
 interface TakenRecord {
   /** the record commit on `refs/norn/runs/<story>` */
   sha: string;
-  /** its `Norn-Branch-Commit`; null = recorded without a branch (B33) */
+  /** its `Norn-Branch-Commit`; null = recorded without a branch */
   branch_commit: string | null;
   /** unpacked into the machine dir (false: this checkout holds the claim and keeps its own run state) */
   unpacked: boolean;
@@ -179,10 +180,10 @@ interface TakenRecord {
 type Staged = Extract<StagedRecord, { ok: true }>;
 
 /**
- * gh-195 D6, D10 (B22, B33; review F1, S2): before anything is taken, the story's record —
+ * Before anything is taken, the story's record —
  * `refs/norn/runs/<story>` fetched from `remote` alone (objects only, no local ref yet; without a remote
- * this checkout's own ref) — and, unless `keepLocal`, staged beside its place with every file validated
- * (S1, S2). Null = no record ref (gh-195/11). A record that cannot be fetched or does not validate is
+ * this checkout's own ref) — and, unless `keepLocal`, staged beside its place with every file validated.
+ * Null = no record ref. A record that cannot be fetched or does not validate is
  * refused here, with no claim taken and nothing changed.
  */
 async function prepareRecord(ctx: Context, remote: string | null, story: RunStory, keepLocal: boolean): Promise<{ taken: TakenRecord; staged: Staged | null } | null> {
@@ -208,18 +209,18 @@ async function prepareRecord(ctx: Context, remote: string | null, story: RunStor
 }
 
 /**
- * T5a (B23, B24): the record's branch commit `gone` is gone when it is not here or not an ancestor of the
- * story branch `head`. Once per gone commit (review#2 F2): a take of this record that already carries the
+ * The record's branch commit `gone` is gone when it is not here or not an ancestor of the
+ * story branch `head`. Once per gone commit: a take of this record that already carries the
  * same rewrite (a checkout retried after a failure, or run again by the holder) is not repeated.
  */
 async function rewrittenSince(git: GitPort, root: string, gone: string | null, head: string | null, storyRuns: string): Promise<Rewritten | null> {
-  if (!gone || !head) return null; // B33: no branch, no check
+  if (!gone || !head) return null;
   if ((await git.revParse(root, `${gone}^{commit}`)) && (await git.isAncestor(root, gone, head))) return null;
   const seen = listReceipts(storyRuns).receipts.some(({ receipt: r }) => r.kind === "take" && r.rewritten?.gone === gone);
   return seen ? null : { gone, head };
 }
 
-/** What a takeover with the record lost starts (gh-195 D10): a new round read off the story branch head. */
+/** What a takeover with the record lost starts: a new round read off the story branch head. */
 interface LostRecord {
   workflow: { name: string; source: string; workflow: Workflow };
   step: string;
@@ -229,12 +230,12 @@ interface LostRecord {
 }
 
 /**
- * T5b (gh-195 B25, B26, D10): with no record to take over, the round a takeover starts from the branch `head`
+ * With no record to take over, the round a takeover starts from the branch `head`
  * (`headRef`, its ref) — or null when there is nothing to restart: the story not started on the branch
  * (its frontmatter not `active`: the tick starts it as any new story) or an older norn's run state still
- * on the branch (the tick moves it off, B34). The frontmatter's workflow pinned fresh from the branch; a
+ * on the branch (the tick moves it off). The frontmatter's workflow pinned fresh from the branch; a
  * missing or invalid one refuses before anything is taken. The step: `restartStepOf` the story unit's
- * last boundary on the branch (its `Norn-Next`, S4).
+ * last boundary on the branch (its `Norn-Next`).
  */
 async function lostRecord(git: GitPort, root: string, story: RunStory, branch: string, head: string, headRef: string, holder: string | null): Promise<LostRecord | null> {
   const key = story.key;
@@ -242,7 +243,7 @@ async function lostRecord(git: GitPort, root: string, story: RunStory, branch: s
   const raw = await git.show(root, head, file);
   if (raw === null) return null;
   const fm = parseStoryFile(raw, file);
-  // S2 (review#1 S3): a story file that fails validation is refused, never read as "not started"
+  // A story file that fails validation is refused, never read as "not started"
   if (!fm.ok)
     throw corruptError(
       `the record of ${key} is lost and ${file} on ${branch} ${fm.reason === "corrupt" ? `fails validation (${fm.error.errors.map((e) => e.message).join(", ")})` : "cannot be read"}; nothing was taken`,
@@ -279,9 +280,9 @@ async function lostRecord(git: GitPort, root: string, story: RunStory, branch: s
 }
 
 /**
- * gh-195 B25 (D10): the new round of a lost record, written into `base` (a story's run-state folder staged
- * empty): its workflow pinned, the take receipt first (P6), then the state at the restart step — round 1
- * of the record that starts here, attempt 1, counters at zero — last (S5). The tick applies the take.
+ * The new round of a lost record, written into `base` (a story's run-state folder staged
+ * empty): its workflow pinned, the take receipt first, then the state at the restart step — round 1
+ * of the record that starts here, attempt 1, counters at zero — last. The tick applies the take.
  */
 function writeLostRound(base: string, key: string, lost: LostRecord, take: TakeFacts & { rewritten: null; record_lost: true }): { receipt: string | null } {
   const dir = runStateStartDirIn(base, STORY_UNIT_DIR, lost.workflow.name);
@@ -292,7 +293,7 @@ function writeLostRound(base: string, key: string, lost: LostRecord, take: TakeF
   return r;
 }
 
-/** R3.3: a local branch that has commits its remote branch does not, and the other way round (norn never resets work). */
+/** A local branch that has commits its remote branch does not, and the other way round (norn never resets work). */
 async function divergedFrom(git: GitPort, root: string, branch: string, upstream: string): Promise<boolean> {
   const cur = await git.readRef(root, `refs/heads/${branch}`);
   const up = await git.readRef(root, upstream);
@@ -320,7 +321,7 @@ export type CheckoutRecord = (restored: { storyWt: string; spec_dir: string; wor
   value: Record<string, unknown>;
 };
 
-/** Phase 1 (T3, T5): the claim as on the remote; held by another heartbeat or unreadable is refused unless `force`. */
+/** Step 1: the claim as on the remote; held by another heartbeat or unreadable is refused unless `force`. */
 async function claimAsOnRemote(ctx: Context, key: string, force: boolean, remote: string | null, hb: string) {
   const cur = await claimFor(ctx, key, { remote, unreadable: (e) => failure(`cannot read the claim: ${e.message}`, "check the network, then retry", "network") });
   if (cur.state === "corrupt" && !force) throw corruptError(`claim ref of ${key} is unreadable`, cmd.storyCheckout(key, { force: true }), cur.error);
@@ -333,12 +334,12 @@ async function claimAsOnRemote(ctx: Context, key: string, force: boolean, remote
 }
 
 /**
- * Phase 2 (review F1): the record, fetched and staged; the holder keeps its own run state unless the
- * remote record is newer than it (10-R3-F1), so an older copy a crashed or failed checkout left behind
+ * Step 2: the record, fetched and staged; the holder keeps its own run state unless the
+ * remote record is newer than it, so an older copy a crashed or failed checkout left behind
  * is never pushed over a newer record. Newer: the remote record continues from the record ref this
  * checkout last had, or this checkout had none and the remote now has one (someone else pushed it:
  * the copy here is set aside as superseded in step 5, never lost). A ref moved off the holder's line
- * (08-F4: not a descendant of its own) is not newer: the holder's run state is kept, its next push on top.
+ * (not a descendant of its own) is not newer: the holder's run state is kept, its next push on top.
  * `record: false`: the caller restores the record itself, so nothing is prepared.
  */
 async function planRecord(ctx: Context, git: GitPort, remote: string | null, run: RunStory, o: { mine: boolean; holder: string; record: boolean }) {
@@ -365,7 +366,7 @@ async function planRecord(ctx: Context, git: GitPort, remote: string | null, run
   const newer = remoteSha !== null && remoteSha !== (ownRef?.sha ?? null) && (ownRef === null || (await continues(ownRef.sha, remoteSha)));
   const keepLocal = mine && localCopy && !newer;
   const before = keepLocal ? ownRef : null;
-  // gh-195 D11 (B27; 10-R3-F1, 11-S2): a local copy not kept is never replaced whole: set aside as
+  // A local copy not kept is never replaced whole: set aside as
   // superseded once the take is in, or removed quietly when it is a record this machine pushed (on the ref)
   const setAside = localCopy && !keepLocal ? await localRecordOf(root, run, holder) : null;
   const prepared = record ? await prepareRecord(ctx, remote, run, keepLocal) : null;
@@ -382,7 +383,7 @@ interface WorktreeRestore {
   worktrees: Array<{ unit: string; path: string; branch: string; local: string; created: boolean; slot: number | null }>;
 }
 
-/** T5, K4: one unit's branch brought here (only created or moved forward) and its worktree equipped; false, with a problem noted, when the branch cannot be. */
+/** One unit's branch brought here (only created or moved forward) and its worktree equipped; false, with a problem noted, when the branch cannot be. */
 async function checkoutWorktree(w: WorktreeRestore, t: WorktreeTarget, unitKey: string): Promise<boolean> {
   const { git, root, remote } = w;
   const existing = w.wtByBranch.get(t.branch) ?? null;
@@ -403,7 +404,7 @@ async function checkoutWorktree(w: WorktreeRestore, t: WorktreeTarget, unitKey: 
   return true;
 }
 
-/** A unit's cursor as printed, with its status (S9) above its handoff's written part (B7); `at` is the state the next tick will have. */
+/** A unit's cursor as printed, with its status above its handoff's written part; `at` is the state the next tick will have. */
 function unitView(unit: string, wt: string | null, runsDir: string, handoff: string | null, at?: UnitState | null): UnitView {
   const read = readState(runsDir);
   const st = at ?? (read.ok ? read.value : null);
@@ -415,13 +416,13 @@ function unitView(unit: string, wt: string | null, runsDir: string, handoff: str
     step: st ? st.step : null,
     status: st ? st.status : null,
     park: st ? (st.park ?? null) : null,
-    // B7: the status the handoff's generated header used to carry, above its written part
+    // The unit's status, above the handoff's written part
     handoff: st ? renderHandoffWithStatus(st, prose, { workflow: wf.ok ? wf.value.workflow : null }) : prose,
   };
 }
 
 /**
- * Phase 5b (T5, K4): the story and slice branches → worktrees, and each unit's view. A story branch
+ * Step 5b: the story and slice branches → worktrees, and each unit's view. A story branch
  * that cannot be brought here throws `onStoryFailed`'s failure; a slice's problem is noted and skipped.
  */
 async function restoreWorktrees(
@@ -452,7 +453,7 @@ async function restoreWorktrees(
   const snapshot = storyWt ? loadStory(storyWt, join(storyWt, spec_dir)) : null;
   const units: UnitView[] = [];
   const storyHandoff = storyWt ? handoffPath(join(storyWt, spec_dir), STORY_UNIT_DIR) : null;
-  // review#2 F7: the story unit as the next tick will have it (the take applied)
+  // The story unit as the next tick will have it (the take applied)
   units.push(unitView(key, storyWt, o.placedRuns, storyHandoff, o.storyState));
   const sliceRefs = new Set(
     (await git.listRefs(root, remote ? `refs/remotes/${remote}/${key}/` : `refs/heads/${key}/`)).map((r) => r.ref.replace(remote ? `refs/remotes/${remote}/` : "refs/heads/", "")),
@@ -474,9 +475,9 @@ async function restoreWorktrees(
 }
 
 /**
- * Journal a forced take (T5): claim blob `forced_from` + a Progress line in the story's handoff
- * (gh-195 B6: prose, no heartbeat block), committed and pushed with what `more` adds; the take receipt
- * stays in the machine dir (S12, D8).
+ * Journal a forced take: claim blob `forced_from` + a Progress line in the story's handoff
+ * (prose, no heartbeat block), committed and pushed with what `more` adds; the take receipt
+ * stays in the machine dir.
  */
 async function journalTake(
   git: GitPort,
@@ -516,7 +517,7 @@ async function journalTake(
 }
 
 /**
- * T5: claim `key` here (`force` takes a live claim over), restore its record from its ref and its
+ * Claim `key` here (`force` takes a live claim over), restore its record from its ref and its
  * worktrees from the pushed branches (the order is in the header). `record: false`: the caller restored
  * the record itself (`story reopen`).
  */
@@ -535,18 +536,18 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   const spec_dir = branch ? specDir(key, branch.slice(key.length + 1)) : "";
   const run = { key, spec_dir };
 
-  // ---- 1. the claim as on the remote (T3, T5)
+  // 1. the claim as on the remote
   const hb = heartbeatId(root, now);
   const holder = machineHolder(ctx.env);
   const { cur, mine, forced, prev } = await claimAsOnRemote(ctx, key, force, remote, hb);
 
-  // ---- 2. the record, fetched and staged (review F1, 10-R3-F1)
+  // 2. the record, fetched and staged
   const { keepLocal, before, setAside, prepared } = await planRecord(ctx, git, remote, run, { mine, holder, record: opts.record !== false });
-  // B33: a story without a branch is taken over from its record alone
+  // A story without a branch is taken over from its record alone
   if (!branch && !prepared) throw refuse(`no story branch for ${key}${remote ? ` on ${remote}` : ""}`, `${cmd.sync()} (intake creates it) or check the story key`, "unknown_story");
   const staged = prepared?.staged ?? null;
   try {
-    // ---- 3. the branches, then the record's branch commit against the story branch (T5a)
+    // 3. the branches, then the record's branch commit against the story branch
     if (remote && branch) {
       const f = await git
         .fetch(root, remote, [`+refs/heads/${branch}:refs/remotes/${remote}/${branch}`, `+refs/heads/${key}/*:refs/remotes/${remote}/${key}/*`], { quiet: true })
@@ -557,7 +558,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
     }
     // the story branch as taken: the remote's, else the local one
     const headRef = branch ? (remote ? `refs/remotes/${remote}/${branch}` : `refs/heads/${branch}`) : null;
-    // T5b (B25, B26, D10): no record on the ref and none of this checkout's own: the record may be lost
+    // No record on the ref and none of this checkout's own: the record may be lost
     const maybeLost = !prepared && !keepLocal && opts.record !== false;
     const head = headRef && (prepared || maybeLost) ? await git.revParse(root, headRef) : null;
     // the story unit's run state the take goes into: the staged record, or the machine dir's
@@ -567,7 +568,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
     const rewritten = await rewrittenSince(git, root, gone, head, storyRuns);
     const lost = maybeLost && branch && headRef && head ? await lostRecord(git, root, run, branch, head, headRef, prev?.holder ?? null) : null;
 
-    // ---- 4. claim by CAS, then the remote record ref must still be the one staged (review#2 F5)
+    // 4. claim by CAS, then the remote record ref must still be the one staged
     const blob = newClaimBlob({
       story: key,
       holder,
@@ -583,7 +584,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       if (claimed.reason === "held") throw claimHeld(claimed.holder, `wait until ${claimed.holder.expires_at} or ${cmd.storyCheckout(key, { force: true })}`);
       throw failure(`claim failed (${claimed.reason}): ${claimed.message}`, `retry: ${again}`, "claim_failed");
     }
-    // review#1 S1: with the record lost, the ref must still be absent — a holder that pushed its record
+    // With the record lost, the ref must still be absent — a holder that pushed its record
     // meanwhile (a handoff, a `remote` boundary) has a record no new round may hide
     const expected = staged && prepared ? prepared.taken.sha : lost ? null : undefined;
     if (remote && expected !== undefined) {
@@ -600,7 +601,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       }
     }
 
-    // ---- 5. locally: the take first (trace event, receipt into the record), then the record into place
+    // 5. locally: the take first (trace event, receipt into the record), then the record into place
     const expired = cur.state === "expired";
     const takeFacts = { previous_holder: prev?.holder ?? null, previous_heartbeat_id: prev?.heartbeat_id ?? null, expired, forced };
     appendTrace(root, traceEvent("take", now, { at: nowIso, unit: key, holder, heartbeat_id: hb, ...takeFacts }));
@@ -632,7 +633,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
     const placedRuns = runStateDir(root, run, STORY_UNIT_DIR);
     const next = nextCursor(placedRuns, rewritten?.gone ?? null);
 
-    // ---- 5b. branches → worktrees (T5, K4)
+    // 5b. branches → worktrees
     const { problems, worktrees, units, storyWt, storyHandoff } = await restoreWorktrees(ctx, ports, remote, run, branch, {
       placedRuns,
       storyState: next.state,
@@ -640,7 +641,6 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       onStoryFailed: (problems) => failure(`${problems.join("; ")}; ${held}`, `fix the story branch, then ${again} again`, "branch_diverged", { claim: blob }),
     });
 
-    // ---- journal a forced take (T5)
     const { journal, extra } = await journalTake(git, remote, run, { branch, holder, now, nowIso, forced_from: forced ? (blob.forced_from ?? null) : null, storyWt, storyHandoff, worktrees, more });
 
     const value = {
@@ -650,13 +650,13 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       taken_from: prev && !mine ? { holder: prev.holder, since: prev.acquired_at, expires_at: prev.expires_at, expired: Date.parse(prev.expires_at) <= now } : null,
       forced,
       journal,
-      // S12: the take receipt is in the machine dir, never committed or pushed (D8)
+      // The take receipt is in the machine dir, never committed or pushed
       receipt: record.receipt ? { file: record.receipt } : { file: null, note: record.note },
-      // T5 (gh-195 D10): the record taken over from its ref; T5a: why the step restarts, when it does
+      // The record taken over from its ref; why the step restarts, when it does
       record: taken ? { ref: recordRef(key), sha: taken.sha, branch_commit: taken.branch_commit, unpacked: taken.unpacked } : null,
-      // B25 (D10): no record to take over: a new round from the branch
+      // No record to take over: a new round from the branch
       record_lost: lost !== null,
-      // gh-195 D11 (B27): this checkout's own older copy, set aside rather than replaced (10-R3-F1, 11-S2)
+      // This checkout's own older copy, set aside rather than replaced
       ...(superseded ? { superseded } : {}),
       ...(lost ? { restarted: lost.line } : next.restarted ? { restarted: next.restarted } : {}),
       worktrees,

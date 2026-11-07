@@ -1,5 +1,5 @@
 /**
- * gh-195/08 (B9–B12, B14, B34; D2–D4): the team's `record.policy`. Under `remote` the holder pushes a
+ * The team's `record.policy`. Under `remote` the holder pushes a
  * story's record, its run-state folder in the machine dir packed into one commit, to
  * `refs/norn/runs/<story>` after the branch; under `local` (the default) no ref leaves the machine.
  */
@@ -120,7 +120,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("record.policy (B9)", () => {
+describe("record.policy", () => {
   test("AC1: absent = local; config set writes the team file, config get names it, doctor fails an unknown value", async () => {
     const got = await h.norn("config", "get", "record.policy", "--json");
     expect(got.exit).toBe(0);
@@ -179,7 +179,7 @@ describe("under remote, every boundary pushes the record after the branch (B10)"
     expect(remoteRecord("gh-9")).toBe(sha);
   });
 
-  test("D3: another clone unpacks the record into a folder, every JSON validated (S2)", async () => {
+  test("D3: another clone unpacks the record into a folder, every JSON validated", async () => {
     const other = join(h.dir, "unpacker");
     sh(h.dir, ["clone", "-q", h.remoteDir, other]);
     sh(other, ["fetch", "-q", "origin", `+${recordRef("gh-9")}:${recordRef("gh-9")}`]);
@@ -348,7 +348,7 @@ describe("a moved open story pushes its record under remote (B34)", () => {
     const rec = recordOnRemote("gh-13");
     expect(rec.files).toEqual(filesOf(s.record()));
     expect(rec.files).toContain("_story/rounds/01-trio/state.json");
-    // the handoff moved to handoffs/ on the branch (gh-195/07): it is no part of the record
+    // the handoff moved to handoffs/ on the branch: it is no part of the record
     expect(rec.files.filter((f) => f.endsWith("handoff.md") || f.startsWith("handoffs/"))).toEqual([]);
     expect(sh(s.wt, ["log", "-1", "--format=%s", rec.trailers["Norn-Branch-Commit"] as string])).toBe("norn: move gh-13 run state off the branch");
     expect(remoteBranch(s.branch)).toBe(rec.trailers["Norn-Branch-Commit"] as string);

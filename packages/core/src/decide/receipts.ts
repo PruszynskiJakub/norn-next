@@ -1,6 +1,6 @@
 /**
  * decide's tick context (`Ctx`) and the receipt/commit helpers every level shares: receipt
- * numbering, boundary commits (S4, S8), norn receipts (P6) applied in memory (S6), and the park path.
+ * numbering, boundary commits, norn receipts applied in memory, and the park path.
  */
 import {
   deriveUlid,
@@ -21,11 +21,11 @@ import type { InboxItem } from "../ports.ts";
 import { iso } from "../time.ts";
 import type { RepoWorkflows } from "./index.ts";
 
-/** R1.1: a side action rides along with its unit's one action this tick — a claim renewal, or a record push (gh-195 D4). */
+/** A side action rides along with its unit's one action this tick — a claim renewal, or a record push. */
 export function isSideAction(a: { kind: string; op?: unknown }): boolean {
   return (a.kind === "claim" && a.op === "renew") || isTailAction(a);
 }
-/** gh-195 D4 (B10): a side action act performs after every other action of the tick: the record push. */
+/** A side action act performs after every other action of the tick: the record push. */
 export function isTailAction(a: { kind: string }): boolean {
   return a.kind === "push_record";
 }
@@ -37,7 +37,7 @@ export class Ctx {
   readonly nowIso: string;
   readonly heartbeat: string;
   agentsFree: number;
-  /** stories with an integrate this tick (K6) */
+  /** stories with an integrate this tick */
   readonly integrating = new Set<string>();
   checksFree: number;
   private readonly slotsUsed: Set<number>;
@@ -62,10 +62,10 @@ export class Ctx {
     return this.taken.has(unit);
   }
   emit(action: Action): void {
-    // O5 (F5): an intake is about one story — key it by that story so `norn run view <story> --why` finds it;
+    // An intake is about one story — key it by that story so `norn run view <story> --why` finds it;
     // other repo-level actions (lease reclaim) stay `*`
     const unit = action.unit?.key ?? (action.kind === "intake_story" ? action.key : "*");
-    // R1.1: a claim renewal rides along; it does not take the unit's one action
+    // A claim renewal rides along; it does not take the unit's one action
     if (action.unit && !isSideAction(action)) {
       if (this.taken.has(unit)) throw new Error(`decide: second action for ${unit} (${action.rule})`);
       this.taken.add(unit);
@@ -75,7 +75,7 @@ export class Ctx {
   noop(unit: UnitRef, rule: string, reason: string): void {
     this.emit({ kind: "noop", unit, rule, reason });
   }
-  /** Next free port slot (K4), or null when the range is exhausted. */
+  /** Next free port slot, or null when the range is exhausted. */
   slot(): number | null {
     for (let s = SLOTS.min; s <= SLOTS.max; s++)
       if (!this.slotsUsed.has(s)) {
@@ -86,18 +86,17 @@ export class Ctx {
   }
   slotEnv(slot: number | null): Record<string, string> {
     if (slot === null) return {};
-    // B33: only NORN_SLOT and PORT_BASE
     return { NORN_SLOT: String(slot), PORT_BASE: String(SLOTS.port_base + slot * SLOTS.ports_per_slot) };
   }
 }
 
-/** B3: the last outcome receipt when it is a failed check. */
+/** The last outcome receipt when it is a failed check. */
 export const lastCheck = (uf: UnitFacts): NumberedReceipt | null => {
   const lo = uf.last_outcome_receipt;
   return lo?.receipt.kind === "check" && lo.receipt.outcome === "fail" ? lo : null;
 };
 
-/** B3: the last outcome receipt when it is a `done` with findings. */
+/** The last outcome receipt when it is a `done` with findings. */
 export const lastFindings = (uf: UnitFacts): NumberedReceipt | null => {
   const lo = uf.last_outcome_receipt;
   return lo?.receipt.kind === "done" && lo.receipt.findings?.length ? lo : null;
@@ -106,11 +105,11 @@ export const lastFindings = (uf: UnitFacts): NumberedReceipt | null => {
 export const nextReceiptNumber = (uf: UnitFacts): number =>
   Math.max(uf.state?.applied_through ?? 0, ...uf.unapplied.map((r) => r.n), lastCheck(uf)?.n ?? 0, lastFindings(uf)?.n ?? 0) + 1;
 
-/** H1: a merge, rebase, cherry-pick or revert (or unmerged paths) in progress in the unit's worktree. */
+/** A merge, rebase, cherry-pick or revert (or unmerged paths) in progress in the unit's worktree. */
 export const gitBusy = (uf: UnitFacts): boolean => !!uf.worktree?.in_progress && (!!uf.worktree.in_progress.operation || uf.worktree.in_progress.unmerged.length > 0);
 
 /**
- * gh-79 (H1, S5): a rebase waiting in the unit's worktree. HEAD is detached on an older commit, so
+ * A rebase waiting in the unit's worktree. HEAD is detached on an older commit, so
  * the working tree's `runs/` is rewound: its state.json and receipts are not the live unit's.
  */
 export const rebasing = (uf: UnitFacts): boolean => uf.worktree?.in_progress?.operation === "rebase";
@@ -123,7 +122,7 @@ export function unitBranch(story: StoryFacts, uf: UnitFacts | null): string {
 
 export const sliceFileOf = (story: StoryFacts, key: string): SliceFileFacts | undefined => story.slices.find((s) => s.key === key);
 
-/** S4: the trailers of a commit norn makes for a unit this tick (`nornTrailers`). */
+/** The trailers of a commit norn makes for a unit this tick (`nornTrailers`). */
 export const trailersFor = (ctx: Ctx, story: string, slice: string | null, step: string | null, ended?: StepEnd): Record<string, string> =>
   nornTrailers(ctx.facts.tick_id, story, slice, step, ended);
 
@@ -132,12 +131,12 @@ interface NewWorktree {
   path: string;
   branch: string;
   slice: string | null;
-  /** S8/T7: an intake is not pushed until the claim is held */
+  /** An intake is not pushed until the claim is held */
   push: boolean;
 }
 
 /**
- * S4, S8: the boundary commit for a unit at `step` — in the unit's worktree (no worktree, no commit),
+ * The boundary commit for a unit at `step` — in the unit's worktree (no worktree, no commit),
  * or in the worktree `fresh` that act creates first. `uf` null is the story unit without facts yet
  * (a story nobody started); `story` is only a key for a story intake creates.
  */
@@ -152,12 +151,12 @@ export function commitFor(ctx: Ctx, story: StoryFacts | string, uf: UnitFacts | 
   const cwd = unitWorktree(story, uf);
   if (!cwd) return null;
   const slice = uf?.unit.slice ?? null;
-  // gh-195 D17: a story unit's boundary is committed even when nothing changed (the non-holder's last boundary)
+  // A story unit's boundary is committed even when nothing changed (the non-holder's last boundary)
   return { cwd, branch: unitBranch(story, uf), message, trailers: trailersFor(ctx, key, slice, step, o.ended), push: true, ...(o.ended && slice === null ? { allow_empty: true as const } : {}) };
 }
 
 /**
- * gh-195 B18, B19 (S4): the outcome that ended the step `res` left — a step's outcome whose edge took the
+ * The outcome that ended the step `res` left — a step's outcome whose edge took the
  * cursor to another step — for the boundary commit's Norn-Outcome. None when no step ended: no advance,
  * a person moving the cursor (`moved`: workflow switch, unstick, update), an edge back into the same step,
  * or `$stuck`, which parks the step for an unstick to resume.
@@ -179,9 +178,9 @@ export function applyCtx(ctx: Ctx, wf: Workflow) {
 type ReceiptHeader = "kind" | "receipt_id" | "run_id" | "step" | "attempt" | "at" | "by" | "who" | "tick_id";
 
 /**
- * A receipt norn writes this tick at the unit's cursor (P6): its id derived from the tick
+ * A receipt norn writes this tick at the unit's cursor: its id derived from the tick
  * (`ctx.id()`, so `norn run view --why` replays it), at `facts.now`, by norn on this machine, no run unless
- * `fields` names one. `fields` may also set `by`/`who` (R6.1: an answer recorded for the agent).
+ * `fields` names one. `fields` may also set `by`/`who` (an answer recorded for the agent).
  */
 export function nornReceipt<K extends Receipt["kind"]>(
   ctx: Ctx,
@@ -204,14 +203,14 @@ export function nornReceipt<K extends Receipt["kind"]>(
 }
 
 /**
- * S6: apply `receipt`, numbered `n`, in memory after `prior` (unapplied receipts, R5.2) — the
+ * Apply `receipt`, numbered `n`, in memory after `prior` (unapplied receipts) — the
  * state the act commits once the receipt is written. `nr` is the receipt as the action carries it.
  */
 export function synth(ctx: Ctx, st: UnitState, wf: Workflow, n: number, receipt: Receipt, prior: readonly NumberedReceipt[] = []): { nr: NewReceipt; res: ApplyResult } {
   return { nr: { n, receipt }, res: applyReceipts(st, [...prior, { n, file: "", receipt }], applyCtx(ctx, wf)) };
 }
 
-/** An `apply_receipts` action for `res` (C2, S5): the receipts written this tick, the state, the boundary commit. */
+/** An `apply_receipts` action for `res`: the receipts written this tick, the state, the boundary commit. */
 export function emitApplied(
   ctx: Ctx,
   story: StoryFacts,

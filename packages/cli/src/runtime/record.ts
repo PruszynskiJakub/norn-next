@@ -1,6 +1,6 @@
 /**
- * GR6 record: after the story PR merged, the spec folder on the base branch is the record. Mark
- * its `spec.md` (or an older folder's `story.md`, GR2) `status: done` there without touching the person's main checkout:
+ * After the story PR merged, the spec folder on the base branch is the record. Mark
+ * its `spec.md` (or an older folder's `story.md`) `status: done` there without touching the person's main checkout:
  *   - with a remote: fetch the base branch, commit in a throwaway detached worktree at
  *     `<remote>/<base>`, push `HEAD:refs/heads/<base>` (fast-forward only, never forced). A
  *     protected base branch or a race rejects the push: the record is then left as merged
@@ -59,7 +59,7 @@ export async function markStoryOnBase(opts: {
     (e: unknown) => (e instanceof Error ? e.message : String(e)),
   );
   if (fetched !== null) return { state: "failed", branch: base, reason: `fetch ${base}: ${fetched}` };
-  // GR2: the base holds spec.md, or story.md for a story an older norn intook
+  // The base holds spec.md, or story.md for a story an older norn intook
   const onBase = async (name: string) => ((await git.hasPath(root, tracking, join(spec_dir, name))) ? join(spec_dir, name) : null);
   const rel = (await onBase(SPEC_FILE)) ?? (await onBase(LEGACY_SPEC_FILE));
   if (!rel) return { state: "deferred", branch: base, reason: `${join(spec_dir, SPEC_FILE)} is not on ${remote}/${base} yet` };
@@ -92,7 +92,7 @@ async function revOf(git: GitPort, root: string, rev: string): Promise<string | 
 }
 
 /**
- * GR6 done record: how the story PR landed, from the PR facts; merged by ancestry (P2) the merge
+ * How the story PR landed, from the PR facts; merged by ancestry the merge
  * commit is the first commit of `<remote>/<base>` that contains the head (the head itself when the
  * base's first-parent line holds it), dated by its committer date.
  */

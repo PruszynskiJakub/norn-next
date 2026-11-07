@@ -33,7 +33,7 @@ import {
 } from "../../src/index.ts";
 import { AT, tmp, WORKFLOW_YAML } from "../helpers.ts";
 
-describe("config (K2)", () => {
+describe("config", () => {
   test("user, local and team files merged; home from param or NORN_HOME_DIR; missing = built-in", () => {
     const repo = tmp();
     const home = tmp();
@@ -55,7 +55,7 @@ describe("config (K2)", () => {
   });
 });
 
-describe("workflows (W1)", () => {
+describe("workflows", () => {
   test("loads yaml and json, reports invalid and name mismatch", () => {
     const repo = tmp();
     const dir = workflowsDir(repo);
@@ -78,7 +78,7 @@ describe("workflows (W1)", () => {
     expect(loadWorkflow(repo, "slice")).toMatchObject({ ok: true, value: { workflow: { mode: "manual", defaults: { deadline: "30m", nudges: 1, retries: 0, stalled: "40m" } } } });
   });
 
-  test("B28 (S4): the hook read window is the longest stalled across the loaded workflows", () => {
+  test("B28: the hook read window is the longest stalled across the loaded workflows", () => {
     const repo = tmp();
     mkdirSync(workflowsDir(repo), { recursive: true });
     const window = () => hookWindowMs(Object.values(loadWorkflows(repo).workflows).map((w) => w.workflow));
@@ -113,7 +113,7 @@ function tick(unit: string, at: string): TraceEvent {
   };
 }
 
-describe("trace (O4)", () => {
+describe("trace", () => {
   test("daily JSONL files; filter by unit (story includes slices); last tick for why", () => {
     const repo = tmp();
     expect(appendTrace(repo, tick("gh-12", AT))).toBe("2026-10-23.jsonl");
@@ -196,7 +196,7 @@ describe("trace (O4)", () => {
       expect(opened(() => readTrace(repo, { types: ["tick"] }))).toEqual(both);
       expect(opened(() => inboxHistory(repo))).toEqual(both);
       expect(opened(() => readHookFacts(repo, AT))).toEqual(both);
-      // B9: the blocked count reads the unit's hook file, never a day file (this hook is only in the day file)
+      // The blocked count reads the unit's hook file, never a day file (this hook is only in the day file)
       expect(opened(() => blockedHookCount(repo, { story: "gh-12" }, runId))).toEqual([]);
       expect(opened(() => readHookFacts(repo, "2026-10-24T00:00:00.000Z"))).toEqual(both.slice(1));
     } finally {
@@ -204,7 +204,7 @@ describe("trace (O4)", () => {
     }
     expect(setTraceReadObserver(null)).toBeNull();
   });
-  test("replay inputs of a tick (O5): facts without the replay block, workflows read back from trace/workflows, config", () => {
+  test("replay inputs of a tick: facts without the replay block, workflows read back from trace/workflows, config", () => {
     const repo = tmp();
     const hash = "a".repeat(64);
     writeTraceFile(repo, `workflows/${hash}.yaml`, WORKFLOW_YAML);
@@ -215,7 +215,7 @@ describe("trace (O4)", () => {
     const inputs = read.ok ? read.inputs : null;
     expect(inputs?.facts as unknown).toEqual({ now: Date.parse(AT), tick_id: "T" });
     expect(inputs?.config).toEqual(config);
-    // a config recorded under the old names reads back in today's names (gh-64 P1)
+    // a config recorded under the old names reads back in today's names
     const old = { ...t, facts: { ...t.facts, replay: { workflows: {}, config: { default_mode: "auto", remote: { label: "x" } } } } } as unknown as TickTrace;
     const oldRead = readTickInputs(repo, old);
     expect(oldRead.ok && oldRead.inputs.config).toEqual({ mode: "auto", label: "x" } as unknown as ResolvedConfig);
@@ -224,7 +224,7 @@ describe("trace (O4)", () => {
     // a tick an older norn recorded without the replay block
     expect(readTickInputs(repo, tick("gh-12", AT) as TickTrace)).toEqual({ ok: false, reason: "no_replay" });
   });
-  test("A2/A4 (B5, D3): a unit's hook events — from its own hook file, since a time, oldest first, each id once; blocked ones counted per run", () => {
+  test("A2/A4 (D3): a unit's hook events — from its own hook file, since a time, oldest first, each id once; blocked ones counted per run", () => {
     const repo = tmp();
     const run9 = "01M5MA3PG0DB4G1MJNV0HKQYSA"; // a ulid of AT
     const hook = (at: string, cwd: string, extra: Record<string, unknown> = {}, blocked = false): HookTrace =>
@@ -238,16 +238,16 @@ describe("trace (O4)", () => {
     appendHookTrace(repo, gh10, hook("2026-10-23T12:00:02.000Z", "/w/gh-10", { story: "gh-10" }, true));
     appendHookTrace(repo, gh9, hook("2026-10-24T00:00:01.000Z", "/w/gh-9", { story: "gh-9", run_id: run9 }, true));
     appendHookTrace(repo, gh9s, hook("2026-10-24T00:00:02.000Z", "/w/gh-9--01", { story: "gh-9", slice: "gh-9/01" }));
-    // B7: the unit is the one written to, whatever the fact names
+    // The unit is the one written to, whatever the fact names
     appendHookTrace(repo, gh10, hook("2026-10-24T00:00:03.000Z", "/elsewhere", { story: "gh-10", run_id: ulid() }));
-    // D4: the hook file's time is its latest fact's; an older fact appended later never moves it back
+    // The hook file's time is its latest fact's; an older fact appended later never moves it back
     expect(unitHooksChangedAt(repo, gh9)).toBe(Date.parse("2026-10-24T00:00:01.000Z"));
     expect(unitHooksChangedAt(repo, gh10)).toBe(Date.parse("2026-10-24T00:00:03.000Z"));
     // a duplicate line (a backfill overlapping an append) is read once
     appendFileSync(hookFilePath(repo, gh9), `${JSON.stringify(late)}\n`);
     expect(hookFilePath(repo, gh9)).toBe(join(machineDir(repo), "hooks/gh-9/_story.jsonl"));
     expect(hookFilePath(repo, gh9s)).toBe(join(machineDir(repo), "hooks/gh-9/01.jsonl"));
-    // every line also lands in its day file (B5)
+    // every line also lands in its day file
     expect(readTrace(repo, { types: ["hook"] }).events).toHaveLength(6);
 
     const seen: string[] = [];
@@ -263,11 +263,11 @@ describe("trace (O4)", () => {
     } finally {
       setTraceReadObserver(prev);
     }
-    // B8–B10: only the units' own hook files are opened (gh-11 has none), no day file
+    // Only the units' own hook files are opened (gh-11 has none), no day file
     expect([...new Set(seen)].sort()).toEqual(["hook hooks/gh-10/_story.jsonl", "hook hooks/gh-9/01.jsonl", "hook hooks/gh-9/_story.jsonl"]);
     expect(unitHooksChangedAt(repo, { story: "gh-11" })).toBeNull();
   });
-  test("briefings stored by trace-relative path (B4)", () => {
+  test("briefings stored by trace-relative path", () => {
     const repo = tmp();
     const rel = writeBriefing(repo, "R1", "T1", "# brief");
     expect(rel).toBe("briefings/R1/T1.md");
@@ -334,7 +334,7 @@ const readBack = (repo: string, t: TickTrace) => {
 };
 const asText = (i: Inputs) => ({ facts: JSON.stringify(i.facts), workflows: JSON.stringify(i.workflows), config: JSON.stringify(i.config) });
 
-describe("chunked tick facts (O4, O5)", () => {
+describe("chunked tick facts", () => {
   test("B17: every golden case's inputs round-trip through a chunked tick byte for byte", () => {
     const repo = tmp();
     const cases = golden();

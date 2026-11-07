@@ -1,5 +1,5 @@
 /**
- * MO3 (gh-92): a run belongs to the agent session that started it. A second session in the unit
+ * A run belongs to the agent session that started it. A second session in the unit
  * worktree cannot brief or report the run (`foreign_session`), its hook facts are not credited to
  * the run, its turn end is not blocked, and so its report never commits the first session's work.
  */
@@ -36,7 +36,7 @@ function env() {
 }
 const hook = (session: string, event: string, payload: Record<string, unknown>) =>
   runChecked(["hook", event], { ...h.deps, cwd: wt(), env: env(), stdin: JSON.stringify({ session_id: session, transcript_path: `/tmp/${session}.jsonl`, cwd: wt(), ...payload }) });
-/** `norn <argv>` as session `session` runs it: its PreToolUse fires first (A2), then the command */
+/** `norn <argv>` as session `session` runs it: its PreToolUse fires first, then the command */
 async function as(session: string, ...argv: string[]): Promise<CliResult> {
   await hook(session, "pre-tool-use", { hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: `norn ${argv.join(" ")}` } });
   return runChecked(argv, { ...h.deps, cwd: wt(), env: env() });
@@ -62,7 +62,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("a run belongs to the session that started it (MO3, gh-92)", () => {
+describe("a run belongs to the session that started it", () => {
   test("session A's brief starts the run and records A", async () => {
     const r = await as("sess-A", "brief", "--json");
     expect(r.exit).toBe(0);

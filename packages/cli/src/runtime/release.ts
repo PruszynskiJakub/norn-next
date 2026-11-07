@@ -1,9 +1,10 @@
 /**
- * Claim release (T6): push the story and slice branches first, then the story's record to its ref
- * (gh-195 B15, under either policy), then delete the claim ref by CAS. Only by the heartbeat holding
- * the claim, and only fast-forward pushes (R3.3). Edited handoff.md files are committed first. A failed
- * record push releases nothing (B16). Used by a clean `watch` exit and `norn story handoff` (B34);
- * `norn story close` and GR6/GR6b make the same push (`pushHeldRecord`, runtime/close.ts).
+ * Claim release: push the story and slice branches first, then the story's record to its ref
+ * (under either policy), then delete the claim ref by CAS. Only by the heartbeat holding
+ * the claim, and only fast-forward pushes. Edited handoff.md files are committed first. A failed
+ * record push releases nothing. Used by a clean `watch` exit and `norn story handoff`;
+ * `norn story close`, the merged-story cleanup and the closed-issue close make the same push
+ * (`pushHeldRecord`, runtime/close.ts).
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -33,9 +34,9 @@ export interface ReleaseResult {
   story: string;
   ok: boolean;
   pushed: string[];
-  /** the record on the story's ref once released: its commit and the story branch commit it matches (null: no branch, B33); null: no run state */
+  /** the record on the story's ref once released: its commit and the story branch commit it matches (null: no branch); null: no run state */
   record?: { sha: string; branch_commit: string | null } | null;
-  /** `record`: the record push failed, so the claim is kept (B16) */
+  /** `record`: the record push failed, so the claim is kept */
   failed?: "record";
   error?: string;
 }
@@ -45,7 +46,7 @@ export function heldHere(obs: Observed, story: StoryFacts): boolean {
   return writtenHere(story.claim, obs.heartbeat_id);
 }
 
-/** Commit edits to each unit's handoff.md (agents and people write Goal/Progress/Resume, S9) before a handoff point. */
+/** Commit edits to each unit's handoff.md (agents and people write Goal/Progress/Resume) before a handoff point. */
 async function commitHandoffs(obs: Observed, story: StoryFacts): Promise<string[]> {
   const out: string[] = [];
   for (const u of story.units) {
@@ -77,7 +78,7 @@ export async function releaseStory(obs: Observed, story: StoryFacts): Promise<Re
       const ul = obs.units[u.unit.key];
       if (u.unit.slice && ul?.worktree && u.worktree?.exists) branches.push({ cwd: ul.worktree, branch: ul.branch });
     }
-    // R3.3 (H6, A21): push only fast-forwards of the remote branches — a stale local branch never
+    // Push only fast-forwards of the remote branches — a stale local branch never
     // replaces the record. Checked for every branch before anything is pushed or deleted.
     for (const b of branches) {
       const ff = await fastForwardOf(git, obs.root, remote, b.branch);
@@ -89,7 +90,7 @@ export async function releaseStory(obs: Observed, story: StoryFacts): Promise<Re
       pushed.push(b.branch);
     }
   }
-  // B15, B16: the record goes before the claim; a failed push keeps the claim and deletes nothing
+  // The record goes before the claim; a failed push keeps the claim and deletes nothing
   const rec = await pushHeldRecord(obs, story.key, obs.stories[story.key]?.branch ?? story.branch);
   if (!rec.ok) return { story: story.key, ok: false, pushed, failed: "record", error: `${recordPushError(story.key, rec.reason, rec.message)}; the claim is kept` };
   const record = rec.sha === null ? null : { sha: rec.sha, branch_commit: rec.branch_commit };
@@ -97,7 +98,7 @@ export async function releaseStory(obs: Observed, story: StoryFacts): Promise<Re
   return r.ok ? { story: story.key, ok: true, pushed, record } : { story: story.key, ok: false, pushed, record, error: r.message };
 }
 
-/** R3.3: is local `branch` a fast-forward of the remote one (fetched now; absent remotely counts)? */
+/** Is local `branch` a fast-forward of the remote one (fetched now; absent remotely counts)? */
 async function fastForwardOf(git: GitPort, root: string, remote: string, branch: string): Promise<{ ok: true } | { ok: false; reason: string }> {
   const tracking = `refs/remotes/${remote}/${branch}`;
   const failed = await git.fetch(root, remote, [`+refs/heads/${branch}:${tracking}`], { quiet: true }).then(
@@ -111,9 +112,9 @@ async function fastForwardOf(git: GitPort, root: string, remote: string, branch:
   return anc ? { ok: true } : { ok: false, reason: "the remote has commits this checkout does not" };
 }
 
-/** Release every claim this heartbeat holds (clean `watch` exit, T6). */
+/** Release every claim this heartbeat holds (clean `watch` exit). */
 export async function releaseHeldClaims(ctx: Context): Promise<ReleaseResult[]> {
-  // T6, H1: the clean-exit release waits for a running tick too; its abort signal has already fired (D5)
+  // The clean-exit release waits for a running tick too; its abort signal has already fired
   const lock = await waitForTickLock(ctx, "norn story handoff", "retry when it finishes", null);
   try {
     const obs = await observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });

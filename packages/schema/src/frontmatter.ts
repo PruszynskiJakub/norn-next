@@ -2,8 +2,8 @@ import { type Static, Type } from "@sinclair/typebox";
 import { GitSha, IsoTime, NonEmpty, PosInt, RemoteProvider, SliceKey, Slug, StoryKey } from "./common.ts";
 import { Criterion } from "./criteria.ts";
 
-/** QV1: acceptance criteria as data; ids unique (checked by `norn done`, QV4). */
-const Criteria = Type.Array(Criterion, { description: "Acceptance criteria as data (QV1); the prose Acceptance section stays the spec" });
+/** Acceptance criteria as data; ids unique (checked by `norn done`). */
+const Criteria = Type.Array(Criterion, { description: "Acceptance criteria as data; the prose Acceptance section stays the spec" });
 
 const WorkflowName = Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "Name of a workflow file" });
 
@@ -19,7 +19,7 @@ export type StoryStatus = Static<typeof StoryStatus>;
 /** A story whose spec.md says it is over: `done` or `dropped`. */
 export const isClosedStatus = (status: string | null | undefined): status is "done" | "dropped" => status === "done" || status === "dropped";
 
-/** How the story PR landed (GR6, P2), recorded at cleanup. */
+/** How the story PR landed, recorded at cleanup. */
 export const StoryMerge = Type.Object(
   {
     pr: Type.Optional(PosInt),
@@ -29,7 +29,7 @@ export const StoryMerge = Type.Object(
     merge_commit_sha: Type.Optional(GitSha),
     merged_by: Type.Optional(NonEmpty),
     merged_at: Type.Optional(IsoTime),
-    /** the PR did not say merged; the branch head was found on the base (P2) */
+    /** the PR did not say merged; the branch head was found on the base */
     by_ancestry: Type.Optional(Type.Boolean()),
   },
   { additionalProperties: false },
@@ -37,7 +37,7 @@ export const StoryMerge = Type.Object(
 export type StoryMerge = Static<typeof StoryMerge>;
 
 /**
- * Frontmatter of `.agents/specs/<id>-<slug>/spec.md` (GR2, GR8).
+ * Frontmatter of `.agents/specs/<id>-<slug>/spec.md`.
  * Mirrored fields (title, url, assignee, labels, body_hash) are written by the CLI;
  * the markdown body is the spec and is never overwritten.
  */
@@ -58,9 +58,9 @@ export const StoryFrontmatter = Type.Object(
     body_hash: Type.Optional(Type.String({ pattern: "^[0-9a-f]{64}$" })),
     /** Remote body hash recorded when refine finished, if it differs from body_hash later. */
     refined_body_hash: Type.Optional(Type.String({ pattern: "^[0-9a-f]{64}$" })),
-    /** GR6 done record: how the story PR landed, written with `status: done` on the base branch. */
+    /** The done record: how the story PR landed, written with `status: done` on the base branch. */
     merge: Type.Optional(StoryMerge),
-    /** QV1: story-level acceptance criteria, checked by story-level QA */
+    /** Story-level acceptance criteria, checked by story-level QA */
     criteria: Type.Optional(Criteria),
   },
   { $id: "https://norn.dev/schema/story.json", title: "norn story frontmatter", additionalProperties: true },
@@ -87,7 +87,7 @@ export const SliceFrontmatter = Type.Object(
     depends_on: Type.Array(SliceKey, { uniqueItems: true }),
     status: SliceStatus,
     labels: Type.Optional(Type.Array(Type.String())),
-    /** QV1: the slice's acceptance criteria, written by the slice skill next to the Acceptance section */
+    /** The slice's acceptance criteria, written by the slice skill next to the Acceptance section */
     criteria: Type.Optional(Criteria),
   },
   { $id: "https://norn.dev/schema/slice.json", title: "norn slice frontmatter", additionalProperties: true },

@@ -1,6 +1,6 @@
 /**
- * `norn ask "<question>" [--option …]` (§9.3, §10 universal report): the step needs a person's
- * answer. The tick parks the unit in the inbox; the answer resumes the same session (B2, C3).
+ * `norn ask "<question>" [--option …]`: the step needs a person's
+ * answer. The tick parks the unit in the inbox; the answer resumes the same session.
  */
 import type { ReceiptOf } from "@norn/schema";
 import { defineCommand, opt } from "../command.ts";
@@ -11,7 +11,7 @@ import { cmd } from "@norn/core";
 export const askCommand = defineCommand({
   name: "ask",
   version: "exempt",
-  summary: "Report that the step needs a person's answer to continue (§9.3); then end your turn",
+  summary: "Report that the step needs a person's answer to continue; then end your turn",
   usage: 'norn ask "<question>" [--option "<a>" --option "<b>"]',
   options: { option: { type: "string", multiple: true } },
   positionals: { min: 1, max: 1 },

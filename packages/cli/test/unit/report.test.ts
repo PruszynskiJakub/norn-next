@@ -1,4 +1,4 @@
-/** gh-273 (O6, S9): `appendProgress` adds the line to the handoff's one Progress section at whatever heading level the agent wrote. */
+/** `appendProgress` adds the line to the handoff's one Progress section at whatever heading level the agent wrote. */
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -18,7 +18,7 @@ function handoff(text: string): string {
   return file;
 }
 
-describe("appendProgress (gh-273)", () => {
+describe("appendProgress", () => {
   for (const level of [1, 2, 3, 4]) {
     const h = "#".repeat(level);
     test(`level ${level} headings: the line lands after the last milestone of the one Progress section`, () => {

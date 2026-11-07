@@ -5,10 +5,10 @@ import { DEFAULT_CONFIG } from "@norn/schema";
 import { machineHolder, readEnvNorn, readUnitMarker, scanWorktrees, slotEnv, writeEnvNorn, writeUnitMarker } from "../../src/index.ts";
 import { tmp } from "../helpers.ts";
 
-describe("worktree files (A3, K4)", () => {
+describe("worktree files", () => {
   test(".env.norn and .norn-unit", () => {
     const wt = tmp();
-    // B33: only NORN_SLOT and PORT_BASE
+    // Only NORN_SLOT and PORT_BASE
     const env = slotEnv(2);
     expect(env).toEqual({ NORN_SLOT: "2", PORT_BASE: "4020" });
     writeEnvNorn(wt, { ...env, ODD: 'a "b" c' });
@@ -19,7 +19,7 @@ describe("worktree files (A3, K4)", () => {
   });
 });
 
-describe("scanWorktrees (GR3, A3; refactor 5.2)", () => {
+describe("scanWorktrees (A3; refactor 5.2)", () => {
   test("story and slice worktrees by folder shape and marker; anything else is skipped", () => {
     const parent = tmp();
     const root = join(parent, "app");
@@ -46,7 +46,7 @@ describe("scanWorktrees (GR3, A3; refactor 5.2)", () => {
   });
 });
 
-describe("machineHolder (R7.2)", () => {
+describe("machineHolder", () => {
   test("user@host from the environment, NORN_MACHINE overriding the host, one token", () => {
     expect(machineHolder({ USER: "ann", NORN_MACHINE: "box" })).toBe("ann@box");
     expect(machineHolder({ LOGNAME: "a b", NORN_MACHINE: "my@mac" })).toBe("a_b@my_mac");

@@ -1,15 +1,15 @@
 /**
- * `norn story view [<story|slice>]` (B16, D6): one story at a glance for a person and the agent that
+ * `norn story view [<story|slice>]`: one story at a glance for a person and the agent that
  * sits with them (`norn story chat`) — what the story is, each slice with its workflow and step, the
  * PR and its state, open notes by unit, what waits for the person (exact commands) and where to look.
- * Built on the orient report, which it extends. Pure: a ProjectView in, a report out; read only (X1).
+ * Built on the orient report, which it extends. Pure: a ProjectView in, a report out; read only.
  */
 import { cmd, formatAge, type InboxGroup } from "@norn/core";
 import { PROVIDERS, type RemoteProvider, type StoryStatus } from "@norn/schema";
 import { inboxItemsInOrder } from "./format.ts";
 import type { ClaimView, DelegatedDecision, PrView, ProjectView, SliceView, StoryView, UnitView } from "./types.ts";
 
-/** Inbox groups that wait for the person (O1), in order. */
+/** Inbox groups that wait for the person, in order. */
 const WAITING: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check", "unclaimed"];
 
 export interface OrientUnit {
@@ -18,12 +18,12 @@ export interface OrientUnit {
   status: UnitView["status"];
   /** the unit's workflow (pinned, else the one it would start with) */
   workflow: string;
-  /** gh-71 B28: the story's round (a slice's: the round that started it); null when not started */
+  /** The story's round (a slice's: the round that started it); null when not started */
   round: number | null;
   step: string | null;
   attempt: number | null;
   last_outcome: { step: string; outcome: string; at: string } | null;
-  /** next command for a person or agent (S9) */
+  /** next command for a person or agent */
   next: string | null;
   /** slices only: integrated into the story branch */
   integrated: boolean;
@@ -67,20 +67,19 @@ export interface OrientReport {
   /** story worktree (or checkout) the spec was read from */
   root: string;
   spec: string;
-  /** null: held from its record alone, no branch (B33) */
+  /** null: held from its record alone, no branch */
   branch: string | null;
   pr: PrView | null;
   /** the PR's state in one word; null when no PR was seen */
   pr_state: "draft" | "open" | "closed" | "merged" | null;
-  /** `gh pr view <branch>` / `glab mr view <branch>` */
-  /** null without a branch */
+  /** `gh pr view <branch>` / `glab mr view <branch>`; null without a branch */
   pr_command: string | null;
   waiting: OrientItem[];
   running: OrientItem[];
   /** open notes grouped by unit, the unit with the newest note first */
   notes: Array<{ unit: string; notes: OrientNote[] }>;
   note_count: number;
-  /** gh-196 D5 (B22): decisions a supervisor made on the person's behalf, oldest first */
+  /** Decisions a supervisor made on the person's behalf, oldest first */
   delegated: DelegatedDecision[];
   look: { spec: string; trace: string; why: string; status: string };
 }
@@ -189,7 +188,7 @@ const indent = (text: string, pad: string) => text.trim().split("\n").join(`\n${
 
 /**
  * The agent's part of the orient workspace: summarize, then answer; act only when told. It never
- * reports an outcome (`done`/`ask`/`stuck`): an orient session is no run (B3).
+ * reports an outcome (`done`/`ask`/`stuck`): an orient session is no run.
  */
 const ORIENT_RULES = [
   "You sit with the person to help them get oriented on this story. Follow these rules:",
@@ -209,16 +208,16 @@ function sliceLine(s: OrientUnit): string {
 
 /**
  * Markdown for `norn story view`; `rules` puts the chat agent's rules first (`norn story chat`
- * starts its agent on this view, B29).
+ * starts its agent on this view).
  */
 export function formatStoryView(r: OrientReport, now: number, o: { rules?: boolean } = {}): string {
   const out: string[] = [`# ${r.story} — ${r.title}`, ""];
   if (o.rules) out.push(...ORIENT_RULES.split("\n").map((l) => `> ${l}`), "");
   out.push("## The story", "");
   if (r.url) out.push(`- Issue: ${r.url}`);
-  // gh-71 B28 (D10): the round and its workflow next to the step
+  // The round and its workflow next to the step
   out.push(`- Story: ${r.unit.round ? `round ${r.unit.round} · ` : ""}${r.unit.workflow} · ${unitStanding(r.unit)} · ${r.mode} · ${r.claim}`);
-  out.push(`- Worktree: \`${r.root}\` · ${r.branch ? `branch \`${r.branch}\`` : "no branch (held from its record, B33)"}`);
+  out.push(`- Worktree: \`${r.root}\` · ${r.branch ? `branch \`${r.branch}\`` : "no branch (held from its record)"}`);
   out.push(`- Spec: \`${r.spec}\``, "");
   out.push("## Slices", "");
   if (r.slices.length === 0) out.push("No slices yet.");
@@ -246,9 +245,9 @@ export function formatStoryView(r: OrientReport, now: number, o: { rules?: boole
     out.push("");
   }
   if (r.note_count) out.pop();
-  // gh-196 D5 (B22): what a supervisor decided on the person's behalf; none → no section
+  // What a supervisor decided on the person's behalf; none → no section
   if (r.delegated.length) {
-    out.push("", `## Delegated (${r.delegated.length})`, "", "A supervisor decided these on the person's behalf (SK3); review what it let through.", "");
+    out.push("", `## Delegated (${r.delegated.length})`, "", "A supervisor decided these on the person's behalf; review what it let through.", "");
     for (const d of r.delegated) out.push(`- ${d.unit}${d.round ? ` round ${d.round}` : ""} · ${d.step}: ${delegatedWhat(d)} — ${d.reason}`);
   }
   out.push("", "## Where to look", "");

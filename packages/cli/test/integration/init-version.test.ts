@@ -1,5 +1,5 @@
 /**
- * gh-61 B1, B28 (D10) at the CLI seam (S1): `norn init` records the running norn's version in a
+ * gh-61 B1, B28 at the CLI seam: `norn init` records the running norn's version in a
  * repo that has none, and on a repo set up for another version sets up the machine, copies in a
  * missing bundled skill, and leaves the version and a differing skill alone, pointing at
  * `norn upgrade`. With the binary on the repo's version it repairs the skills as before.
@@ -25,7 +25,7 @@ async function setUpAt(version: string, running: string): Promise<Harness> {
   return h;
 }
 
-describe("norn init records the version once and never moves it (B1, B28)", () => {
+describe("norn init records the version once and never moves it (B28)", () => {
   test("AC1 B1: a repo with no norn_version gets the binary's, uncommitted, and init says so", async () => {
     const h = await createHarness({ version: "0.19.0" });
     try {

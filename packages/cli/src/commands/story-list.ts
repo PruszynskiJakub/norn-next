@@ -1,6 +1,6 @@
 /**
- * `norn story list [--json]` (B15, §15, MO2): stories, slices, runs and recently done units from
- * @norn/view (X1), the table `norn status` printed before; `--json` gives the same value it did (B70).
+ * `norn story list [--json]`: stories, slices, runs and recently done units from
+ * @norn/view, as a table; `--json` for data.
  */
 import { formatStatus } from "@norn/view";
 import { defineCommand } from "../command.ts";

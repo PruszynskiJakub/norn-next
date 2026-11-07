@@ -12,7 +12,7 @@ export interface HerdrCallOptions {
   bin?: string;
   /** named Herdr session (`--session <name>`); default = the user's default session */
   session?: string;
-  /** H11: bound each call (a timeout is exit 124); default unbounded */
+  /** Bound each call (a timeout is exit 124); default unbounded */
   timeoutMs?: number;
   /**
    * How a failure maps to a PortError. `parsed` (default, runner and status pane): herdr's JSON

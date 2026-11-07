@@ -1,7 +1,7 @@
 /**
- * Machine-local files of one checkout, kept in its machine dir `<norn home>/repos/<id>/` (B5): caches and
+ * Machine-local files of one checkout, kept in its machine dir `<norn home>/repos/<id>/`: caches and
  * bookkeeping norn writes for itself, never committed. Every read is validated against these
- * (S2); a file that is unreadable or of the wrong shape reads as its empty fallback and leaves a
+ * schemas; a file that is unreadable or of the wrong shape reads as its empty fallback and leaves a
  * `local_file` trace event (store `readLocalJson`). Unknown properties are allowed so a file
  * written by a newer norn still reads; the properties norn uses must have the right type.
  */
@@ -12,7 +12,7 @@ import { StoryMerge } from "./frontmatter.ts";
 const id = (name: string, title: string) => ({ $id: `https://norn.dev/schema/${name}.json`, title });
 const Nullable = <T extends import("@sinclair/typebox").TSchema>(t: T) => Type.Union([t, Type.Null()]);
 
-/** `remote.json`: remote sync cache (H5 throttle); times are ms epoch. */
+/** `remote.json`: remote sync cache, read to throttle syncs; times are ms epoch. */
 export const LocalRemoteFile = Type.Object(
   {
     synced_at: Type.Optional(Nullable(Type.Number())),
@@ -24,11 +24,11 @@ export const LocalRemoteFile = Type.Object(
 );
 export type LocalRemoteFile = Static<typeof LocalRemoteFile>;
 
-/** `notified.json`: inbox item ids already notified (O3). */
+/** `notified.json`: inbox item ids already notified. */
 export const LocalNotifiedFile = Type.Object({ ids: Type.Optional(Type.Array(Type.String())) }, id("local-notified", "norn notified inbox ids (trace/notified.json)"));
 export type LocalNotifiedFile = Static<typeof LocalNotifiedFile>;
 
-/** One GR6 base-branch record still owed. */
+/** One base-branch record still owed. */
 export const PendingRecordEntry = Type.Object({
   story: Type.String(),
   spec_dir: Type.String(),
@@ -41,11 +41,11 @@ export const PendingRecordEntry = Type.Object({
 });
 export type PendingRecordEntry = Static<typeof PendingRecordEntry>;
 
-/** `records.json`: GR6 records still owed. */
+/** `records.json`: base-branch records still owed. */
 export const LocalRecordsFile = Type.Object({ records: Type.Optional(Type.Array(PendingRecordEntry)) }, id("local-records", "norn owed base-branch records (trace/records.json)"));
 export type LocalRecordsFile = Static<typeof LocalRecordsFile>;
 
-/** `foreign.json`: commit shas already traced as `foreign_commits` (Q6). */
+/** `foreign.json`: commit shas already traced as `foreign_commits`. */
 export const LocalForeignFile = Type.Object({ shas: Type.Optional(Type.Array(Type.String())) }, id("local-foreign", "norn traced foreign commits (trace/foreign.json)"));
 export type LocalForeignFile = Static<typeof LocalForeignFile>;
 
@@ -78,27 +78,27 @@ export const InboxItemEntry = Type.Object({
   cleared_by: Type.Optional(Type.String()),
 });
 
-/** `inbox.json`: the inbox items open after the last tick (O1, O4). */
+/** `inbox.json`: the inbox items open after the last tick. */
 export const LocalInboxFile = Type.Object({ open: Type.Optional(Type.Record(Type.String(), InboxItemEntry)) }, id("local-inbox", "open inbox items norn has seen (trace/inbox.json)"));
 export type LocalInboxFile = Static<typeof LocalInboxFile>;
 
-/** `heartbeat.json`: this checkout's heartbeat_id (ID2) and `last_tick_at` (R5.5). */
+/** `heartbeat.json`: this checkout's heartbeat_id and `last_tick_at`. */
 export const LocalHeartbeatFile = Type.Object(
   {
     heartbeat_id: Type.Optional(Type.String()),
     created_at: Type.Optional(Type.String()),
-    /** R5.5: ISO time the last tick on this checkout finished */
+    /** ISO time the last tick on this checkout finished */
     last_tick_at: Type.Optional(Type.String()),
-    /** gh-78: how long that tick took, in ms */
+    /** How long that tick took, in ms */
     last_tick_ms: Type.Optional(Type.Integer({ minimum: 0 })),
-    /** B34 (D5): the tick interval `norn watch` or `norn tick --interval` runs at; absent = 30s */
+    /** The tick interval `norn watch` or `norn tick --interval` runs at; absent = 30s */
     interval: Type.Optional(Type.String({ pattern: "^([0-9]+(ms|s|m|h|d))+$" })),
   },
   id("local-heartbeat", "norn checkout heartbeat (trace/heartbeat.json)"),
 );
 export type LocalHeartbeatFile = Static<typeof LocalHeartbeatFile>;
 
-/** R4.3: the last act effect that failed for a unit (core `ActFailure`). */
+/** The last act effect that failed for a unit (core `ActFailure`). */
 export const ActFailureEntry = Type.Object({
   effect: Type.String(),
   rule: Type.String(),
@@ -108,15 +108,15 @@ export const ActFailureEntry = Type.Object({
   step: Type.String(),
   attempt: Type.Number(),
   session: Type.Optional(Type.Object({ runner: Type.String(), session_id: Type.String(), pane_id: Type.Optional(Type.String()) })),
-  /** gh-195 (08-F4): a `record_push` refused as stale — the record ref sha it leased on (null = absent) */
+  /** a `record_push` refused as stale — the record ref sha it leased on (null = absent) */
   lease: Type.Optional(Type.Union([Type.String(), Type.Null()])),
 });
 
-/** `failures.json`: unit key → last failed act effect (R4.3). */
+/** `failures.json`: unit key → last failed act effect. */
 export const LocalFailuresFile = Type.Object({ units: Type.Optional(Type.Record(Type.String(), ActFailureEntry)) }, id("local-failures", "norn failed act effects (trace/failures.json)"));
 export type LocalFailuresFile = Static<typeof LocalFailuresFile>;
 
-/** BS1: the last `story.base` measured (core `StoryBase`). */
+/** The last `story.base` measured (core `StoryBase`). */
 export const StoryBaseEntry = Type.Object({
   ref: Type.String(),
   sha: Type.String(),
@@ -127,7 +127,7 @@ export const StoryBaseEntry = Type.Object({
   conflicts: Type.Array(Type.String()),
 });
 
-/** `base.json`: story key → the last `story.base` measured (BS1). */
+/** `base.json`: story key → the last `story.base` measured. */
 export const LocalBaseFile = Type.Object({ stories: Type.Optional(Type.Record(Type.String(), StoryBaseEntry)) }, id("local-base", "norn measured story bases (trace/base.json)"));
 export type LocalBaseFile = Static<typeof LocalBaseFile>;
 
@@ -142,12 +142,12 @@ export const PullRequestEntry = Type.Object({
   merged_by: Type.Optional(Type.String()),
   merged_at: Type.Optional(Nullable(Type.String())),
   head: Type.Optional(Type.String()),
-  /** older name of `base_branch`, read from a cache an older norn wrote; nothing writes it (dropped in 0.11.0) */
+  /** older name of `base_branch`, read from a cache an older norn wrote; nothing writes it */
   base: Type.Optional(Type.String()),
   base_branch: Type.Optional(Type.String()),
 });
 
-/** `pr.json`: story key → the story PR the last sync saw, with when (C1). */
+/** `pr.json`: story key → the story PR the last sync saw, with when. */
 export const LocalPrFile = Type.Object(
   {
     stories: Type.Optional(
@@ -156,7 +156,7 @@ export const LocalPrFile = Type.Object(
         Type.Object({
           pr: Nullable(PullRequestEntry),
           observed_at: Type.Number(),
-          /** gh-195 B18: the CI state of the PR's head, observed for a story held elsewhere (core `PullRequestCi`) */
+          /** The CI state of the PR's head, observed for a story held elsewhere (core `PullRequestCi`) */
           ci: Type.Optional(Type.Union([Type.Literal("pending"), Type.Literal("success"), Type.Literal("failure"), Type.Literal("none")])),
         }),
       ),
@@ -179,18 +179,18 @@ export const IssueEntry = Type.Object({
   updated_at: Type.String(),
 });
 
-/** `issue.json`: story key → the story issue the last sync saw (`null` = not visible), with when (gh-71 D5). */
+/** `issue.json`: story key → the story issue the last sync saw (`null` = not visible), with when. */
 export const LocalIssueFile = Type.Object(
   { stories: Type.Optional(Type.Record(Type.String(), Type.Object({ issue: Nullable(IssueEntry), observed_at: Type.Number() }))) },
   id("local-issue", "norn story issues seen (trace/issue.json)"),
 );
 export type LocalIssueFile = Static<typeof LocalIssueFile>;
 
-/** `<norn home>/cockpit.json`: CP13 `last_repo`, the main checkout the last cockpit ran in. */
+/** `<norn home>/cockpit.json`: `last_repo`, the main checkout the last cockpit ran in. */
 export const LocalCockpitFile = Type.Object({ last_repo: Type.Optional(Type.String()) }, id("local-cockpit", "memory of norn status --watch (<norn home>/cockpit.json)"));
 export type LocalCockpitFile = Static<typeof LocalCockpitFile>;
 
-/** `checkout.json`: the checkout a machine dir belongs to (D3), so doctor can tell one orphaned by a moved repo folder. */
+/** `checkout.json`: the checkout a machine dir belongs to, so doctor can tell one orphaned by a moved repo folder. */
 export const LocalCheckoutFile = Type.Object(
   {
     /** absolute path of the main checkout */
@@ -199,19 +199,19 @@ export const LocalCheckoutFile = Type.Object(
   id("local-checkout", "the checkout a norn machine dir belongs to (<norn home>/repos/<id>/checkout.json)"),
 );
 export type LocalCheckoutFile = Static<typeof LocalCheckoutFile>;
-/** `hooks/backfill.json` in the machine dir (B11, B12, D5): when the first tick of the per-unit hook files ran, and the units whose live runs' hook lines it has copied from the day files. Never pruned. */
+/** `hooks/backfill.json` in the machine dir: when the first tick of the per-unit hook files ran, and the units whose live runs' hook lines it has copied from the day files. Never pruned. */
 export const LocalHookBackfillFile = Type.Object(
   { since: Type.String(), done: Type.Array(Type.String()) },
   id("local-hook-backfill", "norn hook file backfill (<norn home>/repos/<id>/hooks/backfill.json)"),
 );
 export type LocalHookBackfillFile = Static<typeof LocalHookBackfillFile>;
 
-/** `notices.json`: the one-time notices this checkout has shown (B13), by id. */
+/** `notices.json`: the one-time notices this checkout has shown, by id. */
 export const LocalNoticesFile = Type.Object({ shown: Type.Optional(Type.Array(Type.String())) }, id("local-notices", "norn one-time notices shown (trace/notices.json)"));
 export type LocalNoticesFile = Static<typeof LocalNoticesFile>;
 
 /**
- * gh-195 D12 (B21, T9): one mailbox receipt this holder's tick rejected, kept next to the notices so a
+ * One mailbox receipt this holder's tick rejected, kept next to the notices so a
  * stale answer or approval shows as a Check item. It clears on its own: an answer or approval of the
  * story accepted after it (in the holder's own receipt order, `seen`), or the story finished. `norn
  * tidy` drops only cleared ones older than `trace.retain`; an open one stays.
@@ -240,12 +240,12 @@ export const RejectedMailboxReceipt = Type.Object(
 );
 export type RejectedMailboxReceipt = Static<typeof RejectedMailboxReceipt>;
 
-/** `rejected.json` in the machine dir (gh-195 D12): the mailbox receipts this checkout's ticks rejected. */
+/** `rejected.json` in the machine dir: the mailbox receipts this checkout's ticks rejected. */
 export const LocalRejectedFile = Type.Object({ receipts: Type.Array(RejectedMailboxReceipt) }, id("local-rejected", "norn mailbox receipts rejected on this checkout (<norn home>/repos/<id>/rejected.json)"));
 export type LocalRejectedFile = Static<typeof LocalRejectedFile>;
 
 /**
- * gh-195 D11 (B27, T7a): `superseded.json` at the top of a record set aside in the machine dir's
+ * `superseded.json` at the top of a record set aside in the machine dir's
  * `superseded/<story>-<ulid>/`: whose takeover superseded it and the newest receipt it holds, for its
  * Check item until `norn tidy` deletes it after `trace.retain`.
  */
@@ -263,7 +263,7 @@ export const LocalSupersededFile = Type.Object(
 );
 export type LocalSupersededFile = Static<typeof LocalSupersededFile>;
 
-/** A lock file (H1 tick lock, K6 integrate lock): the holder process and when it took the lock. */
+/** A lock file (the tick lock, the integrate lock): the holder process and when it took the lock. */
 export const LocalLockFile = Type.Object(
   {
     holder: ProcessIdentity,

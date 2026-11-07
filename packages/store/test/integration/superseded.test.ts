@@ -1,5 +1,5 @@
 /**
- * gh-195 D11 (B27), review#1 F6: what a crash between a rename aside and its delete leaves — a dot-named
+ * gh-195 D11, review#1 F6: what a crash between a rename aside and its delete leaves — a dot-named
  * `.drop` folder beside the stories' run state or under `superseded/` — is swept by the next tidy prune
  * (never by a dry one) and the next set-aside; a copy with a broken `superseded.json` is still listed.
  */

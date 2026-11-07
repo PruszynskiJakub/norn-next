@@ -1,5 +1,5 @@
 /**
- * Lease liveness for this CLI (K1, K3). Agent leases normally live while the agent process
+ * Lease liveness for this CLI. Agent leases normally live while the agent process
  * (pid + start time) lives. A runner that reports no process (a Herdr pane) leaves the lease
  * held by the tick that launched it, which exits right away — so such a lease carries the run's
  * worktree as a marker and stays live while that unit's `state.json` still shows the same run

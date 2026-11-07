@@ -1,7 +1,7 @@
 /**
- * The one command execution seam of the adapters, and their one `PortError` (ports.ts). Adapters
- * build argv and hand it to an injectable `Exec`, so they are tested against recorded fixtures
- * (X4); production runs `bunExec` on store's `spawnBounded` (H11: bounded, a timeout is exit 124).
+ * The one command execution seam of the adapters, and their one `PortError`. Adapters build argv
+ * and hand it to an injectable `Exec`, so they are tested against recorded fixtures; production
+ * runs `bunExec` on store's `spawnBounded` (bounded: a timeout is exit 124).
  * Never throws: a missing binary is exit code 127.
  */
 import type { PortError } from "@norn/core";
@@ -12,7 +12,7 @@ export interface ExecOptions {
   /** overlaid on the inherited process.env (a key set to undefined keeps the inherited value) */
   env?: Record<string, string | undefined>;
   stdin?: string;
-  /** H11: kill the call (and its process group) after this long; a timeout is exit 124 */
+  /** Kill the call (and its process group) after this long; a timeout is exit 124 */
   timeoutMs?: number;
 }
 
@@ -57,10 +57,10 @@ class AdapterError extends Error implements PortError {
   }
 }
 
-/** Typed failure for port methods (ports.ts: "throw PortError"): stable `code`, `retryable` for transient failures. */
-/** A repository path for a URL: each segment URL-encoded, the slashes kept (gh-195 B28). */
+/** A repository path for a URL: each segment URL-encoded, the slashes kept. */
 export const encodePath = (path: string): string => path.split("/").map(encodeURIComponent).join("/");
 
+/** Typed failure for port methods: stable `code`, `retryable` for transient failures. */
 export function portError(code: string, message: string, retryable = false): PortError {
   return new AdapterError(code, message, retryable);
 }

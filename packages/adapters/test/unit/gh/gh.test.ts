@@ -1,4 +1,4 @@
-/** gh adapter against recorded CLI fixtures (X4). */
+/** gh adapter against recorded CLI fixtures. */
 import { describe, expect, test } from "bun:test";
 import { fixtureExec, type ExecFixture } from "../../../src/exec.ts";
 import calls from "./fixtures/calls.json";
@@ -12,7 +12,7 @@ describe("gh adapter", () => {
     expect(await gh.whoami()).toBe("jpruszynski");
   });
 
-  test("listAssignedIssues maps to RemoteIssue (GR1)", async () => {
+  test("listAssignedIssues maps to RemoteIssue", async () => {
     const issues = await gh.listAssignedIssues({ label: "norn" });
     expect(issues.map((i) => issueKey(i.number))).toEqual(["gh-12", "gh-15"]);
     expect(issues[0]).toEqual({
@@ -50,7 +50,7 @@ describe("gh adapter", () => {
     expect(await gh.findPullRequest("gh-99-none")).toBeNull();
   });
 
-  test("pullRequestCi folds the checks' buckets into one state (gh-195 B18)", async () => {
+  test("pullRequestCi folds the checks' buckets into one state", async () => {
     expect(await gh.pullRequestCi(40)).toBe("success");
     // gh exits 8 while a check is pending and 1 when one failed, printing the JSON either way
     expect(await gh.pullRequestCi(41)).toBe("pending");
@@ -64,7 +64,7 @@ describe("gh adapter", () => {
     expect(pr).toMatchObject({ number: 41, state: "open", is_draft: true, head_sha: "c".repeat(40), head: "gh-15-fix-crash-on-save", base_branch: "main", merged_at: null });
   });
 
-  test("editPullRequestBody replaces the body (GR9)", async () => {
+  test("editPullRequestBody replaces the body", async () => {
     await gh.editPullRequestBody(41, "## Summary\n\nSaves no longer crash.\n\nCloses #15");
     expect(await gh.editPullRequestBody(42, "x").catch((e) => e.code)).toBe("gh_failed");
   });
@@ -98,13 +98,13 @@ describe("gh adapter", () => {
     expect(await junk.findPullRequest("x").catch((e) => e.code)).toBe("gh_bad_output");
   });
 
-  test("every gh call has the network timeout (H11)", async () => {
+  test("every gh call has the network timeout", async () => {
     const timeouts: Array<number | undefined> = [];
     const timed = createGh({ cwd: "/repo", exec: async (_argv, opts) => (timeouts.push(opts?.timeoutMs), { code: 0, stdout: "me\n", stderr: "" }) });
     await timed.whoami();
     expect(timeouts).toEqual([NETWORK_TIMEOUT_MS]);
   });
-  test("listLabelledIssues lists the label's open issues, any assignee; assignIssue adds one (CP2, GR1)", async () => {
+  test("listLabelledIssues lists the label's open issues, any assignee; assignIssue adds one", async () => {
     const argv: string[][] = [];
     const port = createGh({ cwd: "/repo", exec: async (a) => (argv.push(a), { code: 0, stdout: a[2] === "list" ? "[]" : "", stderr: "" }) });
     expect(await port.listLabelledIssues({ label: "norn" })).toEqual([]);
@@ -113,7 +113,7 @@ describe("gh adapter", () => {
     const failing = createGh({ cwd: "/repo", exec: async () => ({ code: 1, stdout: "", stderr: "error connecting: Could not resolve host" }) });
     expect(await failing.assignIssue(7, "me").catch((e) => e.retryable)).toBe(true);
   });
-  test("listLabels and createLabel: the repository's labels, a new one never forced (GR10)", async () => {
+  test("listLabels and createLabel: the repository's labels, a new one never forced", async () => {
     const argv: string[][] = [];
     const port = createGh({
       cwd: "/repo",

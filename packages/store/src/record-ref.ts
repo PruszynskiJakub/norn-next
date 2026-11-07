@@ -1,13 +1,13 @@
 /**
- * gh-195 D2, D3 (B10, B14): a story's record on `refs/norn/runs/<story>`. Pack writes the story's
- * run-state folder in the machine dir (S12) as one commit with git plumbing (blobs, a temporary index,
+ * A story's record on `refs/norn/runs/<story>`. Pack writes the story's
+ * run-state folder in the machine dir as one commit with git plumbing (blobs, a temporary index,
  * `write-tree`, `commit-tree`), its parent the previous record commit, pushed with a lease on the sha
- * this checkout last saw (as claims are, T3). The blobs are the files' bytes as they are: no filter
- * or line-ending conversion of the repository's config applies (review F1). Unpack extracts a record
+ * this checkout last saw (as claims are). The blobs are the files' bytes as they are: no filter
+ * or line-ending conversion of the repository's config applies. Unpack extracts a record
  * commit into a temp folder (refusing any entry that is not a plain file inside it), parses every JSON
- * file and validates each state, pinned workflow and receipt against its schema (S2), and only then
- * renames it into place, replacing what was there (S1). `recordTreeId` names the tree a pack would
- * write without writing anything, so observe stays effect-free (H2).
+ * file and validates each state, pinned workflow and receipt against its schema, and only then
+ * renames it into place, replacing what was there. `recordTreeId` names the tree a pack would
+ * write without writing anything, so observe stays effect-free.
  */
 import { createHash } from "node:crypto";
 import { type Dirent, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -25,7 +25,7 @@ import { parseWorkflowText } from "./unit.ts";
 /**
  * Every regular file of a folder, relative and sorted (git's order is applied when trees are built).
  * A dot-named entry is a staging or temp folder of an atomic write or a move (`.x.move-<pid>`,
- * `.x.<pid>.….tmp`), never part of the record (review F7); a symlink is no part of it either.
+ * `.x.<pid>.….tmp`), never part of the record; a symlink is no part of it either.
  */
 function filesUnder(base: string): string[] {
   const out: string[] = [];
@@ -58,7 +58,7 @@ export async function readRecordRef(root: string, story: string): Promise<{ sha:
 }
 
 /**
- * D4: the id of the tree a pack of the story's run-state folder would write, computed from the files
+ * The id of the tree a pack of the story's run-state folder would write, computed from the files
  * (git's object format; `algo` sha256 for a repository on it), or null when the folder holds no file.
  */
 export function recordTreeId(root: string, story: RunStory, algo: "sha1" | "sha256" = "sha1"): string | null {
@@ -112,13 +112,13 @@ async function writeRecordTree(root: string, story: RunStory): Promise<string | 
   }
 }
 
-/** The `Norn-Branch-Commit` a record commit names; null = none (a story without a branch, B33). */
+/** The `Norn-Branch-Commit` a record commit names; null = none (a story without a branch). */
 export async function recordBranchCommit(root: string, sha: string): Promise<string | null> {
   const r = await git(root, ["log", "-1", "--format=%(trailers:key=Norn-Branch-Commit,valueonly)", sha]);
   return r.code === 0 ? r.stdout.trim() || null : null;
 }
 
-/** D2: the `Norn-Holder` a record commit names; null = none or unreadable. */
+/** The `Norn-Holder` a record commit names; null = none or unreadable. */
 export async function recordHolder(root: string, sha: string): Promise<string | null> {
   const r = await git(root, ["log", "-1", "--format=%(trailers:key=Norn-Holder,valueonly)", sha]);
   return r.code === 0 ? r.stdout.trim() || null : null;
@@ -130,12 +130,12 @@ export type RecordPushResult =
   | { ok: false; reason: "stale" | "rejected" | "network" | "other"; message: string };
 
 /**
- * D2 (B10, B14): pack the story's record and push it to `refs/norn/runs/<story>` with a lease on
+ * Pack the story's record and push it to `refs/norn/runs/<story>` with a lease on
  * `expected` (the sha this checkout last saw; null = the ref must not exist), its parent that commit.
- * Trailers `Norn-Story`, `Norn-Branch-Commit` (when the story has a branch, B33) and `Norn-Holder`; the
- * commit time is `at` (what "record as of" shows, B13). A tree unchanged from `expected`'s, matching
+ * Trailers `Norn-Story`, `Norn-Branch-Commit` (when the story has a branch) and `Norn-Holder`; the
+ * commit time is `at` (what "record as of" shows). A tree unchanged from `expected`'s, matching
  * the same branch commit, pushes nothing; the same tree for a branch that moved on (a release's
- * handoff commit, gh-195/09) is pushed again, so the record names the branch as pushed. Without a
+ * handoff commit) is pushed again, so the record names the branch as pushed. Without a
  * remote the local ref is the record (solo).
  */
 export async function pushRecord(
@@ -166,7 +166,7 @@ interface RecordEntry {
 }
 
 /**
- * D3 (review F2): the entries of the record commit `sha`, checked before anything is read or written —
+ * The entries of the record commit `sha`, checked before anything is read or written —
  * every entry must be a plain file (mode 100644 or 100755) whose path stays inside `base` (the folder
  * it would land in): an absolute path, an empty, `.` or `..` segment, a symlink or a submodule is
  * refused, since a record may come from another machine. `fail` names a refused entry's file. One set
@@ -190,7 +190,7 @@ function recordEntries(root: string, sha: string, base: string, fail: (path: str
   return { entries, refused };
 }
 
-/** D3 (S2): every JSON file of a record must parse; `fail` names the file. Shared by the unpack and the read into memory. */
+/** Every JSON file of a record must parse; `fail` names the file. Shared by the unpack and the read into memory. */
 function jsonErrors(files: ReadonlyArray<{ path: string; text: string }>, fail: (path: string, message: string) => FileError): FileError[] {
   const errors: FileError[] = [];
   for (const f of files.filter((x) => x.path.endsWith(".json")))
@@ -205,14 +205,14 @@ function jsonErrors(files: ReadonlyArray<{ path: string; text: string }>, fail: 
 export type UnpackResult = { ok: true; files: number } | { ok: false; errors: FileError[] };
 
 /**
- * D3 (S1, S2): extract the record commit `sha` into `dest` (a story's run-state folder). Every entry
+ * Extract the record commit `sha` into `dest` (a story's run-state folder). Every entry
  * must be a plain file (mode 100644 or 100755) whose path stays inside `dest`: an absolute path, an
- * empty, `.` or `..` segment, a symlink or a submodule is refused before anything is written (review
- * F2), since a record may come from another machine. The files are written into a temp folder beside
+ * empty, `.` or `..` segment, a symlink or a submodule is refused before anything is written,
+ * since a record may come from another machine. The files are written into a temp folder beside
  * `dest`; every JSON file must parse, and each state, pinned workflow and receipt must pass its schema.
- * Only then is the temp folder renamed into place, replacing `dest` whole (review F3). A record that
+ * Only then is the temp folder renamed into place, replacing `dest` whole. A record that
  * fails puts nothing in place: its errors are returned instead. Synchronous, so the snapshot's archive
- * cache (gh-195/16) uses it too.
+ * cache uses it too.
  */
 export function unpackRecord(root: string, sha: string, dest: string): UnpackResult {
   const staged = stageRecordSync(root, sha, dest);
@@ -228,12 +228,12 @@ export function unpackRecord(root: string, sha: string, dest: string): UnpackRes
 /**
  * A record extracted and validated beside its destination, not in place yet (`dir`: the staged folder,
  * laid out as `dest` will be, so a caller may add a file to it first): `place()` renames it into place,
- * replacing `dest` whole (S1); `discard()` drops what is left (a no-op once placed).
+ * replacing `dest` whole; `discard()` drops what is left (a no-op once placed).
  */
 export type StagedRecord = { ok: true; files: number; dir: string; place(): void; discard(): void } | { ok: false; errors: FileError[] };
 
 /**
- * review#2 F3: a `dest` an interrupted `place()` moved aside and never swapped back is put back, and the
+ * A `dest` an interrupted `place()` moved aside and never swapped back is put back, and the
  * staging folders a killed process left beside it are dropped, before anything is staged there again.
  */
 function recoverPlace(dest: string): void {
@@ -252,10 +252,10 @@ function recoverPlace(dest: string): void {
 const asideOf = (dest: string): string => join(dirname(dest), `.${basename(dest)}.replaced`);
 
 /**
- * D3 (S1, S2): the checks of `unpackRecord` — hostile entries refused, every file extracted into a temp
+ * The checks of `unpackRecord` — hostile entries refused, every file extracted into a temp
  * folder beside `dest`, every JSON parsed and each state, pinned workflow and receipt validated — with
  * the rename left to the caller, so a command can check a record before it changes anything else
- * (gh-195/10 review F1: `story checkout` validates before it claims). A failing record leaves nothing.
+ * (`story checkout` validates before it claims). A failing record leaves nothing.
  */
 export function stageRecordSync(root: string, sha: string, dest: string): StagedRecord {
   const staging = join(dirname(dest), `.${basename(dest)}.unpack-${process.pid}`);
@@ -297,13 +297,13 @@ export function stageRecordSync(root: string, sha: string, dest: string): Staged
 }
 
 /**
- * gh-195/11 (B25, D10): an empty record staged beside `dest`, for a takeover whose record is lost: the
+ * An empty record staged beside `dest`, for a takeover whose record is lost: the
  * caller writes the new round into `dir`, then `place()` puts it in place as `stageRecordSync`'s does,
- * replacing whatever `dest` held (S1).
+ * replacing whatever `dest` held.
  */
 export function stageEmptyRecord(dest: string): Extract<StagedRecord, { ok: true }> {
   const staging = join(dirname(dest), `.${basename(dest)}.unpack-${process.pid}`);
-  // review#1 S6: what a killed checkout left beside `dest` is swept first, and the staging folder is
+  // What a killed checkout left beside `dest` is swept first, and the staging folder is
   // created exclusively, so a new round never starts from leftovers
   recoverPlace(dest);
   mkdirSync(dirname(dest), { recursive: true });
@@ -311,9 +311,9 @@ export function stageEmptyRecord(dest: string): Extract<StagedRecord, { ok: true
   return { ok: true, files: 0, dir: staging, place: () => placeStaged(staging, dest), discard: () => rmSync(staging, { recursive: true, force: true }) };
 }
 
-/** Rename the staged folder `staging` into `dest` (S1), replacing `dest` whole; never loses `dest` (`recoverPlace`). */
+/** Rename the staged folder `staging` into `dest`, replacing `dest` whole; never loses `dest` (`recoverPlace`). */
 function placeStaged(staging: string, dest: string): void {
-  // into an empty place: one rename (S1)
+  // into an empty place: one rename
   if (!existsSync(dest)) return renameSync(staging, dest);
   // rename cannot replace a non-empty folder: the old one goes aside under a fixed name, the new one
   // in, then the old one is dropped; a crash between the two renames is undone by the next stage
@@ -330,7 +330,7 @@ function placeStaged(staging: string, dest: string): void {
   rmSync(aside, { recursive: true, force: true });
 }
 
-/** gh-195 D7: story key → record commit of every archive ref this checkout has (one `for-each-ref`, local only). */
+/** Story key → record commit of every archive ref this checkout has (one `for-each-ref`, local only). */
 export function localRecordRefs(root: string): Map<string, string> {
   const r = gitSync(root, ["for-each-ref", "--format=%(objectname) %(refname)", RECORD_REF_PREFIX]);
   const out = new Map<string, string>();
@@ -343,11 +343,11 @@ export function localRecordRefs(root: string): Map<string, string> {
 }
 
 /**
- * gh-195 D6, D7, D16 (B29, B30): the folder holding a finished story's record as its archive ref
- * `refs/norn/runs/<story>` has it here (local refs only: never the network, H2), unpacked once per
+ * The folder holding a finished story's record as its archive ref
+ * `refs/norn/runs/<story>` has it here (local refs only: never the network), unpacked once per
  * record commit into the machine dir's `archive/<story>/<commit>/` (`unpackRecord`: hostile
  * entries refused, every file validated, renamed into place), older commits' copies dropped. Null when
- * there is no such ref here, or its record does not unpack (nothing is guessed, S2). Read-only input.
+ * there is no such ref here, or its record does not unpack (nothing is guessed). Read-only input.
  */
 export function archivedRecordDir(root: string, story: string, sha: string | undefined = localRecordRefs(root).get(story)): string | null {
   if (!sha || !/^[0-9a-f]{40,64}$/.test(sha)) return null;
@@ -361,9 +361,9 @@ export function archivedRecordDir(root: string, story: string, sha: string | und
 }
 
 /**
- * gh-195/10 (review F1): the commit `refs/norn/runs/<story>` has on `remote`, its objects fetched here
+ * The commit `refs/norn/runs/<story>` has on `remote`, its objects fetched here
  * but no local ref written, so a record is checked before it counts; null = the remote has no such ref.
- * `setRecordRef` then makes it this checkout's (the lease of its next record push, 09-F4).
+ * `setRecordRef` then makes it this checkout's (the lease of its next record push).
  */
 export async function fetchRecordCommit(root: string, remote: string, story: string): Promise<string | null> {
   const ref = recordRef(story);
@@ -376,7 +376,7 @@ export async function fetchRecordCommit(root: string, remote: string, story: str
   return sha;
 }
 
-/** gh-195/10 (review#2 F5): the commit `refs/norn/runs/<story>` has on `remote` now (`ls-remote`, nothing fetched); null = none. */
+/** The commit `refs/norn/runs/<story>` has on `remote` now (`ls-remote`, nothing fetched); null = none. */
 export async function remoteRecordSha(root: string, remote: string, story: string): Promise<string | null> {
   const ref = recordRef(story);
   const listed = await git(root, ["ls-remote", remote, ref]);
@@ -384,13 +384,13 @@ export async function remoteRecordSha(root: string, remote: string, story: strin
   return listed.stdout.split("\n").map((l) => l.split("\t")).find((p) => p[1]?.trim() === ref)?.[0]?.trim() || null;
 }
 
-/** gh-195/10: point this checkout's `refs/norn/runs/<story>` at `sha` (a record already fetched and checked). */
+/** Point this checkout's `refs/norn/runs/<story>` at `sha` (a record already fetched and checked). */
 export async function setRecordRef(root: string, story: string, sha: string): Promise<void> {
   await gitOk(root, ["update-ref", recordRef(story), sha]);
 }
 
 /**
- * gh-195 D6 (B29, B30): fetch the archive refs of `stories` alone from `remote` into the same local
+ * Fetch the archive refs of `stories` alone from `remote` into the same local
  * refs, for a command that needs those stories' records (`run list`, `run view`, `story reopen`); a
  * story the remote has no ref of is skipped. Returns the refs fetched; never touches another ref.
  */
@@ -409,14 +409,14 @@ export async function fetchRecords(root: string, remote: string, stories: readon
   return refs;
 }
 
-/** Why a tree's run state could not be packed: no such folder at the rev, git failing, or a record that fails validation (S2). */
+/** Why a tree's run state could not be packed: no such folder at the rev, git failing, or a record that fails validation. */
 export type TreeRecordFailure = { kind: "missing" | "git"; message: string } | { kind: "invalid"; errors: FileError[] };
 
 /**
- * gh-195 D14 (B35): the record commit of a finished story's run state an older norn left in the tree
+ * The record commit of a finished story's run state an older norn left in the tree
  * at `rev`: the `<spec folder>/runs` subtree committed as is (`commit-tree`, no unpacking, no parent),
  * with the `Norn-Story` and `Norn-Holder` trailers and commit time `at`. Its files are checked the way
- * an unpack checks them (S2: a temp copy, discarded): a record that fails is not packed.
+ * an unpack checks them (a temp copy, discarded): a record that fails is not packed.
  */
 export function treeRecordCommit(root: string, rev: string, story: RunStory, o: { holder: string; at: string }): { ok: true; sha: string; tree: string } | ({ ok: false } & TreeRecordFailure) {
   const path = treeStoryRunStatePath(story);
@@ -472,7 +472,7 @@ function baseRunStateInIndex(root: string): RunStory[] {
 /**
  * Push each packed record to its ref on `remote`: one batch with a lease of "absent" each (`casRefs`),
  * then each ref the batch rejected again alone, since a remote hook (`pre-receive`) refuses a whole
- * push for one ref (B36).
+ * push for one ref.
  */
 async function pushNewRecords(root: string, remote: string, packed: ReadonlyArray<{ story: RunStory; sha: string }>): Promise<BaseRecordOutcome[]> {
   const results = await casRefs(root, remote, packed.map((p) => ({ ref: recordRef(p.story.key), sha: p.sha, expected: null })));
@@ -485,7 +485,7 @@ async function pushNewRecords(root: string, remote: string, packed: ReadonlyArra
 }
 
 /**
- * gh-195 D14 (B35, B36; P6, GR6c, S1, S2): move every finished story's run state an older norn left in
+ * Move every finished story's run state an older norn left in
  * the main checkout's tree into its archive ref on `remote`. Each story (`baseRunStateInIndex`) is
  * packed from `HEAD` (`treeRecordCommit`); a ref the remote already has with the same tree is a rerun
  * after an interruption, and nothing is pushed for it; the rest go out by `pushNewRecords`. Only then
@@ -518,7 +518,7 @@ export async function archiveBaseRunState(root: string, remote: string | null, o
     else out.set(s.key, outcome(s, { done: "failed", reason: `${recordRef(s.key)} already holds another record (${have.slice(0, 12)})` }));
   }
   for (const r of await pushNewRecords(root, remote, fresh)) out.set(r.story, r);
-  // P6: every ref is on the remote before any removal is staged
+  // Every ref is on the remote before any removal is staged
   for (const s of stories) {
     const r = out.get(s.key) as BaseRecordOutcome;
     if (r.done === "failed") continue;
@@ -538,7 +538,7 @@ export interface RecordObjectUnit {
 }
 
 /**
- * gh-195 D6 (B10, B17; S2): the record commit `sha` read from git objects into memory, writing
+ * The record commit `sha` read from git objects into memory, writing
  * nothing — what a view of a story held elsewhere reads. Its entries pass the same checks as an
  * unpack (`recordEntries`, `jsonErrors`); each unit's state (the story's current round), pinned
  * workflow and receipts are validated against their schemas, and a file that fails is reported in

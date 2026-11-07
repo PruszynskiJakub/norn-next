@@ -1,7 +1,7 @@
 /**
- * Base sync (BS1–BS11) replayed through the pure decide:
+ * Base sync replayed through the pure decide:
  * scripted facts (`story.base`) in, decisions out, with the effects act would have (the `run_git`
- * classify receipt, the check receipt, an agent report) fed back as receipts (X4).
+ * classify receipt, the check receipt, an agent report) fed back as receipts.
  */
 import { describe, expect, test } from "bun:test";
 import { deriveUlid, type Receipt, type UnitState, type Workflow } from "@norn/schema";
@@ -106,7 +106,7 @@ class Sim {
     if (a.kind === "start_run") {
       const run_id = a.launch.run_id;
       if (this.agent === "done") {
-        // the resolve agent merged the base and committed (BS5)
+        // the resolve agent merged the base and committed
         if (this.base && !this.moving) this.base = { ...this.base, behind: 0, conflicts: [], head: SHA("8") };
         this.write({ kind: "done", ...head, run_id, by: "agent", outcome: "done", handoff: "merged the base" });
       } else this.write({ kind: "stuck", ...head, run_id, by: "agent", reason: "a.ts: both sides need a new rule for discounts" });
@@ -127,7 +127,7 @@ class Sim {
 
 const at_ = (step: string, status?: UnitState["status"]) => (s: Sim) => s.state.step === step && (status === undefined || s.state.status === status);
 
-describe("workflow contract (W2, W7, W8, BS9)", () => {
+describe("workflow contract", () => {
   test("update is a story-only git action; stale is a gate outcome; base.step must exist", () => {
     expect(validateWorkflowDefinition(BASE_WF).issues).toEqual([]);
     expect(checkWorkflowLevel(BASE_WF, "slice").map((i) => i.path)).toEqual(["/steps/update"]);
@@ -135,10 +135,10 @@ describe("workflow contract (W2, W7, W8, BS9)", () => {
     expect(baseUpdateStep({ ...BASE_WF, base: { step: "test" } })).toBe("test");
     const bad = validateWorkflowDefinition({ ...BASE_WF, base: { step: "nope" } });
     expect(bad.issues.map((i) => i.path)).toEqual(["/base/step"]);
-    // W7: `stale` is reserved
+    // `stale` is reserved
     const reserved = validateWorkflowDefinition({ ...BASE_WF, steps: { ...BASE_WF.steps, stale: { type: "check", run: "x", timeout: "1m", outcomes: { pass: "$done" } } } });
     expect(reserved.issues.some((i) => i.code === "reserved_name")).toBe(true);
-    // W4: a stale route without a counter is an uncounted cycle
+    // A stale route without a counter is an uncounted cycle
     const uncounted = validateWorkflowDefinition({ ...BASE_WF, steps: { ...BASE_WF.steps, ready: { type: "gate", outcomes: { approve: "$done", stale: "update" } } } });
     expect(uncounted.issues.some((i) => i.code === "uncounted_cycle")).toBe(true);
   });
@@ -296,7 +296,7 @@ describe("base sync replay", () => {
     // running: refused
     const running = { ...s.state, step: "update", status: "running" as const };
     expect(apply(running).rejected[0]?.reason).toContain("update needs it done, at a gate, stuck or held by drifted skills");
-    // gh-61 B22: ready at an agent step — only when the receipt names the drifted skills that held it
+    // Ready at an agent step — only when the receipt names the drifted skills that held it
     const held = { ...s.state, step: "resolve", status: "ready" as const };
     expect(apply(held).rejected[0]?.reason).toContain("update needs it done");
     expect(apply(held, { skills_drift: ["norn"] } as Partial<Receipt>).state).toMatchObject({ step: "update", status: "ready" });
@@ -398,7 +398,7 @@ describe("base sync replay", () => {
     looping.moving = true;
     looping.runUntil((x) => x.state.status === "stuck", 40);
     expect(looping.state.park).toMatchObject({ kind: "exhausted", reason: "base_conflict_loop 2/2 at update.conflict" });
-    // W4: reset_on names a declared edge
+    // Reset_on names a declared edge
     const bad = validateWorkflowDefinition({ ...wf, counters: { ...wf.counters, stale_loop: { max: 3, reset_on: "update.merged" } } });
     expect(bad.issues).toMatchObject([{ code: "unknown_reset", path: "/counters/stale_loop/reset_on" }]);
   });

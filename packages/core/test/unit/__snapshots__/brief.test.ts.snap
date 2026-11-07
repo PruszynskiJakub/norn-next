@@ -1,6 +1,6 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`renderBrief (B3) first run of implement 1`] = `
+exports[`renderBrief first run of implement 1`] = `
 "# norn brief — gh-1/02 · implement #1
 
 ## Where you are
@@ -43,7 +43,7 @@ Then end your turn. Never edit \`runs/\`; never push.
 "
 `;
 
-exports[`renderBrief (B3) the step's description and instructions follow the skill under Your work, instructions trimmed 1`] = `
+exports[`renderBrief the step's description and instructions follow the skill under Your work, instructions trimmed 1`] = `
 "# norn brief — gh-1/02 · implement #1
 
 ## Where you are
@@ -90,7 +90,7 @@ Then end your turn. Never edit \`runs/\`; never push.
 "
 `;
 
-exports[`renderBrief (B3) rework after a failing check shows the output tail and log 1`] = `
+exports[`renderBrief rework after a failing check shows the output tail and log 1`] = `
 "# norn brief — gh-1/02 · implement #2
 
 ## Where you are
@@ -153,7 +153,7 @@ Then end your turn. Never edit \`runs/\`; never push.
 "
 `;
 
-exports[`renderBrief (B3) rework after review findings lists them 1`] = `
+exports[`renderBrief rework after review findings lists them 1`] = `
 "# norn brief — gh-1/02 · implement #2
 
 ## Where you are
@@ -213,7 +213,7 @@ Then end your turn. Never edit \`runs/\`; never push.
 "
 `;
 
-exports[`renderBrief (B3) attended step with answers in context, manual downgrade, no deadline 1`] = `
+exports[`renderBrief attended step with answers in context, manual downgrade, no deadline 1`] = `
 "# norn brief — gh-1 · refine #1
 
 ## Where you are
@@ -253,13 +253,13 @@ Then end your turn. Never edit \`runs/\`; never push.
 
 ## Limits
 
-- Attended step: no deadline or nudges (MO4)
+- Attended step: no deadline or nudges
 - Fresh-session retries left: 1
 - Port slot: none
 "
 `;
 
-exports[`Rework only when sent back (B3, B6, W4) qa.fail without findings: the handoff verbatim and the absolute evidence dir with its files 1`] = `
+exports[`Rework only when sent back qa.fail without findings: the handoff verbatim and the absolute evidence dir with its files 1`] = `
 "# norn brief — gh-1/02 · implement #2
 
 ## Where you are
@@ -314,7 +314,7 @@ Then end your turn. Never edit \`runs/\`; never push.
 "
 `;
 
-exports[`Rework only when sent back (B3, B6, W4) qa.fail with findings: criterion and repro, then the evidence 1`] = `
+exports[`Rework only when sent back qa.fail with findings: criterion and repro, then the evidence 1`] = `
 "# norn brief — gh-1/02 · implement #2
 
 ## Where you are
@@ -373,7 +373,7 @@ Then end your turn. Never edit \`runs/\`; never push.
 "
 `;
 
-exports[`Rework only when sent back (B3, B6, W4) gate reject with a comment: the comment verbatim and who; the judged receipt's evidence; an earlier approve's findings are not rework 1`] = `
+exports[`Rework only when sent back gate reject with a comment: the comment verbatim and who; the judged receipt's evidence; an earlier approve's findings are not rework 1`] = `
 "# norn brief — gh-1/02 · implement #2
 
 ## Where you are
@@ -432,7 +432,7 @@ Then end your turn. Never edit \`runs/\`; never push.
 "
 `;
 
-exports[`Rework only when sent back (B3, B6, W4) gate reject without a comment says so and points at the evidence 1`] = `
+exports[`Rework only when sent back gate reject without a comment says so and points at the evidence 1`] = `
 "# norn brief — gh-1/02 · implement #2
 
 ## Where you are
@@ -490,7 +490,7 @@ Then end your turn. Never edit \`runs/\`; never push.
 "
 `;
 
-exports[`Rework only when sent back (B3, B6, W4) review.approve → qa is forward: no Rework; non-blocking findings are neutral notes in Context 1`] = `
+exports[`Rework only when sent back review.approve → qa is forward: no Rework; non-blocking findings are neutral notes in Context 1`] = `
 "# norn brief — gh-1/02 · qa #1
 
 ## Where you are
@@ -541,7 +541,7 @@ Then end your turn. Never edit \`runs/\`; never push.
 "
 `;
 
-exports[`Rework only when sent back (B3, B6, W4) integrate conflict → merge: the conflicting files 1`] = `
+exports[`Rework only when sent back integrate conflict → merge: the conflicting files 1`] = `
 "# norn brief — gh-1/02 · merge #1
 
 ## Where you are
@@ -592,7 +592,7 @@ Then end your turn. Never edit \`runs/\`; never push.
 "
 `;
 
-exports[`Checks since the last report (B3, gh-170) review after a passing check lists it: step, command, outcome, duration and where its output is 1`] = `
+exports[`Checks since the last report review after a passing check lists it: step, command, outcome, duration and where its output is 1`] = `
 "# norn brief — gh-1/02 · review #1
 
 ## Where you are
@@ -642,7 +642,7 @@ Then end your turn. Never edit \`runs/\`; never push.
 "
 `;
 
-exports[`Re-entry, fresh sessions, handoff and criteria (B2, C2, QV1) a second qa after the code changed: why this attempt, earlier qa is history, review's Resume dropped 1`] = `
+exports[`Re-entry, fresh sessions, handoff and criteria a second qa after the code changed: why this attempt, earlier qa is history, review's Resume dropped 1`] = `
 "# norn brief — gh-1/02 · qa #2
 
 ## Where you are

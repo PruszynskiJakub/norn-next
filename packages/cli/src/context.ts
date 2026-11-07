@@ -1,9 +1,9 @@
 /**
- * Command context: where we are (repo root, unit worktree), resolved config (K2), ports built
- * from the adapter registry (X2), clock and `~/.norn` home (NORN_HOME_DIR overrides it).
+ * Command context: where we are (repo root, unit worktree), resolved config, ports built
+ * from the adapter registry, clock and `~/.norn` home (NORN_HOME_DIR overrides it).
  *
  * Repo root discovery works from the main checkout and from any story/slice worktree: a
- * `.norn-unit` marker (A3) found walking up from cwd names the repo; otherwise git's common dir.
+ * `.norn-unit` marker found walking up from cwd names the repo; otherwise git's common dir.
  */
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -34,19 +34,19 @@ export interface CliDeps {
   signal?: AbortSignal;
   /** stdin text for commands that read it (`norn hook`); else the process stdin */
   stdin?: string;
-  /** CP6: raw key chunks for `norn status --watch`; else the process stdin in raw mode */
+  /** Raw key chunks for `norn status --watch`; else the process stdin in raw mode */
   input?: AsyncIterable<string>;
-  /** HC6/HC12: Herdr for the cockpit; null = none; absent = the real one when `HERDR_ENV=1` */
+  /** Herdr for the cockpit; null = none; absent = the real one when `HERDR_ENV=1` */
   herdr?: herdr.HerdrCockpit | null;
   /** an outside command a front end starts for the person (`norn status --watch` opens a PR or issue link); default Bun.spawn */
   shell?: (argv: string[], cwd: string) => Promise<{ code: number; stderr: string }>;
-  /** D2: the terminal a person answers prompts in; null = none (no TTY); absent = the process terminal */
+  /** The terminal a person answers prompts in; null = none (no TTY); absent = the process terminal */
   interaction?: Interaction | null;
-  /** a tick started a detached `norn check-run` (C5); `exited` settles when it ends (tests wait on it) */
+  /** a tick started a detached `norn check-run`; `exited` settles when it ends (tests wait on it) */
   onCheckStarted?: (exited: Promise<void>) => void;
   /** the running norn's version (`X.Y.Z`); default this package's version. Tests run the CLI as any binary */
   version?: string;
-  /** the pause between polls of `story wait`, and while a person command waits for a running tick (gh-174, H1); default a real timer ended early by `signal` (tests advance a fake clock) */
+  /** the pause between polls of `story wait`, and while a person command waits for a running tick; default a real timer ended early by `signal` (tests advance a fake clock) */
   sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
@@ -66,7 +66,7 @@ export interface Located {
   unit: UnitMarker | null;
 }
 
-/** Walk up from `cwd` for a `.norn-unit` marker (A3). */
+/** Walk up from `cwd` for a `.norn-unit` marker. */
 export function findUnitMarker(cwd: string): { worktree: string; marker: UnitMarker } | null {
   let dir = cwd;
   for (;;) {
@@ -110,9 +110,9 @@ export class Context {
   /** the running norn's version (`runningVersion`): `--version`, tick traces, replay labels */
   readonly version: string;
   readonly deps: CliDeps;
-  /** lines for a person on stderr (a one-time notice, B13), returned in `CliResult.stderr`; never data */
+  /** lines for a person on stderr (a one-time notice), returned in `CliResult.stderr`; never data */
   readonly stderr: string[] = [];
-  /** D5: `locate()` refuses a main checkout on the old or a mixed layout; false for a command that reports it itself (doctor, upgrade, migrate) */
+  /** `locate()` refuses a main checkout on the old or a mixed layout; false for a command that reports it itself (doctor, upgrade, migrate) */
   checksLayout = true;
   private located: Located | null = null;
   private loadedConfig: LoadedConfig | null = null;
@@ -140,9 +140,9 @@ export class Context {
   async locate(): Promise<Located> {
     if (!this.located) {
       const located = await locateRepo(this.cwd, this.git);
-      // B5: the checkout's machine dir lives in this command's norn home, not the process env's
+      // The checkout's machine dir lives in this command's norn home, not the process env's
       bindNornHome(located.root, this.home);
-      // D5, B21: the main checkout's layout, never the unit worktree's own files; before config loads
+      // The main checkout's layout, never the unit worktree's own files; before config loads
       if (this.checksLayout) guardLayout(located.root);
       this.located = located;
     }
@@ -155,7 +155,7 @@ export class Context {
     return this.located.root;
   }
 
-  /** Marker of the worktree the command runs in, if any (A3). */
+  /** Marker of the worktree the command runs in, if any. */
   get unit(): UnitMarker | null {
     return this.located?.unit ?? null;
   }
@@ -163,25 +163,25 @@ export class Context {
     return this.located?.worktree ?? null;
   }
 
-  /** Raw config load result (both layers, K2). */
+  /** Raw config load result (both layers). */
   get loaded(): LoadedConfig {
     if (!this.loadedConfig) this.loadedConfig = loadConfig({ repoRoot: this.root, home: this.home, env: this.env });
     return this.loadedConfig;
   }
 
-  /** The config that loaded, with its entries; refuses with exit `config` when a file has a problem (B7, D3). */
+  /** The config that loaded, with its entries; refuses with exit `config` when a file has a problem. */
   get resolved(): Extract<LoadedConfig, { ok: true }> {
     const l = this.loaded;
     if (!l.ok) throw configError(l.problems, { ...l.paths });
     return l;
   }
 
-  /** Resolved config; refuses like `resolved` (B7, D3). */
+  /** Resolved config; refuses like `resolved`. */
   get config(): ResolvedConfig {
     return this.resolved.config;
   }
 
-  /** D15: the file a setting in effect came from, for adapter errors; null when built in or derived. */
+  /** The file a setting in effect came from, for adapter errors; null when built in or derived. */
   sourceOf(key: string): string | null {
     const l = this.loaded;
     const entries = l.ok ? l.entries : l.fallback.entries;
@@ -205,12 +205,12 @@ export class Context {
     return this.builtPorts;
   }
 
-  /** B48: ports for a given config (doctor's fallback), built afresh and not cached for later callers. */
+  /** Ports for a given config (doctor's fallback), built afresh and not cached for later callers. */
   portsFor(config: ResolvedConfig, overrides: Partial<Ports> = {}): Promise<Ports> {
     return buildPorts(this.registry, this.adapterContext(this.root, config), config, { git: this.git, ...this.deps.ports, ...overrides }, (k) => this.sourceOf(k));
   }
 
-  /** D2: the terminal to prompt in — a TTY, no `--json`, not an agent session (A6, orient) — else null. */
+  /** The terminal to prompt in — a TTY, no `--json`, not an agent session — else null. */
   terminal(json: boolean): Interaction | null {
     const t = this.deps.interaction === undefined ? terminalInteraction() : this.deps.interaction;
     return t?.tty && !json && !isAgentSession(this.env) ? t : null;
