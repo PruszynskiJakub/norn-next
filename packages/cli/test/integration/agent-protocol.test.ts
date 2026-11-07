@@ -421,7 +421,12 @@ describe("norn hook robustness", () => {
       const m = /^norn hook (\S+) --agent (\S+) # norn-owned$/.exec(command);
       expect(m).not.toBeNull();
       expect(m?.[2]).toBe("claude");
-      const payload: Record<string, unknown> = native === "Notification" ? { message: "Claude needs your permission to use Bash", notification_type: "permission_prompt" } : {};
+      // events that map only some payloads need one that maps, or nothing is traced
+      const payloads: Record<string, Record<string, unknown>> = {
+        Notification: { message: "Claude needs your permission to use Bash", notification_type: "permission_prompt" },
+        StopFailure: { error: "authentication_failed" },
+      };
+      const payload = payloads[native] ?? {};
       // no hook_event_name: the argument alone must identify the event
       expect((await hook(wt(), m?.[1] as string, payload, "--agent", m?.[2] as string)).exit).toBe(0);
     }

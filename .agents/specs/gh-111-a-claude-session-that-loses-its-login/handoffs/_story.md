@@ -10,7 +10,8 @@ A Claude session that loses its login mid-step parks on an implicit ask that say
 | Treated like the usage-limit wait, no nudges spent | the logged-out fact parks on `agent.ask.implicit` with that reason and spends no nudge ; the park holds through the idle notification that follows | test | `packages/adapters/test/unit/claude/claude.test.ts` › "the idle notification after a failed login is dropped…" (refineHooks); `packages/core/test/unit/decide.test.ts` › "a logged-out session parks on an implicit ask…" (still parked 30 min later, `nudges_used` 0) |
 | After the login, the run continues in the same session | the session's next prompt after `/login` ends the park and the run goes on, nudges untouched | test | `packages/core/test/unit/decide.test.ts` › "a logged-out session parks on an implicit ask…" (a later `UserPromptSubmit` → `agent.ask.implicit.resolved`, run goes on) |
 
-- `bun run test` (1292 pass) and `bun run typecheck`: green on the reviewed HEAD (review#2).
+- `bun run test` (1292 pass) and `bun run typecheck`: green.
+- CI rework (ci_loop 1): `packages/cli/test/integration/agent-protocol.test.ts` › "installed hook commands use event names the hook accepts" now sends `StopFailure` an `authentication_failed` payload; the file passes locally (29 pass).
 
 ## Easy to miss
 
@@ -24,8 +25,9 @@ A Claude session that loses its login mid-step parks on an implicit ask that say
 ## Notes
 
 - The idle-notification fix lives in the Claude adapter's `refineHooks`, not in decide: after a logged-out `StopFailure`, that session's idle `Notification` (`turn_end`) facts are dropped until any other fact of the session arrives. Decide stays agent-neutral; its test feeds the hooks as refined (no decide test can see the drop itself, so the adapter test is the seam for that half).
+- An empty `StopFailure` payload maps to no fact, so a test that fires every installed hook must give it `error: authentication_failed` (the CI failure in ci#1).
 - Only `authentication_failed` is mapped. `billing_error` could deserve the same treatment, but that is outside this story.
 
 ## Resume
 
-describe#1 wrote pr.md in the spec folder (summary, test evidence, merge danger); next is the workflow's step after describe.
+CI fix committed; next is the workflow's step after implement (CI re-runs on the pushed branch).
