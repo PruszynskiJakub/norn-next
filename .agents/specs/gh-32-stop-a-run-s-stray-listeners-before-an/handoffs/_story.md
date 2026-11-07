@@ -28,6 +28,6 @@ Before a fresh agent session starts, stop what an earlier session left listening
 - `slotPorts(PORT_BASE)` in `packages/cli/src/runtime/strays.ts` is shared by `act/check.ts` and `act/session.ts`.
 - Recording: the check prepends a line to its output. An agent launch has no output, so the stopped listeners go into the action's result detail (`stopped_listeners`), which the tick trace keeps.
 
-### Resume
+## Resume
 
-Review approved; the next step takes the change from here.
+pr.md (spec folder) describes the branch as it is now; the next step opens or updates the pull request with it.
