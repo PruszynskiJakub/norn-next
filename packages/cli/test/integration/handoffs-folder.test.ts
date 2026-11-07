@@ -105,7 +105,7 @@ describe("the story's handoff is handoffs/_story.md, prose only (B39)", () => {
     await tick();
     h.git(["fetch", "-q", "origin"]);
     const onBranch = h.git(["show", `origin/gh-9-prose-only:${HANDOFF}`]);
-    expect(onBranch.trimEnd()).toBe("## Goal\n\n## Done means\n\n## Easy to miss\n\n## Not proven yet\n\n## Notes\n\n## Resume");
+    expect(onBranch.trimEnd()).toBe("## Goal\n\n## Proof\n\n## Easy to miss\n\n## Not proven yet\n\n## Notes\n\n## Resume");
     expect(treeOf(h.root, "origin/gh-9-prose-only", SPEC).filter((p) => p.includes("/runs/"))).toEqual([]);
   });
 

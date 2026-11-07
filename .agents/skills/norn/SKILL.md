@@ -1,6 +1,6 @@
 ---
 name: norn
-description: The protocol for doing one norn step and reporting it once with `norn done`, `norn ask` or `norn stuck`. Use when told to use the norn skill and run `norn brief`, when the working directory has a `.norn-unit` file, or when asked to continue a norn step.
+description: Sends an agent in a norn unit worktree to `norn brief`, which holds the step, how to report it once (`norn done`, `norn ask`, `norn stuck`) and the rules. Use when the working directory has a `.norn-unit` file, when told to run `norn brief`, or when asked to continue a norn step.
 ---
 
 # norn: one step, one report

@@ -23,7 +23,7 @@ steps:
       Post the findings as an issue comment that starts with `## Reproduce` (`## Reproduce (updated)` on a rerun):
       the loop command, the minimised repro, what it prints, the confirmed cause (`file:line`, or the ranked
       hypotheses left) and the seam for a regression test. That one comment is the only remote write this
-      step allows, an exception to the norn skill's rule; never edit the issue, label, assign or close.
+      step allows, an exception to the brief's rule on remote writes; never edit the issue, label, assign or close.
       Write the same under Notes in the handoff (the next agent does not see your Resume); a long loop output goes in evidence, with a pointer.
     outcomes:
       reproduced:       { to: $done, means: "the bug was observed as a user and a loop goes red on it; loop, repro, cause and seam posted and in the handoff" }
