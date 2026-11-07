@@ -1,14 +1,14 @@
 ## Goal
 
-Refine gh-274 into an umbrella spec (all nine wanted items), sliced later, guided by "remove more context and machinery than you add".
+Plan gh-274: seams, coverage, decisions and risks in spec.md's Plan, guided by "remove more context and machinery than you add".
 
 ## Progress
 
-- Interview settled every branch with the person; spec body written (B1–B49, Out of scope, no open questions); side proposals folded: brief order (B48), evidence as folder (B49); RULES index, hook recall, state-note handoff rejected; round gate and workflow overlay out of scope.
-- Key decisions: brief references files (path + generic description), never pastes them; no generated map and no `files:` list (AGENTS.md Layout is the map); RULES.md and all id comments removed, invariants move to docs/dev/contracts.md; brief is the first prompt, protocol stated once, norn skill a fallback; Claude clean profile via built-in args; handoff becomes a norn-written journal, 150-word `--handoff` cap.
-- Suggested slice order: metrics → brief → start/instructions → AGENTS.md + docs/dev + RULES removal → session profile → journal → comments.
-- refine#1 done: Umbrella spec for gh-274 written with the person: B1–B49 (orientation metrics, a brief that references files and shows only relevant norn state, brief as first prompt with the protocol once, Claude clean profile, handoff as norn-written journal with a 150-word entry cap, AGENTS.md as a ≤500-word map plus docs/dev, RULES.md and id comments removed). Side proposals: brief order and evidence-as-folder folded in; RULES index, hook recall and state-note handoff rejected; round gate and workflow overlay out of scope. No open questions. Next: plan, then slice (metrics first).
+- refine#1: umbrella spec B1–B49 written with the person (see spec).
+- plan#1: Plan written with the person. Seams S1 renderBrief, S2 agent protocol in the cli harness, S3 config + Claude launchCommand, S4 report/decision commands → handoff file, S5 repo lints, S6 init. No prefactoring.
+- Amended with the person: B1–B6 (orientation metrics) dropped, too much machinery; B20/B21/B24 now a one-line first prompt "Run `norn brief` in this worktree and do what it says." (no brief-as-prompt, no hook-started run); B28 dropped (chat gets the clean profile; override via args); B22's example points at B48's order.
+- The person wants it kept simple: every decision avoids new action shapes, receipt fields, adapter methods or commands.
 
 ## Resume
 
-Person reviews spec.md; on agreement report `norn done done`.
+Slice the spec (norn-slice). Order suggested: prompt + norn skill → brief trim → journal → AGENTS.md + docs/dev + RULES removal → clean profile (spike first) → id strip (D10, its own slice, last).
