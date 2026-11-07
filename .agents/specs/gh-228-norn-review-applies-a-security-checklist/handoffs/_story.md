@@ -4,10 +4,14 @@
 
 ## Done means
 
-- `packages/cli/assets/skills/norn-review/SECURITY.md`: the checklist (injection, secrets, process spawning, env loading, the PATH shim, tokens, plus CI workflows and persisted data), worded for any repo; breaches are bugs, so blocking.
-- `packages/cli/assets/skills/norn-review/SKILL.md`: step 2 (Sensitive paths), step 3 (Standards subagent gets SECURITY.md; its prompt item (d)) wire it in.
-- `REVIEW.md`: `## Sensitive paths` lists `.github/workflows/`, `scripts/`, `packages/schema/src/`, `packages/store/`, `packages/cli/src/runtime/shim.ts`.
-- Docs/skill change only: no new test; `bun run test` (1282 pass, glossary and skill-command lints included) and `bun run typecheck` green.
+The spec is a quick issue with no criteria frontmatter; its two Wanted items are the rows. Both are skill and docs text, so the review read the files rather than a test.
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| Security checklist in norn-review | bundled `norn-review` gains a generic checklist (injection, secrets, process spawning, env loading, PATH shim, tokens), applied when the diff touches `REVIEW.md` sensitive paths, findings blocking | review (docs) | `packages/cli/assets/skills/norn-review/SECURITY.md`; wired in `SKILL.md` step 2 (Sensitive paths), step 3 (Standards gets SECURITY.md, prompt item (d)); whole skill folders install, as `test/e2e/slice-workflow.test.ts` › init shows for SMELLS.md |
+| This repo lists its sensitive paths | `REVIEW.md` names `.github/workflows/`, `scripts/`, `packages/schema/src/`, `packages/store/`, `packages/cli/src/runtime/shim.ts` | review (docs) | `REVIEW.md` › `## Sensitive paths` (all five exist in the tree) |
+
+`bun run test` (1282 pass, lints included) and `bun run typecheck` green, re-run at review.
 
 ## Easy to miss
 
@@ -18,6 +22,7 @@
 ## Not proven yet
 
 - Whether a reviewer agent actually picks up SECURITY.md on a sensitive diff (QA by use).
+- The starter `REVIEW.md` that `norn init` writes (`packages/cli/assets/REVIEW.md`) has no `## Sensitive paths` section, so other repos do not learn of it (minor review finding, left for a follow-up).
 
 ## Notes
 
@@ -26,4 +31,4 @@
 
 ## Resume
 
-Nothing left in implement; next is the workflow's review.
+Review approved; next is the workflow's step after review.
