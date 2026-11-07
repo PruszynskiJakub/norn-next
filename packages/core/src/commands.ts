@@ -1,16 +1,16 @@
-/** Exact commands shown to people (O1, S9) and naming conventions shared by decide, inbox and handoff. */
+/** Exact commands shown to people and naming conventions shared by decide, inbox and handoff. */
 import { sliceDirName, storyDirName, type UnitState, versionMatch } from "@norn/schema";
 
-/** B5: the whole first prompt of an auto-mode agent session. */
+/** The whole first prompt of an auto-mode agent session. */
 export const AUTO_PROMPT = "Use the norn skill, then run `norn brief`.";
 
-/** Text typed into a silent/timed-out/stalled session (C1). */
+/** Text typed into a silent/timed-out/stalled session. */
 export const NUDGE_TEXT =
   "You ended your turn without reporting. Finish the step and report exactly once: `norn done <outcome> --handoff \"…\"`, `norn ask \"…\"` or `norn stuck \"…\"`. Run `norn brief` to see the outcomes.";
 
 const q = (s: string) => (/^[\w./@:-]+$/.test(s) ? s : `'${s.replaceAll("'", "'\\''")}'`);
 
-/** Worktree path conventions (GR3, K5): story worktrees sit beside the repo; slice worktrees beside their story's. */
+/** Worktree path conventions: story worktrees sit beside the repo; slice worktrees beside their story's. */
 export const storyWorktreePath = (repoRoot: string, story: string, slug: string) =>
   `${repoRoot.replace(/\/+$/, "")}-worktrees/${storyDirName(story, slug)}`;
 export const sliceWorktreePath = (storyWorktree: string, nn: string, slug: string) =>
@@ -18,7 +18,7 @@ export const sliceWorktreePath = (storyWorktree: string, nn: string, slug: strin
 
 /**
  * Command that starts an agent in a worktree for a person (manual mode, attended steps), with the
- * agent's configured args. B3: `--` ends them, so a variadic flag cannot swallow the prompt.
+ * agent's configured args. `--` ends them, so a variadic flag cannot swallow the prompt.
  * `prompt` is the first prompt (default: start the step).
  */
 export function startAgentCommand(worktree: string | null, agentCommand: string, args: string[] = [], prompt = AUTO_PROMPT): string {
@@ -27,10 +27,7 @@ export function startAgentCommand(worktree: string | null, agentCommand: string,
   return worktree ? `cd ${q(worktree)} && ${run}` : run;
 }
 
-/**
- * The next command for a unit, by its state (S9 header, O1 inbox). `start` is the
- * command that starts an agent in the worktree, used for ready/attended agent steps.
- */
+/** The next command for a unit, by its state. `start` starts an agent in the worktree, for ready/attended agent steps. */
 export function nextCommand(unitKey: string, state: UnitState | null, start?: string): string | null {
   if (!state) return null;
   switch (state.status) {
@@ -53,7 +50,7 @@ export function nextCommand(unitKey: string, state: UnitState | null, start?: st
 }
 
 /**
- * The way out of a stuck or parked unit (O1, W4). A counter that ran out (gh-212) leads to the target of
+ * The way out of a stuck or parked unit. A counter that ran out leads to the target of
  * the edge it guards with that counter reset: a plain rerun would restart the same step, and the same
  * outcome would exhaust the counter again. A reserved target (`$done`, `$stuck`) is no step to move to,
  * so the step reruns with the counter reset.
@@ -65,7 +62,7 @@ export function unstickCommand(unitKey: string, state: Pick<UnitState, "park">):
 }
 
 /**
- * gh-212 (W4): a rerun of a unit stuck on a run-out counter that leaves the counter at its max warns:
+ * A rerun of a unit stuck on a run-out counter that leaves the counter at its max warns:
  * the edge it guards stays closed, so the same outcome ends stuck again (a plain rerun of the same step
  * on unchanged code most likely does). Null when nothing to warn about.
  */
@@ -79,8 +76,8 @@ const norn = (...parts: (string | false | null | undefined)[]) => ["norn", ...pa
 
 /**
  * Builders for every norn command printed to a person or an agent (inbox items, decide details,
- * `do_instead` hints, handoff headers, briefs, cockpit actions, next steps). B7: renaming a command
- * is a change here and in its pinned table (`packages/core/test/unit/printed-commands.test.ts`), nowhere else.
+ * `do_instead` hints, handoff headers, briefs, cockpit actions, next steps). Renaming a command is a
+ * change here and in its pinned table (`packages/core/test/unit/printed-commands.test.ts`), nowhere else.
  */
 export const cmd = {
   config: (key?: string) => norn("config", key ? "get" : "list", key),
@@ -123,16 +120,16 @@ export const cmd = {
   watch: (o: { interval?: string; maxTicks?: number } = {}) => norn("watch", o.interval && `--interval ${o.interval}`, o.maxTicks !== undefined && `--max-ticks ${o.maxTicks}`),
 };
 
-/** gh-61 B19, gh-252 (SK1): what the inbox says about bundled skills that differ from the running norn's. */
+/** What the inbox says about bundled skills that differ from the running norn's. */
 export const skillsDriftHint = {
-  /** gh-252: the Check item of a unit whose worktree copies differ; its runs use them */
+  /** The Check item of a unit whose worktree copies differ; its runs use them */
   unit: (running: string, names: readonly string[]) => `skills differ from norn ${running} (${names.join(", ")}): runs use this worktree's copies until the base is merged in`,
-  /** B19: the repo-level item when the main checkout itself drifted */
+  /** The repo-level item when the main checkout itself drifted */
   repo: (running: string) => `skills differ from norn ${running}: run \`${cmd.upgrade()}\` and commit`,
 };
 
 /**
- * gh-195 D16 (B29, B35): what `norn status` and `norn doctor` say while the base's tree still holds
+ * What `norn status` and `norn doctor` say while the base's tree still holds
  * run state an older norn left there (never read: only archive refs are), with the stories it is for.
  */
 export const baseRunStateHint = {
@@ -141,22 +138,22 @@ export const baseRunStateHint = {
   fix: () => `run \`${cmd.upgrade()}\` and commit the removal it stages`,
 };
 
-/** B5: the top-level commands this release removed; no printed command names one (B7). */
+/** Removed top-level commands; no printed command may name one. */
 export const REMOVED_COMMANDS = ["drop", "inbox", "cockpit", "orient", "open", "answer", "approve", "unstick", "update", "mode", "workflow", "take", "release", "trace", "why"] as const;
 
 const REMOVED = new RegExp(`\\bnorn (${REMOVED_COMMANDS.join("|")})(?![\\w-])`);
 
-/** B7: the first removed command (`norn <old>`) a printed text names, or null. */
+/** The first removed command (`norn <old>`) a printed text names, or null. */
 export function nameRemoved(text: string): string | null {
   const m = REMOVED.exec(text);
   return m ? `norn ${m[1]}` : null;
 }
 
 /**
- * gh-61 D3 (B6, B7, B8): what a running binary that does not fit the repo's recorded `X.Y.Z` is told —
+ * What a running binary that does not fit the repo's recorded `X.Y.Z` is told —
  * the refusal's `error` and `do_instead`, and the inbox item. A dev or pre-release build
  * (`0.19.0-dev.3`) is compared by its core. The versions that fit `repo` are its line (`0.19.x` before
- * 1.0, `1.x` from 1.0 on), from `repo` itself up (B2). Null when it fits, or `running` has no `X.Y.Z`.
+ * 1.0, `1.x` from 1.0 on), from `repo` itself up. Null when it fits, or `running` has no `X.Y.Z`.
  */
 export function versionMismatch(repo: string, running: string): { match: "older" | "newer"; needs: string; error: string; do_instead: string } | null {
   const core = /^\d+\.\d+\.\d+/.exec(running)?.[0];
@@ -168,18 +165,18 @@ export function versionMismatch(repo: string, running: string): { match: "older"
   const base = maj === "0" ? pat === "0" : min === "0" && pat === "0";
   const fits = base ? line : `${repo} or a later ${line}`;
   const install = `install norn ${fits}`;
-  // B7: a newer binary moves the repo forward with a commit, not a downgrade
+  // A newer binary moves the repo forward with a commit, not a downgrade
   const do_instead = match === "newer" ? `run \`${cmd.upgrade()}\` to move this repo to norn ${running} and commit the change, or ${install}` : install;
   return { match, needs: fits, error: `this repo needs norn ${fits} (you run ${running})`, do_instead };
 }
 
-/** gh-61 B17 (D9): `norn upgrade` run by a binary older than the repo's version; no flag overrides it. */
+/** `norn upgrade` run by a binary older than the repo's version; no flag overrides it. */
 export function upgradeBackward(repo: string, running: string): { error: string; do_instead: string } {
   return { error: `this repo is set up for norn ${repo}; upgrade will not move it back`, do_instead: versionMismatch(repo, running)?.do_instead ?? `install norn ${repo}` };
 }
 
-/** gh-61 B11 (D8): the one notification `norn watch` sends when it pauses ticks on a mismatch. */
+/** The one notification `norn watch` sends when it pauses ticks on a mismatch. */
 export const ticksPausedTitle = (needs: string): string => `this repo needs norn ${needs}; ticks paused`;
 
-/** gh-61 B5: the hint when the team file records no `norn_version` (`doctor`, `status`). */
+/** The hint when the team file records no `norn_version` (`doctor`, `status`). */
 export const NO_VERSION_HINT = `no norn version recorded: run \`${cmd.upgrade()}\``;

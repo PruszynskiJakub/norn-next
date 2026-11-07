@@ -5,7 +5,7 @@ description: Supervises the norn stories a person names through their current ro
 
 # Supervise named stories through their round
 
-You supervise the stories the person named, in this checkout, until each one's current round ends. norn decides every next step; you decide only what the person delegated to you (SK3), always through norn's commands, always with a reason. Never start another round: that is `norn-fsd`.
+You supervise the stories the person named, in this checkout, until each one's current round ends. norn decides every next step; you decide only what the person delegated to you, always through norn's commands, always with a reason. Never start another round: that is `norn-fsd`.
 
 ## Before you start
 

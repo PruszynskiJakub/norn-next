@@ -1,10 +1,10 @@
 /**
- * gh-195 D11 (B27, T7a, R2.3): this checkout's own record of a story another heartbeat now holds.
+ * This checkout's own record of a story another heartbeat now holds.
  *
- * Observe reports it (`localRecordOf`, read-only, H2) with whether it is on the story's record ref
+ * Observe reports it (`localRecordOf`, read-only) with whether it is on the story's record ref
  * already: its tree is the tree of a record commit this machine pushed (`Norn-Holder` this machine) in
  * the history of the record ref here. A clean release (`norn story handoff`, a clean `watch` exit,
- * `norn story close`) pushes the record before the claim goes (B15), so its copy is on the ref and is
+ * `norn story close`) pushes the record before the claim goes, so its copy is on the ref and is
  * removed quietly (`dropLocalRecord`). A takeover without a release leaves receipts the ref never got:
  * the copy is set aside under `superseded/<story>-<ulid>/` (`setAsideRecord`), never pushed and never
  * merged, with `superseded.json` naming the new holder and its newest receipt for its Check item, until
@@ -20,11 +20,11 @@ import { receiptsDir, supersededDir } from "./paths.ts";
 import { readRecordRef, recordTreeId } from "./record-ref.ts";
 import { machineRunsDir, runStateDirIn, storyRunStateDir } from "./run-state.ts";
 
-/** D11: a local record of a story another heartbeat holds (`StoryFacts.local_record`). */
+/** A local record of a story another heartbeat holds (`StoryFacts.local_record`). */
 export interface LocalRecordFacts {
   /** its newest receipt, `NNNN-<kind>`: the story unit's, else the first slice's that has one; null = none */
   last_receipt: string | null;
-  /** its tree is a record this machine pushed to the story's ref: released cleanly (B15) */
+  /** its tree is a record this machine pushed to the story's ref: released cleanly */
   on_ref: boolean;
 }
 
@@ -60,7 +60,7 @@ function lastReceiptIn(base: string): string | null {
 }
 
 /**
- * D11: the local record of `story` in this checkout's machine dir, or null when it holds no file.
+ * The local record of `story` in this checkout's machine dir, or null when it holds no file.
  * `holder` is this machine (`user@host`), matched against the record commits' `Norn-Holder`.
  */
 export async function localRecordOf(root: string, story: RunStory, holder: string): Promise<LocalRecordFacts | null> {
@@ -83,7 +83,7 @@ async function pushedByMe(root: string, sha: string, tree: string, holder: strin
 }
 
 /**
- * D11 (S1): set the story's local record aside as `superseded/<name>/` — one rename of the whole folder,
+ * Set the story's local record aside as `superseded/<name>/` — one rename of the whole folder,
  * then its `superseded.json`. A crash between the two leaves the copy without it: it is still listed
  * (holder unknown) and pruned the same way. Returns the folder.
  */
@@ -97,7 +97,7 @@ export function setAsideRecord(root: string, story: RunStory, name: string, meta
 }
 
 /**
- * D11 (B27, S1): remove the story's local record quietly, its copy being on the ref already (a clean
+ * Remove the story's local record quietly, its copy being on the ref already (a clean
  * release): renamed aside first (a dot-named folder is never read as a record), then deleted.
  */
 export function dropLocalRecord(root: string, story: RunStory, tag: string): void {
@@ -110,7 +110,7 @@ export function dropLocalRecord(root: string, story: RunStory, tag: string): voi
 
 const SUPERSEDED_FILE = "superseded.json";
 
-/** D11: one record set aside here (`Facts.superseded`). */
+/** One record set aside here (`Facts.superseded`). */
 export interface SupersededCopy {
   /** its folder's name under `superseded/`, `<story>-<ulid>` */
   name: string;
@@ -124,7 +124,7 @@ export interface SupersededCopy {
   dir: string;
 }
 
-/** D11: every record set aside in this checkout's machine dir, by name. */
+/** Every record set aside in this checkout's machine dir, by name. */
 export function listSuperseded(root: string): SupersededCopy[] {
   let names: string[];
   try {
@@ -154,7 +154,7 @@ export function listSuperseded(root: string): SupersededCopy[] {
   return out;
 }
 
-/** D11 (B27): delete the records set aside before `before` (ISO), as `norn tidy` ages the trace out; returns them (`dry`: only lists them). */
+/** Delete the records set aside before `before` (ISO), as `norn tidy` ages the trace out; returns them (`dry`: only lists them). */
 export function pruneSuperseded(root: string, before: string, dry: boolean): SupersededCopy[] {
   const old = listSuperseded(root).filter((c) => c.at < before);
   if (!dry) {
@@ -165,7 +165,7 @@ export function pruneSuperseded(root: string, before: string, dry: boolean): Sup
 }
 
 /**
- * review#1 F6: a copy's `superseded.json`, validated (S2); null when it is missing or not one — the copy
+ * A copy's `superseded.json`, validated; null when it is missing or not one — the copy
  * is still listed, its holder unknown.
  */
 function readMeta(file: string): LocalSupersededFile | null {
@@ -181,7 +181,7 @@ function readMeta(file: string): LocalSupersededFile | null {
 }
 
 /**
- * review#1 F6: what a crash between the rename aside and the delete left behind — `.<story>.drop-<tag>`
+ * What a crash between the rename aside and the delete left behind — `.<story>.drop-<tag>`
  * beside the stories' run state, `.<name>.drop` under `superseded/` — is deleted by the next set-aside,
  * quiet removal or tidy. Never read as a record (dot-named).
  */

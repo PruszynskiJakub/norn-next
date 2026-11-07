@@ -1,5 +1,5 @@
 /**
- * Where norn's shipped assets live (§11 workflow templates, §16 skills, K2 config template).
+ * Where norn's shipped assets live (workflow templates, skills, config template).
  *
  * First match wins:
  *   1. `NORN_ASSETS_DIR` — explicit override (tests, packagers, custom skill sets);

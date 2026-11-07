@@ -10,8 +10,8 @@
  * `rendered(value, markdown)`; `--json` (accepted by every command) prints the value instead.
  *
  * A noun groups verbs (`norn run list`): `defineNoun({...})` with each verb a command named
- * `<noun> <verb>`, listed in `src/commands/index.ts` too. `norn <noun>` lists its verbs (B2);
- * `norn help <noun> <verb>` and `--help` on a verb show its usage and `optionHelp` (B4).
+ * `<noun> <verb>`, listed in `src/commands/index.ts` too. `norn <noun>` lists its verbs;
+ * `norn help <noun> <verb>` and `--help` on a verb show its usage and `optionHelp`.
  */
 import type { ParseArgsConfig } from "node:util";
 import type { Context } from "./context.ts";
@@ -22,22 +22,22 @@ export interface ParsedArgs {
   /** option values by long name (strings, booleans, or arrays for `multiple`) */
   values: Record<string, string | boolean | Array<string | boolean> | undefined>;
   positionals: string[];
-  /** options in the order given (`--note a --note-criterion AC1 --note b` pairs by position, NT1) */
+  /** options in the order given (`--note a --note-criterion AC1 --note b` pairs by position) */
   order?: Array<{ name: string; value: string | boolean }>;
   /** `--json` was given (the dispatcher takes it out of `values`); a command that draws a screen prints data instead */
   json?: boolean;
 }
 
 /**
- * gh-61 D1: how a binary that does not match the repo's `norn_version` treats a command. `acts`: refused
- * (B6, B7); `reads`: runs, as does the mismatch it shows (B8); `exempt`: never checked (setup and repair
- * commands, B9; an agent's reports and hooks and a tick's check-run, so a step in flight can finish, B10).
+ * How a binary that does not match the repo's `norn_version` treats a command. `acts`: refused;
+ * `reads`: runs and shows the mismatch; `exempt`: never checked (setup and repair commands, an
+ * agent's reports and hooks, and a tick's check-run, so a step in flight can finish).
  */
 export type VersionClass = "acts" | "reads" | "exempt";
 
 export interface Command {
   name: string;
-  /** D1: required, so a new command cannot leave its version class out */
+  /** Required, so a new command cannot leave its version class out */
   version: VersionClass;
   /** one line, shown by `norn help` */
   summary: string;
@@ -52,7 +52,7 @@ export interface Command {
   markdown?: boolean;
   /** needs a git repository (default true): `ctx.locate()` runs before `run` */
   repo?: boolean;
-  /** false: reports the repo layout itself instead of refusing an old or mixed one at `locate()` (D5: doctor, upgrade, migrate) */
+  /** false: reports the repo layout itself instead of refusing an old or mixed one at `locate()` (doctor, upgrade, migrate) */
   layout?: boolean;
   run(ctx: Context, args: ParsedArgs): Promise<unknown>;
 }
@@ -67,7 +67,7 @@ export interface Noun {
   /** one line, shown by `norn help` */
   summary: string;
   verbs: readonly Command[];
-  /** B2: `norn <noun>` lists the verbs under these titles, by verb name (`create`); default: one list */
+  /** `norn <noun>` lists the verbs under these titles, by verb name (`create`); default: one list */
   groups?: ReadonlyArray<{ title: string; verbs: readonly string[] }>;
 }
 

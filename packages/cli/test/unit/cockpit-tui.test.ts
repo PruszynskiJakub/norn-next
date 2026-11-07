@@ -1,5 +1,5 @@
 /**
- * The terminal cockpit over a hand-built view (CP6, CP7): three tabs, each story once, a
+ * The terminal cockpit over a hand-built view: three tabs, each story once, a
  * closed story reads done, section counts, `]` `[` `n`, a NEEDS YOU row says what the story is, and the
  * list takes about 60% of the width.
  */
@@ -112,7 +112,7 @@ function press(s: TuiState, ...ks: string[]): TuiState {
   return st;
 }
 
-describe("the cockpit's tabs (CP6, CP7)", () => {
+describe("the cockpit's tabs", () => {
   test("Now: what needs you, then in flight nearest to done first; a story that needs you shows once", () => {
     const f = frame(initialState());
     const lines = f.split("\n");
@@ -166,7 +166,7 @@ describe("the cockpit's tabs (CP6, CP7)", () => {
     expect(frame(press(again, "/")).split("\n")[0]).toStartWith("/ login▏");
   });
 
-  test("gh-61 D7 (B8): a norn version mismatch shows in the header, in the heartbeat's place", () => {
+  test("gh-61 D7: a norn version mismatch shows in the header, in the heartbeat's place", () => {
     const m = model();
     const version = "this repo needs norn 0.19.x (you run 0.18.1): install norn 0.19.x";
     const head = renderCockpit({ ...m, header: { ...m.header, version } }, initialState(), look).split("\n")[0];
@@ -181,14 +181,14 @@ describe("the cockpit's tabs (CP6, CP7)", () => {
     expect(head).toEndWith("tick 0s ago · took 9.4s  12:00");
   });
 
-  test("a story shows its round and workflow: the row before the step, the preview like story view (RD8, gh-71 B28)", () => {
+  test("a story shows its round and workflow: the row before the step, the preview like story view", () => {
     const f = frame(press(initialState(), "]", "j"));
     expect(f).toMatch(/│ ◐ round 2 · refinement · running at implement · auto/);
     // no round before the story starts
     expect(frame(press(initialState(), "2"))).toMatch(/│ · triage · not started · auto/);
   });
 
-  test("the filter matches a story's workflow (CP7)", () => {
+  test("the filter matches a story's workflow", () => {
     const f = frame(press(initialState(), "/", "refinement", "\r"));
     expect(f).toContain("Rename the flag");
     expect(f).not.toContain("Bump the parser");
@@ -208,7 +208,7 @@ describe("the cockpit's tabs (CP6, CP7)", () => {
     expect(body.indexOf("│")).toBe(Math.floor(150 * 0.6) + 1);
   });
 
-  test("Backlog lists the open norn issues not assigned to me under ISSUES; t takes one (CP2, GR1)", () => {
+  test("Backlog lists the open norn issues not assigned to me under ISSUES; t takes one", () => {
     const m = model([issue(31, "Export to PDF", []), issue(12, "Sort the list", ["someone-else"])]);
     const s = press(initialState(), "2");
     const f = frame(s, m);

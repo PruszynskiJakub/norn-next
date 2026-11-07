@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { versionMatch } from "../../src/index.ts";
 
-// gh-61 B2 (D3): a running binary matches the repo's norn version when it is the same minor
+// A running binary matches the repo's norn version when it is the same minor
 // (before 1.0; the same major from 1.0 on) and at least that patch.
-describe("versionMatch (gh-61 B2)", () => {
+describe("versionMatch", () => {
   const table: Array<[repo: string, running: string, expected: "match" | "older" | "newer"]> = [
     ["0.18.0", "0.18.0", "match"],
     ["0.18.0", "0.18.3", "match"],

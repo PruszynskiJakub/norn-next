@@ -1,5 +1,5 @@
 /**
- * Inbox history (O1, O4): each tick diffs the items needing a person after act against the ones
+ * Inbox history: each tick diffs the items needing a person after act against the ones
  * open before and records the changes in its trace record (`inbox`); `norn status --history` pairs
  * them. The open set lives machine-locally in the machine dir (`inbox.json`), like
  * `notified.json`; when it is missing every current item appears again (harmless for pairing).
@@ -12,7 +12,7 @@ import { inboxOpenPath } from "./paths.ts";
 import { readTrace } from "./trace.ts";
 
 function readOpen(root: string): Record<string, InboxItem> {
-  // S2: an unreadable or wrong-shaped open set reads as empty (every current item appears again)
+  // An unreadable or wrong-shaped open set reads as empty, so every current item appears again
   return readLocalJson("local-inbox", inboxOpenPath(root), {}, root).open ?? {};
 }
 

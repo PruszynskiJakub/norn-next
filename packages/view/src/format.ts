@@ -1,6 +1,6 @@
 /**
  * Compact terminal text for `norn story list` / `norn status` human mode. Pure: a ProjectView
- * in, a string out (no colour, no clock). The CLI's default output stays JSON (P8).
+ * in, a string out (no colour, no clock).
  */
 import { cmd, INBOX_ABOUT, INBOX_GROUPS, INBOX_TITLES, isVersionMismatchItem } from "@norn/core";
 import type { RunDetail } from "./run-view.ts";
@@ -41,7 +41,7 @@ function modeText(u: UnitView): string {
   return u.mode_downgraded ? `${u.mode}→${u.effective_mode}` : u.effective_mode;
 }
 
-/** R4.3: a failed act effect, shown under the unit. */
+/** A failed act effect, shown under the unit. */
 function failureText(u: UnitView, indent: string): string {
   return u.act_failure ? `\n${indent}! ${u.act_failure.reason}` : "";
 }
@@ -53,22 +53,21 @@ function sliceLine(s: SliceView): string {
   return `  ${s.key.padEnd(10)} ${s.title} — ${stateText(s)}${fm}${deps}${next}${failureText(s, "      ")}`;
 }
 
-/** R5.5 (N3): this checkout's heartbeat, one line. */
+/** This checkout's heartbeat, one line. */
 function heartbeatText(view: ProjectView): string | null {
   const h = view.heartbeat;
   if (h.down) return `! no heartbeat on ${h.holder}${h.age ? ` for ${h.age}` : " yet"} — run \`${cmd.watch()}\` (auto steps wait for it)`;
   return h.last_tick_at ? `heartbeat: last tick ${h.age} ago on ${h.holder}${h.last_tick_ms === undefined ? "" : ` (took ${formatTickMs(h.last_tick_ms)})`}` : null;
 }
 
-/** gh-78: a tick's duration: `320ms`, `9.4s`, then as `formatDuration` (`1m15s`). */
+/** A tick's duration: `320ms`, `9.4s`, then as `formatDuration` (`1m15s`). */
 export function formatTickMs(ms: number): string {
   if (ms < 1000) return `${Math.round(ms)}ms`;
   if (ms < 10_000) return `${(ms / 1000).toFixed(1)}s`;
   return formatDuration(ms);
 }
 
-/** `norn story list` human mode: one block per story, slices indented, then runs and errors. */
-/** BS1/BS3: `base main: 17 behind · conflicts a.ts, b.ts · last update merge 1a2b3c4d5e6f (…)`; null when nothing is known. */
+/** `base main: 17 behind · conflicts a.ts, b.ts · last update merge 1a2b3c4d5e6f (…)`; null when nothing is known. */
 function baseSyncText(s: StoryView): string | null {
   const b = s.base_sync;
   if (!b) return null;
@@ -79,6 +78,7 @@ function baseSyncText(s: StoryView): string | null {
   return parts.length ? `base ${b.branch}: ${parts.join(" · ")}` : null;
 }
 
+/** `norn story list` human mode: one block per story, slices indented, then runs and errors. */
 export function formatStatus(view: ProjectView): string {
   const out: string[] = [];
   if (!view.stories.length) out.push(`No stories. Run \`${cmd.sync()}\` to pick up labelled issues.`);
@@ -97,7 +97,7 @@ export function formatStatus(view: ProjectView): string {
     out.push("Runs");
     for (const r of view.runs) {
       const live = r.alive === null ? "" : r.alive ? " alive" : " dead";
-      // R4.4: the last classification, so a frozen agent never reads as plain `alive`
+      // The last classification, so a frozen agent never reads as plain `alive`
       const cls = r.classified ? ` — ${r.classified.outcome} since ${r.classified.at}` : "";
       const machine = r.machine && r.machine !== view.holder ? ` on ${r.machine}` : "";
       out.push(`  ${r.unit.padEnd(10)} ${r.step}#${r.attempt} ${r.how}${r.agent ? ` ${r.agent}` : ""}${machine}${live} since ${r.started_at}${cls}`);
@@ -116,7 +116,7 @@ export function formatStatus(view: ProjectView): string {
   return `${out.join("\n").trimEnd()}\n`;
 }
 
-/** NT5: the Notes header's clearing hint — each story's once, e.g. `cleared by gh-1 human-qa approval`. */
+/** The Notes header's clearing hint — each story's once, e.g. `cleared by gh-1 human-qa approval`. */
 function notesHint(items: readonly InboxEntry[]): string {
   return [...new Set(items.flatMap((i) => (i.cleared_by ? [i.cleared_by] : [])))].join("; ");
 }
@@ -126,21 +126,21 @@ function groupAbout(g: keyof typeof INBOX_ABOUT, items: readonly InboxEntry[]): 
   return [INBOX_ABOUT[g], notesHint(items)].filter(Boolean).join(" · ");
 }
 
-/** HC4: the inbox items in display order (O1 group order) — item `n` of the cockpit is `[n - 1]`. */
+/** The inbox items in display order (inbox group order) — item `n` of the cockpit is `[n - 1]`. */
 export function inboxItemsInOrder(view: ProjectView): InboxEntry[] {
   const all = INBOX_GROUPS.flatMap((g) => view.inbox.groups[g]);
-  // gh-61 D7: a version mismatch shows on top of the inbox, above every group
+  // A version mismatch shows on top of the inbox, above every group
   return [...all.filter(isVersionMismatchItem), ...all.filter((it) => !isVersionMismatchItem(it))];
 }
 
-/** An inbox item's line text: its step first, once — many titles already start with the step (F4). */
+/** An inbox item's line text: its step first, once — many titles already start with the step. */
 export function stepTitle(step: string | null | undefined, title: string): string {
   if (!step) return title;
   const named = title.startsWith(step) && (title.length === step.length || /^[: #]/.test(title.slice(step.length)));
   return named ? title : `${step}: ${title}`;
 }
 
-/** gh-196 D5 (B22): a count per story of what a supervisor decided on the person's behalf; never an inbox item. */
+/** A count per story of what a supervisor decided on the person's behalf; never an inbox item. */
 export const delegatedCounts = (view: ProjectView): Record<string, number> =>
   Object.fromEntries(view.stories.filter((s) => s.delegated.length).map((s) => [s.key, s.delegated.length]));
 
@@ -152,17 +152,17 @@ export function formatDelegatedCounts(counts: Record<string, number>): string {
 }
 
 /**
- * `norn status` human mode: groups in O1 order, each item with reason, age and command; `details` adds
- * full texts (L1). With `home`, paths under it print as `~/…` (the JSON keeps them absolute).
- * `numbered` prefixes `[n]` for the cockpit (HC4). Notes show as their header line only, with the
- * command that lists them, unless `notes` (NT6).
+ * `norn status` human mode: groups in inbox order, each item with reason, age and command; `details` adds
+ * full texts. With `home`, paths under it print as `~/…` (the JSON keeps them absolute).
+ * `numbered` prefixes `[n]` for the cockpit. Notes show as their header line only, with the
+ * command that lists them, unless `notes`.
  */
 export function formatInbox(view: ProjectView, opts: { details?: boolean; home?: string; numbered?: boolean; notes?: boolean } = {}): string {
   const home = opts.home?.replace(/\/+$/, "");
   const tilde = (t: string) => (home ? t.replaceAll(`${home}/`, "~/") : t);
   const out: string[] = [];
   let n = 0;
-  // gh-61 D7 (B8): a binary that does not fit the repo's norn version comes first, above every group
+  // A binary that does not fit the repo's norn version comes first, above every group
   for (const it of view.inbox.groups.unblock.filter(isVersionMismatchItem)) {
     const num = opts.numbered ? `${`[${++n}]`.padEnd(5)}` : "";
     out.push(`! ${num}${it.title}`, `      $ ${it.command}`, "");
@@ -178,7 +178,7 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
     for (const it of items) {
       const unit = it.slice ?? it.story;
       const num = opts.numbered ? `${`[${++n}]`.padEnd(5)}` : "";
-      // gh-71 B28: the round and its workflow next to the step, as `story view` and the handoff header show them
+      // The round and its workflow next to the step, as `story view` and the handoff header show them
       const round = it.round ? `round ${it.round.n} · ${it.round.workflow} · ` : "";
       out.push(`  ${num}${unit.padEnd(10)} ${round}${stepTitle(it.step, it.title)} · ${it.age}`);
       if (it.detail) out.push(`      ${tilde(it.detail)}`);
@@ -187,7 +187,7 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
     }
     out.push("");
   }
-  // gh-195 D6 (B17, B18): stories another machine holds, from local refs only
+  // Stories another machine holds, from local refs only
   if (view.elsewhere?.length) {
     out.push(`Held elsewhere (${view.elsewhere.length}) · on another machine`);
     for (const e of view.elsewhere) out.push(`  ${e.key.padEnd(10)} ${e.title} · ${elsewhereStanding(e)}`, `      $ ${cmd.storyView(e.key)}`);
@@ -207,7 +207,7 @@ const minute = (iso: string) => iso.slice(0, 16).replace("T", " ");
 /** `review_loop 0/3` */
 const counterLine = (c: { name: string; value: number; max: number | null }) => `${c.name} ${c.value}${c.max !== null ? `/${c.max}` : ""}`;
 
-/** The story unit's standing from its record (B17), else its last boundary (B18, B19). */
+/** The story unit's standing from its record, else its last boundary. */
 function elsewhereStanding(e: ElsewhereView): string {
   const u = e.record?.units.find((x) => x.slice === null);
   if (u) {
@@ -220,7 +220,7 @@ function elsewhereStanding(e: ElsewhereView): string {
 }
 
 /**
- * `norn story view` of a story another machine holds (gh-195 D6, B10, B13, B17–B19): the claim, the
+ * `norn story view` of a story another machine holds: the claim, the
  * branch, the PR and its CI, then the step, attempt and counters from the record ref when it is here,
  * or the last boundary step when it is not, and where the run state is.
  */
@@ -235,7 +235,7 @@ export function formatElsewhere(e: ElsewhereView): string {
   if (r) {
     out.push("", r.current ? `Record: ${r.sha.slice(0, 7)} (${minute(r.at)})` : `Record as of ${minute(r.at)}:`);
     for (const u of r.units) out.push(`- ${u.key}: Step: ${u.step} (attempt ${u.attempt}), ${u.status}${u.counters.length ? ` · counters: ${u.counters.map(counterLine).join(", ")}` : ""}`);
-    for (const err of r.errors) out.push(`- failed validation (S2): ${err.file}: ${err.errors.map((x) => `${x.path || "/"} ${x.message}`).join("; ")}`);
+    for (const err of r.errors) out.push(`- failed validation: ${err.file}: ${err.errors.map((x) => `${x.path || "/"} ${x.message}`).join("; ")}`);
   }
   const lines: string[] = [];
   if (r && !r.current) lines.push(`record as of ${minute(r.at)} — ${e.key} now keeps its record on ${e.holder}'s machine`);
@@ -284,10 +284,10 @@ function outcomeText(r: StepRow): string {
   return `${r.outcome ?? "-"}${c}`;
 }
 
-/** gh-196 D5 (B21, B34): the mark of a supervisor's decision, with its reason; nothing for the person's own. */
+/** The mark of a supervisor's decision, with its reason; nothing for the person's own. */
 const delegatedText = (reason: string | undefined): string => (reason === undefined ? "" : ` — ${DELEGATED_MARK}: ${reason}`);
 
-/** gh-71 B29, B32: ` · finished`, ` · ended by the person at <step>`, or nothing while the round is under way. */
+/** ` · finished`, ` · ended by the person at <step>`, or nothing while the round is under way. */
 function roundEndText(r: RoundView): string {
   if (!r.ended) return "";
   return r.ended.by === "person" ? ` · ended by the person at ${r.ended.at}` : " · finished";
@@ -311,12 +311,12 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
   const types = Object.entries(v.totals.by_type).map(([k, ms]) => `${k} ${formatDuration(ms)}`);
   out.push(`time in ${v.units.length > 1 ? "story " : ""}steps: ${types.join(" · ") || "-"} · human wait ${formatDuration(v.totals.human_wait_ms)}`);
   if (v.criteria) {
-    // QV8: criteria reports counted per verdict
+    // Criteria reports counted per verdict
     const c = v.criteria;
     out.push(`criteria: ${c.reports} report(s) · ${c.verdicts.pass} pass · ${c.verdicts.fail} fail · ${c.verdicts.person} person · ${c.verdicts.unverified} unverified${c.unchecked_coverage ? ` · ${c.unchecked_coverage} without frontmatter criteria` : ""}`);
   }
   if (v.hidden_events) out.push(`(${v.hidden_events} no-op/claim-renew tick events hidden — --all shows them)`);
-  // gh-195 D7 (B29): a finished story's record, read from its archive ref
+  // A finished story's record, read from its archive ref
   if (v.records?.source === "archive") out.push(`records: from ${v.records.ref} at ${v.records.commit?.slice(0, 12)} — paths below are its copy in ${v.records.root}`);
   out.push("");
   if (!v.steps.length) {
@@ -348,7 +348,7 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
     for (const e of r.events ?? []) out.push(`${pad}· ${clock(e.at, day)} ${e.source.padEnd(8)} ${opts.full ? e.summary : oneLine(e.summary, REASON_MAX)}`);
   };
   if (!v.rounds?.length) v.steps.forEach((_, i) => row(i));
-  // gh-71 B29, B32 (D10): a story's rows under a heading per round, with how the round ended
+  // A story's rows under a heading per round, with how the round ended
   for (const rd of v.rounds ?? []) {
     const rows = v.steps.flatMap((r, i) => ((r.round ?? 1) === rd.n ? [i] : []));
     if (!rows.length) continue;
@@ -359,7 +359,7 @@ export function formatStepTimeline(v: TraceView, opts: { full?: boolean } = {}):
 }
 
 /**
- * `norn run view <run|unit>` (B44): one run — step and attempt, the run id, outcome, when it
+ * `norn run view <run|unit>`: one run — step and attempt, the run id, outcome, when it
  * entered and left with its duration, who, the time a person was waited on, the reason in full
  * and the receipt, evidence and log paths.
  */

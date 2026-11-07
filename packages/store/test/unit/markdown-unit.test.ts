@@ -37,7 +37,7 @@ const STORY: StoryFrontmatter = {
   intake_at: AT,
 };
 
-describe("frontmatter (§7.1)", () => {
+describe("frontmatter", () => {
   test("round trip; body verbatim", () => {
     const p = join(tmp(), "story.md");
     const body = "\n# Spec\n\nSome *text*\n---\nnot frontmatter\n";
@@ -136,7 +136,7 @@ describe("unit files", () => {
     expect(ensureEvidenceDir(u, "R2")).toBe("evidence/R2");
     expect(existsSync(join(u, "evidence/R2"))).toBe(true);
   });
-  test("evidence copy is temp + rename (S1): a failed copy leaves no partial dir and no temp", () => {
+  test("evidence copy is temp + rename: a failed copy leaves no partial dir and no temp", () => {
     if (process.getuid?.() === 0) return; // root reads mode-000 files
     const u = tmp();
     const src = tmp();
@@ -163,7 +163,7 @@ describe("unit files", () => {
     expect(readdirSync(join(u, "evidence/R1"))).toEqual(["keep.txt"]);
     expect(readdirSync(join(u, "evidence"))).toEqual(["R1"]);
   });
-  test("tidyHandoff (gh-195 D9, B6, B8): a new handoff gets the skeleton, an old one loses its generated blocks once, prose is never touched", () => {
+  test("tidyHandoff: a new handoff gets the skeleton, an old one loses its generated blocks once, prose is never touched", () => {
     const u = join(tmp(), "handoffs", "_story.md");
     expect(tidyHandoff(u)).toBe(true);
     expect(readFileSync(u, "utf8")).toBe("## Goal\n\n## Progress\n\n## Resume\n");

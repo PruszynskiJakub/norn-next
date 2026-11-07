@@ -1,5 +1,5 @@
 /**
- * Receipts `runs/<unit>/receipts/NNNN-<kind>.json` (S6): immutable, numbered, never
+ * Receipts `runs/<unit>/receipts/NNNN-<kind>.json`: immutable, numbered, never
  * overwritten. Creation is exclusive (link-based O_EXCL) so two writers never share a number.
  */
 import { readdirSync } from "node:fs";
@@ -13,7 +13,7 @@ import { touchWake } from "./wake.ts";
 export interface ReceiptListing {
   /** valid receipts ascending by number */
   receipts: NumberedReceipt[];
-  /** files failing validation, unparseable names, or duplicate numbers (S2) */
+  /** files failing validation, unparseable names, or duplicate numbers */
   errors: FileError[];
 }
 
@@ -78,7 +78,7 @@ export function readReceipt(unitDir: string, n: number, root?: string): Numbered
   return receiptIndex(unitDir).read(n, root);
 }
 
-/** A unit's receipts listed once (S6: numbered, never rewritten), each read by number without listing the folder again. */
+/** A unit's receipts listed once (numbered, never rewritten), each read by number without listing the folder again. */
 export interface ReceiptIndex {
   /** every numbered receipt file, ascending */
   entries: ReadonlyArray<{ n: number; kind: string }>;
@@ -127,7 +127,7 @@ export type WriteReceiptResult =
 const reservePath = (unitDir: string, n: number) => join(receiptsDir(unitDir), `.${String(n).padStart(4, "0")}.reserve`);
 
 /**
- * Write receipt number `n` exactly (decide numbers receipts; actions.ts step 1).
+ * Write receipt number `n` exactly (decide numbers receipts).
  * A number is reserved with an exclusive hidden `.NNNN.reserve` file (holding the
  * receipt_id) while the receipt is created, so two writers never share a number even
  * with different kinds; the reservation is removed afterwards.
@@ -178,7 +178,7 @@ export function appendReceipt(unitDir: string, receipt: Receipt): { n: number; f
     const n = lastReceiptNumber(unitDir) + 1;
     const r = writeReceiptAt(unitDir, n, receipt);
     if (r.ok) {
-      if (!r.existed) touchWake(unitDir); // H13: a sleeping `norn watch` ticks now, not at its interval
+      if (!r.existed) touchWake(unitDir); // A sleeping `norn watch` ticks now, not at its interval
       return { n: r.n, file: r.file, existed: r.existed };
     }
   }

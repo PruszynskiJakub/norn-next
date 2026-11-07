@@ -1,12 +1,12 @@
 /**
- * R8.1 (M5, A1): agents started by a runner run the norn that launched them. Act writes a shim
+ * Agents started by a runner run the norn that launched them. Act writes a shim
  * `<norn home>/bin/norn` that execs the current norn entry point, and starts the agent through a
  * launcher `<norn home>/launch/<hash>.sh` that sets `PATH=<shim dir>:…` and `NORN_BIN=<shim>`, then
  * execs the agent — inside the command itself, so a login shell in a runner pane (which re-reads
  * the user's profile) cannot put another `norn` first again. Hooks call `$NORN_BIN` when set
  * (init's default hook command).
  *
- * B2: the PATH lives in the launcher file, not on the command line. A pane runner types the command
+ * The PATH lives in the launcher file, not on the command line. A pane runner types the command
  * into a fresh shell; an inline `env PATH=<whole PATH> …` is longer than the tty's line limit
  * (MAX_CANON, 1 024 bytes on macOS) with an ordinary PATH and is cut off unrun.
  */
@@ -31,21 +31,21 @@ export function nornEntry(): string[] {
 const shimDir = (home: string) => join(home, "bin");
 
 /**
- * Write `<dir>/norn` → `entry` (atomic, S1; rewritten only when it changes). Returns its path. `dir`
+ * Write `<dir>/norn` → `entry` (atomic; rewritten only when it changes). Returns its path. `dir`
  * defaults to the launch shim's `<home>/bin`; orient agents get their own, so opening one never
  * changes the norn that launched agents' hooks call.
  */
 export function ensureShim(home: string, entry: string[] = nornEntry(), dir: string = shimDir(home)): string {
   const path = join(dir, "norn");
-  const text = `#!/bin/sh\n# norn-owned: runs the norn that launched this agent (R8.1)\nexec ${proc.shellJoin(entry)} "$@"\n`;
+  const text = `#!/bin/sh\n# norn-owned: runs the norn that launched this agent\nexec ${proc.shellJoin(entry)} "$@"\n`;
   if (!existsSync(path) || readFileSync(path, "utf8") !== text) atomicWrite(path, text, 0o755);
   return path;
 }
 
 /**
- * R8.1: the launch argv run through a launcher that puts the shim dir first on PATH and sets
+ * The launch argv run through a launcher that puts the shim dir first on PATH and sets
  * NORN_BIN, and the same two variables for the runner's own env (`--env` of a pane, the headless
- * process env). B2: the typed command is `<launcher> <agent argv…>` — short whatever PATH is.
+ * process env). The typed command is `<launcher> <agent argv…>`, short whatever PATH is.
  */
 export function withNornOnPath(argv: string[], shim: string, basePath: string | undefined): { argv: string[]; env: Record<string, string> } {
   const dir = dirname(shim);
@@ -54,11 +54,11 @@ export function withNornOnPath(argv: string[], shim: string, basePath: string | 
   return { argv: [ensureLauncher(dirname(dir), env), ...argv], env };
 }
 
-/** Write `<home>/launch/<hash>.sh` (atomic, S1; named by its content, so written once per PATH). Returns its path. */
+/** Write `<home>/launch/<hash>.sh` (atomic; named by its content, so written once per PATH). Returns its path. */
 function ensureLauncher(home: string, env: { PATH: string; NORN_BIN: string }): string {
   const text = [
     "#!/bin/sh",
-    "# norn-owned: runs an agent with the norn that launched it first on PATH (R8.1, B2)",
+    "# norn-owned: runs an agent with the norn that launched it first on PATH",
     `PATH=${proc.shellQuote(env.PATH)}; export PATH`,
     `NORN_BIN=${proc.shellQuote(env.NORN_BIN)}; export NORN_BIN`,
     'exec "$@"',

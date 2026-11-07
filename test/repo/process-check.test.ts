@@ -1,4 +1,4 @@
-/** The "process" check (scripts/process-check.ts, .github/workflows/process.yml). */
+/** The "process" check (scripts/process-check.ts,.github/workflows/process.yml). */
 import { describe, expect, test } from "bun:test";
 import { closedInBody, gatherFacts, linkedIssues, type PrFacts, processCheck, runCheck } from "../../scripts/process-check.ts";
 

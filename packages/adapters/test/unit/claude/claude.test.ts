@@ -41,7 +41,7 @@ describe("claude parseHookEvent", () => {
   });
 });
 
-describe("claude Notification types (A2)", () => {
+describe("claude Notification types", () => {
   const n = (notification_type: string | undefined, message = "x") =>
     claudeAgent.parseHookEvent("notification", { ...payloads.NotificationIdle, notification_type, message }, ENV, AT)?.event ?? null;
   test("dialogs that wait on a person are waiting_input; permission is permission_prompt", () => {
@@ -86,7 +86,7 @@ describe("claude refineHooks (§10 implicit ask shows the command)", () => {
   });
 });
 
-describe("claude hookResponse (A4)", () => {
+describe("claude hookResponse", () => {
   const stop = claudeAgent.parseHookEvent("stop", payloads.Stop, ENV, AT)!;
   test("block encodes Claude Code decision JSON", () => {
     const r = claudeAgent.hookResponse(stop, { block: true, reason: "Run norn done" });
@@ -102,7 +102,7 @@ describe("claude hookResponse (A4)", () => {
   });
 });
 
-describe("claude hooks install (A1)", () => {
+describe("claude hooks install", () => {
   test("merge into user settings, re-run is idempotent, uninstall restores the original", async () => {
     const repo = tmp();
     const path = join(repo, ".claude", "settings.json");
@@ -156,13 +156,13 @@ describe("claude hooks install (A1)", () => {
   });
 });
 
-describe("claude skills (SK1)", () => {
+describe("claude skills", () => {
   test("reads skills from the repo's .claude/skills", () => {
     expect(claudeAgent.skillDir("/r")).toBe("/r/.claude/skills");
   });
 });
 
-describe("claude launchCommand (B2, B5)", () => {
+describe("claude launchCommand", () => {
   const base = { cwd: "/w", prompt: "Use the norn skill, then run `norn brief`.", env: { NORN_RUN: "r" }, config: {} };
   test("interactive, headless, resume, config overrides", () => {
     expect(claudeAgent.launchCommand(base)).toEqual({ argv: ["claude", "--", base.prompt], env: { NORN_RUN: "r" } });
@@ -174,7 +174,7 @@ describe("claude launchCommand (B2, B5)", () => {
       env: { A: "1", NORN_RUN: "r" },
     });
   });
-  test("a variadic flag in the configured args cannot swallow the prompt (B3)", () => {
+  test("a variadic flag in the configured args cannot swallow the prompt", () => {
     // the dogfood config: `claude -p` read the prompt as one more allowed tool and exited at once
     const args = ["--permission-mode", "acceptEdits", "--allowedTools", "Bash(norn:*)", "Bash(git:*)"];
     const argv = claudeAgent.launchCommand({ ...base, headless: true, config: { args } }).argv;
@@ -183,7 +183,7 @@ describe("claude launchCommand (B2, B5)", () => {
   });
 });
 
-describe("claude lastAssistantMessage (C4)", () => {
+describe("claude lastAssistantMessage", () => {
   test("joins text blocks of the last assistant message, skipping sidechains and tool-only turns", async () => {
     expect(await claudeAgent.lastAssistantMessage(join(FIX, "transcript.jsonl"))).toBe(
       "Implemented the slice.\nTests are green; reporting done.",

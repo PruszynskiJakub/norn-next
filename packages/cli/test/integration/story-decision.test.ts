@@ -1,8 +1,8 @@
 /**
- * `norn story answer|approve|reject|update-branch` (B24–B27): the decisions a person makes on a
+ * `norn story answer|approve|reject|update-branch`: the decisions a person makes on a
  * story, with the targets of B54–B60 — the worktree's unit (a slice worktree's story for
- * `update-branch`, B55), and at a terminal elsewhere only the units the verb applies to (B57, B59).
- * The old `answer`, `approve` and `update` are unknown commands (B5). What each verb writes is
+ * `update-branch`, B55), and at a terminal elsewhere only the units the verb applies to.
+ * The old `answer`, `approve` and `update` are unknown commands. What each verb writes is
  * covered where the old command's tests were (human.test.ts, base-sync.test.ts, …).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -118,7 +118,7 @@ describe("gh-1 and gh-2 at gates, gh-3 parked on a question, gh-4/01 at its gate
     await until(() => h.state(sliceRuns())?.status === "parked" && [1, 2].every((n) => h.state(runs(n))?.park?.kind === "gate") && h.state(runs(3))?.park?.kind === "ask");
   });
 
-  test("the old answer, approve and update are unknown commands; nothing is written (B5)", async () => {
+  test("the old answer, approve and update are unknown commands; nothing is written", async () => {
     const before = receipts(runs(1));
     for (const argv of [["answer", "gh-3", "v2"], ["approve", "gh-1"], ["approve", "gh-1", "--reject", "--reason", "x"], ["update", "gh-1"]]) {
       const r = await h.norn(...argv);

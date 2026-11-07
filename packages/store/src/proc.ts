@@ -1,9 +1,9 @@
 /**
- * Process liveness by PID + start time (K3, H1, MO3). The one `ps -o stat= -o lstart=` parser:
+ * Process liveness by PID + start time. The one `ps -o stat= -o lstart=` parser:
  * store's own `localProcess` (leases, tick and integrate locks) and the process adapter
  * (`createProcessPort`) both use it, so they agree. The start time is kept opaque — only
  * compared for equality, so a reused PID never looks like the original process — and a zombie
- * (stat `Z…`) has no start time: it is dead, so a lock or lease it holds is reclaimed (K3).
+ * (stat `Z…`) has no start time: it is dead, so a lock or lease it holds is reclaimed.
  */
 import type { ProcessPort } from "@norn/core";
 import type { ProcessIdentity } from "@norn/schema";
@@ -20,7 +20,7 @@ export function psStartArgv(pid: number): string[] {
   return ["ps", "-o", "stat=", "-o", "lstart=", "-p", String(pid)];
 }
 
-/** Parse `ps -o stat= -o lstart=` output; null when the pid is gone or a zombie (K3). */
+/** Parse `ps -o stat= -o lstart=` output; null when the pid is gone or a zombie. */
 export function parseStart(stdout: string, code: number): string | null {
   const m = /^\s*(\S+)\s+(.+?)\s*$/.exec(stdout);
   if (code !== 0 || !m || m[1]!.startsWith("Z")) return null;

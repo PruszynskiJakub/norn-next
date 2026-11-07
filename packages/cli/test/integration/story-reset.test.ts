@@ -1,5 +1,5 @@
 /**
- * `norn story reset` (GR7a): a story with no work of its own goes back to before intake — worktree,
+ * `norn story reset`: a story with no work of its own goes back to before intake — worktree,
  * local and remote branch, record, mailbox and claim gone, issue untouched — and the next sync takes it in
  * again from the current base. A story holding work is refused unless `--force`.
  * Real git: one clone of a bare remote.
@@ -36,7 +36,7 @@ const remoteHeads = () => h.git(["ls-remote", "--heads", "origin"]);
 
 async function intake(n: number, title: string, slug: string) {
   h.remote.issues = [...h.remote.issues, issue(n, title, ["norn"])];
-  h.clock.advance(10 * 60_000); // past the sync throttle (GR1)
+  h.clock.advance(10 * 60_000); // past the sync throttle
   for (const want of [`gh-${n} intake_story`, `gh-${n} claim`, `gh-${n} start_unit`]) {
     h.clock.advance(10_000);
     expect(kinds((await h.norn("tick")).value as TickReport)).toContain(want);
@@ -80,7 +80,7 @@ describe("norn story reset (GR7a)", () => {
     h.git(["add", "later.txt"]);
     h.git(["commit", "-q", "-m", "later"]);
     h.git(["push", "-q", "origin", "main"]);
-    // a receipt another clone left for the old run (T9)
+    // a receipt another clone left for the old run
     const left = "refs/norn/inbox/gh-8/01JB0000000000000000000000";
     h.git(["update-ref", left, sh(h.root, ["hash-object", "-w", "--stdin"], "{}")]);
     h.git(["push", "-q", "origin", `${left}:${left}`]);

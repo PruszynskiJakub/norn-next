@@ -1,8 +1,8 @@
 /**
- * gh-78 (O4): where a tick spends its time. observe times its phases and counts its remote calls on
+ * Where a tick spends its time. observe times its phases and counts its remote calls on
  * a `PhaseTimer`; `runTick` times observe, decide, act and what follows, and `tickTiming` turns that
  * into the tick record's `timing` with its slowest phase. Diagnostic only: never in `facts` or an
- * `action`, so decide never reads it and `--why` replays ignore it (O5).
+ * `action`, so decide never reads it and `--why` replays ignore it.
  */
 import type { TickSlowest, TickTiming } from "@norn/schema";
 
@@ -30,7 +30,6 @@ export class PhaseTimer {
     return out;
   }
 
-  /** Adds `ms` to `phase`. */
   add(phase: string, ms: number): void {
     this.phases[phase] = (this.phases[phase] ?? 0) + ms;
   }

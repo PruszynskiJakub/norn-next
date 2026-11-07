@@ -1,7 +1,7 @@
 /**
- * Skills on disk (SK1): one committed copy of each bundled skill folder in `.agents/skills/`,
+ * Skills on disk: one committed copy of each bundled skill folder in `.agents/skills/`,
  * linked from each agent's own skill folder. `norn init` overwrites the bundled folders whole
- * (S1 atomic writes per file); a repo customizes a skill by writing its own under another name.
+ * (atomic writes per file); a repo customizes a skill by writing its own under another name.
  */
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, renameSync, rmSync, statSync, symlinkSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
@@ -197,7 +197,7 @@ export function visibleSkills(dir: string): string[] {
 }
 
 /**
- * The bundled skills in `skillsFolder` that differ from this norn's copies in `sourceDir` (B21).
+ * The bundled skills in `skillsFolder` that differ from this norn's copies in `sourceDir`.
  * Only `names` are compared, so a repo-local skill is never named; a missing skill is not drift.
  */
 export function skillsDrift(skillsFolder: string, source: string | SkillSource, names: readonly string[]): string[] {
@@ -218,7 +218,7 @@ export function recordedNornVersion(teamFile: string): string | null {
 }
 
 /**
- * gh-61 B20, D14: the bundled skills in a worktree that differ from the running norn's (`skillsDrift`
+ * The bundled skills in a worktree that differ from the running norn's (`skillsDrift`
  * on its `.agents/skills/`) — none when the worktree's own team file records a `norn_version` newer
  * than `running`: its skills belong to the version that branch moves to.
  */
@@ -238,7 +238,7 @@ export interface SkillsReport {
   unlinked: Record<string, string[]>;
 }
 
-/** Compare the installed skills with the bundled ones (doctor, SK1). */
+/** Compare the installed skills with the bundled ones (doctor). */
 export function skillsReport(root: string, sourceDir: string, names: readonly string[], agentDirs: Record<string, string>): SkillsReport {
   const dir = skillsDir(root);
   const missing = names.filter((n) => !existsSync(join(dir, n, "SKILL.md")));

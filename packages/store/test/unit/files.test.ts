@@ -16,7 +16,7 @@ import {
 } from "../../src/index.ts";
 import { receipt, state, tmp } from "../helpers.ts";
 
-describe("atomic files (S1, S2)", () => {
+describe("atomic files", () => {
   test("atomicWrite creates parents, replaces content, leaves no temp files", () => {
     const d = tmp();
     const p = join(d, "a/b/c.json");
@@ -47,7 +47,7 @@ describe("atomic files (S1, S2)", () => {
   });
 });
 
-describe("receipts (S6)", () => {
+describe("receipts", () => {
   test("append numbers sequentially and names files NNNN-<kind>.json", () => {
     const u = tmp();
     const a = appendReceipt(u, receipt());
@@ -90,7 +90,7 @@ describe("receipts (S6)", () => {
   });
 });
 
-describe("committed runs/ JSON is one line (gh-108)", () => {
+describe("committed runs/ JSON is one line", () => {
   test("receipts and state.json are written as one line of JSON plus a newline", () => {
     const u = tmp();
     const r = receipt();

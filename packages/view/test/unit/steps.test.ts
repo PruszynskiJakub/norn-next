@@ -1,5 +1,5 @@
 /**
- * Step timeline (O4, X1), the pure pieces: durations, human wait, foreign commits, the base-cache note
+ * Step timeline, the pure pieces: durations, human wait, foreign commits, the base-cache note
  * and the criteria summary. The rows built from the gh-1 fixture are in test/integration/steps.test.ts.
  */
 import { describe, expect, test } from "bun:test";
@@ -82,7 +82,7 @@ describe("pure pieces", () => {
   });
 });
 
-describe("criteria summary (QV8)", () => {
+describe("criteria summary", () => {
   const ev = (unit: string, unverified: number, needs: Record<string, number>, rule: "criteria.checked" | "criteria.unchecked_coverage" = "criteria.checked") =>
     ({ type: "criteria", id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC", at: "2026-10-23T12:00:00.000Z", unit, run_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9ABD", step: "qa", attempt: 1, receipt_id: "01JBQ6ZK3E8Y4V5W6X7Y8Z9ABE", outcome: "unverified", rule, verdicts: { pass: 1, fail: 0, person: 0, unverified }, unverified_needs: needs }) as const;
 

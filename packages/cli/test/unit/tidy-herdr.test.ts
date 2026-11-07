@@ -1,5 +1,5 @@
 /**
- * K7: `norn tidy` closes what runs that reported done left in Herdr — the run's tab, or only its pane
+ * `norn tidy` closes what runs that reported done left in Herdr — the run's tab, or only its pane
  * when the tab holds something else, and the workspace when nothing else is left; never a pane that
  * moved out of the run's worktree, one still working, or a run that ended any other way.
  */
@@ -10,7 +10,7 @@ import { spot } from "../herdr-spot.ts";
 
 const run = (pane_id: string, worktree = "/wt/gh-1-01", unit = "gh-1/01"): DoneRun => ({ unit, run_id: ulid(), pane_id, worktree });
 
-describe("planHerdrTidy (K7)", () => {
+describe("planHerdrTidy", () => {
   test("a workspace holding only finished runs closes whole", () => {
     const plan = planHerdrTidy([run("w4:t1.p1"), run("w4:t2.p1")], [spot("w4:t1.p1", "/wt/gh-1-01"), spot("w4:t2.p1", "/wt/gh-1-01/sub", "done")]);
     expect(plan).toEqual({ workspaces: ["w4"], tabs: [], panes: [], kept: [] });

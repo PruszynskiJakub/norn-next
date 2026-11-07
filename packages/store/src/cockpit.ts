@@ -1,8 +1,7 @@
 /**
- * The cockpit's machine-local memory (CP13): `<norn home>/cockpit.json` holds
- * `last_repo`, the main checkout the last `norn status --watch` ran in, so the cockpit opened on a
- * workspace outside any norn repository shows that one. Presentation state, never a fact; an
- * unreadable file, or one of the wrong shape, reads as empty (S2, readLocalJson). It lives outside
+ * The cockpit's machine-local memory: `<norn home>/cockpit.json` holds `last_repo`, the main checkout
+ * the last `norn status --watch` ran in, so a cockpit opened outside any norn repository shows that one.
+ * Presentation state, never a fact; an unreadable or wrong-shaped file reads as empty. It lives outside
  * any repository, so a bad file is not traced.
  */
 import { join } from "node:path";

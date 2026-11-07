@@ -1,5 +1,5 @@
 /**
- * `norn check-run <run_id>`: started by a tick, never by hand (C5, H6). Runs the check order the tick
+ * `norn check-run <run_id>`: started by a tick, never by hand. Runs the check order the tick
  * wrote for that run, writes its `check` receipt and releases the run's lease; the next tick applies it.
  */
 import { defineCommand } from "../command.ts";
@@ -9,7 +9,7 @@ import { refuse } from "../output.ts";
 export const checkRunCommand = defineCommand({
   name: "check-run",
   version: "exempt",
-  summary: "Run a check step a tick started, and write its receipt (C5); a tick starts it",
+  summary: "Run a check step a tick started, and write its receipt; a tick starts it",
   usage: "norn check-run <run_id>",
   positionals: { min: 1, max: 1 },
   repo: false,

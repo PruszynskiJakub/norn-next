@@ -1,5 +1,5 @@
 /**
- * The command rename keeps everything else (B69, B70): a unit that went stuck under a norn that printed
+ * The command rename keeps everything else: a unit that went stuck under a norn that printed
  * the old names (its recorded tick says `norn unstick`) continues after the upgrade with no migration,
  * and `norn run view --why` on that old tick replays it as a version mismatch — labelled, the diff only
  * the command string — not as a failure.
@@ -95,7 +95,7 @@ describe("printed commands renamed, nothing else (B69, B70)", () => {
     // straight through runCli: the harness refuses any output naming an old command, and this one quotes the old trace
     const r = await runCli(["run", "view", "gh-5", "--why", "--tick", stuck.tick_id], h.deps);
     expect(r.value).not.toHaveProperty("error");
-    expect(r.exit).toBe(1); // O5: a replay that differs exits 1, as before the rename
+    expect(r.exit).toBe(1); // A replay that differs exits 1, as before the rename
     expect(r.value).toMatchObject({
       tick_id: stuck.tick_id,
       rule: "unit.stuck",

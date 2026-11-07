@@ -1,10 +1,10 @@
 /**
  * The "process" check (.github/workflows/process.yml): every PR to main comes from norn, from the
  * bypass, or from Dependabot. `processCheck` decides from facts alone; the CLI below gathers them
- * with `gh` and prints the verdict as one JSON value (P8): `{ok, reason}` or `{error, do_instead}`.
+ * with `gh` and prints the verdict as one JSON value: `{ok, reason}` or `{error, do_instead}`.
  *
  * A PR passes iff
- *   (a) its head branch is a norn story branch `gh-<N>-<slug>` (storyBranch, §7) and it closes #N;
+ *   (a) its head branch is a norn story branch `gh-<N>-<slug>` (storyBranch) and it closes #N;
  *   (b) it is labelled `bypass`, closes an issue labelled `bypass`, and that issue links another issue;
  *   (c) its author is Dependabot.
  * (a) and (b) also need a branch in this repository: a fork PR is input to an issue, not merged as is.
@@ -123,8 +123,6 @@ export function processCheck(f: PrFacts): Verdict {
 }
 
 const refuse = (error: string, do_instead: string): Verdict => ({ ok: false, error, do_instead });
-
-// ---------------------------------------------------------------- CLI: gather facts with gh
 
 /** Runs `gh <args>` and returns its parsed JSON; throws on failure. */
 export type Gh = (args: string[]) => unknown;

@@ -1,5 +1,5 @@
 /**
- * Targets and prompts (B54, B56–B60, D2) on `run view` and `run list`: a verb without a target acts
+ * Targets and prompts on `run view` and `run list`: a verb without a target acts
  * on the unit of the worktree it is typed in, an explicit target wins, a terminal elsewhere is offered
  * the units the verb applies to in `norn status` order, and a script or an agent is refused with them.
  */
@@ -171,7 +171,7 @@ describe("a story and its slice have runs", () => {
       ["--json", {}, ["--json"]],
       ["no TTY", { interaction: new FakeInteraction(false) }, []],
       ["no terminal at all", { interaction: null }, []],
-      ["an agent's launch env (A6)", { env: { ...h.deps.env, NORN_RUN: "01ARZ3NDEKTSV4RRFFQ69G5FAV" } }, []],
+      ["an agent's launch env", { env: { ...h.deps.env, NORN_RUN: "01ARZ3NDEKTSV4RRFFQ69G5FAV" } }, []],
       ["an orient session", { env: { ...h.deps.env, NORN_ORIENT: "1" } }, []],
     ];
     for (const [why, deps, flags] of cases) {

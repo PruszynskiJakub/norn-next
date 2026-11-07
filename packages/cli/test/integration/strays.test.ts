@@ -34,7 +34,7 @@ async function serve(cwd: string, port: number): Promise<Bun.Subprocess> {
 
 const freePort = () => 45_000 + Math.floor(Math.random() * 10_000);
 
-describe.skipIf(!hasLsof)("stray listeners on a slot's ports (K4.1)", () => {
+describe.skipIf(!hasLsof)("stray listeners on a slot's ports", () => {
   test("a server started from the worktree, listening on its slot's ports, is stopped and reported", async () => {
     const wt = tempDir();
     const port = freePort();

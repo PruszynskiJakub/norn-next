@@ -55,7 +55,7 @@ describe("loadSnapshot", () => {
     expect(st.units.map((u) => u.unit.key)).toEqual(["gh-12", "gh-12/01", "gh-12/02"]);
     const [story, u1, u2] = st.units;
     expect(story?.state).toBeNull();
-    // S12: run state in the machine dir is named by its absolute path
+    // Run state in the machine dir is named by its absolute path
     expect(story?.errors.map((e) => e.file)).toEqual([join(runStateOf(spec), "state.json")]);
     expect(u1?.state?.applied_through).toBe(1);
     expect(u1?.unapplied.map((r) => r.n)).toEqual([2]);

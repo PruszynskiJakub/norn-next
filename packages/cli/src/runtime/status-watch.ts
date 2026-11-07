@@ -1,16 +1,16 @@
 /**
- * `norn status --watch [--interval 5s] [--json] [--pane]` (B11, B12, CP5–CP13): the cockpit
+ * `norn status --watch [--interval 5s] [--json] [--pane]`: the cockpit
  * model (@norn/view cockpitModel) drawn full screen with raw keys — what needs you, then every
  * story, the selected row's preview, its actions by key. It writes only through CLI verbs run by the
- * dispatcher (X1, HC7) and stays open until q or Esc. Frames go to stderr, one JSON summary to
- * stdout at exit (P8).
+ * dispatcher and stays open until q or Esc. Frames go to stderr, one JSON summary to
+ * stdout at exit.
  *
- * - `--json`: print the model once (CP5), for a front end outside TypeScript (`status --json` is the inbox, B10).
- * - The backlog tab also lists the open issues with the intake label not assigned to the person (CP2),
+ * - `--json`: print the model once, for a front end outside TypeScript (`status --json` is the inbox).
+ * - The backlog tab also lists the open issues with the intake label not assigned to the person,
  *   read from the remote on start, every 5 minutes, on `r` and after a take — not on every frame.
- * - `--pane` (B12): split a Herdr pane below the caller and run the cockpit there.
+ * - `--pane`: split a Herdr pane below the caller and run the cockpit there.
  *
- * CP13: outside a norn repository — no repository, or one norn was never set up in (a Herdr popup over
+ * Outside a norn repository — no repository, or one norn was never set up in (a Herdr popup over
  * any workspace) — it shows the repository the last cockpit ran in on this machine (`~/.norn/cockpit.json`).
  */
 import { existsSync } from "node:fs";
@@ -49,13 +49,13 @@ function keyChunks(ctx: Context): { chunks: AsyncIterator<string>; close: () => 
   };
 }
 
-/** HC7: a verb in-process through the dispatcher (loaded lazily: the dispatcher imports this command). */
+/** A verb in-process through the dispatcher (loaded lazily: the dispatcher imports this command). */
 async function runVerb(ctx: Context, argv: string[], json: boolean): Promise<{ exit: number; value: unknown; stdout: string }> {
   const { runCli } = await import("../cli.ts");
   return runCli(json ? [...argv, "--json"] : argv, { ...ctx.deps, cwd: ctx.cwd, env: ctx.env, log: () => {} });
 }
 
-/** Resolves after `ms`, or at once when `signal` aborts (SIGINT/SIGTERM end the cockpit, CP6). */
+/** Resolves after `ms`, or at once when `signal` aborts (SIGINT/SIGTERM end the cockpit). */
 function sleep(ms: number, signal?: AbortSignal): Promise<null> {
   return new Promise((r) => {
     if (signal?.aborted) return r(null);
@@ -70,7 +70,7 @@ function sleep(ms: number, signal?: AbortSignal): Promise<null> {
   });
 }
 
-/** CP13: this norn repository, else (no repository, or one without norn) the one the last cockpit ran in. */
+/** This norn repository, else (no repository, or one without norn) the one the last cockpit ran in. */
 async function located(ctx: Context): Promise<Context> {
   const last = readCockpitFile(ctx.home).last_repo;
   const elsewhere = async (e: unknown) => {
@@ -95,7 +95,7 @@ const BACKLOG_EVERY_MS = 5 * 60_000;
 
 type Backlog = NonNullable<CockpitOptions["backlog"]>;
 
-/** CP2: the open issues with the intake label and the person's login, from the remote; null without one. */
+/** The open issues with the intake label and the person's login, from the remote; null without one. */
 async function readBacklog(ctx: Context): Promise<Backlog | null> {
   const remote = (await ctx.ports()).remote;
   if (!remote) return null;
@@ -213,7 +213,7 @@ async function interactive(ctx: Context, interval: number) {
 }
 
 /**
- * `norn status --watch [--interval 5s] [--pane] [--json]` (B11, B12): `--pane` opens it in a Herdr pane
+ * `norn status --watch [--interval 5s] [--pane] [--json]`: `--pane` opens it in a Herdr pane
  * split below the caller; `--json` prints the cockpit model once; else the cockpit until q or Esc.
  */
 export async function statusWatch(raw: Context, args: ParsedArgs) {
@@ -228,7 +228,7 @@ export async function statusWatch(raw: Context, args: ParsedArgs) {
   writeCockpitFile(ctx.home, { last_repo: ctx.root });
 
   if (opt.bool(args, "pane")) {
-    // B12: a pane below the caller runs the cockpit; only inside Herdr
+    // A pane below the caller runs the cockpit; only inside Herdr
     const herdr = cockpitHerdr(ctx);
     if (!herdr) throw refuse("not inside Herdr: there is no pane to split", cmd.statusWatch(), "not_in_herdr");
     const opened = await herdr.openBelow(ctx.cwd, cmd.statusWatch(opt.str(args, "interval") ? { interval: intervalRaw } : {}), "norn");

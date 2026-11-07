@@ -1,5 +1,5 @@
 /**
- * Unit guard (B4, D2): a unit test must not start a child process. The guard wraps `Bun.spawn` and
+ * Unit guard: a unit test must not start a child process. The guard wraps `Bun.spawn` and
  * `Bun.spawnSync` (node's `child_process.spawn` goes through them), throws at the call, and remembers the
  * violation so `check` (the preload's `afterEach`) fails the test even when the code under test swallowed
  * the error. The message names the argv and the test file, never the spawn's env or options (they can carry
@@ -60,7 +60,7 @@ export function installUnitGuard(): UnitGuard {
   };
 }
 
-/** The command only: `Bun.spawn(cmd, options)` or `Bun.spawn({ cmd, ...options })`. */
+/** The command only: `Bun.spawn(cmd, options)` or `Bun.spawn({ cmd,...options })`. */
 function argvOf(first: unknown): string[] {
   const cmd = Array.isArray(first) ? first : (first as { cmd?: unknown } | undefined)?.cmd;
   return Array.isArray(cmd) ? cmd.map(String) : ["<unknown command>"];

@@ -1,4 +1,4 @@
-# Reproduce workflow — repo-local copy of the shipped one (W1, W9: label norn:wf:reproduce, set by
+# Reproduce workflow — repo-local copy of the shipped one (label norn:wf:reproduce, set by
 # the bug report template and the `issue` skill). An unattended agent follows the report through the
 # real interface, builds a loop that goes red on the symptom, minimises it, confirms the cause and
 # names the seam for a regression test. It posts all of that as an issue comment and changes no code.
@@ -20,7 +20,7 @@ steps:
       change no file, spec.md included, but the handoff.
       Post the findings as an issue comment that starts with `## Reproduce` (`## Reproduce (updated)` on a rerun):
       the loop command, the minimised repro, what it prints, the confirmed cause (`file:line`, or the ranked
-      hypotheses left), the rule ids it touches and the seam for a regression test. That one comment is the only remote write this
+      hypotheses left) and the seam for a regression test. That one comment is the only remote write this
       step allows, an exception to the norn skill's rule; never edit the issue, label, assign or close.
       Write the same under Progress in the handoff (the next agent does not see your Resume).
     outcomes:

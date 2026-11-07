@@ -1,4 +1,4 @@
-/** `norn init`'s look at a repository (W1, F3): its test command from build files, and the template rewrite. */
+/** `norn init`'s look at a repository: its test command from build files, and the template rewrite. */
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

@@ -1,4 +1,4 @@
-/** Minimal git plumbing for claim and mailbox refs (§13). Not a GitPort; adapters own that. */
+/** Minimal git plumbing for claim and mailbox refs. Not a GitPort; adapters own that. */
 import { claimRef, mailboxPrefix } from "@norn/schema";
 import { noteSpawn, spawnBounded, spawnSyncCaptured } from "./spawn.ts";
 
@@ -8,13 +8,13 @@ export interface GitRun {
   stderr: string;
 }
 
-/** H11: how long a call that talks to a remote (git fetch/push, gh, glab) may take before it is killed. */
+/** How long a call that talks to a remote (git fetch/push, gh, glab) may take before it is killed. */
 export const NETWORK_TIMEOUT_MS = 120_000;
 
 const NETWORK_SUBCOMMANDS = new Set(["fetch", "push", "ls-remote", "pull", "clone"]);
 
 /**
- * H11: the timeout for `git <args>` — set for subcommands that reach a remote, none for local
+ * The timeout for `git <args>` — set for subcommands that reach a remote, none for local
  * ones (a commit runs hooks; a log on a big repo is slow but finite).
  */
 export function gitTimeoutMs(args: readonly string[]): number | undefined {
@@ -43,8 +43,8 @@ export interface GitSyncRun {
 }
 
 /**
- * `git` for callers that must stay synchronous (the base records snapshot, GR6). Same environment
- * and H11 timeout rule as `git`; on timeout the child is killed and the code is 124. Never throws.
+ * `git` for callers that must stay synchronous (the base records snapshot). Same environment
+ * and timeout rule as `git`; on timeout the child is killed and the code is 124. Never throws.
  */
 export function gitSync(cwd: string, args: string[], input?: Uint8Array, opts: { timeoutMs?: number; env?: Record<string, string> } = {}): GitSyncRun {
   const timeoutMs = opts.timeoutMs ?? gitTimeoutMs(args);
@@ -120,7 +120,7 @@ export type CasResult =
   | { ok: false; reason: "stale" | "rejected" | "network" | "other"; message: string };
 
 /**
- * Compare-and-swap one ref (T3). `expected` null = ref must not exist; `sha` null deletes.
+ * Compare-and-swap one ref. `expected` null = ref must not exist; `sha` null deletes.
  * With a remote: `git push --force-with-lease=<ref>:<expected> <remote> <sha>:<ref>`, then the
  * local copy is updated to match. Without (solo, no remote): `git update-ref` with old value.
  */
@@ -135,8 +135,8 @@ export interface CasUpdate {
 }
 
 /**
- * Compare-and-swap several refs, one result per update in order (T3). With a remote they go out in
- * one plain (not `--atomic`) push, a lease per refspec (H5: one round trip however many refs), so
+ * Compare-and-swap several refs, one result per update in order. With a remote they go out in
+ * one plain (not `--atomic`) push, a lease per refspec (one round trip however many refs), so
  * one lost CAS does not fail the others. git exits non-zero when any ref is rejected, so each
  * ref's outcome comes from its `--porcelain` line; a ref without one (the push never reached the
  * remote) is classified from the whole output. Each ref pushed is mirrored locally.
@@ -185,8 +185,8 @@ function casFailReason(text: string): Extract<CasResult, { ok: false }>["reason"
 }
 
 /**
- * Fetch the claim and mailbox refs from the remote by prefix, pruning local ones gone remotely
- * (T9, H2). Named prefixes, never all of `refs/norn/*`, so archive refs stay off every sync (gh-195 B30);
+ * Fetch the claim and mailbox refs from the remote by prefix, pruning local ones gone remotely.
+ * Named prefixes, never all of `refs/norn/*`, so archive refs stay off every sync;
  * `--prune` only touches refs under these refspecs' destinations.
  */
 export async function fetchNornRefs(cwd: string, remote: string): Promise<void> {
@@ -196,7 +196,7 @@ export async function fetchNornRefs(cwd: string, remote: string): Promise<void> 
 }
 
 /**
- * C5 (F35): is every commit in `from..to` norn's own for `story` — a `Norn-Tick` trailer and
+ * Is every commit in `from..to` norn's own for `story` — a `Norn-Tick` trailer and
  * `Norn-Story: <story>` (e.g. the `ready.approve → $done` state commit) — with `from` an ancestor of
  * `to`? False when either commit is unknown here, so a head nobody can vouch for still counts as moved.
  */

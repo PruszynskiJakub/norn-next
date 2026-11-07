@@ -33,7 +33,7 @@ import { normaliser } from "./golden-harvest.ts";
 import type { Harness } from "./harness.ts";
 import { REPO_ROOT } from "./repo-root.ts";
 
-/** Where the pinned transcripts live, named from the repo root (gh-118 B19). */
+/** Where the pinned transcripts live, named from the repo root. */
 export const TRANSCRIPTS_DIR = join(REPO_ROOT, "test", "e2e", "transcripts");
 
 export interface Transcript {
@@ -96,7 +96,7 @@ function numberer(re: RegExp, tag: string): (text: string) => string {
 
 /**
  * Every file under a `runs/` dir below each of `tops` (skipping `.git` and the trace dir) and, S12
- * (gh-195/05), under each top's machine dir `runs/` (the run state), keyed by its path relative to
+ *, under each top's machine dir `runs/` (the run state), keyed by its path relative to
  * `dir`, with its content.
  */
 function runsFiles(dir: string, tops: readonly string[]): Map<string, string> {
@@ -146,7 +146,7 @@ export function textNormaliser(dir: string): (text: string) => string {
   const tmp = [...new Set([tmpdir(), realpathSync(tmpdir()), tmpdir().replace(/^\/private\//, "/")])].map((d) => d.replace(/\/$/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const tmpRe = new RegExp(`(?:${tmp.join("|")})/([\\w.-]*-)[A-Za-z0-9]{6}\\b`, "g");
   return (text: string): string => {
-    // a checkout's machine dir `repos/<folder>-<8 hex of its common dir>` (ID2) differs per temp dir: S12 run state sits there
+    // a checkout's machine dir `repos/<folder>-<8 hex of its common dir>` differs per temp dir: S12 run state sits there
     let t = dirNorm(text).replace(tmpRe, "<tmp>/$1<rand>").replace(/\brepos\/([\w.-]+)-[0-9a-f]{8}(?![\w.-])/g, "repos/$1-<id>");
     for (const m of t.match(SHA) ?? []) fullShas.add(m);
     t = t.replace(/\b[0-9a-f]{7,12}\b/g, (m) => {

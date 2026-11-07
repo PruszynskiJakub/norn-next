@@ -1,4 +1,4 @@
-/** Content installed by `norn init`: workflow templates (§11), skills (§16), repo config template (K2). */
+/** Content installed by `norn init`: workflow templates, skills, repo config template. */
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -12,7 +12,7 @@ const ASSETS = join(import.meta.dir, "..", "..", "assets");
 const SKILLS_DIR = join(ASSETS, "skills");
 const WORKFLOWS_DIR = join(ASSETS, "workflows");
 
-/** The skills of §16: the protocol skill, the step skills, their reference skills and the retro a person runs. */
+/** The shipped skills: the protocol skill, the step skills, their reference skills and the retro a person runs. */
 const SKILLS = [
   "norn",
   "norn-interview",
@@ -35,7 +35,7 @@ const SKILLS = [
   "norn-fsd-round",
   "norn-fsd",
 ];
-/** gh-196 D6: the supervisor skills drive norn's own commands from the main checkout (SK3), so like `norn` they know norn */
+/** The supervisor skills drive norn's own commands from the main checkout, so like `norn` they know norn */
 const SUPERVISOR = ["norn-fsd-round", "norn-fsd"];
 const CRAFT = SKILLS.filter((s) => s !== "norn" && !SUPERVISOR.includes(s));
 
@@ -53,7 +53,7 @@ function splitSkill(text: string): { meta: Record<string, unknown>; body: string
 /** Text outside fenced and inline code, for prose-only lints. */
 const prose = (text: string) => text.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
 
-/** Steps that can reach `$done` (W5), walking declared edges backwards. */
+/** Steps that can reach `$done`, walking declared edges backwards. */
 function stepsReachingDone(wf: Workflow): Set<string> {
   const reach = new Set<string>(["$done"]);
   let grew = true;
@@ -72,7 +72,7 @@ function stepsReachingDone(wf: Workflow): Set<string> {
 }
 
 /**
- * Every elementary cycle has a counted edge (W4) ⇔ the graph without counted edges is acyclic.
+ * Every elementary cycle has a counted edge ⇔ the graph without counted edges is acyclic.
  * Returns one uncounted cycle path, or null.
  */
 function uncountedCycle(wf: Workflow): string[] | null {
@@ -130,12 +130,12 @@ describe("workflow templates", () => {
         }
     });
 
-    test("every step can reach $done (W5)", () => {
+    test("every step can reach $done", () => {
       const reach = stepsReachingDone(wf);
       expect(Object.keys(wf.steps).filter((s) => !reach.has(s))).toEqual([]);
     });
 
-    test("every cycle has a counter, and every counter is declared and used (W4)", () => {
+    test("every cycle has a counter, and every counter is declared and used", () => {
       expect(uncountedCycle(wf)).toBeNull();
       const used = new Set<string>();
       for (const step of Object.values(wf.steps))
@@ -146,7 +146,7 @@ describe("workflow templates", () => {
       expect([...used].sort()).toEqual(Object.keys(wf.counters ?? {}).sort());
     });
 
-    test("agent outcomes routed to a step carry `means` text (B3)", () => {
+    test("agent outcomes routed to a step carry `means` text", () => {
       const missing: string[] = [];
       for (const [name, step] of Object.entries(wf.steps)) {
         if (step.type !== "agent") continue;
@@ -155,25 +155,25 @@ describe("workflow templates", () => {
       expect(missing).toEqual([]);
     });
 
-    test("every referenced skill exists in assets/skills (W5)", () => {
+    test("every referenced skill exists in assets/skills", () => {
       for (const step of Object.values(wf.steps))
         if (step.type === "agent") expect({ skill: step.skill, exists: existsSync(join(SKILLS_DIR, step.skill, "SKILL.md")) }).toEqual({ skill: step.skill, exists: true });
     });
 
     // TODO: core's validator exists in packages/core/src/workflow.ts but is not yet exported from
     // @norn/core. Once it is, also assert:
-    //   validateWorkflowDefinition(wf, { skills: SKILLS }).issues → []            (W4, W5)
-    //   checkWorkflowLevel(wf, file === "story.yaml" ? "story" : "slice") → []   (W8)
+    // validateWorkflowDefinition(wf, { skills: SKILLS }).issues → []
+    // checkWorkflowLevel(wf, file === "story.yaml" ? "story": "slice") → []
   });
 });
 
-describe("single-purpose workflows (W1, #136)", () => {
+describe("single-purpose workflows (#136)", () => {
   const wf = (name: string) => loadWorkflow(`${name}.yaml`);
   const targets = (name: string, step: string) =>
     Object.fromEntries(Object.entries(wf(name).steps[step]?.outcomes ?? {}).map(([o, e]) => [o, outcomeEdge(e as Parameters<typeof outcomeEdge>[0]).to]));
   const types = (name: string) => Object.fromEntries(Object.entries(wf(name).steps).map(([s, step]) => [s, step.type]));
 
-  test("triage is the default story workflow and slice the default slice workflow (W9)", () => {
+  test("triage is the default story workflow and slice the default slice workflow", () => {
     expect([DEFAULT_CONFIG.workflow, DEFAULT_CONFIG.slice_workflow]).toEqual(["triage", "slice"]);
   });
 
@@ -207,7 +207,7 @@ describe("single-purpose workflows (W1, #136)", () => {
     expect(targets("story", "ci")).toEqual({ pass: "ready", fail: "implement" });
   });
 
-  test("story's describe step reads the record, not runs/ in the worktree, here and in this repo's copy (gh-195 D5, B28)", () => {
+  test("story's describe step reads the record, not runs/ in the worktree, here and in this repo's copy (B28)", () => {
     const local = parse(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "workflows", "story.yaml"), "utf8")) as Workflow;
     for (const w of [wf("story"), local]) expect(w.steps.describe).toMatchObject({ skill: "norn-pr", inputs: ["spec", "diff", "record"] });
     expect(readSkill("norn-pr")).toContain("`evidence/<unit>/<run_id>/<file>`");
@@ -225,7 +225,7 @@ describe("single-purpose workflows (W1, #136)", () => {
     expect(targets("quick", "ci")).toEqual({ pass: "ready", fail: "implement" });
   });
 
-  test("story and quick wait for CI with the same script, and update-branch re-enters update (BS9)", () => {
+  test("story and quick wait for CI with the same script, and update-branch re-enters update", () => {
     const run = (name: string) => (wf(name).steps.ci as { run?: string }).run;
     expect(run("story")).toContain("gh pr checks");
     expect(run("quick")).toBe(run("story"));
@@ -234,7 +234,7 @@ describe("single-purpose workflows (W1, #136)", () => {
 });
 
 describe("skills", () => {
-  test("exactly the skills of §16 are shipped", () => {
+  test("exactly these skills are shipped", () => {
     expect(readdirSync(SKILLS_DIR).sort()).toEqual([...SKILLS].sort());
   });
 
@@ -246,11 +246,11 @@ describe("skills", () => {
     expect(body.trim().length).toBeGreaterThan(0);
   });
 
-  test("the norn skill stays under 80 lines (SK2)", () => {
+  test("the norn skill stays under 80 lines", () => {
     expect(readSkill("norn").split("\n").length).toBeLessThanOrEqual(80);
   });
 
-  test("the norn skill names no step of any template (SK2)", () => {
+  test("the norn skill names no step of any template", () => {
     const text = readSkill("norn");
     const reserved = new Set(["test", "slice", "slices", "plan", "ready"]); // glossary nouns / plain words
     const names = new Set(workflowFiles.flatMap((f) => Object.keys(loadWorkflow(f).steps)).filter((n) => !reserved.has(n)));
@@ -263,55 +263,55 @@ describe("skills", () => {
       expect(text).toContain(s);
   });
 
-  // gh-196 S2: the supervisor protocol states its terms (SK3); the command lint checks every command it prints
-  test("norn-fsd-round states the supervisor protocol (B2–B32, B35–B45, SK3)", () => {
+  // The supervisor protocol states its terms; the command lint checks every command it prints
+  test("norn-fsd-round states the supervisor protocol (B2–B32, B35–B45)", () => {
     const text = readSkill("norn-fsd-round");
     const terms = [
-      // B2, B4, B3, B38: where and what it supervises
+      // Where and what it supervises
       ".norn-unit", "main checkout", "One supervisor per checkout", "Named stories only", "/release-start",
-      // B8, B9: the watch is checked by `status --json`'s heartbeat.up (true or false whatever mode the stories are
+      // The watch is checked by `status --json`'s heartbeat.up (true or false whatever mode the stories are
       // in) before start and after every wait, never started
       "No watch is running", "`! norn watch`", "`heartbeat.up`", "after every wait", "stopped moving",
-      // B5, B6, B7: one foreground subagent per story, one voice naming the story, JSON only
+      // One foreground subagent per story, one voice naming the story, JSON only
       "one subagent per story", "foreground", "norn story wait", "only one who talks to the person", "Name the story in every message", "--json", "never grep markdown",
-      // B10: auto mode, never a step's commands
+      // Auto mode, never a step's commands
       "norn story edit <story> --auto", "norn brief", "norn story start",
-      // B11–B14, B18, B23: delegated decisions with reasons; B12: the person's reply is their own answer
+      // Delegated decisions with reasons; B12: the person's reply is their own answer
       "--delegated --reason", "norn story answer", "norn story approve", "norn story reject", "norn run rerun", "--reset", "without `--delegated`: it is their answer",
-      // B15, B19, B20: CI and the PR; B19 reads the checks of the exact head
+      // CI and the PR; B19 reads the checks of the exact head
       "gh run rerun --failed", "exact head", "statusCheckRollup", "headRefOid", "runs/", "handoff.md", "PR's state",
-      // B16, B17: allowed, forbidden, permission rule
+      // Allowed, forbidden, permission rule
       "Allowed:", "Forbidden:", "norn tick", "norn run cancel", "--force", "norn story checkout", "Bash(norn story approve:*)",
-      // B24–B30, B39: escalations; B27: stuck or exhausted again, with the receipts; B36: an unknown workflow
+      // Escalations; B27: stuck or exhausted again, with the receipts; B36: an unknown workflow
       "a merge, a release, an install or a watch restart the request did not name", "force pushes", "rules file", "max_agents", "closing an issue", "a workflow the skill does not know", "`release`'s `ready`", "question set", "sent once", "quiet",
       "Stuck again at the same step → escalate with the receipts", "Exhausted again → escalate",
-      // B40: release, install and restart in that order
+      // Release, install and restart in that order
       "approve on their answer → wait for the merge and the publish → install → pull → restart the watch and the cockpit",
-      // B41–B43: load and flakes; gh-213 (O2a): rerun at its check while implement runs, no cancel first
+      // Load and flakes; Rerun at its check while implement runs, no cancel first
       "reason: timeout", "the load is far above the core count", "suspected flake", "never run tests in a unit worktree", "--step <check> --delegated --reason",
-      // B15, B41: a CI glitch and a load failure are rerun at their check too
+      // A CI glitch and a load failure are rerun at their check too
       "Rerun at its check** (CI glitch, load, suspected flake)", "then rerun at its check (`--step ci`, below)", "then rerun at its check once (`--step <check>`, below)",
-      // gh-213 (O2a): whether the work changed since the fail is run view's `check_retry`, not git; norn stops the session itself
+      // Whether the work changed since the fail is run view's `check_retry`, not git; norn stops the session itself
       "norn run view <unit> --json", "check_retry", "code_changed", "norn stops that session itself",
       "gh run cancel <id>",
-      // B7, B11: JSON only and no story passed to status; a permission prompt answered by its option number
+      // JSON only and no story passed to status; a permission prompt answered by its option number
       "never pass a story to `norn status`", "its option number",
-      // B24, B40: a merge and a watch restart the request named are allowed
+      // A merge and a watch restart the request named are allowed
       "when the request named them, `gh pr merge --squash`", "(unless the request named a watch restart)",
-      // B37: stops at the round's end; B13, B27: a stuck unit does not end the round (RD1, W7)
+      // Stops at the round's end; B13, B27: a stuck unit does not end the round
       "Never start another round", "The round ends at `$done`", "A stuck unit does not end the round",
-      // B19, B20, B39: a gate left parked on purpose is never waited on with `--until gate` (it returns at once)
+      // A gate left parked on purpose is never waited on with `--until gate` (it returns at once)
       "Never loop on `--until gate` while you leave a gate parked", "norn story wait <story> --until merged --timeout 160s", "(`--until merged`, not `--until gate`)", "timeout 170 gh run watch <run-id> --exit-status",
-      // gh-250: every wait stays under the harness's foreground limit; norn and gh run directly, never through a script
+      // Every wait stays under the harness's foreground limit; norn and gh run directly, never through a script
       "under the harness's foreground limit", "Bash timeout about 178 s", "norn story wait <story> --until gate --timeout 160s",
       "exit 7: the timeout passed", "never through a script or in the background",
-      // B44, B45: the report
+      // The report
       "One report", "delegated decisions with their reasons", "suspected flakes", "waiting: your answer to",
     ];
     expect(terms.filter((t) => !text.includes(t))).toEqual([]);
     // `$stuck` parks a unit for its one diagnosed rerun; it never ends a round
     expect(text).not.toMatch(/round ends at[^.\n]*\$stuck/);
-    // gh-250: no wait outlasts the harness's foreground limit (Claude Code moves a command over ~180 s to the background)
+    // No wait outlasts the harness's foreground limit (Claude Code moves a command over ~180 s to the background)
     expect(text).not.toMatch(/--timeout 5m|five minutes/);
     // the shipped text names no spec ids and no story of this repo
     expect(text).not.toMatch(/\(B\d+[,)–]|claims were lost/);
@@ -321,29 +321,29 @@ describe("skills", () => {
     const text = readSkill("norn-fsd");
     const terms = [
       "norn-fsd-round", ".norn-unit", "`quick`", "`story`", "`reproduce`", "Pick the cheapest workflow that delivers safely", "one seam and no new contract → `quick`", "a new contract → `story`", "--workflow <name> --delegated --reason", "Never `--force`", "never on an unfinished round", "closing the issue", "rules file",
-      // B31: refinement without the person: asks answered, the rest as one question set, the plan approved
+      // Refinement without the person: asks answered, the rest as one question set, the plan approved
       "Refinement on the person's behalf", "one question set", "approve the plan yourself",
-      // B32: an attended step is the person's turn; B36: a workflow the skill does not know is a suggestion
+      // An attended step is the person's turn; B36: a workflow the skill does not know is a suggestion
       "norn story start", "Never type into the pane", "a repo-local workflow the skill does not know",
     ];
     expect(terms.filter((t) => !text.includes(t))).toEqual([]);
   });
 
-  // gh-196 D6: norn-fsd's agent and every subagent load norn-fsd-round, so the model must be able to;
-  // norn-fsd stays person-only (B2 holds through the `.norn-unit` stop and the delegated_in_unit refusal)
+  // Norn-fsd's agent and every subagent load norn-fsd-round, so the model must be able to;
+  // norn-fsd stays person-only
   test("norn-fsd-round can be loaded by an agent; norn-fsd is started by a person (D6)", () => {
     expect(splitSkill(readSkill("norn-fsd-round")).meta["disable-model-invocation"]).toBeUndefined();
     expect(splitSkill(readSkill("norn-fsd")).meta["disable-model-invocation"]).toBe(true);
   });
 
-  // gh-196 B5: an agent runs the printed `norn story wait` as written, so every --until value must parse
-  test("every `--until` a bundled skill prints is a story wait condition (B5)", () => {
+  // An agent runs the printed `norn story wait` as written, so every --until value must parse
+  test("every `--until` a bundled skill prints is a story wait condition", () => {
     const values = readdirSync(SKILLS_DIR).flatMap((s) => [...readSkill(s).matchAll(/norn story wait \S+ --until (\S+?)[`\s]/g)].map((m) => [s, m[1] as string] as const));
     expect(values.length).toBeGreaterThan(0);
     expect(values.filter(([, v]) => !/^<[^>]+>$/.test(v) && parseWaitCondition(v) === null)).toEqual([]);
   });
 
-  test("norn-review traces every user story and criterion to a test, and writes the table into the handoff (gh-169, bypass #277)", () => {
+  test("norn-review traces every user story and criterion to a test, and writes the table into the handoff", () => {
     const text = readSkill("norn-review");
     // the Spec axis builds the table, one row per item with what it says in words, a test or UNTRACED
     for (const s of ["traceability table", "| Criterion or story | What it says | Verifier | Proven by |", "UNTRACED"]) expect(text).toContain(s);
@@ -352,11 +352,11 @@ describe("skills", () => {
     for (const s of ["QA (agent)", "QA (person)", "counts as `verifier: test`"]) expect(text).toContain(s);
     // the table goes into the handoff's Progress section
     expect(text).toMatch(/Write the table into the handoff\*\* \(the Progress section/);
-    // a craft skill does not cite the rule ids of norn's own rules file (P7)
+    // a craft skill does not cite the rule ids of norn's own rules file
     expect(text).not.toMatch(/\bQV\d/);
   });
 
-  test("norn-refine writes the to-spec layout, and agents name spec items in words to a person (bypass #277)", () => {
+  test("norn-refine writes the to-spec layout, and agents name spec items in words to a person", () => {
     const refine = readSkill("norn-refine");
     for (const h of ["## Problem Statement", "## Solution", "## User Stories", "## Out of Scope", "## Further Notes", "## Open questions", "## Plan"]) expect(refine).toContain(h);
     expect(refine).not.toMatch(/^## Behaviour$/m);
@@ -368,7 +368,7 @@ describe("skills", () => {
     expect(readSkill("norn-interview")).toMatch(/never by a number or id/);
   });
 
-  test("norn-review reads REVIEW.md, verifies each blocking candidate, and pins every finding to a file and line (gh-226)", () => {
+  test("norn-review reads REVIEW.md, verifies each blocking candidate, and pins every finding to a file and line", () => {
     const text = readSkill("norn-review");
     // the repo's REVIEW.md: ignored paths, what fails here, what not to report
     expect(text).toMatch(/`REVIEW\.md`\*\* at the repo root, when present/);
@@ -383,25 +383,25 @@ describe("skills", () => {
     expect(text).toContain("No findings.");
   });
 
-  test.each(CRAFT)("%s is unaware of norn (P7)", (name) => {
-    // skill names carry the `norn-` prefix (SK1); any other mention of norn is a leak
+  test.each(CRAFT)("%s is unaware of norn", (name) => {
+    // skill names carry the `norn-` prefix; any other mention of norn is a leak
     const text = readSkill(name).replace(/\bnorn-[a-z-]+/g, "");
     expect(text).not.toMatch(/norn/i);
     expect(prose(text)).not.toMatch(/\b(workflows?|receipts?|outcomes?|steps?|brief)\b/i);
   });
 
-  test.each(SKILLS)("%s links only to files that exist (whole skill folders, SK1)", (name) => {
+  test.each(SKILLS)("%s links only to files that exist (whole skill folders)", (name) => {
     const links = [...readSkill(name).matchAll(/\]\(([^)#\s]+\.md)\)/g)].map((m) => m[1] as string).filter((l) => !/^[a-z]+:/.test(l));
     expect(links.filter((l) => !existsSync(join(SKILLS_DIR, name, l)))).toEqual([]);
   });
 
-  /** Banned synonyms (§5), same set as test/repo/repo.test.ts lints in sources. */
+  /** Banned synonyms, same set as test/repo/repo.test.ts lints in sources. */
   const BANNED: Array<[RegExp, string]> = [
     [/\b(task|tasks|job|jobs|ticket|tickets)\b/i, "story / slice"],
     [/\binteractive step/i, "attended step"],
     [/\bapproved\b/i, "approve"],
   ];
-  test.each(SKILLS)("%s uses no banned glossary synonyms (§5)", (name) => {
+  test.each(SKILLS)("%s uses no banned glossary synonyms", (name) => {
     const hits: string[] = [];
     readSkill(name)
       .split("\n")
@@ -429,12 +429,12 @@ describe("config starters (B49, B50)", () => {
     // Uncomment lines that hold a lowercase YAML key (`# key:`); prose comments start uppercase.
     const uncommented = text.replace(/^(\s*)# ( *[a-z_]+:.*)$/gm, "$1$2").replace(/<[^>]+>/g, "x");
     const value = parse(uncommented) as Record<string, unknown>;
-    // D2: the file's schema is what norn checks it with
+    // The file's schema is what norn checks it with
     expect(validate(`${kind}-config`, value)).toMatchObject({ ok: true });
   });
 });
 
-describe("asset resolution (X3)", () => {
+describe("asset resolution", () => {
   const tmp = mkdtempSync(join(tmpdir(), "norn-assets-"));
   afterAll(() => rmSync(tmp, { recursive: true, force: true }));
   const assetsAt = (name: string) => {

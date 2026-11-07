@@ -1,5 +1,5 @@
 /**
- * gh-110 B11–B17 (D6), gh-61 B29, B30: `norn upgrade` (once `norn migrate`) moves a main checkout from the old layout to the new one. The
+ * gh-110 B11–B17, gh-61 B29, B30: `norn upgrade` (once `norn migrate`) moves a main checkout from the old layout to the new one. The
  * config and workflows move as staged git renames, the machine-local files into the machine dir,
  * norn's old `.gitignore` line goes; nothing is committed. It refuses outside the main checkout, with
  * a part in both places, or while the tick lock is held; it does nothing on a migrated repo, and a
@@ -132,7 +132,7 @@ describe("norn upgrade on the old layout (B11, B12, B13)", () => {
     expect(porcelain(h)).toContain("M  .gitignore");
   });
 
-  test("the next tick recognises its own claim (ID2)", async () => {
+  test("the next tick recognises its own claim", async () => {
     h.git(["commit", "-q", "-m", "norn: move to the new layout"]);
     // past the renewal (3m), inside the lease (10m): only a tick that knows the claim is its own renews it
     h.clock.advance(4 * 60_000);
@@ -157,7 +157,7 @@ describe("norn upgrade on the old layout (B11, B12, B13)", () => {
   });
 });
 
-describe("norn migrate is a deprecated alias of norn upgrade (gh-61 B30)", () => {
+describe("norn migrate is a deprecated alias of norn upgrade", () => {
   test("it stages the same moves upgrade stages, with the same JSON value, and says on stderr that it is now norn upgrade", async () => {
     const a = await oldRepo();
     const b = await oldRepo();
@@ -214,7 +214,7 @@ describe("norn upgrade refuses and moves nothing (B15, B16, B17)", () => {
       expectRefused(r, "tick_locked");
       expect((r.value as { do_instead: string }).do_instead).toBe("stop `norn watch` and run it again");
       expect(snapshot(h)).toEqual(before);
-      // gh-61 B29: a rerun under the same lock is refused the same way and still changes nothing
+      // A rerun under the same lock is refused the same way and still changes nothing
       expect((await h.norn("upgrade", "--json")).value).toEqual(r.value);
       expect(snapshot(h)).toEqual(before);
     } finally {
@@ -385,7 +385,7 @@ Body
 
   test("B41, B42: team limits fill each workflow's defaults: and default_mode each workflow's mode, keeping a workflow's own", () => {
     const quick = h.read(join(workflowsDir(h.root), "quick.yaml")).trimEnd();
-    // D13: only the added lines differ; the rest of the file keeps its text (no reflow)
+    // Only the added lines differ; the rest of the file keeps its text (no reflow)
     const before = sh(h.root, ["show", "HEAD:.agents/workflows/quick.yaml"]).trimEnd();
     const added = quick.split("\n").filter((l) => !before.split("\n").includes(l));
     expect(added).toEqual(["mode: auto", "defaults:", "  deadline: 45m"]);
@@ -435,7 +435,7 @@ Body
   });
 });
 
-describe("norn upgrade leaves a new-style config alone (gh-64 B45)", () => {
+describe("norn upgrade leaves a new-style config alone", () => {
   test("B45: a user and team file with no old key, in odd formatting, are neither rewritten nor staged", async () => {
     const h = await createHarness();
     try {
@@ -450,7 +450,7 @@ describe("norn upgrade leaves a new-style config alone (gh-64 B45)", () => {
       expect(out.exit).toBe(0);
       expect(out.value).toMatchObject({ config: { changed: [], renamed: [], removed: [] } });
       expect(h.read(join(h.home, "config.yaml"))).toBe(user);
-      // gh-61 B13: the only change is the norn_version a repo without one gets
+      // The only change is the norn_version a repo without one gets
       expect(h.read(repoConfigPath(h.root))).toBe(`${team}norn_version: ${runningVersion(h.deps)}\n`);
       expect(porcelain(h)).toBe(`M  ${NEW_CONFIG}`);
     } finally {
@@ -459,7 +459,7 @@ describe("norn upgrade leaves a new-style config alone (gh-64 B45)", () => {
   });
 });
 
-describe("norn upgrade on the new layout while watch holds the tick lock (gh-61 B29)", () => {
+describe("norn upgrade on the new layout while watch holds the tick lock", () => {
   test("exit 3, do_instead to stop watch and run it again; a rerun is refused the same way and nothing changes", async () => {
     const h = await createHarness();
     try {
@@ -484,7 +484,7 @@ describe("norn upgrade on the new layout while watch holds the tick lock (gh-61 
   });
 });
 
-describe("norn upgrade on old team values of the wrong shape (gh-64 B43)", () => {
+describe("norn upgrade on old team values of the wrong shape", () => {
   test("B43: a scalar remote, limits or default_mode is removed and listed once with its value", async () => {
     const h = await createHarness();
     try {

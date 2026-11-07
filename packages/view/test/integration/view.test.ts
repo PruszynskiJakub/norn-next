@@ -161,7 +161,7 @@ async function seed() {
   const blob: ClaimBlob = { version: 1, story: "gh-12", holder: "me@box", heartbeat_id: ulid(NOW), acquired_at: ago(100), renewed_at: ago(2), expires_at: ago(-8), last_tick_id: null };
   const c = await acquireClaim(repo, null, blob, { now: NOW });
   if (!c.ok) throw new Error("claim");
-  // the heartbeat is up: auto stories here wait on their runs, not on `norn watch` (R5.5, gh-64 B12)
+  // the heartbeat is up: auto stories here wait on their runs, not on `norn watch`
   markTick(repo, new Date(NOW).toISOString());
   return { repo, home };
 }
@@ -194,7 +194,7 @@ describe("loadProjectView", () => {
       url: "https://x/12",
       workflow: "slice",
       mode: "auto",
-      // gh-64 B12: auto mode runs on the detected runner; it is never downgraded for lack of one
+      // Auto mode runs on the detected runner; it is never downgraded for lack of one
       effective_mode: "auto",
       mode_downgraded: false,
       status: "parked",
@@ -245,14 +245,14 @@ describe("loadProjectView", () => {
       },
     ]);
 
-    // D1 (B3): the project view carries no timeline
+    // The project view carries no timeline
     expect("timeline" in v).toBe(false);
 
     expect(v.recently_done).toEqual([{ unit: "gh-12/02", title: "Wire API", done_at: ago(60), age: "1h" }]);
     expect(JSON.parse(JSON.stringify(v))).toEqual(v);
   });
 
-  test("timelines are a separate read: receipts and trace events per unit (B3, D1)", async () => {
+  test("timelines are a separate read: receipts and trace events per unit (D1)", async () => {
     const { repo, home } = await seed();
     const t = loadTimelines({ repoRoot: repo, home, now: NOW, env: {} });
     expect(t.errors).toEqual([]);
@@ -268,7 +268,7 @@ describe("loadProjectView", () => {
     expect(formatTimeline(t.timeline["gh-12/01"] ?? [])).toContain("check fail at test#1: bun test (exit 1, 2.3s)");
   });
 
-  test("trace window: the timeline read keeps 14 days; the project view reads no trace, so a broken line is not its error (B3, D1)", async () => {
+  test("trace window: the timeline read keeps 14 days; the project view reads no trace, so a broken line is not its error (D1)", async () => {
     const { repo, home } = await seed();
     const old = NOW - 20 * 86_400_000;
     appendTrace(repo, { type: "tick", tick_id: ulid(old), at: new Date(old).toISOString(), heartbeat_id: null, duration_ms: 5, facts: {}, decisions: [{ unit: "gh-12", rule: "old", action: { kind: "wait" }, result: { ok: true } }] });
@@ -296,7 +296,7 @@ describe("loadProjectView", () => {
     expect(v.inbox.groups.unclaimed.map((i) => i.command)).toEqual(["norn story checkout gh-12"]);
   });
 
-  test("corrupt state is reported, not guessed (S2)", async () => {
+  test("corrupt state is reported, not guessed", async () => {
     const { repo, home } = await seed();
     writeFileSync(join(runStateOf(storyDir(repo, "gh-12", "fix-login"), "02-wire-api"), "state.json"), "{}");
     const v = await loadProjectView({ repoRoot: repo, home, now: NOW, holder: "me@box", liveness: () => true, env: {} });
@@ -333,7 +333,7 @@ describe("loadProjectView", () => {
     writeUnitMarker(wt, { repo, story: "gh-7", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-7-thing" });
     // the slice's worktree folder keeps the slug it was cut with; its marker names the slice
     const sliceWt = `${wt}--01-form`;
-    // S12: run state is the checkout's, whichever worktree (these fixture folders are no git checkout: named from the story's)
+    // Run state is the checkout's, whichever worktree (these fixture folders are no git checkout: named from the story's)
     const u1 = runStateOf(spec, "01-login-form");
     pinWorkflow(u1, WF);
     writeState(u1, state({ story: "gh-7", slice: "gh-7/01", unit_dir: "01-login-form", status: "parked", park: { kind: "stuck", reason: "blocked", since: ago(3), receipt_id: ASK } }));
@@ -348,7 +348,7 @@ describe("loadProjectView", () => {
     expect(v.stories[0]?.slices.map((s) => [s.key, s.status, s.park?.reason])).toEqual([["gh-7/01", "parked", "blocked"]]);
   });
 
-  test("the default holder is this machine's (machineHolder, R7.2): its claims are mine", async () => {
+  test("the default holder is this machine's (machineHolder): its claims are mine", async () => {
     const { repo, home } = await seed();
     const v = await loadProjectView({ repoRoot: repo, home, now: NOW, liveness: () => true, env: { USER: "me", NORN_MACHINE: "box" } });
     expect(v.holder).toBe("me@box");

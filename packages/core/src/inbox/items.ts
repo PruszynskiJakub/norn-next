@@ -1,12 +1,11 @@
 /**
- * Inbox read model (O1): what needs a person, grouped by action, built from Facts only.
+ * Inbox read model: what needs a person, grouped by action, built from Facts only.
  * Each item carries the question/reason, its age and the exact command that resolves it.
  *
- * Groups (O1 order): Your turn (work only a person does: attended steps, manual starts, merging
- * the story PR — GR6, F25), Answer, Approve (gates), Unblock, Check (informational: something
- * changed outside norn — the PR head moved after the ready approval, commits norn did not make;
- * F35, Q6), Unclaimed, Running, Notes (agents' notes for a person, NT2: information, not an
- * action), Recently done.
+ * Groups, in order: Your turn (work only a person does: attended steps, manual starts, merging the
+ * story PR), Answer, Approve (gates), Unblock, Check (informational: something changed outside
+ * norn), Unclaimed, Running, Notes (agents' notes for a person: information, not an action),
+ * Recently done.
  */
 import { ATTENDED_WAIT, isClosedStatus, parseDuration, receiptNumber, recordRef, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
 import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, unstickCommand, versionMismatch } from "../commands.ts";
@@ -19,7 +18,7 @@ import { isParked } from "../verbs.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
 
-/** B38: the `needs` was removed message of a file error, or null. */
+/** The `needs` was removed message of a file error, or null. */
 const needsRemoved = (e: FileError): string | null => (e.code === "needs_removed" ? (e.errors[0]?.message ?? null) : null);
 
 export const INBOX_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check", "unclaimed", "running", "notes", "recently_done"];
@@ -65,7 +64,7 @@ export interface Inbox {
 export const RECENT_MS = 24 * 3_600_000;
 
 /**
- * C1 (decide `agent.*.surface`): a counted nudge norn could not type — manual effective mode, or
+ * A counted nudge norn could not type (decide's `agent.*.surface`) — manual effective mode, or
  * no session on this machine's runner. Shown until the agent shows activity again.
  */
 function undeliveredNudge(story: StoryFacts, uf: UnitFacts, facts: Facts): { outcome: string; at: string } | null {
@@ -83,7 +82,7 @@ function undeliveredNudge(story: StoryFacts, uf: UnitFacts, facts: Facts): { out
 }
 
 /**
- * R5.5 (N3, A8): this checkout's heartbeat is down — its last tick is older than 3 × watch interval
+ * This checkout's heartbeat is down — its last tick is older than 3 × watch interval
  * (or no tick ever ran) while a story it holds has a unit in auto mode. Null when it is up, when
  * nothing here needs it, or when the heartbeat was not observed.
  */
@@ -97,7 +96,7 @@ export function heartbeatDown(facts: Facts, config: ResolvedConfig): { holder: s
   return { holder: facts.machine.holder, since: hb.last_tick_at === null ? null : iso(hb.last_tick_at), for_ms: hb.last_tick_at === null ? null : facts.now - hb.last_tick_at };
 }
 
-/** R5.5: the Unblock item for a heartbeat that is down. */
+/** The Unblock item for a heartbeat that is down. */
 function heartbeatItem(facts: Facts, config: ResolvedConfig): InboxItem | null {
   const down = heartbeatDown(facts, config);
   if (!down) return null;
@@ -115,14 +114,14 @@ function heartbeatItem(facts: Facts, config: ResolvedConfig): InboxItem | null {
   };
 }
 
-/** gh-61 D7: the id of the repo-level version item, kept first in Unblock. */
+/** The id of the repo-level version item, kept first in Unblock. */
 const VERSION_ITEM = "norn-version:";
 
-/** gh-61 D7: the repo-level item for a binary that does not fit the repo's norn version; front ends show it on top. */
+/** The repo-level item for a binary that does not fit the repo's norn version; front ends show it on top. */
 export const isVersionMismatchItem = (it: Pick<InboxItem, "id" | "group">): boolean => it.group === "unblock" && it.id.startsWith(VERSION_ITEM);
 
 /**
- * gh-61 D7 (B8, B5): the running binary against the repo's norn version. A mismatch is a repo-level
+ * The running binary against the repo's norn version. A mismatch is a repo-level
  * Unblock item (first in its group); no recorded version is a Check item, so it never notifies.
  * Null when they match or the version was not observed.
  */
@@ -133,12 +132,12 @@ function versionItem(facts: Facts): InboxItem | null {
   if (v.repo === null) return { ...base, id: `${VERSION_ITEM}none`, group: "check", title: NO_VERSION_HINT };
   const mismatch = versionMismatch(v.repo, v.running);
   if (!mismatch) return null;
-  // an older binary's way out is outside norn (install the repo's line); `doctor` runs on a mismatch (B8) and shows it
+  // an older binary's way out is outside norn (install the repo's line); `doctor` runs on a mismatch and shows it
   const command = mismatch.match === "newer" ? cmd.upgrade() : cmd.doctor();
   return { ...base, id: `${VERSION_ITEM}${v.repo}:${v.running}`, group: "unblock", title: `${mismatch.error}: ${mismatch.do_instead}`, command };
 }
 
-/** gh-61 B19: the main checkout holds bundled skills that differ from the running norn's — one repo-level Unblock item. */
+/** The main checkout holds bundled skills that differ from the running norn's — one repo-level Unblock item. */
 function repoSkillsDriftItem(facts: Facts): InboxItem | null {
   const v = facts.norn;
   if (!v?.skills_drift?.length) return null;
@@ -155,7 +154,7 @@ function repoSkillsDriftItem(facts: Facts): InboxItem | null {
   };
 }
 
-/** gh-195 D16 (B29, B35): run state still in the base's tree — one repo-level Check item pointing to `norn upgrade`. */
+/** Run state still in the base's tree — one repo-level Check item pointing to `norn upgrade`. */
 function baseRunStateItem(facts: Facts): InboxItem | null {
   const stories = facts.base_run_state;
   if (!stories?.length) return null;
@@ -172,16 +171,15 @@ function baseRunStateItem(facts: Facts): InboxItem | null {
   };
 }
 
-/**
-/** gh-195 (08-F4): the act failure effect of a record push refused as stale (`ActFailure.lease`) */
+/** The act failure effect of a record push refused as stale (`ActFailure.lease`). */
 export const RECORD_PUSH_EFFECT = "record_push";
-/** gh-195 (review F2): the machine-local failures slot of a story's refused record push, apart from every unit's */
+/** The machine-local failures slot of a story's refused record push, apart from every unit's */
 export const recordPushSlot = (story: string): string => `record:${story}`;
 
 /**
- * gh-195 (08-F4): this checkout holds the story under `remote`, but its record push was refused as
- * stale: another checkout pushed `refs/norn/runs/<story>`. One Check item, whatever the cursor, until a
- * push lands (the tick drops it once the claim is not here or the policy is `local`, review F2);
+ * This checkout holds the story under `remote`, but its record push was refused as stale: another
+ * checkout pushed `refs/norn/runs/<story>`. One Check item, whatever the cursor, until a push lands
+ * (the tick drops it once the claim is not here or the policy is `local`);
  * `norn story checkout` here fetches the ref (this checkout's run state kept), so the next push goes on top.
  */
 function recordPushItem(story: StoryFacts): InboxItem | null {
@@ -202,7 +200,7 @@ function recordPushItem(story: StoryFacts): InboxItem | null {
 }
 
 /**
- * gh-252 (SK1): the unit's worktree holds bundled skills that differ from the running norn's. Nothing
+ * The unit's worktree holds bundled skills that differ from the running norn's. Nothing
  * is held — its runs use those copies — so it is a Check item, one per unit and set of skills.
  */
 function skillsDriftItem(story: StoryFacts, uf: UnitFacts, facts: Facts): InboxItem | null {
@@ -221,18 +219,18 @@ function skillsDriftItem(story: StoryFacts, uf: UnitFacts, facts: Facts): InboxI
 }
 
 /**
- * R4.3: an action's effect failed for the unit (a nudge or answer not delivered, a launch or resume
+ * An action's effect failed for the unit (a nudge or answer not delivered, a launch or resume
  * that failed, a push refused) — an Unblock item until an effect of the same kind succeeds, the
- * cursor moves, or (for deliveries) the agent shows activity again. R6.3 reuses it for prompts.
+ * cursor moves, or (for deliveries) the agent shows activity again. Also used for prompts.
  */
 export function actFailureItem(story: StoryFacts, uf: UnitFacts): InboxItem | null {
   const f = uf.act_failure;
   const st = uf.state;
-  // H1: a refused commit is owed even by a finished unit (its `$done` state is not on record yet)
+  // A refused commit is owed even by a finished unit (its `$done` state is not on record yet)
   if (!f || !st || (st.status === "done" && f.effect !== "commit") || st.status === "corrupt" || f.step !== st.step || f.attempt !== st.attempt) return null;
-  // R6.3: an answer that did not reach its prompt is told on the Answer item itself (answerItem)
+  // An answer that did not reach its prompt is told on the Answer item itself (answerItem)
   if (f.effect === "answer" && st.status === "parked" && st.park?.kind === "ask") return null;
-  // a refused push or commit (H1) stays until the effect succeeds or the cursor moves
+  // a refused push or commit stays until the effect succeeds or the cursor moves
   const delivery = f.effect !== "push" && f.effect !== "commit";
   if (delivery && (uf.run?.last_activity_at ?? 0) > epoch(f.at)) return null;
   const key = uf.unit.key;
@@ -251,9 +249,9 @@ export function actFailureItem(story: StoryFacts, uf: UnitFacts): InboxItem | nu
 }
 
 /**
- * O1 Answer item. L1 (A7): an implicit ask shows the question block and the first command line,
- * with the options; the full screen only in `full` (`inbox --details`, `why`). R6.3: when the
- * typed answer did not reach the pane, the command is how to reach the pane instead.
+ * Answer item. An implicit ask shows the question block and the first command line, with the
+ * options; the full screen only in `full`. When the typed answer did not reach the pane, the
+ * command is how to reach the pane instead.
  */
 function answerItem(uf: UnitFacts, st: UnitState, park: NonNullable<UnitState["park"]>, item: (group: InboxGroup, title: string, command: string, since: string, extra?: Partial<InboxItem>) => InboxItem): InboxItem {
   const key = uf.unit.key;
@@ -273,7 +271,7 @@ function answerItem(uf: UnitFacts, st: UnitState, park: NonNullable<UnitState["p
   });
 }
 
-/** R9.1: the run's session started, the prompt was re-sent, and still no turn 60 s later. */
+/** The run's session started, the prompt was re-sent, and still no turn 60 s later. */
 function launchPromptMissed(uf: UnitFacts, st: UnitState): { since: string; pane: string | null } | null {
   const run = st.run;
   const rf = uf.run;
@@ -285,7 +283,7 @@ function launchPromptMissed(uf: UnitFacts, st: UnitState): { since: string; pane
 
 /**
  * The command a person runs to start the unit's step agent in its worktree. It `cd`s only into a
- * worktree observed on disk — the check decide makes before it starts a run there (O1) — never
+ * worktree observed on disk — the check decide makes before it starts a run there — never
  * into a recorded path that is gone.
  */
 export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: ResolvedConfig): string {
@@ -297,7 +295,7 @@ export function startCommandFor(uf: UnitFacts, story: StoryFacts, config: Resolv
 }
 
 /**
- * MO5: how a person starts the unit's step agent — `norn story start <unit>` when this machine's runner
+ * How a person starts the unit's step agent — `norn story start <unit>` when this machine's runner
  * opens terminals for a person (the hand-typed command then in the detail), else that command itself.
  */
 function personStart(uf: UnitFacts, story: StoryFacts, facts: Facts, config: ResolvedConfig): { command: string; detail?: string } {
@@ -307,7 +305,7 @@ function personStart(uf: UnitFacts, story: StoryFacts, facts: Facts, config: Res
 }
 
 /**
- * GR2, O1: a story taken in on this checkout that no tick has started yet (intake by `norn sync`
+ * A story taken in on this checkout that no tick has started yet (intake by `norn sync`
  * creates the worktree; the tick starts the workflow). Running while the heartbeat is up — the next
  * tick starts it — else Your turn with the command that ticks.
  */
@@ -333,9 +331,9 @@ function absFile(file: string, story: StoryFacts, uf: UnitFacts): string {
 }
 
 /**
- * F21: what a gate judges — the report that led there (e.g. qa `partial`). `detail` names it by
+ * What a gate judges — the report that led there (e.g. qa `partial`). `detail` names it by
  * receipt number; `full` (inbox `--details`, JSON) gives the receipt and its evidence folder as
- * absolute paths a person can open: the receipt lives in the machine dir (S12), not the checkout
+ * absolute paths a person can open: the receipt lives in the machine dir, not the checkout
  * the inbox is read from.
  */
 function judgedDetail(story: StoryFacts, uf: UnitFacts): { detail: string; full: string } | null {
@@ -354,10 +352,10 @@ function judgedDetail(story: StoryFacts, uf: UnitFacts): { detail: string; full:
 const oneLine = (t: string) => t.replace(/\s*\n\s*/g, " ").trim();
 
 /**
- * QV7, NT3: what a person checks at a gate, so they need not open a file — the `person` and
+ * What a person checks at a gate, so they need not open a file — the `person` and
  * `unverified` criteria of the report that led there (with `reason` and `how`), and the open notes:
  * on a story-level gate the story's (approving acknowledges them), on a slice gate the slice's own
- * (shown only; NT5). `detail` is one line; `full` (inbox `--details`) lists each on its own line.
+ * (shown only). `detail` is one line; `full` (inbox `--details`) lists each on its own line.
  */
 function gateChecks(story: StoryFacts, uf: UnitFacts): { detail: string | null; full: string | null } {
   const check = personCriteria(uf.last_outcome_receipt?.receipt);
@@ -382,8 +380,8 @@ function gateChecks(story: StoryFacts, uf: UnitFacts): { detail: string | null; 
 }
 
 /**
- * NT5: when the story's open notes leave the inbox — at the nearest story-level gate ahead of the
- * story unit's step (its own step when it waits at one; NT3), else when the story is done.
+ * When the story's open notes leave the inbox — at the nearest story-level gate ahead of the
+ * story unit's step (its own step when it waits at one), else when the story is done.
  */
 function notesClearedBy(story: StoryFacts): string {
   const uf = storyUnit(story);
@@ -402,9 +400,9 @@ function notesClearedBy(story: StoryFacts): string {
 }
 
 /**
- * NT2: one Notes item per open note of the story — a non-blocking question a reporting agent left
+ * One Notes item per open note of the story — a non-blocking question a reporting agent left
  * for a person; information, not an action. It leaves the inbox when a person gives `approve` at a
- * story-level gate (NT3); `cleared_by` says which one (NT5).
+ * story-level gate; `cleared_by` says which one.
  */
 function noteItems(story: StoryFacts): InboxItem[] {
   const status = story.frontmatter?.status;
@@ -426,23 +424,23 @@ function noteItems(story: StoryFacts): InboxItem[] {
   }));
 }
 
-/** C1: the PR fetched this tick, else the last one this checkout saw (`pr_seen`); null/undefined = none known. */
+/** The PR fetched this tick, else the last one this checkout saw (`pr_seen`); null/undefined = none known. */
 const knownPr = (story: StoryFacts): StoryFacts["pr"] => (story.pr !== undefined ? story.pr : story.pr_seen?.pr);
 
 /**
- * GR6/F25: the story unit finished its workflow and its PR is open — merging it is the person's
+ * The story unit finished its workflow and its PR is open — merging it is the person's
  * last action, so it is an item (Your turn) with the PR URL, not "Recently done".
  */
 function mergeItem(story: StoryFacts, st: UnitState, base: string): InboxItem | null {
   const pr = knownPr(story);
-  // GR6: a branch already contained in origin/<base> (merged by ancestry, e.g. a merge commit
+  // A branch already contained in origin/<base> (merged by ancestry, e.g. a merge commit
   // pushed by hand) needs no merge, even while the PR still reads `open`.
   if (!pr || pr.state !== "open" || story.merged_by_ancestry || story.frontmatter?.status === "done") return null;
   const draft = pr.is_draft;
   const cli = prCli(story);
   const details = [pr.url];
   if (draft) details.push(`draft: mark it ready first (${cli} ready ${pr.number})`);
-  // BS10: how far the base moved since; a conflicting base sends the story back through update first
+  // How far the base moved since; a conflicting base sends the story back through update first
   const b = story.base;
   if (b && b.behind > 0) details.push(`behind ${base} by ${b.behind}`);
   const conflicting = !!b && b.conflicts.length > 0;
@@ -461,7 +459,7 @@ function mergeItem(story: StoryFacts, st: UnitState, base: string): InboxItem | 
   };
 }
 
-/** BS10.1: steps that already bring the base in — `git: update` steps and the steps their `conflict` routes to (resolve). */
+/** Steps that already bring the base in — `git: update` steps and the steps their `conflict` routes to (resolve). */
 function baseSyncSteps(wf: Workflow): Set<string> {
   const out = new Set<string>();
   for (const [name, step] of Object.entries(wf.steps)) {
@@ -474,8 +472,8 @@ function baseSyncSteps(wf: Workflow): Set<string> {
 }
 
 /**
- * BS10: the story waits for a person and the base moved under it (BS7), with no gate `stale` route
- * to send it back by itself (BS6) — a Check item with `norn story update-branch`. BS10.1 (dogfood D1): only where
+ * The story waits for a person and the base moved under it, with no gate `stale` route
+ * to send it back by itself — a Check item with `norn story update-branch`. Only where
  * an update is the next thing to do — parked at a gate, or stuck outside the steps that sync the
  * base; never for an ask (a permission prompt in any step) nor in update/resolve.
  */
@@ -489,7 +487,7 @@ function staleItem(story: StoryFacts, base: string): InboxItem | null {
   const atGate = isParked(st, "gate") && step?.type === "gate";
   const stuck = st.status === "stuck" && !baseSyncSteps(wf).has(st.step);
   if (!atGate && !stuck) return null;
-  // BS6: a gate with a `stale` route is classified by the tick, not shown
+  // A gate with a `stale` route is classified by the tick, not shown
   if (atGate && step?.type === "gate" && step.outcomes.stale !== undefined) return null;
   const title = b.conflicts.length ? `${story.key} conflicts with ${base} in ${b.conflicts.join(", ")} (${b.behind} behind)` : `${story.key} is ${b.behind} behind ${base}`;
   return {
@@ -506,13 +504,13 @@ function staleItem(story: StoryFacts, base: string): InboxItem | null {
   };
 }
 
-/** GR6: the story's work is on its base — merged (PR or ancestry), or spec.md records it done (the durable record when no PR was fetched). */
+/** The story's work is on its base — merged (PR or ancestry), or spec.md records it done (the durable record when no PR was fetched). */
 const landed = (story: StoryFacts, base: string): boolean => mergedIntoBase(story, base) || story.frontmatter?.status === "done";
 
 /**
- * gh-71 D5: an issue change on a finished round (label removed, unassigned, unseen) parks nothing;
+ * An issue change on a finished round (label removed, unassigned, unseen) parks nothing;
  * it is a Check item while the round stays finished, read from `issue_seen` between syncs. A closed
- * issue there is GR6b's.
+ * issue there closes the story instead.
  */
 function finishedRoundRemoteItem(story: StoryFacts, config: ResolvedConfig, base: string): InboxItem | null {
   const st = storyUnit(story)?.state;
@@ -528,14 +526,14 @@ function finishedRoundRemoteItem(story: StoryFacts, config: ResolvedConfig, base
     slice: null,
     step: st.step,
     title: `${story.key}: ${reason} — the round stays finished`,
-    detail: "a finished round is not parked for the issue (gh-71 D5)",
+    detail: "a finished round is not parked for the issue",
     command: cmd.storyView(story.key, { web: true }),
     since: st.updated_at,
     ...(story.frontmatter ? { url: story.frontmatter.url } : {}),
   };
 }
 
-/** BS11: the story PR targets another branch than the story's base — merging it would skip the base. */
+/** The story PR targets another branch than the story's base — merging it would skip the base. */
 function retargetItem(story: StoryFacts, base: string): InboxItem | null {
   const pr = knownPr(story);
   const target = prBaseBranch(pr);
@@ -548,19 +546,19 @@ function retargetItem(story: StoryFacts, base: string): InboxItem | null {
     slice: null,
     step: null,
     title: `PR #${pr.number} targets ${target}, not ${base}`,
-    detail: "a merge there does not finish the story (BS11); retarget the PR to the base branch",
+    detail: "a merge there does not finish the story; retarget the PR to the base branch",
     command: `${prCli(story)} edit ${pr.number} ${prCli(story) === "glab mr" ? "--target-branch" : "--base"} ${base}`,
     since: st?.updated_at ?? story.frontmatter?.intake_at ?? "1970-01-01T00:00:00.000Z",
     url: pr.url,
   };
 }
 
-/** Hook events after which an attended agent waits for its person (HC1). */
+/** Hook events after which an attended agent waits for its person. */
 const WAITING_HOOKS = new Set(["turn_end", "waiting_input", "permission_prompt"]);
 const WAITING_PANE = new Set(["idle", "done", "waiting_input"]);
 
 /**
- * HC1: when the attended agent of the unit's current run started waiting for its person (ms epoch),
+ * When the attended agent of the unit's current run started waiting for its person (ms epoch),
  * or null while it works, is gone, or the step is not attended. The wait starts at the first of the
  * run's trailing waiting hooks, so Claude's `idle_prompt` (~60 s after `Stop`) does not restart it;
  * with no hook since the last activity, a pane that went idle afterwards starts it.
@@ -587,7 +585,7 @@ export function attendedWaitSince(uf: UnitFacts): number | null {
   return null;
 }
 
-/** HC3: where the unit's current run lives (a worktree on disk, as decide requires), for front ends that look for its pane (HC6). */
+/** Where the unit's current run lives (a worktree on disk, as decide requires), for front ends that look for its pane. */
 function reachOf(story: StoryFacts, uf: UnitFacts): InboxItem["reach"] | undefined {
   const run = uf.state?.run;
   if (!run) return undefined;
@@ -607,9 +605,9 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
   const base = { story: story.key, slice: uf.unit.slice, url: story.frontmatter?.url, ...(reach ? { reach } : {}) };
   if (uf.errors.length || st?.status === "corrupt") {
     const files = uf.errors.map((e) => e.file).join(", ") || "state.json";
-    // gh-79: what failed, so a duplicate receipt number names the other (stray) file too
+    // What failed, so a duplicate receipt number names the other (stray) file too
     const why = [...new Set(uf.errors.flatMap((e) => e.errors.map((x) => x.message)))].join("; ");
-    return { ...base, id: `corrupt:${key}:${files}`, group: "unblock", step: st?.step ?? null, title: `corrupt: ${files} failed validation (S2)${why ? `: ${why}` : ""}`, command: cmd.runView(key, { why: true }), since: iso(facts.now) };
+    return { ...base, id: `corrupt:${key}:${files}`, group: "unblock", step: st?.step ?? null, title: `corrupt: ${files} failed validation${why ? `: ${why}` : ""}`, command: cmd.runView(key, { why: true }), since: iso(facts.now) };
   }
   if (!st) return null;
   const item = (group: InboxGroup, title: string, command: string, since: string, extra: Partial<InboxItem> = {}): InboxItem => ({
@@ -623,10 +621,10 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     ...extra,
   });
   const park = st.park;
-  // gh-195 B33 (review#1 S8): a story held here from its record alone has no branch, so nothing runs in
+  // A story held here from its record alone has no branch, so nothing runs in
   // it — a run its record names belongs to the previous holder's session, and nothing can start
   if (story.record_only && (st.status === "running" || st.status === "ready"))
-    return item("check", `${st.step} #${st.attempt}: held here from its record; ${story.key} has no branch, so nothing runs (B33)`, cmd.storyView(key), st.updated_at, {
+    return item("check", `${st.step} #${st.attempt}: held here from its record; ${story.key} has no branch, so nothing runs`, cmd.storyView(key), st.updated_at, {
       id: `record-only:${key}:${st.step}#${st.attempt}`,
     });
   switch (st.status) {
@@ -647,20 +645,20 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     case "stuck":
       return item("unblock", park?.reason ?? "stuck", unstickCommand(key, st), park?.since ?? st.updated_at, park?.receipt_id ? { id: park.receipt_id } : {});
     case "running": {
-      // R9.1: the agent never took its launch prompt — a person looks at the pane
+      // The agent never took its launch prompt — a person looks at the pane
       const unsent = launchPromptMissed(uf, st);
-      if (unsent) return item("unblock", `launch prompt not received by ${key} ${st.step}${unsent.pane ? ` — look at pane ${unsent.pane}` : ""}`, st.run?.session?.reach ?? cmd.runList(key), unsent.since, { id: `launch:${key}:${st.run?.run_id ?? st.step}`, detail: "the agent session started but never began a turn; the prompt was re-sent once (R9.1)" });
+      if (unsent) return item("unblock", `launch prompt not received by ${key} ${st.step}${unsent.pane ? ` — look at pane ${unsent.pane}` : ""}`, st.run?.session?.reach ?? cmd.runList(key), unsent.since, { id: `launch:${key}:${st.run?.run_id ?? st.step}`, detail: "the agent session started but never began a turn; the prompt was re-sent once" });
       const nudge = undeliveredNudge(story, uf, facts);
       if (nudge && !heartbeatDown(facts, config)) return item("your_turn", `agent ended its turn without reporting — reopen the agent and run ${cmd.brief()}`, startCommandFor(uf, story, config), nudge.at, { id: `${nudge.outcome}:${key}:${st.step}#${st.attempt}:${st.nudges_used}` });
-      // HC2: an attended agent waiting for its person past `attended_wait`; one item (and notification) per wait
+      // An attended agent waiting for its person past `attended_wait`; one item (and notification) per wait
       const waiting = attendedWaitSince(uf);
       if (waiting !== null && st.run && facts.now - waiting >= parseDuration(ATTENDED_WAIT)) {
-        // HC3: reach the session that waits — never start a second agent for the step
+        // Reach the session that waits — never start a second agent for the step
         const worktree = reach?.worktree ?? null;
         const command = st.run.session?.reach ?? (worktree ? `cd ${worktree}` : cmd.runList(key));
         return item("your_turn", `${st.step}: the agent is waiting for you`, command, iso(waiting), {
           id: `attended:${key}:${st.run.run_id}:${iso(waiting)}`,
-          detail: "attended step: answer in the agent's pane; it reports when you agree (MO4)",
+          detail: "attended step: answer in the agent's pane; it reports when you agree",
         });
       }
     }
@@ -671,11 +669,11 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
         const { mode, downgraded } = effectiveMode(story.mode, !!step.attended, facts.machine.runner);
         if (mode === "manual") {
           const start = personStart(uf, story, facts, config);
-          const detail = [downgraded ? "auto requested, no runner; running manual (MO2)" : null, start.detail].filter(Boolean).join(" · ");
+          const detail = [downgraded ? "auto requested, no runner; running manual" : null, start.detail].filter(Boolean).join(" · ");
           return item("your_turn", `${st.step} is ready (manual): start an agent in the worktree`, start.command, st.step_entered_at, detail ? { detail } : {});
         }
       }
-      // R5.5 (A8): an auto step waits for the heartbeat, not for a person — no manual start hint
+      // An auto step waits for the heartbeat, not for a person — no manual start hint
       if (step?.type === "agent" && heartbeatDown(facts, config)) return item("running", `${st.step} #${st.attempt} (waiting for the heartbeat — ${cmd.watch()})`, cmd.watch(), st.step_entered_at);
       const checkSince = checkRunningSince(step, uf);
       if (checkSince) return item("running", `${st.step} #${st.attempt} (check running)`, cmd.runList(key), checkSince);
@@ -683,12 +681,12 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     }
     case "done": {
       if (uf.unit.slice === null) {
-        // gh-71 D1 (B1): a round receipt rejected because its workflow file changed — the edit again
+        // A round receipt rejected because its workflow file changed — the edit again
         if (park?.kind === "workflow")
           return item("your_turn", `${story.key}: ${park.reason}`, park.command ?? cmd.storyEdit(story.key, { workflow: "<name>" }), park.since, { id: `round_rejected:${key}:${park.receipt_id ?? park.since}` });
         const merge = mergeItem(story, st, facts.repo.default_branch);
         if (merge) return merge;
-        // gh-71 D6 (B25, B26): a finished round with no PR — the next round or closing the issue is the
+        // A finished round with no PR — the next round or closing the issue is the
         // person's; generic, never a recommendation read off the last step's outcome
         if (!landed(story, facts.repo.default_branch) && !knownPr(story))
           return item("your_turn", `${story.key}: ${st.workflow} round done, no PR`, cmd.storyEdit(story.key, { workflow: "<name>" }), st.updated_at, {
@@ -704,7 +702,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
 
 const isStarted = (s: StoryFacts) => s.units.some((u) => u.state !== null);
 
-/** GR8: the remote body changed after refine finished. */
+/** The remote body changed after refine finished. */
 export function bodyChangedItem(story: StoryFacts): InboxItem | null {
   const fm = story.frontmatter;
   if (!fm?.refined_body_hash || !fm.body_hash || fm.body_hash === fm.refined_body_hash) return null;
@@ -722,13 +720,13 @@ export function bodyChangedItem(story: StoryFacts): InboxItem | null {
   };
 }
 
-/** C5: receipts that send a finished story unit back into its workflow — the head will change, the ready gate is passed again (BS9, S7). */
+/** Receipts that send a finished story unit back into its workflow — the head will change, the ready gate is passed again. */
 export const RE_ENTRY_KINDS = ["update", "workflow"] as const;
 
 /**
- * F35: the story branch head when the person gave `approve` at the `ready` gate — the `head_sha` of
+ * The story branch head when the person gave `approve` at the `ready` gate — the `head_sha` of
  * the newest `approve` receipt at that gate (the `ready` step, or any gate whose `approve` goes to
- * `$done`). C5: only an approval newer than the unit's last re-entry (`norn story update-branch`, `norn story edit
+ * `$done`). Only an approval newer than the unit's last re-entry (`norn story update-branch`, `norn story edit
  * --at`) counts; a re-entry voids it until a new approve at the gate. `receipts` are the story
  * unit's, at least of the kinds `approve` and RE_ENTRY_KINDS; order does not matter.
  */
@@ -736,7 +734,7 @@ function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[]): strin
   return readyApproval(wf, receipts)?.sha;
 }
 
-/** F35 + BS10.2: the head the ready approval let through and when it was given (`readyHeadSha`). */
+/** The head the ready approval let through and when it was given (`readyHeadSha`). */
 export function readyApproval(wf: Workflow, receipts: readonly NumberedReceipt[]): { sha: string; at: string } | undefined {
   const isReady = (step: string) => step === "ready" || (stepOf(wf, step)?.type === "gate" && edgeOf(wf, step, "approve")?.to === "$done");
   const sorted = [...receipts].sort((a, b) => b.n - a.n);
@@ -747,13 +745,13 @@ export function readyApproval(wf: Workflow, receipts: readonly NumberedReceipt[]
   return undefined;
 }
 
-/** F35: the PR head moved after the `ready.approve` — what would merge is not what was reviewed. */
+/** The PR head moved after the `ready.approve` — what would merge is not what was reviewed. */
 function headChangedItem(story: StoryFacts): InboxItem | null {
   const pr = knownPr(story);
   const ready = story.ready_head_sha;
-  // C5: norn's own commits after the approval (its `$done` state commit) leave the head the person let through as it was
+  // Norn's own commits after the approval (its `$done` state commit) leave the head the person let through as it was
   if (!pr || pr.state !== "open" || !ready || !pr.head_sha || pr.head_sha === ready || pr.head_sha === story.ready_head_norn) return null;
-  // BS10.2 (dogfood D6): a PR remembered from before the approval says nothing about what came after it
+  // a PR remembered from before the approval says nothing about what came after it
   if (story.pr === undefined && story.pr_seen && story.ready_approved_at && story.pr_seen.observed_at < epoch(story.ready_approved_at)) return null;
   const st = storyUnit(story)?.state;
   return {
@@ -770,7 +768,7 @@ function headChangedItem(story: StoryFacts): InboxItem | null {
   };
 }
 
-/** Q6: commits norn did not make, one informational item per branch (newest commit in the id). */
+/** Commits norn did not make, one informational item per branch (newest commit in the id). */
 function foreignCommitItems(story: StoryFacts): InboxItem[] {
   const byBranch = new Map<string, NonNullable<StoryFacts["foreign_commits"]>>();
   for (const c of story.foreign_commits ?? []) byBranch.set(c.branch, [...(byBranch.get(c.branch) ?? []), c]);
@@ -795,7 +793,7 @@ function foreignCommitItems(story: StoryFacts): InboxItem[] {
 }
 
 /**
- * gh-195 D11 (B27, T7a, R2.3): a record this checkout set aside when another checkout took the story
+ * A record this checkout set aside when another checkout took the story
  * over without a release — never pushed, never merged into the new holder's. One Check item each, until
  * `norn tidy` deletes the copy after `trace.retain`.
  */
@@ -803,7 +801,7 @@ function supersededItems(facts: Facts): InboxItem[] {
   return (facts.superseded ?? []).map((c) => {
     const url = facts.stories.find((s) => s.key === c.story)?.frontmatter?.url;
     return {
-      // review#1 F6: one id per copy, its ulid (two copies of one story may share a last receipt)
+      // one id per copy, its ulid (two copies of one story may share a last receipt)
       id: `superseded:${c.story}:${c.name.slice(c.story.length + 1)}`,
       group: "check" as const,
       story: c.story,
@@ -819,7 +817,7 @@ function supersededItems(facts: Facts): InboxItem[] {
 }
 
 /**
- * gh-195 D12 (B21, T9): a mailbox receipt this holder's tick rejected, one Check item each, so a stale
+ * A mailbox receipt this holder's tick rejected, one Check item each, so a stale
  * answer never vanishes silently. Gone once a later answer or approval of the story is accepted (observe
  * leaves it out) or the story finishes; there is no dismiss command.
  */
@@ -843,10 +841,10 @@ function rejectedItems(story: StoryFacts): InboxItem[] {
   });
 }
 
-/** Build the whole inbox (O1). Stories held by another heartbeat are not shown (their superseded records are, D11). */
+/** Build the whole inbox. Stories held by another heartbeat are not shown (their superseded records are). */
 export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   const groups = Object.fromEntries(INBOX_GROUPS.map((g) => [g, [] as InboxEntry[]])) as Record<InboxGroup, InboxEntry[]>;
-  // gh-71 B28: every item of a started story carries its round and the round's workflow
+  // Every item of a started story carries its round and the round's workflow
   const rounds = new Map<string, { n: number; workflow: string }>();
   for (const story of facts.stories) {
     const st = storyUnit(story)?.state;
@@ -882,13 +880,13 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
         story: story.key,
         slice: null,
         step: null,
-        title: needs ?? `corrupt: ${story.frontmatter_error.file} failed validation (S2)`,
+        title: needs ?? `corrupt: ${story.frontmatter_error.file} failed validation`,
         command: needs ? cmd.upgrade() : cmd.runView(story.key, { why: true }),
         since: iso(facts.now),
       });
       continue;
     }
-    // B38 (D12): a slice file that still has criteria `needs` is not corrupt: `norn upgrade` fixes it
+    // A slice file that still has criteria `needs` is not corrupt: `norn upgrade` fixes it
     for (const s of story.slices) {
       const needs = s.error && needsRemoved(s.error);
       if (needs) add({ id: `needs:${s.key}`, group: "unblock", story: story.key, slice: s.key, step: null, title: needs, command: cmd.upgrade(), since: iso(facts.now) });
@@ -914,7 +912,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   add(repoSkillsDriftItem(facts));
   add(baseRunStateItem(facts));
   for (const it of supersededItems(facts)) add(it);
-  // gh-61 D7: the version item comes first, whatever its age
+  // The version item comes first, whatever its age
   const pinned = (it: InboxEntry) => (it.id.startsWith(VERSION_ITEM) ? 0 : 1);
   for (const g of INBOX_GROUPS) groups[g].sort((a, b) => pinned(a) - pinned(b) || epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));
   const pending = INBOX_GROUPS.filter((g) => g !== "running" && g !== "notes" && g !== "recently_done").reduce((n, g) => n + groups[g].length, 0);

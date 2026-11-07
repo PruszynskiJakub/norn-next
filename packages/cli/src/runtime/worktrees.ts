@@ -1,6 +1,6 @@
 /**
- * Unit worktrees outside the tick (T5 take): check a fetched branch out into a worktree on this
- * machine and give it a slot (K3, K4) with `.env.norn` and the `.norn-unit` marker (A3) — the same
+ * Unit worktrees outside the tick (`take`): check a fetched branch out into a worktree on this
+ * machine and give it a slot with `.env.norn` and the `.norn-unit` marker — the same
  * layout the tick creates at intake / slice start.
  */
 import { existsSync } from "node:fs";
@@ -18,14 +18,14 @@ export interface WorktreeTarget {
   spec_dir: string;
 }
 
-/** A slot to try first (K4): the one decide chose, with the `.env.norn` it computed for it. */
+/** A slot to try first: the one decide chose, with the `.env.norn` it computed for it. */
 export interface PreferredSlot {
   slot: number;
   env: Record<string, string>;
 }
 
 /**
- * Slot lease + `.env.norn` + `.norn-unit` for an existing worktree (K4, A3), after excluding both
+ * Slot lease + `.env.norn` + `.norn-unit` for an existing worktree, after excluding both
  * files from commits. `preferredSlot` is tried first; any free slot in range otherwise.
  */
 export async function equipWorktree(
@@ -58,7 +58,7 @@ export type SyncBranchResult = { ok: true; local: "created" | "fast-forwarded" |
 
 /**
  * Bring local `branch` to the fetched `upstream` (a remote-tracking ref): create it, or move it
- * forward when it is behind. A branch ahead keeps its commits (pushed later by the holder, T7);
+ * forward when it is behind. A branch ahead keeps its commits (pushed later by the holder);
  * a diverged branch is refused, never reset.
  */
 export async function syncLocalBranch(git: GitPort, root: string, branch: string, upstream: string, worktree: string | null): Promise<SyncBranchResult> {

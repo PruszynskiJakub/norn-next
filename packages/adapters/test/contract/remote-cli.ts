@@ -14,7 +14,7 @@ interface Pr {
   base: string;
   title: string;
   draft: boolean;
-  /** gh-195 B18: the CI state the provider reports for the PR's head */
+  /** The CI state the provider reports for the PR's head */
   ci?: PullRequestCi;
 }
 
@@ -43,7 +43,7 @@ export interface ScriptedRemote {
   /** from now on every label edit (label listings and creations included) exits non-zero, as an unreachable provider would */
   failLabelEdits(): void;
   seedLabels(labels: RemoteLabel[]): void;
-  /** gh-195 B18: the CI state of PR `number` from now on */
+  /** The CI state of PR `number` from now on */
   setCi(number: number, ci: PullRequestCi): void;
 }
 
@@ -118,7 +118,7 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
       return ok(rows.slice(0, Number(flag(argv, "--limit") ?? 30)).map(prJson));
     }
     if (a === "api" && b === "graphql") {
-      // gh-186: the aliased `pullRequests(headRefName:)` query findPullRequests sends
+      // The aliased `pullRequests(headRefName:)` query findPullRequests sends
       if (flag(argv, "-F") === undefined) throw new Error("scripted gh: graphql without owner/name");
       const query = flag(argv, "-f")?.replace(/^query=/, "") ?? "";
       const repository: Record<string, { nodes: unknown[] }> = {};
@@ -186,7 +186,7 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
     }
     if (a === "repo" && b === "view") return ok({ id: 1, web_url: "https://gitlab.com/acme/app", path_with_namespace: "acme/app" });
     if (a === "api" && b === "graphql") {
-      // gh-186: `mergeRequests(sourceBranches:)` of the project, GitLab GraphQL names
+      // `mergeRequests(sourceBranches:)` of the project, GitLab GraphQL names
       const query = flag(argv, "-f")?.replace(/^query=/, "") ?? "";
       if (!/project\(fullPath: "acme\/app"\)/.test(query)) throw new Error(`scripted glab: unexpected graphql: ${query}`);
       const branches = JSON.parse(/sourceBranches: (\[[^\]]*\])/.exec(query)![1]!) as string[];

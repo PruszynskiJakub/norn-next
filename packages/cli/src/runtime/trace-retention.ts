@@ -1,13 +1,12 @@
 /**
- * Trace retention (O7; D11, D13): the `trace.retain` window and how it reads. The 14-day minimum (the
- * timelines' window, B25) and the duration form (B26) are checked here, where the value is used, not
- * in the config schema, so a bad value never fails config loading.
+ * The 14-day minimum (the timelines' window) and the `trace.retain` duration form are checked here,
+ * where the value is used, not in the config schema, so a bad value never fails config loading.
  */
 import type { UnitFacts } from "@norn/core";
 import { DURATION_PATTERN, parseDuration, type ResolvedConfig } from "@norn/schema";
 import { listHookFiles, listRunTraces, liveRun } from "@norn/store";
 
-/** B25: the shortest window: the timelines show 14 days, so tidy never deletes what they still show. */
+/** The shortest window: the timelines show 14 days, so tidy never deletes what they still show. */
 export const MIN_TRACE_RETAIN = "14d";
 const MIN_MS = parseDuration(MIN_TRACE_RETAIN);
 const DURATION = new RegExp(DURATION_PATTERN);
@@ -27,10 +26,10 @@ export function effectiveRetain(config: ResolvedConfig): { retain: string; ms: n
   return c.ok ? c : { retain: MIN_TRACE_RETAIN, ms: MIN_MS };
 }
 
-/** D12: day pairs dated before this UTC day are older than the window. */
+/** Day pairs dated before this UTC day are older than the window. */
 export const retainCutoffDay = (now: number, ms: number) => new Date(now - ms).toISOString().slice(0, 10);
 
-/** A unit hook file tidy prunes (B28). */
+/** A unit hook file tidy prunes. */
 export interface PrunedHookFile {
   /** story or slice key */
   unit: string;
@@ -39,7 +38,7 @@ export interface PrunedHookFile {
   bytes: number;
 }
 
-/** A run whose briefings and transcripts tidy prunes (B29). */
+/** A run whose briefings and transcripts tidy prunes. */
 export interface PrunedRun {
   run_id: string;
   /** trace-relative dirs */
@@ -48,7 +47,7 @@ export interface PrunedRun {
 }
 
 /**
- * D12 (B28–B30): what tidy prunes besides day pairs — the hook files of units with no live run whose
+ * What tidy prunes besides day pairs — the hook files of units with no live run whose
  * last write is before `cutoffMs`, and the briefings and transcripts of runs that are not live whose
  * newest file is before it. A unit counts as live while its run is running or parked, or while a
  * `started` receipt is not yet applied (a launch in flight); its runs count as live with it.

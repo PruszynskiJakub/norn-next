@@ -1,4 +1,4 @@
-/** gh-139: stdout carries the whole value through a pipe, past the 64 KiB pipe buffer (P8). */
+/** Stdout carries the whole value through a pipe, past the 64 KiB pipe buffer. */
 import { describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";

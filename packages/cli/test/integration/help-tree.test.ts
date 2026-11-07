@@ -1,5 +1,5 @@
 /**
- * The finished surface (B1–B3, B5, B69): `norn help` prints the tiers Core, Setup, Background and the
+ * The finished surface: `norn help` prints the tiers Core, Setup, Background and the
  * agent protocol, `help --all` adds what nobody types, `norn story` and `norn run` list their verbs
  * grouped, and every removed name is a plain unknown command that changes nothing.
  */
@@ -43,7 +43,7 @@ const SETUP = ["init", "upgrade", "doctor", "config", "uninstall", "migrate"];
 const BACKGROUND = ["watch", "sync", "tidy"];
 const PROTOCOL = ["brief", "done", "ask", "stuck"];
 
-describe("norn help in tiers (B1)", () => {
+describe("norn help in tiers", () => {
   test("Core, Setup, Background, Agent protocol in that order, then the skills; tick and hook absent", async () => {
     const r = await h.norn("help");
     expect(r.exit).toBe(0);
@@ -67,7 +67,7 @@ describe("norn help in tiers (B1)", () => {
   });
 });
 
-describe("noun help (B2)", () => {
+describe("noun help", () => {
   test("norn story and norn help story list the verbs under general, decision, work, team", async () => {
     const r = await h.norn("story");
     expect(r.exit).toBe(0);
@@ -97,7 +97,7 @@ describe("noun help (B2)", () => {
   });
 });
 
-describe("norn upgrade in help (gh-110 B22, gh-61 B30)", () => {
+describe("norn upgrade in help", () => {
   test("help lists upgrade with one line on what it does, and no help text names the old layout's folder", async () => {
     const v = (await h.norn("help")).value as Help;
     const upgrade = v.commands.find((c) => c.command === "upgrade");
@@ -109,7 +109,7 @@ describe("norn upgrade in help (gh-110 B22, gh-61 B30)", () => {
   });
 });
 
-describe("norn migrate in help (gh-61 B30)", () => {
+describe("norn migrate in help", () => {
   test("help marks migrate deprecated, naming norn upgrade", async () => {
     const r = await h.norn("help");
     const migrate = (r.value as Help).commands.find((c) => c.command === "migrate");
@@ -118,7 +118,7 @@ describe("norn migrate in help (gh-61 B30)", () => {
   });
 });
 
-describe("norn help --all (B3)", () => {
+describe("norn help --all", () => {
   test("everything in help plus tick, hook, check-run and status --segment", async () => {
     const plain = (await h.norn("help")).value as Help;
     const r = await h.norn("help", "--all");
@@ -147,7 +147,7 @@ function disk(): Record<string, string> {
   return out;
 }
 
-describe("removed names are unknown commands (B5, B69)", () => {
+describe("removed names are unknown commands (B69)", () => {
   test("the table of old names covers the B5 list", () => {
     expect<string[]>([...REMOVED_COMMANDS].sort()).toEqual(["drop", "inbox", "cockpit", "orient", "open", "answer", "approve", "unstick", "update", "mode", "workflow", "take", "release", "trace", "why"].sort());
   });

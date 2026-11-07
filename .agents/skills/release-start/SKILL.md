@@ -58,7 +58,7 @@ Assignee: @me
 <notes, or empty>
 ```
 
-Unlike `/issue`, assign it: the release should be taken in now, from today's main (GR1, GR2). Keep the title `Release`; `prepare` renames it to `Release X.Y.Z`.
+Unlike `/issue`, assign it: the release should be taken in now, from today's main. Keep the title `Release`; `prepare` renames it to `Release X.Y.Z`.
 
 Create it only after the person says yes; on any change, show the draft again.
 

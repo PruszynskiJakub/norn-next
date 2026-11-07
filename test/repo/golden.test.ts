@@ -58,7 +58,7 @@ test("decisionChanges lists the decisions that went and came, not those only reo
   expect(decisionChanges([d("a"), d("b")], [d("b"), d("a")])).toEqual({ gone: [], came: [] });
 });
 
-test("the harvest finds the harness test files in cli integration and test/e2e and runs each with its tier's config (gh-118 B19)", () => {
+test("the harvest finds the harness test files in cli integration and test/e2e and runs each with its tier's config", () => {
   const found = harvestFiles();
   expect(found.length).toBeGreaterThan(0);
   expect(found.filter((f) => !f.startsWith("packages/cli/test/integration/") && !f.startsWith("test/e2e/"))).toEqual([]);

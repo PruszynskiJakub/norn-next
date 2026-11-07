@@ -1,11 +1,11 @@
 /**
- * Facts: everything `observe` collects in one tick (H2). Decide is a pure function
- * of `Facts` + config (H3), so a Facts value must be JSON-serializable: it is stored
- * in the tick trace and replayed by `norn run view --why` (O5). No functions, Dates or Maps.
+ * Facts: everything `observe` collects in one tick. Decide is a pure function
+ * of `Facts` + config, so a Facts value must be JSON-serializable: it is stored
+ * in the tick trace and replayed by `norn run view --why`. No functions, Dates or Maps.
  *
  * Absence conventions:
  * - `null`       = observed, and nothing is there
- * - `undefined`  = not observed this tick (e.g. remote throttled, H5) — decide must not act on it
+ * - `undefined`  = not observed this tick (e.g. remote throttled) — decide must not act on it
  */
 import type {
   ClaimBlob,
@@ -23,12 +23,12 @@ import type {
 } from "@norn/schema";
 import type { GitInProgress, PaneState, PullRequestCi, RemoteIssue, RemotePullRequest, RunnerCapabilities, SessionRef, WorktreeStatus } from "./ports.ts";
 
-/** A file that failed to read or validate (S2). */
+/** A file that failed to read or validate. */
 export interface FileError {
   /** repo-relative path */
   file: string;
   errors: SchemaError[];
-  /** B38 (D12): set when the file failed only because criteria still carry the removed `needs`; `norn upgrade` fixes it */
+  /** Set when the file failed only because criteria still carry the removed `needs`; `norn upgrade` fixes it */
   code?: "needs_removed";
 }
 
@@ -51,11 +51,11 @@ export interface WorktreeFacts {
   last_commit_at: number | null;
   /** newest mtime of tracked/untracked files, for `stalled` (ms epoch) */
   last_file_change_at: number | null;
-  /** slot from `.env.norn` (K4) */
+  /** slot from `.env.norn` */
   slot: number | null;
   /**
-   * H1/BS5.1: the git operation in progress in the worktree (an agent's merge, a rebase, …) and its
-   * unmerged paths; absent = not observed. While one is, norn commits nothing there (H1).
+   * The git operation in progress in the worktree (an agent's merge, a rebase, …) and its
+   * unmerged paths; absent = not observed. While one is, norn commits nothing there.
    */
   in_progress?: GitInProgress;
 }
@@ -81,24 +81,24 @@ export interface RunFacts {
   /** max(last hook, last commit, last file change) — ms epoch */
   last_activity_at: number | null;
   transcript: string | null;
-  /** B3: the first lines the session printed, read only once its process is gone (RunnerPort.output) */
+  /** The first lines the session printed, read only once its process is gone (RunnerPort.output) */
   output?: string;
   /**
-   * R5.1 (H2): the run's `started` receipt is not applied (a crash between the receipt and
+   * The run's `started` receipt is not applied (a crash between the receipt and
    * `state.json`), so norn does not know whether, or where, it was launched. `session` is then what
    * observe found for it (runner session or process; null = nothing found), `hooks` its hook facts.
    */
   launch_unknown?: {
     /** number of the unapplied `started` receipt */
     n: number;
-    /** that receipt's time (ms epoch): the R5.2 grace runs from it */
+    /** that receipt's time (ms epoch): the launch-unknown grace runs from it */
     at: number;
     /** agent-tool session id seen for the run (hooks or the runner), for `--resume` */
     agent_session_id: string | null;
   };
 }
 
-/** R5.3: a run of the unit's cursor step/attempt (from its `started` receipts) and its hook activity. */
+/** A run of the unit's cursor step/attempt (from its `started` receipts) and its hook activity. */
 export interface StepRunFacts {
   run_id: string;
   /** newest hook fact for the run (ms epoch), null = none in the window */
@@ -108,7 +108,7 @@ export interface StepRunFacts {
 }
 
 /**
- * R4.3: the last failed effect of an action for this unit on this checkout (send, resume, launch,
+ * The last failed effect of an action for this unit on this checkout (send, resume, launch,
  * push) — kept machine-local until an action of the same effect succeeds for the unit.
  */
 export interface ActFailure {
@@ -124,16 +124,16 @@ export interface ActFailure {
   attempt: number;
   /** the session a failed delivery targeted, so the inbox can say how to reach it */
   session?: { runner: string; session_id: string; pane_id?: string };
-  /** gh-195 (08-F4): a record push refused as stale (`StoryFacts.record.refused`): the sha it leased on (null = none) */
+  /** a record push refused as stale (`StoryFacts.record.refused`): the sha it leased on (null = none) */
   lease?: string | null;
 }
 
 export interface UnitFacts {
   unit: UnitRef;
   /**
-   * gh-71 D2 (B30): the unit's record folder relative to its spec folder, as the store resolver found it:
+   * The unit's record folder relative to its spec folder, as the store resolver found it:
    * `runs/_story/rounds/NN-<wf>` for the story's current round, `runs/<nn>-<slug>` for a slice, `runs/_story`
-   * for a flat story record (B36). Absent = `unitRecordPath(unit.dir)` (facts an older norn recorded).
+   * for a flat story record. Absent = `unitRecordPath(unit.dir)` (facts an older norn recorded).
    */
   record?: string;
   /** null = unit not started (no runs/<unit>/state.json) */
@@ -142,13 +142,13 @@ export interface UnitFacts {
   workflow: Workflow | null;
   /** sha256 of the pinned workflow file as read */
   workflow_hash: string | null;
-  /** files of this unit failing validation → unit is corrupt (S2) */
+  /** files of this unit failing validation → unit is corrupt */
   errors: FileError[];
   /** receipts with n > state.applied_through, ascending by n */
   unapplied: NumberedReceipt[];
   /**
    * The done/check receipt of `state.last_outcome` (the report that moved the cursor here), e.g. the
-   * qa report a gate shows with its evidence (O1, F21). Absent/null = not read or none.
+   * qa report a gate shows with its evidence. Absent/null = not read or none.
    */
   last_outcome_receipt?: NumberedReceipt | null;
   worktree: WorktreeFacts | null;
@@ -156,14 +156,14 @@ export interface UnitFacts {
   /** this machine's lease for the unit's run, if any */
   lease: LeaseFile | null;
   /**
-   * gh-195 D8 (B5): the unit's handoff has uncommitted changes (a crash between write and commit).
-   * Run state is in the machine dir, never in git (S12); the agent's own files are not counted, since
+   * The unit's handoff has uncommitted changes (a crash between write and commit).
+   * Run state is in the machine dir, never in git; the agent's own files are not counted, since
    * they are dirty all through a live session.
    */
   uncommitted: boolean;
-  /** R5.3: runs of the cursor step/attempt with their hook activity; absent = not observed */
+  /** Runs of the cursor step/attempt with their hook activity; absent = not observed */
   step_runs?: StepRunFacts[];
-  /** R4.3: last failed act effect for the unit on this checkout; absent = none */
+  /** Last failed act effect for the unit on this checkout; absent = none */
   act_failure?: ActFailure;
   /**
    * A done slice: its local branch is in the story branch (its head an ancestor of the story
@@ -172,14 +172,14 @@ export interface UnitFacts {
    */
   branch_in_story?: boolean;
   /**
-   * gh-61 D5 (B18, B21): the bundled skills in the unit's worktree that differ from the running
+   * The bundled skills in the unit's worktree that differ from the running
    * norn's, by name; empty = none differ. Absent = not observed (no worktree, no bundled skills given,
-   * or the worktree's own team file records a newer `norn_version`, D14). decide starts no agent step
-   * while it is non-empty (D6).
+   * or the worktree's own team file records a newer `norn_version`). decide starts no agent step
+   * while it is non-empty.
    */
   skills_drift?: string[];
   /**
-   * gh-195/06 (B34, D13): run state an older norn left on this unit's own branch, in `path`
+   * Run state an older norn left on this unit's own branch, in `path`
    * (`<spec folder>/runs`, relative to the unit's worktree). `copy`: the units' folders there (`_story`,
    * `<nn>-<slug>`) read as their run state, the machine dir holding none of it yet (their `state` and
    * `errors` are the branch's); [] = only the removal is left. `holds`: every unit's folder there,
@@ -218,11 +218,10 @@ export interface MailboxItem {
   error: FileError | null;
 }
 
-/** A commit on a story/slice branch that norn did not make (Q6, out-of-band). */
+/** A commit on a story/slice branch that norn did not make (out-of-band). */
 export interface ForeignCommit {
   sha: string;
   subject: string;
-  /** author name */
   author: string;
   /** author date, ISO */
   at: string;
@@ -231,7 +230,7 @@ export interface ForeignCommit {
 }
 
 /**
- * gh-195 D11 (B27, R2.3): this checkout's own record of a story another heartbeat holds, still in its
+ * This checkout's own record of a story another heartbeat holds, still in its
  * machine dir's `runs/<story>/`.
  */
 export interface LocalRecord {
@@ -239,12 +238,12 @@ export interface LocalRecord {
   last_receipt: string | null;
   /**
    * its tree is the tree of a record commit this machine pushed (`Norn-Holder`) in the history of the
-   * story's record ref here: everything in it is on the ref, as after a clean release (B15)
+   * story's record ref here: everything in it is on the ref, as after a clean release
    */
   on_ref: boolean;
 }
 
-/** gh-195 D11 (B27, T7a): a record this checkout set aside as superseded, `<machine dir>/superseded/<name>/`. */
+/** A record this checkout set aside as superseded, `<machine dir>/superseded/<name>/`. */
 export interface SupersededRecord {
   /** `<story>-<ulid>` */
   name: string;
@@ -259,11 +258,11 @@ export interface SupersededRecord {
 }
 
 /**
- * BS1: the story branch against its base (BS0) this tick. `conflicts` comes from `git merge-tree`
+ * The story branch against its base this tick. `conflicts` comes from `git merge-tree`
  * (computed only when `behind > 0` and the pair (story head, base sha) changed, cached per checkout).
  */
 export interface StoryBase {
-  /** BS0: `refs/remotes/<remote>/<base>`, or `refs/heads/<base>` without a git remote */
+  /** `refs/remotes/<remote>/<base>`, or `refs/heads/<base>` without a git remote */
   ref: string;
   /** tip of the base ref this tick */
   sha: string;
@@ -278,15 +277,15 @@ export interface StoryBase {
   conflicts: string[];
 }
 
-/** C1: a story PR observation (`null` = the remote said there is none) and its time (ms epoch). */
+/** A story PR observation (`null` = the remote said there is none) and its time (ms epoch). */
 export interface StoryPrSeen {
   pr: RemotePullRequest | null;
   observed_at: number;
-  /** gh-195 B18: the CI state of the PR's head, observed only for a story another heartbeat holds; absent = not observed */
+  /** The CI state of the PR's head, observed only for a story another heartbeat holds; absent = not observed */
   ci?: PullRequestCi;
 }
 
-/** gh-71 D5: a story issue observation (`null` = not visible to this checkout) and its time (ms epoch). */
+/** A story issue observation (`null` = not visible to this checkout) and its time (ms epoch). */
 export interface StoryIssueSeen {
   issue: RemoteIssue | null;
   observed_at: number;
@@ -302,12 +301,12 @@ export interface StoryFacts {
   frontmatter_error: FileError | null;
   worktree: WorktreeFacts | null;
   claim: ClaimState;
-  /** pending mailbox receipts (T9); undefined if not fetched this tick */
+  /** pending mailbox receipts; undefined if not fetched this tick */
   mailbox: MailboxItem[] | undefined;
   /** the remote issue as seen now; null = not visible (closed/unassigned/unlabelled), undefined = not fetched */
   issue: RemoteIssue | null | undefined;
   /**
-   * gh-71 D5: the story issue as the last successful sync of this checkout saw it, with when (ms epoch).
+   * The story issue as the last successful sync of this checkout saw it, with when (ms epoch).
    * The finished-round Check item (label removed, unassigned, unseen) uses it when `issue` was not
    * fetched this tick, so it stays between syncs and shows in the read model. Decide never acts on
    * it. Absent = never seen here.
@@ -319,63 +318,63 @@ export interface StoryFacts {
    */
   pr?: RemotePullRequest | null;
   /**
-   * C1: the story PR as the last successful sync of this checkout saw it, with when (ms epoch).
-   * Inbox items about the PR (merge BS10, retarget BS11, head changed F35) use it when `pr` was not
-   * fetched this tick, so they stay put between syncs and show in the read model. Decide never acts
-   * on it (GR6/GR7 effects need a fresh `pr`). Absent = never seen here.
+   * The story PR as the last successful sync of this checkout saw it, with when (ms epoch).
+   * Inbox items about the PR (merge, retarget, head changed) use it when `pr` was not fetched this
+   * tick, so they stay put between syncs and show in the read model. Decide never acts on it (its
+   * effects need a fresh `pr`). Absent = never seen here.
    */
   pr_seen?: StoryPrSeen;
   /**
-   * P2 (pull, don't trust): the story branch head is an ancestor of the fetched `<remote>/<base>`
+   * Pull, don't trust: the story branch head is an ancestor of the fetched `<remote>/<base>`
    * while the PR does not say merged (e.g. a remote glitch left it open). Decide treats it as
-   * merged (GR6). Absent = not observed or not merged by ancestry.
+   * merged. Absent = not observed or not merged by ancestry.
    */
   merged_by_ancestry?: boolean;
   /**
    * Commits on the story branch or a slice branch not created by norn (no `Norn-Tick` trailer)
    * since the last norn commit on that branch, newest first; only for units without a live run
    * (an agent's own commits mid-run are not foreign), and never one committed during a run of that
-   * unit — an agent's commit while its unit is parked on an ask (C4). Absent = none / not observed.
+   * unit — an agent's commit while its unit is parked on an ask. Absent = none / not observed.
    */
   foreign_commits?: ForeignCommit[];
   /** story branch head when the person gave `approve` at the `ready` gate (the approve receipt's `head_sha`) */
   ready_head_sha?: string;
-  /** BS10.2: when that approval was given (the approve receipt's `at`); PRs seen before it are not compared */
+  /** When that approval was given (the approve receipt's `at`); PRs seen before it are not compared */
   ready_approved_at?: string;
   /**
-   * C5: the known PR head, when every commit after `ready_head_sha` up to it is norn's own for this
+   * The known PR head, when every commit after `ready_head_sha` up to it is norn's own for this
    * story (`Norn-Tick` + `Norn-Story` trailers — the `ready.approve → $done` commit and later state
-   * commits); the head-changed item (F35) ignores that head. Absent = moved by someone else, or unknown.
+   * commits); the head-changed item ignores that head. Absent = moved by someone else, or unknown.
    */
   ready_head_norn?: string;
   /**
-   * R3.2: the story's `status` in its record on the fetched base ref (`<remote>/<base>`); null = the
+   * The story's `status` in its record on the fetched base ref (`<remote>/<base>`); null = the
    * base has no record of it; absent = no base ref (solo) or not observed. The base record wins over
    * any local spec when deciding to acquire a claim.
    */
   base_status?: StoryFrontmatter["status"] | null;
   /**
-   * gh-195 D11 (B27, R2.3): on a checkout whose story another heartbeat holds, its own record of the
+   * On a checkout whose story another heartbeat holds, its own record of the
    * story still in its machine dir. Absent = none, held here, or not observed.
    */
   local_record?: LocalRecord;
   /**
-   * R3.1: an unclaimed new story — its local branch holds nothing beyond the intake commit: no
+   * An unclaimed new story — its local branch holds nothing beyond the intake commit: no
    * commit past the base ref, or one whose trailers are the story's intake (`isIntakeCommit`, never
    * its subject). Absent = not observed (claimed, not new, or the branch could not be listed).
    */
   intake_only?: boolean;
-  /** BS1: the story branch against its base; absent = not observed (no story branch or base ref) */
+  /** The story branch against its base; absent = not observed (no story branch or base ref) */
   base?: StoryBase;
   /**
-   * gh-195 D4 (B10, B12): under `record.policy: remote`, on the checkout that holds the claim, the
+   * Under `record.policy: remote`, on the checkout that holds the claim, the
    * tree a pack of the story's run-state folder would write (`tree`, null = no file yet) and the record
    * ref as this checkout last saw it (`pushed`: its commit and tree; null = none). Machine-local.
    * Absent = not observed (another holder, or the policy is local).
    */
   record?: { tree: string | null; pushed: { sha: string; tree: string } | null };
   /**
-   * gh-195 (08-F4, review F2): the last record push of this holder refused as stale (another checkout
+   * The last record push of this holder refused as stale (another checkout
    * pushed the ref), kept machine-local in the story's own slot of `failures.json` apart from the story
    * unit's act failure (`lease`: the sha it leased on, null = none); dropped by the tick once the claim
    * is not here or the policy is `local`. While `record` is observed, decide pushes again only once the
@@ -383,20 +382,20 @@ export interface StoryFacts {
    */
   record_refused?: ActFailure;
   /**
-   * gh-195 (review#2 F3): this checkout has the story's record ref (`refs/norn/runs/<story>`, this commit)
+   * This checkout has the story's record ref (`refs/norn/runs/<story>`, this commit)
    * but its story unit has no run state: the record was not put in place (a checkout cut short). decide
    * starts nothing over then. Absent = no such ref, or the story unit has run state.
    */
   record_unplaced?: string;
-  /** gh-195 B33 (review#2 F1): held here, read from its record in the machine dir alone — no branch, no spec in any tree */
+  /** Held here, read from its record in the machine dir alone — no branch, no spec in any tree */
   record_only?: boolean;
   /**
-   * NT2/NT3: notes for a person from `done` receipts of any unit of the story that no story-level
+   * Notes for a person from `done` receipts of any unit of the story that no story-level
    * gate `approve` acknowledged yet, oldest first. Absent = none (or not observed).
    */
   notes?: import("./criteria.ts").StoryNote[];
   /**
-   * gh-195 D12 (B21): mailbox receipts this checkout's ticks rejected that no later accepted answer or
+   * Mailbox receipts this checkout's ticks rejected that no later accepted answer or
    * approval of the story cleared, oldest first. Absent = none.
    */
   rejected_mailbox?: RejectedMailboxReceipt[];
@@ -411,11 +410,11 @@ export interface MachineFacts {
   /** `user@machine` */
   holder: string;
   heartbeat_id: string | null;
-  /** runner configured and available (MO2) */
+  /** runner configured and available */
   runner: string | null;
-  /** R4.1: what that runner can do with a session; absent = unknown (treated as send only, the pre-R4 behaviour) */
+  /** What that runner can do with a session; absent = unknown (treated as send only) */
   runner_capabilities?: RunnerCapabilities;
-  /** all live leases on this machine across repos (K1, K3), dead ones excluded */
+  /** all live leases on this machine across repos, dead ones excluded */
   leases: LeaseFile[];
   /** file names (in ~/.norn/leases/) of leases whose holder process is dead, plus unreadable lease files, for ReclaimLeasesAction */
   dead_lease_files?: string[];
@@ -426,48 +425,48 @@ export interface Facts {
   /** ms epoch at observe start; decide uses only this as "now" */
   now: number;
   /**
-   * `default_branch` is the **base branch** (BS0): config `base_branch` when set, else the remote's
+   * `default_branch` is the **base branch**: config `base_branch` when set, else the remote's
    * default branch as discovered. Stories are cut from it, updated from it and PR'd into it.
    */
   repo: { root: string; default_branch: string; remote: string };
   machine: MachineFacts;
   remote: {
-    /** issues from the last sync (GR1); undefined = not fetched this tick */
+    /** issues from the last sync; undefined = not fetched this tick */
     issues: RemoteIssue[] | undefined;
   };
   stories: StoryFacts[];
   /**
-   * R5.5 (N3): this checkout's heartbeat — when a tick last ran here (ms epoch; null = never).
+   * This checkout's heartbeat — when a tick last ran here (ms epoch; null = never).
    * A tick observes its own start; views read `heartbeat.json`. Absent = not observed.
    */
   heartbeat?: { last_tick_at: number | null };
   /**
-   * gh-61 D5: the running binary's version and the one the main checkout's team config records
-   * (`norn_version`, null = not recorded, B5). Absent = not observed (no running version given, or
-   * the config failed to load). A mismatch never reaches decide (the tick is refused first, B6);
-   * the inbox shows it (B8, D7). `skills_drift`: the main checkout's bundled skills that differ from
-   * the running norn's (B19); absent = not observed.
+   * The running binary's version and the one the main checkout's team config records
+   * (`norn_version`, null = not recorded). Absent = not observed (no running version given, or
+   * the config failed to load). A mismatch never reaches decide (the tick is refused first);
+   * the inbox shows it. `skills_drift`: the main checkout's bundled skills that differ from
+   * the running norn's; absent = not observed.
    */
   norn?: { running: string; repo: string | null; skills_drift?: string[] };
   /**
-   * gh-195 D16 (B29, B35): stories whose run state an older norn left in the base branch's tree (the
+   * Stories whose run state an older norn left in the base branch's tree (the
    * main checkout's without a fetched base), ascending; never read, only pointed to `norn upgrade`.
    * Absent = none.
    */
   base_run_state?: string[];
-  /** gh-195 D11 (B27, T7a): records this checkout set aside as superseded, by name. Absent = none. */
+  /** Records this checkout set aside as superseded, by name. Absent = none. */
   superseded?: SupersededRecord[];
-  /** worktrees/branches with no matching unit (K5) */
+  /** worktrees/branches with no matching unit */
   orphans: { worktrees: string[]; branches: string[] };
   /**
-   * gh-195/05 (B2, H2): unit worktrees whose `.norn-unit` is gone (`git clean -fdx`), each with the
+   * Unit worktrees whose `.norn-unit` is gone (`git clean -fdx`), each with the
    * marker observe inferred from its folder and branch and read the unit by; act writes it back
    * (`restore_markers`). Observe writes nothing. Absent = none.
    */
   unmarked?: UnmarkedWorktree[];
 }
 
-/** A unit worktree without its `.norn-unit`, and the marker its folder and branch name (B2). */
+/** A unit worktree without its `.norn-unit`, and the marker its folder and branch name. */
 export interface UnmarkedWorktree {
   path: string;
   marker: { repo: string; story: string; slice: string | null; unit: string; spec_dir: string };

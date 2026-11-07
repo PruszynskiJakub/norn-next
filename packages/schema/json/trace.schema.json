@@ -23,7 +23,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "at": {
@@ -35,7 +35,7 @@
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -316,7 +316,7 @@
         },
         "id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "fact": {
@@ -391,7 +391,7 @@
             },
             "run_id": {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             "agent_session_id": {
@@ -440,7 +440,7 @@
         },
         "id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "at": {
@@ -450,7 +450,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "unit": {
@@ -488,7 +488,7 @@
         },
         "id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "at": {
@@ -502,7 +502,7 @@
         },
         "run_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "step": {
@@ -536,7 +536,7 @@
         },
         "id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "at": {
@@ -546,7 +546,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "unit": {
@@ -610,7 +610,7 @@
         },
         "id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "at": {
@@ -629,7 +629,7 @@
         },
         "heartbeat_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "previous_holder": {
@@ -647,7 +647,7 @@
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -680,7 +680,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "at": {
@@ -692,7 +692,7 @@
           "anyOf": [
             {
               "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-              "description": "ULID (ID2)",
+              "description": "ULID",
               "type": "string"
             },
             {
@@ -754,7 +754,7 @@
         },
         "tick_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "at": {
@@ -813,7 +813,7 @@
         },
         "id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "at": {
@@ -827,7 +827,7 @@
         },
         "run_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "step": {
@@ -840,7 +840,7 @@
         },
         "receipt_id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "outcome": {
@@ -917,7 +917,7 @@
         },
         "id": {
           "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-          "description": "ULID (ID2)",
+          "description": "ULID",
           "type": "string"
         },
         "at": {

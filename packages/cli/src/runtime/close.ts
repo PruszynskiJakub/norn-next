@@ -1,12 +1,12 @@
 /**
- * What closing a story does to the world (GR7, B35; spec gh-71 prefactor 2; the GR6b `close_story` action calls it too, B22):
- * the effects `norn story close` runs once it holds the claim, in one function a tick action can
- * call too. Refusals, consent and claiming stay with the caller.
+ * What closing a story does to the world: the effects `norn story close` runs once it holds the
+ * claim, in one function the `close_story` tick action calls too. Refusals, consent and claiming
+ * stay with the caller.
  *
- * Order (nothing is lost, T6/GR7): stop this machine's live sessions → commit every unit
+ * Order (nothing is lost): stop this machine's live sessions → commit every unit
  * worktree's changes and mark `spec.md` `status: dropped` → push the story and slice branches → push
- * the story's record to its ref (gh-195 B15) → only then remove worktrees, local branches, leases and
- * the claim ref. A failure before the removals returns with everything still in place (B16). Without
+ * the story's record to its ref → only then remove worktrees, local branches, leases and
+ * the claim ref. A failure before the removals returns with everything still in place. Without
  * a git remote the local branches are the only copy of the work, so they are kept.
  */
 import { existsSync } from "node:fs";
@@ -72,7 +72,7 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
   // 1. stop live sessions this machine runs (best effort; their work is committed below)
   const killed = await killLocalSessions(obs, story);
 
-  // 2. record + every change committed (GR7: never delete work)
+  // 2. record + every change committed (never delete work)
   const committed: string[] = [];
   const sliceWts: Array<{ unit: string; path: string; branch: string }> = [];
   for (const u of story.units) {
@@ -88,7 +88,7 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
     if (await git.commit(storyWt, { message: `norn: ${key} dropped`, trailers: trailers(null, "drop") })) committed.push(key);
   }
 
-  // 3. push first (T6/GR7); stop on any failure with everything still in place
+  // 3. push first; stop on any failure with everything still in place
   const pushed: string[] = [];
   if (obs.remote) {
     const branches = [...(storyWt && loc ? [{ cwd: storyWt, branch: loc.branch, force: false }] : []), ...sliceWts.map((w) => ({ cwd: w.path, branch: w.branch, force: true }))];
@@ -99,7 +99,7 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
     }
   }
 
-  // 3b. gh-195 D15 (B29): the final record on its archive ref, its `Norn-Branch-Commit` the story branch
+  // 3b. The final record on its archive ref, its `Norn-Branch-Commit` the story branch
   // as pushed; a failed push stops here with everything still in place
   const record = await pushHeldRecord(obs, key, loc?.branch ?? null);
   if (!record.ok) return { ok: false, reason: "record_push_failed", story: key, ref: recordRef(key), push_reason: record.reason, message: record.message, pushed };
@@ -142,13 +142,13 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
 }
 
 /**
- * gh-195 D4, D15 (B15, B16, B29, B33): push the story's record to `refs/norn/runs/<story>` with a lease
- * on the sha this checkout last saw (D2), its `Norn-Branch-Commit` the story branch as the remote has
- * it (the local one without a remote; none without a branch, B33). The one push every claim release
- * (`story handoff`, a clean `watch` exit: runtime/release.ts) and every cleanup (GR6
- * `cleanup_merged_story`; closing, `closeStory`: GR6b and `story close`) makes after the branches and
+ * Push the story's record to `refs/norn/runs/<story>` with a lease
+ * on the sha this checkout last saw, its `Norn-Branch-Commit` the story branch as the remote has
+ * it (the local one without a remote; none without a branch). The one push every claim release
+ * (`story handoff`, a clean `watch` exit: runtime/release.ts) and every cleanup
+ * (`cleanup_merged_story`; closing, `closeStory`: the tick action and `story close`) makes after the branches and
  * before the claim or anything else goes; an unchanged or empty record pushes nothing. Once pushed,
- * the local ref and the local run-state folder pack to the same tree: a clean release (gh-195/14).
+ * the local ref and the local run-state folder pack to the same tree: a clean release.
  */
 export async function pushHeldRecord(obs: Observed, key: string, branch: string | null): Promise<RecordPushResult & { branch_commit: string | null }> {
   const git = obs.ports.git;
@@ -161,8 +161,8 @@ export async function pushHeldRecord(obs: Observed, key: string, branch: string 
   return { ...r, branch_commit: head };
 }
 
-/** B16: why a record push failed, the same words for every release and cleanup. */
+/** Why a record push failed, the same words for every release and cleanup. */
 export const recordPushError = (key: string, reason: string, message: string): string => `record push to ${recordRef(key)} failed (${reason}): ${message}`;
 
-/** B16: the one refusal (exit 3) of a command whose record push failed; nothing was released or removed. */
+/** The one refusal (exit 3) of a command whose record push failed; nothing was released or removed. */
 export const recordPushRefused = (error: string, retry: string, pushed: string[]) => refuse(error, `check the remote, then run ${retry} again`, "record_push_failed", { pushed });

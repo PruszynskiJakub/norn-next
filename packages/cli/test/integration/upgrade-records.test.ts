@@ -2,7 +2,7 @@
  * gh-195/17 (B35–B37; D14, D16; S10 retired): `norn upgrade` in the main checkout packs each finished
  * story's run state an older norn left in the base's tree into `refs/norn/runs/<story>`, pushes the
  * refs, then stages the removal of that run state and of the `runs/**` line in `.gitattributes`,
- * committing nothing (LY3). A rerun pushes only what is missing; a story whose push is rejected keeps
+ * committing nothing. A rerun pushes only what is missing; a story whose push is rejected keeps
  * its run state, unstaged. `norn init` writes no `.gitattributes` line.
  */
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -61,7 +61,7 @@ describe("norn upgrade moves the base's run state into archive refs (B35)", () =
     const v = r.value as Upgraded;
     expect(v.run_state.map((s) => `${s.story} ${s.done}`)).toEqual(["gh-1 pushed", "gh-4 pushed", "gh-7 pushed"]);
     for (const n of STORIES) expect(remoteTree(recordRef(`gh-${n}`))).toBe(trees[n] as string);
-    // LY3: staged, never committed
+    // Staged, never committed
     expect(head()).toBe(before);
     const staged = stagedPaths();
     for (const n of STORIES) expect(staged.filter((p) => p.startsWith(`${SPEC(n)}/runs/`)).length).toBeGreaterThan(0);
@@ -75,11 +75,11 @@ describe("norn upgrade moves the base's run state into archive refs (B35)", () =
     const text = (await h.norn("upgrade")).stdout;
     expect(text).toContain("nothing to upgrade");
 
-    // D16: run list reads the ref
+    // Run list reads the ref
     const list = (await h.norn("run", "list", "gh-1")).stdout;
     expect(list.split("\n").filter((l) => l.startsWith("round "))).toEqual(["round 1 · story · finished"]);
 
-    // gh-195/16 AC6: once the removal is committed (and pushed), neither doctor nor status points to upgrade
+    // Once the removal is committed (and pushed), neither doctor nor status points to upgrade
     await h.norn("sync");
     expect((await h.norn("doctor", "--repo", "--json")).value).toMatchObject({ repo: { run_state: { ok: false } } });
     expect(await statusItems()).toHaveLength(1);
@@ -166,7 +166,7 @@ describe("a rejected ref push removes nothing for that story (B36)", () => {
   });
 });
 
-describe("upgrade removes nothing whose record is not on the remote (B36, P6)", () => {
+describe("upgrade removes nothing whose record is not on the remote (B36)", () => {
   test("an unreadable remote: every story named, no ref, nothing staged, the .gitattributes line kept and no run-state commit offered", async () => {
     await olderBase();
     h.git(["remote", "set-url", "origin", join(h.root, "..", "gone.git")]);

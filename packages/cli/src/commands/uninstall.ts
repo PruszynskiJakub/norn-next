@@ -1,5 +1,5 @@
 /**
- * `norn uninstall` (A1, SK1): remove norn-owned hooks and norn's skills — the bundled folders in
+ * `norn uninstall`: remove norn-owned hooks and norn's skills — the bundled folders in
  * `.agents/skills/`, the links to them, and copies an older norn installed (marked). Config,
  * workflows, specs, run state and the repo's own skills stay.
  */

@@ -1,5 +1,5 @@
 /**
- * Config files (K2) and workflow files (W1). The merge rule lives in `resolveConfig` (@norn/schema)
+ * Config files and workflow files. The merge rule lives in `resolveConfig` (@norn/schema)
  * and workflow graph checks in @norn/core.
  */
 import { readdirSync, statSync } from "node:fs";
@@ -25,7 +25,7 @@ import { recordedInterval } from "./heartbeat.ts";
 import { checkoutOf, LOCAL_CONFIG_FILE, LOCAL_CONFIG_SCHEMA_FILE, nornHome, REPO_CONFIG_SCHEMA_FILE, REPO_CONFIG_FILE, repoConfigPath, USER_CONFIG_SCHEMA_FILE, userConfigPath, workflowsDir } from "./paths.ts";
 import { type PinnedWorkflow, parseWorkflowText, sha256 } from "./unit.ts";
 
-/** B8: a missing or empty file sets nothing; a file that is not YAML is `config_invalid`. */
+/** A missing or empty file sets nothing; a file that is not YAML is `config_invalid`. */
 function readConfigFile(kind: ConfigFileKind, path: string): { value: unknown; problems: ConfigProblem[] } {
   const raw = readText(path);
   if (raw === null) return { value: undefined, problems: [] };
@@ -52,7 +52,7 @@ export type LoadedConfig =
       errors: FileError[];
       home: string;
       paths: ConfigPaths;
-      /** B48: the config with each top-level key that has a problem left out whole (one bad `agents.codex.model` drops all of `agents`), so doctor still runs the checks it does not hide */
+      /** The config with each top-level key that has a problem left out whole (one bad `agents.codex.model` drops all of `agents`), so doctor still runs the checks it does not hide */
       fallback: { config: ResolvedConfig; entries: ConfigEntry[] };
     };
 
@@ -84,7 +84,7 @@ function gitConfigValue(text: string, section: string, name: string, key: string
 }
 
 /**
- * B29, B31, B34 (D6, D8): what norn derives — the runner (inside Herdr: `HERDR_ENV=1`; installed:
+ * What norn derives — the runner (inside Herdr: `HERDR_ENV=1`; installed:
  * `herdr` on the env's PATH; else headless), the git remote (the remote the base branch tracks, or
  * with no `base_branch` the branch checked out in the main checkout, else `origin`) and its URL, and
  * the interval the heartbeat records. Reads files only.
@@ -111,9 +111,9 @@ function deriveConfig(opts: { repoRoot: string; env?: Record<string, string | un
 }
 
 /**
- * The three config files (K2: `~/.norn/config.yaml`, home from `home`, else NORN_HOME_DIR, else
+ * The three config files (`~/.norn/config.yaml`, home from `home`, else NORN_HOME_DIR, else
  * ~/.norn; `.agents/norn.config.local.yaml`; `.agents/norn.config.yaml`) resolved with what norn
- * derives. Any problem in any file fails the load (B7: config errors, never corrupt state).
+ * derives. Any problem in any file fails the load (a config error, never corrupt state).
  */
 export function loadConfig(opts: { repoRoot: string; home?: string; env?: Record<string, string | undefined>; derived?: ConfigDerived }): LoadedConfig {
   const home = nornHome(opts.home, opts.env);
@@ -132,14 +132,14 @@ export function loadConfig(opts: { repoRoot: string; home?: string; env?: Record
   return { ok: true, config: r.config, entries: r.entries, files, home, paths };
 }
 
+/** Each config file's schema copy, as the path under its root (repo or norn home). */
+const SCHEMA_COPY: Record<ConfigLayerName, string> = { user: USER_CONFIG_SCHEMA_FILE, local: LOCAL_CONFIG_SCHEMA_FILE, repo: REPO_CONFIG_SCHEMA_FILE };
+
 /**
- * B50, B55 (D14): write the JSON schema of each config file next to it — the team and local
+ * Write the JSON schema of each config file next to it — the team and local
  * schemas in `.agents/` (committed), the user schema in the norn home — when missing or stale.
  * Returns the paths written.
  */
-/** B50, B55 (D14): each config file's schema copy, as the path under its root (repo or norn home). */
-const SCHEMA_COPY: Record<ConfigLayerName, string> = { user: USER_CONFIG_SCHEMA_FILE, local: LOCAL_CONFIG_SCHEMA_FILE, repo: REPO_CONFIG_SCHEMA_FILE };
-
 export function writeConfigSchemas(opts: { repoRoot: string; home: string }): string[] {
   const targets: Array<[string, "repo-config" | "local-config" | "user-config"]> = [
     [join(opts.repoRoot, REPO_CONFIG_SCHEMA_FILE), "repo-config"],
@@ -156,8 +156,6 @@ export function writeConfigSchemas(opts: { repoRoot: string; home: string }): st
   return written;
 }
 
-// ---------------------------------------------------------------- editing a file (B62–B68, D4)
-
 export type ConfigLayerName = ConfigFileKind;
 
 export type ConfigEditResult =
@@ -166,10 +164,10 @@ export type ConfigEditResult =
 
 /**
  * Set (`set`: a YAML value as typed, `auto`, `90m`) or remove (`unset`) one dotted key in the user,
- * local or team config file (D4). A key the file does not take is refused (`config_wrong_file`,
+ * local or team config file. A key the file does not take is refused (`config_wrong_file`,
  * `config_moved`). The file is edited as a YAML document; a list is replaced whole. The edited file
- * is checked before anything is written, and the write is atomic (S1). A changed value, a new key or
- * a removed key touches only its own lines, so comments and key order stay (B67). Removing a key
+ * is checked before anything is written, and the write is atomic. A changed value, a new key or
+ * a removed key touches only its own lines, so comments and key order stay. Removing a key
  * the file lacks writes nothing.
  */
 export function editConfigLayer(opts: {
@@ -213,9 +211,9 @@ export function editConfigLayer(opts: {
   // a set is checked against the whole file; an unset only removes, so it never makes a file worse
   const checked = "set" in edit ? checkConfigFile(opts.file, layer) : [];
   if (checked.length) return { ok: false, code: "invalid_value", error: checked.map(problemText).join("; ") };
-  // B67: the original text with only the changed lines touched, as long as it means the same as the edited document
+  // The original text with only the changed lines touched, as long as it means the same as the edited document
   const edited = spliced !== null && JSON.stringify(parseYaml(spliced) ?? {}) === JSON.stringify(layer) ? spliced : rendered(doc);
-  // B50: a file this creates starts with the modeline its editor reads the schema copy through
+  // A file this creates starts with the modeline its editor reads the schema copy through
   const text = existing === null ? `# yaml-language-server: $schema=${basename(SCHEMA_COPY[opts.file])}\n${edited}` : edited;
   if (text === raw) return { ok: true, path, changed: false, value };
   atomicWrite(path, text);
@@ -223,7 +221,7 @@ export function editConfigLayer(opts: {
 }
 
 /**
- * gh-61 D9, D10 (K8): write `norn_version` into the team file, edited in place so its comments and
+ * Write `norn_version` into the team file, edited in place so its comments and
  * key order stay. `norn init` (when the key is absent) and `norn upgrade` are its only writers.
  */
 export function writeNornVersion(repoRoot: string, version: string): ConfigEditResult {
@@ -314,8 +312,6 @@ function withoutLines(raw: string, doc: Document, segs: string[]): string | null
   const span = pairLines(raw, n > 1 ? doc.getIn(segs.slice(0, n - 1), true) : doc.contents, segs[n - 1] as string);
   return span && raw.slice(0, span.from) + raw.slice(span.to);
 }
-
-// ---------------------------------------------------------------- workflows (W1)
 
 export const WORKFLOW_EXT = [".yaml", ".yml", ".json"];
 

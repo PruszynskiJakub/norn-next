@@ -11,7 +11,7 @@ setDefaultTimeout(60_000);
 
 const starter = readFileSync(join(import.meta.dir, "..", "..", "assets", "REVIEW.md"), "utf8");
 
-describe("norn init writes a starter REVIEW.md (gh-226)", () => {
+describe("norn init writes a starter REVIEW.md", () => {
   test("a repo without one gets the starter, and init says so", async () => {
     const h = await createHarness();
     try {

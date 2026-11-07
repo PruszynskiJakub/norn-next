@@ -1,5 +1,5 @@
 /**
- * gh-61 B21 (D5, D14), gh-252 (SK1): observe records each unit worktree's drifted bundled skills; a
+ * Observe records each unit worktree's drifted bundled skills; a
  * tick launches a drifted unit like any other (its runs use the worktree's copies) and `norn status`
  * shows the difference as a Check item, while a repo-local skill never counts. A unit worktree whose
  * team file records a newer `norn_version` is not drift. The view's inbox equals `buildInbox` over
@@ -56,7 +56,7 @@ beforeAll(async () => {
     h.clock.advance(10_000);
   }
   expect(launchedIn()).toEqual([]);
-  // gh-7: a bundled skill edited by hand; gh-8: only a repo-local skill differs (B21)
+  // A bundled skill edited by hand; Only a repo-local skill differs
   const norn = join(gh7(), ".agents/skills/norn/SKILL.md");
   writeFileSync(norn, `${readFileSync(norn, "utf8")}\nedited by hand\n`);
   h.write(join(gh8(), ".agents/skills/release/SKILL.md"), "---\nname: release\n---\nours, edited\n");
@@ -64,7 +64,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("drifted skills hold nothing (gh-252, gh-61 B21)", () => {
+describe("drifted skills hold nothing", () => {
   test("AC4, D5: observe records the drifted bundled skill, never the repo-local one", async () => {
     const obs = await observeNow(h);
     const unit = (key: string) => obs.facts.stories.find((s) => s.key === key)?.units[0];

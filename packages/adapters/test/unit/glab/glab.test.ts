@@ -1,4 +1,4 @@
-/** glab adapter against recorded CLI fixtures (X4, M4). */
+/** glab adapter against recorded CLI fixtures. */
 import { describe, expect, test } from "bun:test";
 import { fixtureExec, type Exec, type ExecFixture } from "../../../src/exec.ts";
 import calls from "./fixtures/calls.json";
@@ -20,13 +20,13 @@ describe("glab adapter", () => {
     expect(await glab.whoami()).toBe("jpruszynski");
   });
 
-  test("every glab call has the network timeout (H11)", async () => {
+  test("every glab call has the network timeout", async () => {
     timeouts.length = 0;
     await glab.whoami();
     expect(timeouts).toEqual([NETWORK_TIMEOUT_MS]);
   });
 
-  test("listAssignedIssues maps to RemoteIssue (GR1)", async () => {
+  test("listAssignedIssues maps to RemoteIssue", async () => {
     const issues = await glab.listAssignedIssues({ label: "norn" });
     expect(issues.map((i) => issueKey(i.number))).toEqual(["gl-3", "gl-4"]);
     expect(issues[0]).toEqual({
@@ -49,7 +49,7 @@ describe("glab adapter", () => {
     expect(await glab.getIssue(999)).toBeNull();
   });
 
-  test("pullRequestCi: the head pipeline's status as one state (gh-195 B18)", async () => {
+  test("pullRequestCi: the head pipeline's status as one state", async () => {
     expect(await glab.pullRequestCi(11)).toBe("success");
     expect(await glab.pullRequestCi(12)).toBe("pending");
     expect(await glab.pullRequestCi(13)).toBe("failure");
@@ -79,7 +79,7 @@ describe("glab adapter", () => {
     expect(stdins).toContain("Closes #4");
   });
 
-  test("editPullRequestBody passes the body on stdin (GR9)", async () => {
+  test("editPullRequestBody passes the body on stdin", async () => {
     await glab.editPullRequestBody(9, "## Summary\n\nSaves no longer crash.\n\nCloses #4");
     expect(stdins).toContain("## Summary\n\nSaves no longer crash.\n\nCloses #4");
   });
@@ -97,7 +97,7 @@ describe("glab adapter", () => {
     const err = await net.listAssignedIssues({ label: "norn" }).catch((e) => e);
     expect([err.code, err.retryable]).toEqual(["glab_network", true]);
   });
-  test("listLabelledIssues lists the label's open issues, any assignee; assignIssue adds one (CP2, GR1)", async () => {
+  test("listLabelledIssues lists the label's open issues, any assignee; assignIssue adds one", async () => {
     const argv: string[][] = [];
     const port = createGlab({ cwd: "/repo", exec: async (a) => (argv.push(a), { code: 0, stdout: a[2] === "list" ? "[]" : "", stderr: "" }) });
     expect(await port.listLabelledIssues({ label: "norn" })).toEqual([]);
@@ -106,7 +106,7 @@ describe("glab adapter", () => {
     const failing = createGlab({ cwd: "/repo", exec: async () => ({ code: 1, stdout: "", stderr: "error connecting: Could not resolve host" }) });
     expect(await failing.assignIssue(7, "me").catch((e) => e.retryable)).toBe(true);
   });
-  test("listLabels and createLabel: the project's labels, colours without # (GR10)", async () => {
+  test("listLabels and createLabel: the project's labels, colours without #", async () => {
     const argv: string[][] = [];
     const port = createGlab({
       cwd: "/repo",
@@ -122,7 +122,7 @@ describe("glab adapter", () => {
       ["glab", "label", "create", "--name", "norn:wf:quick", "--color", "#5319E7", "--description", "Make a small change"],
     ]);
   });
-  test("createLabel: only a conflict means the label exists; a failure that merely mentions 409 stays a failure (GR10)", async () => {
+  test("createLabel: only a conflict means the label exists; a failure that merely mentions 409 stays a failure", async () => {
     const failing = (stderr: string) => createGlab({ cwd: "/repo", exec: async () => ({ code: 1, stdout: "", stderr }) });
     const label = { name: "norn:wf:quick", color: "5319E7", description: "Make a small change" };
     expect(await failing("ERROR: 409 Conflict: {message: Label already exists}").createLabel(label).catch((e) => e.code)).toBe("glab_exists");

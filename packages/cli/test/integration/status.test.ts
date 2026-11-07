@@ -1,7 +1,7 @@
 /**
- * `norn status` is the inbox (B9, B10), the story table moved to `norn story list` (B15), a one-time
- * notice per checkout tells an upgrader where it went (B13), `status --segment` is only in
- * `help --all` (B14), and `norn inbox` is gone (B5). The inbox's own behaviour is tested where it
+ * `norn status` is the inbox, the story table moved to `norn story list`, a one-time
+ * notice per checkout tells an upgrader where it went, `status --segment` is only in
+ * `help --all`, and `norn inbox` is gone. The inbox's own behaviour is tested where it
  * was (human, inbox-why, prompts, criteria, …), now through `norn status`.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -20,11 +20,11 @@ const noticeFile = () => noticesPath(h.root);
 beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
-  h.recordVersion(); // gh-61 B5: a repo without a version shows a hint; this one is set up with this norn
+  h.recordVersion(); // A repo without a version shows a hint; this one is set up with this norn
 });
 afterAll(() => h.cleanup());
 
-describe("norn status (B9, B13)", () => {
+describe("norn status (B13)", () => {
   test("the first status on a checkout prints the notice on stderr once; stdout is the inbox either way", async () => {
     const first = await h.norn("status");
     expect(first.exit).toBe(0);
@@ -74,7 +74,7 @@ describe("norn status (B9, B13)", () => {
   });
 });
 
-describe("norn story list (B15, B6)", () => {
+describe("norn story list (B15)", () => {
   test("prints the story table, --json its data", async () => {
     const r = await h.norn("story", "list");
     expect(r.exit).toBe(0);
@@ -91,7 +91,7 @@ describe("norn story list (B15, B6)", () => {
   });
 });
 
-describe("help and removed names (B5, B14)", () => {
+describe("help and removed names (B14)", () => {
   test("norn inbox, with any flags, is an unknown command and writes nothing", async () => {
     const before = h.git(["status", "--porcelain", "--untracked-files=all", "--ignored"]);
     for (const args of [[], ["--details"], ["--history", "--since", "1d"], ["--json"]]) {

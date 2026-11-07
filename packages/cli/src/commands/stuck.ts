@@ -1,6 +1,6 @@
 /**
- * `norn stuck "<reason>"` (§9.3, §10 universal report): the agent cannot continue. The tick
- * parks the unit under Unblock (W7: `$stuck`) until a person runs `norn run rerun`.
+ * `norn stuck "<reason>"`: the agent cannot continue. The tick
+ * parks the unit under Unblock (`$stuck`) until a person runs `norn run rerun`.
  */
 import type { ReceiptOf } from "@norn/schema";
 import { defineCommand } from "../command.ts";
@@ -11,7 +11,7 @@ import { cmd } from "@norn/core";
 export const stuckCommand = defineCommand({
   name: "stuck",
   version: "exempt",
-  summary: "Report that the step cannot continue (§9.3); then end your turn",
+  summary: "Report that the step cannot continue; then end your turn",
   usage: 'norn stuck "<reason>"',
   positionals: { min: 1, max: 1 },
   markdown: true,

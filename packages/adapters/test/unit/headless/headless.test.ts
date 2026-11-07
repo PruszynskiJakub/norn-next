@@ -7,13 +7,13 @@ import { runnerLogDir, machineDir } from "@norn/store";
 import { createHeadlessRunner, headlessFactory, logPath } from "../../../src/headless/index.ts";
 
 describe("headless runner (real processes)", () => {
-  test("send is a typed unsupported error (caller resumes or starts fresh, B2)", async () => {
+  test("send is a typed unsupported error (caller resumes or starts fresh)", async () => {
     const runner = createHeadlessRunner({ logDir: tmpdir() });
     const err = await runner.send({ runner: "headless", session_id: "x" }, "hi").catch((e) => e);
     expect(err).toMatchObject({ code: "unsupported", retryable: false });
   });
 
-  test("capabilities: no send, resume, headless (R4.1); findSessions by the run's NORN_RUN env (R5.1)", async () => {
+  test("capabilities: no send, resume, headless; findSessions by the run's NORN_RUN env", async () => {
     const proc = {
       identify: async () => null,
       isAlive: async () => true,
@@ -26,7 +26,7 @@ describe("headless runner (real processes)", () => {
     expect(await runner.findSessions?.({ run_id: "01JOTHER", cwd: "/w" })).toEqual([]);
   });
 
-  test("output: the head of the run's log; null without one (B3)", async () => {
+  test("output: the head of the run's log; null without one", async () => {
     // recorded: `claude -p --allowedTools Read "<prompt>"` — the variadic flag took the prompt
     const dir = mkdtempSync(join(tmpdir(), "norn-headless-"));
     const logDir = join(dir, "trace");
@@ -39,7 +39,7 @@ describe("headless runner (real processes)", () => {
     expect(await runner.output?.({ runner: "headless", session_id: "01JNONE" })).toBeNull();
   });
 
-  test("without log_dir, logs go to store's runner log dir for the checkout: the machine dir's sessions/ (gh-195 B2, D1)", async () => {
+  test("without log_dir, logs go to store's runner log dir for the checkout: the machine dir's sessions/ (D1)", async () => {
     const root = mkdtempSync(join(tmpdir(), "norn-headless-"));
     expect(runnerLogDir(root)).toBe(join(machineDir(root), "sessions"));
     mkdirSync(runnerLogDir(root), { recursive: true });

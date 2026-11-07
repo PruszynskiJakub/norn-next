@@ -1,9 +1,9 @@
 /**
- * `norn story view [<story|slice>]` (B16, B17, D6): one story — slices with their steps, the PR, open
+ * `norn story view [<story|slice>]`: one story — slices with their steps, the PR, open
  * notes, what waits for the person; `--json` is the orient report extended, `--web` opens the PR or
- * the issue. `norn story chat [<story>]` (B29) gives the story its `<story> orient` workspace with an
+ * the issue. `norn story chat [<story>]` gives the story its `<story> orient` workspace with an
  * agent; the agent (`NORN_ORIENT=1`) is no run of the unit. Both act on the story of a slice worktree
- * (B55). `orient` is gone (B5).
+ *. `orient` is gone.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync } from "node:fs";
@@ -98,7 +98,7 @@ describe("norn story view", () => {
     expect(h.git(["status", "--porcelain"])).toBe(before);
   });
 
-  test("--json is the orient report extended with the slice steps and PR state (B6, D6)", async () => {
+  test("--json is the orient report extended with the slice steps and PR state (D6)", async () => {
     const r = await h.norn("story", "view", "gh-2", "--json");
     expect(r.exit).toBe(0);
     const v = r.value as OrientReport;
@@ -214,7 +214,7 @@ describe("targets (B55)", () => {
   });
 });
 
-describe("norn orient is gone (B5)", () => {
+describe("norn orient is gone", () => {
   test("any flags: a usage error, Unknown command: orient", async () => {
     for (const argv of [["orient"], ["orient", "gh-2"], ["orient", "gh-2", "--open"], ["orient", "gh-2", "--json"]]) {
       const r = await h.norn(...argv);

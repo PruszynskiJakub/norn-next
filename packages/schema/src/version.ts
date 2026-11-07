@@ -1,9 +1,9 @@
 /**
- * The repo's norn version (gh-61 B2, D3): the `X.Y.Z` the team file records as `norn_version`, and
+ * The repo's norn version: the `X.Y.Z` the team file records as `norn_version`, and
  * the one rule that says whether a running binary fits it. Pure.
  */
 
-/** `X.Y.Z`, the form `norn_version` takes (D4). */
+/** `X.Y.Z`, the form `norn_version` takes. */
 export const VERSION_PATTERN = "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$";
 
 /** How a running binary stands to the repo's version: it fits, or it is older or newer. */
@@ -16,7 +16,7 @@ const parts = (v: string): [number, number, number] => {
 };
 
 /**
- * B2: `running` matches `repo` when it is the same minor (before 1.0; the same major from 1.0 on)
+ * `running` matches `repo` when it is the same minor (before 1.0; the same major from 1.0 on)
  * and at least that patch (from 1.0 on: at least that minor and patch). Anything below is older,
  * anything past the line is newer.
  */

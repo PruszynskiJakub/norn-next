@@ -1,5 +1,5 @@
 # Triage workflow — example installed by `norn init`, the default for a new story
-# (config `workflow`); edit freely (W1).
+# (config `workflow`); edit freely.
 # An unattended agent checks the issue still holds on the base and posts its findings and one
 # recommendation as an issue comment, the one place the recommendation lives (the outcome is plain
 # `done`). That ends the round ($done): the person reads the comment and starts the next round with
@@ -15,7 +15,7 @@ steps:
     inputs: [spec, handoff]
     instructions: >-
       The issue is mirrored in spec.md. Post the `## Triage` comment on it and add the kind, risk and priority
-      labels (GR11): `norn:kind:bug|feature|security|chore|docs`, `norn:risk:low|medium|high`,
+      labels: `norn:kind:bug|feature|security|chore|docs`, `norn:risk:low|medium|high`,
       `norn:priority:low|medium|high|extreme`; a label missing on the remote is named in the comment with
       "norn upgrade creates it". That comment and those labels are the only remote writes this step allows,
       an exception to the norn skill's rule; never remove a label, the intake label `norn` included. Change no file, spec.md included,

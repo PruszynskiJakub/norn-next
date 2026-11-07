@@ -47,7 +47,7 @@ const checkLease = (): LeaseFile => ({ version: 1, kind: "check", repo: "/x", st
 
 /**
  * The story unit of `gh-1` on `wf`, its state patched, with a live run's facts when `run` is given.
- * Its refine is recorded as finished (GR8), so a cursor past refine does not mirror first.
+ * Its refine is recorded as finished, so a cursor past refine does not mirror first.
  */
 function story(wf: Workflow, patch: Partial<UnitState> = {}, run: Partial<RunFacts> | null = null, sf: Partial<StoryFacts> = {}, uf: Partial<UnitFacts> = {}): StoryFacts {
   const unit = storyUnit();
@@ -95,7 +95,7 @@ function cases(): RuleCase[] {
   // ---- repo and claims
   out.push(c("dead lease files are reclaimed", "leases.reclaim", facts([], machine({ dead_lease_files: ["agent-1.json"] }))));
   out.push(
-    c("a unit worktree lost its .norn-unit: act writes it back (gh-195/05, B2)", "worktree.marker", {
+    c("a unit worktree lost its .norn-unit: act writes it back", "worktree.marker", {
       ...facts([story(SOLO_WF)]),
       unmarked: [{ path: "/r-worktrees/gh-1-login", marker: { repo: "/r", story: "gh-1", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-1-login" } }],
     }),
@@ -103,7 +103,7 @@ function cases(): RuleCase[] {
   out.push(c("an unreadable claim ref", "claim.corrupt", facts([story(SOLO_WF, {}, null, { claim: { state: "corrupt", sha: "c9", error: { file: "refs/norn/claims/gh-1", errors: [{ path: "", message: "invalid JSON" }] } } })])));
   out.push(c("a story file that failed validation", "story.corrupt", facts([story(SOLO_WF, {}, null, { frontmatter: null, frontmatter_error: { file: ".agents/specs/gh-1-login/story.md", errors: [{ path: "/id", message: "bad" }] } })])));
 
-  // ---- remote mirror (GR8)
+  // ---- remote mirror
   {
     const s = story(SOLO_WF);
     out.push(c("the issue title changed", "remote.mirror", facts([{ ...s, issue: { ...s.issue!, title: "Login form v2" } }])));
@@ -112,13 +112,13 @@ function cases(): RuleCase[] {
     out.push(c("the issue body changed after refine", "remote.mirror.body_changed", facts([{ ...s, issue: { ...s.issue!, body: "new body" } }])));
   }
 
-  // ---- mailbox (T9)
+  // ---- mailbox
   {
     const s = story(SOLO_WF);
     out.push(c("an unreadable mailbox receipt", "mailbox.reject", facts([{ ...s, mailbox: [{ ref: "refs/norn/mailbox/gh-1/01JFFFFFFFFFFFFFFFFFFFFFFF", sha: "m1", id: "01JFFFFFFFFFFFFFFFFFFFFFFF", receipt: null, error: null }] }])));
   }
 
-  // ---- superseded records (gh-195 D11, B27, R2.3)
+  // ---- superseded records
   {
     const s = story(SOLO_WF);
     const other = { state: "other" as const, sha: "c2", blob: { ...(s.claim as Extract<StoryFacts["claim"], { state: "mine" }>).blob, holder: "ann@pc", heartbeat_id: OTHER_RUN } };
@@ -135,7 +135,7 @@ function cases(): RuleCase[] {
     out.push(c("the story names a workflow that does not exist", "start.workflow_invalid", facts([fresh("nope")])));
     out.push(c("the story worktree is missing at start", "start.no_worktree", facts([fresh("solo", noWorktree, { worktree: null })])));
     // gh-195/10 review#2 F3: a checkout cut short left the record on its ref but not in the machine dir
-    // gh-195/10 review#2 F1 (B33): a story held here from its record alone, nothing pending
+    // gh-195/10 review#2 F1: a story held here from its record alone, nothing pending
     out.push(c("a story held from its record without a branch", "story.record_only", facts([story(SOLO_WF, ready("implement"), null, { record_only: true, frontmatter: null, worktree: null })])));
     out.push(c("the story's record ref is here but its run state is not", "start.record_unplaced", facts([fresh("solo", {}, { record_unplaced: "0123456789abcdef0123456789abcdef01234567" })])));
   }
@@ -149,14 +149,14 @@ function cases(): RuleCase[] {
   out.push(c("the pinned workflow changed outside norn", "workflow.drift", facts([story(SOLO_WF, {}, null, {}, { workflow_hash: "edited" })])));
   out.push(c("a rebase waits in the unit's worktree past the step's deadline", "unit.rebase_in_progress", facts([story(SOLO_WF, running("implement", 2 * HOUR), null, {}, { worktree: { ...worktree(STORY_WT), in_progress: { operation: "rebase", unmerged: ["X.txt"] } } })])));
   out.push(c("a ready unit whose cursor is $done", "unit.no_step", facts([story(SOLO_WF, ready("$done"))])));
-  // gh-71 D7 (B34): a held story whose record is still flat moves into round 1 first
-  // gh-195/06 (B34, D13): run state an older norn left on a held unit's branch
+  // A held story whose record is still flat moves into round 1 first
+  // Run state an older norn left on a held unit's branch
   const onBranch = { branch_record: { path: ".agents/specs/gh-1-login/runs", copy: ["_story"], holds: ["_story"] }, record: "_story" };
   out.push(c("a held story's flat record still on its branch moves into round 1 of the machine dir", "record.move", facts([story(STORY_WF, { step: "slices" }, null, {}, onBranch)])));
   out.push(
-    c("a story's branch run state waits out a merge in its worktree (H1)", "record.move_waits", facts([story(STORY_WF, { step: "slices" }, null, {}, { ...onBranch, worktree: { ...worktree(STORY_WT), in_progress: { operation: "merge", unmerged: [] } } })])),
+    c("a story's branch run state waits out a merge in its worktree", "record.move_waits", facts([story(STORY_WF, { step: "slices" }, null, {}, { ...onBranch, worktree: { ...worktree(STORY_WT), in_progress: { operation: "merge", unmerged: [] } } })])),
   );
-  // gh-195/08 (B10, D4): under record.policy remote, a held story whose record changed since the ref it last saw
+  // Under record.policy remote, a held story whose record changed since the ref it last saw
   out.push(
     c(
       "a held story's record changed under the remote policy: push it after the branch",
@@ -166,14 +166,14 @@ function cases(): RuleCase[] {
     ),
   );
   out.push(c("a held story with a flat record", "round.migrate", facts([story(STORY_WF, { step: "slices" }, null, {}, { record: "runs/_story" })])));
-  // gh-71 D5 (B35): an older norn's remote park on a finished round is dropped by the holder's tick
+  // An older norn's remote park on a finished round is dropped by the holder's tick
   out.push(c("a finished round an older norn parked for the issue", "remote.unpark_finished", facts([{ ...story(STORY_WF, { step: "$done", status: "stuck", park: { kind: "remote", reason: "remote: issue closed, unassigned or unlabelled", since: at() } }, null, {}, { record: "runs/_story/rounds/01-story" }), issue: null }])));
-  // gh-71 D5 (B22, GR6b): the issue closed on a finished round with no PR closes the story
+  // The issue closed on a finished round with no PR closes the story
   {
     const s = story(STORY_WF, { step: "$done", status: "done", park: null }, null, {}, { record: "runs/_story/rounds/01-story" });
     out.push(c("the issue closed on a finished round with no PR", "remote.issue_closed", facts([{ ...s, issue: { ...(s.issue as NonNullable<typeof s.issue>), state: "closed" } }])));
   }
-  // gh-71 D1 (B1, B6): a round receipt on a finished round starts the next round; stale or changed ones are rejected
+  // A round receipt on a finished round starts the next round; stale or changed ones are rejected
   {
     const done = stateFor(storyUnit(), SOLO_WF, { step: "$done", status: "done", park: null });
     const roundOn = (p: Record<string, unknown>, st: Pick<UnitState, "step" | "attempt" | "run"> = done) =>
@@ -189,7 +189,7 @@ function cases(): RuleCase[] {
     out.push(c("a receipt for another step is rejected", "receipts.reject", facts([story(SOLO_WF, {}, null, {}, { unapplied: [numbered(1, r)] })])));
   }
   {
-    // GR7: the story unit parked on a remote change halts its ready slices
+    // The story unit parked on a remote change halts its ready slices
     const s = story(STORY_WF, { status: "stuck", step: "slices", park: { kind: "remote", reason: "remote: issue closed", since: at() } });
     const slice = sliceAt("01", "form", {}, { worktree: worktree("/r-worktrees/gh-1-login--01-form") });
     out.push(c("a ready slice of a story parked on the remote", "story.halted", facts([{ ...s, issue: null, units: [...s.units, slice], slices: [sliceFile("gh-1", "01", "form", [], "active")] }])));
@@ -198,7 +198,7 @@ function cases(): RuleCase[] {
   // ---- agent steps: start
   out.push(c("auto requested but no runner", "agent.ready.manual.no_runner", facts([story(SOLO_WF)], machine({ runner: null }))));
   out.push(c("the unit worktree is missing", "agent.no_worktree", facts([story(SOLO_WF, {}, null, { worktree: null }, noWorktree)])));
-  // gh-61 B18 (D6): bundled skills in the unit's worktree differ from the running norn's
+  // Bundled skills in the unit's worktree differ from the running norn's
 
   // ---- agent steps: running
   out.push(c("an attended run in progress", "agent.attended.running", facts([story(STORY_WF, running("refine"), {})])));
@@ -217,7 +217,7 @@ function cases(): RuleCase[] {
   out.push(c("nudges used up: stuck", "agent.silent.stuck", facts([story(SOLO_WF, running("implement", MIN, { nudges_used: 2 }), { hooks: [hook("turn_end")] })])));
   out.push(c("a declared stalled route moves to another step", "agent.stalled.route", facts([story(ROUTED_WF, running("implement", 20 * MIN), { last_activity_at: T0 - 20 * MIN })])));
   {
-    // R4.2: resume instead of send, but max_agents is full and the lease is not the run's own
+    // Resume instead of send, but max_agents is full and the lease is not the run's own
     const run = running("implement");
     const st = { ...run, run: { ...run.run!, agent_session_id: "sess-1" } } as Partial<UnitState>;
     out.push(
@@ -230,7 +230,7 @@ function cases(): RuleCase[] {
     );
   }
 
-  // ---- answers (B2) resumed in a fresh process
+  // ---- answers resumed in a fresh process
   {
     const parked = (uf: Partial<UnitFacts>) => {
       const run = running("implement");
@@ -253,11 +253,11 @@ function cases(): RuleCase[] {
   // ---- gates and git steps
   out.push(c("a ready unit at a gate step", "gate.wait", facts([story(STORY_WF, ready("ready"))])));
   out.push(c("a git step with no worktree", "git.no_worktree", facts([story(STORY_WF, ready("open-pr"), null, { worktree: null, pr: null }, noWorktree)])));
-  out.push(c("open-pr with a PR already open runs again: the body is updated (GR9, main 0.9.x)", "git.open-pr", facts([story(STORY_WF, ready("open-pr"), null, { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "h" } })])));
+  out.push(c("open-pr with a PR already open runs again: the body is updated (main 0.9.x)", "git.open-pr", facts([story(STORY_WF, ready("open-pr"), null, { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "h" } })])));
   out.push(c("a push step", "git.push", facts([story(GIT_WF, ready("push"))])));
   out.push(c("an update step with no base observed", "git.update.no_base", facts([story(GIT_WF, ready("update"))])));
   {
-    // K6: one integration per story per tick — two slices at integrate, then a slice before a story update
+    // One integration per story per tick — two slices at integrate, then a slice before a story update
     const files = [sliceFile("gh-1", "01", "form", [], "active"), sliceFile("gh-1", "02", "api", [], "active")];
     const a = sliceAt("01", "form", ready("integrate"), { worktree: worktree("/r-worktrees/gh-1-login--01-form") });
     const b = sliceAt("02", "api", ready("integrate"), { worktree: worktree("/r-worktrees/gh-1-login--02-api") });
@@ -267,7 +267,7 @@ function cases(): RuleCase[] {
     out.push(c("a story update after a slice integrate in the same tick", "git.update.queued", facts([{ ...upd, slices: [files[0] as StoryFacts["slices"][number]], units: [a, ...upd.units] }])));
   }
 
-  // ---- slices (W2)
+  // ---- slices
   out.push(c("no slice files", "slices.none", facts([atSlices([])])));
   out.push(
     c(
@@ -293,7 +293,7 @@ function cases(): RuleCase[] {
   );
   out.push(c("a slice names a workflow that does not exist", "slices.workflow_invalid", facts([atSlices([sliceFile("gh-1", "01", "form", [], "planned", "nope")])])));
   {
-    // §10: the slices step parked the story stuck (its classify receipt) and a slice can start now
+    // The slices step parked the story stuck (its classify receipt) and a slice can start now
     const rid = "01JGGGGGGGGGGGGGGGGGGGGGGG";
     const s = atSlices([sliceFile("gh-1", "01", "form")], [], {
       status: "stuck",

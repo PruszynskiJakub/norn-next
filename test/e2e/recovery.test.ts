@@ -1,8 +1,8 @@
 /**
- * Auto-mode recovery (R1–R3): two clones of one bare remote.
+ * Auto-mode recovery: two clones of one bare remote.
  *   - R1.2: a renewal that loses its CAS stops the story's other actions in that tick.
  *   - H5: the renewals due in a tick go out in one claim push; one lost among them fails alone.
- *   - R2.3, T7a (gh-195 D11): the checkout that lost the claim sets its record aside as superseded in its
+ * - R2.3, T7a: the checkout that lost the claim sets its record aside as superseded in its
  *     machine dir, pushes nothing and shows one Check item.
  *   - R3.1: the loser of an intake race removes its local intake.
  *   - R3.3: release refuses a push that is not a fast-forward and keeps the claim.
@@ -82,7 +82,7 @@ const all = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop").map(
 async function setup(h: Harness, n: number, title: string): Promise<void> {
   expect((await h.norn("init")).exit).toBe(0);
   h.config(CONFIG);
-  h.recordVersion(); // gh-61 B5: set up with this norn, so no version hint
+  h.recordVersion(); // Set up with this norn, so no version hint
   h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
@@ -90,7 +90,7 @@ async function setup(h: Harness, n: number, title: string): Promise<void> {
   h.remote.issues = [issue(n, title)];
 }
 
-describe("a claim lost mid-run (R1.2, R2.3)", () => {
+describe("a claim lost mid-run", () => {
   let h: Harness;
   let A: Clone;
   let B: Clone;
@@ -131,7 +131,7 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
     expect(remoteHead()).toBe(head);
   });
 
-  test("R2.3, T7a (gh-195 D11, B27): the non-holder sets its record aside as superseded, pushes nothing and shows one Check item", async () => {
+  test("R2.3, T7a (B27): the non-holder sets its record aside as superseded, pushes nothing and shows one Check item", async () => {
     step();
     const done = readdirSync(join(storyRuns(A.root), "receipts")).find((f) => f.endsWith("-done.json")) as string;
     const round = relative(storyRunStateDir(A.root, { key: "gh-9", spec_dir: SPEC }), storyRuns(A.root));
@@ -158,7 +158,7 @@ describe("a claim lost mid-run (R1.2, R2.3)", () => {
   });
 });
 
-describe("renewals due together go out in one push (H5, R1.2)", () => {
+describe("renewals due together go out in one push", () => {
   let h: Harness;
   let A: Clone;
   const N = 3;
@@ -170,7 +170,7 @@ describe("renewals due together go out in one push (H5, R1.2)", () => {
     await setup(h, 1, "Story 1");
     h.remote.issues = Array.from({ length: N }, (_, i) => issue(i + 1, `Story ${i + 1}`));
     // tick only until every story's agent runs, then once more: 6 * N fixed ticks ran ~14 of them as
-    // no-ops and kept this hook near its 30 s limit on a loaded machine (gh-181)
+    // no-ops and kept this hook near its 30 s limit on a loaded machine
     const allRunning = () => Array.from({ length: N }, (_, i) => h.state(storyRuns(i + 1))?.status).every((s) => s === "running");
     for (let i = 0; i < 6 * N && !allRunning(); i++) {
       await A.tick();
@@ -206,7 +206,7 @@ describe("renewals due together go out in one push (H5, R1.2)", () => {
   });
 });
 
-describe("intake race and release (R3.1, R3.3)", () => {
+describe("intake race and release", () => {
   let h: Harness;
   let A: Clone;
   let B: Clone;

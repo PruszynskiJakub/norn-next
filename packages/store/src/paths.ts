@@ -1,7 +1,7 @@
 /**
- * Repository layout (§7). Every function returns an absolute path from a root
+ * Repository layout. Every function returns an absolute path from a root
  * (the main checkout or a story worktree — both hold the same relative layout).
- * The checkout's machine-local files live outside it, in the machine dir (B5, D1).
+ * The checkout's machine-local files live outside it, in the machine dir.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
@@ -9,18 +9,18 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { CONFIG_FILES, LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, treeHandoffPath, unitHandoffPath } from "@norn/schema";
 
-/** gh-110 B1, B2 (D1): the committed repo config and workflows, relative to a root, as messages name them. */
+/** The committed repo config and workflows, relative to a root, as messages name them. */
 export const REPO_CONFIG_FILE = CONFIG_FILES.repo;
-/** gh-64 B3: your settings for this repo (gitignored). */
+/** Your settings for this repo (gitignored). */
 export const LOCAL_CONFIG_FILE = CONFIG_FILES.local;
-/** gh-64 B50, B55 (D14): the JSON schema copies editors read through the starters' modelines. */
+/** The JSON schema copies editors read through the starters' modelines. */
 export const REPO_CONFIG_SCHEMA_FILE = ".agents/norn.config.schema.json";
 export const LOCAL_CONFIG_SCHEMA_FILE = ".agents/norn.config.local.schema.json";
 /** under the norn home, next to `config.yaml` */
 export const USER_CONFIG_SCHEMA_FILE = "config.schema.json";
 export const WORKFLOWS_DIR = ".agents/workflows";
 
-/** gh-110 D4: the old layout's places, relative to the main checkout; only refused and moved from, never read. */
+/** The old layout's places, relative to the main checkout; only refused and moved from, never read. */
 export const OLD_NORN_DIR = ".agents/norn";
 export const OLD_CONFIG_FILE = ".agents/norn/config.yaml";
 export const OLD_WORKFLOWS_DIR = ".agents/norn/workflows";
@@ -28,7 +28,7 @@ export const OLD_TRACE_DIR = ".agents/norn/trace";
 
 export const repoConfigPath = (root: string) => join(root, REPO_CONFIG_FILE);
 export const workflowsDir = (root: string) => join(root, WORKFLOWS_DIR);
-/** Whether norn is set up in this checkout (CP13: the cockpit falls back to the last repo otherwise). */
+/** Whether norn is set up in this checkout (the cockpit falls back to the last repo otherwise). */
 export const isNornRepo = (root: string) => existsSync(repoConfigPath(root)) || existsSync(workflowsDir(root));
 
 /** The checkout a root belongs to: its git common dir (real path) and the main checkout's path. */
@@ -37,7 +37,7 @@ export interface CheckoutOf {
   common: string;
   /** the main checkout (the common dir's parent), or the root outside git */
   checkout: string;
-  /** D2: `<folder>-<first 8 hex of sha256(common)>` */
+  /** `<folder>-<first 8 hex of sha256(common)>` */
   id: string;
 }
 
@@ -66,7 +66,7 @@ function gitDirAt(dir: string): string | null {
 const checkouts = new Map<string, CheckoutOf>();
 
 /**
- * D2: which checkout `root` belongs to, from the files git keeps (no git process): walk up to a `.git`,
+ * Which checkout `root` belongs to, from the files git keeps (no git process): walk up to a `.git`,
  * follow a linked worktree's `gitdir:` and its `commondir`, take the real path. Every worktree of one
  * repository resolves to the same common dir, so all share one machine dir; two clones never do.
  * `root` is a located checkout (or a unit worktree), so the walk-up only matters for a path inside one;
@@ -123,21 +123,21 @@ export function unbindNornHome(root: string): void {
 /** The norn home `root`'s machine dir lives in. */
 const machineHomeOf = (root: string) => homes.get(checkoutOf(root).common) ?? nornHome();
 
-/** B5, D1: the checkout's machine-local files (trace, locks, heartbeat, caches), `<norn home>/repos/<id>/`. */
+/** The checkout's machine-local files (trace, locks, heartbeat, caches), `<norn home>/repos/<id>/`. */
 export const machineDir = (root: string) => join(machineReposDir(machineHomeOf(root)), checkoutOf(root).id);
 export const machineReposDir = (home: string) => join(home, "repos");
-/** D3: names the checkout a machine dir belongs to, so doctor can tell an orphan after a repo folder moved. */
+/** Names the checkout a machine dir belongs to, so doctor can tell an orphan after a repo folder moved. */
 export const checkoutFilePath = (dir: string) => join(dir, "checkout.json");
-/** D9, gh-195 D1: the headless runner's default session log dir, the machine dir's `sessions/` (`runs/` holds run state, S12). */
+/** The headless runner's default session log dir, the machine dir's `sessions/` (`runs/` holds run state). */
 export const runnerLogDir = (root: string) => join(machineDir(root), "sessions");
-/** Local tick lock (H1); in the machine dir. */
+/** Local tick lock; in the machine dir. */
 export const tickLockPath = (root: string) => join(machineDir(root), "tick.lock");
-/** D6: where an older norn took the tick lock; `norn upgrade` takes it there. */
+/** Where an older norn took the tick lock; `norn upgrade` takes it there. */
 export const oldTickLockPath = (root: string) => join(root, OLD_TRACE_DIR, "tick.lock");
-/** K6/BS3: a story's integrate lock — slice integrations and base updates of one story never interleave. */
+/** A story's integrate lock — slice integrations and base updates of one story never interleave. */
 export const integrateLockPath = (root: string, story: string) => join(machineDir(root), `integrate-${story}.lock`);
 
-/** Machine-local runtime files of one checkout, in the machine dir (B5). */
+/** Machine-local runtime files of one checkout, in the machine dir. */
 export const heartbeatFilePath = (root: string) => join(machineDir(root), "heartbeat.json");
 export const actFailuresPath = (root: string) => join(machineDir(root), "failures.json");
 export const remoteCachePath = (root: string) => join(machineDir(root), "remote.json");
@@ -147,16 +147,16 @@ export const foreignCommitsPath = (root: string) => join(machineDir(root), "fore
 export const inboxOpenPath = (root: string) => join(machineDir(root), "inbox.json");
 export const baseFactsPath = (root: string) => join(machineDir(root), "base.json");
 export const noticesPath = (root: string) => join(machineDir(root), "notices.json");
-/** gh-195 D12 (B21): the mailbox receipts this checkout's ticks rejected, next to the notices */
+/** The mailbox receipts this checkout's ticks rejected, next to the notices */
 export const rejectedReceiptsPath = (root: string) => join(machineDir(root), "rejected.json");
-/** gh-195 D11 (B27): records set aside as superseded, `superseded/<story>-<ulid>/` in the machine dir */
+/** Records set aside as superseded, `superseded/<story>-<ulid>/` in the machine dir */
 export const supersededDir = (root: string) => join(machineDir(root), "superseded");
-/** gh-195 13-R3-F2: the lock around a read-modify-write of `rejected.json` (a tick's keep, tidy's prune). */
+/** The lock around a read-modify-write of `rejected.json` (a tick's keep, tidy's prune). */
 export const rejectedLockPath = (root: string) => join(machineDir(root), "rejected.lock");
 export const prFactsPath = (root: string) => join(machineDir(root), "pr.json");
 export const issueFactsPath = (root: string) => join(machineDir(root), "issue.json");
 /**
- * B5 (D3): a unit's hook file — `hooks/<story>/_story.jsonl` for the story unit,
+ * A unit's hook file — `hooks/<story>/_story.jsonl` for the story unit,
  * `hooks/<story>/<nn>.jsonl` for a slice.
  */
 export function hookFilePath(root: string, unit: { story: string; slice?: string | null }): string {
@@ -164,20 +164,20 @@ export function hookFilePath(root: string, unit: { story: string; slice?: string
   if (unit.slice && !nn) throw new Error(`not a slice key: ${unit.slice}`);
   return join(hooksDir(root), unit.story, `${nn ?? STORY_UNIT_DIR}.jsonl`);
 }
-/** B5 (D3): the machine dir's `hooks/`, one folder per story holding its units' hook files. */
+/** The machine dir's `hooks/`, one folder per story holding its units' hook files. */
 export const HOOKS_DIR = "hooks";
 export const hooksDir = (root: string) => join(machineDir(root), HOOKS_DIR);
-/** D5: the one-time backfill of the hook files from the day files (`hooks/backfill.json`). */
+/** The one-time backfill of the hook files from the day files (`hooks/backfill.json`). */
 export const hookBackfillPath = (root: string) => join(hooksDir(root), "backfill.json");
-/** GR6: the base branch's `.agents/specs/` materialized per tree id (store/base.ts). */
+/** The base branch's `.agents/specs/` materialized per tree id (store/base.ts). */
 export const baseCacheDir = (root: string) => join(machineDir(root), "base");
-/** gh-195 D6, D7 (B29): finished stories' records unpacked from their archive ref, one folder per record commit (`archive/<story>/<commit>/`, record-ref.ts). */
+/** Finished stories' records unpacked from their archive ref, one folder per record commit (`archive/<story>/<commit>/`, record-ref.ts). */
 export const archiveCacheDir = (root: string, story: string) => join(machineDir(root), "archive", story);
 
 export const specsDir = (root: string) => join(root, SPECS_DIR);
 export const storyDir = (root: string, story: string, slug: string) => join(specsDir(root), storyDirName(story, slug));
 /**
- * GR2: the story's spec file — `spec.md`, or `story.md` in a folder an older norn intook and that has
+ * The story's spec file — `spec.md`, or `story.md` in a folder an older norn intook and that has
  * no `spec.md` yet. Both readers and writers go through here, so such a folder keeps its name.
  */
 export function storyFile(specDir: string): string {
@@ -194,15 +194,15 @@ export const receiptsDir = (ud: string) => join(ud, "receipts");
 export const logPath = (ud: string, runId: string) => join(ud, "logs", `${runId}.log`);
 export const evidenceDir = (ud: string, runId: string) => join(ud, "evidence", runId);
 /**
- * The resolver for a unit's handoff (gh-195 prefactor 2, B6, B39), keyed by the unit (`_story` or
- * `<nn>-<slug>`), not by its record folder: `<spec folder>/handoffs/<unit>.md` (gh-195/07, D9). Every
+ * The resolver for a unit's handoff, keyed by the unit (`_story` or
+ * `<nn>-<slug>`), not by its record folder: `<spec folder>/handoffs/<unit>.md`. Every
  * reader and writer of a handoff goes through here.
  */
 export const handoffPath = (specDir: string, unit: string) => join(specDir, unitHandoffPath(unit));
-/** gh-195/07 (B34, D13 step 2): an older norn's handoff of `unit` in a tree's spec folder, `runs/<unit>/handoff.md`; only the record move reads it. */
+/** An older norn's handoff of `unit` in a tree's spec folder, `runs/<unit>/handoff.md`; only the record move reads it. */
 export const treeHandoffFile = (specDir: string, unit: string) => join(specDir, treeHandoffPath(unit));
 
-/** Worktree marker files (A3, K4), machine-local: never committed (§7.1). */
+/** Worktree marker files, machine-local: never committed. */
 export const UNIT_MARKER_FILE = ".norn-unit";
 export const ENV_NORN_FILE = ".env.norn";
 export const WORKTREE_LOCAL_FILES = [ENV_NORN_FILE, UNIT_MARKER_FILE] as const;
@@ -215,6 +215,6 @@ export function nornHome(override?: string, env: Record<string, string | undefin
 }
 export const userConfigPath = (home: string) => join(home, "config.yaml");
 export const leasesDir = (home: string) => join(home, "leases");
-/** Check orders a tick hands a detached `norn check-run` (C5): `<run_id>.json`, removed by that process. */
+/** Check orders a tick hands a detached `norn check-run`: `<run_id>.json`, removed by that process. */
 export const checkOrdersDir = (home: string) => join(home, "checks");
 export const checkOrderPath = (home: string, runId: string) => join(checkOrdersDir(home), `${runId}.json`);

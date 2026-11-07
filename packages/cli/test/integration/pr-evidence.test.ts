@@ -1,5 +1,5 @@
 /**
- * gh-195/15 (B28, B11; D5): the describe agent links QA evidence in `pr.md` by its path in the story's
+ * The describe agent links QA evidence in `pr.md` by its path in the story's
  * record (`evidence/<unit>/<run_id>/<file>`); `open-pr` pushes the record to `refs/norn/runs/<story>`
  * (under `local` too), rewrites each such link to that record commit's URL, then opens or updates the
  * PR. A link the record does not hold is left as written and named; a rejected record push fails the
@@ -39,7 +39,7 @@ steps:
     outcomes: { approve: $done, reject: { to: qa, counter: loop } }
 counters: { loop: { max: 3 } }
 `;
-// no record.policy: the default `local` (B11) — open-pr pushes the record all the same
+// no record.policy: the default `local` — open-pr pushes the record all the same
 const CONFIG = "provider: gh\nworkflow: ship\nmode: manual\n";
 
 let h: Harness;
@@ -117,13 +117,13 @@ describe("PR evidence links to the story's record (B28, D5)", () => {
   test("AC1, AC2, AC4: the record is pushed before the PR opens, record links rewritten to it, a missing one left as written and named", async () => {
     const run = await qaWithEvidence();
     const brief = await describeWith(`## Evidence\n\n![B2 after](evidence/_story/${run}/shot.png)\n\n![gone](evidence/_story/NOPE/gone.png)\n`);
-    // AC4: the `record` input lists the story's receipts and evidence folders in the machine dir
+    // The `record` input lists the story's receipts and evidence folders in the machine dir
     const record = brief.inputs.filter((i) => i.kind === "record");
     expect(record.map((i) => i.ref)).toEqual([`${runs()}/receipts/`, `${runs()}/evidence/`]);
     expect(record[1]?.label).toContain("evidence/_story/<run_id>/<file>");
     expect(remoteRecord()).toBeNull();
 
-    // AC1: the record ref is on the remote when the PR is opened
+    // The record ref is on the remote when the PR is opened
     let atOpen: string | null | undefined;
     const open = h.remote.openDraftPullRequest.bind(h.remote);
     h.remote.openDraftPullRequest = async (o): Promise<RemotePullRequest> => {
@@ -137,7 +137,7 @@ describe("PR evidence links to the story's record (B28, D5)", () => {
     const path = `_story/rounds/01-ship/evidence/${run}/shot.png`;
     expect(remoteFiles(sha as string)).toContain(path);
     expect(body()).toContain(`![B2 after](https://github.com/o/r/blob/${sha}/${path}?raw=true)`);
-    // AC2: a link to a file the record does not hold is left as written and named in the step's output
+    // A link to a file the record does not hold is left as written and named in the step's output
     expect(body()).toContain("![gone](evidence/_story/NOPE/gone.png)");
     expect(openPrDetail()).toContain("evidence/_story/NOPE/gone.png");
     first = { sha: sha as string, run };

@@ -1,5 +1,5 @@
 /**
- * Human verbs and views through the CLI (§15, O1, O2, O5, S7, W9, T8, T9): inbox / status / trace /
+ * Human verbs and views through the CLI: inbox / status / trace /
  * why read via @norn/view and the trace; story answer / approve / reject / edit and run rerun write receipts
  * the next tick applies; a non-holder clone posts to the mailbox the holder's tick imports.
  */
@@ -82,12 +82,12 @@ const refused = (r: CliResult, code: string) => {
   expect(r.exit).toBe(3);
   expect(r.value).toMatchObject({ code, do_instead: expect.any(String) });
 };
-/** §9.3: a claim held by another heartbeat is "busy" (exit 5), the same for every verb. */
+/** A claim held by another heartbeat is "busy" (exit 5), the same for every verb. */
 const held = (r: CliResult) => {
   expect(r.exit).toBe(5);
   expect(r.value).toMatchObject({ code: "claim_held", do_instead: expect.any(String) });
 };
-/** gh-71 AC8: every file of a story's run state (path → content; S12: in the machine dir) and the worktree's branch head — a refusal changes neither. */
+/** Every file of a story's run state (path → content; S12: in the machine dir) and the worktree's branch head — a refusal changes neither. */
 const recordSnapshot = (wt: string, spec: string) => {
   const dir = storyRunStateOf(join(wt, spec));
   const files = readdirSync(dir, { recursive: true, withFileTypes: true })
@@ -102,7 +102,7 @@ beforeAll(async () => {
   h = await createHarness();
   expect((await h.norn("init")).exit).toBe(0);
   h.config(CONFIG);
-  h.recordVersion(); // gh-61 B5: set up with this norn, so no version hint
+  h.recordVersion(); // Set up with this norn, so no version hint
   h.write(join(workflowsDir(h.root), "gated.yaml"), GATED);
   h.write(join(workflowsDir(h.root), "alt.yaml"), ALT);
   h.write(join(workflowsDir(h.root), "sliced.yaml"), SLICED);
@@ -115,12 +115,12 @@ beforeAll(async () => {
 afterAll(() => h.cleanup());
 
 describe("before start", () => {
-  test("intake; story edit --workflow sets frontmatter (W9, B31) and refuses unknown names and --at", async () => {
+  test("intake; story edit --workflow sets frontmatter (B31) and refuses unknown names and --at", async () => {
     await tick();
     refused(await h.norn("story", "edit", "gh-6", "--workflow", "nope"), "unknown_workflow");
     refused(await h.norn("story", "edit", "gh-6", "--workflow", "alt", "--at", "draft"), "not_started");
-    // gh-196 D3 (B34): --reason (with or without --delegated) is kept only on a round receipt; before start it is refused, never dropped
-    // P8: the unit's state says no, so a refusal with a code, not a usage error
+    // --reason (with or without --delegated) is kept only on a round receipt; before start it is refused, never dropped
+    // The unit's state says no, so a refusal with a code, not a usage error
     for (const extra of [["--reason", "why"], ["--reason", "why", "--delegated"]]) refused(await h.norn("story", "edit", "gh-6", "--workflow", "alt", ...extra), "not_a_round_start");
     const r = await h.norn("story", "edit", "gh-6", "--workflow", "alt");
     expect(r.exit).toBe(0);
@@ -140,7 +140,7 @@ describe("before start", () => {
   });
 });
 
-describe("views (X1)", () => {
+describe("views", () => {
   test("story list: the table and its JSON, as status printed them (B15)", async () => {
     const all = await h.norn("story", "list", "--json");
     expect((all.value as { stories: Array<{ key: string }> }).stories.map((s) => s.key)).toEqual(["gh-5", "gh-6"]);
@@ -153,7 +153,7 @@ describe("views (X1)", () => {
     expect(text.stdout).toContain("gh-6 Export report");
   });
 
-  test("status: running items; the rest empty (B9)", async () => {
+  test("status: running items; the rest empty", async () => {
     const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ story: string }>>; pending: number };
     expect(inbox.groups.running?.map((i) => i.story).sort()).toEqual(["gh-5", "gh-6"]);
     expect(inbox.pending).toBe(0);
@@ -171,14 +171,14 @@ describe("preconditions refuse with do_instead", () => {
   });
 });
 
-describe("story edit --workflow after start: a new round (gh-71 D3, D4, B9, B10)", () => {
+describe("story edit --workflow after start: a new round (D4, B9, B10)", () => {
   test("an unfinished round is refused; --at must exist; a finished round gets a round receipt the tick applies at --at", async () => {
-    // gh-71 B10: no in-place switch of a story any more — its round is not finished
+    // No in-place switch of a story any more — its round is not finished
     const unfinished = await h.norn("story", "edit", "gh-6", "--workflow", "gated", "--at", "review");
     refused(unfinished, "round_unfinished");
     expect(unfinished.value).toMatchObject({ error: "gh-6's alt round is not finished; pass --force to end it and start a gated round", do_instead: "norn story edit gh-6 --workflow gated --force --at review" });
     refused(await h.norn("story", "edit", "gh-6", "--workflow", "gated", "--at", "nope"), "unknown_step");
-    // gh-71 B15 (D3): --at alone is no longer a usage error; it moves the cursor within the round's own workflow
+    // --at alone is no longer a usage error; it moves the cursor within the round's own workflow
     const alone = await h.norn("story", "edit", "gh-6", "--at", "review");
     refused(alone, "unknown_step");
     expect(alone.value).toMatchObject({ error: "no step 'review' in gh-6's alt workflow", do_instead: "norn story edit gh-6 --at <draft>" });
@@ -199,7 +199,7 @@ describe("story edit --workflow after start: a new round (gh-71 D3, D4, B9, B10)
   });
 });
 
-describe("answer (O2, B2)", () => {
+describe("answer", () => {
   test("parked ask shows in the inbox with the exact command; answer → receipt → delivered to the same session", async () => {
     h.report(runs5(), "ask", { question: "Which currency?" });
     await tick();
@@ -207,7 +207,7 @@ describe("answer (O2, B2)", () => {
     expect(st).toMatchObject({ status: "parked", park: { kind: "ask", reason: "Which currency?" } });
     const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ command: string }>> };
     expect(inbox.groups.answer?.[0]?.command).toBe('norn story answer gh-5 "…"');
-    // B9: one gate and one ask → the Approve and Answer groups, each item with its age and command
+    // One gate and one ask → the Approve and Answer groups, each item with its age and command
     const text = await h.norn("status");
     expect(text.exit).toBe(0);
     expect(text.stdout).toMatch(/^Answer \(1\) · .*\n  gh-5 +round 1 · gated · work: Which currency\? · \d+[smhd]\S*\n(?: {6}.*\n)*? {6}\$ norn story answer gh-5 "…"\n/m);
@@ -217,7 +217,7 @@ describe("answer (O2, B2)", () => {
     expect(r.exit).toBe(0);
     const v = r.value as Verb;
     expect(v.delivered).toMatchObject({ via: "local", claim: "mine" });
-    // S12: the receipt is in the machine dir, named by its absolute path
+    // The receipt is in the machine dir, named by its absolute path
     expect(v.delivered.file).toMatch(new RegExp(`^${join(runs5(), "receipts")}/\\d{4}-answer\\.json$`));
     expect(v.receipt).toMatchObject({ kind: "answer", answer: "EUR", step: "work", attempt: 1, slice: null, ask_receipt_id: st?.park?.receipt_id, run_id: st?.run?.run_id });
     // a second answer for the same ask while the first is unapplied is refused, not silently dropped later
@@ -230,7 +230,7 @@ describe("answer (O2, B2)", () => {
   });
 });
 
-describe("run rerun (W4, B48, B49)", () => {
+describe("run rerun (B48, B49)", () => {
   test("unknown step / counter refused; --step + --reset journaled and applied", async () => {
     h.report(runs5(), "stuck", { reason: "no API key" });
     await tick();
@@ -246,13 +246,13 @@ describe("run rerun (W4, B48, B49)", () => {
   });
 });
 
-describe("story edit --auto|--manual (MO1, B30)", () => {
+describe("story edit --auto|--manual (B30)", () => {
   test("both flags, no change flag, or a mode with --workflow are usage errors; nothing is written", async () => {
     for (const flags of [["--auto", "--manual"], [], ["--manual", "--workflow", "alt"]]) {
       const r = await h.norn("story", "edit", "gh-5", ...flags);
       expect([flags, r.exit]).toEqual([flags, 2]);
     }
-    // gh-71 RD3: --force ends a story's round; on a slice it is a usage error, never silently ignored
+    // --force ends a story's round; on a slice it is a usage error, never silently ignored
     const slice = await h.norn("story", "edit", "gh-5/01", "--workflow", "alt", "--force", "--json");
     expect(slice.exit).toBe(2);
     expect(slice.value).toMatchObject({ error: "story edit: --force applies to a story, not a slice" });
@@ -285,11 +285,11 @@ describe("approve (gate)", () => {
     refused(await h.norn("story", "approve", "gh-5"), "already_recorded");
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 3, counters: { loop: 1 } });
-    // O6: the rejection is a milestone in handoff.md, so the next brief's Context carries it
+    // The rejection is a milestone in handoff.md, so the next brief's Context carries it
     expect(h.read(handoffPath(join(wt5(), spec5), STORY_UNIT_DIR))).toContain("- review#1 reject by tester@box: needs tests");
     expect(r.value).not.toHaveProperty("warning");
 
-    // B26 (B3): a rejection without a reason would leave the agent nothing to fix: a usage error, nothing written
+    // A rejection without a reason would leave the agent nothing to fix: a usage error, nothing written
     h.report(runs5(), "done", { outcome: "done", handoff: "with tests" });
     await tick();
     const bare = await h.norn("story", "reject", "gh-5");
@@ -301,7 +301,7 @@ describe("approve (gate)", () => {
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "work", attempt: 4, counters: { loop: 2 } });
 
-    // T8: drop gh-6's claim everywhere; approve takes it for this heartbeat
+    // Drop gh-6's claim everywhere; approve takes it for this heartbeat
     const hb = JSON.parse(h.read(heartbeatFilePath(h.root))).heartbeat_id;
     h.git(["push", "-q", "origin", ":refs/norn/claims/gh-6"]);
     h.git(["update-ref", "-d", "refs/norn/claims/gh-6"]);
@@ -315,7 +315,7 @@ describe("approve (gate)", () => {
   });
 });
 
-describe("mailbox (T9): a second clone while this one holds the claim", () => {
+describe("mailbox: a second clone while this one holds the claim", () => {
   let b: (...argv: string[]) => Promise<CliResult>;
   let importTick: TickReport;
 
@@ -335,13 +335,13 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     const deps = { ...h.deps, cwd: bRoot, env: { ...h.deps.env, NORN_HOME_DIR: bHome, USER: "colleague", NORN_MACHINE: "laptop" } };
     b = (...argv) => runChecked(argv, deps);
 
-    // gh-196 D2: a delegated decision goes through the mailbox like any other, its mark unchanged
+    // A delegated decision goes through the mailbox like any other, its mark unchanged
     const r = await b("story", "approve", "gh-5", "--reason", "lgtm", "--delegated");
     expect(r.exit).toBe(0);
     const v = r.value as Verb;
     expect(v.delivered).toMatchObject({ via: "mailbox", holder: "tester@box" });
     expect(v.delivered.ref).toMatch(/^refs\/norn\/inbox\/gh-5\/[0-9A-Z]{26}$/);
-    // gh-195 B20 (S12): run state stays on the holder's machine, so the colleague has no copy of it, stale or
+    // Run state stays on the holder's machine, so the colleague has no copy of it, stale or
     // not; under `local` the receipt is stamped with the step the last boundary led to, and no attempt
     expect(existsSync(runStateOf(join(bWt, spec5)))).toBe(false);
     expect(v.receipt).toMatchObject({ kind: "approve", step: "review", slice: null, who: "colleague@laptop", comment: "lgtm", delegated: true });
@@ -351,12 +351,12 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     // the same decision twice is refused before it reaches the mailbox
     refused(await b("story", "approve", "gh-5"), "already_recorded");
     held(await b("story", "edit", "gh-5", "--auto"));
-    // gh-71 D3 (B18): a new round is refused for the claim first, before the workflow or the unfinished round
+    // A new round is refused for the claim first, before the workflow or the unfinished round
     const mailbox = h.git(["ls-remote", "origin", "refs/norn/inbox/*"]);
     const round = await b("story", "edit", "gh-5", "--workflow", "sotry", "--json");
     const why = JSON.stringify(round.value);
     held(round);
-    // AC9: nothing written, locally or to the mailbox
+    // Nothing written, locally or to the mailbox
     expect(h.git(["ls-remote", "origin", "refs/norn/inbox/*"])).toBe(mailbox);
     expect(existsSync(runStateOf(join(bWt, spec5)))).toBe(false);
     expect(why).toContain("held by tester@box");
@@ -369,12 +369,12 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     expect(h.git(["ls-remote", "origin", "refs/norn/inbox/*"])).toBe("");
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "$done", status: "done", last_outcome: { outcome: "approve", source: "human" } });
-    // D2: the imported receipt still carries delegated: true, so the holder's views show it apart
+    // The imported receipt still carries delegated: true, so the holder's views show it apart
     const v = (await h.norn("story", "view", "gh-5", "--json")).value as { delegated: Array<{ kind: string; step: string; reason: string }> };
     expect(v.delegated.map((d) => [d.kind, d.step, d.reason])).toContainEqual(["approve", "review", "lgtm"]);
   });
 
-  test("run view --why replays decide on the recorded snapshot and equals the recorded decision (O5)", async () => {
+  test("run view --why replays decide on the recorded snapshot and equals the recorded decision", async () => {
     const r = await h.norn("run", "view", "gh-5", "--why");
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ unit: "gh-5", replay: { matches: true, all_match: true } });
@@ -382,7 +382,7 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     expect(v.replay.rule).toBe(v.rule);
     const at = await h.norn("run", "view", "gh-5", "--why", "--tick", importTick.tick_id);
     expect(at.value).toMatchObject({ tick_id: importTick.tick_id, rule: "mailbox.import", action: "import_mailbox", replay: { matches: true } });
-    // a 2016 tick id, its day long gone: older than the trace retained (D10)
+    // a 2016 tick id, its day long gone: older than the trace retained
     refused(await h.norn("run", "view", "gh-5", "--why", "--tick", "01ARZ3NDEKTSV4RRFFQ69G5FAV"), "tick_pruned");
   });
 
@@ -428,7 +428,7 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
     expect((await h.norn("run", "list", "gh-5", "--full", "--json")).value).toEqual((await h.norn("run", "list", "gh-5", "--json")).value);
   });
 
-  test("run view: a unit's latest run, a run by its id; --json is the data (B44, B6)", async () => {
+  test("run view: a unit's latest run, a run by its id; --json is the data (B44)", async () => {
     type Row = { unit: string; step: string; attempt: number; outcome: string | null; who: Array<{ run_id: string | null }> };
     const steps = ((await h.norn("run", "list", "gh-5", "--json")).value as { steps: Row[] }).steps;
     const latest = steps.at(-1) as Row;
@@ -456,7 +456,7 @@ describe("mailbox (T9): a second clone while this one holds the claim", () => {
   });
 });
 
-describe("a slice gate in its own worktree (X1: views read slice runs from the machine dir, S12)", () => {
+describe("a slice gate in its own worktree (X1: views read slice runs from the machine dir)", () => {
   const spec8 = ".agents/specs/gh-8-split-work";
   const wt8 = () => `${h.root}-worktrees/gh-8-split-work`;
   const sliceWt = () => `${wt8()}--01-part`;
@@ -473,7 +473,7 @@ describe("a slice gate in its own worktree (X1: views read slice runs from the m
     h.report(storyRuns(), "done", { outcome: "done", handoff: "one slice" });
     for (let i = 0; i < 6 && h.state(sliceRuns())?.status !== "parked"; i++) await tick();
     expect(h.state(sliceRuns())).toMatchObject({ slice: "gh-8/01", step: "qa", status: "parked", park: { kind: "gate" } });
-    // S12: one copy, in the machine dir: the slice worktree holds no runs/, only its handoff (gh-195/07)
+    // One copy, in the machine dir: the slice worktree holds no runs/, only its handoff
     expect(existsSync(join(sliceWt(), spec8, "runs"))).toBe(false);
     expect(existsSync(handoffPath(join(sliceWt(), spec8), "01-part"))).toBe(true);
   });
@@ -597,7 +597,7 @@ counters: { loop: { max: 2 } }
     t = await createHarness();
     expect((await t.norn("init")).exit).toBe(0);
     t.config(CONFIG.replace("workflow: gated", "workflow: triage"));
-    t.recordVersion(); // gh-61 B5: set up with this norn, so no version hint
+    t.recordVersion(); // Set up with this norn, so no version hint
     t.write(join(workflowsDir(t.root), "triage.yaml"), TRIAGE);
     t.git(["add", "-A"]);
     t.git(["commit", "-q", "-m", "norn init"]);
@@ -620,7 +620,7 @@ counters: { loop: { max: 2 } }
     expect(t.read(join(wt(), spec, "spec.md"))).toContain("status: active");
     expect(existsSync(wt())).toBe(true);
     expect(t.git(["ls-remote", "origin", "refs/norn/claims/gh-12"])).toContain("refs/norn/claims/gh-12");
-    // a forced sync later it is still a finished round, never parked (D5), and it needs the person (B25)
+    // a forced sync later it is still a finished round, never parked, and it needs the person
     t.clock.advance(10_000);
     const s = await t.norn("sync");
     expect((s.value as TickReport).decisions.filter((d) => d.unit === "gh-12").map((d) => d.rule)).toContain("story.round_done");
@@ -642,7 +642,7 @@ counters: { loop: { max: 2 } }
   });
 });
 
-/** gh-71: the workflows the round tests run (triage → story / quick). */
+/** The workflows the round tests run (triage → story / quick). */
 const ROUND_TRIAGE = `name: triage
 start: explore
 steps:
@@ -716,7 +716,7 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
 
   test("B10: at the confirm gate the round is unfinished — refused, nothing written", async () => {
     for (let i = 0; i < 8 && t.state(runs())?.status !== "running"; i++) await next();
-    // B3: round 1's counter reaches its max — reject twice at confirm
+    // Round 1's counter reaches its max — reject twice at confirm
     for (let loop = 0; loop < 3; loop++) {
       t.report(runs(), "done", { outcome: "story", handoff: "a story" });
       await next();
@@ -735,12 +735,12 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
   });
 
   test("B17, B9: an unknown workflow or step is refused and writes nothing", async () => {
-    // B5 (AC4): round 1 goes manual before it finishes (a finished round takes no mode edit)
+    // Round 1 goes manual before it finishes (a finished round takes no mode edit)
     expect((await t.norn("story", "edit", "gh-14", "--manual")).exit).toBe(0);
     expect((await t.norn("story", "approve", "gh-14")).exit).toBe(0);
     await next();
     expect(t.state(runs())).toMatchObject({ step: "$done", status: "done" });
-    // B31: the person's part of the handoff, written in round 1
+    // The person's part of the handoff, written in round 1
     const handoff = handoffPath(join(wt(), spec), STORY_UNIT_DIR);
     t.write(handoff, `${t.read(handoff)}\n## Goal\nDeliver it.\n\n## Progress\n- triaged\n\n## Resume\nRefine the spec.\n`);
     const before = receiptsIn(runs());
@@ -775,7 +775,7 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
   });
 
   test("B1, B3, B5, B6, B30, B31: the next tick starts round 2 at refine in one action and one commit", async () => {
-    // B5: round 1 was set manual, against the config's default_mode auto, so only a carried mode makes round 2 manual
+    // Round 1 was set manual, against the config's default_mode auto, so only a carried mode makes round 2 manual
     expect(t.state(runs())).toMatchObject({ step: "$done", mode: "manual" });
     expect((await t.norn("story", "edit", "gh-14", "--workflow", "story")).exit).toBe(0);
     const branch = t.git(["rev-parse", "--abbrev-ref", "HEAD"], wt()).trim();
@@ -785,7 +785,7 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
     expect(Number(t.git(["rev-list", "--count", "HEAD"], wt()).trim())).toBe(commits + 1);
     expect(t.git(["log", "-1", "--format=%s"], wt()).trim()).toBe("norn: gh-14 round 2 (story) at refine");
     expect(t.git(["status", "--porcelain"], wt()).trim()).toBe("");
-    // B30: round 1 kept, round 2 in its own folder with the story workflow pinned and a fresh state
+    // Round 1 kept, round 2 in its own folder with the story workflow pinned and a fresh state
     expect(runs()).toBe(join(record(), "rounds/02-story"));
     expect(t.state(join(record(), "rounds/01-triage"))).toMatchObject({ workflow: "triage", step: "$done", status: "done", counters: { loop: 2 } });
     expect(t.read(join(runs(), "workflow.yaml"))).toBe(ROUND_STORY);
@@ -794,12 +794,12 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
     expect(st).toMatchObject({ workflow: "story", round: 2, step: "refine", attempt: 1, counters: { fix: 0 }, applied_through: 0, mode: "manual" });
     expect(t.git(["rev-parse", "--abbrev-ref", "HEAD"], wt()).trim()).toBe(branch);
     expect(t.read(join(wt(), spec, "spec.md"))).toContain("workflow: story");
-    // B31: one handoff, the person's sections kept
+    // One handoff, the person's sections kept
     const handoff = t.read(handoffPath(join(wt(), spec), STORY_UNIT_DIR));
     expect(handoffPath(join(wt(), spec), STORY_UNIT_DIR)).toBe(join(wt(), spec, "handoffs/_story.md"));
     expect(handoff).toContain("## Goal\nDeliver it.");
     expect(handoff).toContain("## Resume\nRefine the spec.");
-    // B6: Your turn for refine
+    // Your turn for refine
     const inbox = (await t.norn("status", "--json")).value as Inbox;
     expect(inbox.groups.your_turn).toContainEqual(expect.objectContaining({ story: "gh-14", step: "refine" }));
     // back to auto for the rounds after; round 2's own receipts start at 0001
@@ -902,12 +902,12 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
     expect((await t.norn("story", "approve", "gh-14")).exit).toBe(0);
     await next();
     expect(t.state(runs())).toMatchObject({ round: 3, step: "$done", status: "done" });
-    // B7: the open PR does not stop round 4
+    // The open PR does not stop round 4
     const r = await t.norn("story", "edit", "gh-14", "--workflow", "quick");
     expect(r.exit).toBe(0);
     for (let i = 0; i < 4 && t.state(runs())?.status !== "running"; i++) await next();
     expect(runs()).toEndWith("/rounds/04-quick");
-    // B4: the same worktree, on top of round 3's commit
+    // The same worktree, on top of round 3's commit
     expect(existsSync(join(wt(), "round3.txt"))).toBe(true);
     t.write(join(wt(), "round4.txt"), "four\n");
     t.git(["add", "round4.txt"], wt());
@@ -957,7 +957,7 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
     refused(await t.norn("story", "edit", "gh-16", "--workflow", "triage", "--json"), "already_recorded");
     const second = t.report(r1, "mode", { mode: "manual", previous: "auto" }, "human");
     const first = second - 1;
-    // S5: a round.start that stopped after pinning round 2 left a folder without state: still round 1
+    // A round.start that stopped after pinning round 2 left a folder without state: still round 1
     t.write(join(flat, "rounds/02-story/workflow.yaml"), ROUND_STORY);
     expect(runs16()).toBe(r1);
     const started = await next();
@@ -984,7 +984,7 @@ describe("gh-71 B11–B17, B32: --force ends an unfinished round, --at alone mov
     t.clock.advance(10_000);
     return t.tick();
   };
-  /** AC8: refused with exit 3 and a CliError; the record's files and the branch head unchanged */
+  /** Refused with exit 3 and a CliError; the record's files and the branch head unchanged */
   const refusedUnchanged = async (wt: string, spec: string, argv: string[], code: string) => {
     const before = recordSnapshot(wt, spec);
     const r = await t.norn(...argv, "--json");

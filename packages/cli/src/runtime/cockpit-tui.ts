@@ -1,8 +1,9 @@
 /**
- * The terminal renderer of the cockpit model (CP6–CP8): raw keys, three tabs (now, backlog,
+ * The terminal renderer of the cockpit model: raw keys, three tabs (now, backlog,
  * done) each with its own selection and filter, a one-line prompt for actions that take text, and a
- * full-screen frame — rows on the left, the selected row's preview on the right. Pure: keys and a model in, the next state, an effect and a frame out. Which
- * actions a row offers is the model's (CP4); keys only look them up.
+ * full-screen frame — rows on the left, the selected row's preview on the right. Pure: keys and a
+ * model in, the next state, an effect and a frame out. Which actions a row offers is the model's;
+ * keys only look them up.
  */
 import { basename } from "node:path";
 import { cmd, formatAge, type InboxGroup } from "@norn/core";
@@ -19,19 +20,19 @@ export type Key =
 export type Tone = "ok" | "error" | "info";
 
 export interface TuiState {
-  /** CP7: the tab shown (`1` `2` `3`) */
+  /** The tab shown (`1` `2` `3`) */
   tab: CockpitTab;
   /** the selection and filter of the tabs not shown, restored when the person goes back to one */
   saved: Partial<Record<CockpitTab, { selected: string | null; filter: string }>>;
-  /** id of the selected row in the shown tab; kept across refreshes (CP2) */
+  /** id of the selected row in the shown tab; kept across refreshes */
   selected: string | null;
   filter: string;
   /** typing into the filter (`/`) */
   filtering: boolean;
-  /** CP7: an action waiting for its text */
+  /** An action waiting for its text */
   prompt: { row: string; action: CockpitAction["id"]; text: string } | null;
   message: { text: string; tone: Tone } | null;
-  /** CP8: a shown verb's markdown (or the key list) in place of the preview */
+  /** A shown verb's markdown (or the key list) in place of the preview */
   shown: string | null;
   /** first preview line shown (⌃d / ⌃u); back to 0 when the selection moves */
   scroll: number;
@@ -45,7 +46,7 @@ export const initialState = (): TuiState => ({ tab: "now", saved: {}, selected: 
 export function parseKeys(chunk: string): Key[] {
   const keys: Key[] = [];
   for (let i = 0; i < chunk.length; ) {
-    // SGR mouse: `ESC [ < button ; x ; y M|m`; 64/65 are the wheel, other buttons are ignored
+    // SGR mouse: `ESC [ < button; x; y M|m`; 64/65 are the wheel, other buttons are ignored
     const mouse = /^\x1b\[<(\d+);(\d+);(\d+)[Mm]/.exec(chunk.slice(i));
     if (mouse) {
       const button = Number(mouse[1]) & ~(4 | 8 | 16); // without shift/alt/ctrl
@@ -83,7 +84,7 @@ function rowText(r: CockpitRow): string {
   return [r.group ? GROUP_WORD[r.group] : r.kind, r.unit, r.step ?? "", r.preview.report?.unit.workflow ?? "", r.title, r.preview.report?.title ?? "", ...(r.preview.issue?.labels ?? [])].join(" ").toLowerCase();
 }
 
-/** CP7: the shown tab's rows where every word of the filter appears. */
+/** The shown tab's rows where every word of the filter appears. */
 function visibleRows(model: CockpitModel, s: Pick<TuiState, "tab" | "filter">): CockpitRow[] {
   const words = s.filter.toLowerCase().split(/\s+/).filter(Boolean);
   return model.rows.filter((r) => r.tab === s.tab && words.every((w) => rowText(r).includes(w)));
@@ -148,7 +149,6 @@ const HELP = [
 
 const PAGE = 10;
 
-/** One key → the next state and what to do. Pure. */
 /** Preview lines one wheel notch scrolls. */
 const WHEEL_LINES = 3;
 
@@ -165,7 +165,7 @@ export function handleKey(s: TuiState, key: Key, model: CockpitModel, look?: Loo
     return handleKey(s, { kind: key.dir }, model, look);
   }
   const row = selectedRow(model, s);
-  // CP7: the prompt of an action that takes text
+  // The prompt of an action that takes text
   if (s.prompt) {
     const p = s.prompt;
     if (key.kind === "esc") return { state: { ...s, prompt: null, message: { text: "cancelled", tone: "info" } } };
@@ -251,8 +251,6 @@ export function handleKey(s: TuiState, key: Key, model: CockpitModel, look?: Loo
   return { state: { ...s, selected: row.id, message: null }, effect: { kind: "run", row, action } };
 }
 
-// ------------------------------------------------------------------ frame
-
 export interface Look {
   width: number;
   height: number;
@@ -324,7 +322,7 @@ function hang(text: string, width: number, first: string, rest: string, max = Nu
   return cut.map((l, i) => `${i === 0 ? first : rest}${l}`);
 }
 
-/** CP3: an issue row's preview — the issue, its labels and assignees, its link, and what take does (GR1). */
+/** An issue row's preview — the issue, its labels and assignees, its link, and what take does. */
 function issuePreview(row: CockpitRow, width: number, paint: Paint): string[] {
   const i = row.preview.issue;
   const label = (t: string) => paint(t.padEnd(8), ["dim"]);
@@ -338,7 +336,7 @@ function issuePreview(row: CockpitRow, width: number, paint: Paint): string[] {
 }
 
 /**
- * CP3: the preview, styled, for a column `width` wide — the story, its slices one line each, the PR,
+ * The preview, styled, for a column `width` wide — the story, its slices one line each, the PR,
  * the selected item, what waits and runs, and the open notes by unit. Lines never exceed `width`.
  */
 export function previewLines(row: CockpitRow, now: number, width: number, paint: Paint = (t) => t): string[] {
@@ -350,7 +348,7 @@ export function previewLines(row: CockpitRow, now: number, width: number, paint:
   const status = standing(row);
   const [mark, markStyle] = unitMark(status === "dropped" ? "done" : status);
   const where = whereText(status, r.unit.step, " at ");
-  // RD8, gh-71 B28 (D10): the round and its workflow before the step, as `story view` writes them
+  // The round and its workflow before the step, as `story view` writes them
   const round = r.unit.round ? `round ${r.unit.round} · ` : "";
   out.push(`${paint(mark, markStyle)} ${fit(`${round}${r.unit.workflow} · ${where} · ${r.mode} · ${r.claim}`, width - 2)}`);
   if (r.unit.last_outcome) out.push(paint(fit(`  last: ${r.unit.last_outcome.step} → ${r.unit.last_outcome.outcome}`, width), ["dim"]));
@@ -406,7 +404,7 @@ export function previewLines(row: CockpitRow, now: number, width: number, paint:
   return out;
 }
 
-/** A story row's workflow and standing (RD8), then its slices and PR when it has them; an issue row's labels and assignees. */
+/** A story row's workflow and standing, then its slices and PR when it has them; an issue row's labels and assignees. */
 function storySummary(r: CockpitRow): string {
   const rep = r.preview.report;
   const issue = r.preview.issue;
@@ -471,7 +469,7 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
   const pending = model.header.pending;
   const filter = s.filtering ? `${paint("/", ["bold", "cyan"])} ${s.filter}${paint("▏", ["dim"])}   ` : s.filter ? `${paint("filter:", ["dim"])} ${s.filter} ${paint("(esc clears)", ["dim"])}   ` : "";
   const left = `${filter}${paint(o.version ? `norn ${o.version}` : "norn", ["bold"])} ${paint("·", ["dim"])} ${basename(model.header.repo)}  ${pending ? paint(`${pending} need${pending === 1 ? "s" : ""} you`, ["bold", "yellow"]) : paint("nothing needs you", ["green"])}`;
-  // gh-61 D7 (B8): a binary that does not fit the repo's norn version takes the heartbeat's place (its ticks are refused)
+  // A binary that does not fit the repo's norn version takes the heartbeat's place (its ticks are refused)
   const beat = model.header.version
     ? paint(`! ${model.header.version}`, ["bold", "red"])
     : hb.down

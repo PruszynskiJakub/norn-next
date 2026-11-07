@@ -2,14 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { buildInbox } from "../../src/inbox/items.ts";
 import { CONFIG, facts, storyFacts, storyUnit, STORY_WF, stateFor, unitFacts, T0, at } from "../fixtures.ts";
 
-// gh-61 B8, B5 (D5, D7): the repo's norn version against the running binary, in the inbox.
+// The repo's norn version against the running binary, in the inbox.
 const stuck = () => {
   const u = storyUnit("gh-1");
   const st = stateFor(u, STORY_WF, { status: "stuck", park: { kind: "stuck", reason: "broken", since: at(T0 - 60_000) } });
   return storyFacts("gh-1", [unitFacts(u, STORY_WF, st)]);
 };
 
-describe("the norn version in the inbox (gh-61 B8, B5)", () => {
+describe("the norn version in the inbox", () => {
   test("B8: an older binary puts a repo-level Unblock item first: install the repo's line", () => {
     const inbox = buildInbox(facts([stuck()], { norn: { running: "0.18.1", repo: "0.19.0" } }), CONFIG);
     const first = inbox.groups.unblock[0];

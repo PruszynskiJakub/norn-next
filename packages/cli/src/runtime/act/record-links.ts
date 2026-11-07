@@ -1,5 +1,5 @@
 /**
- * gh-195 D5 (B28): the PR body's links to QA evidence by its path in the story's record,
+ * The PR body's links to QA evidence by its path in the story's record,
  * `evidence/<unit>/<run_id>/<file>` (`<unit>` is `_story` or `<nn>-<slug>`), rewritten to the file's
  * URL at the record commit `open-pr` just pushed. The record path of `evidence/_story/…` is the story's
  * current round (`_story/rounds/NN-<wf>/evidence/…`); a slice's is `<nn>-<slug>/evidence/…`. A link

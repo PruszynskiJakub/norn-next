@@ -39,7 +39,7 @@
     },
     "run_id": {
       "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-      "description": "ULID (ID2)",
+      "description": "ULID",
       "type": "string"
     },
     "step": {
@@ -52,7 +52,7 @@
     },
     "tick_id": {
       "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
-      "description": "ULID (ID2)",
+      "description": "ULID",
       "type": "string"
     },
     "who": {

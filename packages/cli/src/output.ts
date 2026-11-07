@@ -1,5 +1,5 @@
 /**
- * Machine contract (P8, §9.3): every command prints exactly one JSON value on stdout and
+ * Machine contract: every command prints exactly one JSON value on stdout and
  * exits with an `ExitCode`. Failures and refusals are `CliError` `{error, do_instead, code?}`.
  * Commands return a value (exit 0) or `withExit(value, code)`, and throw `CliFailure` to refuse.
  */
@@ -29,11 +29,11 @@ export const refuse = (error: string, do_instead: string | null, code?: string, 
 /** Bad arguments (exit 2). */
 export const usageError = (error: string, do_instead: string | null = cmd.help(), code = "usage") =>
   new CliFailure(body(error, do_instead, code), ExitCode.usage);
-/** A state or config file failed validation (S2, exit 4). */
+/** A state or config file failed validation (exit 4). */
 export const corruptError = (error: string, do_instead: string | null, details?: unknown, code = "corrupt") =>
   new CliFailure(body(error, do_instead, code, details), ExitCode.corrupt);
 /**
- * B7 (D3): config files a person wrote need fixing (exit 6, "Config error"): code
+ * Config files a person wrote need fixing (exit 6, "Config error"): code
  * `config_invalid`, `config_wrong_file` or `config_moved`, the files in `details`. Never corrupt.
  */
 export function configError(problems: readonly ConfigProblem[], paths?: Record<string, string>): CliFailure {
@@ -48,12 +48,11 @@ export function configError(problems: readonly ConfigProblem[], paths?: Record<s
 export const busyError = (error: string, do_instead: string | null, code = "busy", details?: unknown) =>
   new CliFailure(body(error, do_instead, code, details), ExitCode.busy);
 /**
- * Another heartbeat holds the story's claim (T3): busy, exit 5, code `claim_held` — the one
- * refusal every verb uses (§9.3), so scripts tell "wait / --force" apart from rule refusals.
+ * Another heartbeat holds the story's claim: busy, exit 5, code `claim_held` — the one
+ * refusal every verb uses, so scripts tell "wait / --force" apart from rule refusals.
  */
 export const claimHeld = (claim: Pick<ClaimBlob, "holder" | "acquired_at" | "expires_at">, do_instead: string, note = "") =>
   busyError(`held by ${claim.holder} since ${claim.acquired_at} (expires ${claim.expires_at})${note}`, do_instead, "claim_held", { claim });
-/** Unexpected failure (exit 1). */
 /** The remote port, or the `no_remote` refusal when this repo has none. */
 export function requireRemote<R>(remote: R | null): R {
   if (!remote) throw refuse("no remote is configured", cmd.doctor(), "no_remote");
@@ -63,6 +62,7 @@ export function requireRemote<R>(remote: R | null): R {
 /** A remote call that threw, as the `remote_failed` failure. */
 export const remoteFailed = (e: unknown) => failure(`the remote failed: ${(e as Error).message}`, cmd.doctor(), "remote_failed");
 
+/** Unexpected failure (exit 1). */
 export const failure = (error: string, do_instead: string | null = null, code = "error", details?: unknown) =>
   new CliFailure(body(error, do_instead, code, details), ExitCode.error);
 
@@ -86,9 +86,9 @@ export function isWithExit(v: unknown): v is WithExit {
 const RENDERED = Symbol("norn.rendered");
 
 /**
- * A command's data together with its markdown for a reader (P8, see AGENTS.md "Decisions"): stdout
- * gets the markdown unless the caller passes `--json`, which prints `value`. Exit codes are the same
- * either way, so code branches on them and on `--json` data, never on the markdown.
+ * A command's data together with its markdown for a reader: stdout gets the markdown unless the
+ * caller passes `--json`, which prints `value`. Exit codes are the same either way, so code
+ * branches on them and on `--json` data, never on the markdown.
  * `asked` marks text a JSON command prints because the caller asked for it (`watch --human`).
  */
 export interface Rendered {

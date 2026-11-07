@@ -1,4 +1,4 @@
-/** The cockpit model (CP1–CP5): rows, previews and the actions each row offers, as data. */
+/** The cockpit model: rows, previews and the actions each row offers, as data. */
 import { describe, expect, test } from "bun:test";
 import type { InboxGroup, RemoteIssue } from "@norn/core";
 import { type CockpitRow, cockpitModel, formatInbox, type InboxEntry, inboxItemsInOrder, type ProjectView, type StoryView, withInput } from "../../src/index.ts";
@@ -107,7 +107,7 @@ describe("cockpitModel", () => {
     expect(cockpitModel(view(), { places: true, provider: "gh" }).rows.map((r) => r.id)).toEqual(m.rows.map((r) => r.id));
   });
 
-  test("each action exactly where the table says (CP4)", () => {
+  test("each action exactly where the table says", () => {
     const { rows } = cockpitModel(view(), { places: true, provider: "gh" });
     expect(ids(row(rows, "your_turn:gh-1"))).toEqual(["orient", "start", "trace", "issue"]);
     expect(ids(row(rows, "attended:gh-2"))).toEqual(["orient", "agent", "trace", "issue"]);
@@ -120,16 +120,16 @@ describe("cockpitModel", () => {
 
   test("effects: verbs with {input}, links, places only when the front end has them", () => {
     const { rows } = cockpitModel(view(), { places: true, provider: "gh" });
-    // B28: the start action runs `norn story start <unit>`
+    // The start action runs `norn story start <unit>`
     expect(row(rows, "your_turn:gh-1")?.actions.find((a) => a.id === "start")?.effect).toEqual({ kind: "verb", argv: ["story", "start", "gh-1"] });
     const answer = row(rows, "answer:gh-3")?.actions.find((a) => a.id === "answer");
     expect(answer).toEqual({ id: "answer", label: "answer", key: "a", input: { prompt: "Your answer", required: true }, effect: { kind: "verb", argv: ["story", "answer", "gh-3/02", "{input}"] } });
     if (answer?.effect.kind !== "verb") throw new Error("unreachable");
     expect(withInput(answer.effect.argv, "CSV only")).toEqual(["story", "answer", "gh-3/02", "CSV only"]);
     expect(row(rows, "approve:gh-4")?.actions.find((a) => a.id === "reject")?.effect).toEqual({ kind: "verb", argv: ["story", "reject", "gh-4", "--reason", "{input}"] });
-    // B48: unstick is gone; a stuck unit is rerun
+    // Unstick is gone; a stuck unit is rerun
     expect(row(rows, "unblock:gh-5")?.actions.find((a) => a.id === "unstick")?.effect).toEqual({ kind: "verb", argv: ["run", "rerun", "gh-5"] });
-    // gh-212: a run-out counter's way out keeps the item's --step and --reset
+    // A run-out counter's way out keeps the item's --step and --reset
     const counted = view();
     counted.inbox.groups.unblock = [entry("unblock", "gh-5", { command: "norn run rerun gh-5 --step implement --reset review_loop" })];
     expect(row(cockpitModel(counted, { places: true, provider: "gh" }).rows, "unblock:gh-5")?.actions.find((a) => a.id === "unstick")?.effect).toEqual({
@@ -184,7 +184,7 @@ describe("cockpitModel", () => {
     expect(m.header.pending).toBe(0);
   });
 
-  test("CP2: the backlog lists open norn issues not assigned to me after not-started stories; take assigns (GR1)", () => {
+  test("CP2: the backlog lists open norn issues not assigned to me after not-started stories; take assigns", () => {
     const v = view();
     v.stories = [...v.stories, story("gh-8", { status: "not_started", step: null })];
     const issue = (number: number, assignees: string[], over: Partial<RemoteIssue> = {}): RemoteIssue => ({
@@ -225,7 +225,7 @@ describe("cockpitModel", () => {
   });
 });
 
-describe("a norn version mismatch (gh-61 B8, D7)", () => {
+describe("a norn version mismatch (D7)", () => {
   const TITLE = "this repo needs norn 0.19.x (you run 0.18.1): install norn 0.19.x";
   const withMismatch = (): ProjectView => {
     const v = view();

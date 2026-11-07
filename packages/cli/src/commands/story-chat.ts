@@ -1,10 +1,10 @@
 /**
- * `norn story chat [<story>] [--json]` (B29): gives a story its own Herdr workspace with an agent. It
+ * `norn story chat [<story>] [--json]`: gives a story its own Herdr workspace with an agent. It
  * focuses the workspace labelled `<story> orient` when one exists, else creates it in the story
  * worktree with an agent told to run `norn story view <story>` and follow it. The agent runs with
  * `NORN_ORIENT=1`, so its hooks are no facts of a run and `brief`/`done`/`ask`/`stuck` refuse it;
- * like a launched agent (R8.1) it runs the norn that opened it, first on PATH. Outside Herdr it
- * prints the command. In a slice worktree it acts on the slice's story (B55).
+ * like a launched agent it runs the norn that opened it, first on PATH. Outside Herdr it
+ * prints the command. In a slice worktree it acts on the slice's story.
  */
 import { join } from "node:path";
 import { cmd, startAgentCommand } from "@norn/core";
@@ -52,7 +52,7 @@ export const storyChatCommand = defineCommand({
       await cockpit.focusWorkspace(existing.workspace_id);
       return rendered({ story, opened: true, created: false, workspace_id: existing.workspace_id }, `Focused workspace ${label}.`);
     }
-    // R8.1: the agent's `norn` is this norn (its `norn story view` must exist), set inside the command —
+    // The agent's `norn` is this norn (its `norn story view` must exist), set inside the command —
     // through a shim of its own, not the launch shim launched agents' hooks share
     const shim = ensureShim(ctx.home, nornEntry(), join(ctx.home, "orient", "bin"));
     const launcher = withNornOnPath([], shim, ctx.env.PATH).argv[0] as string;

@@ -1,11 +1,10 @@
 /**
- * Machine-local runtime files of one checkout's heartbeat, in its machine dir (B5):
- * - `heartbeat.json`  this checkout's heartbeat_id (ID2, see AGENTS.md) and, since R5.5,
- *                     `last_tick_at` — when a tick last finished here (status/inbox show it, N3)
- * - `failures.json`   R4.3: per unit, the last act effect that failed (send, resume, launch, push),
- *                     read back into Facts so the inbox shows it under Unblock
- * Both are diagnostic local state, never committed; an unreadable file, or one of the wrong shape,
- * reads as empty (S2, readLocalJson).
+ * Machine-local runtime files of one checkout's heartbeat, in its machine dir:
+ * - `heartbeat.json`: this checkout's heartbeat_id (one per checkout, not per `watch` process, so
+ *   every tick recognises its own claim) and `last_tick_at`, when a tick last finished here
+ * - `failures.json`: per unit, the last act effect that failed (send, resume, launch, push),
+ *   read back into Facts so the inbox shows it under Unblock
+ * Both are diagnostic local state, never committed; an unreadable or wrong-shaped file reads as empty.
  */
 import type { ActFailure } from "@norn/core";
 import { ulid } from "@norn/schema";
@@ -17,11 +16,11 @@ import { actFailuresPath, heartbeatFilePath } from "./paths.ts";
 export interface HeartbeatFile {
   heartbeat_id?: string;
   created_at?: string;
-  /** R5.5: ISO time the last tick on this checkout finished */
+  /** ISO time the last tick on this checkout finished */
   last_tick_at?: string;
-  /** gh-78: how long that tick took, in ms */
+  /** How long that tick took, in ms */
   last_tick_ms?: number;
-  /** B34 (D5): the tick interval recorded by `norn watch` or `norn tick --interval` */
+  /** The tick interval recorded by `norn watch` or `norn tick --interval` */
   interval?: string;
 }
 
@@ -33,9 +32,9 @@ function writeHeartbeatFile(root: string, hb: HeartbeatFile): void {
   atomicWriteJson(heartbeatFilePath(root), hb);
 }
 
-/** This checkout's heartbeat_id; created on first use (keeps `last_tick_at`, R5.5). */
+/** This checkout's heartbeat_id; created on first use (keeps `last_tick_at`). */
 export function heartbeatId(root: string, now: number): string {
-  // D3: every tick names the checkout its machine dir belongs to
+  // Every tick names the checkout its machine dir belongs to
   ensureCheckoutFile(root);
   const cur = readHeartbeatFile(root);
   if (cur.heartbeat_id && /^[0-9A-HJKMNP-TV-Z]{26}$/.test(cur.heartbeat_id)) return cur.heartbeat_id;
@@ -44,41 +43,40 @@ export function heartbeatId(root: string, now: number): string {
   return id;
 }
 
-/** This checkout's heartbeat_id as recorded (S2: validated), null when none yet; never creates one. */
+/** This checkout's heartbeat_id as recorded, null when none yet; never creates one. */
 export function recordedHeartbeatId(root: string): string | null {
   return readHeartbeatFile(root).heartbeat_id ?? null;
 }
 
-/** R5.5: record that a tick finished now (keeps the heartbeat_id); gh-78: and how long it took. */
+/** Record that a tick finished now and how long it took (keeps the heartbeat_id). */
 export function markTick(root: string, at: string, ms?: number): void {
   writeHeartbeatFile(root, { ...readHeartbeatFile(root), last_tick_at: at, ...(ms === undefined ? {} : { last_tick_ms: ms }) });
 }
 
-/** gh-78: how long the last tick here took, in ms; null when not recorded. */
+/** How long the last tick here took, in ms; null when not recorded. */
 export function lastTickMs(root: string): number | null {
   const ms = readHeartbeatFile(root).last_tick_ms;
   return typeof ms === "number" && ms >= 0 ? ms : null;
 }
 
-/** B34 (D5): record the interval ticks run at on this checkout (keeps everything else). */
+/** Record the interval ticks run at on this checkout (keeps everything else). */
 export function recordInterval(root: string, interval: string): void {
   ensureCheckoutFile(root);
   writeHeartbeatFile(root, { ...readHeartbeatFile(root), interval });
 }
 
-/** B34: the recorded tick interval; null when none was recorded. */
 export function recordedInterval(root: string): string | null {
   return readHeartbeatFile(root).interval ?? null;
 }
 
-/** R5.5: `last_tick_at` as ms epoch; null = no tick recorded. */
+/** `last_tick_at` as ms epoch; null = no tick recorded. */
 export function lastTickAt(root: string): number | null {
   const at = readHeartbeatFile(root).last_tick_at;
   const t = at ? Date.parse(at) : Number.NaN;
   return Number.isFinite(t) ? t : null;
 }
 
-/** R4.3: unit key → last failed act effect. */
+/** Unit key → last failed act effect. */
 export function readActFailures(root: string): Record<string, ActFailure> {
   return readLocalJson("local-failures", actFailuresPath(root), {}, root).units ?? {};
 }

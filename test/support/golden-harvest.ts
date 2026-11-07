@@ -2,7 +2,7 @@
  * Golden decisions harvest (refactor Phase 0.1). With `NORN_GOLDEN_OUT` set, `Harness.cleanup()`
  * calls `harvestGolden` before deleting the temp repo: every tick of the repo's trace becomes one
  * golden case — decide's inputs as `norn why` rebuilds them (O5, store `readTickInputs`) and the decisions
- * the tick's `tick.start` record holds (R5.4) — with the harness's temp paths normalised.
+ * the tick's `tick.start` record holds — with the harness's temp paths normalised.
  * `scripts/golden.ts` runs the cli integration tests with it on and writes the corpus that
  * `packages/core/test/unit/golden.test.ts` replays. Off (the default), this does nothing.
  *

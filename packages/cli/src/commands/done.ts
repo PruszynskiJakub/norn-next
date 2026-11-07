@@ -1,9 +1,9 @@
 /**
  * `norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>] [--criteria <file>]
- * [--note "…" [--note-criterion <id>]]…` (§9.3, §10): the only way an agent step completes. The
- * outcome must be declared at the pinned step (W3); findings are copied into the receipt, evidence
- * into runs/<unit>/evidence/<run_id>/. The criteria report (QV2) is validated against
- * `CriteriaReport`, its coverage against the unit's frontmatter `criteria` (QV4), and the outcome against its worst verdict (QV5); notes (NT1) never block and never change the route.
+ * [--note "…" [--note-criterion <id>]]…`: the only way an agent step completes. The
+ * outcome must be declared at the pinned step; findings are copied into the receipt, evidence
+ * into runs/<unit>/evidence/<run_id>/. The criteria report is validated against
+ * `CriteriaReport`, its coverage against the unit's frontmatter `criteria`, and the outcome against its worst verdict; notes never block and never change the route.
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
@@ -56,7 +56,7 @@ export function parseFindings(text: string, file: string): Finding[] {
 
 const abs = (ctx: Context, p: string) => (isAbsolute(p) ? p : resolve(ctx.cwd, p));
 
-/** QV2: read and validate a `--criteria` file (a JSON array, CriteriaReport). */
+/** Read and validate a `--criteria` file (a JSON array, CriteriaReport). */
 function parseCriteria(text: string, file: string): CriterionVerdict[] {
   const how = "write the report as a JSON array: [{\"id\": \"AC1\", \"verdict\": \"pass\", \"evidence\": \"…\"}, …] — pass needs evidence, fail repro, person how, unverified reason and how — then report again";
   let raw: unknown;
@@ -70,7 +70,7 @@ function parseCriteria(text: string, file: string): CriterionVerdict[] {
   return v.value;
 }
 
-/** NT1: `--note` values in order; each `--note-criterion` belongs to the `--note` before it. */
+/** `--note` values in order; each `--note-criterion` belongs to the `--note` before it. */
 function parseNotes(args: ParsedArgs): Note[] {
   const notes: Note[] = [];
   for (const o of args.order ?? []) {
@@ -90,11 +90,11 @@ function parseNotes(args: ParsedArgs): Note[] {
 }
 
 /**
- * BS5: the base a base-mode step (entered by a `git: update` conflict) must merge — the base of the
+ * The base a base-mode step (entered by a `git: update` conflict) must merge — the base of the
  * classify `conflict` receipt that entered the current step, the same receipt whose base the brief's
  * Rework shows (`enteringReceipt`); null for any other step. Never keyed on the receipt's `route`: a
  * conflict that exhausted its counter records `$stuck`, and `norn run rerun --step <step>` still enters
- * the step from it (BUG-2 follow-up).
+ * the step from it.
  */
 function baseToMerge(s: UnitSession): NonNullable<ReceiptOf<"classify">["base"]> | null {
   const r = enteringReceipt({ state: s.state, receipts: s.receipts })?.receipt;
@@ -102,8 +102,8 @@ function baseToMerge(s: UnitSession): NonNullable<ReceiptOf<"classify">["base"]>
 }
 
 /**
- * BS5 (audit H1): before a base-mode step reports done, the merge is concluded — no merge or rebase in
- * progress, no unmerged path, the base sha an ancestor of HEAD — and no conflict marker is left in the
+ * Before a base-mode step reports done, the merge is concluded — no merge or rebase in progress,
+ * no unmerged path, the base sha an ancestor of HEAD — and no conflict marker is left in the
  * conflicting paths or the files changed since the merge. Returns what the done receipt records.
  */
 async function verifyBaseMerge(ctx: Context, s: UnitSession, base: NonNullable<ReceiptOf<"classify">["base"]>): Promise<NonNullable<ReceiptOf<"done">["base_merge"]>> {
@@ -132,7 +132,7 @@ async function verifyBaseMerge(ctx: Context, s: UnitSession, base: NonNullable<R
 export const doneCommand = defineCommand({
   name: "done",
   version: "exempt",
-  summary: "Report that the current step finished with a declared outcome (§9.3); then end your turn",
+  summary: "Report that the current step finished with a declared outcome; then end your turn",
   usage: 'norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>] [--criteria <file>] [--note "…" [--note-criterion <id>]]…',
   markdown: true,
   options: {
@@ -167,7 +167,7 @@ export const doneCommand = defineCommand({
     if (evidencePath && !(existsSync(evidencePath) && statSync(evidencePath).isDirectory()))
       throw refuse(`evidence directory not found: ${evidenceSrc}`, "pass the directory your skill wrote evidence to, then report again", "bad_evidence");
 
-    // QV2–QV5, NT1: the report and notes, checked against the step and the unit's frontmatter criteria
+    // The report and notes, checked against the step and the unit's frontmatter criteria
     const notes = parseNotes(args);
     let report: CriterionVerdict[] | null = null;
     const criteriaFile = opt.str(args, "criteria");
@@ -180,7 +180,7 @@ export const doneCommand = defineCommand({
     const verdicts = checkReport({ step, step_name: t.s.state.step, outcome, report, criteria: declared, notes });
     if (!verdicts.ok) throw refuse(verdicts.refusal.error, verdicts.refusal.do_instead, verdicts.refusal.code, verdicts.refusal.details);
 
-    // BS5: a base-mode step reports done only with the base merged and nothing left unresolved
+    // A base-mode step reports done only with the base merged and nothing left unresolved
     const base = baseToMerge(t.s);
     const baseMerge = base ? await verifyBaseMerge(ctx, t.s, base) : null;
 
@@ -192,11 +192,11 @@ export const doneCommand = defineCommand({
     if (notes.length) receipt.notes = notes;
     const check = validate("receipt", receipt);
     if (!check.ok) throw refuse(`receipt does not validate: ${check.errors.map((e) => `${e.path} ${e.message}`).join("; ")}`, "fix the arguments and report again", "invalid_receipt");
-    // evidence sits beside the receipt it belongs to; copied before the receipt lands (P6)
+    // evidence sits beside the receipt it belongs to; copied before the receipt lands
     if (evidencePath) ensureEvidenceDir(t.s.runsDir, t.run_id, evidencePath);
     const written = writeReport(t, receipt);
     appendProgress(t.s.handoffFile, `${t.s.state.step}#${t.s.state.attempt} ${outcome}: ${handoff}`);
-    // QV4/QV8: the report counted in the trace — unverified per capability, unchecked coverage
+    // The report counted in the trace — unverified per capability, unchecked coverage
     if (report)
       appendTrace(
         t.s.root,

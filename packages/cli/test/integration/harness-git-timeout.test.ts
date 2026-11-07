@@ -1,5 +1,5 @@
 /**
- * gh-215: a child that never exits must not hang the tier. bun 1.3.13 cannot cut a test stuck in
+ * A child that never exits must not hang the tier. bun 1.3.13 cannot cut a test stuck in
  * `Bun.spawnSync` at its per-test timeout once the file has run another `spawnSync`, so one stuck
  * sync spawn blocked its worker and the whole `--parallel` run, with no test named. The harness bounds
  * its own git calls, and the spawning-tier preload bounds every other `Bun.spawnSync` (norn's

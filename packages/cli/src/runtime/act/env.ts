@@ -33,10 +33,10 @@ import type { Observed, StoryLoc, UnitLoc } from "../observe/index.ts";
 import { receiptsWritten } from "../report.ts";
 
 export class QueueFull extends Error {}
-/** S6: a receipt number another writer (an agent verb, a person) took since observe. */
+/** A receipt number another writer (an agent verb, a person) took since observe. */
 export class ReceiptTaken extends Error {}
 
-/** R1.2: a claim write lost to another heartbeat (CAS stale/rejected, held) — not a network failure. */
+/** A claim write lost to another heartbeat (CAS stale/rejected, held) — not a network failure. */
 export function claimLost(r: ActionResult): boolean {
   const reason = (r.detail as { reason?: string } | undefined)?.reason;
   return reason === "stale" || reason === "rejected" || reason === "held" || reason === "corrupt";
@@ -46,17 +46,17 @@ export function claimLost(r: ActionResult): boolean {
 export class ActEnv {
   readonly notified: Set<string>;
   readonly notifiedNow: string[] = [];
-  /** what act changed locally this tick, for the post-act facts notifications are built from (O3) */
+  /** what act changed locally this tick, for the post-act facts notifications are built from */
   readonly written = new Map<string, UnitState>();
   readonly claimed = new Map<string, { blob: ClaimBlob; sha: string }>();
   readonly cleaned = new Set<string>();
-  /** R4.3: effects of the current action that failed after its state was written (push, typed delivery) */
+  /** Effects of the current action that failed after its state was written (push, typed delivery) */
   effectErrors: Array<{ effect: string; reason: string }> = [];
-  /** R4.3: effects of the current action that succeeded */
+  /** Effects of the current action that succeeded */
   effectsOk = new Set<string>();
-  /** R4.3: session a failed delivery targeted (for the inbox item; R6.3 reuses it) */
+  /** Session a failed delivery targeted (for the inbox item; a retried delivery reuses it) */
   failedSession: SessionRef | null = null;
-  /** R4.3: unit key → last failed effect (machine-local `failures.json`) */
+  /** Unit key → last failed effect (machine-local `failures.json`) */
   readonly failures: Record<string, ActFailure>;
   failuresChanged = false;
 
@@ -84,8 +84,6 @@ export class ActEnv {
     return this.ctx.clock.iso();
   }
 
-  // ------------------------------------------------------------ locations
-
   storyLoc(key: string): StoryLoc {
     const s = this.obs.stories[key];
     if (!s) throw new Error(`unknown story ${key}`);
@@ -106,17 +104,15 @@ export class ActEnv {
     return leaseLiveness((p) => this.obs.ports.process.isAlive(p));
   }
 
-  // ------------------------------------------------------------ receipts / state / commit
-
   writeReceipts(loc: Pick<UnitLoc, "runsDir" | "handoffFile">, receipts: NewReceipt[]): void {
     for (const r of receipts) {
       const res = writeReceiptAt(loc.runsDir, r.n, r.receipt);
-      if (!res.ok) throw new ReceiptTaken(`receipt number ${r.n} is taken by ${relative(this.root, res.file)} (S6)`);
+      if (!res.ok) throw new ReceiptTaken(`receipt number ${r.n} is taken by ${relative(this.root, res.file)}`);
     }
     receiptsWritten(loc.handoffFile, receipts.map((r) => r.receipt));
   }
 
-  /** Write state.json (S5, last) and keep the in-memory location current for later actions this tick. */
+  /** Write state.json (last) and keep the in-memory location current for later actions this tick. */
   writeUnitState(unit: UnitRef, runsDir: string, state: UnitState): void {
     writeState(runsDir, state);
     this.written.set(unit.key, state);
@@ -128,7 +124,7 @@ export class ActEnv {
     return releaseStoryLeases(this.ctx.home, this.root, unit.story, (l) => l.slice === unit.slice && kinds.includes(l.kind) && (!runId || l.run_id === runId || l.kind === "slot"));
   }
 
-  /** Tidy the unit's handoff (gh-195 D9: skeleton when new, an older norn's blocks gone, B6, B8), commit with trailers (S4) and push (S8, T7). */
+  /** Tidy the unit's handoff (skeleton when new, an older norn's blocks gone), commit with trailers and push. */
   async commit(
     c: BoundaryCommit | null,
     unit: UnitRef | null,
@@ -138,19 +134,19 @@ export class ActEnv {
     if (!c) return null;
     if (unit && state) {
       const loc = this.unitLoc(unit);
-      // B6: the status is printed by `brief` and `story checkout` (renderHandoffStatus), never written into the file
+      // The status is printed by `brief` and `story checkout` (renderHandoffStatus), never written into the file
       if (existsSync(loc.runsDir)) tidyHandoff(loc.handoffFile);
     }
     let sha: string | null;
     try {
-      // gh-195 D17: decide asks for a story unit's boundary even when nothing changed (`allow_empty`)
+      // Decide asks for a story unit's boundary even when nothing changed (`allow_empty`)
       sha = await this.git.commit(c.cwd, { message: c.message, trailers: c.trailers, ...(paths ? { paths } : {}), ...(c.allow_empty ? { allowEmpty: true } : {}) });
     } catch (e) {
       const code = (e as { code?: string }).code;
-      // H1: an agent's merge or rebase is in progress in the worktree — norn's files wait there
+      // An agent's merge or rebase is in progress in the worktree — norn's files wait there
       // uncommitted (git cannot commit them without concluding it); the next commit after it carries them
       if (code === GIT_IN_PROGRESS) return { sha: null, pushed: null, deferred: (e as Error).message };
-      // H1: never create (or push) a norn commit recording conflict markers: a failed effect, Unblock item (R4.3)
+      // Never create (or push) a norn commit recording conflict markers: a failed effect, Unblock item
       if (code === GIT_CONFLICT_MARKERS) {
         this.effectErrors.push({ effect: "commit", reason: `commit on ${c.branch} refused: ${(e as Error).message}` });
         return { sha: null, pushed: null, refused: (e as Error).message };
@@ -161,15 +157,15 @@ export class ActEnv {
     if (!c.push || !this.obs.remote) return { sha, pushed: null };
     const r = await this.pushBranch(c.cwd, c.branch, c.trailers);
     if (r.ok) this.effectsOk.add("push");
-    // R4.3: committed but not pushed is a failed effect (the record is not on the remote, S8)
+    // Committed but not pushed is a failed effect (the record is not on the remote)
     else this.effectErrors.push({ effect: "push", reason: `push of ${c.branch} failed: ${r.message}` });
     return r.ok ? { sha, pushed: true } : { sha, pushed: false, push_error: r.message };
   }
 
   /**
-   * Push a branch (T7: only the claim holder; decide acts only on held stories). Slice branches are
-   * rebased by integrate, so they force-push. BS5.2: never publishes a commit that leaves conflict
-   * markers (an agent's merge included); BS3.3a: a story branch someone pushed to meanwhile is
+   * Push a branch (only the claim holder; decide acts only on held stories). Slice branches are
+   * rebased by integrate, so they force-push. Never publishes a commit that leaves conflict
+   * markers (an agent's merge included); a story branch someone pushed to meanwhile is
    * merged in (never rebased) and pushed again.
    */
   async pushBranch(cwd: string, branch: string, trailers: Record<string, string> = {}): Promise<{ ok: true } | { ok: false; message: string }> {
@@ -188,7 +184,7 @@ export class ActEnv {
     return r.ok ? { ok: true } : { ok: false, message: `${r.reason}: ${r.message}` };
   }
 
-  /** BS5.2 (dogfood D5): why the push of `branch` is held — its unpublished commits leave conflict markers — or null. */
+  /** Why the push of `branch` is held — its unpublished commits leave conflict markers — or null. */
   async markersHeld(cwd: string, remote: string, branch: string): Promise<string | null> {
     const marked = await this.git.outgoingConflictMarkers(cwd, remote, `refs/heads/${branch}`);
     if (!marked.length) return null;
@@ -197,7 +193,7 @@ export class ActEnv {
   }
 
   /**
-   * BS3.3a (dogfood D4): the push of the story branch was rejected — someone pushed to it. Take the
+   * The push of the story branch was rejected — someone pushed to it. Take the
    * remote branch in (fast-forward, else a merge commit with norn's trailers); true when the push may
    * be retried, else why not (null = nothing new on the remote, e.g. a protected branch).
    */
@@ -212,8 +208,6 @@ export class ActEnv {
     }
   }
 
-  // ------------------------------------------------------------ notifications (O3)
-
   /** Notify once per inbox item id; the id is persisted before sending (receipt-first). */
   async notify(item: InboxItem | null): Promise<void> {
     if (!item || this.notified.has(item.id)) return;
@@ -223,7 +217,7 @@ export class ActEnv {
       try {
         await n.notify(item);
       } catch (e) {
-        // notifiers are best-effort, the inbox is the truth; the trace keeps why, naming the file (B47)
+        // notifiers are best-effort, the inbox is the truth; the trace keeps why, naming the file
         this.traceReject(item.slice ?? (item.story || "repo"), "notify", (e as Error).message || `notify ${n.name} failed`, { item: item.id });
       }
     }

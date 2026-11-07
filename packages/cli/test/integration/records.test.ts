@@ -1,9 +1,9 @@
 /**
- * Durable records and pulled facts (P2, GR6, Q6): the `ready` approve records the head it saw
- * (F35), commits norn did not make are facts and traced once (Q6), a PR left open whose head is on
- * the fetched base is merged by ancestry and cleaned up (F34), the done record carries how the PR
+ * Durable records and pulled facts: the `ready` approve records the head it saw
+ *, commits norn did not make are facts and traced once, a PR left open whose head is on
+ * the fetched base is merged by ancestry and cleaned up, the done record carries how the PR
  * landed, and a story stays in `status` after its worktree is gone even though the main checkout's
- * local `main` is stale (F36).
+ * local `main` is stale.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { cpSync, existsSync, readdirSync } from "node:fs";
@@ -163,7 +163,7 @@ describe("records: ready head, foreign commits, merged by ancestry, durable stat
     const r = await h.norn("story", "list");
     expect(r.exit).toBe(0);
     const keys = (r.value as { stories: Array<{ key: string }> }).stories.map((x) => x.key);
-    // seen empty once in a parallel tier run and never again (gh-118/03): say which read gave nothing
+    // seen empty once in a parallel tier run and never again: say which read gave nothing
     if (!keys.includes("gh-5")) console.error("F36 diagnostics", baseDiagnostics(h));
     expect(keys).toContain("gh-5");
     expect(await h.listed("gh-5")).toMatchObject({ key: "gh-5" });
@@ -246,7 +246,7 @@ describe("C4: an agent's commit while its unit is parked on an ask is not foreig
   });
 });
 
-/** gh-71 B28, B29, B32 (D10): the round a story is in, and how its earlier rounds ended, in every view. */
+/** The round a story is in, and how its earlier rounds ended, in every view. */
 describe("rounds in the views: status, story view, the handoff header, run list", () => {
   const TRIAGE = `name: triage
 start: explore
@@ -289,7 +289,7 @@ steps:
   const spec = ".agents/specs/gh-16-rounds-shown";
   const wt = () => `${h.root}-worktrees/gh-16-rounds-shown`;
   const runs = () => runStateOf(join(wt(), spec));
-  // gh-195 D9 (B7): the status block `story checkout` prints above the handoff, rendered from state.json
+  // The status block `story checkout` prints above the handoff, rendered from state.json
   const header = () => {
     const st = h.state(runs());
     if (!st) throw new Error("no state");
@@ -336,7 +336,7 @@ steps:
     expect(mine.length).toBeGreaterThan(0);
     expect(mine).toContainEqual(expect.objectContaining({ step: "refine", round: { n: 2, workflow: "story" } }));
     for (const i of mine) expect(i.round).toEqual({ n: 2, workflow: "story" });
-    // qa#1 (B28): the markdown a person reads shows the round and its workflow next to the step too
+    // qa#1: the markdown a person reads shows the round and its workflow next to the step too
     const status = (await h.norn("status")).stdout;
     expect(status).toMatch(/gh-16 +round 2 · story · refine/);
 
@@ -381,7 +381,7 @@ steps:
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "merge gh-1 (older norn)"]);
     h.git(["push", "-q", "origin", "main"]);
-    // gh-195 D16: read from its archive ref, as `norn upgrade` leaves it (D14), never from the base tree
+    // Read from its archive ref, as `norn upgrade` leaves it, never from the base tree
     archiveTreeRunState(h.root, "HEAD", OLD);
     const head = h.git(["rev-parse", "HEAD"]).trim();
     const text = (await h.norn("run", "list", "gh-1")).stdout;

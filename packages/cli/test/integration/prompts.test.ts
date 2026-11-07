@@ -1,5 +1,5 @@
 /**
- * Prompts and launches end to end (§13.1):
+ * Prompts and launches end to end:
  *   - R6.1: an implicit ask (a prompt in the agent's pane) does not refuse the agent's report — the
  *     report is accepted behind an `answer` receipt `by: "agent"`
  *   - R6.2: `norn answer` types the option number + enter into the prompt, then writes the receipt
@@ -9,7 +9,7 @@
  *   - B6/B11: a report after a person's answer is accepted; a tick racing the agent's own answer is
  *     superseded, not failed
  *   - R8.1: the launch command puts the norn shim first on PATH inside the command, NORN_BIN set —
- *     through a launcher file, so the typed command stays short (B2)
+ * through a launcher file, so the typed command stays short
  *   - R9.1: SessionStart without a turn start → one re-send, then `silent` "launch prompt not received"
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -223,7 +223,7 @@ describe("B11: the tick and the agent resolve the same implicit ask", () => {
   });
   afterAll(() => h.cleanup());
 
-  test("the agent's answer takes the number first (S6): the tick's resolution is superseded, not a failure", async () => {
+  test("the agent's answer takes the number first: the tick's resolution is superseded, not a failure", async () => {
     await untilRunning(h);
     await parkOnPrompt(h);
     // the pane moved on, and while this tick observes it the agent reports
@@ -256,7 +256,7 @@ describe("R8.1: the launched agent runs this norn (acceptance 11)", () => {
     await untilRunning(h);
     const launch = h.runner.launches[0];
     const shim = join(h.home, "bin", "norn");
-    // B2: the command is `<launcher> claude …`; the launcher (not the command line) carries PATH and NORN_BIN
+    // The command is `<launcher> claude …`; the launcher (not the command line) carries PATH and NORN_BIN
     const launcher = launch?.argv[0] as string;
     expect(launcher).toStartWith(join(h.home, "launch") + "/");
     expect(launch?.argv[1]).toBe("claude");

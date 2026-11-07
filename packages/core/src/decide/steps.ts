@@ -1,4 +1,4 @@
-/** decide for the other step types: story start, check and git steps, and the slices step (W2). */
+/** decide for the other step types: story start, check and git steps, and the slices step. */
 import {
   type GitStep,
   PR_BODY_FILE,
@@ -23,8 +23,6 @@ import { unitWorktree } from "../policy.ts";
 import { checkWorkflowLevel, stepOf, type UnitLevel } from "../workflow.ts";
 import { commitFor, type Ctx, emitApplied, endedWith, nextReceiptNumber, nornReceipt, park, rebasing, synth, trailersFor, unitBranch } from "./receipts.ts";
 
-// ---------------------------------------------------------------- start
-
 export function startStoryUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts): void {
   const fm = story.frontmatter as StoryFrontmatter;
   const loaded = usableWorkflow(ctx, fm.workflow, "story");
@@ -37,7 +35,7 @@ export function startStoryUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts): void
     });
   }
   const worktree = unitWorktree(story, uf);
-  if (!worktree) return ctx.noop(uf.unit, "start.no_worktree", "story worktree missing (GR2)");
+  if (!worktree) return ctx.noop(uf.unit, "start.no_worktree", "story worktree missing");
   const state = initialState({ unit: uf.unit, workflow: loaded.workflow, workflowName: fm.workflow, workflowHash: sha256(loaded.source), now: ctx.nowIso, mode: story.mode, tick_id: ctx.facts.tick_id });
   ctx.emit({
     kind: "start_unit",
@@ -61,13 +59,11 @@ export function usableWorkflow(ctx: Ctx, name: string, level: UnitLevel): { work
   return { workflow: lw.workflow, source: lw.source };
 }
 
-// ---------------------------------------------------------------- check / git
-
-/** gh-71 D2, gh-195 D7: the unit's record folder relative to the story's run-state folder, as observe resolved it. */
+/** The unit's record folder relative to the story's run-state folder, as observe resolved it. */
 export function recordOf(uf: UnitFacts): string {
   return uf.record !== undefined ? normalRecord(uf.record) : unitRecordPath(uf.unit.dir);
 }
-/** gh-71 D7 (B34), RD7: the story unit's record is flat, `_story/state.json` directly in its folder (an older norn's). */
+/** The story unit's record is flat, `_story/state.json` directly in its folder (an older norn's). */
 export const hasFlatRecord = (uf: UnitFacts): boolean => uf.unit.slice === null && uf.record !== undefined && normalRecord(uf.record) === unitRecordPath(STORY_UNIT_DIR);
 
 export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, command: string, timeout_ms: number): void {
@@ -75,7 +71,7 @@ export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitSta
   if (uf.lease?.kind === "check") return ctx.noop(ref, "check.running", `check run ${uf.lease.run_id ?? "?"} in progress`);
   const cwd = unitWorktree(story, uf);
   if (!cwd) return ctx.noop(ref, "check.no_worktree", "unit worktree missing");
-  if (ctx.checksFree <= 0) return ctx.noop(ref, "check.queued", `queued: max_agents ${ctx.config.max_agents} in use (K1)`);
+  if (ctx.checksFree <= 0) return ctx.noop(ref, "check.queued", `queued: max_agents ${ctx.config.max_agents} in use`);
   ctx.checksFree--;
   const run_id = ctx.id();
   const env: Record<string, string> = { NORN_STORY: story.key, NORN_RUN: run_id, ...ctx.slotEnv(uf.worktree?.slot ?? null) };
@@ -99,14 +95,14 @@ export function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState
   const cwd = unitWorktree(story, uf);
   if (!cwd) return ctx.noop(ref, "git.no_worktree", "unit worktree missing");
   if (step.action === "integrate" || step.action === "update") {
-    // K6: integration is serialized per story — a base update (BS3) takes the same lock
-    if (ctx.integrating.has(story.key)) return ctx.noop(ref, `git.${step.action}.queued`, "another integration of this story runs this tick (K6)");
+    // Integration is serialized per story — a base update takes the same lock
+    if (ctx.integrating.has(story.key)) return ctx.noop(ref, `git.${step.action}.queued`, "another integration of this story runs this tick");
     ctx.integrating.add(story.key);
   }
   const fm = story.frontmatter as StoryFrontmatter;
   let update: RunGitAction["update"] = null;
   if (step.action === "update") {
-    // BS1/BS3: the base is measured by observe; no base ref (never fetched, no base branch) → wait
+    // The base is measured by observe; no base ref (never fetched, no base branch) → wait
     const b = story.base;
     if (!b) return ctx.noop(ref, "git.update.no_base", `base ${ctx.facts.repo.default_branch} not observed for ${story.branch}`);
     const base = ctx.facts.repo.default_branch;
@@ -136,7 +132,7 @@ export function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState
   });
 }
 
-/** BS8: the base a classify receipt records. */
+/** The base a classify receipt records. */
 export const baseOf = (b: NonNullable<StoryFacts["base"]>): NonNullable<ReceiptOf<"classify">["base"]> => ({ ref: b.ref, sha: b.sha, behind: b.behind, conflicts: [...b.conflicts] });
 
 /** A norn-classified outcome for a non-agent step (git/slices/gate), applied in the same tick. */
@@ -153,7 +149,7 @@ export function classifyNorn(
 ): void {
   const receipt = nornReceipt(ctx, st, "classify", { outcome, rule: extra.receiptRule ?? rule, detail, route: "park", ...(extra.base ? { base: extra.base } : {}) });
   const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), receipt);
-  // §10, W4: the route is where applying the receipt sent the unit
+  // The route is where applying the receipt sent the unit
   receipt.route = routeOf(res) ?? "park";
   ctx.emit({
     kind: "classify",
@@ -168,10 +164,8 @@ export function classifyNorn(
   });
 }
 
-// ---------------------------------------------------------------- slices (W2)
-
 /**
- * §10: the story is stuck because its slices step classified `stuck` (that receipt parked it), and
+ * The story is stuck because its slices step classified `stuck` (that receipt parked it), and
  * a slice can move again now — a person unstuck it, or the slice files changed.
  */
 export function slicesCanResume(story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): boolean {
@@ -181,7 +175,7 @@ export function slicesCanResume(story: StoryFacts, uf: UnitFacts, st: UnitState,
   return parkedBySlices && !sliceProgress(story).broken.length && slicesStuck(story) === null;
 }
 
-/** §10, O2: norn unsticks the story back into its slices step, as `norn run rerun <story>` would. */
+/** Norn unsticks the story back into its slices step, as `norn run rerun <story>` would. */
 export function resumeSlices(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): void {
   const unstick = nornReceipt(ctx, st, "unstick", { comment: "a slice can move again" });
   const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), unstick);
@@ -195,13 +189,13 @@ function sliceProgress(story: StoryFacts) {
   const broken = files.filter((s) => !s.frontmatter);
   const integrated = (s: SliceFileFacts) => s.frontmatter?.status === "integrated" || unitOf(s.key)?.state?.status === "done";
   const done = new Set(files.filter(integrated).map((s) => s.key));
-  // a broken file (null frontmatter) is never pending: decide notes `slices.file_invalid` first (S2)
+  // a broken file (null frontmatter) is never pending: decide notes `slices.file_invalid` first
   const pending = files.filter((s): s is SliceFileFacts & { frontmatter: SliceFrontmatter } => !!s.frontmatter && !done.has(s.key) && !unitOf(s.key)?.state);
   const startable = pending.filter((s) => s.frontmatter.depends_on.every((d) => done.has(d)));
   return { unitOf, files, broken, done, pending, startable };
 }
 
-/** §10: why no slice can move without a person (no slice files, every active slice stuck, none can start); null when one can. */
+/** Why no slice can move without a person (no slice files, every active slice stuck, none can start); null when one can. */
 function slicesStuck(story: StoryFacts): { rule: string; detail: string } | null {
   const { unitOf, files, done, pending, startable } = sliceProgress(story);
   if (!files.length) return { rule: "slices.none", detail: "no slice files" };
@@ -209,7 +203,7 @@ function slicesStuck(story: StoryFacts): { rule: string; detail: string } | null
   const activeUnits = files.filter((s) => !done.has(s.key) && unitOf(s.key)?.state);
   const isStuck = (s: SliceFileFacts) => {
     const u = unitOf(s.key);
-    // gh-79 (H1): a rebasing slice's state is a rewound copy; it is held, so it still progresses
+    // A rebasing slice's state is a rewound copy; it is held, so it still progresses
     if (u && rebasing(u)) return false;
     const status = u?.state?.status;
     return status === "stuck" || status === "corrupt";
@@ -218,8 +212,8 @@ function slicesStuck(story: StoryFacts): { rule: string; detail: string } | null
   const stuckSlices = activeUnits.filter(isStuck);
   if (stuckSlices.length && stuckSlices.length === activeUnits.length) {
     const corrupt = (s: SliceFileFacts) => unitOf(s.key)?.state?.status === "corrupt";
-    const named = stuckSlices.map((s) => (corrupt(s) ? `slice ${s.key} corrupt (S2)` : `slice ${s.key} stuck: ${unitOf(s.key)?.state?.park?.reason ?? "?"}`));
-    // gh-79: run rerun refuses a corrupt unit, so a corrupt one is pointed at run view --why
+    const named = stuckSlices.map((s) => (corrupt(s) ? `slice ${s.key} corrupt` : `slice ${s.key} stuck: ${unitOf(s.key)?.state?.park?.reason ?? "?"}`));
+    // Run rerun refuses a corrupt unit, so a corrupt one is pointed at run view --why
     const first = stuckSlices[0] as SliceFileFacts;
     return { rule: "slices.slice_stuck", detail: `${named.join("; ")} — ${corrupt(first) ? cmd.runView(first.key, { why: true }) : cmd.runRerun(first.key)}` };
   }
@@ -250,7 +244,7 @@ export function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
     const branch = sliceBranch(story.key, s.nn, s.slug);
     const slot = ctx.slot();
     const worktree: WorktreeSpec = { path, branch, from: story.branch, env: ctx.slotEnv(slot), slot };
-    // gh-71 D2 (B33): a slice records the story round that started it
+    // A slice records the story round that started it
     const state = initialState({ unit: sliceRef, workflow: loaded.workflow, workflowName: name, workflowHash: sha256(loaded.source), now: ctx.nowIso, tick_id: ctx.facts.tick_id, round: st.round ?? 1 });
     starts.push({
       kind: "start_unit" as const,

@@ -1,7 +1,4 @@
-/**
- * Briefing renderer (B3, B5, B6): `norn brief [--json]` built from data only — state,
- * pinned workflow step, inputs, handoff and receipts. Pure and snapshot-testable (B4).
- */
+/** Briefing renderer: `norn brief [--json]` built from data only (state, pinned step, inputs, handoff, receipts). */
 import {
   type AgentStep,
   type CheckReceipt,
@@ -31,9 +28,8 @@ import { branchRewrittenLine, recordLostLine } from "./apply.ts";
 export interface BriefInput {
   unit: UnitRef;
   state: UnitState;
-  /** the unit's pinned workflow */
   workflow: Workflow;
-  /** the story's mode and this machine's runner, for the effective mode (MO2) */
+  /** the story's mode and this machine's runner, for the effective mode */
   mode: Mode;
   runner: string | null;
   /** absolute or repo-relative paths shown to the agent */
@@ -50,12 +46,12 @@ export interface BriefInput {
   check_log?: { log: string; text: string } | null;
   /** files in each evidence folder, keyed by the receipt's `evidence` (e.g. `evidence/<run_id>`), when the caller listed them */
   evidence_files?: Readonly<Record<string, readonly string[]>>;
-  /** F28/O2: the story's gate rulings (`storyRulings` over the receipts of every unit of the story), when the caller read them */
+  /** The story's gate rulings (`storyRulings` over the receipts of every unit of the story), when the caller read them */
   rulings?: readonly Ruling[];
-  /** QV1: the unit's frontmatter `criteria` (slice file, or spec.md for the story unit), when the caller read them */
+  /** The unit's frontmatter `criteria` (slice file, or spec.md for the story unit), when the caller read them */
   criteria?: readonly Criterion[] | null;
   /**
-   * gh-195 D5 (B28): for the `record` input, each unit of the story's record: its folder name in the
+   * For the `record` input, each unit of the story's record: its folder name in the
    * record (`_story`, `<nn>-<slug>`) and its run-state folder in the machine dir (absolute; the story's
    * current round for `_story`), when the caller listed them
    */
@@ -63,8 +59,8 @@ export interface BriefInput {
 }
 
 /**
- * A person's ruling at a gate (O2): `norn story approve|reject --reason "…"` on any unit of the story.
- * The gate receipt is the record; every later brief of the story and its slices repeats it (F28).
+ * A person's ruling at a gate: `norn story approve|reject --reason "…"` on any unit of the story.
+ * The gate receipt is the record; every later brief of the story and its slices repeats it.
  */
 export interface Ruling {
   /** unit the gate belonged to (story or slice key) */
@@ -76,11 +72,11 @@ export interface Ruling {
   at: string;
   comment: string;
   receipt_id: string;
-  /** C2: the unit's branch head the ruling judged; null when the gate receipt did not record it */
+  /** The unit's branch head the ruling judged; null when the gate receipt did not record it */
   head_sha: string | null;
 }
 
-/** Gate rulings with a reason across the story's units, oldest first, one per receipt (F28). */
+/** Gate rulings with a reason across the story's units, oldest first, one per receipt. */
 export function storyRulings(units: ReadonlyArray<{ unit: string; receipts: readonly NumberedReceipt[] }>): Ruling[] {
   const seen = new Set<string>();
   const out: Ruling[] = [];
@@ -108,7 +104,7 @@ export interface BriefReport {
   outcome: string;
   handoff: string;
   evidence: BriefEvidence | null;
-  /** QV2: the report's criteria that did not pass (fail with repro, person/unverified with how); absent = none */
+  /** The report's criteria that did not pass (fail with repro, person/unverified with how); absent = none */
   criteria?: CriterionVerdict[];
 }
 
@@ -125,17 +121,16 @@ export interface BriefCheck {
 }
 
 export interface BriefJson {
-  /** gh-195 D9 (B7): `counters` and `last_outcome` are the status the handoff's generated header used to carry */
   where: { story: string; slice: string | null; step: string; attempt: number; counters: string; last_outcome: string; mode: Mode; mode_note: string | null; attended: boolean; run_id: string | null };
   /** why this run is not a first entry of the step; null when it is, or when Rework already says why */
   history: {
-    /** B2/C1: a session of this attempt ended without reporting; this is a fresh one */
+    /** A session of this attempt ended without reporting; this is a fresh one */
     retry: { outcome: string; detail: string | null; at: string } | null;
-    /** C2: an earlier attempt of this step reported on older code, and the outcomes recorded since */
+    /** An earlier attempt of this step reported on older code, and the outcomes recorded since */
     earlier: { attempt: number; outcome: string; since: string[] } | null;
-    /** T5a (gh-195 B24): a takeover restarted the step because the story branch was rewritten since the record */
+    /** A takeover restarted the step because the story branch was rewritten since the record */
     rewritten?: { gone: string; head: string; line: string } | null;
-    /** gh-195 B25 (D10): a takeover found no record and started this round from the branch */
+    /** A takeover found no record and started this round from the branch */
     record_lost?: { holder: string | null; line: string } | null;
   } | null;
   work: { skill: string; instructions: string | null; description: string | null };
@@ -143,7 +138,7 @@ export interface BriefJson {
   rework: {
     /** `<step>.<outcome>` that sent the work back */
     from: string;
-    /** the counted edge taken (W4): the fix round */
+    /** the counted edge taken: the fix round */
     counter: { name: string; value: number; max: number } | null;
     check: { step: string; command: string; exit_code: number | null; reason: string | null; output_tail: string; log: string | null } | null;
     /** a step that reported a failing outcome: its handoff and evidence */
@@ -153,19 +148,19 @@ export interface BriefJson {
     decision: { step: string; by: string | null; comment: string | null; judged: BriefReport | null } | null;
     detail: string | null;
     /**
-     * BS5 base mode: `git: update` stopped on conflicts — merge `sha` (the tip of `ref`) into the
+     * Base mode: `git: update` stopped on conflicts — merge `sha` (the tip of `ref`) into the
      * story branch in this worktree, resolve, commit the merge; never rebase. Absent otherwise.
      */
     base?: { ref: string; sha: string; conflicts: string[] };
   } | null;
   /**
-   * B3 (gh-170): checks recorded since the last `done` report — what ran on the code that report
+   * Checks recorded since the last `done` report — what ran on the code that report
    * left, so a reviewer knows which checks have run and which have not. `log`: the full log when the
    * check kept one, else its receipt (which holds the output tail). The failing check shown under
    * Rework is not repeated. `since`: that report, `<step>#<attempt>`. null when none.
    */
   checks: { since: string; items: BriefCheck[] } | null;
-  /** F28: gate rulings of the story, oldest first (the one shown under Rework excepted) */
+  /** Gate rulings of the story, oldest first (the one shown under Rework excepted) */
   rulings: Ruling[];
   context: {
     handoff: string | null;
@@ -175,9 +170,9 @@ export interface BriefJson {
     /** findings of the previous step on a forward entry: for information, not rework */
     notes: { step: string; outcome: string; items: Finding[] } | null;
   };
-  /** `verdict`: QV5 — reportable only when the worst verdict of the criteria report is this one */
+  /** `verdict`: reportable only when the worst verdict of the criteria report is this one */
   finish: Array<{ command: string; means: string; verdict?: string }>;
-  /** QV1: the criteria the `--criteria` report must cover, when declared */
+  /** The criteria the `--criteria` report must cover, when declared */
   criteria: Array<{ id: string; verifier: string }> | null;
   limits: { attended: boolean; deadline: string | null; deadline_at: string | null; nudges_left: number | null; retries_left: number | null; slot: number | null; port_base: number | null };
 }
@@ -257,12 +252,12 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): Br
       case "handoff":
         // its text is already under Context: name the file to update, not one to read again
         return [{ kind: i, label: "Handoff (text under Context; update it here)", ref: `${p.spec_dir}/${unitHandoffPath(input.unit.dir)}` }];
-      // B6: point at Rework only when it holds something for this input
+      // Point at Rework only when it holds something for this input
       case "last_check":
         return [{ kind: i, label: "Last failing check", ref: rw?.check ? "see Rework" : "none" }];
       case "last_findings":
         return [{ kind: i, label: "Last findings", ref: rw && (rw.findings || rw.report || rw.decision) ? "see Rework" : "none" }];
-      // gh-195 D5 (B28): run state is in the machine dir, not the worktree; evidence is linked by its record path
+      // Run state is in the machine dir, not the worktree; evidence is linked by its record path
       case "record":
         return (input.record ?? []).flatMap((u) => [
           { kind: i, label: `Receipts of ${u.unit} (QA criteria reports)`, ref: `${u.dir}/receipts/` },
@@ -278,7 +273,7 @@ const isDone = (r: NumberedReceipt): r is NumberedReceipt & { receipt: DoneRecei
 const FORWARD = new Set(["pass", "approve", "done", "partial", "unverified"]);
 
 /**
- * A receipt that sends work back (W4): its outcome takes a counted edge, or — for edges without
+ * A receipt that sends work back: its outcome takes a counted edge, or — for edges without
  * a counter — it is failure-shaped (failing check, gate reject, merge conflict, a `done` whose
  * outcome is not a forward one).
  */
@@ -293,7 +288,7 @@ function sendsBack(wf: Workflow, r: Receipt): boolean {
 }
 
 /**
- * Receipts that can still be rework for the current attempt (B6): those after the last receipt
+ * Receipts that can still be rework for the current attempt: those after the last receipt
  * of an earlier attempt of this step (whose run already addressed what came before it).
  */
 function sincePreviousAttempt({ state: st, receipts }: BriefInput): readonly NumberedReceipt[] {
@@ -328,9 +323,9 @@ const IN_STEP = new Set(["nudge", "retry", "park"]);
 /**
  * The receipt that moved the cursor here from another step, if any. After an in-step outcome
  * (`died`, `silent`, …) `last_outcome` names this step, so look back for the last outcome of
- * another step: a fresh session keeps its Rework (B2). An `unstick` keeps `last_outcome`, so a
+ * another step: a fresh session keeps its Rework. An `unstick` keeps `last_outcome`, so a
  * unit stuck by an exhausted counter and unstuck `--to` a step still enters it from that receipt.
- * Exported for `norn done` (BS5): the base it verifies is the one this brief told the agent to merge.
+ * Exported for `norn done`: the base it verifies is the one this brief told the agent to merge.
  */
 export function enteringReceipt({ state: st, receipts }: Pick<BriefInput, "state" | "receipts">): NumberedReceipt | undefined {
   if (!st.last_outcome) return undefined;
@@ -346,7 +341,7 @@ function movesAfter(receipts: readonly NumberedReceipt[], from: number): string[
   });
 }
 
-/** History (B2, C2) when this is not a first entry and Rework does not already explain it. */
+/** History when this is not a first entry and Rework does not already explain it. */
 function history(input: BriefInput, rw: BriefJson["rework"]): BriefJson["history"] {
   const { state: st, receipts } = input;
   const died = st.retries_used > 0 ? receipts.findLast(({ receipt: r }) => r.kind === "classify" && r.route === "retry" && r.step === st.step && r.attempt === st.attempt)?.receipt : undefined;
@@ -354,13 +349,13 @@ function history(input: BriefInput, rw: BriefJson["rework"]): BriefJson["history
   const idx = rw ? -1 : receipts.findLastIndex(({ receipt: r }) => r.kind === "done" && r.step === st.step && r.attempt !== st.attempt);
   const prev = receipts[idx]?.receipt;
   const earlier = prev?.kind === "done" ? { attempt: prev.attempt, outcome: prev.outcome, since: movesAfter(receipts, idx) } : null;
-  // T5a (gh-195 B24): this attempt is the one a takeover started because the branch was rewritten —
-  // the last such take, with every receipt after it written at this cursor (review F3: the step it
-  // restarted may be another than the one it was written at)
+  // This attempt is the one a takeover started because the branch was rewritten —
+  // the last such take, with every receipt after it written at this cursor (the step it restarted
+  // may be another than the one it was written at)
   const at = receipts.findLastIndex(({ receipt: r }) => r.kind === "take" && !!r.rewritten);
   const take = at >= 0 && receipts.slice(at + 1).every(({ receipt: r }) => r.step === st.step && r.attempt === st.attempt) ? receipts[at]?.receipt : undefined;
   const rewritten = take?.kind === "take" && take.rewritten ? { gone: take.rewritten.gone, head: take.rewritten.head, line: branchRewrittenLine(st.story, take.rewritten.gone, st.step, st.attempt) } : null;
-  // gh-195 B25: this attempt is the first of a round a takeover started from the branch with the record
+  // This attempt is the first of a round a takeover started from the branch with the record
   // lost — the take written at this cursor, every receipt after it too
   const lostAt = receipts.findLastIndex(({ receipt: r }) => r.kind === "take" && r.record_lost === true);
   const lostTake = lostAt >= 0 && receipts.slice(lostAt).every(({ receipt: r }) => r.step === st.step && r.attempt === st.attempt) ? receipts[lostAt]?.receipt : undefined;
@@ -393,17 +388,17 @@ function dropSection(md: string, title: string, note: string): string {
   return [...lines.slice(0, start + 1), note, ...(end < lines.length ? [""] : []), ...lines.slice(end)].join("\n");
 }
 
-/** QV1: the declared criteria (B36: id and verifier only). */
+/** The declared criteria (id and verifier only). */
 function criteriaFor({ criteria }: BriefInput): BriefJson["criteria"] {
   if (!criteria?.length) return null;
   return criteria.map((c) => ({ id: c.id, verifier: c.verifier }));
 }
 
 /**
- * B3 Rework, only when the work was sent back here (W4: the edge taken has a counter, or the
- * entering receipt is failure-shaped). It shows what sent it back — the failing check, the failed
+ * Rework, only when the work was sent back here (the edge taken has a counter, or the entering
+ * receipt is failure-shaped). It shows what sent it back — the failing check, the failed
  * report with its handoff, findings and evidence, the gate's comment, the conflict — plus declared
- * `last_check` / `last_findings` failures still live for this attempt (B6).
+ * `last_check` / `last_findings` failures still live for this attempt.
  */
 function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
   const { state: st, workflow: wf, receipts } = input;
@@ -444,12 +439,12 @@ function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
     findings: done?.findings?.length ? { step: done.step, outcome: done.outcome, items: done.findings } : null,
     decision,
     detail: r.kind === "classify" ? (r.detail ?? `${r.step}: ${r.outcome}`) : null,
-    // BS5: the base the update could not merge, as data (never parsed from `detail`, P8)
+    // The base the update could not merge, as data (never parsed from `detail`)
     ...(r.kind === "classify" && r.outcome === "conflict" && r.base ? { base: { ref: r.base.ref, sha: r.base.sha, conflicts: [...r.base.conflicts] } } : {}),
   };
 }
 
-/** B3 (gh-170): the checks recorded after the unit's last `done` report, oldest first; the one under Rework left out. */
+/** The checks recorded after the unit's last `done` report, oldest first; the one under Rework left out. */
 function checksSince(input: BriefInput, step: AgentStep): BriefJson["checks"] {
   const { receipts } = input;
   const from = receipts.findLastIndex(isDone);
@@ -464,7 +459,7 @@ function checksSince(input: BriefInput, step: AgentStep): BriefJson["checks"] {
   return out.length ? { since: `${report.step}#${report.attempt}`, items: out } : null;
 }
 
-/** The failing check Rework shows: the one that sent the work back, or a declared `last_check` still live (B6). */
+/** The failing check Rework shows: the one that sent the work back, or a declared `last_check` still live. */
 function reworkCheck(input: BriefInput, step: AgentStep): (NumberedReceipt & { receipt: CheckReceipt }) | undefined {
   const entering = enteringReceipt(input);
   if (!entering || !sendsBack(input.workflow, entering.receipt)) return undefined;
@@ -478,13 +473,13 @@ function rulingsFor(input: BriefInput): Ruling[] {
   return (input.rulings ?? []).filter((r) => !(entering?.kind === "reject" && r.receipt_id === entering.receipt_id));
 }
 
-/** B3 Context on a forward entry: the previous step's findings, as information only. */
+/** Context on a forward entry: the previous step's findings, as information only. */
 function notes(input: BriefInput): BriefJson["context"]["notes"] {
   const e = enteringReceipt(input);
   return e && isDone(e) && e.receipt.findings?.length ? { step: e.receipt.step, outcome: e.receipt.outcome, items: e.receipt.findings } : null;
 }
 
-/** Questions asked in this attempt and their answers (B3 Context). */
+/** Questions asked in this attempt and their answers (Context). */
 function answers(input: BriefInput): BriefJson["context"]["answers"] {
   const { state: st } = input;
   const out: BriefJson["context"]["answers"] = [];
@@ -503,7 +498,7 @@ function answers(input: BriefInput): BriefJson["context"]["answers"] {
 function finish(step: AgentStep): BriefJson["finish"] {
   const out: BriefJson["finish"] = reportableOutcomes(step).map((o) => {
     const edge = outcomeEdge(step.outcomes[o] as OutcomeSpec);
-    // QV3/QV5: a step requiring criteria, or an outcome gated by a verdict, takes the report file
+    // A step requiring criteria, or an outcome gated by a verdict, takes the report file
     const criteria = step.criteria === "required" || edge.verdict !== undefined;
     return {
       command: cmd.done(o, { criteria }),
@@ -531,8 +526,6 @@ function limits(input: BriefInput, step: AgentStep): BriefJson["limits"] {
   };
 }
 
-// ---------------------------------------------------------------- markdown
-
 /** `83400` → `1m 23s`; under a minute `2.1s`. */
 function duration(ms: number): string {
   if (ms < 60_000) return `${Math.round(ms / 100) / 10}s`;
@@ -554,7 +547,7 @@ function findingLines(out: string[], items: readonly Finding[]): void {
   out.push("");
 }
 
-/** QV2: criteria of a report that did not pass, each with its repro or how to check it. */
+/** Criteria of a report that did not pass, each with its repro or how to check it. */
 function criteriaLines(out: string[], items: readonly CriterionVerdict[] | undefined): void {
   if (!items?.length) return;
   out.push("Criteria not passed:", "");
@@ -686,7 +679,7 @@ function markdown(b: BriefJson): string {
     out.push(
       "## Rulings",
       "",
-      "A person ruled at a gate of this story, each time at the head named below. These rulings answer the questions of reading and scope they address, even where the spec text still says otherwise; follow them and do not raise them again. A ruling never turns a criterion into `pass`: it judged the code at its head, not the current code. Each criterion still gets its own verdict from what you observe now; one you cannot observe here is `unverified` (QV5a). At most a ruling informs a `person` verdict — cite it in that verdict's `how` for the person to confirm on the current head.",
+      "A person ruled at a gate of this story, each time at the head named below. These rulings answer the questions of reading and scope they address, even where the spec text still says otherwise; follow them and do not raise them again. A ruling never turns a criterion into `pass`: it judged the code at its head, not the current code. Each criterion still gets its own verdict from what you observe now; one you cannot observe here is `unverified`. At most a ruling informs a `person` verdict — cite it in that verdict's `how` for the person to confirm on the current head.",
       "",
     );
     for (const r of b.rulings)
@@ -726,7 +719,7 @@ function markdown(b: BriefJson): string {
 
   out.push("## Limits", "");
   const l = b.limits;
-  if (l.attended) out.push("- Attended step: no deadline or nudges (MO4)");
+  if (l.attended) out.push("- Attended step: no deadline or nudges");
   else {
     out.push(`- Deadline: ${l.deadline} (until ${l.deadline_at})`);
     out.push(`- Nudges left: ${l.nudges_left}`);

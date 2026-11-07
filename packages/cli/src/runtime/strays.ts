@@ -1,5 +1,5 @@
 /**
- * K4.1: a process an agent left behind (a dev or smoke server started from inside the worktree)
+ * A process an agent left behind (a dev or smoke server started from inside the worktree)
  * keeps listening on the worktree's slot ports after its run ended, and the next check fails with
  * "address in use". Before a check, norn stops every listener on the slot's ports whose working
  * directory is inside the worktree; a listener started anywhere else is left alone. Best effort:

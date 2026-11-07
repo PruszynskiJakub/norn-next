@@ -34,7 +34,7 @@ Write the commit → section (or omitted, with why) list under Progress in the h
 
 ## 3. Write the changelog
 
-Read the two latest sections of `CHANGELOG.md` and write the same way: one bullet per change a user notices, in plain sentences, present tense, commands and keys in backticks, rule ids where a rule changed; sub-bullets when one change has several parts. Several PRs that make one change are one bullet. Never paste PR titles.
+Read the two latest sections of `CHANGELOG.md` and write the same way: one bullet per change a user notices, in plain sentences, present tense, commands and keys in backticks; sub-bullets when one change has several parts. Several PRs that make one change are one bullet. Never paste PR titles.
 
 Insert `## [X.Y.Z] - <today, YYYY-MM-DD>` above the latest version, with `### Added`, `### Changed`, `### Removed`, `### Fixed` in that order, empty ones left out. Keep the preamble. Never add an `## [Unreleased]` section; remove an empty one. `release.yml` refuses to tag a version without its `## [X.Y.Z]` section.
 
@@ -46,9 +46,9 @@ The version from Rework, else the one in `## Version`, else your proposal. Befor
 
 - `version` in `packages/cli/package.json`.
 - The README release badge: `badge/release-vX.Y.Z-blue` and its alt text `Release vX.Y.Z`.
-- `norn_version: X.Y.Z` in `.agents/norn.config.yaml`: edit the line in place so the comments stay. Once the PR merges, `main` asks for exactly the binary it publishes (gh-61 B27).
+- `norn_version: X.Y.Z` in `.agents/norn.config.yaml`: edit the line in place so the comments stay. Once the PR merges, `main` asks for exactly the binary it publishes.
 
-Edit by hand, never with `norn upgrade` (gh-61 D13): it runs only in the main checkout, and the norn running this step is the release before this one.
+Edit by hand, never with `norn upgrade`: it runs only in the main checkout, and the norn running this step is the release before this one.
 
 ## 6. Refresh the bundled skills
 
@@ -74,7 +74,7 @@ Only `norn`-prefixed folders: `release`, `release-start` and `issue` are this re
 
 ## 8. Rename the issue
 
-`gh issue edit <N> --title "Release X.Y.Z"`. The story mirrors the title (GR8), and the squash commit on main takes the PR's title. This is the one remote write this step allows, an exception to the `norn` skill's rule; never edit the issue body.
+`gh issue edit <N> --title "Release X.Y.Z"`. The story mirrors the title, and the squash commit on main takes the PR's title. This is the one remote write this step allows, an exception to the `norn` skill's rule; never edit the issue body.
 
 ## 9. Report
 

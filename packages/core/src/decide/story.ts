@@ -1,6 +1,6 @@
 /**
- * decide at story level (claims T1–T10, corrupt S2, remote lifecycle GR6–GR8, mailbox T9) and the
- * per-unit dispatch (receipts C2 → drift S7 → recovery commit → step semantics by type).
+ * decide at story level (claims, corrupt, remote lifecycle, mailbox) and the per-unit dispatch
+ * (receipts → drift → recovery commit → step semantics by type).
  */
 import {
   type ClaimBlob,
@@ -34,10 +34,8 @@ import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceF
 import { baseOf, classifyNorn, hasFlatRecord, recordOf, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit, usableWorkflow } from "./steps.ts";
 import { cmd } from "../commands.ts";
 
-// ================================================================= story level
-
 /**
- * R3.1 (H6): what the loser of an intake race removes — the story worktree and local branch, when
+ * What the loser of an intake race removes — the story worktree and local branch, when
  * the branch holds nothing beyond the intake commit (`intake_only`, from trailers) and the worktree
  * is clean. Not observed: keep everything.
  */
@@ -69,24 +67,23 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   const claim = story.claim;
   const { facts } = ctx;
 
-  // ---- claims (T1–T6, T10): act only on stories this heartbeat holds
-  // gh-195 D11 (B27, R2.3): this checkout's own record of a story another heartbeat holds leaves runs/
+  // Claims: act only on stories this heartbeat holds. This checkout's own record of a story another heartbeat holds leaves runs/
   if (story.local_record && (claim.state === "other" || (claim.state === "expired" && claim.blob.heartbeat_id !== ctx.heartbeat))) return setAsideRecord(ctx, story, ref, claim.blob.holder);
   if (claim.state === "other") return ctx.noop(ref, "claim.other", `held by ${claim.blob.holder} until ${claim.blob.expires_at}`);
   if (claim.state === "corrupt") return ctx.noop(ref, "claim.corrupt", `claim ref ${claim.sha} is unreadable`);
   if (claim.state === "none" || claim.state === "expired") {
     const ours = claim.state === "expired" && claim.blob.heartbeat_id === ctx.heartbeat;
     const fresh = claim.state === "none" && !su?.state && story.frontmatter?.status === "new";
-    // R3.2 (H6, A21): the base record wins over any local spec — a story the base records as done
+    // The base record wins over any local spec — a story the base records as done
     // (or whose PR merged) is never acquired by a stale local intake or a returning checkout. Only this
     // heartbeat's own expired claim (nobody took it since) is re-acquired for a merged PR whose record
-    // is not yet done, so GR6 cleanup and the base record still happen.
+    // is not yet done, so the merge cleanup and the base record still happen.
     const baseDone = isClosedStatus(story.base_status);
     if (baseDone || (mergedIntoBase(story, ctx.facts.repo.default_branch) && !ours))
-      return ctx.noop(ref, "story.finished", baseDone ? `finished: ${ctx.facts.repo.default_branch} records it ${story.base_status} (R3.2); nothing to acquire` : "finished: PR merged (R3.2); nothing to acquire");
-    // GR6: a finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
+      return ctx.noop(ref, "story.finished", baseDone ? `finished: ${ctx.facts.repo.default_branch} records it ${story.base_status}; nothing to acquire` : "finished: PR merged; nothing to acquire");
+    // A finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
     if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${isClosedStatus(story.frontmatter?.status) ? story.frontmatter.status : "workflow done"}); nothing to take`);
-    if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — ${cmd.storyCheckout(story.key)} (T10)`);
+    if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — ${cmd.storyCheckout(story.key)}`);
     return ctx.emit({
       kind: "claim",
       unit: ref,
@@ -97,22 +94,22 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
       ...(fresh ? { lost_intake: lostIntake(story) } : {}),
     });
   }
-  // T4 + R1.1: renewal is a side action — emitted first (act renews before the story's other
-  // actions, R1.2), it leaves the story's units their one action this tick (H4, A15)
+  // Renewal is a side action, emitted first (act renews before the story's other actions); it
+  // leaves the story's units their one action this tick
   const renewAt = epoch(claim.blob.renewed_at) + parseDuration(ctx.config.claim.renew);
   if (facts.now >= renewAt)
     ctx.emit({ kind: "claim", unit: ref, rule: "claim.renew", op: "renew", expected: claim.sha, blob: claimBlob(ctx, story.key, claim.blob) });
 
   if (story.record_only) {
     recordOnly(ctx, story, ref);
-    // 10-R3-F2 (D4, B10): a story held from its record alone still owes its record under `remote`
+    // a story held from its record alone still owes its record under `remote`
     return pushRecord(ctx, story, ref);
   }
 
-  // ---- story file corrupt: never touch anything of the story (S2)
+  // story file corrupt: never touch anything of the story
   if (story.frontmatter_error || !story.frontmatter) {
     const errors = story.frontmatter_error ? [story.frontmatter_error] : [{ file: `${story.spec_dir}/${SPEC_FILE}`, errors: [{ path: "", message: "missing" }] }];
-    // S2: a broken spec.md is surfaced, never written into the unit's state
+    // A broken spec.md is surfaced, never written into the unit's state
     if (!ctx.has(ref.key)) ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "story.corrupt", errors, state: null, notify: null });
     return;
   }
@@ -121,8 +118,8 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
 
   moveRecords(ctx, story);
 
-  // gh-71 D7 (B34): a held story whose record is still flat moves into round 1 before anything else —
-  // never mid-rebase (H1), and never once its PR merged (the base keeps old records flat, B36)
+  // A held story whose record is still flat moves into round 1 before anything else —
+  // never mid-rebase, and never once its PR merged (the base keeps old records flat)
   if (!ctx.has(ref.key) && su?.state && hasFlatRecord(su) && !rebasing(su) && !mergedIntoBase(story, ctx.facts.repo.default_branch)) {
     const from = runStatePath(story, STORY_UNIT_DIR);
     return ctx.emit({ kind: "round_migrate", unit: ref, rule: "round.migrate", from, to: roundRunStatePath(story, 1, su.state.workflow) });
@@ -139,9 +136,9 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
 }
 
 /**
- * gh-195 D11 (B27, T7a): a local record whose tree this machine pushed to the story's ref went there with
- * a clean release (B15): removed quietly. Any other was superseded by a takeover without a release: set
- * aside under `superseded/<story>-<ulid>/`, never pushed, never merged, one Check item (R2.3).
+ * A local record whose tree this machine pushed to the story's ref went there with
+ * a clean release: removed quietly. Any other was superseded by a takeover without a release: set
+ * aside under `superseded/<story>-<ulid>/`, never pushed, never merged, one Check item.
  */
 function setAsideRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef, holder: string): void {
   const local = story.local_record;
@@ -151,29 +148,29 @@ function setAsideRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef, holder: strin
 }
 
 /**
- * gh-195 B33 (review#2 F1): a story held here with its record in the machine dir and no branch (taken
+ * A story held here with its record in the machine dir and no branch (taken
  * over from its record alone) goes on from that record: its claim is renewed above, its story unit's
  * receipts applied (the take among them), never intaken again. Nothing runs in it until it has a
  * branch to work on: no worktree, no session. Under `remote` its record is pushed as any held story's
- * (`pushRecord`, without a `Norn-Branch-Commit`, B33).
+ * (`pushRecord`, without a `Norn-Branch-Commit`).
  */
 function recordOnly(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
   if (ctx.has(ref.key)) return;
   const su = storyUnit(story);
   const st = su?.state;
   if (su && st && su.workflow && st.status !== "corrupt" && !su.errors.length && su.unapplied.length) return applyAction(ctx, story, su, st, su.workflow, su.unapplied, "receipts.apply");
-  return ctx.noop(ref, "story.record_only", `held here from its record; ${story.key} has no branch (B33), so nothing runs until it has one`);
+  return ctx.noop(ref, "story.record_only", `held here from its record; ${story.key} has no branch, so nothing runs until it has one`);
 }
 
 /**
- * gh-195 D4 (B10–B12, B14, S11): under `record.policy: remote` (read at every tick, B12), the holder
+ * Under `record.policy: remote` (read at every tick), the holder
  * pushes the story's record once its tree differs from the one on the record ref it last saw, after
  * the tick's branch pushes (a side action act performs last). A push that failed leaves the tree
- * different, so the next tick pushes again (B14). A move off the branch this tick (B34, D13) brings the
- * record into the machine dir as it acts, so the push rides along with it. Under `local`, nothing (B11).
+ * different, so the next tick pushes again. A move off the branch this tick brings the
+ * record into the machine dir as it acts, so the push rides along with it. Under `local`, nothing.
  * An action of this tick that pushes the record itself leaves no second push beside it: a story
- * cleaned up this tick (GR6, GR6b) is archived by that action (D15), and an `open-pr` pushes the
- * record before the PR (D5, B28). A push refused as stale (08-F4: another checkout pushed the ref)
+ * cleaned up this tick is archived by that action, and an `open-pr` pushes the
+ * record before the PR. A push refused as stale (another checkout pushed the ref)
  * waits until the record ref this checkout sees is another one, rather than failing again every tick.
  */
 function pushRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
@@ -187,16 +184,16 @@ function pushRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
   ctx.emit({ kind: "push_record", unit: ref, rule: "record.push", branch: story.branch, expected: pushed?.sha ?? null, holder: ctx.facts.machine.holder });
 }
 
-/** gh-195 D15, D5: an action that pushes the story's record itself — the archive of GR6/GR6b, or `open-pr`. */
+/** An action that pushes the story's record itself: the archive at merge or close, or `open-pr`. */
 const pushesRecordItself = (a: Action): boolean =>
   a.kind === "cleanup_merged_story" || a.kind === "close_story" || (a.kind === "run_git" && a.action === "open-pr");
 
 /**
- * gh-195/06 (B34, D13): run state an older norn left on a held unit's branch moves into the machine dir
+ * Run state an older norn left on a held unit's branch moves into the machine dir
  * before anything else is decided for the units it holds, one `move_record` per branch (the story's,
  * each slice's): the units read from there were read from the branch, so nothing else may act on them
- * this tick. A record whose files fail validation is not moved: the unit is marked corrupt (S2) and its
- * branch keeps its runs/. Never mid-merge or mid-rebase (H1): the removal would land in that commit.
+ * this tick. A record whose files fail validation is not moved: the unit is marked corrupt and its
+ * branch keeps its runs/. Never mid-merge or mid-rebase: the removal would land in that commit.
  */
 function moveRecords(ctx: Ctx, story: StoryFacts): void {
   for (const uf of story.units) {
@@ -208,19 +205,19 @@ function moveRecords(ctx: Ctx, story: StoryFacts): void {
       for (const u of [uf, ...moving]) if (!u.errors.length && !ctx.has(u.unit.key)) ctx.noop(u.unit, "record.move_waits", why);
     };
     if (busy) {
-      wait(`${busy} in progress in ${uf.worktree?.path}: the run state on ${unitBranch(story, uf)} moves once it is concluded (H1)`);
+      wait(`${busy} in progress in ${uf.worktree?.path}: the run state on ${unitBranch(story, uf)} moves once it is concluded`);
       continue;
     }
-    // S2: decideUnit marks each broken unit corrupt; nothing moves off this branch while a unit with a
+    // decideUnit marks each broken unit corrupt; nothing moves off this branch while a unit with a
     // folder on it is broken, even one read from elsewhere (its copy here may be the good one)
     const bad = story.units.filter((u) => br.holds.includes(u.unit.dir) && u.errors.length);
     if (bad.length) {
-      wait(`${bad.map((u) => u.unit.key).join(", ")} failed validation on ${unitBranch(story, uf)}: nothing moves (S2)`);
+      wait(`${bad.map((u) => u.unit.key).join(", ")} failed validation on ${unitBranch(story, uf)}: nothing moves`);
       continue;
     }
     const copy = br.copy.map((dir) => {
       const u = story.units.find((x) => x.unit.dir === dir);
-      // RD7: a flat story record lands in round 1 of its workflow
+      // A flat story record lands in round 1 of its workflow
       const flat = u?.state && hasFlatRecord(u) ? u.state : null;
       return { unit: dir, from: treeRunStatePath(story, dir), to: flat ? roundRunStatePath(story, 1, flat.workflow) : runStatePath(story, dir) };
     });
@@ -246,9 +243,9 @@ function claimBlob(ctx: Ctx, story: string, prev: ClaimBlob | null): ClaimBlob {
 }
 
 /**
- * GR6 (gh-88): a merged PR is the story's final outcome, so every unit not yet done is recorded done
+ * A merged PR is the story's final outcome, so every unit not yet done is recorded done
  * with the cleanup: a gate, ask or stuck still open at merge time is moot and leaves nothing in the
- * inbox, and `story wait --until done` returns. A unit whose files failed validation stays as it is (S2).
+ * inbox, and `story wait --until done` returns. A unit whose files failed validation stays as it is.
  */
 function finishMerged(ctx: Ctx, story: StoryFacts): Array<{ unit: UnitRef; state: UnitState }> {
   const out: Array<{ unit: UnitRef; state: UnitState }> = [];
@@ -260,11 +257,11 @@ function finishMerged(ctx: Ctx, story: StoryFacts): Array<{ unit: UnitRef; state
   return out;
 }
 
-/** GR6 merged → cleanup; GR6b issue closed on a finished round → close; GR7 closed/unassigned/unlabelled → park "remote: …" (a finished round: PR only, gh-71 D5); GR8 mirror + body change. */
+/** Merged → cleanup; issue closed on a finished round → close; closed/unassigned/unlabelled → park "remote: …" (a finished round: PR only); mirror + body change. */
 function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: UnitFacts | null): void {
   const ref = storyRef(story);
-  // P2 (F34): merged when the PR says so, or when its head is already on the fetched base;
-  // BS11: a PR merged into another branch than the base is not merged (parked below, GR7)
+  // Merged when the PR says so, or when its head is already on the fetched base;
+  // a PR merged into another branch than the base is not merged (parked below)
   if (mergedIntoBase(story, ctx.facts.repo.default_branch)) {
     if (fm.status === "done") return;
     const slices = story.slices.filter((s) => s.frontmatter);
@@ -282,21 +279,21 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
       finish: finishMerged(ctx, story),
     });
   }
-  // gh-79 (H1, S5): mid-rebase the story unit's state.json and story.md are a rewound copy; a park or
+  // Mid-rebase the story unit's state.json and story.md are a rewound copy; a park or
   // mirror written from them would land in the rebased history. Held with the unit (decideUnit)
   if (su && rebasing(su)) return;
   const st = su?.state;
   const base = ctx.facts.repo.default_branch;
   const prReason = prProblem(story, base);
-  // gh-71 D5: a finished round parks only for its PR (GR7); the issue's label, assignee or visibility
+  // A finished round parks only for its PR; the issue's label, assignee or visibility
   // is a Check item there (inbox), so the round stays finished
   const finished = roundFinished(st);
-  // GR6b (gh-71 D5, B22): only an issue seen `closed` (never null/unobserved), a PR seen absent and
-  // no unfinished slice close a finished round; an unfinished one parks below (GR7, B24)
+  // Only an issue seen `closed` (never null/unobserved), a PR seen absent and
+  // no unfinished slice close a finished round; an unfinished one parks below
   if (finished && !prReason && story.issue?.state === "closed" && story.pr === null && !story.slices.some(sliceUnfinished))
     return ctx.emit({ kind: "close_story", unit: ref, rule: "remote.issue_closed", refs: (story.mailbox ?? []).map((m) => ({ ref: m.ref, sha: m.sha })) });
   const reason = prReason ?? (finished ? null : issueProblem(story, ctx.config.label));
-  // gh-71 D5 (B35): an older norn parked a finished round for an issue change — drop that park
+  // An older norn parked a finished round for an issue change — drop that park
   if (finished && st && su && st.status === "stuck" && !prReason) {
     const state: UnitState = { ...st, status: "done", park: null, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };
     return ctx.emit({
@@ -310,11 +307,11 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
       commit: commitFor(ctx, story, su, `norn: ${story.key} round finished (remote park dropped)`, st.step),
     });
   }
-  // GR7: a remote problem parks the story unit through the one park path (stuck, kind remote)
+  // A remote problem parks the story unit through the one park path (stuck, kind remote)
   if (reason && st && st.park?.kind !== "remote" && st.status !== "corrupt") return park(ctx, story, su as UnitFacts, st, "remote", reason, "remote.park");
   const refinedHash = story.issue ? sha256(story.issue.body) : fm.body_hash;
   if (!fm.refined_body_hash && refinedHash && refineFinished(su)) {
-    // GR8: record the remote body as of refine finishing, so a later body change surfaces in the inbox
+    // Record the remote body as of refine finishing, so a later body change surfaces in the inbox
     const fields: UpdateStoryMirrorAction["fields"] = { refined_body_hash: refinedHash };
     if (refinedHash !== fm.body_hash) fields.body_hash = refinedHash;
     return ctx.emit({
@@ -329,13 +326,13 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
   if (story.issue) mirror(ctx, story, fm, su, story.issue);
 }
 
-/** gh-71 D3/D5: a slice that is neither integrated nor dropped (an unreadable file counts as unfinished). */
+/** A slice that is neither integrated nor dropped (an unreadable file counts as unfinished). */
 const sliceUnfinished = (s: StoryFacts["slices"][number]): boolean => s.frontmatter?.status !== "integrated" && s.frontmatter?.status !== "dropped";
 
-/** GR8: a refine step's skill, under the bundled name every shipped workflow uses (`norn-refine`) or the bare one (gh-73). */
+/** A refine step's skill, under the bundled name every shipped workflow uses (`norn-refine`) or the bare one. */
 const REFINE_SKILLS = new Set(["refine", "norn-refine"]);
 
-/** GR8: the story unit has left a refine step (cursor elsewhere, or re-entered later). */
+/** The story unit has left a refine step (cursor elsewhere, or re-entered later). */
 function refineFinished(uf: UnitFacts | null): boolean {
   const st = uf?.state;
   const wf = uf?.workflow;
@@ -368,7 +365,7 @@ function mirror(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: UnitFacts
   });
 }
 
-/** T9: copy one mailbox receipt into the unit whose cursor it matches, or reject it. */
+/** Copy one mailbox receipt into the unit whose cursor it matches, or reject it. */
 function importMailbox(ctx: Ctx, story: StoryFacts): void {
   const item = (story.mailbox ?? [])[0];
   if (!item) return;
@@ -377,9 +374,9 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
   const reject = (reason: string) =>
     ctx.emit({ kind: "reject_receipt", unit: ref, rule: "mailbox.reject", source: { ref: item.ref, sha: item.sha }, reason, state: null, ...(r ? { keep: keptRejection(ctx, story, r, reason) } : {}) });
   if (!r) return reject(item.error ? `invalid receipt: ${item.error.errors.map((e) => e.message).join("; ")}` : "unreadable receipt");
-  // gh-71 AC12: a receipt made in another round is stale even at the same step#attempt (the same workflow again)
+  // A receipt made in another round is stale even at the same step#attempt (the same workflow again)
   const otherRound = (u: UnitFacts) => r.round !== undefined && u.unit.slice === null && (u.state?.round ?? 1) !== r.round;
-  // gh-195 B20: a receipt without an attempt (a non-holder's, for a `local` story) matches by step alone
+  // A receipt without an attempt (a non-holder's, for a `local` story) matches by step alone
   const atStep = (u: UnitFacts) => !!u.state && u.state.step === r.step && (r.attempt === undefined || u.state.attempt === r.attempt) && !u.errors.length;
   const at = stepLabel(r.step, r.attempt);
   const atCursor = (u: UnitFacts) => atStep(u) && !otherRound(u);
@@ -388,7 +385,7 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
     // routed by unit when the receipt names one (story unit = null)
     const unit = story.units.find((u) => u.unit.slice === r.slice);
     if (!unit) return reject(`no unit ${r.slice ?? story.key} in story ${story.key}`);
-    // gh-79 (H1): its cursor is read from a rewound state.json until the rebase is concluded; wait
+    // Its cursor is read from a rewound state.json until the rebase is concluded; wait
     if (rebasing(unit)) return;
     if (atStep(unit) && otherRound(unit)) return reject(`stale: ${unit.unit.key} is in round ${unit.state?.round ?? 1}, the receipt was made in round ${r.round}`);
     if (!atCursor(unit)) return reject(`stale: ${unit.unit.key} is not at ${at}`);
@@ -404,7 +401,7 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
     unit: target.unit,
     rule: "mailbox.import",
     refs: [{ ref: item.ref, sha: item.sha }],
-    // a step-only receipt is copied with the attempt it matched, so the unit's receipts are all stamped (S6)
+    // a step-only receipt is copied with the attempt it matched, so the unit's receipts are all stamped
     receipts: [{ n: nextReceiptNumber(target), receipt: r.attempt === undefined && target.state ? { ...r, attempt: target.state.attempt } : r }],
     state: null,
     commit: commitFor(ctx, story, target, `norn: ${target.unit.key} ${r.kind} from mailbox`, r.step),
@@ -412,7 +409,7 @@ function importMailbox(ctx: Ctx, story: StoryFacts): void {
 }
 
 /**
- * gh-195 D12 (B21): what the holder keeps of a mailbox receipt it rejects, for its Check item — who sent
+ * What the holder keeps of a mailbox receipt it rejects, for its Check item — who sent
  * what for which step, the step the unit is at, and each unit's last receipt number now, so only an
  * answer or approval numbered past it clears the item (the holder's own order, never the sender's clock).
  */
@@ -429,29 +426,27 @@ function keptRejection(ctx: Ctx, story: StoryFacts, r: Receipt, reason: string):
     at_step: unit?.state?.step ?? null,
     reason,
     rejected_at: ctx.nowIso,
-    // 13-R3-F1: what the holder has applied, never a receipt still waiting to be (it may be the answer that clears this)
+    // what the holder has applied, never a receipt still waiting to be (it may be the answer that clears this)
     seen: Object.fromEntries(story.units.map((u) => [u.unit.key, u.state?.applied_through ?? 0])),
   };
 }
 
-// ================================================================= unit level
-
 function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean): void {
   const ref = uf.unit;
-  // gh-79 (H1, S2, S5): mid-rebase the unit's runs/ files are a rewound copy, so nothing is decided
+  // Mid-rebase the unit's runs/ files are a rewound copy, so nothing is decided
   // against them and nothing is written there (a receipt numbered from the rewound state would
   // collide with a committed one once the rebase is aborted); the unit is held until it is concluded.
-  // An exception to BS5.1, which still decides liveness and deadlines during a merge, cherry-pick or revert
-  if (rebasing(uf)) return ctx.noop(ref, "unit.rebase_in_progress", `rebase in progress in ${uf.worktree?.path} — held until it is concluded (H1)`);
+  // (A merge, cherry-pick or revert in progress still lets liveness and deadlines be decided.)
+  if (rebasing(uf)) return ctx.noop(ref, "unit.rebase_in_progress", `rebase in progress in ${uf.worktree?.path} — held until it is concluded`);
   if (uf.errors.length) {
-    if (uf.state?.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
+    if (uf.state?.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched");
     const notify = unitItem(ctx, story, uf, uf.state as UnitState);
-    // S2: only the unit's own runs/ files mark its state corrupt, and only a state.json that reads —
-    // never one read from an older norn's branch (gh-195/06): nothing is written there
+    // Only the unit's own runs/ files mark its state corrupt, and only a state.json that reads —
+    // never one read from an older norn's branch: nothing is written there
     const own = uf.errors.every((e) => e.file.includes(`/${unitRecordPath(ref.dir)}/`));
     const onBranch = story.units.some((u) => u.branch_record?.copy.includes(ref.dir));
     const marked = uf.state !== null && own && !onBranch && !uf.errors.some((e) => /(^|\/)state\.json$/.test(e.file));
-    const reason = `corrupt: ${uf.errors.map((e) => e.file).join(", ")} failed validation (S2)`;
+    const reason = `corrupt: ${uf.errors.map((e) => e.file).join(", ")} failed validation`;
     const state: UnitState | null = marked
       ? { ...(uf.state as UnitState), status: "corrupt", park: { kind: "corrupt", reason, since: ctx.nowIso }, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id }
       : null;
@@ -459,37 +454,37 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   }
   const st = uf.state;
   if (!st) {
-    if (ref.slice !== null) return ctx.noop(ref, "slice.not_started", "started by the story's slices step (W2)");
-    // review#2 F3 (S2): the story's record is on its ref here but not in the machine dir (a checkout cut
+    if (ref.slice !== null) return ctx.noop(ref, "slice.not_started", "started by the story's slices step");
+    // The story's record is on its ref here but not in the machine dir (a checkout cut
     // short): never start it over, the checkout puts it in place
     if (story.record_unplaced)
       return ctx.noop(ref, "start.record_unplaced", `${story.key}'s record (${story.record_unplaced}) is not in place here; never started over — run ${cmd.storyCheckout(story.key)}`);
     return startStoryUnit(ctx, story, uf);
   }
-  if (st.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched (S2)");
+  if (st.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched");
   const wf = uf.workflow;
-  // S2: a missing pinned workflow is surfaced; the state stays as it is (no file failed validation)
+  // A missing pinned workflow is surfaced; the state stays as it is (no file failed validation)
   if (!wf) return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.workflow_missing", errors: [{ file: `${recordOf(uf)}/workflow.yaml`, errors: [{ path: "", message: "pinned workflow missing" }] }], state: null, notify: null });
 
-  // R5.1: a run whose launch is unknown is looked for before anything else is decided for the unit
+  // A run whose launch is unknown is looked for before anything else is decided for the unit
   if (uf.run?.launch_unknown) return launchUnknown(ctx, story, uf, st, wf);
-  // gh-71 D1: a round receipt is applied alone (round.start), after the receipts before it
+  // A round receipt is applied alone (round.start), after the receipts before it
   if (ref.slice === null) {
     const ri = uf.unapplied.findIndex((r) => r.receipt.kind === "round");
     if (ri === 0) return roundStart(ctx, story, uf, st, uf.unapplied[0] as NumberedReceipt);
     if (ri > 0) return applyAction(ctx, story, uf, st, wf, uf.unapplied.slice(0, ri), "receipts.apply");
   }
-  // C2: receipts first — they always win over runner facts
+  // Receipts first — they always win over runner facts
   if (uf.unapplied.length) return applyAction(ctx, story, uf, st, wf, uf.unapplied, "receipts.apply");
 
-  // S7: pinned workflow edited outside `norn story edit --workflow`, or cursor step gone
+  // Pinned workflow edited outside `norn story edit --workflow`, or cursor step gone
   if (st.status !== "stuck" || st.park?.kind !== "workflow") {
-    const drift = uf.workflow_hash && uf.workflow_hash !== st.workflow_hash ? "pinned workflow.yaml changed outside norn story edit (S7)" : null;
-    const gone = st.step !== "$done" && !stepOf(wf, st.step) ? `step '${st.step}' no longer exists in workflow ${wf.name} (S7)` : null;
+    const drift = uf.workflow_hash && uf.workflow_hash !== st.workflow_hash ? "pinned workflow.yaml changed outside norn story edit" : null;
+    const gone = st.step !== "$done" && !stepOf(wf, st.step) ? `step '${st.step}' no longer exists in workflow ${wf.name}` : null;
     const reason = drift ?? gone;
     if (reason) return park(ctx, story, uf, st, "workflow", reason, "workflow.drift");
   }
-  // BS5.1 (H1, dogfood D3): while a git operation is in progress in the worktree (an agent's merge)
+  // While a git operation is in progress in the worktree (an agent's merge)
   // the owed commit cannot happen — act would only defer it — so it never takes the unit's action:
   // liveness, implicit asks and deadlines are still decided below; the commit follows the merge
   if (uf.uncommitted && !gitBusy(uf)) {
@@ -515,29 +510,29 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
           commit: null,
         });
       }
-      // gh-71 D6 (B25): the story's round is finished; the next round or the PR merge is the person's
-      return ctx.noop(ref, ref.slice ? "slice.done" : "story.round_done", ref.slice ? "integrated" : "round done (gh-71 D6)");
+      // The story's round is finished; the next round or the PR merge is the person's
+      return ctx.noop(ref, ref.slice ? "slice.done" : "story.round_done", ref.slice ? "integrated" : "round done");
     case "stuck":
       if (slicesCanResume(story, uf, st, wf)) return resumeSlices(ctx, story, uf, st, wf);
       return ctx.noop(ref, "unit.stuck", `stuck: ${st.park?.reason ?? "?"} — ${cmd.runRerun(ref.key)}`);
     case "parked": {
-      // R6.1 (H3, A14): an implicit ask a later fact shows the agent has moved past resolves itself
+      // An implicit ask a later fact shows the agent has moved past resolves itself
       const moved = implicitAskResolved(st, uf);
       if (moved) return resolveImplicitAsk(ctx, story, uf, st, wf, moved);
-      // BS6–BS8: a story waiting at a gate with a `stale` route goes back to update when the base moved under it
+      // A story waiting at a gate with a `stale` route goes back to update when the base moved under it
       if (ref.slice === null && st.park?.kind === "gate" && story.base && edgeOf(wf, st.step, "stale") && isStale(wf, story.base)) {
         const b = story.base;
         const detail = `${b.behind} behind, conflicts: ${b.conflicts.length ? b.conflicts.join(", ") : "none"}`;
         return classifyNorn(ctx, story, uf, st, wf, "stale", "gate.stale", detail, { receiptRule: "base moved", base: baseOf(b) });
       }
-      // T6: parked keeps the claim; C3: a restart never answers
+      // Parked keeps the claim; a restart never answers
       return ctx.noop(ref, `unit.parked.${st.park?.kind ?? "?"}`, st.park?.reason ?? "parked");
     }
   }
 
   const step = stepOf(wf, st.step);
   if (!step) return ctx.noop(ref, "unit.no_step", st.step);
-  if (halted && st.status === "ready") return ctx.noop(ref, "story.halted", "story parked on a remote change (GR7)");
+  if (halted && st.status === "ready") return ctx.noop(ref, "story.halted", "story parked on a remote change");
   switch (step.type) {
     case "agent":
       return st.status === "running" ? classifyRun(ctx, story, uf, st, wf, step) : startRun(ctx, story, uf, st, wf, step);
@@ -552,16 +547,13 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   }
 }
 
-// ================================================================= rounds
-
 /**
- * gh-71 D1 (B1, B3, B5, B6, B9, B30): apply a `round` receipt — the old round ends in its own state
- * and round N+1 starts in its own folder with the receipt's workflow pinned, fresh counters, the mode
- * carried over and the cursor at the receipt's step; the receipts after it in the old round are rejected
- * with it (they were made for the round it ends). Rejected into the trace when the cursor moved
- * (T9), the round is not finished, or the workflow is gone; a workflow file changed since the edit
- * leaves a finished round with a `workflow` park that asks for the edit again, and an unfinished (forced)
- * round with its own park (B17).
+ * Apply a `round` receipt: the old round ends in its own state and round N+1 starts in its own
+ * folder with the receipt's workflow pinned, fresh counters, the mode carried over and the cursor at
+ * the receipt's step; the receipts after it in the old round are rejected with it. Rejected into the
+ * trace when the cursor moved, the round is not finished, or the workflow is gone; a workflow file
+ * changed since the edit leaves a finished round with a `workflow` park that asks for the edit
+ * again, and an unfinished (forced) round with its own park.
  */
 function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, nr: NumberedReceipt): void {
   const r = nr.receipt;
@@ -573,10 +565,10 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
   const loaded = usableWorkflow(ctx, r.workflow, "story");
   if ("problem" in loaded) return reject(loaded.problem);
   if (sha256(loaded.source) !== r.workflow_hash) {
-    // gh-71 D1 (B1): the edit judged another workflow file; a finished round stays finished and the inbox asks again
+    // The edit judged another workflow file; a finished round stays finished and the inbox asks again
     const again = cmd.storyEdit(story.key, { workflow: r.workflow, at: r.to, force: r.forced });
     const reason = `workflow ${r.workflow} changed since ${again}; run it again`;
-    // gh-71 B17 (AC8): an unfinished (forced) round is untouched — its own gate, ask or stuck park stays
+    // An unfinished (forced) round is untouched — its own gate, ask or stuck park stays
     if (!roundFinished(st)) return reject(reason, "round.workflow_changed");
     return reject(reason, "round.workflow_changed", { ...moved, park: { kind: "workflow", reason, since: ctx.nowIso, receipt_id: r.receipt_id, command: again } });
   }
@@ -586,7 +578,7 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
   const after = uf.unapplied.filter((x) => x.n > nr.n);
   const rejected = after.map((x) => ({ n: x.n, receipt_id: x.receipt.receipt_id, reason: `round ${st.round ?? 1} ended at receipt ${nr.n} (round.start); receipt ${x.n} (${x.receipt.kind}) was made for it` }));
   const through = { ...moved, applied_through: after.at(-1)?.n ?? nr.n };
-  // gh-71 B32 (D1, RD3): a forced round ends at $done in its own state, recorded as ended by the person at its step
+  // A forced round ends at $done in its own state, recorded as ended by the person at its step
   const at = st.step;
   const ended: UnitState =
     roundFinished(st) || at === "$done"
@@ -605,7 +597,7 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
     workflow_source: loaded.source,
     state,
     commit: commitFor(ctx, story, uf, `norn: ${story.key} round ${n} (${r.workflow}) at ${r.to}`, state.step),
-    // gh-71 D9 (B19): the issue label follows the round; it is never read back as a request for one
+    // The issue label follows the round; it is never read back as a request for one
     label: story.frontmatter && st.workflow !== r.workflow ? { number: story.frontmatter.number, remove: `${WF_LABEL}${st.workflow}`, add: `${WF_LABEL}${r.workflow}` } : null,
   });
 }

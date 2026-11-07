@@ -1,11 +1,11 @@
 /**
- * `runCli(argv, deps)`: parse → dispatch → one JSON value + exit code (P8). Never exits the
+ * `runCli(argv, deps)`: parse → dispatch → one JSON value + exit code. Never exits the
  * process and never prints; `main.ts` does both. Tests call this in-process with fakes.
  * A command with `markdown: true` prints markdown (its `rendered` result, refusals too) unless
  * `--json` is given; every command accepts `--json`. `value` is always the data. A JSON command
  * may print text the caller asked for with its own flag (`rendered(…, { asked: true })`).
  * A command adds lines for a person on stderr through `ctx.stderr`; they come back in `stderr`.
- * `norn <noun> <verb>` runs the verb; `norn <noun>` alone is `norn help <noun>` (B2).
+ * `norn <noun> <verb>` runs the verb; `norn <noun>` alone is `norn help <noun>`.
  */
 import { parseArgs } from "node:util";
 import { ExitCode } from "@norn/schema";
@@ -22,7 +22,7 @@ export interface CliResult {
   value: unknown;
   /** exactly what goes to stdout */
   stdout: string;
-  /** what goes to stderr, when anything does (a one-time notice for a person, B13); never data */
+  /** what goes to stderr, when anything does (a one-time notice for a person); never data */
   stderr?: string;
 }
 
@@ -36,7 +36,7 @@ export function helpFor(c: Command) {
   return { command: c.name, summary: c.summary, usage: c.usage, options: Object.keys(c.options ?? {}) };
 }
 
-/** A noun as `norn help` lists it: its verbs in order (B2). */
+/** A noun as `norn help` lists it: its verbs in order. */
 export function nounHelp(n: Noun) {
   const groups = n.groups?.map((g) => ({ title: g.title, verbs: g.verbs.map((v) => `${n.name} ${v}`) }));
   return { command: n.name, summary: n.summary, usage: `norn ${n.name} <verb>`, options: [], verbs: n.verbs.map(helpFor), ...(groups ? { groups } : {}) };
@@ -65,7 +65,7 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
   if (name === "--version" || name === "-v") return done({ version: runningVersion(deps) });
   const noun = findNoun(name);
   if (noun) {
-    // B2: `norn run` (and `norn run --help`) lists the verbs
+    // `norn run` (and `norn run --help`) lists the verbs
     const [verb, ...after] = rest;
     if (!verb || verb.startsWith("-")) return runCli(["help", name, ...jsonOnly(rest)], deps);
     const command = findCommand(`${name} ${verb}`);
@@ -80,7 +80,7 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
 }
 
 async function dispatch(command: Command, rest: string[], deps: CliDeps): Promise<CliResult> {
-  // `--json` is every command's; `--text` is the old opt-in for readable output, now the default
+  // `--json` is every command's; a markdown command still accepts `--text` and ignores it
   const end = rest.indexOf("--");
   const flags = end < 0 ? rest : rest.slice(0, end);
   const json = flags.includes("--json");
@@ -92,7 +92,7 @@ async function dispatch(command: Command, rest: string[], deps: CliDeps): Promis
   try {
     const args = { ...parseCommandArgs(command, argvOwn), json };
     if (command.repo !== false) await ctx.locate();
-    if (command.version === "acts") guardVersion(ctx); // gh-61 D1, D2: after locate and config, before the command
+    if (command.version === "acts") guardVersion(ctx); // After locate and config, before the command
     const out = await command.run(ctx, args);
     const [value, exit] = isWithExit(out) ? [out.value, out.exit] : [out ?? { ok: true }, ExitCode.ok];
     if (isRendered(value)) return withStderr(markdown || (value.asked && !json) ? { exit, value: value.value, stdout: value.markdown } : done(value.value, exit));

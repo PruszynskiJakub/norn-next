@@ -1,5 +1,5 @@
 /**
- * Run a check command (W2, C5): `sh -c` in the unit worktree with env, stdout+stderr merged,
+ * Run a check command: `sh -c` in the unit worktree with env, stdout+stderr merged,
  * killed as a process group on timeout (a timeout is a `fail` with reason `timeout`).
  */
 import { noteSpawn, spawnBounded } from "@norn/store";
@@ -12,12 +12,12 @@ export interface ShellResult {
   timed_out: boolean;
 }
 
-/** Output kept in memory; the head is dropped beyond this (the tail matters, C5). */
+/** Output kept in memory; the head is dropped beyond this (the tail matters). */
 const MAX_OUTPUT = 4 * 1024 * 1024;
 
 export async function runShell(command: string, opts: { cwd: string; env: Record<string, string | undefined>; timeoutMs: number }): Promise<ShellResult> {
   const started = Date.now();
-  noteSpawn(["sh", "-c", command], opts.cwd); // effect transcripts (refactor Phase 0.2)
+  noteSpawn(["sh", "-c", command], opts.cwd); // recorded for effect transcripts
   // `exec 2>&1`: the command's stderr goes to stdout, so `out` keeps both in order; stderr only
   // carries a failure to start sh and spawnBounded's own timeout note, which a check's output never showed
   const r = await spawnBounded(["sh", "-c", `exec 2>&1\n${command}`], {

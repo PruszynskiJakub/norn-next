@@ -1,4 +1,4 @@
-/** Unit and story keys as a person types them on the command line (ID1). */
+/** Unit and story keys as a person types them on the command line. */
 import { isStoryKey, parseSliceKey, sliceKey, storyOf } from "@norn/schema";
 import { usageError } from "../output.ts";
 import { cmd } from "@norn/core";
@@ -15,7 +15,7 @@ export function parseUnitKey(raw: string): { key: string; story: string; slice: 
   throw usageError(`not a story or slice key: '${raw}' (use e.g. gh-123 or gh-123/03)`, cmd.status());
 }
 
-/** Story key from `gh-7` or a unit key `gh-7/01` (claims are per story, T1). */
+/** Story key from `gh-7` or a unit key `gh-7/01` (claims are per story). */
 export function storyArg(raw: string, command: string): string {
   const key = parseSliceKey(raw)?.story ?? raw;
   if (!isStoryKey(key)) throw usageError(`not a story key: '${raw}' (expected e.g. gh-123)`, `norn ${command} <story>`);

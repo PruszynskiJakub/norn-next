@@ -1,4 +1,4 @@
-/** gh-118 B18, B19: the helpers name their pinned outputs from the repo root, so helpers and outputs can move apart. */
+/** The helpers name their pinned outputs from the repo root, so helpers and outputs can move apart. */
 import { expect, test } from "bun:test";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";

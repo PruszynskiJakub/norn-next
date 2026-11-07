@@ -1,7 +1,7 @@
 /**
  * Fixed defect, kept as a regression test (refactor plan BUG-4, fixed by 1.4):
  *   - BUG-4: the machine-local readers (now store/src/local.ts) cast parsed JSON instead of validating it
- *     (S2), so a file of the wrong shape leaked through: a string `attempted_at` in remote.json made
+ *, so a file of the wrong shape leaked through: a string `attempted_at` in remote.json made
  *     `now - attempted_at` NaN (observe never found a sync due again); junk records.json entries were
  *     returned as records. Every local reader now goes through store `readLocalJson`.
  */

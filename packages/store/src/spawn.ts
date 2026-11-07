@@ -1,5 +1,5 @@
 /**
- * Bounded child processes (H11). The child leads its own process group; on timeout the whole
+ * Bounded child processes. The child leads its own process group; on timeout the whole
  * group is killed, so a grandchild holding the pipes (git → ssh) cannot keep the call open.
  * A connection dropped while the machine slept otherwise never errors and holds the tick lock.
  */
@@ -31,7 +31,7 @@ export interface BoundedResult {
   spawn_error?: string;
 }
 
-/** One child process norn is about to start: what an effect transcript records (refactor Phase 0.2). */
+/** One child process norn is about to start: what an effect transcript records. */
 export interface SpawnRecord {
   argv: readonly string[];
   cwd: string | undefined;
@@ -247,7 +247,7 @@ export function spawnDetached(argv: string[], opts: { cwd?: string; env: Record<
 
 /**
  * `text` edited by the person in `editor` (a shell command, `code --wait` included) on their
- * terminal — stdin, stdout and stderr inherited — until it exits (D2). Not bounded: the person
+ * terminal — stdin, stdout and stderr inherited — until it exits. Not bounded: the person
  * decides when it ends. The edited text, or null when the editor fails. Never throws.
  */
 export async function editInTerminal(text: string, editor: string): Promise<string | null> {

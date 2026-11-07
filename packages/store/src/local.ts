@@ -1,17 +1,16 @@
 /**
- * Machine-local runtime files of one checkout, kept in its machine dir `<norn home>/repos/<id>/` (B5):
- * - `heartbeat.json`  this checkout's heartbeat_id (ID2), stable across `tick` runs so a
- *                     claim taken by one tick is "mine" for the next (T4); `last_tick_at` (R5.5)
- *                     (heartbeat.ts)
- * - `remote.json`     remote sync cache: last sync time, default branch (H5 throttle)
- * - `notified.json`   inbox item ids already notified (O3: once per item, receipt-first)
- * - `records.json`    GR6 base-branch records still owed (retried by later ticks, throttled),
- *                     each with the merge facts to write (`merge`, StoryMerge)
- * - `foreign.json`    commit shas already traced as `foreign_commits` (Q6: once per sha)
- * - `base.json`       per story, the last `story.base` measured (BS1; base.ts)
- * - `notices.json`    one-time notices already shown on this checkout (B13)
- * - `rejected.json`   mailbox receipts this checkout's ticks rejected (gh-195 D12, B21)
- * Every read is validated (S2, BUG-4): a file that is unreadable or of the wrong shape reads as
+ * Machine-local runtime files of one checkout, kept in its machine dir `<norn home>/repos/<id>/`:
+ * - `heartbeat.json`: this checkout's heartbeat_id, stable across `tick` runs so a
+ *   claim taken by one tick is "mine" for the next; `last_tick_at` (heartbeat.ts)
+ * - `remote.json`: remote sync cache: last sync time, default branch (sync throttle)
+ * - `notified.json`: inbox item ids already notified (once per item, receipt-first)
+ * - `records.json`: base-branch records still owed (retried by later ticks, throttled),
+ *   each with the merge facts to write (`merge`, StoryMerge)
+ * - `foreign.json`: commit shas already traced as `foreign_commits` (once per sha)
+ * - `base.json`: per story, the last `story.base` measured (base.ts)
+ * - `notices.json`: one-time notices already shown on this checkout
+ * - `rejected.json`: mailbox receipts this checkout's ticks rejected
+ * Every read is validated: a file that is unreadable or of the wrong shape reads as
  * empty through `readLocalJson`, never as a cast of what was there. Paths are in paths.ts.
  */
 import type { StoryFacts } from "@norn/core";
@@ -23,7 +22,7 @@ import { foreignCommitsPath, noticesPath, notifiedPath, pendingRecordsPath, reje
 import { appendTrace, traceEvent } from "./trace.ts";
 
 export interface RemoteCache {
-  /** ms epoch of the last successful sync (GR1) */
+  /** ms epoch of the last successful sync */
   synced_at: number | null;
   /** ms epoch of the last attempt (success or not) */
   attempted_at: number | null;
@@ -46,14 +45,14 @@ export function readNotified(root: string): Set<string> {
   return new Set(readLocalJson("local-notified", notifiedPath(root), {}, root).ids ?? []);
 }
 
-/** Persist a newly notified id before the notification is sent (receipt-first, O3). */
+/** Persist a newly notified id before the notification is sent (receipt-first). */
 export function markNotified(root: string, ids: Set<string>, id: string): void {
   ids.add(id);
   atomicWriteJson(notifiedPath(root), { ids: [...ids].slice(-KEEP_NOTIFIED) });
 }
 
 /**
- * B13: true the first time notice `id` is asked for on this checkout, then false. A notice file that
+ * True the first time notice `id` is asked for on this checkout, then false. A notice file that
  * cannot be read or written never fails the command: the notice shows again.
  */
 export function firstNotice(root: string, id: string): boolean {
@@ -68,7 +67,7 @@ export function firstNotice(root: string, id: string): boolean {
 }
 
 /**
- * gh-195 D12 (B21), 13-R3-F2 (S2): `rejected.json` read entry by entry. A file that is not JSON or not
+ * `rejected.json` read entry by entry. A file that is not JSON or not
  * `{ receipts: [...] }` is `ok: false`: it reads as no rejection and is never written over. An entry
  * of the wrong shape is left out of `receipts` but kept in `raw`, so a later write keeps it as it was
  * (reported by a `local_file` trace event, never dropped and never guessed).
@@ -115,14 +114,14 @@ function traceRejectedFile(root: string, file: string, message: string): void {
   }
 }
 
-/** gh-195 D12 (B21): the mailbox receipts this checkout's ticks rejected, oldest first (entries of the wrong shape left out, S2). */
+/** The mailbox receipts this checkout's ticks rejected, oldest first (entries of the wrong shape left out). */
 export function readRejectedReceipts(root: string): RejectedMailboxReceipt[] {
   const f = readRejectedFile(root);
   return f.ok ? f.receipts : [];
 }
 
 /**
- * 13-R3-F2: run `f` holding `rejected.lock` in the machine dir, so a tick's keep and tidy's prune never
+ * Run `f` holding `rejected.lock` in the machine dir, so a tick's keep and tidy's prune never
  * interleave their read-modify-writes; waits up to `waitMs` for a live holder, then throws.
  */
 async function withRejectedLock<T>(root: string, f: () => T, waitMs = 10_000): Promise<T> {
@@ -141,14 +140,14 @@ async function withRejectedLock<T>(root: string, f: () => T, waitMs = 10_000): P
   }
 }
 
-/** The file as it was, unless it cannot be read as one (13-R3-F2, S2: never written over). */
+/** The file as it was, unless it cannot be read as one (never written over). */
 function rejectedForWrite(root: string): Extract<RejectedFile, { ok: true }> {
   const f = readRejectedFile(root);
-  if (!f.ok) throw new Error(`${f.message}: rejected mailbox receipts are not written over (S2); fix or remove the file`);
+  if (!f.ok) throw new Error(`${f.message}: rejected mailbox receipts are not written over; fix or remove the file`);
   return f;
 }
 
-/** gh-195 D12 (B21): keep one rejected mailbox receipt (once per receipt id), under the lock, keeping every other entry as it was. */
+/** Keep one rejected mailbox receipt (once per receipt id), under the lock, keeping every other entry as it was. */
 export async function addRejectedReceipt(root: string, entry: RejectedMailboxReceipt): Promise<void> {
   await withRejectedLock(root, () => {
     const f = rejectedForWrite(root);
@@ -158,10 +157,10 @@ export async function addRejectedReceipt(root: string, entry: RejectedMailboxRec
 }
 
 /**
- * gh-195 D12: drop the rejected mailbox receipts rejected before `before` (ISO) that are not `open` (by
+ * Drop the rejected mailbox receipts rejected before `before` (ISO) that are not `open` (by
  * receipt id: their Check item still shows), as `norn tidy` ages the trace out (`trace.retain`). Under
- * the lock; an entry of the wrong shape is kept (S2). `dry` only lists them: no lock, nothing written.
- * Never throws (review#1 F2): a file that cannot be read as one, or a lock that cannot be had, is
+ * the lock; an entry of the wrong shape is kept. `dry` only lists them: no lock, nothing written.
+ * Never throws: a file that cannot be read as one, or a lock that cannot be had, is
  * returned as `error` with the file left as it was, so tidy reports it and goes on.
  */
 export async function pruneRejectedReceipts(
@@ -173,7 +172,7 @@ export async function pruneRejectedReceipts(
   const drop = (r: RejectedMailboxReceipt) => r.rejected_at < before && !open.has(r.receipt_id);
   const prune = (): { removed: RejectedMailboxReceipt[]; error: string | null } => {
     const f = readRejectedFile(root);
-    if (!f.ok) return { removed: [], error: `${f.message}: left as it is (S2); fix or remove the file` };
+    if (!f.ok) return { removed: [], error: `${f.message}: left as it is; fix or remove the file` };
     const old = f.receipts.filter(drop);
     if (old.length && !dry) atomicWriteJson(rejectedReceiptsPath(root), { receipts: f.raw.filter((e) => !(e.valid && drop(e.valid))).map((e) => e.entry) });
     return { removed: old, error: null };
@@ -186,7 +185,7 @@ export async function pruneRejectedReceipts(
   }
 }
 
-/** GR6: a merged story whose `status: done` record on the base branch is still owed (deferred or failed). */
+/** A merged story whose `status: done` record on the base branch is still owed (deferred or failed). */
 export interface PendingRecord {
   story: string;
   spec_dir: string;
@@ -195,7 +194,7 @@ export interface PendingRecord {
   attempted_at: number;
   attempts: number;
   reason: string;
-  /** how the PR landed (GR6 done record), written into spec.md `merge:` with the status */
+  /** how the PR landed (the done record), written into spec.md `merge:` with the status */
   merge?: StoryMerge;
 }
 
@@ -210,7 +209,7 @@ export function writePendingRecords(root: string, records: PendingRecord[]): voi
 const KEEP_FOREIGN = 5000;
 
 /**
- * Q6: one `foreign_commits` trace event per story for the commits not traced before (once per
+ * One `foreign_commits` trace event per story for the commits not traced before (once per
  * sha). The seen set is written first, so a crash never traces the same sha twice.
  */
 export function traceForeignCommits(root: string, stories: StoryFacts[], tick_id: string, now: number): number {

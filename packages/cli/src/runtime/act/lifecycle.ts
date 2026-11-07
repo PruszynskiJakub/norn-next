@@ -41,12 +41,12 @@ import { equipWorktree } from "../worktrees.ts";
 import { type ActEnv, claimLost } from "./env.ts";
 import type { UnitLoc } from "../observe/index.ts";
 
-/** Create a unit worktree (K4, K5): branch, worktree, slot lease, `.env.norn`, `.norn-unit`. */
+/** Create a unit worktree: branch, worktree, slot lease, `.env.norn`, `.norn-unit`. */
 async function ensureWorktree(act: ActEnv, spec: WorktreeSpec, unit: UnitRef, spec_dir: string): Promise<{ created: boolean; slot: number | null }> {
   let created = false;
   if (!existsSync(spec.path)) {
     const exists = await act.git.branchExists(act.root, spec.branch);
-    // F33: a new story branch starts from the fetched base (`<remote>/<base>`), not a stale local `main`
+    // A new story branch starts from the fetched base (`<remote>/<base>`), not a stale local `main`
     const tracking = act.obs.remote && spec.from === act.obs.facts.repo.default_branch ? `refs/remotes/${act.obs.remote}/${spec.from}` : null;
     // (by sha: a remote-tracking start point would make it the new branch's upstream)
     const from = (tracking ? await act.git.readRef(act.root, tracking).catch(() => null) : null) ?? spec.from;
@@ -86,7 +86,7 @@ export async function startUnit(act: ActEnv, a: Extract<Action, { kind: "start_u
   const run = { key: a.unit.story, spec_dir: story.spec_dir };
   const runsDir = runStateStartDir(wtPath, run, a.unit.dir, a.workflow);
   const pin = pinWorkflow(runsDir, a.workflow_source);
-  if (!pin.ok) throw new Error(`${runStateRecord(wtPath, run, runsDir)}/workflow.yaml is already pinned with different content (S7)`);
+  if (!pin.ok) throw new Error(`${runStateRecord(wtPath, run, runsDir)}/workflow.yaml is already pinned with different content`);
   const loc: UnitLoc = (act.obs.units[a.unit.key] = {
     unit: a.unit,
     story: a.unit.story,
@@ -150,7 +150,7 @@ export async function markDone(act: ActEnv, a: Extract<Action, { kind: "mark_don
 
 export async function rejectReceipt(act: ActEnv, a: Extract<Action, { kind: "reject_receipt" }>): Promise<ActionResult> {
   if ("ref" in a.source) {
-    // gh-195 D12 (P6): kept before the ref goes, so a failed keep leaves the receipt for the next tick
+    // Kept before the ref goes, so a failed keep leaves the receipt for the next tick
     // (kept once per receipt id); kept after, a failure would lose it for good
     if (a.keep) await addRejectedReceipt(act.root, a.keep);
     const res = await deleteMailbox(act.root, act.obs.remote, a.source.ref, a.source.sha);
@@ -163,8 +163,6 @@ export async function rejectReceipt(act: ActEnv, a: Extract<Action, { kind: "rej
   return { ok: true };
 }
 
-// ------------------------------------------------------------ claims (T3–T6)
-
 export async function claim(act: ActEnv, a: Extract<Action, { kind: "claim" }>): Promise<ActionResult> {
   const story = a.unit.story;
   const remote = act.obs.remote;
@@ -176,14 +174,14 @@ export async function claim(act: ActEnv, a: Extract<Action, { kind: "claim" }>):
   if (a.op === "renew") return (await renewAll(act, [a]))[0] as ActionResult;
   const r = await acquireClaim(act.root, remote, a.blob, { now: act.obs.facts.now });
   const res = claimed(act, a, r);
-  // R3.1 (H6): the intake race is lost — undo what the intake made here, unless it holds work
+  // The intake race is lost — undo what the intake made here, unless it holds work
   if (a.lost_intake && !res.ok && claimLost(res)) (res.detail as Record<string, unknown>).intake = await dropLostIntake(act, story, a.lost_intake).catch((e: Error) => ({ kept: `clean-up failed: ${e.message}` }));
   return res;
 }
 
 /**
- * T4, H5: renew every claim due this tick in one CAS batch (one push to the remote), one result
- * per action in order. A lost CAS fails only its own story (R1.2).
+ * Renew every claim due this tick in one CAS batch (one push to the remote), one result
+ * per action in order. A lost CAS fails only its own story.
  */
 export async function renewAll(act: ActEnv, as: ReadonlyArray<Extract<Action, { kind: "claim" }>>): Promise<ActionResult[]> {
   const rs = await renewClaims(
@@ -204,7 +202,7 @@ function claimed(act: ActEnv, a: Extract<Action, { kind: "claim" }>, r: ClaimWri
 }
 
 /**
- * R3.1: after losing an intake's acquire, remove what decide said holds nothing beyond the
+ * After losing an intake's acquire, remove what decide said holds nothing beyond the
  * intake (`lost_intake.drop`): the story worktree, its local branch (and the spec folder in it) and
  * its slot. Otherwise keep everything: the branch and worktree stay for a person to look at.
  */
@@ -224,16 +222,14 @@ async function dropLostIntake(act: ActEnv, story: string, lost: NonNullable<Extr
   return { removed };
 }
 
-// ------------------------------------------------------------ remote lifecycle (GR2, GR6, GR8)
-
 export async function intake(act: ActEnv, a: Extract<Action, { kind: "intake_story" }>): Promise<ActionResult> {
   const unit: UnitRef = { story: a.key, slice: null, dir: STORY_UNIT_DIR, key: a.key };
   const specDir = dirname(a.story_file);
-  // T5/T10: a story already intaken elsewhere (its branch is on the remote) is continued by take, never re-intaken
+  // A story already intaken elsewhere (its branch is on the remote) is continued by take, never re-intaken
   if (act.obs.remote && !existsSync(a.worktree.path) && !(await act.git.branchExists(act.root, a.worktree.branch)) && (await act.git.branchExists(act.root, a.worktree.branch, "remote", act.obs.remote)))
     return { ok: true, detail: { skipped: `${a.worktree.branch} already exists on ${act.obs.remote}`, do_instead: cmd.storyCheckout(a.key) } };
   const wt = await ensureWorktree(act, a.worktree, unit, specDir);
-  // GR2: a folder an older norn intook keeps its story.md (storyFile reads it), so it is never written twice
+  // A folder an older norn intook keeps its story.md (storyFile reads it), so it is never written twice
   const file = join(a.worktree.path, a.story_file);
   const written = !existsSync(storyFile(dirname(file)));
   if (written) writeStoryFile(file, a.frontmatter, a.body.endsWith("\n") || !a.body ? `\n${a.body}` : `\n${a.body}\n`);
@@ -250,23 +246,23 @@ export async function mirror(act: ActEnv, a: Extract<Action, { kind: "update_sto
   return { ok: true, detail: await act.commit(a.commit, null, null) };
 }
 
-/** gh-195 D15 (B29): GR6's archive push (`pushHeldRecord`, the one closing and every claim release make too) before any cleanup; a failure says why the cleanup waits. */
+/** The archive push (`pushHeldRecord`, the one closing and every claim release make too) before any cleanup; a failure says why the cleanup waits. */
 async function archiveRecord(act: ActEnv, key: string): Promise<{ archive: Record<string, unknown> } | { error: string; detail: Record<string, unknown> }> {
   const branch = act.obs.facts.stories.find((s) => s.key === key)?.branch ?? null;
   const r = await pushHeldRecord(act.obs, key, branch);
   if (r.ok) return { archive: { ref: recordRef(key), ...r } };
   return {
-    error: `archive ${recordRef(key)} on ${act.obs.remote ?? "this checkout"} failed (${r.reason}): ${r.message}; nothing was cleaned up, the next tick tries again (D15)`,
+    error: `archive ${recordRef(key)} on ${act.obs.remote ?? "this checkout"} failed (${r.reason}): ${r.message}; nothing was cleaned up, the next tick tries again`,
     detail: { archive: { ref: recordRef(key), reason: r.reason, message: r.message } },
   };
 }
 
 export async function cleanupMerged(act: ActEnv, a: Extract<Action, { kind: "cleanup_merged_story" }>): Promise<ActionResult> {
-  // GR6 (gh-88): the merge is the final outcome; each unfinished unit is recorded done first, so the
+  // The merge is the final outcome; each unfinished unit is recorded done first, so the
   // archive below carries it and nothing parked at merge time stays in the inbox. A failed archive
   // leaves the cleanup owed: the next tick decides it again and writes the same states.
   for (const f of a.finish) act.writeUnitState(f.unit, act.unitLoc(f.unit).runsDir, f.state);
-  // D15 (B29): the final record is on its archive ref before anything is removed; a failed push leaves the cleanup owed
+  // The final record is on its archive ref before anything is removed; a failed push leaves the cleanup owed
   const archived = await archiveRecord(act, a.unit.story);
   if ("error" in archived) return { ok: false, error: archived.error, detail: archived.detail };
   const detail: Record<string, unknown> = { ...archived };
@@ -290,9 +286,9 @@ export async function cleanupMerged(act: ActEnv, a: Extract<Action, { kind: "cle
       if (act.obs.remote) await act.git.pushRef(act.root, act.obs.remote, { ref, sha: null });
     });
   }
-  // the record stays on the base branch (GR6): mark spec.md done there (record.ts; never forced).
+  // the record stays on the base branch: mark spec.md done there (record.ts; never forced).
   // Deferred (merge not on the base yet) or failed → owed; later ticks retry it (retryRecords).
-  // GR6 done record: how the PR landed (merge commit, merged_by, merged_at; P2 ancestry) goes into
+  // The done record: how the PR landed (merge commit, merged_by, merged_at, by ancestry) goes into
   // spec.md `merge:` on the base with the status (record.ts), and is kept in records.json while owed
   const story = act.storyLoc(a.unit.story);
   const facts = act.obs.facts.stories.find((s) => s.key === a.unit.story);
@@ -303,7 +299,7 @@ export async function cleanupMerged(act: ActEnv, a: Extract<Action, { kind: "cle
 }
 
 /**
- * GR6b (gh-71 D5, B22): the issue closed on a finished round with no PR — the effects of `norn story
+ * The issue closed on a finished round with no PR — the effects of `norn story
  * close` (runtime/close.ts: push first, then remove worktrees, local branches, leases and the claim),
  * then the mailbox refs. A failure before the removals leaves everything in place; the next tick re-decides.
  */
@@ -312,14 +308,14 @@ export async function closeClosedIssueStory(act: ActEnv, a: Extract<Action, { ki
   const story = act.obs.facts.stories.find((s) => s.key === key);
   const claimSha = act.claimed.get(key)?.sha ?? (story?.claim.state === "mine" ? story.claim.sha : null);
   if (!story || !claimSha) throw new Error(`${key} is not held here; nothing closed`);
-  // D15 (B29): closeStory pushes the final record to its archive ref before it removes anything
+  // closeStory pushes the final record to its archive ref before it removes anything
   const r = await closeStory(act.obs, story, { home: act.ctx.home, claimSha });
   if (!r.ok) {
     const error =
       r.reason === "push_failed"
         ? `push ${r.branch} failed (${r.push_reason}): ${r.message}; nothing was removed`
         : r.reason === "record_push_failed"
-          ? `${recordPushError(key, r.push_reason, r.message)}; nothing was removed, the next tick tries again (D15)`
+          ? `${recordPushError(key, r.push_reason, r.message)}; nothing was removed, the next tick tries again`
           : `cannot mark ${r.file} dropped: ${r.message}`;
     return { ok: false, error, detail: r };
   }
@@ -330,7 +326,7 @@ export async function closeClosedIssueStory(act: ActEnv, a: Extract<Action, { ki
   return { ok: true, detail: { ...effects, mailbox_deleted: deleted } };
 }
 
-/** One attempt at a GR6 record; keeps it in `records.json` until it lands (idempotent: `unchanged` counts). */
+/** One attempt at a base-branch done record; keeps it in `records.json` until it lands (idempotent: `unchanged` counts). */
 async function record(act: ActEnv, p: PendingRecord): Promise<RecordResult | { state: "failed"; reason: string }> {
   const res = await markStoryOnBase({
     root: act.root,
@@ -349,7 +345,7 @@ async function record(act: ActEnv, p: PendingRecord): Promise<RecordResult | { s
   return res;
 }
 
-/** GR6: retry owed base-branch records, at most once per `remote.sync_interval` each (H5). */
+/** Retry owed base-branch records, at most once per `remote.sync_interval` each. */
 export async function retryRecords(act: ActEnv): Promise<Array<{ story: string; state: string; reason?: string }>> {
   const every = parseDuration(act.config.sync_interval);
   const now = act.ctx.clock.now();
@@ -363,12 +359,12 @@ export async function retryRecords(act: ActEnv): Promise<Array<{ story: string; 
 }
 
 /**
- * gh-71 D7 (B34): a flat story record moves into round 1 — every entry of `_story/` but `rounds/` —
- * inside the machine dir (S12, gh-195/05), so nothing is committed: the worktree holds only the handoff,
+ * A flat story record moves into round 1 — every entry of `_story/` but `rounds/` —
+ * inside the machine dir, so nothing is committed: the worktree holds only the handoff,
  * which stays where it is. Receipt paths are relative to the round, so they still resolve; slice folders
- * are not touched. Resumable (S5): `state.json` moves last, so a move that stops partway still reads as
+ * are not touched. Resumable: `state.json` moves last, so a move that stops partway still reads as
  * flat and the next round.migrate moves what is left; an entry already in the round is merged into,
- * entry by entry. (Moving an older norn's record off the branch is gh-195/06.)
+ * entry by entry.
  */
 export async function roundMigrate(act: ActEnv, a: Extract<Action, { kind: "round_migrate" }>): Promise<ActionResult> {
   const from = runStateFile(act.root, a.from);
@@ -384,22 +380,22 @@ export async function roundMigrate(act: ActEnv, a: Extract<Action, { kind: "roun
 }
 
 /**
- * gh-195/06 (B34, D13): copy each record off the unit's branch into the machine dir — validated and put
- * in place atomically, one the machine dir already holds skipped (a move that stopped after the copy,
- * S5) — then remove the branch's run state but the handoffs from the worktree and commit that removal
- * alone, pushed. A copy that fails removes nothing (S2); state was never in git, so nothing is
+ * Copy each record off the unit's branch into the machine dir — validated and put
+ * in place atomically, one the machine dir already holds skipped (a move that stopped after the copy)
+ * — then remove the branch's run state but the handoffs from the worktree and commit that removal
+ * alone, pushed. A copy that fails removes nothing; state was never in git, so nothing is
  * written past the copies. The move is done only once its commit lands: a commit that fails, or that a
- * merge or rebase defers (H1), fails the action, and the next tick finishes the removal (observe sees
- * it uncommitted, S1).
+ * merge or rebase defers, fails the action, and the next tick finishes the removal (observe sees
+ * it uncommitted).
  */
 export async function moveRecord(act: ActEnv, a: Extract<Action, { kind: "move_record" }>): Promise<ActionResult> {
   const wt = a.commit.cwd;
   const story = act.storyLoc(a.unit.story);
-  // H1: a merge or rebase begun since observe: nothing is removed under it
+  // A merge or rebase begun since observe: nothing is removed under it
   const busy = await act.git.inProgress(wt);
-  if (busy.operation || busy.unmerged.length) return { ok: false, error: `${busy.operation ?? "a merge"} in progress in ${wt}: the move waits until it is concluded (H1)` };
+  if (busy.operation || busy.unmerged.length) return { ok: false, error: `${busy.operation ?? "a merge"} in progress in ${wt}: the move waits until it is concluded` };
   const copied = a.copy.filter((c) => copyTreeRecord(join(wt, c.from), runStateFile(act.root, c.to), treeHandoffFile(join(wt, story.spec_dir), c.unit))).map((c) => c.to);
-  // gh-195/07 (D13 step 2, B8): the old handoffs move to handoffs/, prose only, in the same commit
+  // The old handoffs move to handoffs/, prose only, in the same commit
   const handoffs = moveTreeHandoffs(wt, story).map((f) => relative(wt, f));
   const removed = removeTreeRunState(wt, story);
   const committed = await act.commit(a.commit, null, null, await movePaths(act, wt, story.spec_dir));
@@ -410,8 +406,8 @@ export async function moveRecord(act: ActEnv, a: Extract<Action, { kind: "move_r
 }
 
 /**
- * gh-195 D11 (B27, T7a, R2.3): this checkout's own record of a story another heartbeat holds leaves
- * `runs/<story>/` in one rename (S1): set aside whole under `superseded/<name>/` with its
+ * This checkout's own record of a story another heartbeat holds leaves
+ * `runs/<story>/` in one rename: set aside whole under `superseded/<name>/` with its
  * `superseded.json`, or, already on the ref after a clean release, removed quietly. Nothing is pushed.
  */
 export async function setAsideRecordAct(act: ActEnv, a: Extract<Action, { kind: "set_aside_record" }>): Promise<ActionResult> {
@@ -427,7 +423,7 @@ export async function setAsideRecordAct(act: ActEnv, a: Extract<Action, { kind: 
 
 /**
  * The pathspec of a move commit: the spec folder's `runs/` and `handoffs/` (moved now, or by a move that
- * stopped before its commit, S1), every other entry of it excluded, so an agent's work stays out. The spec
+ * stopped before its commit), every other entry of it excluded, so an agent's work stays out. The spec
  * folder, not `runs/` itself, is what it names: a move whose commit failed after staging left no `runs/`
  * for git to match.
  */
@@ -450,10 +446,10 @@ function migrateEntry(from: string, target: string, name: string): void {
 }
 
 /**
- * gh-71 D1 (B1, B30, B31): end the old round in its own folder (its state with the round receipt
- * applied), then create the new round's folder — workflow pinned, first state written last (S5) —
+ * End the old round in its own folder (its state with the round receipt
+ * applied), then create the new round's folder — workflow pinned, first state written last —
  * set the story's `workflow:`, and commit the shared handoff and spec.md in one commit (the round
- * folders are in the machine dir, S12).
+ * folders are in the machine dir).
  */
 export async function roundStart(act: ActEnv, a: Extract<Action, { kind: "round_start" }>): Promise<ActionResult> {
   const loc = act.unitLoc(a.unit);
@@ -463,8 +459,8 @@ export async function roundStart(act: ActEnv, a: Extract<Action, { kind: "round_
   const oldDir = loc.runsDir;
   const dir = runStateFile(act.root, a.round.dir);
   const pin = pinWorkflow(dir, a.workflow_source);
-  if (!pin.ok) throw new Error(`${a.round.dir}/workflow.yaml is already pinned with different content (S7)`);
-  // S5: the new round's state is the commit point — a round folder without state.json is not the current
+  if (!pin.ok) throw new Error(`${a.round.dir}/workflow.yaml is already pinned with different content`);
+  // The new round's state is the commit point — a round folder without state.json is not the current
   // round (store currentRound), so before it the old round stays the record and the next tick applies
   // the round receipt again; once it exists the story is in round N, whatever happens to the old state after
   act.obs.units[a.unit.key] = { ...loc, runsDir: dir, state: null, workflow: null };
@@ -477,7 +473,7 @@ export async function roundStart(act: ActEnv, a: Extract<Action, { kind: "round_
   return { ok: true, detail: { round: a.round, story_file: fm.ok ? "updated" : fm.reason, commit, ...(label.swapped ? { label: a.label } : {}) }, ...(label.warning ? { warnings: [label.warning] } : {}) };
 }
 
-/** gh-71 D9 (B19, B20): swap the issue's workflow label after the round started; a failure is only a warning. */
+/** Swap the issue's workflow label after the round started; a failure is only a warning. */
 async function swapRoundLabel(act: ActEnv, label: Extract<Action, { kind: "round_start" }>["label"]): Promise<{ swapped: boolean; warning?: string }> {
   if (!label) return { swapped: false };
   const remote = act.obs.ports.remote;
@@ -492,12 +488,12 @@ async function swapRoundLabel(act: ActEnv, label: Extract<Action, { kind: "round
 }
 
 /**
- * gh-195 D2, D4 (B10, B14): push the story's record to `refs/norn/runs/<story>` after the tick's
- * branch pushes, its `Norn-Branch-Commit` the story branch as pushed (the local head without a
- * remote). While the story branch is not on the remote as it is here (its push failed this tick, or
- * has not happened yet), the record waits: it would describe work the remote does not hold (review
- * F5). A lease that no longer holds (another checkout pushed the ref) or a rejected push leaves the
- * record owed, the reason in the trace: the next tick tries again.
+ * Push the story's record to `refs/norn/runs/<story>` after the tick's branch pushes, its
+ * `Norn-Branch-Commit` the story branch as pushed (the local head without a remote). While the story
+ * branch is not on the remote as it is here (its push failed this tick, or has not happened yet), the
+ * record waits: it would describe work the remote does not hold. A lease that no longer holds
+ * (another checkout pushed the ref) or a rejected push leaves the record owed, the reason in the
+ * trace: the next tick tries again.
  */
 export async function pushRecord(act: ActEnv, a: Extract<Action, { kind: "push_record" }>): Promise<ActionResult> {
   const story = act.storyLoc(a.unit.story);
@@ -505,12 +501,12 @@ export async function pushRecord(act: ActEnv, a: Extract<Action, { kind: "push_r
   const local = await act.git.revParse(act.root, `refs/heads/${a.branch}`);
   const head = remote ? await act.git.revParse(act.root, `refs/remotes/${remote}/${a.branch}`) : local;
   if (local !== null && head !== local)
-    return { ok: false, error: `record push for ${a.unit.story} waits: ${a.branch} is not on ${remote} as it is here (${remote} has ${head ?? "no such branch"}); the next tick pushes it after the branch (B10)` };
+    return { ok: false, error: `record push for ${a.unit.story} waits: ${a.branch} is not on ${remote} as it is here (${remote} has ${head ?? "no such branch"}); the next tick pushes it after the branch` };
   const r = await pushStoryRecord(act.root, remote, story, { expected: a.expected, holder: a.holder, branch_commit: head, at: act.nowIso() });
   if (r.ok) return { ok: true, detail: r };
   const why =
     r.reason === "stale" || r.reason === "rejected"
-      ? `${recordRef(a.unit.story)} on ${remote} is not the record this checkout last saw (${a.expected ?? "none"}): another checkout pushed it, or the remote refused it; nothing overwritten (D2)`
+      ? `${recordRef(a.unit.story)} on ${remote} is not the record this checkout last saw (${a.expected ?? "none"}): another checkout pushed it, or the remote refused it; nothing overwritten`
       : `${r.reason}: ${r.message}`;
-  return { ok: false, error: `record push for ${a.unit.story} failed, owed to the next tick (B14): ${why}`, detail: { reason: r.reason, message: r.message } };
+  return { ok: false, error: `record push for ${a.unit.story} failed, owed to the next tick: ${why}`, detail: { reason: r.reason, message: r.message } };
 }

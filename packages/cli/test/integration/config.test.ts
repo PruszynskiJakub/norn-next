@@ -23,7 +23,7 @@ const entries = async (h: Harness, deps?: Partial<CliDeps>) => {
 };
 const by = (list: ConfigEntry[], key: string) => list.find((e) => e.key === key);
 
-describe("three files and where keys belong (B1–B8)", () => {
+describe("three files and where keys belong", () => {
   let h: Harness;
   beforeAll(async () => {
     h = await createHarness();
@@ -52,7 +52,7 @@ describe("three files and where keys belong (B1–B8)", () => {
     expect(by(e, "max_agents")).toMatchObject({ value: 4, source: "user" });
     expect(by(e, "mode")).toMatchObject({ value: "auto", source: "user" });
     expect(by(e, "agents.claude.model")).toMatchObject({ value: "claude-opus-5-5", source: "user" });
-    // B14: setting a model keeps the built-in args
+    // Setting a model keeps the built-in args
     expect(by(e, "agents.claude.args")).toMatchObject({ value: ["--permission-mode", "auto"], source: "built-in" });
     expect(by(e, "base_branch")).toMatchObject({ value: "develop", source: "repo" });
     expect(by(e, "workflow")).toMatchObject({ value: "story", source: "repo" });
@@ -98,7 +98,7 @@ describe("three files and where keys belong (B1–B8)", () => {
       ["agents: { aider: {} }\n", "`~/.norn/config.yaml`: unknown agent `aider`: `agents` takes claude, codex, opencode, gemini"],
       ["max_agents: 12\n", "`~/.norn/config.yaml`: `max_agents` must be 1–9 (there are 9 slots)"],
       ["notify: { webhook: not-a-url }\n", "`~/.norn/config.yaml`: `notify.webhook` must be an http or https URL"],
-      // D2: the file's own schema decides, the one an editor checks it with (B50)
+      // The file's own schema decides, the one an editor checks it with
       ["notify:\n", "`~/.norn/config.yaml`: `notify` must be a map with `os`, `ntfy`, `webhook`"],
       ["agents: { claude: null }\n", "`~/.norn/config.yaml`: `agents.claude` must be a map with `model` and `args`"],
       ["agents: { codex: { args: [1] } }\n", "`~/.norn/config.yaml`: `agents.codex.args` must be a list of strings"],
@@ -222,7 +222,7 @@ describe("three files and where keys belong (B1–B8)", () => {
   });
 });
 
-describe("two repos, one user home (B3)", () => {
+describe("two repos, one user home", () => {
   let a: Harness;
   let b: Harness;
   beforeAll(async () => {
@@ -265,7 +265,7 @@ describe("norn config set and unset (B62–B68, D4)", () => {
 
   test("--user, --local and --repo write their file; get shows the source (B62, D4)", async () => {
     expect((await h.norn("config", "set", "mode", "auto", "--user", "--json")).value).toMatchObject({ file: "user", key: "mode", value: "auto" });
-    // B50: a file config set creates starts with the modeline naming its schema copy
+    // A file config set creates starts with the modeline naming its schema copy
     expect(read(userFile(h))).toBe("# yaml-language-server: $schema=config.schema.json\nmode: auto\n");
     expect((await h.norn("config", "set", "mode", "manual", "--local")).exit).toBe(0);
     expect(read(localFile(h))).toBe("# yaml-language-server: $schema=norn.config.local.schema.json\nmode: manual\n");
@@ -373,7 +373,7 @@ describe("norn config set and unset (B62–B68, D4)", () => {
   });
 });
 
-describe("the team's norn version (gh-61 B3, B4, D4)", () => {
+describe("the team's norn version (D4)", () => {
   let h: Harness;
   const read = (path: string) => {
     try {

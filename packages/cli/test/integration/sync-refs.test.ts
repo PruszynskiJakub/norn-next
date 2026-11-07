@@ -1,5 +1,5 @@
 /**
- * The sync fetch (gh-195 B30, T9, H2): a tick's sync fetches claim and mailbox refs by name, never
+ * The sync fetch: a tick's sync fetches claim and mailbox refs by name, never
  * every `refs/norn/*` ref, so archive refs (`refs/norn/runs/<story>`) do not ride along with every
  * sync; pruning still works within each prefix.
  */

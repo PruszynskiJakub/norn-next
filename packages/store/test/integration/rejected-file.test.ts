@@ -1,5 +1,5 @@
 /**
- * gh-195 13-R3-F2 (D12, S2): `rejected.json` is read entry by entry and written under a lock — one
+ * gh-195 13-R3-F2: `rejected.json` is read entry by entry and written under a lock — one
  * entry of the wrong shape never makes the file read as empty for the next write, a file that is not
  * one at all is never written over, and a write waits for the lock another holder has.
  */

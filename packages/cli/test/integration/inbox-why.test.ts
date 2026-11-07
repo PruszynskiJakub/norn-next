@@ -114,7 +114,7 @@ describe("gate item and rulings (F21, F28)", () => {
     const judged = h.git(["rev-parse", "HEAD"], wt());
     const rej = await h.norn("story", "reject", "gh-7", "--reason", "AC6 wins over B6: show the raw count");
     expect(rej.exit).toBe(0);
-    // C2: the ruling is tied to the head it judged
+    // The ruling is tied to the head it judged
     expect(rej.value).toMatchObject({ receipt: { kind: "reject", head_sha: judged } });
     await tick();
     expect(h.state(runs())).toMatchObject({ step: "work", attempt: 2 });
@@ -140,7 +140,7 @@ describe("gate item and rulings (F21, F28)", () => {
   });
 });
 
-describe("why by step, attempt, transition and rule (O5, F5)", () => {
+describe("why by step, attempt, transition and rule (F5)", () => {
   test("--transition finds the tick that applied the reject and quotes the comment", async () => {
     const r = await h.norn("run", "view", "gh-7", "--why", "--transition", "human-qa.reject");
     expect(r.exit).toBe(0);
@@ -188,7 +188,7 @@ describe("merge PR item and inbox history (F25, Q3)", () => {
     await tick();
     expect(h.state(runs())).toMatchObject({ step: "$done", status: "done" });
     const pr = h.remote.prs[0];
-    // qa#1 (gh-71 B27): before any sync has seen the PR, the PR open-pr opened is the merge item —
+    // qa#1: before any sync has seen the PR, the PR open-pr opened is the merge item —
     // never "round done, no PR"
     const before = (await h.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; title: string }>> };
     expect(before.groups.your_turn?.filter((i) => i.story === "gh-7").map((i) => i.title)).toEqual([`Merge PR #${pr?.number} (still a draft)`]);

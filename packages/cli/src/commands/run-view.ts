@@ -1,31 +1,19 @@
 /**
- * `norn run view <run|unit>` (B44): one run of a unit from @norn/view — its step row: step,
- * attempt, outcome, durations, who, reason, receipts; a unit key means its latest run.
+ * `norn run view <run|unit>`: one run of a unit, its step row; a unit key means its latest run.
  *
- * `norn run view <unit> --why [--tick <id>] [--step <s>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>]`
- * (B45, O5, H3; what `why` was, JSON unchanged, B70): explain a tick's decision for a unit by replaying the pure `decide` on the facts
- * snapshot, workflows and config recorded in the trace, showing the rule that fired, what
- * triggered it — the receipt applied (with its reason text: handoff, comment, check output) or the
- * fact the rule read — and verifying the replay equals the recorded decision. A mismatch exits 1
- * (decide was not pure, or the trace was edited). A tick recorded by another norn version
- * (`norn_version` on the trace) is still replayed and diffed with this one's decide, and the replay
- * is labelled `recorded by norn <X>` — a mismatch there may just be a rule that changed between
- * versions; the exit code is the same either way.
+ * `--why` explains a tick's decision for a unit by replaying the pure `decide` on the facts
+ * snapshot, workflows and config recorded in the trace, and verifies the replay equals the recorded
+ * decision: a mismatch exits 1 (decide was not pure, or the trace was edited). A tick recorded by
+ * another norn version is still replayed and labelled; a mismatch there may just be a rule that
+ * changed between versions, and the exit code is the same either way.
  *
- * Without `--tick` the matching ticks are found automatically: by default the latest decision for
- * the unit; with `--step` / `--attempt` / `--transition` / `--rule` every decision that matches
- * (noops excluded unless `--rule` names them), newest explained, all listed under `matches`.
- * Intake decisions are keyed by the story (F5), so `norn run view gh-1 --why --rule remote.intake` covers them.
- * `--receipt <id>` (NT2: the command of a note's inbox item) picks the decision that applied that
- * receipt (the unit may be left out: it is the one whose decision applied it); its reason text
- * lists the report's criteria not passed and its notes.
+ * Without `--tick`: the latest decision for the unit, or with a filter every match (noops excluded
+ * unless `--rule` names them), newest explained. Intake decisions are keyed by the story.
+ * `--receipt <id>` picks the decision that applied that receipt (the unit may be left out).
  *
- * R5.4 (N2): a tick with a `tick.start` but no end died during act. `--why` explains it from its
- * recorded decisions ("tick crashed during act") — `--tick <id>` resolves the tick a receipt cites,
- * and without `--tick` a crashed tick newer than the unit's last finished one is the one explained.
- *
- * O7, D10 (B20): `--tick <id>` for a tick not in the trace whose ulid time is older than the retention
- * window and whose day file is gone is refused as `tick_pruned`, never guessed at.
+ * A tick with a `tick.start` but no end died during act and is explained from its recorded
+ * decisions. A `--tick` older than the retention window whose day file is gone is refused as
+ * `tick_pruned`, never guessed at.
  */
 import { cmd, criterionLine, decide, type Decision, legacyAction, type NumberedReceipt, type StoryFacts, type UnitFacts, unitDecision } from "@norn/core";
 import { ExitCode, isUlid, type Receipt, receiptNumber, storyOf, type TickStartTrace, type TickTrace, type TickUnitRecord, ULID_PATTERN, ulidTime } from "@norn/schema";
@@ -41,7 +29,7 @@ import { localUnit } from "../runtime/human.ts";
 import { fetchArchived } from "../runtime/archive.ts";
 import { effectiveRetain } from "../runtime/trace-retention.ts";
 
-/** An action as compared with its replay; one an older norn recorded drops the fields since removed (O5). */
+/** An action as compared with its replay; one an older norn recorded drops the fields since removed. */
 const canon = (v: unknown) => JSON.stringify(JSON.parse(JSON.stringify(legacyAction(v ?? null))));
 
 interface Filter {
@@ -49,7 +37,7 @@ interface Filter {
   attempt?: number;
   transition?: { step: string; outcome: string };
   rule?: string;
-  /** NT2: the decision that applied this receipt (the note item's command) */
+  /** The decision that applied this receipt (the note item's command) */
   receipt?: string;
 }
 
@@ -75,11 +63,11 @@ function reasonOf(r: Receipt): string | null {
     case "done": {
       const findings = r.findings?.length ? `\n\nFindings:\n${r.findings.map((f, i) => `${i + 1}. [${f.severity}] ${f.title}${f.detail ? ` — ${f.detail}` : ""}`).join("\n")}` : "";
       const evidence = r.evidence ? `\n\nEvidence: ${r.evidence}` : "";
-      // QV2, NT1: the verdicts not passed and the notes for a person
+      // The verdicts not passed and the notes for a person
       const open = r.criteria?.filter((c) => c.verdict !== "pass") ?? [];
       const criteria = r.criteria ? `\n\nCriteria: ${r.criteria.length - open.length}/${r.criteria.length} pass${open.length ? `\n${open.map((c) => `- ${criterionLine(c)}${c.repro ? ` — repro: ${c.repro}` : ""}`).join("\n")}` : ""}` : "";
       const notes = r.notes?.length ? `\n\nNotes for a person:\n${r.notes.map((n, i) => `${i + 1}. ${n.criterion ? `(${n.criterion}) ` : ""}${n.text}`).join("\n")}` : "";
-      // BS5: the base merge norn verified at `norn done`
+      // The base merge norn verified at `norn done`
       const bm = r.base_merge;
       const merged = bm ? `\n\nBase merged: ${bm.sha}${bm.merge ? ` by merge commit ${bm.merge}` : ""}, head ${bm.head}` : "";
       return `${r.handoff}${findings}${evidence}${criteria}${notes}${merged}`;
@@ -94,7 +82,7 @@ function reasonOf(r: Receipt): string | null {
     case "answer":
       return r.answer;
     case "ask": {
-      // L1 (A7): the full pane screen of an implicit ask is shown here, not in inbox titles
+      // The full pane screen of an implicit ask is shown here, not in inbox titles
       const parts = [r.question];
       if (r.command) parts.push(`pending command: ${r.command}`);
       if (r.options?.length) parts.push(`options: ${r.options.map((o, i) => `${i + 1}. ${o}`).join(" · ")}`);
@@ -201,7 +189,7 @@ function parseFilter(args: Parameters<typeof opt.str>[0]): Filter {
   return f;
 }
 
-/** R5.4: explain a tick that died during act from its `tick.start` decisions (no results, no replay). */
+/** Explain a tick that died during act from its `tick.start` decisions (no results, no replay). */
 function crashedExplanation(tick: TickStartTrace, key: string) {
   const d = unitDecision(tick.decisions, key, decisionUnit);
   if (!d) throw refuse(`tick ${tick.tick_id} decided nothing for ${key}`, cmd.runList(key), "no_decision");
@@ -225,7 +213,7 @@ function crashedExplanation(tick: TickStartTrace, key: string) {
   };
 }
 
-/** NT2: the unit of the decision that applied a receipt, for `--receipt` without a unit. */
+/** The unit of the decision that applied a receipt, for `--receipt` without a unit. */
 function unitOfReceipt(root: string, reader: TickReader, receiptId: string): string | null {
   const { events } = readTrace(root, { types: ["tick"] });
   for (const ev of (events as TickTrace[]).toReversed())
@@ -237,7 +225,6 @@ function unitOfReceipt(root: string, reader: TickReader, receiptId: string): str
   return null;
 }
 
-/** O5: `run view --why` / `--receipt`, what `why` was. */
 async function why(ctx: Context, args: ParsedArgs) {
   const filter = parseFilter(args);
   if (!args.positionals[0] && !filter.receipt) throw usageError("run view --why: expected a unit", cmd.runView(undefined, { why: true }));
@@ -255,7 +242,7 @@ async function why(ctx: Context, args: ParsedArgs) {
     if (!tick) {
       const crashed = findCrashedTick(ctx.root, tickId);
       if (crashed) return crashedExplanation(crashed, key);
-      // D10: older than the window and its day is gone → tidy pruned it (B20)
+      // Older than the window and its day is gone → tidy pruned it
       if (isUlid(tickId)) {
         const window = effectiveRetain(ctx.config);
         const at = ulidTime(tickId);
@@ -271,13 +258,13 @@ async function why(ctx: Context, args: ParsedArgs) {
     const { events } = readTrace(ctx.root, { unit: key, types: ["tick"] });
     found = [];
     for (const ev of events as TickTrace[]) {
-      // R1.1: by default the unit's own action, not the claim renewal riding along; a filter may pick either
+      // By default the unit's own action, not the claim renewal riding along; a filter may pick either
       const d = filtered
         ? ev.decisions.filter((x) => decisionUnit(x) === key).find((x) => matches(x, unitIn(reader, ev, story, key).uf, filter))
         : unitDecision(ev.decisions, key, decisionUnit);
       if (d) found.push({ tick: ev, d });
     }
-    // R5.4: a newer tick that died during act is the one to explain
+    // A newer tick that died during act is the one to explain
     const crashed = filtered ? undefined : crashedTicksFor(ctx.root, key).at(-1);
     if (crashed && (!found.length || crashed.at >= (found.at(-1) as { tick: TickTrace }).tick.at)) return crashedExplanation(crashed, key);
     if (!found.length)
@@ -289,7 +276,7 @@ async function why(ctx: Context, args: ParsedArgs) {
   }
   const { tick, d: recorded } = found.at(-1) as { tick: TickTrace; d: TickUnitRecord };
   const read = reader.inputs(tick);
-  // D10 (B21, S2): a chunk the tick names is missing; nothing is replayed from a partial snapshot
+  // A chunk the tick names is missing; nothing is replayed from a partial snapshot
   if (!read.ok && read.reason === "corrupt") throw corruptError(`trace entry of tick ${tick.tick_id} is corrupt: ${read.error.errors[0]?.message}`, cmd.runList(key), [read.error], "trace_corrupt");
   if (!read.ok) throw refuse(`tick ${tick.tick_id} has no replay block (recorded by an older norn)`, cmd.runList(key), "no_replay");
   const { inputs } = read;
@@ -335,7 +322,7 @@ async function why(ctx: Context, args: ParsedArgs) {
       all_match: allMatch,
       rule: mine?.rule ?? null,
       ...(same ? {} : { action: mine?.action ?? null }),
-      // O5: decide may have changed since; say whose decision the replay is compared with
+      // Decide may have changed since; say whose decision the replay is compared with
       ...(tick.norn_version && tick.norn_version !== ctx.version ? { label: `recorded by norn ${tick.norn_version}, replayed by norn ${ctx.version}` } : {}),
     },
     ...(filtered && !tickId
@@ -356,7 +343,7 @@ const WHY_ONLY = ["tick", "step", "attempt", "transition", "rule"] as const;
 export const runViewCommand = defineCommand({
   name: "run view",
   version: "reads",
-  summary: "One run of a unit: step, attempt, outcome, durations, receipts; --why replays the decision (B44, O5)",
+  summary: "One run of a unit: step, attempt, outcome, durations, receipts; --why replays the decision",
   usage: "norn run view [<run|unit>] [--why [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>]] | norn run view [<unit>] --receipt <receipt_id>",
   markdown: true,
   optionHelp: {
@@ -378,13 +365,13 @@ export const runViewCommand = defineCommand({
     const runId = new RegExp(ULID_PATTERN).test(target);
     const key = runId ? target : parseUnitKey(target).key;
     const load = () => loadRunView({ repoRoot: ctx.root, home: ctx.home, env: ctx.env, now: ctx.clock.now(), target: key });
-    // gh-195 D6 (B29, B30): a finished story's record on a clone that has none is fetched from its
+    // A finished story's record on a clone that has none is fetched from its
     // archive ref — the unit's story, or for a run id not found here, each story this clone has no record of
     if (!runId) await fetchArchived(ctx, [storyOf(key)]);
     let run = load();
     if (!run && runId && (await fetchArchived(ctx, loadSnapshot({ repoRoot: ctx.root, home: ctx.home, env: ctx.env }).stories.map((s) => s.key))).length) run = load();
     if (!run) throw refuse(runId ? `no run ${key} in the trace` : `${key} is unknown or has no run yet`, cmd.status(), runId ? "unknown_run" : "unknown_unit");
-    // gh-213 (O2a): a unit a check's fail sent back: that check, and whether the work changed since
+    // A unit a check's fail sent back: that check, and whether the work changed since
     const uf = runId ? null : await localUnit(ctx, key);
     const retry = uf ? await checkRetry(ctx.git, uf) : null;
     const changed = retry && (retry.code_changed === null ? "unknown" : retry.code_changed ? "yes" : "no");

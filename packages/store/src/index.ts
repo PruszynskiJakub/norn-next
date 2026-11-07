@@ -1,6 +1,6 @@
 /**
  * @norn/store — `.agents/` files, `runs/` JSON, claim and mailbox refs, `~/.norn` leases.
- * Atomic writes (temp + fsync + rename), validated reads returning `corrupt` (S1, S2).
+ * Atomic writes (temp + fsync + rename), validated reads returning `corrupt`.
  * Persistence only: no business decisions.
  */
 export * from "./base.ts";
@@ -9,7 +9,7 @@ export * from "./config.ts";
 export * from "./config-migrate.ts";
 export * from "./frontmatter.ts";
 export * from "./fsx.ts";
-// raw git (`git`, `gitSync`, blob and ref plumbing) stays inside store: everyone else goes through GitPort (X2)
+// raw git (`git`, `gitSync`, blob and ref plumbing) stays inside store: everyone else goes through GitPort
 export { type CasResult, fetchNornRefs, gitRemoteUrl, gitTimeoutMs, NETWORK_TIMEOUT_MS, onlyNornCommitsSince } from "./git.ts";
 export * from "./heartbeat.ts";
 export * from "./inbox-history.ts";

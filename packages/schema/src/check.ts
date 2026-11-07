@@ -1,6 +1,6 @@
 /**
  * The ajv engine behind every schema check: compiled once per schema, errors as JSON pointers.
- * Imports no schema, so a schema module may check against its own schemas (config.ts, D2).
+ * Imports no schema, so a schema module may check against its own schemas (as config.ts does).
  */
 import type { Static, TSchema } from "@sinclair/typebox";
 import { Ajv, type ErrorObject, type ValidateFunction } from "ajv";

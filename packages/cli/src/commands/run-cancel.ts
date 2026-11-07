@@ -1,7 +1,7 @@
 /**
- * `norn run cancel [<unit>]` (B51–B53, D4): stop a unit's running agent session without cancelling
+ * `norn run cancel [<unit>]`: stop a unit's running agent session without cancelling
  * the story. A `stuck` receipt by the person (reason `cancelled by person`) is written first, then
- * the session is killed through the runner (P6); the next tick parks the unit under Unblock and does
+ * the session is killed through the runner; the next tick parks the unit under Unblock and does
  * not restart it. Commits, the worktree, the branch, the claim and the pane stay; `norn run rerun`
  * resumes the step. Only the claim holder cancels: the session runs on its machine.
  */
@@ -24,7 +24,7 @@ export const runCancelCommand = defineCommand({
   positionals: { max: 1 },
   async run(ctx, args) {
     const key = await targetKey(ctx, args.positionals[0], args.json === true, inState("run cancel", (k) => cmd.runCancel(k), "Nothing is running", (u) => u.status === "running"));
-    // B53: the session runs on the claim holder's machine, and its run state lives there only (S12):
+    // The session runs on the claim holder's machine, and its run state lives there only:
     // the claim is checked before the unit is resolved, so a non-holder hears who holds it
     const story = storyOf(key);
     const claim = await claimFor(ctx, story);
@@ -45,8 +45,8 @@ export const runCancelCommand = defineCommand({
       },
       build: (t, cur) => humanReceipt(ctx, t, cur, "stuck", { reason: CANCEL_REASON }),
     });
-    // P6: the receipt is written; now stop the session (what kill means is the runner's). A session
-    // norn cannot stop from here is said, never skipped: decide does not kill on a person's stuck (B51)
+    // The receipt is written; now stop the session (what kill means is the runner's). A session
+    // norn cannot stop from here is said, never skipped: decide does not kill on a person's stuck
     const recorded = { receipt_id: done.receipt.receipt_id, ...(done.delivered.file ? { file: done.delivered.file } : {}) };
     const notStopped = (why: string, code: string) =>
       failure(
@@ -71,7 +71,7 @@ export const runCancelCommand = defineCommand({
   },
 });
 
-/** The live run's session, as the runner addresses it (R7.2: only a run started on this machine). */
+/** The live run's session, as the runner addresses it (only a run started on this machine). */
 function sessionOf(st: UnitState): SessionRef | null {
   const s = st.run?.session;
   if (!s) return null;

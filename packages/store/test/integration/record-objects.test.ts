@@ -1,5 +1,5 @@
 /**
- * gh-195 D6 (S2): a record read from git objects into memory for a view (`readRecordObjects`). A
+ * A record read from git objects into memory for a view (`readRecordObjects`). A
  * record commit whose tree names a blob the repository does not have reports that file and reads the
  * rest of the record as it is: the `cat-file --batch` stream stays aligned past a `missing` reply.
  */
@@ -49,7 +49,7 @@ const state = (unit: string, slice: string | null, step: string) =>
     mode: "manual",
   });
 
-describe("readRecordObjects (gh-195 D6, S2)", () => {
+describe("readRecordObjects", () => {
   test("F17: a blob missing from the repository is reported for its file; the units after it are still read", async () => {
     const root = tmp();
     await gitOk(root, ["init", "-q"]);

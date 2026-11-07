@@ -1,5 +1,5 @@
 /**
- * loadTraceView (O4, X1): the step timeline of one unit — for a story, its slices too —
+ * loadTraceView: the step timeline of one unit — for a story, its slices too —
  * read from local files only (spec folders in the checkout and story worktrees, slice
  * worktrees — found as the project view finds them, `scanWorktrees` — and the whole trace of
  * that story). No writes, no network.
@@ -10,7 +10,7 @@ import { buildStepTimeline, mergeStoryTimeline } from "./steps.ts";
 import { TIMELINE_TYPES } from "./timeline.ts";
 import type { CriteriaSummary, RoundView, TraceRecords, TraceView, UnitTraceSummary } from "./types.ts";
 
-/** QV8: sum the `criteria` trace events of the given units, per verdict (B37: no split by `needs`). */
+/** Sum the `criteria` trace events of the given units, per verdict (no split by `needs`). */
 export function criteriaSummary(events: readonly TraceEvent[], units: ReadonlySet<string>): CriteriaSummary | null {
   const out: CriteriaSummary = { reports: 0, verdicts: { pass: 0, fail: 0, person: 0, unverified: 0 }, unchecked_coverage: 0 };
   for (const ev of events) {
@@ -23,9 +23,9 @@ export function criteriaSummary(events: readonly TraceEvent[], units: ReadonlySe
 }
 
 /**
- * Where the unit's records are read from (S12, gh-195 D7): the checkout's machine dir; a finished
- * story's archive ref, unpacked into the machine dir's cache (the ref named, D16: never the base
- * tree); or an older norn's run state still on a unit worktree's branch, before the tick moves it (B34).
+ * Where the unit's records are read from: the checkout's machine dir; a finished
+ * story's archive ref, unpacked into the machine dir's cache (the ref named, never the base
+ * tree); or an older norn's run state still on a unit worktree's branch, before the tick moves it.
  */
 function recordsOf(repoRoot: string, story: StorySnapshot): { records: TraceRecords; runsDir: (u: UnitSnapshot) => string } {
   if (story.run_state.archive) return { records: { source: "archive", root: story.run_state.base, ref: recordRef(story.key), commit: story.run_state.archive }, runsDir: (u) => u.path };
@@ -49,14 +49,14 @@ export interface LoadTraceViewOptions {
   storyOnly?: boolean;
 }
 
-/** gh-71 B29, B32: how a round's record says it ended; null while it is under way. */
+/** How a round's record says it ended; null while it is under way. */
 function roundEnd(st: UnitState | null): RoundView["ended"] {
   if (st?.ended) return { by: "person", at: st.ended.at };
   return st?.status === "done" ? { by: "workflow", at: "$done" } : null;
 }
 
 /**
- * gh-71 B29, B36: the story's timeline across its rounds — each round's record read on its own, with
+ * The story's timeline across its rounds — each round's record read on its own, with
  * the trace events of its time (from its start to the next round's), its rows in round order; the
  * summary is the current round's, the wall-clock from the first round's intake. A flat record is round 1.
  */
@@ -95,7 +95,7 @@ function storyTimeline(story: StorySnapshot, build: (u: UnitSnapshot, evs?: Trac
     steps: views.flatMap((v) => v.steps),
     hidden_events: views.reduce((n, v) => n + v.hidden_events, 0),
     rounds: rounds.map((r, i) => {
-      // gh-196 D5 (B34): the round receipt that started round i sits in round i-1's record
+      // The round receipt that started round i sits in round i-1's record
       const start = (rounds[i - 1]?.unit.receipts ?? []).findLast((x) => x.receipt.kind === "round")?.receipt;
       const delegated = start?.kind === "round" && start.delegated ? { delegated_reason: start.comment ?? "" } : {};
       return { n: r.n, workflow: r.workflow, ended: roundEnd(r.unit.state), ...delegated };

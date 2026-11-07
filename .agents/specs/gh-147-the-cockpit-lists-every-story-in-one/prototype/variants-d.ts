@@ -259,7 +259,7 @@ export function handle(s: S, key: Key, model0: CockpitModel, look: Look): { stat
     const i = rows.indexOf(sel);
     const here = section(s, sel);
     if (ch === "]") return go(rows.slice(i + 1).find((r) => section(s, r) !== here));
-    // [ : the start of this section, or of the one before when already there
+    // [: the start of this section, or of the one before when already there
     const before = rows.slice(0, i).reverse();
     const startOf = (sec: string) => rows.find((r) => section(s, r) === sec);
     const prevSec = before.find((r) => section(s, r) !== here);

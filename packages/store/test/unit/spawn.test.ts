@@ -1,4 +1,4 @@
-/** git's network timeout rule (H11); the bounded child processes themselves are in test/integration/spawn.test.ts. */
+/** git's network timeout rule; the bounded child processes themselves are in test/integration/spawn.test.ts. */
 import { describe, expect, test } from "bun:test";
 import { NETWORK_TIMEOUT_MS, gitTimeoutMs } from "../../src/index.ts";
 

@@ -70,7 +70,7 @@ function bundledCiScript(wf: string): string {
   return steps.ci?.run ?? "";
 }
 
-describe("the shipped ci check waits for the checks on the PR (W1, #136)", () => {
+describe("the shipped ci check waits for the checks on the PR (#136)", () => {
   const SHA = "0123456789abcdef0123456789abcdef01234567";
   // A fake gh and sleep: PR 7 has checks from the APPEAR-th rollup call on (never when 0).
   const FAKE_GH = `#!/bin/sh

@@ -1,5 +1,5 @@
 /**
- * gh-195/14 (B27; D11, T7a, R2.3): the old holder's record after someone else holds the story. Taken over
+ * The old holder's record after someone else holds the story. Taken over
  * without a release from it, the old holder's next tick sets its record aside whole under
  * `<machine dir>/superseded/<story>-<ulid>/`, pushes nothing for it and shows one Check item naming the
  * new holder and its last local receipt, until `norn tidy` deletes it after `trace.retain`. Handed over
@@ -150,7 +150,7 @@ describe("a takeover without a release supersedes the old holder's record (B27, 
     expect(supersededOf(s.key)).toHaveLength(1);
     expect((await checkItems(s.key)).map((i) => i.title)).toEqual([title]);
 
-    // AC2: tidy keeps it within trace.retain, deletes it after, and the item goes with it
+    // Tidy keeps it within trace.retain, deletes it after, and the item goes with it
     const young = await h.norn("tidy", "--json");
     expect(young.exit).toBe(0);
     expect(young.value).toMatchObject({ removed: { superseded: [] } });

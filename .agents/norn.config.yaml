@@ -22,6 +22,6 @@ norn_version: 0.25.0
 
 # Workflows in .agents/workflows/. An issue label norn:wf:<name> picks another one per story.
 # Every story starts in triage unless its issue names a workflow; a person switches it from the
-# triage gate with `norn story edit <story> --workflow <name> --at <step>` (W9, S7).
+# triage gate with `norn story edit <story> --workflow <name> --at <step>`.
 # workflow: triage
 # slice_workflow: slice

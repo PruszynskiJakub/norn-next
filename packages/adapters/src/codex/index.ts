@@ -1,9 +1,9 @@
 /**
- * Codex CLI agent adapter (M4, `blocking` tier). Codex hooks share Claude Code's shape and live in
+ * Codex CLI agent adapter (`blocking` tier). Codex hooks share Claude Code's shape and live in
  * `<repo>/.codex/hooks.json`; `Stop` accepts `{"decision":"block","reason":…}` and continues the
- * turn with `reason` as the next prompt (A4).
+ * turn with `reason` as the next prompt.
  * Caveat: project-local hooks only run once the project's `.codex/` layer is trusted and the hooks
- * reviewed via `/hooks` in Codex — `norn doctor` (A7) must surface that.
+ * reviewed via `/hooks` in Codex — `norn doctor` must surface that.
  */
 import { join } from "node:path";
 import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookDecision, HookResponse } from "@norn/core";
@@ -77,10 +77,10 @@ export function launchCommand(req: AgentLaunchRequest): { argv: string[]; env: R
 }
 
 /**
- * C4: Codex rollout JSONL (`~/.codex/sessions/…/rollout-*.jsonl`): assistant output is
+ * Codex rollout JSONL (`~/.codex/sessions/…/rollout-*.jsonl`): assistant output is
  * `{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text",…}]}}`;
  * `event_msg` lines of type `agent_message` carry the same text and are used as a fallback.
- * TODO(M4): re-verify against a current Codex rollout file.
+ * TODO: re-verify against a current Codex rollout file.
  */
 export async function lastAssistantMessage(transcriptPath: string): Promise<string | null> {
   const lines = await readJsonl(transcriptPath);

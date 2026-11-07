@@ -1,4 +1,4 @@
-# Reproduce workflow — example installed by `norn init`; edit freely (W1).
+# Reproduce workflow — example installed by `norn init`; edit freely.
 # Select it with the issue label norn:wf:reproduce, or start it after triage
 # (`norn story edit <story> --workflow reproduce`).
 # An unattended agent follows the report through the real interface, builds a loop that goes red on

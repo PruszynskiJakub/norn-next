@@ -1,9 +1,9 @@
 /**
- * gh-64 `norn upgrade`, the config part (D13, B40–B45): rewrite old config keys into the three-file
+ * `norn upgrade`, the config part: rewrite old config keys into the three-file
  * shape. The user file is rewritten in place; the team file, the workflows it hands limits and mode
  * to, the slices and specs that lose criteria `needs`, and the team schema copy are returned for the
  * caller to stage. Files are edited as YAML documents, so comments and key order stay. Every step
- * reads what is there and changes only old keys, so a second run changes nothing (B45).
+ * reads what is there and changes only old keys, so a second run changes nothing.
  */
 import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -28,9 +28,9 @@ export interface ConfigMigration {
   changed: string[];
   /** repo-relative paths to stage (team file, workflows, slices, specs, schema copy) */
   stage: string[];
-  /** B43: keys dropped with their value and what to do */
+  /** Keys dropped with their value and what to do */
   removed: ConfigMigrationRemoved[];
-  /** B40: renames, `old → new` */
+  /** Renames, `old → new` */
   renamed: Array<{ file: "user" | "repo"; from: string; to: string }>;
 }
 
@@ -56,7 +56,7 @@ const js = (doc: Document, path: string[]): unknown => {
   return v && typeof (v as { toJSON?: unknown }).toJSON === "function" ? (v as { toJSON: () => unknown }).toJSON() : v;
 };
 
-/** B40 (D9): the old notifier list as a `notify` map, and the adapters that have no place in it. */
+/** The old notifier list as a `notify` map, and the adapters that have no place in it. */
 function notifyOf(list: unknown): { notify: Record<string, unknown>; dropped: string[] } {
   const notify: Record<string, unknown> = {};
   const dropped: string[] = [];
@@ -66,7 +66,7 @@ function notifyOf(list: unknown): { notify: Record<string, unknown>; dropped: st
     const adapter = (n as { adapter?: unknown })?.adapter;
     const o = ((n as { options?: Record<string, unknown> })?.options ?? {}) as Record<string, unknown>;
     if (adapter === "os") os = true;
-    else if (adapter === "herdr") continue; // inside Herdr it is on by itself (B20)
+    else if (adapter === "herdr") continue; // inside Herdr it is on by itself
     else if (adapter === "ntfy") {
       const url = typeof o.url === "string" ? o.url : typeof o.topic === "string" ? `${typeof o.server === "string" ? o.server.replace(/\/+$/, "") : "https://ntfy.sh"}/${o.topic}` : null;
       if (url) notify.ntfy = url;
@@ -97,7 +97,6 @@ function rename(r: FileRun, from: string, to: string): void {
   if (renameKey(r.doc, from, to)) r.out.renamed.push({ file: r.file, from, to });
 }
 
-/** B40, B43: the user file. */
 function migrateUser(r: FileRun): void {
   rename(r, "default_agent", "agent");
   rename(r, "default_mode", "mode");
@@ -129,7 +128,7 @@ const REMOVED_NOTE: Record<string, string> = {
   claim: "claim timing is derived from the tick interval",
 };
 
-/** B14 (D10): agent entries keep `model` and `args`; other fields and unknown agents are dropped. */
+/** Agent entries keep `model` and `args`; other fields and unknown agents are dropped. */
 function agentsEntries(r: FileRun): void {
   const agents = r.doc.get("agents", true);
   if (!isMap(agents)) return;
@@ -151,7 +150,7 @@ function agentsEntries(r: FileRun): void {
 
 const PERSONAL_NOTE = (key: string, value: unknown) => `set it in ${USER_FILE} if you want it${key !== "agents" ? `: \`${key}: ${typeof value === "object" ? JSON.stringify(value) : String(value)}\`` : ""}`;
 
-/** B40–B43: the team file; returns the limits and mode it hands to the workflows. */
+/** The team file; returns the limits and mode it hands to the workflows. */
 function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode: string | null } {
   const rawRemote = js(r.doc, ["remote"]);
   if (rawRemote !== undefined) {
@@ -177,7 +176,7 @@ function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode
   if (limits) {
     r.doc.delete("limits");
     r.out.renamed.push({ file: "repo", from: "limits", to: "each workflow's defaults:" });
-    // B43: a limit no workflow takes is listed with its value
+    // A limit no workflow takes is listed with its value
     for (const [k, v] of Object.entries(limits))
       if (!WORKFLOW_DEFAULTS.includes(k)) r.out.removed.push({ file: "repo", key: `limits.${k}`, value: v, note: LIMIT_NOTE[k] ?? "norn fixes it" });
   }
@@ -188,7 +187,7 @@ function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode
     r.doc.delete("default_mode");
     r.out.renamed.push({ file: "repo", from: "default_mode", to: "each workflow's mode" });
   }
-  // B43: personal and machine keys leave the team file, each listed with its value
+  // Personal and machine keys leave the team file, each listed with its value
   const agent = js(r.doc, ["default_agent"]);
   if (agent !== undefined) {
     r.out.removed.push({ file: "repo", key: "agent", value: agent, note: PERSONAL_NOTE("agent", agent) });
@@ -196,7 +195,7 @@ function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode
   }
   for (const k of ["agents", "max_agents", "trace"]) if (r.doc.has(k)) drop(r, k, PERSONAL_NOTE(k, js(r.doc, [k])));
   if (r.doc.has("notifiers")) {
-    // B43: offered in the user file's shape (`notify`), since the old key is refused there
+    // Offered in the user file's shape (`notify`), since the old key is refused there
     const { notify, dropped } = notifyOf(js(r.doc, ["notifiers"]));
     const lost = dropped.length ? `; ${dropped.join(", ")} no longer supported: use notify.webhook` : "";
     drop(r, "notifiers", `${PERSONAL_NOTE("notify", notify)}${lost}`);
@@ -205,7 +204,7 @@ function migrateRepo(r: FileRun): { limits: Record<string, unknown> | null; mode
   return { limits, mode };
 }
 
-/** The limits a workflow's `defaults:` takes (B41). */
+/** The limits a workflow's `defaults:` takes. */
 const WORKFLOW_DEFAULTS = ["deadline", "nudges", "retries", "stalled"];
 const LIMIT_NOTE: Record<string, string> = { attended_wait: `fixed at ${ATTENDED_WAIT}`, max_checks: REMOVED_NOTE.max_checks as string };
 
@@ -226,7 +225,7 @@ function fillWorkflow(doc: Document, wanted: Record<string, unknown>, mode: stri
 }
 
 /**
- * D13: the filled workflow as text. New top-level keys are spliced in as lines after `name:`, so the
+ * The filled workflow as text. New top-level keys are spliced in as lines after `name:`, so the
  * rest of the file keeps its text; when that cannot be done (a `defaults:` it adds to, no `name:`),
  * the document is re-rendered without wrapping long lines.
  */
@@ -245,7 +244,7 @@ function workflowText(raw: string, doc: Document): string {
   return doc.toString({ lineWidth: 0, flowCollectionPadding: false });
 }
 
-/** B41, B42: fill each workflow's `defaults:` and `mode` from the old team values it does not set. */
+/** Fill each workflow's `defaults:` and `mode` from the old team values it does not set. */
 function migrateWorkflows(root: string, limits: Record<string, unknown> | null, mode: string | null, out: ConfigMigration): void {
   if (!limits && !mode) return;
   const wanted = Object.fromEntries(Object.entries(limits ?? {}).filter(([k]) => WORKFLOW_DEFAULTS.includes(k)));
@@ -270,7 +269,7 @@ function migrateWorkflows(root: string, limits: Record<string, unknown> | null, 
   }
 }
 
-/** B44: strip criteria `needs` from every slice file and spec under `.agents/specs/`. */
+/** Strip criteria `needs` from every slice file and spec under `.agents/specs/`. */
 function stripNeeds(root: string, out: ConfigMigration): void {
   let specs: string[];
   try {
@@ -311,7 +310,7 @@ function stripNeeds(root: string, out: ConfigMigration): void {
 }
 
 /**
- * D13: the whole config migration. `root` is the main checkout; `home` the norn home. Writes the
+ * The whole config migration. `root` is the main checkout; `home` the norn home. Writes the
  * changed files; returns what changed, what to stage and every key dropped or renamed.
  */
 export function migrateConfig(opts: { root: string; home: string }): ConfigMigration {
@@ -329,7 +328,7 @@ export function migrateConfig(opts: { root: string; home: string }): ConfigMigra
     }
     const before = { value: JSON.stringify(doc.toJS()), notes: out.removed.length + out.renamed.length };
     fn({ doc, file, out });
-    // B45: write only what the migration changed; the YAML writer's own reformatting is no change
+    // Write only what the migration changed; the YAML writer's own reformatting is no change
     const dirty = JSON.stringify(doc.toJS()) !== before.value || out.removed.length + out.renamed.length !== before.notes;
     if (!dirty) return;
     const text = doc.toString();
@@ -345,7 +344,7 @@ export function migrateConfig(opts: { root: string; home: string }): ConfigMigra
   });
   migrateWorkflows(opts.root, handed.limits, handed.mode, out);
   stripNeeds(opts.root, out);
-  // B55: the schema copies follow the norn that ran migrate; the team copy is staged
+  // The schema copies follow the norn that ran migrate; the team copy is staged
   for (const p of writeConfigSchemas({ repoRoot: opts.root, home: opts.home })) {
     out.changed.push(p);
     for (const rel of [REPO_CONFIG_SCHEMA_FILE, LOCAL_CONFIG_SCHEMA_FILE]) if (p === join(opts.root, rel)) out.stage.push(rel);

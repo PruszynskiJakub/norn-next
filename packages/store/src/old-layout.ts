@@ -1,5 +1,5 @@
 /**
- * gh-110 D6: the file moves of `norn upgrade`, from the old layout's places (D4) to the new ones (D1).
+ * The file moves of `norn upgrade`, from the old layout's places to the new ones.
  * Each one can run again: a rerun moves what an interrupted run left and leaves the rest.
  */
 import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmdirSync, rmSync } from "node:fs";
@@ -38,7 +38,7 @@ export const oldWorkflowEntries = (root: string): string[] => entries(join(root,
 /** Old trace entries a machine dir already holds under the same name: a rerun cannot tell which one to keep. */
 export const traceClashes = (root: string): string[] => oldTraceEntries(root).filter((n) => existsSync(join(machineDir(root), n)));
 
-/** B12: move the old trace dir's contents (all but the held lock) into the machine dir; true when something moved. */
+/** Move the old trace dir's contents (all but the held lock) into the machine dir; true when something moved. */
 export function moveOldTrace(root: string): boolean {
   const names = oldTraceEntries(root);
   for (const n of names) moveFile(join(root, OLD_TRACE_DIR, n), join(machineDir(root), n));
@@ -46,7 +46,7 @@ export function moveOldTrace(root: string): boolean {
   return names.length > 0;
 }
 
-/** B13: the lines an older `norn init` wrote for the old trace folder; the person's own lines are kept. */
+/** The lines an older `norn init` wrote for the old trace folder; the person's own lines are kept. */
 const OLD_IGNORE_LINES = [OLD_TRACE_DIR, `${OLD_TRACE_DIR}/`];
 
 /** Drop norn's old trace line from `.gitignore`; true when the file changed. */
@@ -61,11 +61,11 @@ export function dropOldIgnoreLine(root: string): boolean {
   return true;
 }
 
-/** gh-195 S10 (retired, B35, B37): the `.gitattributes` line and its comment an older `norn init` added to collapse `runs/` in PR diffs. */
+/** The `.gitattributes` line and its comment an older `norn init` added to collapse `runs/` in PR diffs. */
 export const OLD_RUNS_ATTRIBUTE_LINES = ["# norn (machine state, collapsed in diffs)", ".agents/specs/*/runs/** linguist-generated=true gitlab-generated=true"];
 
 /**
- * gh-195 S10 (retired, B35): drop an older norn's `runs/**` line (and its comment) from `.gitattributes`,
+ * Drop an older norn's `runs/**` line (and its comment) from `.gitattributes`,
  * the person's lines kept; a file left with nothing in it is deleted. `changed` when the file changed,
  * `tracked` when git tracks it (only then may the change be staged: an untracked file never is).
  */

@@ -77,7 +77,7 @@ describe("storyFile (GR2: spec.md, story.md still read)", () => {
   });
 });
 
-describe("the story's current round (gh-71 D2, S5)", () => {
+describe("the story's current round", () => {
   test("a round folder without state.json (a round.start that stopped after the pin) is not the current round", () => {
     const base = tmp(); // a story's run-state folder (S12: `<machine dir>/runs/<story>`)
     const r1 = join(base, "_story/rounds/01-triage");
@@ -101,7 +101,7 @@ describe("the story's current round (gh-71 D2, S5)", () => {
   });
 });
 
-describe("run state lives in the checkout's machine dir, the handoff in the worktree (S12, gh-195/05, B2, B5)", () => {
+describe("run state lives in the checkout's machine dir, the handoff in the worktree", () => {
   const story = { key: "gh-12", spec_dir: ".agents/specs/gh-12-fix-login" };
   test("a unit's run state is `<machine dir>/runs/<story>/<unit>`, the story's current round under `_story/rounds/`", () => {
     const root = tmp();
@@ -118,7 +118,7 @@ describe("run state lives in the checkout's machine dir, the handoff in the work
     pinWorkflow(r2, WORKFLOW_YAML);
     writeState(r2, state());
     expect(runStateDir(root, story, "_story")).toBe(r2);
-    // gh-195/07 (D9, B39): one file per unit under handoffs/, never under a record folder
+    // One file per unit under handoffs/, never under a record folder
     expect(handoffPath(spec, "_story")).toBe(join(spec, "handoffs/_story.md"));
     expect(handoffPath(spec, "01-add-form")).toBe(join(spec, "handoffs/01-add-form.md"));
     mkdirSync(join(spec, "handoffs"), { recursive: true });

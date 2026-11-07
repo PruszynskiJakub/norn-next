@@ -1,7 +1,7 @@
 /**
- * gh-77: a check step runs in a detached `norn check-run`, not inside the tick (H6, C5, K1).
+ * A check step runs in a detached `norn check-run`, not inside the tick.
  * The tick that starts it returns at once; while the command runs, later ticks run (not `busy`),
- * keep the heartbeat fresh (R5.5) and wait on its run lease (`check.running`); the tick after the
+ * keep the heartbeat fresh and wait on its run lease (`check.running`); the tick after the
  * process ends applies its `check` receipt. A step timeout still kills it as a `fail` with reason `timeout`.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -62,7 +62,7 @@ async function atCheck(run: string, timeout: string): Promise<{ h: Harness; runs
 
 const checks = (runsDir: string) => listReceipts(runsDir).receipts.filter((r) => r.receipt.kind === "check").map((r) => r.receipt);
 
-describe("a long check (gh-77)", () => {
+describe("a long check", () => {
   let h: Harness;
   let runsDir: string;
   beforeAll(async () => ({ h, runsDir } = await atCheck('sleep 3 && echo "checked $USER $GH77_SECRET"', "1m")));
@@ -117,7 +117,7 @@ describe("a long check (gh-77)", () => {
   }, 20_000);
 });
 
-describe("two long checks (K1, K3)", () => {
+describe("two long checks", () => {
   let h: Harness;
   let runsDirs: string[];
   beforeAll(async () => ({ h, runsDirs } = await atChecks("sleep 3", "1m", ["Slow check", "Other check"])));
@@ -133,7 +133,7 @@ describe("two long checks (K1, K3)", () => {
     expect(running.map((e) => e.lease.story).sort()).toEqual(["gh-10", "gh-9"]);
     expect(readdirSync(join(h.home, "checks"))).toHaveLength(2);
 
-    // K3: the first one dies (crash, reboot): its lease is dead, the next tick starts its check again
+    // The first one dies (crash, reboot): its lease is dead, the next tick starts its check again
     const dead = running.find((e) => e.lease.story === "gh-9")!;
     process.kill(-dead.lease.holder.pid, "SIGKILL");
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -146,7 +146,7 @@ describe("two long checks (K1, K3)", () => {
   }, 30_000);
 });
 
-describe("a check past its step timeout (C5)", () => {
+describe("a check past its step timeout", () => {
   let h: Harness;
   let runsDir: string;
   beforeAll(async () => ({ h, runsDir } = await atCheck("sleep 30", "1s")));
@@ -159,7 +159,7 @@ describe("a check past its step timeout (C5)", () => {
   }, 20_000);
 });
 
-describe("a check-run that fails on its own side (C5)", () => {
+describe("a check-run that fails on its own side", () => {
   test("still writes a fail receipt with the error, so the step ends instead of rerunning", async () => {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), "norn-check-run-")));
     try {
@@ -192,7 +192,7 @@ describe("a check-run that fails on its own side (C5)", () => {
   });
 });
 
-describe("a check-run the tick could not identify (K1, K3)", () => {
+describe("a check-run the tick could not identify", () => {
   test("takes its run's lease over itself while it runs, and releases it after", async () => {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), "norn-check-run-")));
     try {

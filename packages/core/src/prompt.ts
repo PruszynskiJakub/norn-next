@@ -1,5 +1,5 @@
 /**
- * R6.2: turning a person's answer into the keystrokes a pane prompt expects. Pure: the options and
+ * Turning a person's answer into the keystrokes a pane prompt expects. Pure: the options and
  * how they are chosen come from the runner (PanePrompt) via the implicit ask's park.
  *
  * - choice prompt, answer names an option (its number or its label) → the option number + enter,
@@ -23,7 +23,7 @@ export function optionIndex(options: readonly string[], answer: string): number 
   return prefixed.length === 1 ? (prefixed[0] as number) : null;
 }
 
-/** R6.2: the keystrokes that answer a prompt with `answer`; `option` is the chosen index when it named one. */
+/** The keystrokes that answer a prompt with `answer`; `option` is the chosen index when it named one. */
 export function promptKeys(prompt: { options?: readonly string[]; choice?: PromptChoice | null }, answer: string): { keys: PromptKey[]; option: number | null } {
   const options = prompt.options ?? [];
   const i = options.length ? optionIndex(options, answer) : null;
@@ -35,5 +35,5 @@ export function promptKeys(prompt: { options?: readonly string[]; choice?: Promp
   return { keys: [...arrows, { key: "enter" }], option: i };
 }
 
-/** L1: the options as one line, `1. Yes · 2. No`, for inbox details and refusals. */
+/** The options as one line, `1. Yes · 2. No`, for inbox details and refusals. */
 export const optionsLine = (options: readonly string[]): string => options.map((o, i) => `${i + 1}. ${o}`).join(" · ");

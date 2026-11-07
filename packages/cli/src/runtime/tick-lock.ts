@@ -1,5 +1,5 @@
 /**
- * H1 (gh-174): a person command that needs the tick lock waits for a running tick, up to 60s,
+ * A person command that needs the tick lock waits for a running tick, up to 60s,
  * instead of refusing at once. One line on the progress log (stderr) says so, once, only when the
  * first try finds the lock busy; a dead holder is reclaimed at once by store (no wait). After 60s
  * on the context clock, or on the abort signal (Ctrl-C), it refuses `tick_locked` without taking
@@ -35,7 +35,7 @@ function holderText(h: LockContent): string {
 }
 
 /**
- * Take the tick lock for a person command (H1), waiting up to 60s for a running tick.
+ * Take the tick lock for a person command, waiting up to 60s for a running tick.
  * `retry` is the command's `do_instead` on a refusal. `signal` stops the wait (default: the run's
  * abort signal; null for watch's exit release, whose signal has already fired).
  */
@@ -50,7 +50,7 @@ export async function waitForTickLock(ctx: Context, note: string, retry: string,
     const left = TICK_WAIT_MS - (ctx.clock.now() - started);
     if (left <= 0) throw busyError(`a tick is still running (${holderText(lock.holder)}); waited ${TICK_WAIT_MS / 1000}s`, retry, "tick_locked", { holder: lock.holder });
     await ctx.sleep(Math.min(TICK_POLL_MS, left), signal ?? undefined);
-    // D5: an abort during the sleep never takes the lock
+    // An abort during the sleep never takes the lock
     if (signal?.aborted) continue;
     lock = await take();
     if (lock.ok) return lock;

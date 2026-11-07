@@ -1,6 +1,6 @@
 /**
- * Claim refs `refs/norn/claims/<story>` (T2–T6) and mailbox refs
- * `refs/norn/inbox/<story>/<ulid>` (T9), stored as JSON blobs and updated by CAS.
+ * Claim refs `refs/norn/claims/<story>` and mailbox refs
+ * `refs/norn/inbox/<story>/<ulid>`, stored as JSON blobs and updated by CAS.
  * `remote` null = solo repo without a remote: the local ref is the truth.
  * Classification helpers report facts only; whether to take/renew is decide's call.
  */
@@ -17,7 +17,7 @@ export type ClaimRead =
 /** A claim read from the remote: what it holds, or `unreachable` when `ls-remote` or the fetch of its blob failed. */
 export type RemoteClaimRead = ClaimRead | { state: "unreachable"; reason: "network"; message: string };
 
-/** A claim or receipt blob read from `ref`, parsed and validated (S2): the value, or the FileError it fails with. */
+/** A claim or receipt blob read from `ref`, parsed and validated: the value, or the FileError it fails with. */
 export function parseBlob<N extends "claim" | "receipt">(name: N, ref: string, raw: string | null) {
   if (raw === null) return { ok: false as const, error: { file: ref, errors: [{ path: "", message: "object missing" }] } };
   let v: unknown;
@@ -49,7 +49,7 @@ export async function readLocalClaim(cwd: string, story: string): Promise<ClaimR
  * Claim as on the remote now: `ls-remote`, then fetch the blob into the local ref
  * (or delete the local ref when gone). With `remote` null, the local ref.
  * A failed `ls-remote` or fetch is reported, not thrown: `{ state: "unreachable", reason: "network" }`
- * with git's message; the caller says what an unreadable claim means for it (T3).
+ * with git's message; the caller says what an unreadable claim means for it.
  */
 export async function readClaim(cwd: string, remote: string | null, story: string): Promise<RemoteClaimRead> {
   const ref = claimRef(story);
@@ -89,15 +89,15 @@ export function classifyClaim(read: ClaimRead, me: { heartbeat_id: string | null
   return { state: me.heartbeat_id !== null && read.blob.heartbeat_id === me.heartbeat_id ? "mine" : "other", blob: read.blob, sha: read.sha };
 }
 
-/** Last written by this heartbeat: held now, or expired but not taken by another since (T5, T6). */
+/** Last written by this heartbeat: held now, or expired but not taken by another since. */
 export function writtenHere(c: ClaimState, heartbeat_id: string): boolean {
   return c.state === "mine" || (c.state === "expired" && c.blob.heartbeat_id === heartbeat_id);
 }
 
 /**
- * A claim blob this heartbeat writes when it acquires a story (T3, T5): held for `lease` from
+ * A claim blob this heartbeat writes when it acquires a story: held for `lease` from
  * `now`. `at` is the ISO time written as renewed_at (and acquired_at unless one is kept); it
- * defaults to `now`. `forced_from` is set only by `take --force` (T8).
+ * defaults to `now`. `forced_from` is set only by `take --force`.
  */
 export function newClaimBlob(o: {
   story: string;
@@ -134,7 +134,7 @@ function casFail(r: Extract<CasResult, { ok: false }>): ClaimWriteResult {
 }
 
 /**
- * Acquire a story claim (T3, T5, T8). Fails with holder info when held by another
+ * Acquire a story claim. Fails with holder info when held by another
  * heartbeat and unexpired at `now`, unless `force` (journaled `take --force`, caller sets
  * `blob.forced_from`). A held-by-me claim is overwritten (acts as renew). A corrupt
  * claim needs `force`. Losing the CAS race re-reads and reports the winner.
@@ -176,15 +176,15 @@ async function writeClaim(cwd: string, remote: string | null, blob: ClaimBlob, e
   return r.ok ? { ok: true, sha } : casFail(r);
 }
 
-/** Renew (T4): CAS from the sha this heartbeat last wrote/saw. */
+/** Renew: CAS from the sha this heartbeat last wrote/saw. */
 export async function renewClaim(cwd: string, remote: string | null, blob: ClaimBlob, expected: string): Promise<ClaimWriteResult> {
   assertValid("claim", blob);
   return writeClaim(cwd, remote, blob, expected);
 }
 
 /**
- * Renew several claims (T4) in one CAS batch: one push to the remote however many there are (H5),
- * one result per renewal in order. A lost CAS fails only its own renewal (R1.2).
+ * Renew several claims in one CAS batch: one push to the remote however many there are,
+ * one result per renewal in order. A lost CAS fails only its own renewal.
  */
 export async function renewClaims(cwd: string, remote: string | null, renewals: ReadonlyArray<{ blob: ClaimBlob; expected: string }>): Promise<ClaimWriteResult[]> {
   const shas: string[] = [];
@@ -196,12 +196,10 @@ export async function renewClaims(cwd: string, remote: string | null, renewals: 
   return res.map((r, i) => (r.ok ? { ok: true, sha: shas[i] as string } : casFail(r)));
 }
 
-/** Release (T6): delete the ref by CAS. */
+/** Release: delete the ref by CAS. */
 export async function releaseClaim(cwd: string, remote: string | null, story: string, expected: string): Promise<CasResult> {
   return casRef(cwd, remote, claimRef(story), null, expected);
 }
-
-// ---------------------------------------------------------------- mailbox (T9)
 
 /** Push a receipt from a non-holder to `refs/norn/inbox/<story>/<id>`; `id` defaults to receipt_id. */
 export async function postMailbox(
@@ -212,7 +210,7 @@ export async function postMailbox(
   id: string = receipt.receipt_id,
 ): Promise<{ ok: true; ref: string; sha: string } | (Extract<CasResult, { ok: false }> & { ref: string })> {
   assertValid("receipt", receipt);
-  if (!(MAILBOX_KINDS as readonly string[]).includes(receipt.kind)) throw new Error(`receipt kind '${receipt.kind}' cannot go through the mailbox (T9)`);
+  if (!(MAILBOX_KINDS as readonly string[]).includes(receipt.kind)) throw new Error(`receipt kind '${receipt.kind}' cannot go through the mailbox`);
   if (!isUlid(id)) throw new Error(`mailbox id must be a ULID: ${id}`);
   const ref = mailboxRef(story, id);
   const sha = await writeBlob(cwd, json(receipt));
@@ -237,7 +235,7 @@ function mailboxOf(prefix: string, refs: ReadonlyArray<{ ref: string; sha: strin
   });
 }
 
-/** Every story's local claim (T2) and mailbox items (T9), as `readLocalClaim` and `listMailbox` read them one story at a time. */
+/** Every story's local claim and mailbox items, as `readLocalClaim` and `listMailbox` read them one story at a time. */
 export interface LocalStoryRefs {
   claim(story: string): Promise<ClaimRead>;
   mailbox(story: string): Promise<MailboxItem[]>;
@@ -246,7 +244,7 @@ export interface LocalStoryRefs {
 /**
  * All local claim and mailbox refs in one `for-each-ref` and their blobs in one `cat-file --batch`,
  * read on the first ask (call fetchNornRefs first). Parsed and validated as `readLocalClaim` and
- * `listMailbox` do (S2): a corrupt claim or mailbox item reads the same either way. When either git
+ * `listMailbox` do: a corrupt claim or mailbox item reads the same either way. When either git
  * call fails, each story is read on its own instead, so a failure reads as it would there.
  */
 export function readLocalStoryRefs(cwd: string): LocalStoryRefs {
@@ -299,7 +297,7 @@ function readBlobs(cwd: string, shas: readonly string[]): Map<string, string> | 
   return out;
 }
 
-/** Delete a mailbox ref after import (T9), CAS on its sha. */
+/** Delete a mailbox ref after import, CAS on its sha. */
 export async function deleteMailbox(cwd: string, remote: string | null, ref: string, sha: string): Promise<CasResult> {
   return casRef(cwd, remote, ref, null, sha);
 }

@@ -10,7 +10,7 @@ import { at, CONFIG, facts, numbered, receipt, SLICE_WF, sliceUnit, STORY_WF, st
 
 const SLICE = sliceUnit("gh-1", "02", "form");
 
-describe("handoff.md (S9, O6)", () => {
+describe("handoff.md", () => {
   const st = stateFor(SLICE, SLICE_WF, {
     step: "review",
     attempt: 2,
@@ -24,7 +24,7 @@ describe("handoff.md (S9, O6)", () => {
     expect(renderHandoffStatus(st, { workflow: SLICE_WF })).toMatchSnapshot();
   });
 
-  test("gh-195 D9 (B7): story checkout's text is the status, markers dropped, above the handoff's written part", () => {
+  test("gh-195 D9: story checkout's text is the status, markers dropped, above the handoff's written part", () => {
     const text = renderHandoffWithStatus(st, "## Goal\n\nform\n", { workflow: SLICE_WF });
     expect(text).not.toContain(STATUS_BEGIN);
     expect(text).toStartWith("- Story: gh-1 · Slice: gh-1/02\n- Workflow: slice · Step: review (attempt 2)\n");
@@ -34,7 +34,7 @@ describe("handoff.md (S9, O6)", () => {
   });
 });
 
-describe("inbox (O1)", () => {
+describe("inbox", () => {
   test("groups items with reason, age and exact command", () => {
     const now = T0 + 90 * 60_000;
     const ask = stateFor(sliceUnit("gh-1", "01", "a"), SLICE_WF, { status: "parked", park: { kind: "ask", reason: "Which DB?", since: at(T0), receipt_id: "01JCCCCCCCCCCCCCCCCCCCCCCC" } });
@@ -67,7 +67,7 @@ describe("inbox (O1)", () => {
     expect(inbox.groups.answer[0]?.id).toBe("01JCCCCCCCCCCCCCCCCCCCCCCC");
   });
 
-  test("a runner that opens terminals for a person: Your turn shows norn open, the typed command in the detail (MO5)", () => {
+  test("a runner that opens terminals for a person: Your turn shows norn open, the typed command in the detail", () => {
     const st = stateFor(storyUnit(), STORY_WF, { status: "parked", park: { kind: "attended", reason: "attended", since: at(T0) } });
     const f = facts([storyFacts("gh-1", [unitFacts(storyUnit(), STORY_WF, st)])]);
     f.machine.runner_capabilities = { send: true, resume: true, open: true };
@@ -76,7 +76,7 @@ describe("inbox (O1)", () => {
     ]);
   });
 
-  test("a story taken in but not started: Your turn (norn watch) while no heartbeat runs, else Running (GR2)", () => {
+  test("a story taken in but not started: Your turn (norn watch) while no heartbeat runs, else Running", () => {
     const fresh = storyFacts("gh-1", [unitFacts(storyUnit(), STORY_WF, null)]);
     const down = buildInbox(facts([fresh]), CONFIG);
     expect(down.groups.your_turn).toMatchObject([{ id: "not-started:gh-1", story: "gh-1", command: "norn watch" }]);
@@ -93,7 +93,7 @@ describe("inbox (O1)", () => {
     const f = facts([storyFacts("gh-1", [unitFacts(SLICE, SLICE_WF, st)])]);
     f.machine.runner = null;
     const item = buildInbox(f, CONFIG).groups.your_turn[0];
-    expect(item).toMatchObject({ title: "implement is ready (manual): start an agent in the worktree", detail: "auto requested, no runner; running manual (MO2)" });
+    expect(item).toMatchObject({ title: "implement is ready (manual): start an agent in the worktree", detail: "auto requested, no runner; running manual" });
     expect(item?.command).toStartWith("cd ");
   });
 });
@@ -118,7 +118,7 @@ describe("the inbox points only at a worktree on disk, as decide does (refactor 
     expect(manual(uf).groups.your_turn[0]?.command).toStartWith("cd /r-worktrees/gh-1-login--02-form && ");
   });
 
-  test("a running unit whose worktree is gone reaches no worktree (HC3)", () => {
+  test("a running unit whose worktree is gone reaches no worktree", () => {
     const st = stateFor(SLICE, SLICE_WF, { status: "running", run: { run_id: "01JDDDDDDDDDDDDDDDDDDDDDDD", step: "implement", attempt: 1, started_at: at(), how: "auto" } });
     const uf = unitFacts(SLICE, SLICE_WF, st);
     const running = (u: ReturnType<typeof unitFacts>) => buildInbox(facts([storyFacts("gh-1", [u])]), CONFIG).groups.running;
@@ -128,7 +128,7 @@ describe("the inbox points only at a worktree on disk, as decide does (refactor 
   });
 });
 
-describe("start command for a person (MO2, B3)", () => {
+describe("start command for a person", () => {
   test("carries the agent's configured args, ended by --", () => {
     expect(startAgentCommand("/w", "claude", ["--allowedTools", "Bash(git:*)", "Read"])).toBe(
       "cd /w && claude --allowedTools 'Bash(git:*)' Read -- 'Use the norn skill, then run `norn brief`.'",
@@ -192,7 +192,7 @@ describe("inbox: the person's last actions (F21, F25, F35, Q6)", () => {
 
   test("merged PR or PR not fetched: no merge item", () => {
     expect(buildInbox(facts([doneStory({ pr: pr({ state: "merged" }) })]), CONFIG).groups.your_turn).toEqual([]);
-    // gh-71 D6: no PR known → a finished round (below), never "waiting for the PR merge"
+    // No PR known → a finished round (below), never "waiting for the PR merge"
     const notFetched = buildInbox(facts([doneStory({ pr: undefined })]), CONFIG);
     expect(notFetched.groups.your_turn.map((i) => i.title)).toEqual(["gh-1: story round done, no PR"]);
     expect(notFetched.groups.recently_done).toEqual([]);
@@ -263,7 +263,7 @@ describe("inbox: the person's last actions (F21, F25, F35, Q6)", () => {
   });
 });
 
-describe("inbox history (O1, O4)", () => {
+describe("inbox history", () => {
   const unit = sliceUnit("gh-1", "02", "form");
   const gate = stateFor(unit, SLICE_WF, { step: "human-qa", status: "parked", park: { kind: "gate", reason: "approve or reject human-qa", since: at(T0 - 60_000) } });
 
@@ -292,7 +292,7 @@ describe("inbox history (O1, O4)", () => {
   });
 });
 
-describe("superseded records (gh-195 D11, B27, R2.3)", () => {
+describe("superseded records (B27)", () => {
   test("a record set aside as superseded is one Check item naming the new holder and its last receipt", () => {
     const s = storyFacts("gh-9", [unitFacts(storyUnit("gh-9"), STORY_WF, stateFor(storyUnit("gh-9"), STORY_WF))], {
       claim: { state: "other", sha: "x", blob: { version: 1, story: "gh-9", holder: "ann@pc", heartbeat_id: "01JEEEEEEEEEEEEEEEEEEEEEEE", acquired_at: at(), renewed_at: at(), expires_at: at(T0 + 600_000), last_tick_id: null } },
@@ -316,7 +316,7 @@ describe("superseded records (gh-195 D11, B27, R2.3)", () => {
   });
 });
 
-describe("inbox: a finished round (gh-71 D5, D6; B25–B27, B35)", () => {
+describe("inbox: a finished round (D6; B25–B27, B35)", () => {
   const unit = storyUnit();
   const finished = (patch: Partial<StoryFacts> = {}, st: Parameters<typeof stateFor>[2] = {}) =>
     storyFacts("gh-1", [unitFacts(unit, STORY_WF, stateFor(unit, STORY_WF, { step: "$done", status: "done", updated_at: at(T0 - 60_000), ...st }))], patch);
@@ -388,7 +388,7 @@ describe("inbox: a finished round (gh-71 D5, D6; B25–B27, B35)", () => {
   });
 });
 
-describe("the way out of a run-out counter (gh-212, W4, O1)", () => {
+describe("the way out of a run-out counter", () => {
   const stuckOn = (counter?: { name: string; max: number; outcome: string; to: string }, kind: "exhausted" | "stuck" = "exhausted") =>
     stateFor(SLICE, SLICE_WF, { step: "review", status: "stuck", park: { kind, reason: "r", since: at(), ...(counter ? { counter } : {}) } });
 

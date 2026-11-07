@@ -2,7 +2,7 @@ import { type Static, Type } from "@sinclair/typebox";
 import { NonEmpty } from "./common.ts";
 
 /**
- * Every CLI refusal/failure prints exactly this object as JSON on stdout (P8, §9.3).
+ * Every CLI refusal/failure prints exactly this object as JSON on stdout.
  * `do_instead` is the next command or action that would succeed, or null when none applies.
  */
 export const CliError = Type.Object(
@@ -26,13 +26,13 @@ export const ExitCode = {
   usage: 2,
   /** refused by a rule; `do_instead` says what to do */
   refused: 3,
-  /** a state file failed validation (S2) */
+  /** a state file failed validation */
   corrupt: 4,
   /** another process holds the lock or claim */
   busy: 5,
-  /** a config file a person wrote needs fixing (gh-64 B7, D3); no unit is broken */
+  /** a config file a person wrote needs fixing; no unit is broken */
   config: 6,
-  /** `norn story wait` ran out of time before its condition held (gh-175) */
+  /** `norn story wait` ran out of time before its condition held */
   timeout: 7,
 } as const;
 export type ExitCode = (typeof ExitCode)[keyof typeof ExitCode];

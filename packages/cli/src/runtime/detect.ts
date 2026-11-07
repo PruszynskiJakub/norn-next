@@ -1,7 +1,7 @@
 /**
  * What `norn init` can tell about a repository before the first story: its test command, for the
- * `test` check steps of the workflow templates (W1).
- * A check runs in a fresh worktree with no installed dependencies (F3), so a JS command installs first.
+ * `test` check steps of the workflow templates.
+ * A check runs in a fresh worktree with no installed dependencies, so a JS command installs first.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";

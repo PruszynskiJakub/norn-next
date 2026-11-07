@@ -1,10 +1,10 @@
 # Contributing to norn
 
-norn is built with norn. This file is the person's side: how a change gets proposed, built and released. To run the tests and find your way in the code, read [`AGENTS.md`](AGENTS.md): it holds the dev commands, the layout, the code rules and the agent's side of the process. The rules norn follows, with their ids, are in [`.agents/RULES.md`](.agents/RULES.md).
+norn is built with norn. This file is the person's side: how a change gets proposed, built and released. To run the tests and find your way in the code, read [`AGENTS.md`](AGENTS.md): it holds the dev commands, the layout, the code rules and the agent's side of the process.
 
 ## The loop
 
-1. **Everything is an issue.** Every change to a file in the repo starts as a GitHub issue labelled `norn`. It stays unassigned in the backlog; whoever runs norn on it assigns it to themselves when work should begin, because intake cuts the story branch from the base at that moment (GR1, GR2).
+1. **Everything is an issue.** Every change to a file in the repo starts as a GitHub issue labelled `norn`. It stays unassigned in the backlog; whoever runs norn on it assigns it to themselves when work should begin, because intake cuts the story branch from the base at that moment.
 2. **norn picks it up.** `norn sync` turns the issue into story `gh-N` (a branch `gh-N-<slug>`, a worktree, a spec folder).
 3. **Triage or reproduce.** Unless the issue names a workflow, the `triage` workflow runs first: an agent checks the issue still applies, adds the affected code and context as an issue comment, and recommends `refinement`, `quick`, `reproduce` or closing it. A bug (the bug report template sets `norn:wf:reproduce`) runs `reproduce` instead: an agent reproduces it through the real interface, builds a loop that goes red, confirms the cause and posts it on the issue. Both end their round on their own; the inbox shows the story as done with no PR.
 4. **You start the next round.** Each workflow does one thing, and a story goes through them one after another on the same branch: `norn story edit gh-N --workflow <name>`. A feature: `triage → refinement → story`. A small change: `triage → quick`. A bug: `reproduce → quick`. To close instead, close the issue: a story with no PR and no unfinished round then ends by itself.
@@ -13,13 +13,13 @@ norn is built with norn. This file is the person's side: how a change gets propo
 
 ## Workflows
 
-Picked by the issue label `norn:wf:<name>` (W9); without one, `triage` runs. They live in `.agents/workflows/`.
+Picked by the issue label `norn:wf:<name>`; without one, `triage` runs. They live in `.agents/workflows/`.
 
 | Label | Workflow | For |
 |---|---|---|
 | `norn:wf:triage` | triage | Default, for stories and features. Check the issue, recommend `refinement`, `quick`, `reproduce` or close. |
 | `norn:wf:reproduce` | reproduce | Bugs: reproduce read-only, confirm the cause and the seam for a regression test, then `quick` fixes it. |
-| `norn:wf:refinement` | refinement | Spec and plan with you, and rule changes (refine amends `.agents/RULES.md`): sync → refine → clarify → plan. No code, no PR. |
+| `norn:wf:refinement` | refinement | Spec and plan with you: sync → refine → clarify → plan. No code, no PR. |
 | `norn:wf:story` | story | A planned feature: sync → slices → test → QA → PR → CI. Each slice: implement → test → review → integrate. |
 | `norn:wf:quick` | quick | Refactors, docs, chores, small changes, a reproduced bug's fix: sync → implement → test → review → PR → CI. |
 | `norn:wf:release` | release | Changelog, version bump → PR, wait for its CI. Started by `/release-start`. |

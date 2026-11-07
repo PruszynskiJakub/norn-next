@@ -67,7 +67,7 @@ norn story create [--title "…"] [--body "…" | --body-file <f>] [--workflow <
 - `--title`: the issue title; prompted at a terminal when left out
 - `--body`: the issue body; at a terminal without --title, written in $EDITOR
 - `--body-file <f>`: read the body from a file
-- `--workflow <name>`: label the issue norn:wf:<name> so intake picks that workflow (W9)
+- `--workflow <name>`: label the issue norn:wf:<name> so intake picks that workflow
 - `--web`: open the remote's new-issue page with the labels filled in; creates nothing
 
 ##### `norn story take`
@@ -117,7 +117,7 @@ norn story answer [<story|unit>] "<text>" [--reason "…" --delegated]   (a choi
 ```
 
 - `--reason "…"`: why this answer, kept on the answer receipt
-- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason (SK3)
+- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason
 
 ##### `norn story approve`
 
@@ -128,7 +128,7 @@ norn story approve [<story|slice>] [--reason "…"] [--delegated]
 ```
 
 - `--reason <text>`: a comment kept on the approve receipt
-- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason (SK3)
+- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason
 
 ##### `norn story reject`
 
@@ -139,7 +139,7 @@ norn story reject [<story|slice>] --reason "…" [--delegated]
 ```
 
 - `--reason <text>`: required: what failed; the agent sent back gets it
-- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason (SK3)
+- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason
 
 ##### `norn story update-branch`
 
@@ -175,13 +175,13 @@ Switch a story between auto and manual mode, or choose a unit's workflow
 norn story edit [<story|slice>] --auto|--manual | --workflow <name> [--at <step>] [--force] [--reason "…" --delegated] | --at <step>
 ```
 
-- `--auto`: the heartbeat starts the story's agent steps (MO1)
-- `--manual`: a person starts the story's agent steps (MO1)
+- `--auto`: the heartbeat starts the story's agent steps
+- `--manual`: a person starts the story's agent steps
 - `--workflow <name>`: the unit's workflow: set before it starts; on a started story, the next round's; on a started slice, switched with --at
-- `--at <step>`: with --workflow: the step the new round (story) or the switched slice lands on (S7); alone: move the current round's cursor to that step
+- `--at <step>`: with --workflow: the step the new round (story) or the switched slice lands on; alone: move the current round's cursor to that step
 - `--force`: with --workflow on a story (not a slice): end its unfinished round (recorded as ended by you) and start the new one
 - `--reason "…"`: with --workflow on a started story: why this workflow, kept on the round receipt
-- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason (SK3)
+- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason
 
 ##### `norn story checkout`
 
@@ -285,7 +285,7 @@ norn run rerun [<unit>] [--step <step>] [--reset <counter>]… [--reason "…"] 
 - `--step <step>`: move the unit to another step of its pinned workflow
 - `--reset <counter>`: reset a workflow counter to 0 (repeatable)
 - `--reason "…"`: why, journaled in the receipt
-- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason (SK3)
+- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason
 
 ##### `norn run cancel`
 
@@ -411,7 +411,7 @@ norn sync
 
 ##### `norn tidy`
 
-Report or clean orphan worktrees, branches, stale leases, receipt reservations, Herdr panes of runs that reported done, and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain (D12, gh-195 D1, D11)
+Report or clean orphan worktrees, branches, stale leases, receipt reservations, Herdr panes of runs that reported done, and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain
 
 ```sh
 norn tidy [--dry-run] [--retain <duration>]

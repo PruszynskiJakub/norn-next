@@ -1,7 +1,7 @@
 /**
- * Honest QA (QV1–QV8) and notes for a person (NT1–NT4). Pure: `norn done` asks `checkReport`
+ * Honest QA and notes for a person. Pure: `norn done` asks `checkReport`
  * whether a report may be written; inbox and brief read verdicts and notes from receipts. Decide
- * never reads the prose Acceptance section (P8) — only frontmatter `criteria` and the report.
+ * never reads the prose Acceptance section — only frontmatter `criteria` and the report.
  */
 import { type AgentStep, type Criterion, type CriterionVerdict, type Note, noteId, outcomeEdge, type OutcomeSpec, type Receipt, type Verdict } from "@norn/schema";
 import type { NumberedReceipt } from "./facts.ts";
@@ -9,10 +9,10 @@ import { epoch } from "./time.ts";
 import { reportableOutcomes } from "./workflow.ts";
 import { cmd } from "./commands.ts";
 
-/** QV5: `fail` > `unverified` > `person` > `pass`. */
+/** `fail` > `unverified` > `person` > `pass`. */
 const VERDICT_RANK: Readonly<Record<Verdict, number>> = { pass: 0, person: 1, unverified: 2, fail: 3 };
 
-/** QV5: the worst verdict in a report; null for an empty one. */
+/** The worst verdict in a report; null for an empty one. */
 export function worstVerdict(report: readonly CriterionVerdict[]): Verdict | null {
   let worst: Verdict | null = null;
   for (const c of report) if (worst === null || VERDICT_RANK[c.verdict] > VERDICT_RANK[worst]) worst = c.verdict;
@@ -37,7 +37,7 @@ export interface CriteriaCheckInput {
   report: readonly CriterionVerdict[] | null;
   /** the unit's frontmatter `criteria` (slice file, or spec.md for the story unit); null = none declared */
   criteria: readonly Criterion[] | null;
-  /** `--note` values (NT1) */
+  /** `--note` values */
   notes: readonly Note[];
 }
 
@@ -45,7 +45,7 @@ export type CriteriaCheck =
   | {
       ok: true;
       worst: Verdict | null;
-      /** QV4: `checked` against frontmatter ids; `unchecked` when the unit declares no criteria; null = no report */
+      /** `checked` against frontmatter ids; `unchecked` when the unit declares no criteria; null = no report */
       coverage: "checked" | "unchecked" | null;
     }
   | { ok: false; refusal: CriteriaRefusal };
@@ -57,11 +57,11 @@ const edgeVerdict = (step: AgentStep, outcome: string): Verdict | undefined => {
 
 
 /**
- * QV3–QV5, NT1: may this `norn done <outcome>` be written with this report and these notes?
- * - QV3: `criteria: required` (or an outcome gated by `verdict`) needs a report;
- * - QV4: with frontmatter `criteria`, the report covers exactly those ids, once each; a note's
+ * May this `norn done <outcome>` be written with this report and these notes?
+ * - `criteria: required` (or an outcome gated by `verdict`) needs a report;
+ * - with frontmatter `criteria`, the report covers exactly those ids, once each; a note's
  *   `--note-criterion` names one of them;
- * - QV5: an outcome with `verdict: v` only when the worst verdict in the report is `v`.
+ * - an outcome with `verdict: v` only when the worst verdict in the report is `v`.
  */
 export function checkReport(input: CriteriaCheckInput): CriteriaCheck {
   const { step, outcome, report, criteria } = input;
@@ -72,7 +72,7 @@ export function checkReport(input: CriteriaCheckInput): CriteriaCheck {
   });
   const expected = criteria ? [...new Set(criteria.map((c) => c.id))] : null;
 
-  // NT1/QV4: a note about a criterion names a declared one
+  // A note about a criterion names a declared one
   if (expected) {
     const bad = input.notes.filter((n) => n.criterion !== undefined && !expected.includes(n.criterion)).map((n) => n.criterion as string);
     if (bad.length)
@@ -80,7 +80,7 @@ export function checkReport(input: CriteriaCheckInput): CriteriaCheck {
   }
 
   if (!report) {
-    // QV3: required by the step, or implied by an outcome gated on a verdict (QV5)
+    // Required by the step, or implied by an outcome gated on a verdict
     if (step.criteria === "required" || gated)
       return refuse(
         "criteria_required",
@@ -92,7 +92,7 @@ export function checkReport(input: CriteriaCheckInput): CriteriaCheck {
     return { ok: true, worst: null, coverage: null };
   }
 
-  // QV4: each id once; exactly the frontmatter ids when declared
+  // Each id once; exactly the frontmatter ids when declared
   const ids = report.map((c) => c.id);
   const dup = [...new Set(ids.filter((id, i) => ids.indexOf(id) !== i))];
   if (dup.length)
@@ -110,7 +110,7 @@ export function checkReport(input: CriteriaCheckInput): CriteriaCheck {
     }
   }
 
-  // QV5: the outcome must match the worst verdict when it is gated
+  // The outcome must match the worst verdict when it is gated
   const worst = worstVerdict(report) as Verdict;
   if (gated && gated !== worst) {
     const matching = reportableOutcomes(step).filter((o) => edgeVerdict(step, o) === worst);
@@ -125,20 +125,19 @@ export function checkReport(input: CriteriaCheckInput): CriteriaCheck {
   return { ok: true, worst, coverage: expected ? "checked" : "unchecked" };
 }
 
-/** QV8: count per verdict. */
 export function verdictCounts(report: readonly CriterionVerdict[]): Record<Verdict, number> {
   const out: Record<Verdict, number> = { pass: 0, fail: 0, person: 0, unverified: 0 };
   for (const c of report) out[c.verdict]++;
   return out;
 }
 
-/** QV7: the criteria a person checks at a gate — `person` and `unverified` verdicts of the report that led there. */
+/** The criteria a person checks at a gate — `person` and `unverified` verdicts of the report that led there. */
 export function personCriteria(r: Receipt | undefined | null): CriterionVerdict[] {
   if (r?.kind !== "done" || !r.criteria) return [];
   return r.criteria.filter((c) => c.verdict === "person" || c.verdict === "unverified");
 }
 
-/** One line per criterion a person checks (QV7): `AC2 unverified (no browser here) — how: …`. */
+/** One line per criterion a person checks: `AC2 unverified (no browser here) — how: …`. */
 export function criterionLine(c: CriterionVerdict): string {
   const why = c.verdict === "unverified" ? ` (${c.reason})` : "";
   const how = c.how ? ` — how: ${c.how}` : "";
@@ -146,9 +145,9 @@ export function criterionLine(c: CriterionVerdict): string {
   return `${c.id} ${c.verdict}${why}${how}${ev}`;
 }
 
-/** NT1–NT3: a note for a person from a `done` receipt of some unit of the story, not acknowledged yet. */
+/** A note for a person from a `done` receipt of some unit of the story, not acknowledged yet. */
 export interface StoryNote {
-  /** `note:<receipt_id>:<n>` (NT2) */
+  /** `note:<receipt_id>:<n>` */
   id: string;
   receipt_id: string;
   /** unit key (story or slice) the report belongs to */
@@ -163,7 +162,7 @@ export interface StoryNote {
 }
 
 /**
- * NT2/NT3: the story's open notes — every note of a `done` receipt of any unit of the story,
+ * The story's open notes — every note of a `done` receipt of any unit of the story,
  * minus those an `approve` receipt lists in `acknowledged_notes`, oldest first. A unit may appear
  * more than once (several worktrees hold copies of its runs/); receipts count once by id.
  */
@@ -193,5 +192,5 @@ export function openNotes(units: ReadonlyArray<{ unit: string; receipts: readonl
   return notes.filter((n) => !acknowledged.has(n.id)).sort((a, b) => epoch(a.at) - epoch(b.at) || a.id.localeCompare(b.id));
 }
 
-/** NT2 title: `qa note on gh-4/01 (AC3): …`. */
+/** A note's inbox title: `qa note on gh-4/01 (AC3): …`. */
 export const noteTitle = (n: StoryNote) => `${n.step} note on ${n.unit}${n.criterion ? ` (${n.criterion})` : ""}: ${n.text}`;

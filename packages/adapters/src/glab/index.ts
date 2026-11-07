@@ -1,7 +1,6 @@
 /**
- * glab adapter — implements RemotePort (packages/core/src/ports.ts) for GitLab (M4) over the
- * `glab` CLI's JSON output, run in the repository directory. Story key for issue iid n is
- * `gl-<n>` (§5.1); "pull request" in the port means merge request here.
+ * glab adapter for GitLab over the `glab` CLI's JSON output, run in the repository directory;
+ * "pull request" in the port means merge request.
  */
 import type { PullRequestCi, RemoteFactory, RemoteIssue, RemoteLabel, RemotePort, RemotePullRequest } from "@norn/core";
 import { storyKey } from "@norn/schema";
@@ -53,7 +52,7 @@ interface GlMr {
 }
 
 /**
- * gh-195 B18: a GitLab pipeline status as one CI state: `success`; `failed` or `canceled` → failure;
+ * A GitLab pipeline status as one CI state: `success`; `failed` or `canceled` → failure;
  * `skipped` or no pipeline → none; every other status (created, pending, running, manual, …) → pending.
  */
 function ciOfPipeline(status: string | null | undefined): PullRequestCi {
@@ -94,7 +93,7 @@ function mapMr(m: GlMr): RemotePullRequest {
   };
 }
 
-/** gh-186: the merge request fields `findPullRequests` reads, GitLab GraphQL names. */
+/** The merge request fields `findPullRequests` reads, GitLab GraphQL names. */
 interface GlMrNode {
   iid: string;
   webUrl: string;
@@ -109,10 +108,10 @@ interface GlMrNode {
   mergeUser?: { username?: string } | null;
 }
 
-/** How many merge requests one GraphQL page holds (gh-186); a fuller answer falls back to one call per branch. */
+/** How many merge requests one GraphQL page holds; a fuller answer falls back to one call per branch. */
 const MRS_PER_QUERY = 100;
 
-/** gh-186: every merge request of `branches`, any state, as GitLab GraphQL lists it. JSON strings are GraphQL strings. */
+/** Every merge request of `branches`, any state, as GitLab GraphQL lists it. JSON strings are GraphQL strings. */
 export function mrsQuery(fullPath: string, branches: readonly string[]): string {
   const node = "iid webUrl state draft sourceBranch targetBranch mergedAt diffHeadSha mergeCommitSha squashCommitSha mergeUser { username }";
   return `query { project(fullPath: ${JSON.stringify(fullPath)}) { mergeRequests(sourceBranches: ${JSON.stringify(branches)}, first: ${MRS_PER_QUERY}) { pageInfo { hasNextPage } nodes { ${node} } } } }`;
@@ -140,7 +139,7 @@ export function createGlab(opts: GlabOptions): RemotePort {
   const bin = opts.bin ?? "glab";
   const env = { NO_PROMPT: "1", NO_COLOR: "1", GLAB_NO_PROMPT: "1", ...(opts.env ?? {}) };
   const repo = opts.repo ? ["-R", opts.repo] : [];
-  // H11: every glab call reaches the remote, so every one is bounded
+  // Every glab call reaches the remote, so every one is bounded
   const run = (args: string[], stdin?: string) => exec([bin, ...args], { cwd: opts.cwd, env, timeoutMs: NETWORK_TIMEOUT_MS, ...(stdin === undefined ? {} : { stdin }) });
   const json = async <T>(args: string[]): Promise<T> =>
     parseJson<T>(okOrThrow(await run(args), `glab ${args[0]} ${args[1]}`, "glab"), `glab ${args[0]}`, "glab");
@@ -158,17 +157,17 @@ export function createGlab(opts: GlabOptions): RemotePort {
       return u.username;
     },
     async listAssignedIssues({ label }) {
-      // GR1; glab lists open issues by default
+      // glab lists open issues by default
       const rows = await json<GlIssue[]>(["issue", "list", ...repo, "--assignee=@me", "--label", label, "--per-page", "100", "--output", "json"]);
       return rows.map(mapIssue);
     },
     async listLabelledIssues({ label }) {
-      // CP2: the backlog — any assignee or none; glab lists open issues by default
+      // The backlog — any assignee or none; glab lists open issues by default
       const rows = await json<GlIssue[]>(["issue", "list", ...repo, "--label", label, "--per-page", "100", "--output", "json"]);
       return rows.map(mapIssue);
     },
     async assignIssue(number, assignee) {
-      // GR1: `+` adds to the assignees instead of replacing them
+      // `+` adds to the assignees instead of replacing them
       okOrThrow(await run(["issue", "update", String(number), ...repo, "--assignee", `+${assignee}`]), "glab issue update", "glab");
     },
     async getIssue(number) {
@@ -178,7 +177,7 @@ export function createGlab(opts: GlabOptions): RemotePort {
     },
     findPullRequest,
     async findPullRequests(branches) {
-      // gh-186: one GraphQL query for every branch instead of one `glab mr list` per branch
+      // One GraphQL query for every branch instead of one `glab mr list` per branch
       const out = new Map<string, RemotePullRequest | null>();
       const unique = [...new Set(branches)];
       if (!unique.length) return out;
@@ -213,11 +212,9 @@ export function createGlab(opts: GlabOptions): RemotePort {
       return mapMr(await json<GlMr>(["mr", "view", m[1] as string, ...repo, "--output", "json"]));
     },
     async editPullRequestBody(number, body) {
-      // GR9
       okOrThrow(await run(["mr", "update", String(number), ...repo, "--description-file", "-", "--yes"], body), "glab mr update", "glab");
     },
     async createIssue({ title, body, labels, assignee }) {
-      // B18
       const out = okOrThrow(
         await run(["issue", "create", ...repo, "--title", title, "--description-file", "-", ...labels.flatMap((l) => ["--label", l]), "--assignee", assignee, "--yes"], body),
         "glab issue create",
@@ -228,27 +225,26 @@ export function createGlab(opts: GlabOptions): RemotePort {
       return mapIssue(await json<GlIssue>(["issue", "view", m[1] as string, ...repo, "--output", "json"]));
     },
     async newIssueUrl({ labels }) {
-      // B23: GitLab's new-issue page takes no label names, so the labels go in as a /label quick action
+      // GitLab's new-issue page takes no label names, so the labels go in as a /label quick action
       const { web_url } = await json<{ web_url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--output", "json"]);
       const action = `/label ${labels.map((l) => `~"${l}"`).join(" ")}`;
       return `${web_url}/-/issues/new?${new URLSearchParams({ "issue[description]": action })}`;
     },
     async rawFileUrl({ commit, path }) {
-      // gh-195 D5 (B28): GitLab serves a commit's file raw under `/-/raw/`
+      // GitLab serves a commit's file raw under `/-/raw/`
       const { web_url } = await json<{ web_url: string }>(["repo", "view", ...(opts.repo ? [opts.repo] : []), "--output", "json"]);
       return `${web_url}/-/raw/${commit}/${encodePath(path)}`;
     },
     async replaceIssueLabel(number, { remove, add }) {
-      // B19: GitLab ignores a label to remove that the issue does not carry
+      // GitLab ignores a label to remove that the issue does not carry
       okOrThrow(await run(["issue", "update", String(number), ...repo, "--unlabel", remove, "--label", add]), "glab issue update", "glab");
     },
     async listLabels() {
-      // GR10: GitLab's colours carry `#`; one page of 100 (a label beyond it shows up as `_exists` on create)
+      // GitLab's colours carry `#`; one page of 100 (a label beyond it shows up as `_exists` on create)
       const rows = await json<Array<{ name: string; color?: string; description?: string | null }>>(["label", "list", ...repo, "--per-page", "100", "--output", "json"]);
       return rows.map((l): RemoteLabel => ({ name: l.name, color: (l.color ?? "").replace(/^#/, "").toUpperCase(), description: l.description ?? "" }));
     },
     async createLabel({ name, color, description }) {
-      // GR10
       const r = await run(["label", "create", ...repo, "--name", name, "--color", `#${color}`, "--description", description]);
       if (r.code !== 0 && /already exists|\b409 Conflict\b|HTTP 409\b|has already been taken/i.test(`${r.stderr}${r.stdout}`)) throw portError("glab_exists", `glab label create: label ${name} already exists`);
       okOrThrow(r, "glab label create", "glab");

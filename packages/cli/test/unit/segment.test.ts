@@ -44,7 +44,7 @@ describe("planWorkspaceMoves", () => {
   });
 });
 
-describe("segmentLine: a norn version mismatch (gh-61 B8, D7)", () => {
+describe("segmentLine: a norn version mismatch (D7)", () => {
   const none = { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], notes: [], recently_done: [] };
   const item = (id: string, group: "unblock" | "approve", title: string) => ({ id, group, story: "*", slice: null, step: null, title, command: "norn doctor", since: "2026-10-27T12:00:00.000Z", age: "0s" });
   const view = (groups: Partial<ProjectView["inbox"]["groups"]>) => ({ repo: "/x/todo", inbox: { groups: { ...none, ...groups } } }) as unknown as ProjectView;

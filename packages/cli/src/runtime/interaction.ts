@@ -1,8 +1,8 @@
 /**
- * The terminal interaction (D2): the one place norn asks a person something at the terminal. Kept
+ * The terminal interaction: the one place norn asks a person something at the terminal. Kept
  * thin; tests script it (the harness's `FakeInteraction`). A session is interactive when it has a TTY
- * on stdin and stdout, the command was not given `--json`, and it is not an agent session — the launch
- * env of A6 or the orient env present. Anywhere else a prompt is a refusal that names the candidates (B60).
+ * on stdin and stdout, the command was not given `--json`, and it is not an agent session (the launch
+ * env or the orient env present). Anywhere else a prompt is a refusal that names the candidates.
  */
 import { editInTerminal } from "@norn/store";
 import { ORIENT_ENV } from "./agent-unit.ts";
@@ -13,7 +13,6 @@ export interface InteractionChoice {
 }
 
 export interface Interaction {
-  /** a TTY on stdin and stdout */
   readonly tty: boolean;
   /** one of `choices`, starting at `preselect`; null when the person leaves (Esc, Ctrl-C) */
   pick(question: string, choices: readonly InteractionChoice[], preselect: number): Promise<string | null>;
@@ -25,7 +24,7 @@ export interface Interaction {
   confirm(question: string): Promise<boolean>;
 }
 
-/** A6: what norn sets when it launches an agent; the orient env marks the agent beside a person. */
+/** What norn sets when it launches an agent; the orient env marks the agent beside a person. */
 export function isAgentSession(env: Record<string, string | undefined>): boolean {
   return !!env.NORN_RUN || env[ORIENT_ENV] === "1";
 }

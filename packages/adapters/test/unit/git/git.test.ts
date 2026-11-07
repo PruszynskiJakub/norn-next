@@ -1,15 +1,15 @@
-/** git adapter parsers and pure helpers (X4); the real-repo tests are in test/integration/git/. */
+/** git adapter parsers and pure helpers; the real-repo tests are in test/integration/git/. */
 import { describe, expect, test } from "bun:test";
 import { addedConflictMarkers, classifyPush, gitVersionOk, parseGitVersion, parseStatusV2, parseWorktreeList } from "../../../src/git/index.ts";
 
-describe("git adapter: base sync (BS1, BS3)", () => {
+describe("git adapter: base sync", () => {
   test("H1: addedConflictMarkers needs both an opening and a closing marker in one file", () => {
     const diff = (file: string, ...added: string[]) => [`diff --git a/${file} b/${file}`, `--- a/${file}`, `+++ b/${file}`, "@@ -0,0 +1 @@", ...added.map((l) => `+${l}`)].join("\n");
     expect(addedConflictMarkers([diff("x.ts", "<<<<<<< HEAD", "a", "=======", "b", ">>>>>>> main"), diff("y.md", "<<<<<<< only an opening")].join("\n"))).toEqual(["x.ts"]);
     expect(addedConflictMarkers(diff("z.md", "Heading", "=======", ">>>>>>>no space"))).toEqual([]);
   });
 
-  test("git version gate (BS2)", () => {
+  test("git version gate", () => {
     expect(parseGitVersion("git version 2.50.1 (Apple Git-155)")).toEqual([2, 50, 1]);
     expect(gitVersionOk("git version 2.38.0")).toBe(true);
     expect(gitVersionOk("git version 2.37.9")).toBe(false);

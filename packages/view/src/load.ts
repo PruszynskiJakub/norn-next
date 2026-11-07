@@ -1,7 +1,7 @@
 /**
- * loadProjectView (X1): one read-only pass over local data — the checkout's local facts as observe
+ * loadProjectView: one read-only pass over local data — the checkout's local facts as observe
  * reads them (`loadLocalFacts`: spec folders in the main checkout and story worktrees, runs/, hook
- * facts, caches, ~/.norn leases) and local claim refs. No trace day file (B1, B2, D1): timelines are
+ * facts, caches, ~/.norn leases) and local claim refs. No trace day file: timelines are
  * a separate read, `loadTimelines`.
  * No network (no fetch, no ls-remote, no remote API) and no writes of any kind.
  */
@@ -61,9 +61,9 @@ const DELEGATED_KINDS: readonly string[] = ["approve", "reject", "answer", "unst
 const isDelegatedKind = (k: string): k is DelegatedKind => DELEGATED_KINDS.includes(k);
 
 /**
- * gh-196 D5 (B21, B22, B34): the decisions a supervisor made on the person's behalf, over every round of
+ * The decisions a supervisor made on the person's behalf, over every round of
  * the story unit (store `loadRounds`: the current round from the snapshot, each earlier round read from
- * its folder) and its slices, oldest first. An earlier round's failing file is reported, never skipped (S2).
+ * its folder) and its slices, oldest first. An earlier round's failing file is reported, never skipped.
  */
 function delegatedDecisions(story: StorySnapshot): { decisions: DelegatedDecision[]; errors: FileError[] } {
   const decisions: DelegatedDecision[] = [];
@@ -91,26 +91,26 @@ export interface LoadProjectViewOptions {
   /** ms epoch; default Date.now() */
   now?: number;
   env?: Record<string, string | undefined>;
-  /** `user@machine` whose claims count as `mine`; default this machine's (`machineHolder`, R7.2) */
+  /** `user@machine` whose claims count as `mine`; default this machine's (`machineHolder`) */
   holder?: string;
   /** this machine's heartbeat id, also counted as `mine` */
   heartbeatId?: string | null;
-  /** what the configured runner can do (R4.1); `open` makes Your turn show `norn story start` (MO5) */
+  /** what the configured runner can do; `open` makes Your turn show `norn story start` */
   runnerCapabilities?: RunnerCapabilities;
   /** lease liveness check (default: holder pid + start time) */
   liveness?: LeaseLiveness;
-  /** gh-61 D5: the running norn's version; given = the inbox shows a mismatch with the repo's (B8) */
+  /** The running norn's version; given = the inbox shows a mismatch with the repo's */
   version?: string;
-  /** gh-61 D5 (B19): this norn's bundled skills; given with `version` = the inbox shows drifted skills */
+  /** This norn's bundled skills; given with `version` = the inbox shows drifted skills */
   bundledSkills?: { source: string; names: readonly string[] };
   /**
-   * HC13: a view for the inbox and the story statuses alone (`status --segment`, run every few seconds):
+   * A view for the inbox and the story statuses alone (`status --segment`, run every few seconds):
    * earlier rounds are not read, so stories' `delegated` is empty
    */
   inboxOnly?: boolean;
 }
 
-/** A worktree as the view sees it: on disk and its slot; git status is not read (no git, X1). Null when absent, as observe. */
+/** A worktree as the view sees it: on disk and its slot; git status is not read (no git). Null when absent, as observe. */
 function worktreeFacts(path: string | null): WorktreeFacts | null {
   if (!path || !existsSync(path)) return null;
   const slotRaw = readEnvNorn(path)?.NORN_SLOT;
@@ -134,7 +134,7 @@ function counters(u: UnitSnapshot): CounterView[] {
   return counterViews(u.workflow?.workflow ?? null, u.state);
 }
 
-/** A unit's counters with their W4 limits from its pinned workflow. */
+/** A unit's counters with their limits from its pinned workflow. */
 function counterViews(wf: Workflow | null, st: UnitState | null): CounterView[] {
   const max = wf?.counters ?? {};
   const live = st?.counters ?? {};
@@ -147,7 +147,7 @@ interface Ctx {
   now: number;
   config: ResolvedConfig;
   runner: string | null;
-  /** R5.5: the heartbeat is down — auto steps get no manual start hint */
+  /** The heartbeat is down — auto steps get no manual start hint */
   heartbeatDown: boolean;
 }
 
@@ -166,7 +166,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
   const corrupt = u.errors.length > 0 || st?.status === "corrupt";
   const checkSince = checkRunningSince(step, uf);
   const since = st ? (st.park?.since ?? (st.status === "running" ? st.run?.started_at : null) ?? checkSince ?? (st.status === "done" ? st.updated_at : st.step_entered_at)) : null;
-  // R5.5 (A8): while the heartbeat is down an auto step waits for `norn watch`, not a person
+  // While the heartbeat is down an auto step waits for `norn watch`, not a person
   const waitsForHeartbeat = ctx.heartbeatDown && step?.type === "agent" && eff.mode === "auto";
   const start = step?.type === "agent" ? (waitsForHeartbeat ? cmd.watch() : startCommandFor(uf, sf, ctx.config)) : undefined;
   const failure = actFailureItem(sf, uf) ? uf.act_failure : undefined;
@@ -201,7 +201,7 @@ function unitView(u: UnitSnapshot, story: StorySnapshot, sf: StoryFacts, uf: Uni
 }
 
 /**
- * A unit's facts as the view has them: what loadLocalFacts read (B3, R5.1, R5.3), its worktree as
+ * A unit's facts as the view has them: what loadLocalFacts read, its worktree as
  * on disk, and its run from the state record — hooks picked as observe picks them (`runHooks`), the
  * process judged by its lease (the view has no process or runner port).
  */
@@ -212,7 +212,7 @@ function unitFacts(lu: LocalUnit, hooks: readonly HookFact[], leaseByRun: Readon
   let run: RunFacts | null = null;
   const unknown = lu.unknown_launch;
   if (unknown && st) {
-    // R5.1: a launch that never reached state.json — its hooks, and the agent session they name
+    // A launch that never reached state.json — its hooks, and the agent session they name
     const r = unknown.receipt;
     const mine = hooks.filter((h) => h.run_id === r.run_id);
     const last = mine.at(-1);
@@ -248,7 +248,7 @@ function unitFacts(lu: LocalUnit, hooks: readonly HookFact[], leaseByRun: Readon
   return { ...baseUnitFacts(lu), worktree, run, uncommitted: false };
 }
 
-/** BS1/BS3: the last base measurement (`trace/base.json`) and the newest base merge in the story unit's receipts. */
+/** The last base measurement (`trace/base.json`) and the newest base merge in the story unit's receipts. */
 function baseSync(sf: StoryFacts, receipts: readonly NumberedReceipt[], branch: string): BaseSyncView | null {
   let last: BaseSyncView["last_update"] = null;
   for (const { receipt: r } of [...receipts].sort((a, b) => b.n - a.n)) {
@@ -262,9 +262,9 @@ function baseSync(sf: StoryFacts, receipts: readonly NumberedReceipt[], branch: 
 }
 
 /**
- * gh-195 D6 (B10, B13, B17–B19): a story held elsewhere as this checkout's local refs have it. Under
- * `remote` its record ref is kept current; under `local` a ref shows the record as of its commit (B13)
- * and the view says where the run state is (B18). Data only: `formatElsewhere` writes the sentences.
+ * A story held elsewhere as this checkout's local refs have it. Under
+ * `remote` its record ref is kept current; under `local` a ref shows the record as of its commit
+ * and the view says where the run state is. Data only: `formatElsewhere` writes the sentences.
  */
 function elsewhereView(e: ElsewhereStory, policy: ResolvedConfig["record"]["policy"], seen: StoryFacts["pr_seen"]): ElsewhereView {
   return {
@@ -304,7 +304,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const holder = opts.holder ?? machineHolder(opts.env ?? process.env);
   const errors: FileError[] = [];
 
-  // H2/X1: the local facts observe reads, from the worktrees found on disk (GR3, A3)
+  // The local facts observe reads, from the worktrees found on disk
   if (opts.home) bindNornHome(opts.repoRoot, opts.home);
   const wts = scanWorktrees(opts.repoRoot);
   const local = await loadLocalFacts(opts.repoRoot, {
@@ -343,7 +343,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const baseRef = snap.base_ref;
   const defaultBranch = config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main";
   const prSeen = local.pr_seen;
-  // F35/C5: the ready approval's head, voided by a later re-entry; and whether only norn moved the PR head since
+  // The ready approval's head, voided by a later re-entry; and whether only norn moved the PR head since
   const readyHeads = await Promise.all(
     local.stories.map(async (ls): Promise<{ ready_head_sha?: string; ready_approved_at?: string; ready_head_norn?: string }> => {
       if (!ls.ready) return {};
@@ -372,19 +372,18 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       mailbox: undefined,
       issue: undefined,
       pr: undefined,
-      // C1: the PR as this checkout's last sync saw it — merge (BS10), retarget (BS11), head changed (F35)
+      // The PR as this checkout's last sync saw it — merge, retarget, head changed
       ...(prSeen[story.key] && !finished ? { pr_seen: prSeen[story.key] } : {}),
-      // gh-71 D5: the issue as this checkout's last sync saw it — the finished-round Check item
+      // The issue as this checkout's last sync saw it — the finished-round Check item
       ...(local.issue_seen[story.key] && !finished ? { issue_seen: local.issue_seen[story.key] } : {}),
       ...readyHeads[i],
       units,
       slices: story.slices,
-      // BS1: the last base measurement of this checkout's ticks (stale items, merge-item detail)
+      // The last base measurement of this checkout's ticks (stale items, merge-item detail)
       ...(local.base[story.key] && !finished ? { base: local.base[story.key] } : {}),
     };
     storyFacts.push(sf);
 
-    // Runs.
     story.units.forEach((u, j) => {
       const r = u.state?.run;
       const uf = units[j] as UnitFacts;
@@ -404,7 +403,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
           alive: lease ? lease.alive : null,
           lease: lease ? { kind: lease.entry.lease.kind, file: lease.entry.file, slot: lease.entry.lease.slot ?? null } : null,
           last_hook_at: uf.run?.last_hook_at ? new Date(uf.run.last_hook_at).toISOString() : null,
-          // R4.4: the tick's last classification of this run (until the cursor moves)
+          // The tick's last classification of this run (until the cursor moves)
           classified:
             u.state?.status === "running" && u.state.last_outcome?.source === "classified" && u.state.last_outcome.step === r.step
               ? { outcome: u.state.last_outcome.outcome, at: u.state.last_outcome.at }
@@ -414,7 +413,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
       }
     });
 
-    // Unit views — built once the heartbeat state is known (R5.5), below.
+    // Unit views — built once the heartbeat state is known, below.
     views.push(() => {
       const storyTitle = story.frontmatter?.title ?? story.key;
       const storyUnit = story.units[0] as UnitSnapshot;
@@ -433,13 +432,13 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
           errors: file?.error ? [file.error, ...v.errors] : v.errors,
         };
       });
-      // gh-196 D5 (B22): reads each earlier round's receipts on every load but the inbox-only one (`status --segment`, HC13);
-      // accepted: a story has few rounds, and a cache across loads went stale
+      // Reads each earlier round's receipts on every load but the inbox-only one (`status --segment`);
+      // accepted: a story has few rounds, and a cache across loads goes stale
       const delegated = opts.inboxOnly ? { decisions: [], errors: [] } : delegatedDecisions(story);
       stories.push({
         ...base,
         slice: null,
-        // B33 (review#1 S8): a story held from its record alone has no branch
+        // a story held from its record alone has no branch
         branch: sf.record_only ? null : sf.branch,
         pr: prView(prSeen[story.key]),
         notes: sf.notes ?? [],
@@ -469,13 +468,13 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     stories: storyFacts,
     heartbeat: { last_tick_at: lastTick },
     ...(local.norn ? { norn: local.norn } : {}),
-    // gh-195 D16: run state an older norn left on the base, pointed to `norn upgrade`
+    // Run state an older norn left on the base, pointed to `norn upgrade`
     ...(local.snapshot.base_run_state.length ? { base_run_state: local.snapshot.base_run_state } : {}),
-    // gh-195 D11 (B27): records set aside as superseded (loadLocalFacts, as observe)
+    // Records set aside as superseded (loadLocalFacts, as observe)
     ...(local.superseded.length ? { superseded: local.superseded } : {}),
     orphans: { worktrees: [], branches: [] },
   };
-  // R5.5 (N3): is this checkout's heartbeat down while it holds auto work?
+  // Is this checkout's heartbeat down while it holds auto work?
   const down = heartbeatDown(facts, config);
   ctx.heartbeatDown = !!down;
   for (const build of views) build();
@@ -490,7 +489,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
 
   runs.sort((a, b) => Date.parse(a.started_at) - Date.parse(b.started_at) || a.unit.localeCompare(b.unit));
 
-  // gh-195 D6: stories another heartbeat holds that this checkout has no copy of, from local refs only
+  // Stories another heartbeat holds that this checkout has no copy of, from local refs only
   const held = await heldElsewhereKeys(opts.repoRoot, me, now, new Set(local.stories.map((s) => s.snapshot.key))).catch((e: Error) => {
     errors.push({ file: CLAIMS_PREFIX, errors: [{ path: "", message: `cannot list the claims held elsewhere: ${e.message}` }] });
     return [];

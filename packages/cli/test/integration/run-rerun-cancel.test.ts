@@ -1,7 +1,7 @@
 /**
- * `norn run cancel` and `norn run rerun` (B48–B53, D4): a person stops a running agent with a human
+ * `norn run cancel` and `norn run rerun`: a person stops a running agent with a human
  * `stuck` receipt written before the session is killed, and resumes or moves a stuck, parked or
- * gate-waiting unit; `unstick` is gone (B5).
+ * gate-waiting unit; `unstick` is gone.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
@@ -135,7 +135,7 @@ describe("run cancel (B51–B53)", () => {
     expect(r.exit).toBe(0);
     const v = r.value as Verb;
     expect(v.receipt).toMatchObject({ kind: "stuck", by: "human", reason: "cancelled by person", run_id: run?.run_id, step: "implement", attempt: 2 });
-    // P6: the receipt existed when the session was killed
+    // The receipt existed when the session was killed
     expect(atKill.at(-1)).toMatch(/-stuck\.json$/);
     expect(h.runner.killed.slice(killedBefore)).toEqual([expect.objectContaining({ session_id: run?.session?.session_id })]);
     const launches = h.runner.launches.length;
@@ -143,7 +143,7 @@ describe("run cancel (B51–B53)", () => {
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "implement", attempt: 2, status: "stuck", park: { reason: "cancelled by person" } });
     expect(h.runner.launches.length).toBe(launches);
-    // B52: commits, uncommitted changes, branch and claim are still there
+    // Commits, uncommitted changes, branch and claim are still there
     expect(sh(wt5(), ["log", "--format=%H"]).split("\n")).toContain(head);
     expect(existsSync(join(wt5(), "draft.ts"))).toBe(true);
     expect(sh(h.root, ["branch", "--list", "gh-5-pay-invoices"])).toContain("gh-5-pay-invoices");
@@ -275,7 +275,7 @@ describe("run rerun --step (B49)", () => {
   });
 });
 
-describe("the surface (B2, B5)", () => {
+describe("the surface", () => {
   test("unstick is an unknown command; run lists rerun and cancel", async () => {
     const r = await h.norn("unstick", "gh-5");
     expect(r.exit).toBe(2);
@@ -286,7 +286,7 @@ describe("the surface (B2, B5)", () => {
   });
 });
 
-describe("run rerun after a counter runs out (gh-212, W4)", () => {
+describe("run rerun after a counter runs out", () => {
   const toGate = async () => {
     h.report(runs5(), "done", { outcome: "done", handoff: "built" });
     await tick();

@@ -13,8 +13,8 @@ export type ProcessContractTest =
   | "identify refuses what is not a pid"
   | "a live child: identify gives its start time and isAlive matches only that start time"
   | "a process that exited is gone"
-  | "a zombie is not alive (K3)"
-  | "findByEnv finds a live process by one env entry, never this one (R5.1)";
+  | "a zombie is not alive"
+  | "findByEnv finds a live process by one env entry, never this one";
 
 /** Does `ps` show this pid's environment to us (BSD `-E`, procps `e`)? Hardened systems hide it. */
 function envVisible(pid: number, token: string): boolean {
@@ -58,7 +58,7 @@ export function processContract(name: string, make: () => ProcessPort, opts: Con
       expect(id!.pid).toBe(child.pid);
       expect(id!.pid_start.length).toBeGreaterThan(0);
       expect(await port.isAlive(id!)).toBe(true);
-      // a reused pid: same number, another start time — never the original process (K3)
+      // a reused pid: same number, another start time — never the original process
       expect(await port.isAlive({ pid: child.pid, pid_start: "Thu Jan 1 00:00:00 1970" })).toBe(false);
     });
 
@@ -75,9 +75,9 @@ export function processContract(name: string, make: () => ProcessPort, opts: Con
 
     if (zombieUnsupported) {
       console.warn(`ProcessPort contract (${name}): zombie test skipped: ${zombieUnsupported}`);
-      test.skip(`a zombie is not alive (K3) [skipped: ${zombieUnsupported}]`, () => {});
+      test.skip(`a zombie is not alive [skipped: ${zombieUnsupported}]`, () => {});
     } else {
-      t("a zombie is not alive (K3)", async () => {
+      t("a zombie is not alive", async () => {
         const port = make();
         const z = await makeZombie();
         if (typeof z === "string") throw new Error(z);
@@ -90,7 +90,7 @@ export function processContract(name: string, make: () => ProcessPort, opts: Con
       });
     }
 
-    t("findByEnv finds a live process by one env entry, never this one (R5.1)", async () => {
+    t("findByEnv finds a live process by one env entry, never this one", async () => {
       const port = make();
       if (!port.findByEnv) return; // optional: a port without it never finds any
       const value = `contract-${process.pid}-${Math.random().toString(36).slice(2)}`;

@@ -1,23 +1,23 @@
 /**
- * `norn tidy [--dry-run]` (K5): report, or clean, what no unit needs any more:
+ * `norn tidy [--dry-run]`: report, or clean, what no unit needs any more:
  *   - orphan worktrees (norn-shaped, story unknown here) — removed only when clean; stale
  *     worktree records (`git worktree prune`)
  *   - orphan branches (observe: finished/unknown story, integrated/dropped slice) — deleted only
  *     when their commits are kept elsewhere (story branch, default branch, or the remote copy)
- *   - dead or unreadable leases in `~/.norn/leases/` (K3)
- *   - leftover `.NNNN.reserve` receipt reservations (S6) older than a minute
- *   - gh-195 D11 (B27, T7a): records set aside as superseded (`superseded/<story>-<ulid>/` in the
+ *   - dead or unreadable leases in `~/.norn/leases/`
+ *   - leftover `.NNNN.reserve` receipt reservations older than a minute
+ *   - records set aside as superseded (`superseded/<story>-<ulid>/` in the
  *     machine dir) longer ago than the window, and their Check item with them
- *   - K7: with Herdr as the runner, the panes left by runs that reported done — the run's tab, or
+ *   - with Herdr as the runner, the panes left by runs that reported done — the run's tab, or
  *     only its pane when the tab holds something else, and the workspace when nothing else is left
- *   - O7, D12: trace day pairs (day file and chunks file) dated before today minus the window
- *     (`--retain`, else `trace.retain`, default 14d, at least 14d: B23–B26); `trace/workflows/`
- *     is never pruned. Only tidy prunes the trace, never watch or a tick (B34).
- *   - D12, B28–B30: the hook files of units with no live run untouched within the window, and the
- *     briefings, transcripts and old `runs/<run_id>.log` session logs (gh-195 D1) of runs that are not
+ *   - trace day pairs (day file and chunks file) dated before today minus the window
+ *     (`--retain`, else `trace.retain`, default and minimum 14d); `trace/workflows/`
+ *     is never pruned. Only tidy prunes the trace, never watch or a tick.
+ *   - the hook files of units with no live run untouched within the window, and the
+ *     briefings, transcripts and old `runs/<run_id>.log` session logs of runs that are not
  *     live whose newest file is older than the window;
  *     never a live run's, nor `backfill.json`, the caches or the locks.
- *   - gh-195 D12: rejected mailbox receipts (`rejected.json`) cleared and rejected before the window
+ *   - rejected mailbox receipts (`rejected.json`) cleared and rejected before the window
  * Nothing with unique work is removed; such items are listed under `kept` with the reason.
  */
 import { readdirSync, statSync } from "node:fs";
@@ -39,14 +39,14 @@ import { cmd, storyFinished } from "@norn/core";
 const RESERVE_STALE_MS = 60_000;
 const RESERVE = /^\.\d{4,}\.reserve$/;
 
-/** K7: Herdr when it is the runner — injected, else the real one; null = another runner. */
+/** Herdr when it is the runner — injected, else the real one; null = another runner. */
 function tidyHerdr(ctx: Context): herdr.HerdrCockpit | null {
   if (ctx.config.runner.adapter !== herdr.RUNNER_NAME) return null;
   if (ctx.deps.herdr !== undefined) return ctx.deps.herdr;
   return herdr.createHerdrCockpit({ env: ctx.env });
 }
 
-/** K7: close (or, dry, list) what runs that reported done left in Herdr; a Herdr that fails is kept, not fatal. */
+/** Close (or, dry, list) what runs that reported done left in Herdr; a Herdr that fails is kept, not fatal. */
 async function tidyHerdrPanes(cockpit: herdr.HerdrCockpit, obs: Observed, dry: boolean, kept: Array<{ item: string; reason: string }>) {
   const closed = { workspaces: [] as string[], tabs: [] as string[], panes: [] as string[] };
   const runs = doneHerdrRuns(
@@ -75,7 +75,7 @@ async function tidyHerdrPanes(cockpit: herdr.HerdrCockpit, obs: Observed, dry: b
   return closed;
 }
 
-/** B24–B26: the window for this run — `--retain`, else `trace.retain` — refused before anything is touched. */
+/** The window for this run — `--retain`, else `trace.retain` — refused before anything is touched. */
 function retainWindow(ctx: Context, flag: string | undefined): { retain: string; ms: number } {
   const retain = flag ?? ctx.config.trace.retain;
   const c = checkRetain(retain);
@@ -90,7 +90,7 @@ function retainWindow(ctx: Context, flag: string | undefined): { retain: string;
 export const tidyCommand = defineCommand({
   name: "tidy",
   version: "acts",
-  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations (K5), Herdr panes of runs that reported done (K7), and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain (D12, gh-195 D1, D11)",
+  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations, Herdr panes of runs that reported done, and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain",
   usage: "norn tidy [--dry-run] [--retain <duration>]",
   options: { "dry-run": { type: "boolean" }, retain: { type: "string" } },
   async run(ctx, args) {
@@ -103,7 +103,6 @@ export const tidyCommand = defineCommand({
       const root = obs.root;
       const kept: Array<{ item: string; reason: string }> = [];
 
-      // ---- worktrees
       const worktrees: string[] = [];
       for (const path of obs.facts.orphans.worktrees) {
         const st = await git.status(path).catch(() => null);
@@ -117,7 +116,7 @@ export const tidyCommand = defineCommand({
       const prunable = (await git.worktreeList(root)).filter((w) => w.prunable).map((w) => w.path);
       if (!dry && prunable.length) await git.worktreePrune(root).catch(() => undefined);
 
-      // ---- branches: delete only when their commits are contained elsewhere
+      // Branches: delete only when their commits are contained elsewhere
       const branches: string[] = [];
       const base = obs.facts.repo.default_branch;
       for (const b of obs.facts.orphans.branches) {
@@ -138,11 +137,10 @@ export const tidyCommand = defineCommand({
         branches.push(b);
       }
 
-      // ---- leases (K3): dead holders and unreadable files
       const leaseFiles = obs.facts.machine.dead_lease_files ?? [];
       const leases = dry ? [...leaseFiles] : await reclaimLeases(ctx.home, leaseFiles, leaseLiveness((p) => obs.ports.process.isAlive(p)));
 
-      // ---- receipt reservations (S6) left by a crashed writer
+      // Receipt reservations left by a crashed writer
       const reserves: string[] = [];
       const now = Date.now(); // file mtimes are wall-clock
       for (const u of Object.values(obs.units)) {
@@ -164,26 +162,25 @@ export const tidyCommand = defineCommand({
         }
       }
 
-      // ---- K7: Herdr panes of runs that reported done
       const cockpit = tidyHerdr(ctx);
       const herdrClosed = cockpit ? await tidyHerdrPanes(cockpit, obs, dry, kept) : null;
 
-      // ---- D12: trace day pairs older than the window (under the tick lock, so no tick appends to them)
+      // Trace day pairs older than the window (under the tick lock, so no tick appends to them)
       const days = traceDaysBefore(root, retainCutoffDay(ctx.clock.now(), window.ms));
-      // B28–B30: hook files and run dirs past the window that no live run needs
+      // Hook files and run dirs past the window that no live run needs
       const { hook_files, runs } = unitTracesBefore(root, obs.facts.stories.flatMap((s) => s.units), ctx.clock.now() - window.ms);
       if (!dry) {
         deleteTraceDays(root, days);
         deleteTracePaths(root, [...hook_files.map((f) => f.file), ...runs.flatMap((r) => r.files)]);
       }
-      // gh-195 D12: cleared rejected mailbox receipts age out with the trace that also records them; an open
+      // Cleared rejected mailbox receipts age out with the trace that also records them; an open
       // one (its Check item still shown: no answer or approval since, story not finished) stays
       const open = new Set(obs.facts.stories.filter((s) => !storyFinished(s)).flatMap((s) => (s.rejected_mailbox ?? []).map((r) => r.receipt_id)));
-      // review#1 F2: a rejected.json that cannot be pruned is one kept item; the rest of tidy goes on
+      // A rejected.json that cannot be pruned is one kept item; the rest of tidy goes on
       const pruned = await pruneRejectedReceipts(root, new Date(ctx.clock.now() - window.ms).toISOString(), open, dry);
       if (pruned.error) kept.push({ item: rejectedReceiptsPath(root), reason: pruned.error });
       const rejected = pruned.removed.map((r) => r.receipt_id);
-      // gh-195 D11 (B27, T7a): records set aside as superseded go once older than the window; their Check item with them
+      // Records set aside as superseded go once older than the window; their Check item with them
       const superseded = pruneSuperseded(root, new Date(ctx.clock.now() - window.ms).toISOString(), dry).map((c) => c.name);
       const bytes = [...days, ...hook_files, ...runs].reduce((n, d) => n + d.bytes, 0);
       const trace = { retain: window.retain, days, hook_files, runs, bytes };

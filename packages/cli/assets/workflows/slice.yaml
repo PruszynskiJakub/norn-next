@@ -1,4 +1,4 @@
-# Slice workflow — example installed by `norn init`; edit freely (W1).
+# Slice workflow — example installed by `norn init`; edit freely.
 # Runs on a slice: build test-first, check, review, then integrate into the story branch.
 # A slice has no QA of its own: its criteria stay in its file and the story's qa checks them all, once.
 # Change `test.run` to your repo's test command.

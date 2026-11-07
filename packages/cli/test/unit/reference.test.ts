@@ -9,7 +9,7 @@ import { currentReference, FILE_LABEL, REFERENCE_END, REFERENCE_FILE, REFERENCE_
 
 const fresh = freshReference();
 
-describe("Reference render (B8, B9, B13)", () => {
+describe("Reference render (B13)", () => {
   test("every command and every noun verb has a heading with its usage, every option is listed", () => {
     for (const c of [...COMMANDS, ...NOUNS.flatMap((n) => n.verbs)]) {
       expect(fresh).toContain(`##### \`norn ${c.name}\`\n`);
@@ -23,7 +23,7 @@ describe("Reference render (B8, B9, B13)", () => {
     expect(fresh).not.toMatch(/\(B30–B32, MO1, W9, S7\)/);
   });
 
-  test("every key of the three config files appears with the files that take it (gh-64 B1, B2)", () => {
+  test("every key of the three config files appears with the files that take it", () => {
     const keys = (schema: unknown, prefix = ""): string[] =>
       Object.entries((schema as { properties?: Record<string, unknown> }).properties ?? {})
         .filter(([k]) => k !== "$schema")
@@ -36,11 +36,11 @@ describe("Reference render (B8, B9, B13)", () => {
     }
   });
 
-  test("types and defaults come from the file schemas and the built-in config (B9)", () => {
+  test("types and defaults come from the file schemas and the built-in config", () => {
     expect(fresh).toContain('| `mode` | user, local | `"manual"` or `"auto"` | `"manual"` |');
     expect(fresh).toContain("| `max_agents` | user | integer 1–9 | `9` |");
     expect(fresh).toContain('| `agents.claude.args` | user, local | list of strings | `["--permission-mode","auto"]` |');
-    // B22, B23: derived when unset, never a fixed default
+    // Derived when unset, never a fixed default
     expect(fresh).toContain('| `provider` | team | `"gh"` or `"glab"` | derived from the remote URL |');
     expect(fresh).toContain("| `base_branch` | team | string or null | derived: the remote's default branch |");
     expect(fresh).toContain('| `trace.retain` | user | duration | `"14d"` |');
@@ -49,7 +49,7 @@ describe("Reference render (B8, B9, B13)", () => {
     expect(fresh).not.toContain("$schema");
   });
 
-  test("the repo's norn version key and norn upgrade are listed, norn migrate as deprecated (gh-61 B26)", () => {
+  test("the repo's norn version key and norn upgrade are listed, norn migrate as deprecated", () => {
     expect(fresh).toContain("| `norn_version` | team | string | `null` |");
     expect(fresh).toContain("##### `norn upgrade`\n");
     expect(fresh).toMatch(/##### `norn migrate`\n\nDeprecated: the old name of norn upgrade/);

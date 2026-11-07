@@ -1,8 +1,8 @@
 /**
  * GitPort contract (ports.ts), the subset norn's cli, store and view call today: roots and status,
- * revParse, commit with trailers (S4) and its H1 refusal, branches, worktrees, ref CAS (T2/T3),
- * push and its stale result, ancestry and divergence (BS1), merge and merge-tree (BS1/BS3),
- * conflict markers (H1), outgoing conflict markers (BS5.2), the base merge commit (BS5), diffStat
+ * revParse, commit with trailers and its H1 refusal, branches, worktrees, ref CAS,
+ * push and its stale result, ancestry and divergence, merge and merge-tree,
+ * conflict markers, outgoing conflict markers, the base merge commit, diffStat
  * and fast-forward, and the reads the runtime makes (4.1): remotes, commonDir, hasRef, hasPath,
  * show, lsTree, listRefs over several prefixes, firstParentLog, revList, quiet fetch, detached
  * worktrees and prune, and what the commands call (4.2): version, remoteBranches, changedPaths,
@@ -19,24 +19,24 @@ import { type ContractOptions, contractTest } from "./suite.ts";
 
 export type GitContractTest =
   | "a clone: roots, status, revParse, default branch, last commit time"
-  | "commit returns the sha with its trailers; nothing to commit is null (S4)"
-  | "commit refuses while a merge is in progress and says what is in progress (H1)"
+  | "commit returns the sha with its trailers; nothing to commit is null"
+  | "commit refuses while a merge is in progress and says what is in progress"
   | "branches: create, push, exist locally and on the remote, delete"
   | "worktrees: add on a new branch, list, remove"
-  | "refs: updateRef is compare-and-swap; readRef and listRefs see it (T2)"
-  | "pushRef is compare-and-swap on the remote; a lost race is stale (T3)"
+  | "refs: updateRef is compare-and-swap; readRef and listRefs see it"
+  | "pushRef is compare-and-swap on the remote; a lost race is stale"
   | "push: a non-fast-forward is rejected, a lease the remote moved past is stale"
-  | "ancestry and divergence (BS1)"
-  | "merge: clean merges commit, conflicts abort and name the paths; mergeTree agrees (BS1, BS3)"
-  | "conflictMarkers finds marker lines (H1)"
-  | "outgoingConflictMarkers names marked files changed by commits not on the remote (BS5.2)"
-  | "baseMergeCommit is the merge that brought base into head, or null (BS5)"
+  | "ancestry and divergence"
+  | "merge: clean merges commit, conflicts abort and name the paths; mergeTree agrees"
+  | "conflictMarkers finds marker lines"
+  | "outgoingConflictMarkers names marked files changed by commits not on the remote"
+  | "baseMergeCommit is the merge that brought base into head, or null"
   | "diffStat summarises the files a range changes"
   | "fastForward moves only when it can"
   | "remotes and commonDir: the repo's remotes and the git dir its worktrees share"
   | "hasRef, hasPath, show and lsTree read refs and files of a revision"
   | "listRefs takes several prefixes in one call"
-  | "firstParentLog: first-parent commits with dates and one trailer (Q6, C4)"
+  | "firstParentLog: first-parent commits with dates and one trailer (Q6)"
   | "revList: first-parent and ancestry-path walks, limited and reversed"
   | "fetch: quiet or not; a missing remote branch fails and says so"
   | "worktreeAddDetached checks out a detached HEAD; worktreePrune forgets removed directories"
@@ -104,7 +104,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(await git.status(root)).toMatchObject({ clean: false, unstaged: ["a.txt"], untracked: ["b.txt"] });
     });
 
-    t("commit returns the sha with its trailers; nothing to commit is null (S4)", async () => {
+    t("commit returns the sha with its trailers; nothing to commit is null", async () => {
       const { root, git } = repo();
       writeFileSync(join(root, "a.txt"), "two\n");
       writeFileSync(join(root, "b.txt"), "left out\n");
@@ -117,7 +117,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(await git.commit(root, { message: "nothing", trailers: {}, paths: ["a.txt"] })).toBeNull();
     });
 
-    t("commit refuses while a merge is in progress and says what is in progress (H1)", async () => {
+    t("commit refuses while a merge is in progress and says what is in progress", async () => {
       const { root, git } = repo();
       expect(await git.inProgress(root)).toEqual({ operation: null, unmerged: [] });
       sh(root, "checkout", "-q", "-b", "side");
@@ -155,7 +155,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect((await git.worktreeList(root)).map((w) => w.path)).toEqual([root]);
     });
 
-    t("refs: updateRef is compare-and-swap; readRef and listRefs see it (T2)", async () => {
+    t("refs: updateRef is compare-and-swap; readRef and listRefs see it", async () => {
       const { root, git } = repo();
       const head = sh(root, "rev-parse", "HEAD");
       const ref = "refs/norn/claims/gh-1";
@@ -169,7 +169,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(await git.readRef(root, ref)).toBeNull();
     });
 
-    t("pushRef is compare-and-swap on the remote; a lost race is stale (T3)", async () => {
+    t("pushRef is compare-and-swap on the remote; a lost race is stale", async () => {
       const { root, git } = repo();
       const one = sh(root, "rev-parse", "HEAD");
       const two = commitFile(root, "a.txt", "two\n");
@@ -197,7 +197,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(sh(remote, "rev-parse", "main")).toBe(sh(other, "rev-parse", "HEAD"));
     });
 
-    t("ancestry and divergence (BS1)", async () => {
+    t("ancestry and divergence", async () => {
       const { root, git } = repo();
       const init = sh(root, "rev-parse", "HEAD");
       sh(root, "checkout", "-q", "-b", "side");
@@ -211,7 +211,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(await git.divergence(root, "main", "main")).toMatchObject({ ahead: 0, behind: 0 });
     });
 
-    t("merge: clean merges commit, conflicts abort and name the paths; mergeTree agrees (BS1, BS3)", async () => {
+    t("merge: clean merges commit, conflicts abort and name the paths; mergeTree agrees", async () => {
       const { root, git } = repo();
       sh(root, "checkout", "-q", "-b", "clean");
       commitFile(root, "b.txt", "b\n");
@@ -232,7 +232,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect((await git.status(root)).clean).toBe(true);
     });
 
-    t("conflictMarkers finds marker lines (H1)", async () => {
+    t("conflictMarkers finds marker lines", async () => {
       const { root, git } = repo();
       writeFileSync(join(root, "a.txt"), "<<<<<<< ours\none\n=======\ntwo\n>>>>>>> theirs\n");
       expect(await git.conflictMarkers(root, { paths: ["a.txt"] })).toEqual([
@@ -243,7 +243,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(await git.conflictMarkers(root, { rev: "HEAD" })).toEqual([]);
     });
 
-    t("outgoingConflictMarkers names marked files changed by commits not on the remote (BS5.2)", async () => {
+    t("outgoingConflictMarkers names marked files changed by commits not on the remote", async () => {
       const { root, git } = repo();
       const marked = "<<<<<<< HEAD\none\n=======\ntwo\n>>>>>>> main\n";
       // a pushed file with markers is not outgoing
@@ -261,7 +261,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(await git.outgoingConflictMarkers(root, "origin", "HEAD")).toEqual([]);
     });
 
-    t("baseMergeCommit is the merge that brought base into head, or null (BS5)", async () => {
+    t("baseMergeCommit is the merge that brought base into head, or null", async () => {
       const { root, git } = repo();
       sh(root, "checkout", "-q", "-b", "feature");
       commitFile(root, "b.txt", "b\n");
@@ -355,7 +355,7 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(await git.listRefs(root, "refs/heads/")).toEqual(refs.filter((r) => r.ref.startsWith("refs/heads/")));
     });
 
-    t("firstParentLog: first-parent commits with dates and one trailer (Q6, C4)", async () => {
+    t("firstParentLog: first-parent commits with dates and one trailer (Q6)", async () => {
       const { root, git } = repo();
       const init = sh(root, "rev-parse", "HEAD");
       sh(root, "checkout", "-q", "-b", "side");

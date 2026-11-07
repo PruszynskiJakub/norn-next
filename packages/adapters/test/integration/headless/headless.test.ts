@@ -42,7 +42,7 @@ describe("headless runner (real processes)", () => {
     expect(err).toMatchObject({ code: "launch_failed" });
   });
 
-  test("without log_dir, a session's log is written at <machine dir>/sessions/<run_id>.log and nothing under runs/ (gh-195 B2, D1)", async () => {
+  test("without log_dir, a session's log is written at <machine dir>/sessions/<run_id>.log and nothing under runs/ (D1)", async () => {
     const root = mkdtempSync(join(tmpdir(), "norn-headless-"));
     const runner = headlessFactory({ repoRoot: root } as AdapterContext, { adapter: "headless" });
     const session = await runner.launch({ cwd: root, argv: ["sh", "-c", 'echo "run=$NORN_RUN"; exec sleep 30'], env: { NORN_RUN: "01JSESS" }, title: "t", run_id: "01JSESS" });

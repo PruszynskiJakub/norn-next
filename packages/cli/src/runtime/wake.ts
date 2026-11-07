@@ -1,5 +1,5 @@
 /**
- * H13 (bypass #265): `norn watch`'s pause between ticks ends early when another process appends a
+ * `norn watch`'s pause between ticks ends early when another process appends a
  * receipt (`norn done`, `ask`, `stuck`, `story answer`, a finished `norn check-run`): store's
  * `appendReceipt` rewrites the wake file in the checkout's machine dir, and the pause watches that dir.
  *

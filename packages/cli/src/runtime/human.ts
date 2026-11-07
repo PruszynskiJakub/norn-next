@@ -1,8 +1,8 @@
 /**
- * Shared plumbing of the human verbs (§15, O2): unit addressing (ID1), reading a unit's cursor
- * locally or from the story's record ref (gh-195 D6), receipt building, and delivery — locally under the claim
- * (T8: acquired for this heartbeat when free) or through the mailbox when another heartbeat
- * holds it (T9). Views read through @norn/view only (X1).
+ * Shared plumbing of the human verbs: unit addressing, reading a unit's cursor
+ * locally or from the story's record ref, receipt building, and delivery — locally under the claim
+ * (acquired for this heartbeat when free) or through the mailbox when another heartbeat
+ * holds it. Views read through @norn/view only.
  */
 import { isAbsolute, relative } from "node:path";
 import { cmd, type ClaimState, stepLabel, type StoryFacts, storyUnit, type UnitFacts } from "@norn/core";
@@ -42,14 +42,12 @@ import { gitRemote, type Observed, observe } from "./observe/index.ts";
 import { receiptsWritten } from "./report.ts";
 import { bundledSkillSet } from "./skills-drift.ts";
 
-// ------------------------------------------------------------------ views (X1)
-
 /** The read model for this checkout and machine (no writes, no network). */
 export async function projectView(ctx: Context, opts: { inboxOnly?: boolean } = {}): Promise<ProjectView> {
-  // B7: a config file with a problem refuses under "Config error" (exit config), never a view
+  // A config file with a problem refuses under "Config error" (exit config), never a view
   // drawn on fallback values
   void ctx.config;
-  // MO5: the runner's capabilities decide how Your turn says to start an agent; ports that fail
+  // The runner's capabilities decide how Your turn says to start an agent; ports that fail
   // to build for another reason still leave the view
   const runner = await ctx.ports().then((p) => p.runner, () => null);
   return loadProjectView({
@@ -66,8 +64,6 @@ export async function projectView(ctx: Context, opts: { inboxOnly?: boolean } = 
   });
 }
 
-// ------------------------------------------------------------------ targets
-
 /** A unit as the verb sees it: its cursor and pinned workflow, local or from the remote branch. */
 export interface Target {
   key: string;
@@ -78,18 +74,18 @@ export interface Target {
   workflow: Workflow | null;
   /** absolute runs/<unit>/ in this checkout; null when read from the remote branch only */
   runsDir: string | null;
-  /** the unit's handoff in this checkout, from its own resolver (gh-195 prefactor 2); null with `runsDir` */
+  /** the unit's handoff in this checkout, from its own resolver; null with `runsDir` */
   handoffFile: string | null;
   /** where the cursor was read from */
   source: "local" | "remote";
   /**
-   * gh-195 B20: a `local` story another machine holds — the only cursor known here is the step its last
+   * A `local` story another machine holds — the only cursor known here is the step its last
    * boundary commit led to (`Norn-Next`); `state` is null. Only a mailbox verb that builds a step-only
    * receipt (`stepOnly`) acts on it; the holder checks the receipt. Absent = none.
    */
   boundary?: LastBoundary & { next: string };
   /**
-   * gh-195 B20: how the verb builds its step-only receipt (`stepOnlyReceipt`) — given to `resolveTarget`
+   * How the verb builds its step-only receipt (`stepOnlyReceipt`) — given to `resolveTarget`
    * by a mailbox verb; its presence is what lets a `local` story held elsewhere resolve to its last
    * boundary. Absent = the verb needs the cursor.
    */
@@ -98,7 +94,7 @@ export interface Target {
   story_facts: StoryFacts | null;
 }
 
-/** gh-195 B20: a mailbox verb's step-only receipt for a unit, from the step its last boundary led to. */
+/** A mailbox verb's step-only receipt for a unit, from the step its last boundary led to. */
 export type StepOnlyBuild = (t: Target, step: string) => Receipt;
 
 function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
@@ -117,17 +113,17 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
 }
 
 /**
- * The unit's cursor as a non-holder knows it (gh-195 D6, B20): the one record ref and story branch this
+ * The unit's cursor as a non-holder knows it: the one record ref and story branch this
  * verb needs are fetched (a failed fetch refuses). Under `local` the story unit's cursor is the step its
  * last boundary commit led to (`Norn-Next`), with no attempt — only for a verb that can send a step-only
  * receipt (`stepOnly`). Otherwise (`remote`, a slice, no such boundary) it is read from the record ref's
- * git objects (validated, S2); null when the ref holds no such unit. Run state is never on a branch (S12).
+ * git objects (validated); null when the ref holds no such unit. Run state is never on a branch.
  */
 async function remoteTarget(ctx: Context, key: string, stepOnly: StepOnlyBuild | undefined): Promise<Target | null> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
   if (!remote) return null;
   const { story, slice } = parseUnitKey(key);
-  // a verb never acts on a record it could not refresh (D6: it fetches the one story it needs)
+  // a verb never acts on a record it could not refresh (it fetches the one story it needs)
   await fetchElsewhere(ctx.root, remote, [story]).catch((e: Error) => {
     throw failure(`cannot fetch the record of ${story}: ${e.message}`, "check the network and retry", "record_unreachable");
   });
@@ -159,7 +155,7 @@ function observeLocal(ctx: Context): Promise<Observed> {
  * Resolve the unit a verb acts on. A story key may stand for one of its slices when `pick`
  * matches the story unit's state nowhere but exactly one slice (e.g. `answer gh-7` while only
  * slice 02 asks). Falls back to the story's record ref when the story is not in this checkout, or — for a
- * mailbox verb that can send a step-only receipt (`o.stepOnly`, gh-195 B20) — to its last boundary.
+ * mailbox verb that can send a step-only receipt (`o.stepOnly`) — to its last boundary.
  */
 export async function resolveTarget(ctx: Context, raw: string, pick?: (st: UnitState) => boolean, o: { stepOnly?: StepOnlyBuild } = {}): Promise<Target> {
   const t = await findTarget(ctx, raw, pick, o.stepOnly);
@@ -192,14 +188,12 @@ async function findTarget(ctx: Context, raw: string, pick: ((st: UnitState) => b
 export function started(t: Target): UnitState {
   if (t.story_facts) {
     const uf = t.story_facts.units.find((u) => u.unit.key === t.key);
-    if (uf?.errors.length) throw refuse(`${t.key} is corrupt (S2): ${uf.errors.map((e) => e.file).join(", ")}`, cmd.runView(t.key, { why: true }), "corrupt_unit", uf.errors);
+    if (uf?.errors.length) throw refuse(`${t.key} is corrupt: ${uf.errors.map((e) => e.file).join(", ")}`, cmd.runView(t.key, { why: true }), "corrupt_unit", uf.errors);
   }
   if (!t.state) throw refuse(`${t.key} has not started yet`, cmd.tick(), "not_started");
-  if (t.state.status === "corrupt") throw refuse(`${t.key} is corrupt (S2)`, cmd.runView(t.key, { why: true }), "corrupt_unit");
+  if (t.state.status === "corrupt") throw refuse(`${t.key} is corrupt`, cmd.runView(t.key, { why: true }), "corrupt_unit");
   return t.state;
 }
-
-// ------------------------------------------------------------------ delegated decisions (gh-196)
 
 /** `--delegated` with its `--reason`: what the receipt carries, or nothing for the person's own decision. */
 export interface Delegation {
@@ -207,38 +201,36 @@ export interface Delegation {
   reason: string | undefined;
 }
 
-/** The option definitions every delegatable verb takes (D1). */
+/** The option definitions every delegatable verb takes. */
 export const DELEGATED_OPTION = { delegated: { type: "boolean" } } as const;
-export const DELEGATED_HELP = { "--delegated": "a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason (SK3)" };
+export const DELEGATED_HELP = { "--delegated": "a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason" };
 
 /**
- * gh-196 D1, D3, D4 (B2, B23, SK3): read `--delegated` and `--reason`. A delegated decision always
+ * Read `--delegated` and `--reason`. A delegated decision always
  * carries a non-empty reason, and is refused inside a unit worktree: a step agent never supervises.
  */
 export function delegation(ctx: Context, args: ParsedArgs, verb: string): Delegation {
   const reason = opt.str(args, "reason")?.trim() || undefined;
   const delegated = opt.bool(args, "delegated");
   if (delegated && !reason) throw usageError(`${verb} --delegated: the reason is required`, `pass --reason "the evidence": norn ${verb} … --delegated --reason "…"`, "reason_required");
-  if (delegated && ctx.unit) throw refuse(`${verb} --delegated runs in the main checkout, never in a unit worktree (SK3)`, `run it from ${ctx.root}`, "delegated_in_unit");
+  if (delegated && ctx.unit) throw refuse(`${verb} --delegated runs in the main checkout, never in a unit worktree`, `run it from ${ctx.root}`, "delegated_in_unit");
   return { delegated, reason };
 }
 
-/** The receipt fields of a delegation: `delegated: true` (D2) and the reason as `comment` (D3). */
+/** The receipt fields of a delegation: `delegated: true` and the reason as `comment`. */
 export const delegatedFields = (d: Delegation): { delegated?: true; comment?: string } => ({ ...(d.delegated ? { delegated: true as const } : {}), ...(d.reason ? { comment: d.reason } : {}) });
-
-// ------------------------------------------------------------------ receipts
 
 type HumanKind = "answer" | "approve" | "reject" | "unstick" | "stuck" | "mode" | "workflow" | "update" | "round";
 
 /**
- * S6: how an unapplied receipt of a kind conflicts with a new one of the same `purpose` — `step-attempt`:
+ * How an unapplied receipt of a kind conflicts with a new one of the same `purpose` — `step-attempt`:
  * one per step attempt (the tick would apply the first and reject the second silently); `any-step`: one
  * per unit at any step (update); `last-wins`: never, every receipt applies and the last one wins (mode,
- * MO1; a workflow switch or cursor move).
+ * a workflow switch or cursor move).
  */
 type Conflict = "step-attempt" | "any-step" | "last-wins";
 
-/** Per human receipt kind: the verb that records it, its command as printed (B7), what it decides and how it conflicts (S6). */
+/** Per human receipt kind: the verb that records it, its command as printed, what it decides and how it conflicts. */
 const HUMAN_KINDS: Record<HumanKind, { verb: string; command: (unit: string) => string; purpose: string; conflict: Conflict }> = {
   answer: { verb: "story answer", command: (u) => cmd.storyAnswer(u), purpose: "answer", conflict: "step-attempt" },
   approve: { verb: "story approve", command: (u) => cmd.storyApprove(u), purpose: "gate", conflict: "step-attempt" },
@@ -254,7 +246,7 @@ const HUMAN_KINDS: Record<HumanKind, { verb: string; command: (unit: string) => 
 /** The table row of a receipt kind; only human kinds are ever looked up. */
 const humanKind = (kind: Receipt["kind"]) => HUMAN_KINDS[kind as HumanKind];
 
-/** A human receipt at the unit's cursor (S6): step + attempt + slice (+ the story's round) so the tick routes it (T9). */
+/** A human receipt at the unit's cursor: step + attempt + slice (+ the story's round) so the tick routes it. */
 export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, "slice">, st: UnitState, kind: K, body: Record<string, unknown>): Extract<Receipt, { kind: K }> {
   return validReceipt(kind, {
     kind,
@@ -266,36 +258,34 @@ export function humanReceipt<K extends HumanKind>(ctx: Context, t: Pick<Target, 
     by: "human",
     who: machineHolder(ctx.env),
     slice: t.slice,
-    // gh-71 AC12 (T9): the story's round, so a mailbox receipt is not applied to a later round at the same cursor
+    // The story's round, so a mailbox receipt is not applied to a later round at the same cursor
     ...(t.slice === null ? { round: st.round ?? 1 } : {}),
     ...body,
   });
 }
 
-/** gh-195 B20 (T9): the receipts a mailbox carries that may be stamped with a step only. */
+/** The receipts a mailbox carries that may be stamped with a step only. */
 export type StepOnlyKind = "answer" | "approve" | "reject" | "unstick";
 
 /**
- * gh-195 B20 (D17): a mailbox receipt a `local` non-holder makes from the step the story's last boundary
- * led to: that step, and no attempt, run or round — the holder matches it by step alone (T9).
+ * A mailbox receipt a `local` non-holder makes from the step the story's last boundary
+ * led to: that step, and no attempt, run or round — the holder matches it by step alone.
  */
 export function stepOnlyReceipt<K extends StepOnlyKind>(ctx: Context, t: Pick<Target, "slice">, step: string, kind: K, body: Record<string, unknown>): Extract<Receipt, { kind: K }> {
   return validReceipt(kind, { kind, receipt_id: ulid(ctx.clock.now()), run_id: null, step, at: ctx.clock.iso(), by: "human", who: machineHolder(ctx.env), slice: t.slice, ...body });
 }
 
-/** Validate a person's receipt (S6): a shape the schema refuses is a usage error. */
+/** Validate a person's receipt: a shape the schema refuses is a usage error. */
 function validReceipt<K extends HumanKind>(kind: K, r: Record<string, unknown>): Extract<Receipt, { kind: K }> {
   const v = validate("receipt", r);
   if (!v.ok) throw usageError(`invalid ${kind}: ${v.errors.map((e) => `${e.path || "/"} ${e.message}`).join("; ")}`, `norn ${HUMAN_KINDS[kind].verb} --help`);
   return v.value as Extract<Receipt, { kind: K }>;
 }
 
-// ------------------------------------------------------------------ claim and delivery (T8, T9)
-
 export type Route = { via: "local"; claim: "mine" | "acquired" } | { via: "mailbox"; holder: ClaimBlob };
 
 /**
- * The story's claim as the remote has it now (T3), classified for this checkout's heartbeat (ID2)
+ * The story's claim as the remote has it now, classified for this checkout's heartbeat
  * by store `classifyClaim` — the rule observe uses, so a verb and the tick judge a claim alike.
  * Judged by the recorded heartbeat_id: reading a claim never creates one (a new one matches no claim).
  * `remote` saves a caller that already knows the git remote looking it up again; `unreadable`
@@ -319,7 +309,7 @@ export async function claimFor(
 
 /**
  * Who may write the receipt: this heartbeat when it holds the claim, or after acquiring a free
- * claim (T8); otherwise the mailbox (T9) — or a refusal when `mailbox` is false (mode, workflow).
+ * claim; otherwise the mailbox — or a refusal when `mailbox` is false (mode, workflow).
  */
 async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; verb: string; claim?: ClaimState }): Promise<Route> {
   const remote = await gitRemote(ctx.git, ctx.root, ctx.config.git_remote);
@@ -340,23 +330,23 @@ async function claimRoute(ctx: Context, t: Target, opts: { mailbox: boolean; ver
     if (r.reason !== "held") throw failure(`cannot acquire the claim of ${t.story}: ${r.message}`, `norn ${opts.verb} again`, "claim_failed");
     holder = r.holder;
   }
-  if (!opts.mailbox) throw claimHeld(holder, `ask ${holder.holder} to run it, or ${cmd.storyCheckout(t.story, { force: true })}`, `; ${opts.verb} cannot go through the mailbox (T9)`);
+  if (!opts.mailbox) throw claimHeld(holder, `ask ${holder.holder} to run it, or ${cmd.storyCheckout(t.story, { force: true })}`, `; ${opts.verb} cannot go through the mailbox`);
   return { via: "mailbox", holder };
 }
 
 /**
  * Refuse a verb that needs the claim (story edit --auto|--manual, story start) while another heartbeat holds it: this
- * checkout's copy may be stale (T9), so no answer is computed from it — not even a no-op.
+ * checkout's copy may be stale, so no answer is computed from it — not even a no-op.
  */
 export async function refuseIfHeldElsewhere(ctx: Context, story: string, verb: string): Promise<ClaimState> {
   const claim = await claimFor(ctx, story);
   const holder = heldElsewhere(claim);
-  if (holder) throw claimHeld(holder, `ask ${holder.holder} to run it, or ${cmd.storyCheckout(story, { force: true })}`, `; ${verb} cannot go through the mailbox (T9)`);
+  if (holder) throw claimHeld(holder, `ask ${holder.holder} to run it, or ${cmd.storyCheckout(story, { force: true })}`, `; ${verb} cannot go through the mailbox`);
   return claim;
 }
 
 /**
- * T7: a verb only the claim holder runs (update) — refused unless this heartbeat holds the claim
+ * A verb only the claim holder runs (update) — refused unless this heartbeat holds the claim
  * and the unit's runs/ are in this checkout; it never acquires a free claim nor uses the mailbox.
  */
 function refuseUnlessHolder(claim: ClaimState, t: Target, verb: string, rule: string): Route {
@@ -366,10 +356,10 @@ function refuseUnlessHolder(claim: ClaimState, t: Target, verb: string, rule: st
   throw refuse(`${t.story}'s claim is ${who}; ${rule}`, live ? `ask ${claim.blob.holder} to run norn ${verb} ${t.story}, or ${cmd.storyCheckout(t.story, { force: true })}` : cmd.storyCheckout(t.story), "not_holder");
 }
 
-/** A live claim of another heartbeat (T9: the verb goes through the mailbox), else null. */
+/** A live claim of another heartbeat (the verb goes through the mailbox), else null. */
 const heldElsewhere = (c: ClaimState): ClaimBlob | null => (c.state === "other" ? c.blob : null);
 
-/** S6: whether an unapplied receipt `a` conflicts with the new `b`, by `b`'s conflict scope (`HUMAN_KINDS`). */
+/** Whether an unapplied receipt `a` conflicts with the new `b`, by `b`'s conflict scope (`HUMAN_KINDS`). */
 function conflicts(a: Receipt, b: Receipt): boolean {
   const row = humanKind(b.kind);
   if (row.conflict === "last-wins" || humanKind(a.kind)?.purpose !== row.purpose || (a.slice ?? null) !== (b.slice ?? null)) return false;
@@ -377,8 +367,8 @@ function conflicts(a: Receipt, b: Receipt): boolean {
 }
 
 /**
- * Refuse a receipt that conflicts with one already recorded and not yet applied (S6, `HUMAN_KINDS`).
- * Looks at the unit's unapplied receipts and, for a verb that may use it, the story's mailbox (T9).
+ * Refuse a receipt that conflicts with one already recorded and not yet applied (`HUMAN_KINDS`).
+ * Looks at the unit's unapplied receipts and, for a verb that may use it, the story's mailbox.
  */
 async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder: ClaimBlob | null, mailbox: boolean): Promise<void> {
   const scope = humanKind(receipt.kind).conflict;
@@ -396,7 +386,7 @@ async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder
   const dup = pending.find((p) => conflicts(p.receipt, receipt));
   if (!dup) return;
   if (scope === "any-step") throw refuse(`an ${receipt.kind} of ${t.story} is already recorded (${dup.where}) and not applied yet`, cmd.tick(), "already_recorded");
-  const next = holder ? `wait for ${holder.holder}'s next tick to import it (T9)` : cmd.tick();
+  const next = holder ? `wait for ${holder.holder}'s next tick to import it` : cmd.tick();
   throw refuse(
     `${dup.receipt.kind} already recorded for ${stepLabel(receipt.step, receipt.attempt)} (${dup.where}) and not applied yet`,
     next,
@@ -405,14 +395,13 @@ async function refuseDuplicate(ctx: Context, t: Target, receipt: Receipt, holder
   );
 }
 
-
 export interface Delivered {
   via: "local" | "mailbox";
   claim?: "mine" | "acquired";
   /** local: receipt number and repo-relative file */
   n?: number;
   file?: string;
-  /** mailbox ref (T9) */
+  /** mailbox ref */
   ref?: string;
   holder?: string;
 }
@@ -436,15 +425,15 @@ async function deliver(ctx: Context, t: Target, route: Route, receipt: Receipt):
 export interface HumanVerbOptions {
   verb: string;
   /**
-   * true: another heartbeat's claim sends the receipt through its mailbox (T9), and the claim is
+   * true: another heartbeat's claim sends the receipt through its mailbox, and the claim is
    * read before anything else. false: refused when another heartbeat holds the claim; the claim is
-   * read after `check` unless the caller passes the one it read first (`claim`: mode, T9).
+   * read after `check` unless the caller passes the one it read first (`claim`: mode).
    */
   mailbox: boolean;
   /** the story's claim the caller already read (claimFor) */
   claim?: ClaimState;
   /**
-   * T7: only the claim holder runs the verb (update); the refusal states this rule. Checked after
+   * Only the claim holder runs the verb (update); the refusal states this rule. Checked after
    * `check`; the claim is never acquired here and never goes through the mailbox.
    */
   requireHolder?: string;
@@ -452,7 +441,7 @@ export interface HumanVerbOptions {
   /** true: nothing to record (mode already set); the verb returns null without touching the claim */
   noop?: (t: Target, st: UnitState) => boolean;
   build: (t: Target, st: UnitState) => Receipt;
-  /** an effect that must succeed before the receipt is written (R6.3: typing an answer into a prompt); returns the receipt to write */
+  /** an effect that must succeed before the receipt is written (typing an answer into a prompt); returns the receipt to write */
   before?: (t: Target, st: UnitState, route: Route, receipt: Receipt) => Promise<Receipt>;
 }
 
@@ -471,16 +460,16 @@ export interface HumanVerbResult {
 export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions & { noop?: undefined }): Promise<HumanVerbResult>;
 export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions): Promise<HumanVerbResult | null>;
 export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptions): Promise<HumanVerbResult | null> {
-  // T9: read the claim first — a non-holder's local copy may be stale, so when another heartbeat
+  // Read the claim first — a non-holder's local copy may be stale, so when another heartbeat
   // holds the story the cursor comes from its record ref before any precondition is checked
   let claim = opts.claim ?? (opts.mailbox ? await claimFor(ctx, t.story) : null);
   let target = t;
-  // gh-195 B20: a step-only receipt goes only through the mailbox
+  // A step-only receipt goes only through the mailbox
   const stepOnly = opts.mailbox ? t.stepOnly : undefined;
   if (opts.mailbox && t.source === "local" && claim && heldElsewhere(claim)) target = (await remoteTarget(ctx, t.key, stepOnly)) ?? t;
   let receipt: Receipt;
   if (target.boundary) {
-    // gh-195 B20: only the step is known here; the holder checks the receipt against its cursor (T9)
+    // Only the step is known here; the holder checks the receipt against its cursor
     if (!stepOnly) throw refuse(`${t.key}'s run state is on the machine that holds it`, cmd.storyView(t.story), "story_not_local");
     receipt = stepOnly(target, target.boundary.next);
   } else {
@@ -508,7 +497,7 @@ export async function runHumanVerb(ctx: Context, t: Target, opts: HumanVerbOptio
       ? cmd.tick()
       : target.boundary
         ? `sent to ${route.holder.holder}; the holder checks it against the step it is at (last boundary: ${target.boundary.ended} -> ${target.boundary.next})`
-        : `${route.holder.holder}'s next tick imports it (T9)`;
+        : `${route.holder.holder}'s next tick imports it`;
   return { unit: target.key, receipt, delivered, next };
 }
 

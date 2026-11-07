@@ -24,7 +24,7 @@ function repo(): string {
 const put = (r: string, name: string, v: unknown) => writeFileSync(join(machineDir(r), name), typeof v === "string" ? v : JSON.stringify(v));
 const localEvents = (r: string) => readTrace(r, { types: ["local_file"] }).events;
 
-describe("readLocalJson (S2, BUG-4)", () => {
+describe("readLocalJson (BUG-4)", () => {
   test("a valid file reads as itself; a missing one as the fallback, untraced", () => {
     const r = repo();
     put(r, "remote.json", { synced_at: 1, attempted_at: 2, last_error: null, default_branch: "main" });
@@ -43,7 +43,7 @@ describe("readLocalJson (S2, BUG-4)", () => {
     expect(readLocalJson("local-notified", join(machineDir(r), "notified.json"), {}, r)).toEqual({});
     const evs = localEvents(r) as Array<{ file: string; schema: string; reason: string }>;
     expect(evs.map((e) => [e.file, e.schema, e.reason])).toEqual([
-      // D10: absolute, the file is outside the repo
+      // Absolute, the file is outside the repo
       [remote, "local-remote", "wrong_shape"],
       [join(machineDir(r), "notified.json"), "local-notified", "invalid_json"],
     ]);

@@ -1,5 +1,5 @@
 /**
- * X3 distribution build.
+ * Distribution build.
  *
  *   bun scripts/build.ts                 → dist/npm/   npm-ready @norn/cli (bundle + assets + package.json)
  *   bun scripts/build.ts --name @o/norn --registry <url>

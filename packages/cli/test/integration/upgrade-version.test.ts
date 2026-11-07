@@ -1,5 +1,5 @@
 /**
- * gh-61 B13, B15, B16, B17 (D9) at the CLI seam (S1): `norn upgrade` moves the repo's `norn_version`
+ * gh-61 B13, B15, B16, B17 at the CLI seam: `norn upgrade` moves the repo's `norn_version`
  * to the running binary's, rewrites and relinks the bundled skills and runs the config moves, all
  * staged and nothing committed; with nothing to do it changes nothing; it never moves the version
  * back, and refuses before any write (`norn migrate` too).

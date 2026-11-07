@@ -1,11 +1,11 @@
 /**
- * `norn watch [--interval 30s]` (H5): ticks in a loop until SIGINT/SIGTERM (or `--max-ticks`).
- * Per-tick progress goes to stderr as JSON lines; stdout gets one summary at exit (P8).
- * A clean exit releases the claims this heartbeat holds (T6) unless `--keep-claims`.
+ * `norn watch [--interval 30s]`: ticks in a loop until SIGINT/SIGTERM (or `--max-ticks`).
+ * Per-tick progress goes to stderr as JSON lines; stdout gets one summary at exit.
+ * A clean exit releases the claims this heartbeat holds unless `--keep-claims`.
  * `--human` is for a person at the terminal: a line per action instead of JSON (quiet ticks print
  * nothing; the cockpit shows the last tick) and a sentence instead of the summary. `--json` wins.
- * H12: a tick that left the next one something to do (`follow_up`) is followed at once, up to
- * `SETTLE_TICKS` in a row, then the interval; `--max-ticks` counts every tick. H13: a receipt another
+ * A tick that left the next one something to do (`follow_up`) is followed at once, up to
+ * `SETTLE_TICKS` in a row, then the interval; `--max-ticks` counts every tick. A receipt another
  * process appends during the pause (a report, a finished check) wakes it within about a second.
  */
 import { git as gitAdapter } from "@norn/adapters";
@@ -20,10 +20,10 @@ import { pauseUntilWake, wakeStamp } from "../runtime/wake.ts";
 import { cmd, type InboxItem, ticksPausedTitle } from "@norn/core";
 import type { Context } from "../context.ts";
 
-/** H12: at most this many ticks in a row run at once after a tick that left a follow-up, so a unit that keeps changing never spins. */
+/** At most this many ticks in a row run at once after a tick that left a follow-up, so a unit that keeps changing never spins. */
 export const SETTLE_TICKS = 3;
 
-/** H12: after a tick, whether the next one runs at once, and how many have run at once in a row since the last pause. */
+/** After a tick, whether the next one runs at once, and how many have run at once in a row since the last pause. */
 export function settleStep(followUp: boolean, settling: number): { now: boolean; settling: number } {
   return followUp && settling < SETTLE_TICKS ? { now: true, settling: settling + 1 } : { now: false, settling: 0 };
 }
@@ -49,10 +49,10 @@ export function humanSummary(s: { ticks: number; failed_actions: number; skipped
 }
 
 /**
- * gh-61 B11 (D8): the version guard again before a tick, with the config reloaded so a pull mid-watch
+ * The version guard again before a tick, with the config reloaded so a pull mid-watch
  * is seen. A mismatch skips the tick and notifies once per repo version it pauses on; a match clears
  * that memory, so the same mismatch coming back notifies again. The memory lives in this watch
- * process only, and watch never exits for a mismatch (a cron tick just exits 3, B6).
+ * process only, and watch never exits for a mismatch (a cron tick just exits 3).
  */
 async function pausedOnVersion(ctx: Context, state: { notified: string | null }) {
   ctx.reload();
@@ -78,7 +78,7 @@ async function pausedOnVersion(ctx: Context, state: { notified: string | null })
       try {
         await n.notify(item);
       } catch (e) {
-        ctx.log(JSON.stringify({ error: (e as Error).message })); // best-effort, like the inbox's notifications (O3)
+        ctx.log(JSON.stringify({ error: (e as Error).message })); // best-effort, like the inbox's notifications
       }
     }
   }
@@ -88,7 +88,7 @@ async function pausedOnVersion(ctx: Context, state: { notified: string | null })
 export const watchCommand = defineCommand({
   name: "watch",
   version: "acts",
-  summary: "Run ticks in a loop (H5); a clean exit releases held claims (T6)",
+  summary: "Run ticks in a loop; a clean exit releases held claims",
   usage: "norn watch [--interval 30s] [--max-ticks N] [--keep-claims] [--human]",
   options: { interval: { type: "string" }, "max-ticks": { type: "string" }, "keep-claims": { type: "boolean" }, human: { type: "boolean" } },
   async run(ctx, args) {
@@ -99,16 +99,16 @@ export const watchCommand = defineCommand({
     } catch {
       throw usageError(`bad --interval '${raw}' (use e.g. 30s, 2m)`, cmd.watch({ interval: "30s" }));
     }
-    // B34 (D5): watch always records the interval it runs at (liveness, claim timing)
+    // Watch always records the interval it runs at (liveness, claim timing)
     recordInterval(ctx.root, raw);
     ctx.reload();
     const maxRaw = opt.str(args, "max-ticks");
     const max = maxRaw === undefined ? Number.POSITIVE_INFINITY : Number(maxRaw);
     if (!(max > 0)) throw usageError(`bad --max-ticks '${maxRaw}'`, cmd.watch({ maxTicks: 10 }));
-    // BS2: no heartbeat without `git merge-tree --write-tree` (git ≥ 2.38) — base conflicts would go unseen
+    // No heartbeat without `git merge-tree --write-tree` (git ≥ 2.38) — base conflicts would go unseen
     const v = await ctx.git.version(ctx.root);
     if (!v || !gitAdapter.gitVersionOk(v))
-      throw refuse(`git ≥ ${gitAdapter.MIN_GIT_VERSION.join(".")} is required to run a heartbeat (found: ${v || "no git"}) (BS2)`, `upgrade git, then ${cmd.doctor()}`, "git_too_old");
+      throw refuse(`git ≥ ${gitAdapter.MIN_GIT_VERSION.join(".")} is required to run a heartbeat (found: ${v || "no git"})`, `upgrade git, then ${cmd.doctor()}`, "git_too_old");
     const human = opt.bool(args, "human");
     if (human) ctx.log(`norn watch: a tick every ${raw}, one line per action; Ctrl-C finishes the tick and releases claims`);
     const signal = ctx.deps.signal;
@@ -120,7 +120,7 @@ export const watchCommand = defineCommand({
     const version = { notified: null as string | null };
     while (ticks < max && !signal?.aborted) {
       const started = ctx.clock.now();
-      const since = wakeStamp(ctx.root); // H13: receipts written from here on by another process wake the pause
+      const since = wakeStamp(ctx.root); // Receipts written from here on by another process wake the pause
       let followUp = false;
       try {
         const refused = await pausedOnVersion(ctx, version);
@@ -142,11 +142,11 @@ export const watchCommand = defineCommand({
       }
       ticks++;
       if (ticks >= max || signal?.aborted) break;
-      // H12: the follow-up a tick left (a receipt to apply, a step to start) runs now, not an interval later
+      // The follow-up a tick left (a receipt to apply, a step to start) runs now, not an interval later
       const next = settleStep(followUp, settling);
       settling = next.settling;
       if (next.now) continue;
-      // H13: a receipt another process writes (an agent report, a finished check) ends the pause early
+      // A receipt another process writes (an agent report, a finished check) ends the pause early
       await pauseUntilWake(ctx, Math.max(0, interval - (ctx.clock.now() - started)), since, signal);
     }
     const kept = opt.bool(args, "keep-claims");

@@ -1,6 +1,6 @@
 /**
- * gh-110 D5: the one layout guard. The code knows one layout (D1); on a main checkout still on the
- * old one (B18, B19) or with a part in both places (B17) a command refuses before it reads config
+ * The code knows one layout; on a main checkout still on the
+ * old one or with a part in both places a command refuses before it reads config
  * or workflows, so norn never half-reads an old layout or guesses between two.
  */
 import { cmd } from "@norn/core";

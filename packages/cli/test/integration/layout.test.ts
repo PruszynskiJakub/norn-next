@@ -1,7 +1,7 @@
 /**
- * gh-110 B1, B2, B4: the repo config lives at `.agents/norn.config.yaml` and the repo workflows in
+ * The repo config lives at `.agents/norn.config.yaml` and the repo workflows in
  * `.agents/workflows/` — written there by `init`, read there by every command, named there by every
- * message (D11) — and a unit keeps the workflow it pinned when the file changes on the base (S7).
+ * message — and a unit keeps the workflow it pinned when the file changes on the base.
  * The paths are spelled out here on purpose: this is what a person sees.
  */
 import { } from "@norn/store";
@@ -51,7 +51,7 @@ function commitOnBase(message: string) {
   h.git(["push", "-q", "origin", "main"]);
 }
 
-describe("norn init writes the new layout (B1, B2)", () => {
+describe("norn init writes the new layout", () => {
   test("config file and workflows in .agents/workflows/; no folder of norn's own under .agents/", () => {
     expect(init.exit).toBe(0);
     expect(existsSync(join(h.root, CONFIG_FILE))).toBe(true);
@@ -85,7 +85,7 @@ describe("messages name the new paths (D11)", () => {
     expect(created.value).toMatchObject({ code: "unknown_workflow", error: expect.stringContaining(`no workflow 'nope' in ${WORKFLOWS}/`) });
   });
 
-  test("a team key in the wrong place names the repo config file (gh-64 B5)", async () => {
+  test("a team key in the wrong place names the repo config file", async () => {
     h.write(join(h.root, CONFIG_FILE), "mode: auto\n");
     const r = await h.norn("tick");
     expect(r.value).toMatchObject({ code: "config_wrong_file", error: expect.stringContaining(CONFIG_FILE) });
@@ -93,7 +93,7 @@ describe("messages name the new paths (D11)", () => {
   });
 });
 
-describe("workflows in .agents/workflows/ run and stay pinned (B2, B4, S7)", () => {
+describe("workflows in .agents/workflows/ run and stay pinned", () => {
   beforeAll(() => {
     h.write(join(h.root, WORKFLOWS, "story.yaml"), gateFirst("story", "v1"));
     h.write(join(h.root, WORKFLOWS, "quick.yaml"), gateFirst("quick", "quick"));

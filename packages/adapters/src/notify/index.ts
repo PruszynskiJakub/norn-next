@@ -1,6 +1,6 @@
 /**
- * Notifiers (NotifierPort, O3): `os` (default; macOS osascript, Linux notify-send), `ntfy`
- * (JSON publish to a server/topic), `webhook` (POST JSON) and `herdr` (a toast in Herdr, HC14). A notifier only sends: fire-once
+ * Notifiers (NotifierPort): `os` (default; macOS osascript, Linux notify-send), `ntfy`
+ * (JSON publish to a server/topic), `webhook` (POST JSON) and `herdr` (a toast in Herdr). A notifier only sends: fire-once
  * per inbox item is the caller's duty (receipt-first). `notify` resolves when delivered and
  * throws PortError `notify_failed` (retryable for network/5xx/429) or `config_invalid`.
  */
@@ -35,8 +35,6 @@ export function render(item: InboxItem): { title: string; subtitle: string; body
     body: `${item.title}\n${item.command}`,
   };
 }
-
-// ------------------------------------------------------------------ os
 
 export interface OsNotifierOptions {
   platform?: NodeJS.Platform;
@@ -73,8 +71,6 @@ export function createOsNotifier(opts: OsNotifierOptions = {}): NotifierPort {
     },
   };
 }
-
-// ------------------------------------------------------------------ http (ntfy, webhook)
 
 async function post(fetchFn: Fetch, url: string, headers: Record<string, string>, body: unknown, who: string): Promise<void> {
   let res: Awaited<ReturnType<Fetch>>;
@@ -147,8 +143,6 @@ export function createWebhookNotifier(o: WebhookNotifierOptions): NotifierPort {
   };
 }
 
-// ------------------------------------------------------------------ factories
-
 function str(options: Record<string, unknown>, key: string, adapter: string, required: true): string;
 function str(options: Record<string, unknown>, key: string, adapter: string, required?: false): string | undefined;
 function str(options: Record<string, unknown>, key: string, adapter: string, required = false): string | undefined {
@@ -193,8 +187,6 @@ const webhookFactory = (_ctx: AdapterContext, config: NotifierConfig): NotifierP
 
 const osFactory = (_ctx: AdapterContext, _config: NotifierConfig): NotifierPort => createOsNotifier();
 
-// ------------------------------------------------------------------ herdr (HC14)
-
 /** Groups whose toast plays Herdr's `request` sound; the rest are silent. */
 const HERDR_REQUEST: ReadonlySet<InboxGroup> = new Set(["your_turn", "answer", "approve"]);
 
@@ -217,7 +209,7 @@ export function herdrNotifyArgv(item: InboxItem, o: Pick<HerdrNotifierOptions, "
   ];
 }
 
-/** HC14: an inbox item as a Herdr toast; outside Herdr it is `unsupported` and the other notifiers still run. */
+/** An inbox item as a Herdr toast; outside Herdr it is `unsupported` and the other notifiers still run. */
 export function createHerdrNotifier(o: HerdrNotifierOptions = {}): NotifierPort {
   const exec = o.exec ?? bunExec;
   const env = o.env ?? process.env;

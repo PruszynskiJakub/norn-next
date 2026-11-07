@@ -1,8 +1,4 @@
-/**
- * @norn/core — pure logic, no IO (§17): adapter ports, Facts (observe output), Action
- * (decide output), workflow validation, receipt application, decide, briefing, handoff
- * and inbox rendering.
- */
+/** @norn/core: pure logic, no IO. */
 export type * from "./actions.ts";
 export { legacyAction } from "./actions.ts";
 export type * from "./facts.ts";

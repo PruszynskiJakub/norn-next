@@ -7,29 +7,29 @@
  * - launch     → `herdr workspace list`                      (find the unit worktree's workspace)
  *                `herdr tab create --workspace W --cwd C --label T --env K=V… --no-focus`
  *                  or `herdr workspace create --cwd C --label T --env K=V… --no-focus`
- *                `herdr pane run <pane> "<argv>"`             (A6 env comes from --env)
+ *                `herdr pane run <pane> "<argv>"`             (the launch env comes from --env)
  *                `herdr pane process-info --pane <pane>`      (record the agent's pid + start time)
- *                nothing in the foreground → `pane read` + `pane close`, launch_failed (R4.3, B2)
+ *                nothing in the foreground → `pane read` + `pane close`, launch_failed
  * - send       → `herdr agent prompt <pane> <text>`          (submit; bracketed paste + enter)
  *                fallback when no agent is recognized: `pane send-text` + `pane send-keys enter`
  *                without submit: `herdr pane send-text <pane> <text>`
  * - paneState  → `herdr pane get <pane>` (+ `pane read --source visible` when blocked; the prompt
- *                parsed from it, R6.2)
- * - sendKeys   → `herdr pane send-text <pane> <text>` / `herdr pane send-keys <pane> <key>…` (R6.2)
- * - reach      → `herdr agent attach <pane>`                 (the command a person runs, R6.3)
+ *                parsed from it)
+ * - sendKeys   → `herdr pane send-text <pane> <text>` / `herdr pane send-keys <pane> <key>…`
+ * - reach      → `herdr agent attach <pane>`                 (the command a person runs)
  * - isAlive    → agent pid + start time if recorded, else `pane process-info` (foreground != shell)
  * - kill       → `herdr pane close <pane>` (pane_not_found = already gone)
- * - findSessions → `herdr pane list`                         (agent panes whose cwd is the worktree, R5.1)
+ * - findSessions → `herdr pane list`                         (agent panes whose cwd is the worktree)
  *                `herdr pane process-info --pane <pane>`      (their agent pid)
  * - openForPerson → `herdr workspace list`                  (the workspace on the worktree, else the caller's)
  *                `herdr tab create --workspace W --cwd C --label T` or `herdr workspace create …` (focused)
- *                `herdr pane run <pane> "<command>"`          (MO5, `norn story start`)
- * - capabilities: send + resume + open (R4.1, MO5)
+ *                `herdr pane run <pane> "<command>"`          (`norn story start`)
+ * - capabilities: send + resume + open
  *
- * - cockpit helpers (agent list, focus, labels, command panes): `./cockpit.ts` (HC6, HC12)
+ * - cockpit helpers (agent list, focus, labels, command panes): `./cockpit.ts`
  * - every herdr command runs through `herdrCaller` (`./call.ts`), as do the cockpit's
  *
- * Herdr's agent status is one fact among several (C2): `idle`/`done` never completes a step.
+ * Herdr's agent status is one fact among several: `idle`/`done` never completes a step.
  */
 import type { AdapterContext, LaunchSpec, PaneState, PersonOpenSpec, ProcessPort, RunnerPort, SessionRef } from "@norn/core";
 import type { ProcessIdentity, RunnerConfig } from "@norn/schema";
@@ -149,7 +149,7 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
       }
 
       if (!identity) {
-        // R4.3, B2: nothing took the pane's foreground — the command never ran (cut off while the
+        // Nothing took the pane's foreground — the command never ran (cut off while the
         // pane's shell started) or exited at once. Not a launch: say what the pane shows, close it.
         const screen = await herdr(["pane", "read", paneId, "--source", "visible", "--lines", "30"]).catch(() => null);
         const shown = typeof screen === "string" ? lastLines(screen, 5) : "";
@@ -192,7 +192,6 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
         const screen = await herdr(["pane", "read", pane, "--source", "visible", "--lines", "30"]).catch(() => null);
         if (typeof screen === "string" && screen.trim() !== "") {
           result.detail = screen.trim();
-          // R6.2, L1: the question, options and pending command, read off the screen
           const prompt = parsePanePrompt(screen);
           if (prompt) result.prompt = prompt;
         }
@@ -201,7 +200,7 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
     },
 
     async sendKeys(session, keys) {
-      // R6.2: raw keystrokes into the pane — a blocked agent takes no `agent prompt`; runs of named
+      // Raw keystrokes into the pane — a blocked agent takes no `agent prompt`; runs of named
       // keys go in one `send-keys`
       const pane = paneOf(session);
       let named: string[] = [];
@@ -220,7 +219,7 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
     },
 
     reach(session) {
-      // R6.3, R9.1: what a person runs to look at (and type into) the agent's pane
+      // What a person runs to look at (and type into) the agent's pane
       return shellJoin([...base, "agent", "attach", paneOf(session)]);
     },
 

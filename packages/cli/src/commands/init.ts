@@ -1,14 +1,14 @@
 /**
- * `norn init` (A1, SK1, W1): repo config from the template if absent, workflow examples if
+ * `norn init`: repo config from the template if absent, workflow examples if
  * absent, the bundled skills into `.agents/skills/` (whole folders, the bundled version) linked
  * from each configured agent's skill folder, agent hooks (norn-owned, updated in place),
- * and machine-local paths in .gitignore (gh-195 B37: S10 is retired, so no `.gitattributes` line). Idempotent: re-running updates norn-owned files only.
- * gh-61 B1, B28 (D10): `norn_version` is recorded only in a repo that has none; on a repo set up
+ * and machine-local paths in .gitignore. Idempotent: re-running updates norn-owned files only.
+ * `norn_version` is recorded only in a repo that has none; on a repo set up
  * for another version, a differing bundled skill is left as it is and `norn upgrade` named instead.
  * Workflows created now get the repo's test command when its build files name one (`runtime/detect.ts`).
- * gh-67 GR10: last, the labels norn uses are created on the remote (`runtime/labels.ts`); a remote it
+ * Last, the labels norn uses are created on the remote (`runtime/labels.ts`); a remote it
  * cannot reach or write is reported, never a failure.
- * gh-226: a starter `REVIEW.md` at the repo root (what `norn-review` ignores, counts as failure and
+ * A starter `REVIEW.md` at the repo root (what `norn-review` ignores, counts as failure and
  * does not report), only when the repo has none.
  * Prints a summary for a person, ending in the next steps to a first story; `--json` for data.
  */
@@ -26,10 +26,10 @@ import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { cmd } from "@norn/core";
 import { PROVIDERS, type RemoteProvider } from "@norn/schema";
 
-/** gh-226: the repo's review guide the `norn-review` skill reads, at the repo root. */
+/** The repo's review guide the `norn-review` skill reads, at the repo root. */
 const REVIEW_FILE = "REVIEW.md";
 
-/** Paths that must never be committed (§7.1, gh-64 B9); the machine-local files live outside the checkout (B5). */
+/** Paths that must never be committed; the machine-local files live outside the checkout. */
 const IGNORED = [...WORKTREE_LOCAL_FILES, LOCAL_CONFIG_FILE];
 
 function ensureGitignore(root: string): string[] {
@@ -42,7 +42,7 @@ function ensureGitignore(root: string): string[] {
 }
 
 /**
- * R8.1: installed hooks run `$NORN_BIN` when set — the norn that launched the agent (act exports
+ * Installed hooks run `$NORN_BIN` when set — the norn that launched the agent (act exports
  * it) — else the `norn` on PATH. Hooks run through `sh -c`, which expands it.
  */
 const DEFAULT_HOOK_COMMAND = '"${NORN_BIN:-norn}" hook';
@@ -61,11 +61,11 @@ export function hookBinary(command: string, env: Record<string, string | undefin
 export interface InitReport {
   root: string;
   config: "exists" | "created";
-  /** B49: `~/.norn/config.yaml` */
+  /** `~/.norn/config.yaml` */
   user_config: "exists" | "created";
-  /** gh-226: the starter `REVIEW.md` at the repo root; never overwritten */
+  /** The starter `REVIEW.md` at the repo root; never overwritten */
   review: "exists" | "created";
-  /** B50, B55: schema copies written or refreshed */
+  /** Schema copies written or refreshed */
   schemas: string[];
   workflows: { created: string[]; kept: string[] };
   skills: { dir: string; updated: string[]; unchanged: string[]; links: Array<{ agent: string; dir: string; linked: string[]; unchanged: string[]; kept: string[] }> };
@@ -77,12 +77,12 @@ export interface InitReport {
   /** the `test` check command written into the workflows created now (null when none were created) */
   test_command: { command: string; detected_from: string | null; set_in: string[] } | null;
   /**
-   * gh-61 B1, B28 (D10): the repo's `norn_version` after init and the running norn's; `recorded`
+   * The repo's `norn_version` after init and the running norn's; `recorded`
    * when this init wrote it; `skills_kept`: bundled skills that differ and were left alone because
    * the repo is on another version (`norn upgrade` moves both)
    */
   norn_version: { repo: string; running: string; recorded: boolean; skills_kept: string[] };
-  /** gh-67 GR10, B15: the labels created, already there, unused and not created, or why they were not checked */
+  /** The labels created, already there, unused and not created, or why they were not checked */
   labels: LabelsReport;
 }
 
@@ -111,7 +111,7 @@ function formatInit(r: InitReport): string {
   const changed = r.config === "created" || r.review === "created" || r.norn_version.recorded || r.schemas.some((p) => p.startsWith(r.root)) || r.workflows.created.length || sk.updated.length || sk.links.some((l) => l.linked.length) || r.hooks.some((h) => h.changed.length) || r.gitignore.length;
   if (r.test_command) row("test command", `${r.test_command.command} (${r.test_command.detected_from ? `from ${r.test_command.detected_from}` : "not detected: the template's default"})`);
   row("remote", r.remote.url ? `${r.remote.git_remote} → ${r.remote.url}` : `no git remote named ${r.remote.git_remote}`);
-  // B15, B29: the labels line says what norn did on the remote, or what to run
+  // The labels line says what norn did on the remote, or what to run
   const [labelsHead = "", ...labelsRest] = labelsLines(r.labels);
   row("labels", labelsHead.replace(/^labels: /, ""));
   for (const l of labelsRest) row("", l.trim());
@@ -140,7 +140,7 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
   }
   steps.push(`Check this machine: \`${cmd.doctor()}\`.`);
   const label = r.remote.label;
-  // B29: the labels line above says how to get a label norn could not create
+  // The labels line above says how to get a label norn could not create
   const issueCreate = PROVIDERS[r.remote.provider].issueCreate;
   steps.push(`Make a first story: an issue labelled \`${label}\` and assigned to you${issueCreate ? `, e.g. \`${issueCreate(label)}\`` : ""}.`);
   steps.push(`Pick it up: \`${cmd.sync()}\`, then \`${cmd.status()}\` shows what needs you and the command for each item; \`${cmd.watch()}\` keeps norn working.`);
@@ -150,27 +150,27 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
 export const initCommand = defineCommand({
   name: "init",
   version: "exempt",
-  summary: "Set up norn in this repository: config, workflows, skills, hooks (A1, SK1, W1)",
+  summary: "Set up norn in this repository: config, workflows, skills, hooks",
   usage: "norn init [--json] [--hook-command <cmd>]",
   markdown: true,
   options: { "hook-command": { type: "string" } },
   async run(ctx, args) {
     const root = ctx.root;
-    // B7: a config file with a problem refuses before init writes anything, so no half setup
+    // A config file with a problem refuses before init writes anything, so no half setup
     void ctx.config;
 
     const assets = assetsDir(ctx.env);
     const configPath = repoConfigPath(root);
     const config = existsSync(configPath) ? "exists" : (atomicWrite(configPath, readFileSync(join(assets, "config.yaml"), "utf8")), "created");
-    // B49: the commented user file on a machine's first init, never overwritten
+    // The commented user file on a machine's first init, never overwritten
     const userPath = userConfigPath(ctx.home);
     const user_config = existsSync(userPath) ? "exists" : (atomicWrite(userPath, readFileSync(join(assets, "user-config.yaml"), "utf8")), "created");
     const reviewPath = join(root, REVIEW_FILE);
     const review = existsSync(reviewPath) ? "exists" : (atomicWrite(reviewPath, readFileSync(join(assets, REVIEW_FILE), "utf8")), "created");
-    // B50, B55 (D14): the schema copies the starters' modelines point at
+    // The schema copies the starters' modelines point at
     const schemas = writeConfigSchemas({ repoRoot: root, home: ctx.home });
 
-    // W1: the templates' `test` checks get the repo's own test command when its build files name one
+    // The templates' `test` checks get the repo's own test command when its build files name one
     const detected = detectTestCommand(root);
     const testCommand = detected?.command ?? TEMPLATE_TEST_COMMAND;
     const workflows = { created: [] as string[], kept: [] as string[] };
@@ -189,7 +189,7 @@ export const initCommand = defineCommand({
     }
     const test_command = workflows.created.length ? { command: testCommand, detected_from: detected?.from ?? null, set_in: setIn } : null;
 
-    // B1 (D10): the version is written only into a repo that has none; init never moves it (B28)
+    // The version is written only into a repo that has none; init never moves it
     ctx.reload();
     const recorded = ctx.config.norn_version === null;
     if (recorded) {
@@ -199,9 +199,9 @@ export const initCommand = defineCommand({
     }
     const repoVersion = ctx.config.norn_version ?? ctx.version;
     const ports = await ctx.ports(); // validates the config again with the written files (exit 6 when invalid)
-    const agents = agentsInUse(root, ctx.resolved, ports); // B1, B13
+    const agents = agentsInUse(root, ctx.resolved, ports);
     const names = bundledSkills(ctx.env);
-    // B28 (D10): on another version's repo, a missing skill is copied in and one that differs stays
+    // On another version's repo, a missing skill is copied in and one that differs stays
     const source = join(assets, "skills");
     const skills_kept = repoVersion === ctx.version ? [] : skillsDrift(join(root, SKILLS_DIR), source, names);
     const installed = installSkills(root, source, names.filter((n) => !skills_kept.includes(n)));
@@ -223,7 +223,7 @@ export const initCommand = defineCommand({
     }
 
     const url = gitRemoteUrl(root, ctx.config.git_remote);
-    // GR10: after every file is in place, so the workflows (and the skills they name) are the repo's
+    // After every file is in place, so the workflows (and the skills they name) are the repo's
     const labels = await remoteLabels({ remote: ports.remote, gitRemoteUrl: url, intake: ctx.config.label, workflows: checkedRepoWorkflows(loadWorkflows(root), root, ctx.config, ports.agents), create: true });
     const report: InitReport = { root, config, review, user_config, schemas, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url }, test_command, norn_version: { repo: repoVersion, running: ctx.version, recorded, skills_kept }, labels };
     return rendered(report, formatInit(report));

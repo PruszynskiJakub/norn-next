@@ -1,7 +1,7 @@
 /**
- * Git step logic over GitPort: W2 `git: integrate`, BS3.3a remote story branch sync and W2
- * `git: update`. These choose between outcomes (conflict, stuck, adopt, merge), so they live in
- * the cli runtime rather than the git adapter: ports never decide (AGENTS.md), they perform one
+ * Git step logic over GitPort: `git: integrate`, remote story branch sync and `git: update`.
+ * These choose between outcomes (conflict, stuck, adopt, merge), so they live in
+ * the cli runtime rather than the git adapter: ports never decide, they perform one
  * effect each.
  */
 import { git as gitAdapter } from "@norn/adapters";
@@ -12,10 +12,10 @@ const { portError } = gitAdapter;
 export type IntegrateResult = { outcome: "done"; head: string } | { outcome: "conflict"; files: string[] };
 
 /**
- * W2 `git: integrate`: rebase the slice branch (checked out in `sliceCwd`) onto the story
- * branch — or merge the story branch in when the slice already merged it once (gh-80, `trailers`
+ * `git: integrate`: rebase the slice branch (checked out in `sliceCwd`) onto the story
+ * branch — or merge the story branch in when the slice already merged it once (`trailers`
  * on that merge commit) — then fast-forward the story branch to it. A conflicting rebase or merge
- * is aborted cleanly and yields `conflict` (K6). The caller serializes integrations per story (K6).
+ * is aborted cleanly and yields `conflict`. The caller serializes integrations per story.
  * If the story branch is checked out in a worktree it is fast-forwarded there (keeps that
  * checkout in sync); otherwise its ref is moved with a compare-and-swap.
  */
@@ -41,7 +41,7 @@ export async function integrate(
 }
 
 /**
- * gh-80 (W2, W4): a slice whose merge step merged the story branch in (a merge on the ancestry
+ * A slice whose merge step merged the story branch in (a merge on the ancestry
  * path from its fork point) takes the story branch in by merging again, never by rebasing: a
  * rebase linearises the resolution away (or re-creates the merge on a story tip that moved on)
  * and the same conflict comes back, spending `conflict_loop` twice on one conflict.
@@ -58,7 +58,7 @@ export type UpdateResult =
   | { outcome: "stuck"; reason: string };
 
 /**
- * BS3.3a: how the local story branch took in `<remote>/<branch>` — `none` (no remote branch),
+ * How the local story branch took in `<remote>/<branch>` — `none` (no remote branch),
  * `local` (nothing new on the remote), `adopted` (fast-forwarded to it), `merged` (a merge commit),
  * or `conflict` (diverged and the merge was aborted, paths reported).
  */
@@ -68,11 +68,11 @@ export type RemoteSync =
   | { outcome: "conflict"; remote_sha: string; files: string[] };
 
 /**
- * BS3.3a (dogfood D4): bring the remote story branch into the local one checked out in `cwd` —
+ * Bring the remote story branch into the local one checked out in `cwd` —
  * fetch it; fast-forward when the local branch is an ancestor of it (a person pressed "Update
  * branch"); when they diverged (a person pushed while norn committed locally), merge it with
- * `message` and `trailers` (never rebase: the branch is published, BS4). A conflicting merge is
- * aborted and its paths reported. The caller holds the claim (T7) and pushes afterwards.
+ * `message` and `trailers` (never rebase: the branch is published). A conflicting merge is
+ * aborted and its paths reported. The caller holds the claim and pushes afterwards.
  */
 export async function syncRemoteBranch(
   git: GitPort,
@@ -82,7 +82,7 @@ export async function syncRemoteBranch(
   try {
     await git.fetch(opts.cwd, opts.remote, [`+refs/heads/${opts.branch}:${tracking}`]);
   } catch (e) {
-    // a story branch never pushed has nothing to take in; anything else is a failed effect (R4.3)
+    // a story branch never pushed has nothing to take in; anything else is a failed effect
     if (!/couldn't find remote ref|could not find remote ref/i.test((e as Error).message)) throw e;
     return { outcome: "none", remote_sha: null };
   }
@@ -99,24 +99,24 @@ export async function syncRemoteBranch(
 }
 
 /**
- * W2 `git: update` (BS3, BS4) in the story worktree `cwd`, whose branch is `branch`. The caller
- * holds the story's integrate lock (K6) and pushes afterwards (S8, T7).
+ * `git: update` in the story worktree `cwd`, whose branch is `branch`. The caller
+ * holds the story's integrate lock and pushes afterwards.
  *  1. a dirty worktree → `stuck` (`worktree dirty`);
- *  3. the remote story branch ahead of the local one and descended from it (a person pressed
- *     "Update branch" on the host) → fast-forward to it first; diverged → merge it (BS3.3a), and a
+ *  2. the remote story branch ahead of the local one and descended from it (a person pressed
+ *     "Update branch" on the host) → fast-forward to it first; diverged → merge it, and a
  *     conflicting merge of it → `stuck`;
- *  4. nothing of `baseSha` missing → `done`, no commit;
- *  5. else `git merge --no-ff <baseSha>` with `message` and `trailers` (`Norn-Tick`, so Q6 does
- *     not report the merge as foreign) → `done`;
- *  6. a conflicting merge is aborted → `conflict` with the paths.
- * Merge, never rebase: the story branch is published (BS4).
+ *  3. nothing of `baseSha` missing → `done`, no commit;
+ *  4. else `git merge --no-ff <baseSha>` with `message` and `trailers` (`Norn-Tick`, so the merge is
+ *     not reported as foreign) → `done`;
+ *  5. a conflicting merge is aborted → `conflict` with the paths.
+ * Merge, never rebase: the story branch is published.
  */
 export async function update(
   git: GitPort,
   opts: { cwd: string; branch: string; baseSha: string; remote: string | null; message: string; trailers: Record<string, string> },
 ): Promise<UpdateResult> {
   const st = await git.status(opts.cwd);
-  // H1: a merge or rebase left in progress (a resolve agent's) is never aborted or concluded here
+  // A merge or rebase left in progress (a resolve agent's) is never aborted or concluded here
   const busy = await git.inProgress(opts.cwd);
   if (busy.operation || busy.unmerged.length) return { outcome: "stuck", reason: `${busy.operation ?? "merge"} in progress in the story worktree` };
   if (!st.clean || st.rebase_in_progress) return { outcome: "stuck", reason: "worktree dirty" };

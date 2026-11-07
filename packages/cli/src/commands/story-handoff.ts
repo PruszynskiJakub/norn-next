@@ -1,8 +1,8 @@
 /**
- * `norn story handoff [<story>]` (B34, T6): hand a story over. Commits edited handoff.md files, pushes
- * the story and slice branches, then the story's record to its ref (gh-195 B15), then deletes the claim
- * ref by CAS — in that order, so whoever checks it out next (T5) finds everything on the remote. A
- * rejected record push releases nothing and is refused (B16). Refused when this heartbeat does not
+ * `norn story handoff [<story>]`: hand a story over. Commits edited handoff.md files, pushes
+ * the story and slice branches, then the story's record to its ref, then deletes the claim
+ * ref by CAS — in that order, so whoever checks it out next finds everything on the remote. A
+ * rejected record push releases nothing and is refused. Refused when this heartbeat does not
  * hold the claim.
  */
 import { cmd } from "@norn/core";
@@ -15,7 +15,7 @@ import { aStory, resolveStory } from "../runtime/target.ts";
 export const storyHandoffCommand = defineCommand({
   name: "story handoff",
   version: "acts",
-  summary: "Hand a story over: push branches, handoff and the record, then delete the claim (B34, T6)",
+  summary: "Hand a story over: push branches, handoff and the record, then delete the claim",
   usage: "norn story handoff [<story>]",
   markdown: true,
   positionals: { max: 1 },
@@ -28,7 +28,7 @@ export const storyHandoffCommand = defineCommand({
         throw refuse(`${key} is not claimed by this machine (claim: ${c.state})`, null, "not_held");
       }
       const r = await releaseStory(obs, story);
-      // B16: the remote refused the record, so the claim is kept and nothing deleted
+      // The remote refused the record, so the claim is kept and nothing deleted
       if (!r.ok && r.failed === "record") throw recordPushRefused(r.error ?? "record push failed", cmd.storyHandoff(key), r.pushed);
       if (!r.ok) throw failure(`handoff failed: ${r.error}`, `fix the push problem, then ${cmd.storyHandoff(key)} (the claim is kept until the branches are pushed)`, "release_failed", { pushed: r.pushed });
       const record = r.record ?? null;

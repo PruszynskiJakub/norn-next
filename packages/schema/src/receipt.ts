@@ -20,10 +20,9 @@ import {
 import { CriterionVerdict, Note, NoteId } from "./criteria.ts";
 
 /**
- * Receipts are immutable inputs at `runs/<unit>/receipts/NNNN-<kind>.json` (S6),
- * also the payload of mailbox refs (T9). Every receipt carries the common header;
- * `step` + `attempt` must match the unit's cursor when applied, else it is rejected
- * into the trace.
+ * Receipts are immutable inputs at `runs/<unit>/receipts/NNNN-<kind>.json`, also the payload
+ * of mailbox refs. `step` + `attempt` must match the unit's cursor when applied, else the
+ * receipt is rejected into the trace.
  */
 const header = {
   receipt_id: Ulid,
@@ -37,20 +36,17 @@ const header = {
   who: Type.Optional(NonEmpty),
   /** tick that wrote it (norn receipts) */
   tick_id: Type.Optional(Ulid),
-  /**
-   * Unit the receipt is for: a slice key, or null for the story unit. Optional (additive);
-   * set on mailbox receipts (T9) so the holder routes them by unit, not by step/attempt alone.
-   */
+  /** Unit the receipt is for: a slice key, or null for the story unit. Mailbox receipts set it so the holder routes them by unit, not by step/attempt alone. */
   slice: Type.Optional(Type.Union([SliceKey, Type.Null()])),
   /**
-   * gh-71 AC12 (T9): the story round whose cursor a person's receipt for the story unit was made at
+   * The story round whose cursor a person's receipt for the story unit was made at
    * (absent = not recorded); a mailbox receipt for another round than the story's is stale.
    */
   round: Type.Optional(PosInt),
   /**
-   * gh-196 D2 (B21, SK3): the receipt a supervisor sent on the person's behalf (`--delegated`). The cli
-   * writes it only on a human receipt and keeps `by` human, so decide reads it as the person's; the
-   * schema does not check `by`. Absent = the person's own.
+   * A supervisor sent this on the person's behalf (`--delegated`). The cli writes it only on a
+   * human receipt and keeps `by` human, so decide reads it as the person's; the schema does not
+   * check `by`. Absent = the person's own.
    */
   delegated: Type.Optional(Type.Literal(true)),
 };
@@ -60,7 +56,7 @@ function receipt<K extends string, P extends TProperties>(kind: K, props: P) {
 }
 
 /**
- * gh-195 B20 (T9): a receipt a person may send through the mailbox (answer, approve, reject, unstick).
+ * A receipt a person may send through the mailbox (answer, approve, reject, unstick).
  * `attempt` is absent only when a non-holder made it for a `local` story: stamped with the step its last
  * boundary led to (`Norn-Next`), the holder matches it by step alone.
  */
@@ -90,12 +86,12 @@ export const DoneReceipt = receipt("done", {
   findings: Type.Optional(Type.Array(Finding)),
   /** Evidence folder relative to the unit's runs dir, e.g. `evidence/<run_id>`. */
   evidence: Type.Optional(NonEmpty),
-  /** QV2: the `--criteria` report, one verdict per criterion */
+  /** The `--criteria` report, one verdict per criterion */
   criteria: Type.Optional(Type.Array(CriterionVerdict, { minItems: 1 })),
-  /** NT1: notes for a person; never block, never change the route */
+  /** Notes for a person; never block, never change the route */
   notes: Type.Optional(Type.Array(Note, { minItems: 1 })),
   /**
-   * BS5 (verified at `norn done` of a base-mode step): the base merged, the merge commit that brought
+   * Verified at `norn done` of a base-mode step: the base merged, the merge commit that brought
    * it in (null = reached without a merge commit) and the story head reported.
    */
   base_merge: Type.Optional(
@@ -116,9 +112,9 @@ export const AskReceipt = receipt("ask", {
   implicit: Type.Optional(Type.Boolean()),
   /** Permission prompt command shown in inbox (implicit asks). */
   command: Type.Optional(Type.String()),
-  /** R6.2: implicit asks from a pane prompt — how a choice is made (option number, or arrows from the cursor) */
+  /** Implicit asks from a pane prompt — how a choice is made (option number, or arrows from the cursor) */
   choice: Type.Optional(PromptChoice),
-  /** L1 (A7): implicit asks — the full pane text; `question` holds only the question block */
+  /** Implicit asks — the full pane text; `question` holds only the question block */
   screen: Type.Optional(NonEmpty),
 });
 export const StuckReceipt = receipt("stuck", { reason: NonEmpty });
@@ -127,23 +123,23 @@ export const AnswerReceipt = mailboxReceipt("answer", {
   /** receipt_id of the ask being answered */
   ask_receipt_id: Type.Optional(Ulid),
   /**
-   * R6.2/R6.3: `norn story answer` already typed the keystrokes into the agent's pane before writing this
-   * receipt, so the tick does not deliver it again. (`by: "agent"` answers, R6.1, are never delivered.)
+   * `norn story answer` already typed the keystrokes into the agent's pane before writing this
+   * receipt, so the tick does not deliver it again. (`by: "agent"` answers are never delivered.)
    */
   delivered: Type.Optional(Type.Boolean()),
-  /** gh-196 D3: why (`--reason`); the cli refuses `--delegated` without it (reason_required), the schema does not require it */
+  /** Why (`--reason`); the cli refuses `--delegated` without it (reason_required), the schema does not require it */
   comment: Type.Optional(Type.String()),
 });
 export const ApproveReceipt = mailboxReceipt("approve", {
   comment: Type.Optional(Type.String()),
-  /** The unit's branch head at the moment of `approve` (story unit: observe's `ready_head_sha`); the ruling's head (C2). */
+  /** The unit's branch head at the moment of `approve` (story unit: observe's `ready_head_sha`); the ruling's head. */
   head_sha: Type.Optional(GitSha),
-  /** NT3: open notes of the story listed at this story-level gate at `approve`; they leave the inbox */
+  /** Open notes of the story listed at this story-level gate at `approve`; they leave the inbox */
   acknowledged_notes: Type.Optional(Type.Array(NoteId, { uniqueItems: true })),
 });
 export const RejectReceipt = mailboxReceipt("reject", {
   comment: Type.Optional(Type.String()),
-  /** C2: the unit's branch head the person judged — a ruling is tied to it */
+  /** The unit's branch head the person judged — a ruling is tied to it */
   head_sha: Type.Optional(GitSha),
 });
 export const UnstickReceipt = mailboxReceipt("unstick", {
@@ -159,7 +155,7 @@ export const CheckReceipt = receipt("check", {
   exit_code: Type.Union([Type.Integer(), Type.Null()]),
   duration_ms: NonNegInt,
   reason: Type.Optional(Type.Literal("timeout")),
-  /** last ~200 lines (C5) */
+  /** last ~200 lines */
   output_tail: Type.String(),
   /** `logs/<run_id>.log`, present on fail */
   log: Type.Optional(NonEmpty),
@@ -169,7 +165,7 @@ export const SessionInfo = Type.Object(
     runner: NonEmpty,
     session_id: NonEmpty,
     pane_id: Type.Optional(NonEmpty),
-    /** R6.3, R9.1: the command a person runs to reach the session (the runner's, e.g. `herdr agent attach <pane>`) */
+    /** The command a person runs to reach the session (the runner's, e.g. `herdr agent attach <pane>`) */
     reach: Type.Optional(NonEmpty),
   },
   { additionalProperties: false },
@@ -184,14 +180,13 @@ export const StartedReceipt = receipt("started", {
   agent_session_id: Type.Optional(NonEmpty),
   process: Type.Optional(ProcessIdentity),
   worktree: NonEmpty,
-  /** true when this is a fresh-session retry of the same step (B2, C1) */
+  /** true when this is a fresh-session retry of the same step */
   retry: Type.Optional(Type.Boolean()),
-  /** R7.1 (M4): `user@host` that launched the run; process liveness is judged only there (R7.2) */
+  /** `user@host` that launched the run; process liveness is judged only there */
   machine: Type.Optional(NonEmpty),
-  /** R7.1: heartbeat that launched the run */
   heartbeat_id: Type.Optional(Ulid),
 });
-/** Tick classification (§10): the outcome decided from facts and the route taken. */
+/** Tick classification: the outcome decided from facts and the route taken. */
 export const ClassifyReceipt = receipt("classify", {
   outcome: OutcomeName,
   rule: NonEmpty,
@@ -200,8 +195,8 @@ export const ClassifyReceipt = receipt("classify", {
   route: Type.Union([Target, Type.Literal("nudge"), Type.Literal("retry"), Type.Literal("park")]),
   counter: Type.Optional(Type.Object({ name: NonEmpty, value: NonNegInt, max: PosInt }, { additionalProperties: false })),
   /**
-   * BS3/BS8: the base the story was measured against — `git: update` conflicts and gate `stale`.
-   * Structured so the `resolve` brief carries the base sha and paths without parsing `detail` (P8).
+   * The base the story was measured against — `git: update` conflicts and gate `stale`.
+   * Structured so the `resolve` brief carries the base sha and paths without parsing `detail`.
    */
   base: Type.Optional(
     Type.Object(
@@ -210,15 +205,15 @@ export const ClassifyReceipt = receipt("classify", {
         sha: GitSha,
         behind: Type.Optional(NonNegInt),
         conflicts: Type.Array(NonEmpty),
-        /** BS3: the story head after a `done` update — the `Norn-Tick` merge commit when one was made */
+        /** The story head after a `done` update — the `Norn-Tick` merge commit when one was made */
         head: Type.Optional(GitSha),
-        /** BS3: a `done` update made a merge commit (false = already up to date) */
+        /** A `done` update made a merge commit (false = already up to date) */
         merged: Type.Optional(Type.Boolean()),
       },
       { additionalProperties: false },
     ),
   ),
-  /** C4 snapshot on silent: last assistant message, head commit, diff stat. */
+  /** Taken when the agent went silent: last assistant message, head commit, diff stat. */
   snapshot: Type.Optional(
     Type.Object(
       {
@@ -232,8 +227,8 @@ export const ClassifyReceipt = receipt("classify", {
   ),
 });
 /**
- * R10.1 (M8): a `norn story checkout` of the story, forced or not, recorded on the story unit. Informational:
- * applied at any cursor (like `mode`), it moves nothing, unless it says the branch was `rewritten` (T5a);
+ * A `norn story checkout` of the story, forced or not, recorded on the story unit. Informational:
+ * applied at any cursor (like `mode`), it moves nothing, unless it says the branch was `rewritten`;
  * `norn run list` / `why` show it.
  */
 export const TakeReceipt = receipt("take", {
@@ -242,24 +237,24 @@ export const TakeReceipt = receipt("take", {
   previous_heartbeat_id: Type.Union([Ulid, Type.Null()]),
   /** the previous claim had expired (false when it was free or taken with --force) */
   expired: Type.Boolean(),
-  /** `take --force` over an unexpired or corrupt claim (T5) */
+  /** `take --force` over an unexpired or corrupt claim */
   forced: Type.Optional(Type.Boolean()),
   /**
-   * T5a (gh-195 B24): the story branch was rewritten since the record (`gone`, its `Norn-Branch-Commit`,
+   * The story branch was rewritten since the record (`gone`, its `Norn-Branch-Commit`,
    * is not an ancestor of `head`): applied at the cursor it names, the step restarts as a new attempt
    */
   rewritten: Type.Optional(Type.Object({ gone: GitSha, head: GitSha }, { additionalProperties: false })),
   /**
-   * gh-195 B25 (D10): no record to take over (no `refs/norn/runs/<story>`, none here): the take is the first
-   * receipt of a new round started from the branch, fresh counters; false on a takeover from a record.
-   * Absent on a take an older norn wrote.
+   * No record to take over (no `refs/norn/runs/<story>`, none here): the take is the first
+   * receipt of a new round started from the branch, fresh counters; false on a takeover from a
+   * record. Absent = not recorded.
    */
   record_lost: Type.Optional(Type.Boolean()),
 });
 /**
- * BS9: `norn story update-branch <story>` — a person sends the story unit back to its base-update step (from a
- * gate, from stuck, from `$done` while the PR is unmerged, or from an agent step held by drifted skills (gh-61 B22).
- * Written before the state change (P6).
+ * `norn story update-branch <story>` — a person sends the story unit back to its base-update step
+ * (from a gate, from stuck, from `$done` while the PR is unmerged, or from an agent step held by
+ * drifted skills). Written before the state change.
  */
 export const UpdateReceipt = receipt("update", {
   /** the step left, or `$done` */
@@ -267,10 +262,10 @@ export const UpdateReceipt = receipt("update", {
   /** the step entered (the workflow's `base.step`) */
   to: StepName,
   reason: Type.Literal("person"),
-  /** gh-61 B22: the bundled skills that differed when the unit was held at an agent step (B18); the base brings them in */
+  /** The bundled skills that differed when the unit was held at an agent step; the base brings them in */
   skills_drift: Type.Optional(Type.Array(NonEmpty, { minItems: 1 })),
 });
-/** Journaled workflow switch (`norn story edit <unit> --workflow <name> --at <step>`, S7). */
+/** Journaled workflow switch (`norn story edit <unit> --workflow <name> --at <step>`). */
 export const WorkflowReceipt = receipt("workflow", {
   name: NonEmpty,
   from_hash: Type.Union([NonEmpty, Type.Null()]),
@@ -279,7 +274,7 @@ export const WorkflowReceipt = receipt("workflow", {
 });
 
 /**
- * gh-71 D1 (B1, B6, B9): `norn story edit <story> --workflow <name> [--at <step>]` on a story whose round is
+ * `norn story edit <story> --workflow <name> [--at <step>]` on a story whose round is
  * finished — written into the current round, applied by the next tick (rule `round.start`), which ends
  * that round and starts round N+1 of `workflow` at `to`. Rejected when the workflow file changed since.
  */
@@ -289,11 +284,11 @@ export const RoundReceipt = receipt("round", {
   workflow_hash: Type.String({ pattern: "^[0-9a-f]{64}$" }),
   /** the step the new round starts at: `--at`, else the workflow's start step */
   to: StepName,
-  /** `--force` on an unfinished round: the old round is ended by the person at `left_at` (gh-71 B11, RD3); false on a finished one (B14) */
+  /** `--force` on an unfinished round: the old round is ended by the person at `left_at`; false on a finished one */
   forced: Type.Boolean(),
   /** the step the old round is left at */
   left_at: Type.Union([StepName, Type.Literal("$done"), Type.Literal("$stuck")]),
-  /** gh-196 D3 (B34): why this workflow (`--reason`); the cli refuses `--delegated` without it, the schema does not require it */
+  /** Why this workflow (`--reason`); the cli refuses `--delegated` without it, the schema does not require it */
   comment: Type.Optional(Type.String()),
 });
 
@@ -357,5 +352,5 @@ export const RECEIPT_KINDS = [
 // RECEIPT_KINDS lists every kind: a kind added to `Receipt` but not here fails typecheck.
 const _allReceiptKinds: [Exclude<ReceiptKind, (typeof RECEIPT_KINDS)[number]>] extends [never] ? true : never = true;
 
-/** Receipts a non-holder may push through the mailbox (T9). */
+/** Receipts a non-holder may push through the mailbox. */
 export const MAILBOX_KINDS = ["answer", "approve", "reject", "unstick"] as const satisfies readonly ReceiptKind[];

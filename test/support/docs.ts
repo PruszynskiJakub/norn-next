@@ -1,5 +1,5 @@
 /**
- * The doc set and the doc-text helpers the repo lints share (gh-162 prefactor): which files are docs,
+ * The doc set and the doc-text helpers the repo lints share: which files are docs,
  * and how a line's prose is told from its URLs and inline code.
  */
 import { existsSync, readdirSync, statSync } from "node:fs";
@@ -22,15 +22,12 @@ export function textFiles(dir: string, exts: string[]): string[] {
   });
 }
 
-/** The rules file: every id'd rule. */
-export const RULES_FILE = ".agents/RULES.md";
-
 /** Docs for people: the README, CONTRIBUTING, everything under docs/ and the Herdr plugin's README. */
 export function userDocs(root: string): string[] {
   return [join(root, "README.md"), join(root, "CONTRIBUTING.md"), ...textFiles(join(root, "docs"), [".md"]), join(root, "plugins", "herdr", "README.md")];
 }
 
-/** Every doc a person or agent reads about norn: the user docs, AGENTS.md and the rules file. */
+/** Every doc a person or agent reads about norn: the user docs and AGENTS.md. */
 export function allDocs(root: string): string[] {
-  return [...userDocs(root), join(root, "AGENTS.md"), join(root, RULES_FILE)];
+  return [...userDocs(root), join(root, "AGENTS.md")];
 }

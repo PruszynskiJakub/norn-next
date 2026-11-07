@@ -89,7 +89,7 @@ describe("herdr runner", () => {
     expect(ref).toMatchObject({ runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1", process: { pid: 59610 } });
   });
 
-  test("a foreground group gone before it is identified is not a launch: keep waiting for the agent (R4.3)", async () => {
+  test("a foreground group gone before it is identified is not a launch: keep waiting for the agent", async () => {
     // the pane's zsh still reads its rc files: a subshell (conda activate) owns the foreground for a
     // moment and exits before `ps` sees it — then the launched command takes the foreground
     const rcSubshell = structuredClone(fx.process_info_idle);
@@ -110,8 +110,8 @@ describe("herdr runner", () => {
     expect(calls.some((c) => c.includes("close"))).toBe(false);
   });
 
-  test("a command that never takes the pane's foreground is a failed launch: screen in the reason, pane closed (R4.3, B2)", async () => {
-    // B2: a launch line longer than the tty's MAX_CANON, typed while the pane's zsh still read its
+  test("a command that never takes the pane's foreground is a failed launch: screen in the reason, pane closed", async () => {
+    // A launch line longer than the tty's MAX_CANON, typed while the pane's zsh still read its
     // rc files, is cut off and never runs — the shell stays in the foreground (screen derived from
     // the dogfood rerun's pane w15, paths scrubbed)
     const screen = readFileSync(join(import.meta.dir, "fixtures", "pane-launch-truncated.txt"), "utf8");
@@ -148,11 +148,11 @@ describe("herdr runner", () => {
     expect(c.calls).toEqual([["herdr", "pane", "send-text", "w1:p1", "partial"]]);
   });
 
-  test("capabilities: send, resume and open (R4.1, MO5)", () => {
+  test("capabilities: send, resume and open", () => {
     expect(createHerdrRunner({ exec: fakeExec([]).exec }).capabilities).toEqual({ send: true, resume: true, open: true });
   });
 
-  test("findSessions: agent panes whose cwd is the worktree, with pid and agent session (R5.1)", async () => {
+  test("findSessions: agent panes whose cwd is the worktree, with pid and agent session", async () => {
     const { exec, calls } = fakeExec([
       ["pane list", ok(fx.pane_list)],
       ["pane process-info", ok(fx.process_info_busy)],
@@ -198,7 +198,7 @@ describe("herdr runner", () => {
     expect(await createHerdrRunner({ exec: gone.exec }).paneState(session)).toEqual({ alive: false, state: "unknown", since: null });
   });
 
-  test("paneState parses the prompt off a recorded permission dialog (R6.2, L1)", async () => {
+  test("paneState parses the prompt off a recorded permission dialog (L1)", async () => {
     const session: SessionRef = { runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1" };
     const screen = pane("pane-permission-prompt.txt");
     const blocked = fakeExec([
@@ -216,7 +216,7 @@ describe("herdr runner", () => {
     expect(blocked.calls.at(-1)).toEqual(["herdr", "pane", "read", "w1:p1", "--source", "visible", "--lines", "30"]);
   });
 
-  test("sendKeys types text and presses named keys in the pane; reach is the attach command (R6.2, R6.3)", async () => {
+  test("sendKeys types text and presses named keys in the pane; reach is the attach command", async () => {
     const session: SessionRef = { runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1" };
     const { exec, calls } = fakeExec([
       ["--session norn pane send-text", empty],
@@ -262,7 +262,7 @@ describe("herdr runner", () => {
   });
 });
 
-describe("herdr openForPerson (MO5, norn open)", () => {
+describe("herdr openForPerson (norn open)", () => {
   const runner = (exec: Exec) => createHerdrRunner({ exec, process: fakeProcess() });
 
   test("a focused tab in the workspace on the worktree, running the start command", async () => {
@@ -288,7 +288,7 @@ describe("herdr openForPerson (MO5, norn open)", () => {
 
 const pane = (name: string) => readFileSync(join(import.meta.dir, "fixtures", name), "utf8");
 
-describe("parsePanePrompt (recorded Claude Code dialogs in herdr panes, A4, A7)", () => {
+describe("parsePanePrompt (recorded Claude Code dialogs in herdr panes)", () => {
   test("trust dialog: unnumbered menu, answered by arrows from the cursor", () => {
     expect(parsePanePrompt(pane("pane-trust-dialog.txt"))).toEqual({
       question:

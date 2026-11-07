@@ -89,7 +89,7 @@ describe("observe snapshots and inbox parity (refactor Phase 0.3)", () => {
   };
 
   beforeAll(async () => {
-    // gh-61 D5: a fixed binary version, recorded as the repo's, so the Facts' \`norn\` part does not move with each release
+    // A fixed binary version, recorded as the repo's, so the Facts' \`norn\` part does not move with each release
     h = await createHarness({ version: "0.19.0" });
     expect((await h.norn("init")).exit).toBe(0);
     h.config(CONFIG);

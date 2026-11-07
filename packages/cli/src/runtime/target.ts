@@ -1,11 +1,9 @@
 /**
- * The unit a verb acts on (B54–B60). An explicit target wins (B56); without one, the unit of the
- * worktree the verb is typed in (B54); elsewhere a person at a terminal picks from the units the
- * verb applies to, in `norn status` order, the first preselected even when it is the only one (B57,
- * B58). No applicable unit is a refusal with the reason (B59); a script or an agent — `--json`, no
- * TTY, an agent session (D2) — is refused with the candidates and never prompted (B60).
- *
- * Each verb says which units it applies to (`applies`) and why none does (`none`); later verbs reuse this.
+ * The unit a verb acts on. An explicit target wins; without one, the unit of the
+ * worktree the verb is typed in; elsewhere a person at a terminal picks from the units the
+ * verb applies to, in `norn status` order, the first preselected even when it is the only one.
+ * No applicable unit is a refusal with the reason; a script or an agent — `--json`, no
+ * TTY, an agent session — is refused with the candidates and never prompted.
  */
 import type { ProjectView, SliceView, StoryView } from "@norn/view";
 import { inboxItemsInOrder, loadRunView, stepTitle } from "@norn/view";
@@ -23,9 +21,9 @@ export interface TargetRule {
   applies(key: string, unit: StoryView | SliceView | undefined): boolean;
   /** why no unit applies, e.g. `No unit has a run yet` */
   none: string;
-  /** the verb on one unit, as printed (`cmd.runView`) */
+  /** the verb on one unit, as printed */
   command(key: string): string;
-  /** B55: a story-only verb — in a slice worktree it acts on the slice's story */
+  /** A story-only verb — in a slice worktree it acts on the slice's story */
   story?: boolean;
   /** the units offered, when they are not in the read model (`story reopen`: closed stories); `applies` is then unused */
   candidates?: () => Promise<InteractionChoice[]>;
@@ -35,7 +33,7 @@ export interface TargetRule {
 function unitsInStatusOrder(view: ProjectView): InteractionChoice[] {
   const out = new Map<string, string>();
   for (const i of inboxItemsInOrder(view)) {
-    if (i.story === "*") continue; // a repo-level item (heartbeat, gh-61 norn version) names no unit
+    if (i.story === "*") continue; // a repo-level item (heartbeat, norn version) names no unit
     const key = i.slice ?? i.story;
     if (!out.has(key)) out.set(key, `${key}  ${stepTitle(i.step, i.title)}`);
   }
@@ -80,12 +78,12 @@ export function inState(verb: string, command: (key: string) => string, none: st
   return { verb, command, none, applies: (_key, u) => !!u && ok(u) };
 }
 
-/** B55: a story verb (`story view`, `chat`, `checkout`, `handoff`, `close`) applies to every story, never to a slice. */
+/** A story verb (`story view`, `chat`, `checkout`, `handoff`, `close`) applies to every story, never to a slice. */
 export function aStory(verb: string, command: (key: string) => string): TargetRule {
   return { verb, command, none: "No story yet", story: true, applies: (key) => !key.includes("/") };
 }
 
-/** B55: the story a team verb (`story checkout`, `handoff`, `close`) acts on; a slice key, or a slice worktree, means the slice's story. */
+/** The story a team verb (`story checkout`, `handoff`, `close`) acts on; a slice key, or a slice worktree, means the slice's story. */
 export async function resolveStory(ctx: Context, explicit: string | undefined, json: boolean, rule: TargetRule): Promise<string> {
   return storyArg(await targetKey(ctx, explicit, json, rule), rule.verb);
 }

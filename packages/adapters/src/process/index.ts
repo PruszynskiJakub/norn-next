@@ -1,5 +1,5 @@
 /**
- * ProcessPort (ports.ts): liveness by PID + start time (K3, MO3). The start time and the zombie
+ * ProcessPort: liveness by PID + start time. The start time and the zombie
  * rule come from store's one `ps -o stat= -o lstart=` parser (`parseStart`), shared with the
  * leases and locks, so both agree: a zombie is dead. The start time is kept opaque — only
  * compared for equality, so a reused PID never looks like the original process.
@@ -13,7 +13,7 @@ export { type Exec, type ExecOptions, type ExecResult, bunExec, portError, shell
 export { parseStart, psStartArgv } from "@norn/store";
 
 /**
- * R5.1: every process with its environment appended to the command line. macOS (BSD ps) prints
+ * Every process with its environment appended to the command line. macOS (BSD ps) prints
  * the environment with `-E`; procps (Linux) with the BSD-style `e` flag. Only processes this user
  * may inspect show it — elsewhere the env is simply absent (no match, never an error).
  */

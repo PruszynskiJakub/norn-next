@@ -1,5 +1,5 @@
 /**
- * Prompts the agent is blocked on, and launch prompts that never arrive (§13.1):
+ * Prompts the agent is blocked on, and launch prompts that never arrive:
  *   - R6.1: an implicit ask ends when the pane leaves `waiting_input` or a newer hook arrives —
  *     an `answer` receipt `by: "agent"`, nothing typed; explicit asks wait for the person
  *   - R6.2: answers to pane prompts become keystrokes (option number / arrows + enter)
@@ -65,7 +65,7 @@ describe("R6.2: answers become the keys a prompt expects", () => {
   });
 });
 
-describe("§10 implicit ask from a pane prompt (L1, R6.2)", () => {
+describe("§10 implicit ask from a pane prompt (L1)", () => {
   test("parks with the question block, first command line, options, choice and the screen", () => {
     const st = parkedOnPrompt();
     expect(st.park).toMatchObject({ kind: "ask", reason: "Do you want to proceed?", command: "rm -rf build", implicit: "pane", options: ["Yes", "No"], choice: { numbered: true, cursor: 0 }, screen: SCREEN });

@@ -1,11 +1,11 @@
 /**
- * The cockpit (`status --watch`), `status`, `story list`, `story view` and `status --segment` read no trace day file (B1, B2, D1): the
+ * The cockpit (`status --watch`), `status`, `story list`, `story view` and `status --segment` read no trace day file: the
  * project view carries no timeline, so what they show is the same over a trace of several days and
  * over an empty one. The trace-read observer (store) sees every day file a reader opens.
  *
  * The days here are older than the hook-fact window (no live run, last hook beyond `limits.stalled`):
  * the hook-fact read of local facts still scans day files within that window until hooks move to
- * per-unit files (B8).
+ * per-unit files.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { copyFileSync, mkdirSync, readdirSync, renameSync } from "node:fs";
@@ -71,8 +71,8 @@ const views = {
   "story view gh-7": () => h.norn("story", "view", "gh-7", "--json"),
 };
 
-describe("views that read no trace (B1, B2)", () => {
-  test("norn status --watch --json and a refreshing cockpit open no day file (B1)", async () => {
+describe("views that read no trace", () => {
+  test("norn status --watch --json and a refreshing cockpit open no day file", async () => {
     expect(await opened(() => runCli(["status", "--watch", "--json"], { ...h.deps, herdr: null }))).toEqual([]);
     let frames = 0;
     expect(
@@ -84,7 +84,7 @@ describe("views that read no trace (B1, B2)", () => {
     expect(frames).toBeGreaterThanOrEqual(3); // it refreshed
   });
 
-  test("story list, status --segment, status and story view open no day file and print the same as over an empty trace (B2)", async () => {
+  test("story list, status --segment, status and story view open no day file and print the same as over an empty trace", async () => {
     const full: Record<string, unknown> = {};
     for (const [name, run] of Object.entries(views)) {
       let out: unknown;

@@ -1,10 +1,10 @@
 /**
- * `norn brief [--json]` (B3–B6, MO3): render the briefing of the cursor step from data only.
- * It prints the briefing as markdown, for the agent; `--json` keeps the machine contract (P8)
+ * `norn brief [--json]`: render the briefing of the cursor step from data only.
+ * It prints the briefing as markdown, for the agent; `--json` keeps the machine contract
  * with the run, the markdown and the data.
  * In a unit worktree with no live run for the step, the first brief starts the run: it writes
  * a `started` receipt (run_id, session, PID) that the next tick applies. The exact briefing of
- * every run is stored in the trace (B4) and linked from it by a `briefing` event (O4).
+ * every run is stored in the trace and linked from it by a `briefing` event.
  */
 import { readdirSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -31,7 +31,7 @@ function parentOf(pid: number): { ppid: number; comm: string } | null {
 }
 
 /**
- * MO3: the agent process that ran `norn brief` — the first ancestor that is not a shell or
+ * The agent process that ran `norn brief` — the first ancestor that is not a shell or
  * launcher wrapper. `NORN_AGENT_PID` overrides (wrappers, tests).
  */
 async function agentProcess(ctx: Context, proc: ProcessPort): Promise<ProcessIdentity | null> {
@@ -74,11 +74,11 @@ async function startRun(ctx: Context, s: UnitSession, step: AgentStep): Promise<
   if (process) receipt.process = process;
   if (s.state.retries_used > 0) receipt.retry = true;
   if (s.unit.slice) receipt.slice = s.unit.slice;
-  appendReceipt(s.runsDir, receipt); // P6: receipt first; the tick applies it (S6)
+  appendReceipt(s.runsDir, receipt); // Receipt first; the tick applies it
   return run_id;
 }
 
-/** Full log of the latest failing check (C5), when committed; the brief uses it only if that check is the rework (B6). */
+/** Full log of the latest failing check, when committed; the brief uses it only if that check is the rework. */
 function checkLog(s: UnitSession): { log: string; text: string } | null {
   const last = s.receipts.findLast((r: NumberedReceipt) => r.receipt.kind === "check" && r.receipt.outcome === "fail");
   const log = last?.receipt.kind === "check" ? last.receipt.log : undefined;
@@ -86,7 +86,7 @@ function checkLog(s: UnitSession): { log: string; text: string } | null {
   return log && text !== null ? { log, text } : null;
 }
 
-/** Files in each evidence folder of the unit's receipts, so Rework can list them (B3); renderBrief stays pure. */
+/** Files in each evidence folder of the unit's receipts, so Rework can list them; renderBrief stays pure. */
 function evidenceFiles(s: UnitSession): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   for (const { receipt: r } of s.receipts) {
@@ -101,8 +101,8 @@ function evidenceFiles(s: UnitSession): Record<string, string[]> {
 }
 
 /**
- * F28/O2: the story's gate rulings, from the receipts of every unit of the story this machine holds
- * (S12: all in the checkout's machine dir). The gate receipt is the record; renderBrief stays pure.
+ * The story's gate rulings, from the receipts of every unit of the story this machine holds
+ * (all in the checkout's machine dir). The gate receipt is the record; renderBrief stays pure.
  */
 function rulings(s: UnitSession): Ruling[] {
   const units: Array<{ unit: string; receipts: NumberedReceipt[] }> = [];
@@ -115,8 +115,7 @@ function rulings(s: UnitSession): Ruling[] {
 
 /**
  * Every unit of the story's record, its folder name and its run-state folder (the story's current
- * round for `_story`). S12 (gh-195/05): every unit's run state of the story is in this checkout's
- * machine dir, whichever worktree.
+ * round for `_story`), all in this checkout's machine dir, whichever worktree.
  */
 function storyRecord(s: UnitSession): Array<{ unit: string; dir: string }> {
   const run = { key: s.unit.story, spec_dir: s.marker.spec_dir };
@@ -131,7 +130,7 @@ function storyRecord(s: UnitSession): Array<{ unit: string; dir: string }> {
 
 /** `<remote>/<base>` when the remote-tracking base exists, else the local base branch (solo). */
 function storyDiffBase(ctx: Context, root: string): string {
-  // BS0: config `base_branch` when set, else the discovered default branch
+  // Config `base_branch` when set, else the discovered default branch
   const branch = ctx.config.base_branch ?? readRemoteCache(root).default_branch ?? "main";
   const ref = defaultBaseRef(root, ctx.config.git_remote, branch);
   return ref ? ref.slice("refs/remotes/".length) : branch;
@@ -140,7 +139,7 @@ function storyDiffBase(ctx: Context, root: string): string {
 export const briefCommand = defineCommand({
   name: "brief",
   version: "acts",
-  summary: "Brief the agent on the current step of this worktree's unit; starts the run in manual mode (B3, MO3)",
+  summary: "Brief the agent on the current step of this worktree's unit; starts the run in manual mode",
   usage: "norn brief [--json]",
   markdown: true,
   async run(ctx, args) {
@@ -153,7 +152,7 @@ export const briefCommand = defineCommand({
     if (run) {
       const report = standingReport(s, run.run_id);
       if (report) throw refuse(`this run already reported \`${reportCommand(report.receipt)}\`; exactly one report per run`, "end your turn", "already_reported");
-      refuseForeignSession(ctx, s, run.run_id, "brief"); // MO3: never join another session's run
+      refuseForeignSession(ctx, s, run.run_id, "brief"); // Never join another session's run
     }
     const pending = s.unapplied.filter((r) => r.receipt.kind !== "started" && r.receipt.kind !== "mode");
     if (pending.length) throw refuse(`unit ${key} has receipts the heartbeat has not applied yet (${pending.map((r) => r.receipt.kind).join(", ")})`, `${cmd.tick()}, then run ${cmd.brief()} again`, "pending_receipts");
@@ -172,7 +171,7 @@ export const briefCommand = defineCommand({
     const num = (v: string | undefined) => (v !== undefined && /^\d+$/.test(v) ? Number(v) : null);
     const slicePath = s.unit.slice ? `${s.marker.spec_dir}/slices/${s.unit.dir}.md` : null;
     const slug = s.marker.spec_dir.split("/").at(-1)?.slice(s.unit.story.length + 1) ?? "";
-    // F33: a story diffs against the fetched base (`origin/main`), never the main checkout's stale local `main`
+    // A story diffs against the fetched base (`origin/main`), never the main checkout's stale local `main`
     const base = s.unit.slice ? storyBranch(s.unit.story, slug) : storyDiffBase(ctx, s.root);
     const state = run.applied ? s.state : { ...s.state, run: { run_id: run.run_id, step: s.state.step, attempt: s.state.attempt, started_at: ctx.clock.iso(), how: "manual" as const } };
     const briefing = renderBrief({
@@ -189,7 +188,7 @@ export const briefCommand = defineCommand({
         unit_dir: s.runsDir,
       },
       diff_range: `${base}...HEAD`,
-      // S9: the agent-written part only; the generated header and heartbeat are not for the agent
+      // The agent-written part only; the generated header and heartbeat are not for the agent
       handoff: readHandoff(s.handoffFile)?.body ?? null,
       receipts: s.receipts,
       limits: {
@@ -204,12 +203,11 @@ export const briefCommand = defineCommand({
       rulings: rulings(s),
       criteria: unitCriteria(s),
       record: storyRecord(s),
-      // QV5a: what this run's agent may `pass`
     });
-    // B4: the exact briefing of every run, in the trace
+    // The exact briefing of every run, in the trace
     const id = ulid(ctx.clock.now());
     const stored = writeBriefing(s.root, run.run_id, id, briefing.markdown);
-    // O4: link the run to its briefing in the trace (`norn run list <unit>` shows it)
+    // Link the run to its briefing in the trace (`norn run list <unit>` shows it)
     appendTrace(s.root, traceEvent("briefing", ctx.clock.now(), { id, unit: key, run_id: run.run_id, step: s.state.step, attempt: s.state.attempt, briefing: stored }));
     return rendered({ unit: key, step: s.state.step, attempt: s.state.attempt, run_id: run.run_id, started, briefing: stored, markdown: briefing.markdown, brief: briefing.json }, briefing.markdown);
   },

@@ -1,5 +1,5 @@
 /**
- * gh-195/09 (B15, B16, B33, B11; D4): every claim release (`norn story handoff`, a clean `watch` exit,
+ * Every claim release (`norn story handoff`, a clean `watch` exit,
  * `norn story close`) pushes the story's branches and then its record to `refs/norn/runs/<story>`
  * before the claim ref goes, under either policy. A rejected record push releases nothing.
  * The order is what the bare remote received, logged by a real `post-receive` hook; a rejection is a

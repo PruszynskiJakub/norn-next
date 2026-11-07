@@ -1,5 +1,5 @@
 /**
- * Exclusive lock files with dead-holder reclaim (H1 tick lock; shared by leases, K3).
+ * Exclusive lock files with dead-holder reclaim (the tick lock; leases share it).
  * A holder is a process identity (pid + start time); a lock whose holder is dead —
  * or whose content is unreadable — is reclaimed.
  */
@@ -91,7 +91,7 @@ export type LockResult =
   | { ok: true; path: string; content: LockContent; release: () => boolean; reclaimed: LockContent | null }
   | { ok: false; path: string; holder: LockContent };
 
-/** S2: a lock of the wrong shape is unreadable (reclaimed); the raw text is kept for removeIfUnchanged. */
+/** A lock of the wrong shape is unreadable (reclaimed); the raw text is kept for removeIfUnchanged. */
 function parseLock(raw: string | null): LockContent | null {
   if (raw === null) return null;
   const r = parseLocalJson("local-lock", raw);
@@ -132,12 +132,12 @@ export async function acquireLock(path: string, opts: LockOptions = {}): Promise
   return { ok: false, path, holder: cur ?? { holder: { pid: 1, pid_start: "unknown" }, acquired_at: "" } };
 }
 
-/** The local tick lock (H1) in the machine dir (`tick.lock`, B5). */
+/** The local tick lock in the machine dir (`tick.lock`). */
 export function acquireTickLock(repoRoot: string, opts: LockOptions = {}): Promise<LockResult> {
   return acquireLock(tickLockPath(repoRoot), opts);
 }
 
-/** K6/BS3: the story's integrate lock in the machine dir (`integrate-<story>.lock`). */
+/** The story's integrate lock in the machine dir (`integrate-<story>.lock`). */
 export function acquireIntegrateLock(repoRoot: string, story: string, opts: LockOptions = {}): Promise<LockResult> {
   return acquireLock(integrateLockPath(repoRoot, story), opts);
 }

@@ -1,7 +1,7 @@
 /**
- * gh-252 (SK1): a unit whose worktree holds bundled skills that differ from the running norn's runs
+ * A unit whose worktree holds bundled skills that differ from the running norn's runs
  * as any other: its agent steps start with the worktree's copies, its gates, checks and base syncs
- * go on, and the inbox shows the difference as a Check item. Hand-built Facts (S3).
+ * go on, and the inbox shows the difference as a Check item. Hand-built Facts.
  */
 import { describe, expect, test } from "bun:test";
 import type { Workflow } from "@norn/schema";
@@ -42,7 +42,7 @@ function driftedStory(wf: Workflow, patch: Parameters<typeof stateFor>[2], uf: P
   return facts([storyFacts("gh-1", [unitFacts(u, wf, st, { skills_drift: DRIFT, ...uf })], { frontmatter: { ...fm, workflow: wf.name, refined_body_hash: fm.body_hash }, ...sf })], { norn: NORN });
 }
 
-describe("drifted skills hold nothing (gh-252, SK1)", () => {
+describe("drifted skills hold nothing", () => {
   test("a drifted slice is launched like its sibling", () => {
     const ds = decide(twoSlices(["01"]), WORKFLOWS, CONFIG);
     expect(of(ds, "gh-1/01")?.kind).toBe("start_run");
@@ -103,7 +103,7 @@ describe("drifted skills hold nothing (gh-252, SK1)", () => {
   });
 });
 
-describe("drifted skills in the inbox (gh-252, gh-61 B21)", () => {
+describe("drifted skills in the inbox", () => {
   test("a drifted unit is a Check item, never Unblock", () => {
     const inbox = buildInbox(twoSlices(["01"]), CONFIG);
     const items = inbox.groups.check.filter((i) => i.slice === "gh-1/01");

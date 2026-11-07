@@ -1,9 +1,9 @@
 /**
- * `norn config set <key> <value>` and `norn config unset <key>` (B62–B68, gh-64 D4): one value in
+ * `norn config set <key> <value>` and `norn config unset <key>`: one value in
  * the user (`~/.norn/config.yaml`), local (`.agents/norn.config.local.yaml`) or team
  * (`.agents/norn.config.yaml`) file, edited in place. A key the file does not take is refused
  * (`config_wrong_file`, `config_moved`). Without `--user`/`--local`/`--repo` a person at a terminal
- * is asked which file (B64); anywhere else it is a usage error (B65).
+ * is asked which file; anywhere else it is a usage error.
  */
 import { relative } from "node:path";
 import { CONFIG_FILES, configKeyProblem } from "@norn/schema";
@@ -61,12 +61,12 @@ export const configUnsetCommand = defineCommand({
   },
 });
 
-/** gh-61 D4, K8: `norn_version` is written by `norn upgrade` and `norn init` only; hand-editing stays the escape hatch (B17). */
+/** `norn_version` is written by `norn upgrade` and `norn init` only; hand-editing stays the escape hatch. */
 function refuseWrittenByNorn(key: string): void {
   if (key === "norn_version") throw refuse("`norn_version` is written by norn upgrade, which moves the skills and files with it", cmd.upgrade(), "written_by_norn");
 }
 
-/** The file flag, else the person's pick at a terminal (B64), else a usage error (B65). */
+/** The file flag, else the person's pick at a terminal, else a usage error. */
 async function layerFile(ctx: Context, args: ParsedArgs, verb: string): Promise<ConfigLayerName> {
   const flags = (["user", "local", "repo"] as const).filter((f) => opt.bool(args, f));
   if (flags.length > 1) throw usageError(`${flags.map((f) => `--${f}`).join(" and ")} together: pick one file`, PASS_FILE);
@@ -89,7 +89,7 @@ function edit(ctx: Context, file: ConfigLayerName, key: string, change: { set: s
   return r;
 }
 
-/** D4: the same edit in the file that takes the key, so the refusal says where it goes. */
+/** The same edit in the file that takes the key, so the refusal says where it goes. */
 function inRightFile(key: string, change: { set: string } | { unset: true }): string {
   const right = (["user", "local", "repo"] as const).find((f) => configKeyProblem(f, key) === null);
   if (!right) return cmd.config();

@@ -1,5 +1,5 @@
 /**
- * K7: what `norn tidy` closes in Herdr — the pane each finished run left behind. A run counts only
+ * What `norn tidy` closes in Herdr — the pane each finished run left behind. A run counts only
  * when it reported `done` (an ask, a stuck or any other end is left for a person), its `started`
  * receipt recorded a Herdr pane, and it ran on this machine (pane ids are local to a Herdr server).
  * The pane is found by its recorded id and must still work in the run's worktree, so a pane id Herdr

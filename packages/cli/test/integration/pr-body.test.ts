@@ -1,5 +1,5 @@
 /**
- * GR9: the story PR body is the agent's `pr.md` in the spec folder with the issue link under it;
+ * The story PR body is the agent's `pr.md` in the spec folder with the issue link under it;
  * without the file it is the link alone, and a PR already open gets the new body after rework.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -74,7 +74,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("story PR body (GR9)", () => {
+describe("story PR body", () => {
   const link = () => `Closes ${issue(7, "Count items").url}\n\nDelivered by norn (story gh-7).`;
 
   test("no pr.md: the draft PR body is the issue link alone", async () => {
@@ -92,7 +92,7 @@ describe("story PR body (GR9)", () => {
     const n = h.remote.prs[0]!.number;
     expect(h.remote.calls).toContain(`pr~ ${n}`);
     expect(h.remote.bodies.get(n)).toBe(`## Summary\n\ncount items\n\n---\n\n${link()}`);
-    // the body file is the agent's work: committed with the step (S8)
+    // the body file is the agent's work: committed with the step
     expect(h.git(["status", "--porcelain"], wt())).toBe("");
   });
 });

@@ -2,8 +2,8 @@
  * Helpers shared by the agent adapters (claude, codex, gemini, opencode). Claude Code, Codex and
  * Gemini CLI all use the same hook config shape:
  *   { "hooks": { "<Event>": [ { "matcher"?: "...", "hooks": [ { "type": "command", "command": "..." } ] } ] } }
- * so one merge/unmerge implementation serves all three (A1). Settings files are written through
- * store's atomicWrite (S1).
+ * so one merge/unmerge implementation serves all three. Settings files are written through
+ * store's atomicWrite.
  */
 import { readFile } from "node:fs/promises";
 import type { HookFact, HookEventKind } from "@norn/schema";
@@ -12,16 +12,14 @@ import type { AgentLaunchRequest } from "@norn/core";
 import { atomicWrite, json, readText } from "@norn/store";
 import { portError } from "../exec.ts";
 
-/** A1: every norn-installed hook command ends with this shell comment; it is the ownership marker. */
+/** Every norn-installed hook command ends with this shell comment; it is the ownership marker. */
 const NORN_HOOK_MARKER = "# norn-owned";
-
-// ------------------------------------------------------------------ files
 
 export type JsonObject = Record<string, unknown>;
 
 const isObject = (v: unknown): v is JsonObject => typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** Read a JSON object file; missing → {}; invalid → PortError (never guess, S2). */
+/** Read a JSON object file; missing → {}; invalid → PortError (never guess). */
 export function readJsonObject(path: string): JsonObject {
   const text = readText(path);
   if (text === null || text.trim() === "") return {};
@@ -35,15 +33,13 @@ export function readJsonObject(path: string): JsonObject {
   return v;
 }
 
-/** Write `next` if its serialization differs from the file (atomically, S1); returns true when written. */
+/** Write `next` atomically if its serialization differs from the file; returns true when written. */
 export function writeJsonIfChanged(path: string, next: JsonObject): boolean {
   const text = json(next);
   if (readText(path) === text) return false;
   atomicWrite(path, text);
   return true;
 }
-
-// ------------------------------------------------------------------ hook config merge
 
 export interface HookSpec {
   /** native event name, e.g. `Stop` */
@@ -94,7 +90,7 @@ export function removeNornHooks(settings: JsonObject, which: (event: string) => 
 }
 
 /**
- * Add or update norn hooks (A1). An existing norn group is replaced at its position, new ones are
+ * Add or update norn hooks. An existing norn group is replaced at its position, new ones are
  * appended after the user's groups; norn entries under events no longer installed are removed.
  * User hooks are untouched. Idempotent and pure.
  */
@@ -142,8 +138,6 @@ export function jsonHookInstaller(adapterName: string, settingsPath: (repoRoot: 
   };
 }
 
-// ------------------------------------------------------------------ hook facts
-
 const str = (v: unknown): string | undefined => (typeof v === "string" && v.length > 0 ? v : undefined);
 export const field = (payload: unknown, key: string): string | undefined => (isObject(payload) ? str(payload[key]) : undefined);
 export const objField = (payload: unknown, key: string): JsonObject | undefined =>
@@ -152,7 +146,7 @@ export const objField = (payload: unknown, key: string): JsonObject | undefined 
 const match = (pattern: string, v: string | undefined) => (v !== undefined && new RegExp(pattern).test(v) ? v : undefined);
 
 /**
- * Build a validated HookFact. Story/slice/run come from the launch env (A6) and are dropped
+ * Build a validated HookFact. Story/slice/run come from the launch env and are dropped
  * when malformed. Returns null when no cwd is known or the fact does not validate.
  */
 export function buildFact(
@@ -189,9 +183,7 @@ export function nativeEvent(arg: string, payload: unknown, natives: readonly str
   return natives.find((n) => n === arg || kebab(n) === arg);
 }
 
-// ------------------------------------------------------------------ launch + transcripts
-
-/** Common env merge for launchCommand: config env, then norn env (A6) wins. */
+/** Common env merge for launchCommand: config env, then norn env wins. */
 export const launchEnv = (req: AgentLaunchRequest) => ({ ...(req.config.env ?? {}), ...req.env });
 
 /** Read a JSONL file; unparsable lines are skipped. null if the file is unreadable. */

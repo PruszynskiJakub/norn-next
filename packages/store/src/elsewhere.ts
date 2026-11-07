@@ -1,9 +1,9 @@
 /**
- * gh-195 D6 (B10, B13, B17–B19, B30): stories another heartbeat holds that this checkout has no copy of.
- * A story with a claim is open: the claim goes when the story finishes (GR6, GR6b) or is handed over.
+ * Stories another heartbeat holds that this checkout has no copy of.
+ * A story with a claim is open: the claim goes when the story finishes or is handed over.
  * The tick fetches, for each one, its story branch and its record ref `refs/norn/runs/<story>`
  * (`fetchElsewhere`), and nothing else under `refs/norn/runs/`. Views read what is local and write
- * nothing (H2): the claim ref, the remote-tracking story branch (its spec, its last commit and its last
+ * nothing: the claim ref, the remote-tracking story branch (its spec, its last commit and its last
  * boundary commit) and the record ref, read from git objects into memory (`readRecordObjects`).
  */
 import type { ClaimState, FileError } from "@norn/core";
@@ -17,7 +17,7 @@ export type ElsewhereClaim = Extract<ClaimState, { blob: ClaimBlob }>;
 
 /**
  * The story keys whose local claim another heartbeat holds (live or expired), other than `known` (the
- * stories this checkout has). Judged by heartbeat (ID2): another clone of the same `user@host` is
+ * stories this checkout has). Judged by heartbeat: another clone of the same `user@host` is
  * another checkout, its stories held elsewhere too.
  */
 export async function heldElsewhereKeys(root: string, me: { heartbeat_id: string | null }, now: number, known: ReadonlySet<string>): Promise<Array<{ key: string; claim: ElsewhereClaim }>> {
@@ -33,7 +33,7 @@ export async function heldElsewhereKeys(root: string, me: { heartbeat_id: string
 }
 
 /**
- * B30 (D6): fetch what a non-holder needs of `stories`: each one's story branch (`<story>-<slug>`)
+ * Fetch what a non-holder needs of `stories`: each one's story branch (`<story>-<slug>`)
  * into the remote-tracking refs, and its record ref when the remote has one. One `ls-remote` of the
  * record names, then one fetch; never all of `refs/norn/runs/*`. Throws on a failed `ls-remote` or fetch.
  */
@@ -51,13 +51,13 @@ export async function fetchElsewhere(root: string, remote: string, stories: read
 /** The record ref as this checkout has it: its commit, time, holder trailer and units. */
 export interface RecordRead {
   sha: string;
-  /** ISO commit time: what "record as of" shows (B13) */
+  /** ISO commit time: what "record as of" shows */
   at: string;
   /** `Norn-Holder` trailer; null = none */
   holder: string | null;
   /** the story unit first, then slices by folder */
   units: RecordObjectUnit[];
-  /** files of the record that failed its checks (S2); their units are left out of `units` */
+  /** files of the record that failed its checks; their units are left out of `units` */
   errors: FileError[];
 }
 
@@ -69,7 +69,7 @@ export interface ElsewhereStory {
   frontmatter: StoryFrontmatter | null;
   /** the remote-tracking story branch's head */
   head: { sha: string; subject: string; at: string } | null;
-  /** B18, B19: the step the story's last boundary commit ended (`Norn-Step` of a commit with `Norn-Outcome`); null = none pushed yet */
+  /** The step the story's last boundary commit ended (`Norn-Step` of a commit with `Norn-Outcome`); null = none pushed yet */
   last_boundary: string | null;
   /** the local record ref; null = none here */
   record: RecordRead | null;
@@ -92,18 +92,18 @@ function trailers(block: string): Array<[string, string]> {
     .map((m) => [m[1] as string, m[2] as string]);
 }
 
-/** A story unit's last boundary commit: the step it ended and, from its `Norn-Next` (gh-195 B20), the step it led to (null = a commit an older norn made). */
+/** A story unit's last boundary commit: the step it ended and, from its `Norn-Next`, the step it led to (null = a commit an older norn made). */
 export interface LastBoundary {
   ended: string;
   next: string | null;
 }
 
 /**
- * B18–B20 (S4): the story unit's last boundary commit — the newest commit on `ref` (past `base`, when
+ * The story unit's last boundary commit — the newest commit on `ref` (past `base`, when
  * given) with `Norn-Story: <key>`, no `Norn-Slice` and a `Norn-Outcome`, which only a commit that ends a
  * step carries (not a start, a session start, a mirror, a wait for input or a round start). Null = no
  * boundary pushed yet. `strict`: a failing `git log` throws instead of reading as no boundary
- * (gh-195/11 review#1 S4: a takeover with the record lost must not restart at the first step on a guess).
+ * (a takeover with the record lost must not restart at the first step on a guess).
  */
 export async function lastBoundary(root: string, ref: string, key: string, base: string | null, opts: { strict?: boolean } = {}): Promise<LastBoundary | null> {
   const r = await git(root, ["log", "--format=%x1e%(trailers:only,unfold)", "--grep=^Norn-Outcome: ", ref, ...(base ? ["--not", base] : [])]);

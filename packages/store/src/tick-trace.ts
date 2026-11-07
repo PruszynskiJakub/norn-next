@@ -1,9 +1,9 @@
 /**
- * Tick records and their replay inputs (O4, O5). A tick line keeps its decisions inline and stores its
- * facts as a skeleton marked `"$chunked": 1` (D6): each large part is replaced by `{"$chunk": <hash>}`
+ * Tick records and their replay inputs. A tick line keeps its decisions inline and stores its
+ * facts as a skeleton marked `"$chunked": 1`: each large part is replaced by `{"$chunk": <hash>}`
  * and each run's hook list by `{"$blocks": [<hash>, …]}`, the values living once in the day's chunks
  * file `<day>.chunks.jsonl` beside the day file, one `{"h": <sha256 of the value's JSON>, "v": <value>}`
- * per line (D8). A tick line without the marker is a full-facts tick an older norn wrote (B18).
+ * per line. A tick line without the marker is a full-facts tick an older norn wrote.
  */
 import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -14,32 +14,32 @@ import { machineDir } from "./paths.ts";
 import { appendTrace, readTraceFile, traceFileName } from "./trace.ts";
 import { parseWorkflowText, sha256 } from "./unit.ts";
 
-/** decide's inputs as a tick recorded them (O5). */
+/** decide's inputs as a tick recorded them. */
 export interface TickInputs {
   facts: Facts;
   workflows: RepoWorkflows;
   config: ResolvedConfig;
 }
 
-/** A workflow in a full-facts tick's replay block: the hash of its text stored at `trace/workflows/<hash>.yaml` (D9). */
+/** A workflow in a full-facts tick's replay block: the hash of its text stored at `trace/workflows/<hash>.yaml`. */
 export interface ReplayWorkflowRef {
   hash: string | null;
   issues: LoadedWorkflow["issues"];
 }
 
-/** What a full-facts tick records beside its facts so `norn run view --why` can replay decide on the same inputs (O5). */
+/** What a full-facts tick records beside its facts so `norn run view --why` can replay decide on the same inputs. */
 export interface ReplayBlock {
   workflows: Record<string, ReplayWorkflowRef>;
   config: ResolvedConfig;
 }
 
-/** A chunked tick's replay block: each workflow's source is a chunk of the day (D9). */
+/** A chunked tick's replay block: each workflow's source is a chunk of the day. */
 interface ChunkedReplay {
   workflows: Record<string, { source: string; issues: LoadedWorkflow["issues"] }>;
   config: ResolvedConfig;
 }
 
-/** Hook facts per block (D7): blocks are cut by position in the run's hook list, so full ones never change. */
+/** Hook facts per block: blocks are cut by position in the run's hook list, so full ones never change. */
 const HOOK_BLOCK = 64;
 
 const CHUNKED = "$chunked";
@@ -48,14 +48,12 @@ type Obj = Record<string, unknown>;
 
 const isObj = (v: unknown): v is Obj => !!v && typeof v === "object" && !Array.isArray(v);
 
-/** Chunks file of the day an ISO time falls on: `2026-10-23.chunks.jsonl` (D8). */
+/** Chunks file of the day an ISO time falls on: `2026-10-23.chunks.jsonl`. */
 function chunksFileName(at: string): string {
   return traceFileName(at).replace(/\.jsonl$/, ".chunks.jsonl");
 }
 
-// ---------------------------------------------------------------- writing (B13–B16)
-
-/** The skeleton of `full` (D7) and the chunks it names, hash → the value's JSON. */
+/** The skeleton of `full` and the chunks it names, hash → the value's JSON. */
 function split(full: Obj): { skeleton: Obj; chunks: Map<string, string> } {
   const chunks = new Map<string, string>();
   const ref = (v: unknown) => {
@@ -73,7 +71,7 @@ function split(full: Obj): { skeleton: Obj; chunks: Map<string, string> } {
     ...story,
     units: (story.units as Obj[]).map((u) => (isObj(u.run) && Array.isArray(u.run.hooks) ? { ...u, run: { ...u.run, hooks: blocks(u.run.hooks) } } : u)),
   });
-  // spreading first keeps every key where observe put it, so the rebuilt facts serialize byte for byte (B17)
+  // spreading first keeps every key where observe put it, so the rebuilt facts serialize byte for byte
   const skeleton: Obj = { [CHUNKED]: 1, ...full };
   if (full.machine !== undefined) skeleton.machine = ref(full.machine);
   if (isObj(full.remote) && Array.isArray(full.remote.issues)) skeleton.remote = { ...full.remote, issues: ref(full.remote.issues) };
@@ -86,7 +84,7 @@ function split(full: Obj): { skeleton: Obj; chunks: Map<string, string> } {
 }
 
 /**
- * Which hashes a chunks file holds, trusted while the file is the size this process left it (D8, B16).
+ * Which hashes a chunks file holds, trusted while the file is the size this process left it.
  * Only the file last written to is kept: a long-running watch moves on to the next day's.
  */
 let written: { path: string; size: number; hashes: Set<string> } | null = null;
@@ -100,7 +98,7 @@ function fileSize(path: string): number {
   }
 }
 
-/** The last byte of a file: a torn last line (a write killed midway) has no newline (B15). */
+/** The last byte of a file: a torn last line (a write killed midway) has no newline. */
 function endsWithNewline(path: string, size: number): boolean {
   const fd = openSync(path, "r");
   try {
@@ -123,7 +121,7 @@ function scanHashes(text: string): Set<string> {
   return out;
 }
 
-/** Append the chunks the file lacks in one fsynced write (D8): a quiet tick has none and pays no fsync. */
+/** Append the chunks the file lacks in one fsynced write: a quiet tick has none and pays no fsync. */
 function appendChunks(path: string, chunks: Map<string, string>): void {
   const size = fileSize(path);
   let known = written;
@@ -141,8 +139,8 @@ function appendChunks(path: string, chunks: Map<string, string>): void {
 }
 
 /**
- * Record a tick (O4): its facts and replay inputs as chunks of the day, written and fsynced before the
- * tick line that names them, so no tick line ever names an unwritten chunk (B15). Returns the day file.
+ * Record a tick: its facts and replay inputs as chunks of the day, written and fsynced before the
+ * tick line that names them, so no tick line ever names an unwritten chunk. Returns the day file.
  */
 export function appendTick(root: string, tick: Omit<TickTrace, "type" | "facts">, inputs: TickInputs): string {
   const replay: ChunkedReplay = { workflows: {}, config: inputs.config };
@@ -156,13 +154,11 @@ export function appendTick(root: string, tick: Omit<TickTrace, "type" | "facts">
   return appendTrace(root, line);
 }
 
-// ---------------------------------------------------------------- reading (B17–B19, B21)
-
 export type TickInputsRead =
   | { ok: true; inputs: TickInputs }
   /** recorded by an older norn without a replay block */
   | { ok: false; reason: "no_replay" }
-  /** a chunk the tick names is missing from its day (B21, S2): nothing is replayed */
+  /** a chunk the tick names is missing from its day: nothing is replayed */
   | { ok: false; reason: "corrupt"; error: FileError };
 
 class MissingChunk extends Error {
@@ -171,7 +167,7 @@ class MissingChunk extends Error {
   }
 }
 
-/** One day's chunks: lines indexed by hash on first use, each parsed only when a tick needs it (D8). */
+/** One day's chunks: lines indexed by hash on first use, each parsed only when a tick needs it. */
 class DayChunks {
   private lines: Map<string, string[]> | null = null;
   private values = new Map<string, unknown>();
@@ -203,7 +199,7 @@ class DayChunks {
   }
 }
 
-/** Put each chunk's value back where its reference stood, dropping the marker (B17). */
+/** Put each chunk's value back where its reference stood, dropping the marker. */
 function rebuild(v: unknown, day: DayChunks): unknown {
   if (Array.isArray(v)) return v.map((x) => rebuild(x, day));
   if (!isObj(v)) return v;
@@ -220,7 +216,7 @@ export interface TickReader {
 }
 
 /**
- * A reader of ticks' decide inputs (O5) that keeps each day's chunks it read, for callers that read
+ * A reader of ticks' decide inputs that keeps each day's chunks it read, for callers that read
  * many ticks (`why` with a filter, the golden harvest). One reader per command: it never sees later appends.
  */
 export function tickReader(root: string): TickReader {
@@ -247,7 +243,7 @@ export function tickReader(root: string): TickReader {
       if (!replay) return { ok: false, reason: "no_replay" };
       const workflows: Record<string, LoadedWorkflow> = {};
       for (const [name, ref] of Object.entries(replay.workflows as Record<string, Partial<ReplayWorkflowRef> & { source?: string; issues: LoadedWorkflow["issues"] }>)) {
-        // a chunked tick carries the source; a full-facts tick names it in trace/workflows (D9)
+        // a chunked tick carries the source; a full-facts tick names it in trace/workflows
         const label = ref.hash ? `trace/workflows/${ref.hash}.yaml` : `trace/${chunksFileName(tick.at)}`;
         const source = typeof ref.source === "string" ? ref.source : ref.hash ? (readTraceFile(root, `workflows/${ref.hash}.yaml`) ?? "") : "";
         const parsed = source ? parseWorkflowText(source, label) : null;
@@ -258,7 +254,7 @@ export function tickReader(root: string): TickReader {
   };
 }
 
-/** Rebuild decide's inputs from one tick record (O5): its facts without the replay block, each workflow, the config. */
+/** Rebuild decide's inputs from one tick record: its facts without the replay block, each workflow, the config. */
 export function readTickInputs(root: string, tick: TickTrace): TickInputsRead {
   return tickReader(root).inputs(tick);
 }

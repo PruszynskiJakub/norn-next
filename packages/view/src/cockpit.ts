@@ -1,9 +1,9 @@
 /**
- * The cockpit model (CP1–CP5): rows — what needs the person, then each other story once, in its
+ * The cockpit model: rows — what needs the person, then each other story once, in its
  * tab (now, backlog, done), then the backlog's issues not taken in yet — each with
  * its story's orient preview and the actions it offers, as data. Pure: a ProjectView in, plain JSON
  * out. Renderers (the terminal `norn status --watch`, a web panel later) map actions to keys or buttons and
- * run their effects; they never decide which actions fit a row (CP4). Writes stay CLI verbs (X1).
+ * run their effects; they never decide which actions fit a row. Writes stay CLI verbs.
  */
 import type { InboxGroup, InboxItem, RemoteIssue } from "@norn/core";
 import { isClosedStatus, type RemoteProvider, storyKey } from "@norn/schema";
@@ -12,12 +12,12 @@ import { type OrientReport, orientReport } from "./orient.ts";
 import type { HeartbeatView, InboxEntry, ProjectView, StoryView } from "./types.ts";
 import { cmd, isVersionMismatchItem } from "@norn/core";
 
-/** CP2: inbox groups that are rows, in O1 order; running, notes and recently done live in the preview. */
+/** Inbox groups that are rows, in inbox order; running, notes and recently done live in the preview. */
 const COCKPIT_GROUPS: readonly InboxGroup[] = ["your_turn", "answer", "approve", "unblock", "check"];
 
 export type CockpitActionId = "orient" | "agent" | "start" | "answer" | "approve" | "reject" | "unstick" | "take" | "trace" | "pr" | "issue";
 
-/** CP4: what an action does. `{input}` in argv is the text the person typed. */
+/** What an action does. `{input}` in argv is the text the person typed. */
 export type CockpitEffect =
   | { kind: "verb"; argv: string[]; show?: boolean }
   | { kind: "link"; url: string }
@@ -32,10 +32,10 @@ export interface CockpitAction {
   effect: CockpitEffect;
 }
 
-/** CP2: where a row is listed — now (needs you, in flight), backlog (not started), done (closed) */
+/** Where a row is listed — now (needs you, in flight), backlog (not started), done (closed) */
 export type CockpitTab = "now" | "backlog" | "done";
 
-/** CP2: an open issue with the intake label that is not assigned to the person, as the backlog lists it */
+/** An open issue with the intake label that is not assigned to the person, as the backlog lists it */
 export interface CockpitIssue {
   number: number;
   title: string;
@@ -58,26 +58,28 @@ export interface CockpitRow {
   title: string;
   since: string | null;
   age: string | null;
-  /** CP3: the story's orient report (null for an issue row), the item for an item row, the issue for an issue row */
+  /** The story's orient report (null for an issue row), the item for an item row, the issue for an issue row */
   preview: { report: OrientReport | null; item: { title: string; detail?: string; full?: string; command: string } | null; issue?: CockpitIssue };
   actions: CockpitAction[];
 }
 
 export interface CockpitModel {
   at: string;
-  /** `pending`: how many rows the needs-you section holds */
-  /** `version`: gh-61 D7, the version mismatch item's text when the binary does not fit the repo's norn version */
+  /**
+   * `pending`: how many rows the needs-you section holds; `version`: the version mismatch item's
+   * text when the binary does not fit the repo's norn version
+   */
   header: { repo: string; pending: number; heartbeat: HeartbeatView; version?: string };
   rows: CockpitRow[];
 }
 
 export interface CockpitOptions {
-  /** CP1: the front end can focus an agent's pane and open an orient workspace (the terminal inside Herdr) */
+  /** The front end can focus an agent's pane and open an orient workspace (the terminal inside Herdr) */
   places: boolean;
   /** shown in the preview's PR command (`config.provider`) */
   provider: RemoteProvider;
   /**
-   * CP2: what the front end read from the remote — the open issues carrying the intake label, and the
+   * What the front end read from the remote — the open issues carrying the intake label, and the
    * person's login. Those not assigned to `me` and not taken in are backlog rows; absent, there are none.
    */
   backlog?: { me: string; issues: readonly RemoteIssue[] };
@@ -109,18 +111,18 @@ function storyActions(s: StoryView, unit: string, o: CockpitOptions, own: boolea
   return out;
 }
 
-/** CP4: the actions an inbox item offers, by the table. */
+/** The actions an inbox item offers, by the table. */
 function itemActions(i: InboxEntry, unit: string, o: CockpitOptions): CockpitAction[] {
   const out: CockpitAction[] = [];
   if (o.places && i.reach) out.push(action("agent", { kind: "place", place: "agent", story: i.story, reach: i.reach }));
-  // MO5: a manual start the runner opens itself
+  // A manual start the runner opens itself
   if (i.group === "your_turn" && !i.reach && i.command.startsWith(`${cmd.storyStart()} `)) out.push(action("start", { kind: "verb", argv: ["story", "start", unit] }));
   if (i.group === "answer") out.push(action("answer", { kind: "verb", argv: ["story", "answer", unit, "{input}"] }, { prompt: "Your answer", required: true }));
   if (i.group === "approve") {
     out.push(action("approve", { kind: "verb", argv: ["story", "approve", unit] }));
     out.push(action("reject", { kind: "verb", argv: ["story", "reject", unit, "--reason", "{input}"] }, { prompt: "What to change", required: true }));
   }
-  // gh-212: the item's own flags too (a run-out counter's `--step <to> --reset <counter>`); no word has a space
+  // The item's own flags too (a run-out counter's `--step <to> --reset <counter>`); no word has a space
   if (i.command.startsWith(`${cmd.runRerun()} `)) {
     const flags = i.command.split(" ").slice(cmd.runRerun(unit).split(" ").length);
     out.push(action("unstick", { kind: "verb", argv: ["run", "rerun", unit, ...flags] }));
@@ -177,7 +179,7 @@ export function cockpitModel(view: ProjectView, o: CockpitOptions): CockpitModel
         actions: [orient as CockpitAction, ...itemActions(i, unit, o), ...rest],
       };
     });
-  // CP2: a story that needs you is listed once, under its item
+  // A story that needs you is listed once, under its item
   const waiting = new Set(items.map((r) => r.story));
   const storyRows: CockpitRow[] = view.stories
     .filter((s) => !waiting.has(s.key))
@@ -203,8 +205,8 @@ export function cockpitModel(view: ProjectView, o: CockpitOptions): CockpitModel
 }
 
 /**
- * CP2: the backlog's issues, after its stories, by number — open, not assigned to the person (assigning
- * is how they choose when intake takes one in, GR1) and not taken in already. Take assigns (CP4).
+ * The backlog's issues, after its stories, by number — open, not assigned to the person (assigning
+ * is how they choose when intake takes one in) and not taken in already. Take assigns.
  */
 function issueRows(view: ProjectView, o: CockpitOptions): CockpitRow[] {
   if (!o.backlog) return [];

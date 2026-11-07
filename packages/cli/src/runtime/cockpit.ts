@@ -1,7 +1,7 @@
 /**
- * Herdr side of `norn status --watch` (CP8–CP10, HC6, HC12, HC15): which Herdr the cockpit talks
+ * Herdr side of `norn status --watch`: which Herdr the cockpit talks
  * to, going to an agent's pane, labelling agent panes, and the oldest Your turn item for `--next`.
- * Presentation only — none of this is a fact for decide (HC13). Verbs run through the CLI dispatcher.
+ * Presentation only — none of this is a fact for decide. Verbs run through the CLI dispatcher.
  */
 import { herdr } from "@norn/adapters";
 import type { InboxGroup, InboxItem } from "@norn/core";
@@ -22,7 +22,7 @@ export const GROUP_MARK: Partial<Record<InboxGroup, string>> = {
   running: "◐",
 };
 
-/** HC6/HC8: the Herdr the cockpit talks to — injected, or the real one inside Herdr, else none. */
+/** The Herdr the cockpit talks to — injected, or the real one inside Herdr, else none. */
 export function cockpitHerdr(ctx: Context): herdr.HerdrCockpit | null {
   if (ctx.deps.herdr !== undefined) return ctx.deps.herdr;
   // inside a Herdr pane (HERDR_ENV), or a command Herdr runs itself (a tab bar segment: only the socket is set)
@@ -31,7 +31,7 @@ export function cockpitHerdr(ctx: Context): herdr.HerdrCockpit | null {
 }
 
 /**
- * HC10: the Your turn item to go to next — the oldest one with a run (an agent waits there), else,
+ * The Your turn item to go to next — the oldest one with a run (an agent waits there), else,
  * unless `agentsOnly`, the oldest one at all (a manual start).
  */
 export function oldestYourTurn(items: readonly InboxEntry[], agentsOnly = false): InboxEntry | null {
@@ -40,7 +40,7 @@ export function oldestYourTurn(items: readonly InboxEntry[], agentsOnly = false)
   return oldest(mine.filter((i) => i.reach)) ?? (agentsOnly ? null : oldest(mine));
 }
 
-/** HC7: one line for a verb's JSON outcome. */
+/** One line for a verb's JSON outcome. */
 export function verbMessage(argv: readonly string[], exit: number, value: unknown): string {
   // the command words and the unit: `norn story checkout gh-6`, `norn story answer gh-6`
   const unit = argv.findIndex((a) => /^(gh|gl)-\d/.test(a));
@@ -51,7 +51,7 @@ export function verbMessage(argv: readonly string[], exit: number, value: unknow
 }
 
 /**
- * CP4 place `agent` (HC6, HC15): focus the agent pane of the run, else the workspace of the run; a
+ * Focus the agent pane of the run, else the workspace of the run; a
  * line saying where it went or why not. Several candidates are no candidate (never a guess).
  */
 export async function placeAgent(cockpit: HerdrCockpit, reach: InboxItem["reach"], unit: string): Promise<string> {
@@ -69,7 +69,7 @@ export async function placeAgent(cockpit: HerdrCockpit, reach: InboxItem["reach"
   return `focused workspace ${ws} (${unit})`;
 }
 
-/** HC12: the label for an item's agent pane; null = none. */
+/** The label for an item's agent pane; null = none. */
 function labelFor(item: InboxEntry, ttlMs: number): PaneLabel | null {
   const title = `${item.slice ?? item.story}${item.step ? ` · ${item.step}` : ""}`;
   const all = (text: string) => ({ idle: text, done: text, blocked: text, working: text, unknown: text });
@@ -87,7 +87,7 @@ function labelFor(item: InboxEntry, ttlMs: number): PaneLabel | null {
   }
 }
 
-/** HC12: label the agent pane of every item whose run Herdr hosts; first item per pane wins. Failures are ignored (HC13). */
+/** Label the agent pane of every item whose run Herdr hosts; first item per pane wins. Failures are ignored. */
 export async function labelPanes(cockpit: HerdrCockpit, items: readonly InboxEntry[], ttlMs: number): Promise<number> {
   const agents = await cockpit.listAgents().catch(() => []);
   const done = new Set<string>();

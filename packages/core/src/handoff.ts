@@ -1,7 +1,6 @@
 /**
- * A unit's status (S9), rendered from state.json. gh-195 D9 (B6, B7): `brief` and `story checkout` print
- * it above the handoff; it is never written into the handoff, which holds only what agents and people
- * write there (Goal / Progress / Resume).
+ * A unit's status, rendered from state.json. `brief` and `story checkout` print it above the
+ * handoff; it is never written into the handoff, which holds only what agents and people write.
  */
 import type { UnitState, Workflow } from "@norn/schema";
 import { nextCommand } from "./commands.ts";
@@ -23,11 +22,6 @@ export function handoffLastOutcome(state: UnitState): string {
   return state.last_outcome ? `${state.last_outcome.step}.${state.last_outcome.outcome} (${state.last_outcome.source}, ${state.last_outcome.at})` : "none";
 }
 
-/**
- * The status block (S9): story, slice, step, attempt, counters, last outcome, next command. gh-195 D9
- * (B7): rendered from state.json for `brief` and `story checkout` to print above the handoff, never
- * written into the file (B6).
- */
 export function renderHandoffStatus(state: UnitState, opts: { workflow?: Workflow | null; next?: string | null } = {}): string {
   const key = state.slice ?? state.story;
   const status = state.park ? `${state.status} (${state.park.kind}: ${state.park.reason})` : state.status;
@@ -35,7 +29,7 @@ export function renderHandoffStatus(state: UnitState, opts: { workflow?: Workflo
   const lines = [
     STATUS_BEGIN,
     `- Story: ${state.story}${state.slice ? ` · Slice: ${state.slice}` : ""}`,
-    // gh-71 B28 (D10): the story's round next to its workflow; a slice has no rounds of its own
+    // a slice has no rounds of its own
     `- ${state.slice ? "" : `Round ${state.round ?? 1} · `}Workflow: ${state.workflow} · Step: ${state.step} (attempt ${state.attempt})`,
     `- Status: ${status}`,
     `- Counters: ${handoffCounters(state, opts.workflow)}`,
@@ -48,7 +42,7 @@ export function renderHandoffStatus(state: UnitState, opts: { workflow?: Workflo
 }
 
 /**
- * gh-195 D9 (B7): what `story checkout` prints for a unit: its status block (markers dropped), then the
+ * What `story checkout` prints for a unit: its status block (markers dropped), then the
  * handoff's written part `prose` (null: no handoff on the branch).
  */
 export function renderHandoffWithStatus(state: UnitState, prose: string | null, opts: { workflow?: Workflow | null } = {}): string {

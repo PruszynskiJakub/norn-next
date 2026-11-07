@@ -1,6 +1,6 @@
 /**
- * git adapter — implements GitPort (packages/core/src/ports.ts) over the `git` CLI.
- * Commands run through an injectable Exec (X4). Failures surface as typed results where the
+ * git adapter over the `git` CLI.
+ * Commands run through an injectable Exec. Failures surface as typed results where the
  * port declares them (PushResult, RebaseResult, booleans, null) and as PortError otherwise.
  */
 import { existsSync } from "node:fs";
@@ -21,7 +21,7 @@ export interface GitOptions {
 
 const ZERO_OID = /^0+$/;
 
-/** Parse `Key: value` trailer lines (S4). */
+/** Parse `Key: value` trailer lines. */
 function parseTrailers(text: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const line of text.split("\n")) {
@@ -31,7 +31,7 @@ function parseTrailers(text: string): Record<string, string> {
   return out;
 }
 
-/** BS2: `git merge-tree --write-tree` (BS1 conflict detection) needs git ≥ 2.38. */
+/** `git merge-tree --write-tree` (conflict detection) needs git ≥ 2.38. */
 export const MIN_GIT_VERSION = [2, 38] as const;
 
 /** `git version 2.50.1 (Apple Git-155)` → [2, 50, 1]; null when unreadable. */
@@ -40,7 +40,6 @@ export function parseGitVersion(text: string): number[] | null {
   return m ? [Number(m[1]), Number(m[2]), Number(m[3] ?? 0)] : null;
 }
 
-/** BS2: is this git new enough for norn (≥ 2.38)? */
 export function gitVersionOk(text: string): boolean {
   const v = parseGitVersion(text);
   if (!v) return false;
@@ -59,14 +58,14 @@ export function classifyPush(res: ExecResult): PushResult {
   return { ok: false, reason: "other", message: msg };
 }
 
-/** H1: a conflict-marker line (`<<<<<<< ours`, `>>>>>>> theirs`, diff3 `||||||| base`); `=======` alone is a setext heading too. */
+/** A conflict-marker line (`<<<<<<< ours`, `>>>>>>> theirs`, diff3 `||||||| base`); `=======` alone is a setext heading too. */
 const MARKER = /^(<{7}|>{7}|\|{7})( |$)/;
-/** PortError codes of commit (H1); the same strings as `GIT_IN_PROGRESS` / `GIT_CONFLICT_MARKERS` in @norn/core. */
+/** PortError codes of commit; the same strings as `GIT_IN_PROGRESS` / `GIT_CONFLICT_MARKERS` in @norn/core. */
 const IN_PROGRESS = "git_operation_in_progress";
 const CONFLICT_MARKERS = "git_conflict_markers";
 
 /**
- * H1: files whose added lines (`git diff -U0` output) hold both an opening (`<<<<<<< `) and a closing
+ * Files whose added lines (`git diff -U0` output) hold both an opening (`<<<<<<< `) and a closing
  * (`>>>>>>> `) conflict marker — a merge result committed unresolved.
  */
 export function addedConflictMarkers(diff: string): string[] {
@@ -170,7 +169,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
   const bin = opts.bin ?? "git";
   const env = { GIT_TERMINAL_PROMPT: "0", GIT_EDITOR: "true", ...(opts.env ?? {}) };
   const run = (cwd: string, args: string[], stdin?: string, extraEnv?: Record<string, string>) => {
-    // H11: a call that reaches the remote is bounded; local ones (hooks on commit) are not
+    // A call that reaches the remote is bounded; local ones (hooks on commit) are not
     const timeoutMs = gitTimeoutMs(args);
     return exec([bin, ...args], { cwd, env: extraEnv ? { ...env, ...extraEnv } : env, ...(stdin === undefined ? {} : { stdin }), ...(timeoutMs === undefined ? {} : { timeoutMs }) });
   };
@@ -192,7 +191,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
     return r.code === 0 && rebaseIn(cwd, lines(r.stdout));
   };
 
-  /** H1: MERGE_HEAD, a rebase, CHERRY_PICK_HEAD or REVERT_HEAD in cwd's worktree, and the unmerged paths. */
+  /** MERGE_HEAD, a rebase, CHERRY_PICK_HEAD or REVERT_HEAD in cwd's worktree, and the unmerged paths. */
   const inProgress = async (cwd: string): Promise<GitInProgress> => {
     // one rev-parse for every marker git leaves while an operation waits to be concluded
     const names = ["MERGE_HEAD", "rebase-merge", "rebase-apply", "REBASE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD"] as const;
@@ -334,7 +333,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
     },
     async deleteRemoteBranch(cwd, remote, branch) {
       const r = await run(cwd, ["push", remote, "--delete", `refs/heads/${branch}`]);
-      if (r.code !== 0 && /remote ref does not exist/i.test(r.stderr)) return { ok: true }; // idempotent (GR6)
+      if (r.code !== 0 && /remote ref does not exist/i.test(r.stderr)) return { ok: true }; // idempotent
       return classifyPush(r);
     },
 
@@ -356,7 +355,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
     },
 
     async commit(cwd, spec: CommitSpec) {
-      // H1: never stage or commit through someone's merge or rebase — any commit would conclude it
+      // Never stage or commit through someone's merge or rebase — any commit would conclude it
       // (git refuses a partial commit mid-merge), with whatever the work tree holds, markers included
       const busy = await inProgress(cwd);
       if (busy.operation || busy.unmerged.length)
@@ -370,14 +369,14 @@ export function createGit(opts: GitOptions = {}): GitPort {
       if (diff.code === 0 && !spec.allowEmpty) return null;
       if (diff.code !== 0 && diff.code !== 1) okOrThrow(diff, "git diff", "git");
       if (diff.code === 1) {
-        // H1 last guard: a norn commit never records an unresolved merge
+        // last guard: a norn commit never records an unresolved merge
         const added = await must(cwd, ["diff", "--cached", "-U0", "--no-color", "--no-ext-diff", ...(paths ? ["--", ...paths] : [])]);
         const marked = addedConflictMarkers(added);
         if (marked.length) throw portError(CONFLICT_MARKERS, `conflict markers in ${marked.join(", ")}: nothing committed; resolve them first`);
       }
       const args = ["commit", "-F", "-", "--cleanup=strip"];
       if (spec.allowEmpty) args.push("--allow-empty");
-      for (const [k, v] of Object.entries(spec.trailers)) args.push("--trailer", `${k}: ${v}`); // S4
+      for (const [k, v] of Object.entries(spec.trailers)) args.push("--trailer", `${k}: ${v}`);
       if (paths && diff.code === 1) args.push("--", ...paths);
       await must(cwd, args, spec.message);
       return line(cwd, ["rev-parse", "HEAD"]);
@@ -402,7 +401,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
       return out;
     },
     async outgoingConflictMarkers(cwd, remote, rev): Promise<OutgoingMarkers[]> {
-      // BS5.2: the files the unpublished commits change — first parent only, so a merge commit counts
+      // The files the unpublished commits change — first parent only, so a merge commit counts
       // with everything it brought in (and what its author left unresolved)
       const notPushed = [rev, "--not", `--remotes=${remote}`];
       const ch = await run(cwd, ["-c", "core.quotePath=false", "log", "--format=", "--name-only", "-m", "--first-parent", ...notPushed, "--"]);
@@ -474,17 +473,17 @@ export function createGit(opts: GitOptions = {}): GitPort {
       return { merge_base: mb.code === 0 ? mb.stdout.trim() || null : null, ahead: Number(counts[0] ?? 0), behind: Number(counts[1] ?? 0) };
     },
     async mergeTree(cwd, ours, theirs) {
-      // BS1: exit 0 = clean (prints the tree), 1 = conflicts (tree, then one conflicted path per line)
+      // Exit 0 = clean (prints the tree), 1 = conflicts (tree, then one conflicted path per line)
       const r = await run(cwd, ["merge-tree", "--write-tree", "--name-only", "--no-messages", ours, theirs]);
       if (r.code === 0) return [];
       if (r.code !== 1) okOrThrow(r, "git merge-tree", "git");
       return [...new Set(lines(r.stdout).slice(1))].sort();
     },
     async merge(cwd, rev, spec): Promise<MergeResult> {
-      // H1: a merge already in progress is someone's (a resolve agent's): never abort or conclude it
+      // A merge already in progress is someone's (a resolve agent's): never abort or conclude it
       const busy = await inProgress(cwd);
       if (busy.operation || busy.unmerged.length) throw portError(IN_PROGRESS, `${busy.operation ?? "a merge"} in progress in ${cwd}: not merging ${rev}`);
-      // BS3: merge without committing, so the merge commit carries the message and trailers (S4)
+      // Merge without committing, so the merge commit carries the message and trailers
       const r = await run(cwd, ["merge", "--no-ff", "--no-commit", "--no-edit", rev]);
       const head = () => line(cwd, ["rev-parse", "HEAD"]);
       const inMerge = async () => {
@@ -531,7 +530,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
       return (await run(cwd, args)).code === 0;
     },
     async pushRef(cwd, remote, u: RefUpdate) {
-      // T3: compare-and-swap via --force-with-lease=<ref>:<expected> ("" = must not exist).
+      // Compare-and-swap via --force-with-lease=<ref>:<expected> ("" = must not exist).
       const args = ["push", "--porcelain"];
       let spec: string;
       if (u.expected === undefined) spec = u.sha === null ? `:${u.ref}` : `+${u.sha}:${u.ref}`;

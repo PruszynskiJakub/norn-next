@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { listReceipts } from "../../src/index.ts";
 import { tmp } from "../helpers.ts";
 
-describe("receipts (S6)", () => {
+describe("receipts", () => {
   test("concurrent appends from several processes get distinct numbers", async () => {
     const u = tmp();
     const script = join(import.meta.dir, "fixtures/append.ts");

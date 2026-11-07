@@ -1,5 +1,5 @@
 /**
- * gh-213 (O2a): a check that failed on a glitch is retried on the same code with one command. While
+ * A check that failed on a glitch is retried on the same code with one command. While
  * the unit sits at the step that check's fail sent it to (ready or running), `norn run rerun <unit>
  * --step <check>` is accepted; the next tick stops the step's session and runs the check again.
  */
@@ -63,7 +63,7 @@ afterAll(() => {
   rmSync(glitch, { recursive: true, force: true });
 });
 
-describe("run rerun --step <check> on the step its fail sent the unit to (gh-213)", () => {
+describe("run rerun --step <check> on the step its fail sent the unit to", () => {
   test("the check fails on a glitch and sends the unit back to implement, which runs", async () => {
     h.report(runs(), "done", { outcome: "done", handoff: "built" });
     for (let i = 0; i < 6 && !(h.state(runs())?.attempt === 2 && h.state(runs())?.status === "running"); i++) await tick();

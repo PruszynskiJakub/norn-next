@@ -1,4 +1,4 @@
-/** CriteriaReport (QV2), frontmatter `criteria` (QV1), receipt fields `criteria`, `notes`, `acknowledged_notes` (NT1, NT3). */
+/** CriteriaReport, frontmatter `criteria`, receipt fields `criteria`, `notes`, `acknowledged_notes`. */
 import { describe, expect, test } from "bun:test";
 import { validate } from "../../src/index.ts";
 
@@ -6,7 +6,7 @@ const ID = "01JBQ6ZK3E8Y4V5W6X7Y8Z9ABC";
 const AT = "2026-10-23T12:00:00.000Z";
 const head = { receipt_id: ID, run_id: ID, step: "qa", attempt: 1, at: AT, by: "agent" as const };
 
-describe("CriteriaReport (QV2)", () => {
+describe("CriteriaReport", () => {
   test("each verdict carries its required fields", () => {
     const ok = validate("criteria-report", [
       { id: "AC1", verdict: "pass", evidence: "evidence/r/ac1.txt" },
@@ -35,7 +35,7 @@ describe("CriteriaReport (QV2)", () => {
   });
 });
 
-describe("frontmatter criteria (QV1) and receipt fields (NT1, NT3)", () => {
+describe("frontmatter criteria and receipt fields", () => {
   test("slice and story frontmatter take criteria with id and verifier only (B36)", () => {
     const slice = { id: "gh-4/01", title: "t", depends_on: [], status: "planned", criteria: [{ id: "AC1", verifier: "test" }, { id: "AC2", verifier: "agent" }] };
     expect(validate("slice", slice).ok).toBe(true);

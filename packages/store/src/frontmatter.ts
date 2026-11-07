@@ -1,5 +1,5 @@
 /**
- * Markdown with YAML frontmatter: spec.md and slices/<nn>-<slug>.md (§7, §7.1).
+ * Markdown with YAML frontmatter: spec.md and slices/<nn>-<slug>.md.
  * The body is preserved byte for byte; patches touch only the given keys and keep
  * the rest of the YAML (order, comments) as written by humans and skills.
  */
@@ -13,7 +13,7 @@ export interface MarkdownDoc<T> {
   body: string;
 }
 
-/** Fields the CLI may change (§7.1); everything else belongs to humans and skills. */
+/** Fields the CLI may change; everything else belongs to humans and skills. */
 const STORY_CLI_FIELDS = [
   "status",
   "workflow",
@@ -76,7 +76,7 @@ function parseMarkdown<N extends "story" | "slice">(name: N, raw: string, path: 
     } as ReadResult<MarkdownDoc<T>>;
   const y = parseYaml(split.yaml);
   if (!y.ok) return { ok: false, reason: "corrupt", error: fileError(path, y.errors, root) } as ReadResult<MarkdownDoc<T>>;
-  // B38 (D12): criteria `needs` was removed; its own message, pointing at `norn upgrade`
+  // A criterion still carrying the removed `needs` gets its own message, pointing at `norn upgrade`
   const fm = y.value as { id?: unknown; criteria?: unknown };
   const withNeeds = Array.isArray(fm.criteria) ? fm.criteria.findIndex((c) => typeof c === "object" && c !== null && "needs" in c) : -1;
   if (withNeeds >= 0)
@@ -118,7 +118,7 @@ function assertFrontmatter(name: "story" | "slice", value: unknown, path: string
 
 /**
  * Patch only `patch`'s keys in a markdown file's frontmatter (undefined deletes a key),
- * keeping other YAML and the body verbatim. Refuses keys outside `allowed` (§7.1) and
+ * keeping other YAML and the body verbatim. Refuses keys outside `allowed` and
  * results that fail validation; a corrupt or missing file is returned unchanged.
  */
 function patchMarkdown<N extends "story" | "slice">(
@@ -130,7 +130,7 @@ function patchMarkdown<N extends "story" | "slice">(
 ) {
   type T = N extends "story" ? StoryFrontmatter : SliceFrontmatter;
   for (const k of Object.keys(patch))
-    if (!allowed.includes(k)) throw new Error(`the CLI may not change ${name} frontmatter field '${k}' (§7.1)`);
+    if (!allowed.includes(k)) throw new Error(`the CLI may not change ${name} frontmatter field '${k}'`);
   const current = readMarkdown(name, path, root);
   if (!current.ok) return current;
   const split = splitFrontmatter(current.raw) as Split;

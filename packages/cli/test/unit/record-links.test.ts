@@ -1,4 +1,4 @@
-/** gh-195 D5 (B28): `open-pr`'s rewrite of `pr.md`'s record links to the record commit's URLs. */
+/** `open-pr`'s rewrite of `pr.md`'s record links to the record commit's URLs. */
 import { describe, expect, test } from "bun:test";
 import { rewriteRecordLinks } from "../../src/runtime/act/record-links.ts";
 

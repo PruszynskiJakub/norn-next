@@ -1,9 +1,9 @@
 /**
- * One heartbeat pass (H1): local lock → observe → decide → `tick.start` → act → log → `tick.end`
- * (R5.4) → `heartbeat.json` `last_tick_at` (R5.5). The tick trace record
+ * One heartbeat pass: local lock → observe → decide → `tick.start` → act → log → `tick.end`
+ * → `heartbeat.json` `last_tick_at`. The tick trace record
  * holds the facts snapshot, the workflows and config decide used (as chunks of the day, store
- * `appendTick`), each rule fired, action and result (O4), so `norn run view --why` replays decide on exactly the
- * same inputs (O5) via store `readTickInputs`.
+ * `appendTick`), each rule fired, action and result, so `norn run view --why` replays decide on exactly the
+ * same inputs via store `readTickInputs`.
  */
 import { decide, type Facts, leavesFollowUp } from "@norn/core";
 import { type TickSlowest, type TickTiming, type TickTrace, type TickUnitRecord, ulid } from "@norn/schema";
@@ -25,24 +25,24 @@ export interface TickReport {
   sync: SyncReport;
   /** one line per decision: unit, rule, action kind, result */
   decisions: Array<{ unit: string; rule: string; kind: string; ok: boolean; error?: string; warnings?: string[]; story?: string }>;
-  /** inbox item ids notified this tick (O3) */
+  /** inbox item ids notified this tick */
   notified: string[];
   /** trace day file the record went to */
   trace: string;
   failed: number;
-  /** GR6: owed base-branch records retried this tick */
+  /** Owed base-branch records retried this tick */
   records?: Array<{ story: string; state: string; reason?: string }>;
-  /** K5: orphan worktrees/branches seen this tick (also in the trace facts); `norn tidy` cleans them */
+  /** Orphan worktrees/branches seen this tick (also in the trace facts); `norn tidy` cleans them */
   orphans?: Facts["orphans"];
-  /** gh-78: the tick's slowest phase (its full timing is in the trace record) */
+  /** The tick's slowest phase (its full timing is in the trace record) */
   slowest: TickSlowest;
-  /** H12: an action of this tick that went through left the next tick something to do (`leavesFollowUp`); absent = none */
+  /** An action of this tick that went through left the next tick something to do (`leavesFollowUp`); absent = none */
   follow_up?: true;
 }
 
 const jsonSafe = <T>(v: T): T => JSON.parse(JSON.stringify(v ?? null)) as T;
 
-/** The tick record's fields beside its facts; store `appendTick` records the facts and replay inputs as chunks (O4). */
+/** The tick record's fields beside its facts; store `appendTick` records the facts and replay inputs as chunks. */
 export function traceRecord(obs: Observed, records: ActRecord[], startedAt: number, duration: number, version: string, timing?: TickTiming): Omit<TickTrace, "type" | "facts"> {
   const decisions: TickUnitRecord[] = records.map(({ decision, result, ms }) => ({
     unit: decision.unit,
@@ -53,7 +53,7 @@ export function traceRecord(obs: Observed, records: ActRecord[], startedAt: numb
       ...(result.error ? { error: result.error } : {}),
       ...(result.detail === undefined ? {} : { detail: jsonSafe(result.detail) }),
       ...(result.warnings?.length ? { warnings: result.warnings } : {}),
-      // gh-78: the action's time, beside its result, never in `action` (O5)
+      // The action's time, beside its result, never in `action`
       ms: Math.max(0, Math.round(ms)),
     },
     ...(result.briefing ? { briefing: result.briefing } : {}),
@@ -63,11 +63,11 @@ export function traceRecord(obs: Observed, records: ActRecord[], startedAt: numb
     tick_id: obs.facts.tick_id,
     at: new Date(startedAt).toISOString(),
     heartbeat_id: obs.heartbeat_id,
-    // O5: `norn run view --why` labels a replay of a tick another norn recorded
+    // `norn run view --why` labels a replay of a tick another norn recorded
     norn_version: version,
     duration_ms: Math.max(0, Math.round(duration)),
     decisions,
-    // gh-78: the sync outcome and where the tick spent its time, outside `facts` (O5)
+    // The sync outcome and where the tick spent its time, outside `facts`
     sync: { ...obs.sync },
     ...(timing ? { timing } : {}),
   };
@@ -85,7 +85,7 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
     const tDecide = performance.now();
     const decisions = decide(obs.facts, obs.workflows, obs.config);
     const tAct = performance.now();
-    // R5.4 (N2): the decisions reach the trace before act, so a tick that dies mid-act is explainable
+    // The decisions reach the trace before act, so a tick that dies mid-act is explainable
     appendTrace(ctx.root, {
       type: "tick.start",
       tick_id,
@@ -97,11 +97,11 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
     const records = await actor.run(decisions);
     const tAfter = performance.now();
     const recorded = await actor.retryRecords();
-    // O3: notify from what is true after act (post-act local facts), so items resolved this tick
+    // Notify from what is true after act (post-act local facts), so items resolved this tick
     // stay quiet and items created this tick are not a tick late
     const post = actor.postActFacts();
     await actor.notifyInbox(post);
-    // O1 history: items needing a person that appeared or were resolved this tick, in the tick record
+    // Inbox history: items needing a person that appeared or were resolved this tick, in the tick record
     const inbox = trackInbox(ctx.root, post, obs.facts, decisions, obs.config);
     const tEnd = performance.now();
     const timing = tickTiming(
@@ -113,7 +113,7 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
     const file = appendTick(ctx.root, record, { facts: obs.facts, workflows: obs.workflows, config: obs.config });
     const failed = records.filter((r) => !r.result.ok).length;
     appendTrace(ctx.root, { type: "tick.end", tick_id, at: new Date(ctx.clock.now()).toISOString(), duration_ms: record.duration_ms, failed, slowest: timing.slowest });
-    // R5.5: the checkout's heartbeat is alive as of this tick; gh-78: and how long the tick took (status, cockpit)
+    // The checkout's heartbeat is alive as of this tick, and how long the tick took (status, cockpit)
     markTick(ctx.root, new Date(ctx.clock.now()).toISOString(), record.duration_ms);
     inbox.commit();
     const lines = records.map(({ decision, result }) => ({
@@ -122,7 +122,7 @@ export async function runTick(ctx: Context, opts: TickOptions = {}): Promise<Tic
       kind: decision.action.kind,
       ok: result.ok,
       ...(result.error ? { error: result.error } : {}),
-      // gh-71 B20: the tick's output says what did not happen though the action went on
+      // The tick's output says what did not happen though the action went on
       ...(result.warnings?.length ? { warnings: result.warnings } : {}),
       ...(decision.action.kind === "intake_story" ? { story: decision.action.key } : {}),
     }));

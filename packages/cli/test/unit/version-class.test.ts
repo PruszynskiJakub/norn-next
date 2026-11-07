@@ -1,5 +1,5 @@
 /**
- * gh-61 D1, B6–B10: every command declares how a binary that does not match the repo's `norn_version`
+ * Every command declares how a binary that does not match the repo's `norn_version`
  * treats it — `acts` (refused), `reads` (runs) or `exempt` (never checked). This table pins each one;
  * `Command.version` is required by the type, so a new command cannot leave it out.
  */
@@ -55,7 +55,7 @@ const D1: Record<string, VersionClass> = {
 
 const all: Command[] = [...COMMANDS, ...NOUNS.flatMap((n) => n.verbs)];
 
-describe("version classes (gh-61 D1)", () => {
+describe("version classes", () => {
   test("every command declares the class D1 gives it, and D1 names every command", () => {
     expect(Object.fromEntries(all.map((c) => [c.name, c.version]))).toEqual(D1);
   });

@@ -1,5 +1,5 @@
 /**
- * gh-195/16 (B29–B32, B35; D6, D7, D15, D16): a finished story's record is archived on its ref
+ * A finished story's record is archived on its ref
  * `refs/norn/runs/<story>`, never on the base. GR6 and GR6b push it before any cleanup; `run list`,
  * `run view` and `story reopen` read it on a fresh clone, fetching that one ref; `tidy` never touches
  * the refs; run state an older norn left on the base is never read, only pointed to `norn upgrade`.
@@ -232,7 +232,7 @@ describe("GR6b: a story closed without a PR is archived, and reopened from its r
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ story: "gh-10", reopened: true });
     const story = { key: "gh-10", spec_dir: s.spec };
-    // the record as archived, plus the take receipt the reopen wrote (R10.1)
+    // the record as archived, plus the take receipt the reopen wrote
     const archived = recordFiles(remoteSha(recordRef("gh-10")) as string);
     expect(archived.length).toBeGreaterThan(0);
     expect(filesOf(storyRunStateDir(D.root, story))).toEqual(expect.arrayContaining(archived));

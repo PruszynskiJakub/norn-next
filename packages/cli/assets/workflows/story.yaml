@@ -1,4 +1,4 @@
-# Story workflow — example installed by `norn init`; edit freely (W1).
+# Story workflow — example installed by `norn init`; edit freely.
 # Delivers a story whose spec and plan a refinement round agreed: bring the story up to date with its
 # base, cut slices from the plan against that base, approve them, run the slices, bring the story up
 # to date again, verify the whole story once (QA over every slice's criteria), describe it, open the
@@ -136,10 +136,10 @@ counters:
   ci_loop: { max: 3 }
   qa_loop: { max: 2 }
   ready_loop: { max: 2 }
-  # reset each time their update merges cleanly: only repeated conflicts on one base move count (W4)
+  # reset each time their update merges cleanly: only repeated conflicts on one base move count
   sync_conflict_loop: { max: 2, reset_on: sync.done }
   base_conflict_loop: { max: 2, reset_on: update.done }
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
-# update-branch re-enters update, not sync (the default would be the first update step, BS9)
+# update-branch re-enters update, not sync (the default would be the first update step)
 base: { stale: conflict, step: update }

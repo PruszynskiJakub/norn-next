@@ -7,7 +7,7 @@ import { hasNornHooks, jsonHookInstaller, mergeNornHooks, readJsonObject, remove
 const tmp = () => mkdtempSync(join(tmpdir(), "norn-agent-hooks-"));
 const SPECS = [{ native: "Stop", arg: "stop" }];
 
-describe("hook config merge (A1)", () => {
+describe("hook config merge", () => {
   test("keeps the norn group position and removes norn hooks from events no longer installed", () => {
     const settings = {
       hooks: {
@@ -33,7 +33,7 @@ describe("hook config merge (A1)", () => {
   });
 });
 
-describe("settings files (S1, S2)", () => {
+describe("settings files", () => {
   test("readJsonObject: missing → {}, invalid → PortError", () => {
     const dir = tmp();
     expect(readJsonObject(join(dir, "none.json"))).toEqual({});
