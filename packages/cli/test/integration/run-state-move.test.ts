@@ -113,6 +113,7 @@ describe("an open story's run state moves off its branch at the holder's first t
   test("AC1: gh-9's runs/ on its branch moves into the machine dir in one pushed commit; same step, attempt and counters", async () => {
     const s = await storyAtRework(9, "keep-it-local", "Keep it local");
     const before = h.state(s.runs());
+    h.write(handoffPath(join(s.wt, s.spec), STORY_UNIT_DIR), "## Goal\n\nKeep it local.\n\n## Notes\n\n- built it\n\n## Resume\n\nreview it\n");
     const prose = h.read(handoffPath(join(s.wt, s.spec), STORY_UNIT_DIR));
     const receipts = readdirSync(join(s.runs(), "receipts")).sort();
     toBranchRunState(s.wt, s.spec, "_story", { push: "origin" });
@@ -136,8 +137,8 @@ describe("an open story's run state moves off its branch at the holder's first t
     expect(changed.filter((l) => !l.startsWith("D\t"))).toEqual([`A\t${handoff}`]);
     expect(changed.filter((l) => l.startsWith("D\t")).every((l) => l.includes(`${s.spec}/runs/_story/`))).toBe(true);
     expect(changed).toContain(`D\t${s.spec}/runs/_story/handoff.md`);
-    // The older norn's header and heartbeat blocks are gone, Goal / Progress / Resume as written
-    expect(prose).toContain("- implement#1 done: built it");
+    // The older norn's header and heartbeat blocks are gone, the written part as it was
+    expect(prose).toContain("- built it");
     expect(handoffAt(s.wt, "HEAD", s.spec)).toBe(prose.trimEnd());
     expect(sh(s.wt, ["show", `${old}:${s.spec}/runs/_story/handoff.md`])).toContain("norn:header:begin");
     expect(sh(s.wt, ["status", "--porcelain", "--untracked-files=all"])).toBe("");
@@ -313,7 +314,7 @@ describe("a story with slices: each unit's record moves off its own branch (B34)
     expect(subject(wt())).toBe("norn: move gh-11 run state off the branch");
     expect(sh(wt(), ["rev-list", "--count", `${heads[0]}..HEAD`])).toBe("1");
     expect(treeRuns(wt(), "HEAD", SPEC)).toEqual([]);
-    expect(handoffAt(wt(), "HEAD", SPEC)).toContain("## Progress");
+    expect(handoffAt(wt(), "HEAD", SPEC)).toContain("## Resume");
     SLICES.forEach(([nn, slug], i) => {
       const w = sliceWt(nn, slug);
       expect(subject(w)).toBe(`norn: move gh-11/${nn} run state off the branch`);

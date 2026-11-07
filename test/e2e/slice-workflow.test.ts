@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { STORY_UNIT_DIR, type TickTrace, unitHandoffPath } from "@norn/schema";
 import { loadWorkflows, readTickInputs, readTrace, repoConfigPath, workflowsDir, handoffPath } from "@norn/store";
 import type { TickReport } from "../../packages/cli/src/index.ts";
-import { decide } from "@norn/core";
+import { decide, HANDOFF_SKELETON } from "@norn/core";
 import { createHarness, type Harness, issue } from "../support/harness.ts";
 import { expectTranscript, recordTranscript, type Transcript } from "../support/transcript.ts";
 import { runStateOf } from "../support/run-state.ts";
@@ -290,7 +290,7 @@ describe("a story through the slice workflow", () => {
     expect(st).toMatchObject({ step: "plan", status: "ready", mode: "auto", workflow: "mini" });
     expect(h.read(join(storyRuns(), "workflow.yaml"))).toBe(MINI);
     // The story's handoff starts as the skeleton, prose only; its status is in the brief
-    expect(h.read(handoffPath(join(storyWt(), spec), STORY_UNIT_DIR))).toBe("## Goal\n\n## Progress\n\n## Resume\n");
+    expect(h.read(handoffPath(join(storyWt(), spec), STORY_UNIT_DIR))).toBe(HANDOFF_SKELETON);
     expect(h.read(join(storyWt(), spec, "spec.md"))).toContain("status: active");
     expect(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"])).not.toBe("");
   });
@@ -301,7 +301,7 @@ describe("a story through the slice workflow", () => {
     const launch = h.runner.launches[0];
     expect(launch?.cwd).toBe(storyWt());
     expect(launch?.env).toMatchObject({ NORN_STORY: "gh-7", NORN_HOME: h.root, NORN_SLOT: "1" });
-    expect(launch?.argv.join(" ")).toContain("Use the norn skill, then run `norn brief`.");
+    expect(launch?.argv.join(" ")).toContain("Run `norn brief` in this worktree and do the step it gives you.");
     const st = h.state(storyRuns());
     expect(st?.status).toBe("running");
     expect(st?.run?.session).toEqual({ runner: "fake", session_id: "s-1", pane_id: "p-1", reach: "fake attach p-1" });

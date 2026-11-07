@@ -166,7 +166,7 @@ describe("unit files", () => {
   test("tidyHandoff: a new handoff gets the skeleton, an old one loses its generated blocks once, prose is never touched", () => {
     const u = join(tmp(), "handoffs", "_story.md");
     expect(tidyHandoff(u)).toBe(true);
-    expect(readFileSync(u, "utf8")).toBe("## Goal\n\n## Progress\n\n## Resume\n");
+    expect(readFileSync(u, "utf8")).toBe("## Goal\n\n## Done means\n\n## Easy to miss\n\n## Not proven yet\n\n## Notes\n\n## Resume\n");
     // an agent's own text: nothing to do, the file is untouched
     writeFileSync(u, "## Goal\n\nship it\n\n## Progress\n\n## Resume\n");
     expect(tidyHandoff(u)).toBe(false);

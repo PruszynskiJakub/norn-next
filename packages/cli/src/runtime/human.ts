@@ -39,7 +39,6 @@ import { opt, type ParsedArgs } from "../command.ts";
 import { claimHeld, failure, refuse, usageError } from "../output.ts";
 import { parseUnitKey } from "./args.ts";
 import { gitRemote, type Observed, observe } from "./observe/index.ts";
-import { receiptsWritten } from "./report.ts";
 import { bundledSkillSet } from "./skills-drift.ts";
 
 /** The read model for this checkout and machine (no writes, no network). */
@@ -74,8 +73,6 @@ export interface Target {
   workflow: Workflow | null;
   /** absolute runs/<unit>/ in this checkout; null when read from the remote branch only */
   runsDir: string | null;
-  /** the unit's handoff in this checkout, from its own resolver; null with `runsDir` */
-  handoffFile: string | null;
   /** where the cursor was read from */
   source: "local" | "remote";
   /**
@@ -105,7 +102,6 @@ function localTarget(obs: Observed, story: StoryFacts, uf: UnitFacts): Target {
     state: uf.state,
     workflow: uf.workflow,
     runsDir: obs.units[uf.unit.key]?.runsDir ?? null,
-    handoffFile: obs.units[uf.unit.key]?.handoffFile ?? null,
     source: "local",
     obs,
     story_facts: story,
@@ -127,7 +123,7 @@ async function remoteTarget(ctx: Context, key: string, stepOnly: StepOnlyBuild |
   await fetchElsewhere(ctx.root, remote, [story]).catch((e: Error) => {
     throw failure(`cannot fetch the record of ${story}: ${e.message}`, "check the network and retry", "record_unreachable");
   });
-  const base = { key, story, slice, runsDir: null, handoffFile: null, source: "remote" as const, obs: null, story_facts: null, ...(stepOnly ? { stepOnly } : {}) };
+  const base = { key, story, slice, runsDir: null, source: "remote" as const, obs: null, story_facts: null, ...(stepOnly ? { stepOnly } : {}) };
   if (stepOnly && ctx.config.record.policy === "local") {
     const branch = slice ? null : await remoteStoryBranch(ctx.root, remote, story);
     const b = branch ? await lastBoundary(ctx.root, `refs/remotes/${remote}/${branch}`, story, null) : null;
@@ -409,7 +405,6 @@ export interface Delivered {
 async function deliver(ctx: Context, t: Target, route: Route, receipt: Receipt): Promise<Delivered> {
   if (route.via === "local") {
     const r = appendReceipt(t.runsDir as string, receipt);
-    receiptsWritten(t.handoffFile, [receipt]);
     // repo-relative: the runs/ may live in a story or slice worktree, not under ctx.root
     const checkout = t.obs?.units[t.key]?.root ?? ctx.root;
     const rel = relative(checkout, r.file);
