@@ -8,6 +8,28 @@ import { nextCommand } from "./commands.ts";
 export const STATUS_BEGIN = "<!-- norn:status — generated from state.json, do not edit -->";
 const STATUS_END = "<!-- /norn:status -->";
 
+/**
+ * The handoff's sections, in order, each with what it holds. The handoff is the unit's current state,
+ * rewritten by whoever works on it; what happened is in the receipts, which the brief lists as History.
+ */
+export const HANDOFF_SECTIONS: ReadonlyArray<readonly [heading: string, holds: string]> = [
+  ["Goal", "what this unit must achieve, in one or two lines"],
+  ["Done means", "each check that proves the goal, and what shows it: a test, a command, an evidence file"],
+  ["Easy to miss", "the rule or edge case the quick path would break"],
+  ["Not proven yet", "what is still open or unverified"],
+  ["Notes", "decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam"],
+  ["Resume", "the exact next action, so a fresh agent or a person can continue from git alone"],
+];
+
+/** A new handoff: the section headings, empty. */
+export const HANDOFF_SKELETON = HANDOFF_SECTIONS.map(([h]) => `## ${h}\n`).join("\n");
+
+/** `norn done` refuses a handoff over this size: past it, a handoff has turned into a log. */
+export const HANDOFF_MAX_BYTES = 8 * 1024;
+
+/** The handoff's size in bytes, as `norn done` measures it. */
+export const handoffBytes = (text: string): number => new TextEncoder().encode(text).length;
+
 /** The unit's counters as the status shows them, `review_loop 1/3, test_loop 0/5`; "none" without any. */
 export function handoffCounters(state: UnitState, workflow?: Workflow | null): string {
   const max = workflow?.counters ?? {};

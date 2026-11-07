@@ -1,6 +1,6 @@
 # Contributing to norn
 
-norn is built with norn. This file is the person's side: how a change gets proposed, built and released. To run the tests and find your way in the code, read [`AGENTS.md`](AGENTS.md): it holds the dev commands, the layout, the code rules and the agent's side of the process.
+norn is built with norn. This file is the person's side: how a change gets proposed, built and released. To run the tests and find your way in the code, read [Development](docs/development.md): the dev commands, the test tiers and CI, the layout, where each contract lives, the release mechanics and the design decisions. [`AGENTS.md`](AGENTS.md) is the short map an agent reads first: the code rules and the agent's side of the process.
 
 ## The loop
 

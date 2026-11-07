@@ -64,7 +64,7 @@ describe("renderBrief", () => {
       instructions: "Base mode: merge the base commit named in Rework; never rebase.\n",
     });
     expect(b.markdown).toContain(
-      "## Your work\n\nUse the `implement` skill.\n\nBuild the slice test-first.\n\nBase mode: merge the base commit named in Rework; never rebase.\n\n## Inputs",
+      "## Your work\n\nUse the `implement` skill.\n\nBuild the slice test-first.\n\nBase mode: merge the base commit named in Rework; never rebase.\n\n## Finish with exactly one of",
     );
     expect(b.markdown).toMatchSnapshot();
   });
@@ -403,7 +403,13 @@ describe("golden replays (norn-sandbox-todoist)", () => {
     expect(b.json.rework).toMatchObject({ from: "qa.fail", counter: { name: "qa_loop", value: 1, max: 2 }, report: { outcome: "fail", evidence: { dir: `${wt}/${spec}/runs/_story/evidence/01M5MTEB6T37MVRHZ5FADDAQTK` } } });
     expect(b.json.rework?.report?.handoff).toContain("Repro in B12-repro.md");
     expect(b.json.rework?.report?.evidence?.files).toContain("B12-repro.md");
-    expect(b.markdown).not.toContain("`see Rework`\n\n## Context");
+    // evidence is a folder and a count, the likely entry points named first
+    expect(b.markdown).toContain("— 41 files: PERSON.md, report.md, AC10-tests.md, B1.md, B10.md and 36 more");
+    expect(b.markdown).not.toContain("  - B30.md");
+    // Rework comes right after the work, before how to finish and what to read
+    const at = (h: string) => b.markdown.indexOf(`\n## ${h}\n`);
+    expect(at("Rework")).toBeGreaterThan(at("Your work"));
+    expect(at("Rework")).toBeLessThan(at("Finish with exactly one of"));
     expect(b.markdown).toMatchSnapshot();
   });
 
@@ -420,7 +426,10 @@ describe("golden replays (norn-sandbox-todoist)", () => {
     expect(b.json.where).toMatchObject({ step: "implement", attempt: 2 });
     expect(b.json.rework).toMatchObject({ from: "human-qa.reject", findings: null, decision: { judged: { step: "qa", outcome: "partial" } } });
     expect(b.json.rework?.decision?.comment).toContain("'Item not found'");
-    expect(b.markdown).not.toContain("li.overdue");
+    // review#1's approve findings are not rework (History lists that report as one neutral line)
+    const rework = b.markdown.slice(b.markdown.indexOf("\n## Rework\n"), b.markdown.indexOf("\n## Finish with"));
+    expect(rework).toContain("'Item not found'");
+    expect(rework).not.toContain("li.overdue");
     expect(b.markdown).toMatchSnapshot();
   });
 
@@ -484,5 +493,68 @@ describe("Rulings (F28): gate reasons as story-level notes", () => {
     const back = renderBrief(input(st, rs, { rulings: [...rulings, ...own] }));
     expect(back.json.rework?.decision?.comment).toBe("Item not found must be shown");
     expect(back.json.rulings.map((r) => r.unit)).toEqual(["gh-1/01"]);
+  });
+});
+
+describe("the brief as a map: History from receipts, state shown only when it matters", () => {
+  const st = stateFor(SLICE, SLICE_WF);
+  const ask = (q: string) => numbered(0, receipt(st, "ask", { question: q }));
+  const renumber = (rs: NumberedReceipt[]) => rs.map((r, i) => numbered(i + 1, r.receipt));
+
+  test("History lists the unit's receipts one line each, oldest first; a regular run start is left out", () => {
+    const rs = renumber([
+      numbered(0, started(st)),
+      ask("which database?\nsqlite or postgres"),
+      numbered(0, receipt(st, "answer", { answer: "sqlite", who: "ann" }, "human")),
+      numbered(0, receipt({ ...st, step: "test" }, "check", { outcome: "fail", command: "bun test", exit_code: 1, duration_ms: 1500, output_tail: "x" }, "norn")),
+    ]);
+    const b = renderBrief(input(st, rs));
+    expect(b.json.log).toEqual({
+      lines: ["implement#1 asked: which database? sqlite or postgres", "implement#1 answer by ann: sqlite", "test#1 check `fail` (exit 1) in 1.5s"],
+      omitted: 0,
+      command: "norn run list gh-1/02",
+    });
+    expect(b.markdown).toContain("## History\n\nWhat happened in this unit so far, oldest first, from its receipts:\n\n- implement#1 asked: which database? sqlite or postgres\n");
+  });
+
+  test("History shows the last 25 lines and points at the rest", () => {
+    const rs = renumber(Array.from({ length: 30 }, (_, i) => ask(`question ${i + 1}`)));
+    const b = renderBrief(input(st, rs));
+    expect(b.json.log?.omitted).toBe(5);
+    expect(b.json.log?.lines).toHaveLength(25);
+    expect(b.markdown).toContain("- … 5 earlier (`norn run list gh-1/02`)\n- implement#1 asked: question 6\n");
+  });
+
+  test("the first brief shows no tool state: no counters, last outcome, run id or retries; ports and the deadline stay", () => {
+    const b = renderBrief(input(st, []));
+    for (const gone of ["Where you are", "Counters:", "Last outcome:", "Nudges left", "Fresh-session retries", "Run:"]) expect(b.markdown).not.toContain(gone);
+    expect(b.markdown).toContain("## Limits\n\n- Deadline: 60m");
+    expect(b.markdown).toContain("- Ports: `PORT_BASE=4030` (slot 3, in `.env.norn`)");
+    // the JSON keeps all of it for programs
+    expect(b.json.where).toMatchObject({ counters: "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5", last_outcome: "none" });
+  });
+
+  test("a counter at its max and no reminders left are said, up front and under Limits", () => {
+    const b = renderBrief(input(stateFor(SLICE, SLICE_WF, { counters: { test_loop: 5 }, nudges_used: 2 }), []));
+    expect(b.json.where.at_limit).toEqual([{ name: "test_loop", value: 5, max: 5 }]);
+    expect(b.markdown).toContain("**Last round on `test_loop` (5/5):** if the work is sent back along it once more, the unit goes stuck.");
+    expect(b.markdown).toContain("- No reminders left: end your turn only after a report.");
+  });
+
+  test("a runaway handoff is cut in the brief at twice the limit and says so", () => {
+    const handoff = `## Goal\n\nship it\n\n## Notes\n\n${"- a line of a pasted log that nobody needs again\n".repeat(400)}`;
+    const b = renderBrief(input(st, [], { handoff }));
+    expect(b.json.context.handoff_bytes).toMatchObject({ max: 8192, truncated: true });
+    expect(b.markdown).toContain("_… cut: the handoff is 20 KB; `norn done` refuses one over 8 KB._");
+    expect(b.markdown.length).toBeLessThan(16384 + 8000);
+    const small = renderBrief(input(st, [], { handoff: "## Goal\n\nship it\n" }));
+    expect(small.json.context.handoff_bytes).toMatchObject({ truncated: false });
+    expect(small.markdown).not.toContain("_… cut:");
+  });
+
+  test("the inputs say what to read each one for", () => {
+    const b = renderBrief(input(st, []));
+    expect(b.markdown).toContain("- Story spec: `.agents/specs/gh-1-login/story.md` — what the story asks (its user stories) and, once planned, how it is built (its Plan)");
+    expect(b.markdown).toContain("- Handoff: `.agents/specs/gh-1-login/handoffs/02-form.md` — the unit's current state, shown under Context: keep it current here");
   });
 });
