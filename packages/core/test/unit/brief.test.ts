@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Receipt, UnitState, Workflow } from "@norn/schema";
+import type { Finding, Receipt, UnitState, Workflow } from "@norn/schema";
 import { applyReceipts } from "../../src/apply.ts";
 import { type BriefInput, renderBrief, storyRulings } from "../../src/brief.ts";
 import type { NumberedReceipt, UnitRef } from "../../src/facts.ts";
@@ -361,6 +361,72 @@ describe("Re-entry, fresh sessions, handoff and criteria", () => {
     expect(b.json.context.resume_dropped).toBeNull();
     expect(b.markdown).toContain("Wire the email field.");
     expect(b.markdown).not.toContain("## Why this attempt");
+  });
+
+  describe("a re-review that declares last_findings checks the earlier findings first", () => {
+    const REVIEW_WF = (() => {
+      const wf = structuredClone(DECLARED);
+      (wf.steps.review as { inputs?: unknown }).inputs = ["slice", "diff", "last_findings"];
+      return wf;
+    })();
+    const EARLIER: Finding[] = [
+      { severity: "blocking", title: "Count off by one", file: "src/count.ts", line: 12 },
+      { severity: "minor", title: "Name the helper after what it returns" },
+    ];
+    /** review#1 changes_requested → implement#2 → test.pass → review#2 */
+    const review2 = (wf: Workflow) => history(at_("review", { implement: 1, review: 1 }), wf, started, done("changes_requested", { findings: EARLIER }), started, done("done"), pass);
+
+    test("the earlier review's findings are listed to check, fixed or not, and Inputs points at them", () => {
+      const { st, rs } = review2(REVIEW_WF);
+      expect(st).toMatchObject({ step: "review", attempt: 2 });
+      const b = renderBrief(input(st, rs, { workflow: REVIEW_WF }));
+      expect(b.json.rework).toBeNull();
+      expect(b.json.history?.earlier).toEqual({ attempt: 1, outcome: "changes_requested", since: ["implement.done", "test.pass"], findings: EARLIER });
+      expect(refOf(b, "last_findings")).toBe("see Earlier findings");
+      expect(b.markdown).toContain("### Earlier findings (review#1)");
+      expect(b.markdown).toContain("First check each earlier finding below against the current code: fixed or not.");
+      expect(b.markdown).not.toContain("is history, not a result for this one");
+      expect(b.markdown).toContain("1. **blocking** Count off by one — `src/count.ts:12`");
+      expect(b.markdown).toMatchSnapshot();
+    });
+
+    test("a review that does not declare last_findings keeps the earlier attempt as history only", () => {
+      const { st, rs } = review2(DECLARED);
+      const b = renderBrief(input(st, rs, { workflow: DECLARED }));
+      expect(b.json.history?.earlier).toEqual({ attempt: 1, outcome: "changes_requested", since: ["implement.done", "test.pass"] });
+      expect(b.markdown).not.toContain("Earlier findings");
+      expect(b.markdown).toContain("is history, not a result for this one");
+    });
+
+    test("no earlier findings: Last findings is none", () => {
+      const { st, rs } = history(at_("review", { implement: 1, review: 1 }), REVIEW_WF, started, done("changes_requested"), started, done("done"), pass);
+      const b = renderBrief(input(st, rs, { workflow: REVIEW_WF }));
+      expect(b.json.history?.earlier?.findings).toBeUndefined();
+      expect(refOf(b, "last_findings")).toBe("none");
+    });
+  });
+
+  test("implement's Rework sorts the findings: blocking and major to fix, minor and nit left as notes", () => {
+    const findings: Finding[] = [
+      { severity: "minor", title: "Name the helper after what it returns" },
+      { severity: "blocking", title: "Count off by one" },
+      { severity: "nit", title: "Trailing space in the label" },
+      { severity: "major", title: "Empty list crashes the footer" },
+    ];
+    const { st, rs } = history(at_("review", { implement: 1, review: 1 }), DECLARED, started, done("changes_requested", { findings }));
+    expect(st).toMatchObject({ step: "implement", attempt: 2 });
+    const b = renderBrief(input(st, rs, { workflow: DECLARED }));
+    expect(b.json.rework?.findings?.items).toEqual(findings);
+    const md = b.markdown;
+    expect(md).not.toContain("for you to weigh");
+    expect(md).toContain("Rework is the blocking and major findings: fix each one.");
+    expect(md).toContain("### Notes (review: minor and nit)");
+    expect(md).toContain("Leave these as notes: do not fix them in this round.");
+    // the ones to fix come first, then the notes
+    expect(md.indexOf("Empty list crashes the footer")).toBeLessThan(md.indexOf("### Notes (review: minor and nit)"));
+    expect(md.indexOf("Count off by one")).toBeLessThan(md.indexOf("### Notes (review: minor and nit)"));
+    expect(md.indexOf("Trailing space in the label")).toBeGreaterThan(md.indexOf("### Notes (review: minor and nit)"));
+    expect(md).toMatchSnapshot();
   });
 
   test("without declared criteria the brief points at the spec's Acceptance section", () => {

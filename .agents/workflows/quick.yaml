@@ -56,7 +56,7 @@ steps:
   review:
     type: agent
     skill: norn-review
-    inputs: [spec, diff]
+    inputs: [spec, diff, last_findings]
     outcomes:
       approve:           { to: describe, means: "the change does what the story asks and nothing else, no blocking findings" }
       changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
