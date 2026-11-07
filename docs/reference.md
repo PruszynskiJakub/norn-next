@@ -191,7 +191,7 @@ Take a story over on this machine: claim it, check out its branches, print the h
 norn story checkout [<story>] [--force]
 ```
 
-- `--force`: take over a claim another machine still holds (journaled in the claim and the handoff)
+- `--force`: take over a claim another machine still holds (journaled in the claim and the take receipt)
 
 ##### `norn story handoff`
 

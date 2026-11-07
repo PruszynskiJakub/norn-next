@@ -53,7 +53,7 @@ describe("inbox", () => {
     const inbox = buildInbox(facts([storyFacts("gh-1", units), released], {}, now), CONFIG);
     const view = Object.fromEntries(Object.entries(inbox.groups).map(([g, items]) => [g, items.map((i) => `${i.slice ?? i.story} | ${i.title} | ${i.age} | ${i.command}`)]));
     expect(view).toEqual({
-      your_turn: [`gh-1 | refine: attended step — work with the agent | 1h | cd /r-worktrees/gh-1-login && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'`],
+      your_turn: [`gh-1 | refine: attended step — work with the agent | 1h | cd /r-worktrees/gh-1-login && claude --permission-mode auto -- 'Run \`norn brief\` in this worktree and do the step it gives you.'`],
       answer: ['gh-1/01 | Which DB? | 1h | norn story answer gh-1/01 "…"'],
       approve: ["gh-1/02 | approve or reject human-qa | 1h | norn story approve gh-1/02"],
       unblock: ["gh-1/03 | review_loop 3/3 at review.changes_requested | 1h | norn run rerun gh-1/03 --step implement --reset review_loop"],
@@ -72,7 +72,7 @@ describe("inbox", () => {
     const f = facts([storyFacts("gh-1", [unitFacts(storyUnit(), STORY_WF, st)])]);
     f.machine.runner_capabilities = { send: true, resume: true, open: true };
     expect(buildInbox(f, CONFIG).groups.your_turn).toMatchObject([
-      { command: "norn story start gh-1", detail: `by hand: cd /r-worktrees/gh-1-login && claude --permission-mode auto -- 'Use the norn skill, then run \`norn brief\`.'` },
+      { command: "norn story start gh-1", detail: `by hand: cd /r-worktrees/gh-1-login && claude --permission-mode auto -- 'Run \`norn brief\` in this worktree and do the step it gives you.'` },
     ]);
   });
 
@@ -112,7 +112,7 @@ describe("the inbox points only at a worktree on disk, as decide does (refactor 
   test("a manual ready step whose worktree is gone: start command without cd, same as no worktree", () => {
     const uf = unitFacts(SLICE, SLICE_WF, stateFor(SLICE, SLICE_WF));
     const view = manual(gone(uf)).groups.your_turn[0];
-    expect(view?.command).toBe("claude --permission-mode auto -- 'Use the norn skill, then run `norn brief`.'");
+    expect(view?.command).toBe("claude --permission-mode auto -- 'Run `norn brief` in this worktree and do the step it gives you.'");
     expect(view).toEqual(manual(absent(uf)).groups.your_turn[0]);
     // on disk: the person is told to cd into it
     expect(manual(uf).groups.your_turn[0]?.command).toStartWith("cd /r-worktrees/gh-1-login--02-form && ");
@@ -131,11 +131,11 @@ describe("the inbox points only at a worktree on disk, as decide does (refactor 
 describe("start command for a person", () => {
   test("carries the agent's configured args, ended by --", () => {
     expect(startAgentCommand("/w", "claude", ["--allowedTools", "Bash(git:*)", "Read"])).toBe(
-      "cd /w && claude --allowedTools 'Bash(git:*)' Read -- 'Use the norn skill, then run `norn brief`.'",
+      "cd /w && claude --allowedTools 'Bash(git:*)' Read -- 'Run `norn brief` in this worktree and do the step it gives you.'",
     );
   });
   test("no args, no --", () => {
-    expect(startAgentCommand(null, "codex")).toBe("codex 'Use the norn skill, then run `norn brief`.'");
+    expect(startAgentCommand(null, "codex")).toBe("codex 'Run `norn brief` in this worktree and do the step it gives you.'");
   });
 });
 
