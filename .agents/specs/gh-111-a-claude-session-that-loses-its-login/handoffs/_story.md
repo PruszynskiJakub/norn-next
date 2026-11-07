@@ -30,4 +30,4 @@ A Claude session that loses its login mid-step parks on an implicit ask that say
 
 ## Resume
 
-Review #3 approved the current HEAD (no findings); next is the workflow's step after review (CI on the pushed branch).
+describe#2 rewrote pr.md for the current HEAD (adds the CI-fixed integration test to the evidence); next is updating the PR and CI on the pushed branch.
