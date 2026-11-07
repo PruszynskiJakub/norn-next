@@ -491,6 +491,8 @@ async function journalTake(
     storyWt: string | null;
     worktrees: ReadonlyArray<{ unit: string; path: string; branch: string }>;
     more: CheckoutRecord | undefined;
+    /** the take receipt was written (the story unit has state) */
+    receipted: boolean;
   },
 ) {
   const { key, spec_dir } = run;
@@ -507,8 +509,9 @@ async function journalTake(
     const pushed = remote && sha ? await git.push(storyWt, remote, `refs/heads/${branch}:refs/heads/${branch}`) : null;
     committed = { commit: sha, pushed: pushed ? pushed.ok : null };
   }
-  if (line) journal = { line, commit: committed?.commit ?? null, note: "journaled in the claim blob (forced_from) and the take receipt" };
-  return { journal, extra };
+  // A forced take commits nothing of its own: the journal names where it is recorded
+  if (line) journal = { line, commit: null, pushed: null, note: `journaled in the claim blob (forced_from) and ${o.receipted ? "the take receipt" : "the trace"}` };
+  return { journal, extra, committed };
 }
 
 /**
@@ -636,7 +639,7 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       onStoryFailed: (problems) => failure(`${problems.join("; ")}; ${held}`, `fix the story branch, then ${again} again`, "branch_diverged", { claim: blob }),
     });
 
-    const { journal, extra } = await journalTake(git, remote, run, { branch, holder, now, nowIso, forced_from: forced ? (blob.forced_from ?? null) : null, storyWt, worktrees, more });
+    const { journal, extra, committed } = await journalTake(git, remote, run, { branch, holder, now, nowIso, forced_from: forced ? (blob.forced_from ?? null) : null, storyWt, worktrees, more, receipted: record.receipt !== null });
 
     const value = {
       story: key,
@@ -645,6 +648,8 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
       taken_from: prev && !mine ? { holder: prev.holder, since: prev.acquired_at, expires_at: prev.expires_at, expired: Date.parse(prev.expires_at) <= now } : null,
       forced,
       journal,
+      // What `more` committed on the story branch, and whether it was pushed
+      ...(committed ? { committed } : {}),
       // The take receipt is in the machine dir, never committed or pushed
       receipt: record.receipt ? { file: record.receipt } : { file: null, note: record.note },
       // The record taken over from its ref; why the step restarts, when it does

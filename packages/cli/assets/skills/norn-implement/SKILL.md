@@ -16,7 +16,7 @@ Without this, code lands before its test, rework gets patched without a test tha
    A finding no test can show (a name, a smell, a doc) is fixed directly, the suite staying green. When a failing check or a repro does not fail for you on the first try (flaky, CI-only, timing), invoke `norn-diagnose` and get a loop that goes red before the red test; never fix a failure you have not seen fail. Then go on with criteria not yet covered.
 3. **Build test-first.** Invoke `norn-tdd` and work red → green, one tracer bullet at a time. The Plan's seams are the pre-agreed seams `norn-tdd` asks for; when a behaviour cannot be observed at any of them, use the highest existing seam that does and say so when you hand back. A docs change or a pure refactor needs no new test, only a green suite.
 4. Run the type check and the repo's fast suite after each change. Slower tiers (integration, end-to-end) run in their own check; do not run them before handing back.
-5. **Review pass.** Read your whole diff as review will: every criterion or rework point met and nothing beyond it, the repo's documented standards, and the smells in [`norn-review`'s SMELLS.md](../norn-review/SMELLS.md). Refactor here, not inside the loop, the suite green after each change.
+5. **Review pass.** Read your whole diff as review will: every criterion or rework point met and nothing beyond it, the repo's documented standards, and the smells in [`norn-review`'s SMELLS.md](../norn-review/SMELLS.md). Refactor here, not inside the loop, the suite green after each change. In what you hand back, name for each behaviour you changed the test that went red first (`file` › test name), so the PR can show it.
 
 ## Rules
 

@@ -1,6 +1,6 @@
 # Reviewing a norn change
 
-Short on purpose. The contributor guide is `AGENTS.md`.
+Short on purpose. The code rules in full are in [`docs/development.md`](docs/development.md#code-rules); `AGENTS.md` is the map.
 
 ## Skip
 

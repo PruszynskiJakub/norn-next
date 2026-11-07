@@ -18,7 +18,7 @@ steps:
       labels: `norn:kind:bug|feature|security|chore|docs`, `norn:risk:low|medium|high`,
       `norn:priority:low|medium|high|extreme`; a label missing on the remote is named in the comment with
       "norn upgrade creates it". That comment and those labels are the only remote writes this step allows,
-      an exception to the norn skill's rule; never remove a label, the intake label `norn` included. Change no file, spec.md included,
+      an exception to the brief's rule on remote writes; never remove a label, the intake label `norn` included. Change no file, spec.md included,
       but the handoff. The recommendation lives only in that comment:
       report `norn done done --handoff "<recommendation>: <reason>"`.
     outcomes:
