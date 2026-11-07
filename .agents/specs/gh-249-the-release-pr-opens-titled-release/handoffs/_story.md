@@ -2,12 +2,14 @@
 
 An open story PR follows its issue's title, so a release PR opened as "Release" becomes "Release X.Y.Z" once `prepare` renames the issue, without a person renaming it by hand; the `ready` gate's title check goes.
 
-## Done means
+## Proof
 
-- decide emits `retitle_pr` (rule `remote.pr_title`) for an open PR whose title differs from the issue's: `packages/core/test/unit/decide.test.ts` ("an open PR whose title is not the issue's is retitled to it…"), plus a rule case in `packages/core/test/rule-cases.ts`.
-- End to end over the harness: the issue renamed after open-pr → the PR is retitled at the next remote sync, exactly once, and not again at the sync after: `packages/cli/test/integration/pr-body.test.ts` ("story PR title"). Red with the decide rule disabled, green with it.
-- RemotePort `editPullRequestTitle` and `RemotePullRequest.title` hold for gh, glab and FakeRemote: contract test "editPullRequestTitle renames the PR, which findPullRequest and findPullRequests then report" (`packages/adapters/test/contract/remote.ts`), and gh/glab unit tests over the fixtures.
-- `bun run test` (1291 pass after merging main 7fd61b2) and `bun run typecheck` green.
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| Wanted: PR title follows the issue | an open PR whose title differs from the issue's gets the issue's title (rule `remote.pr_title`) | test | `packages/core/test/unit/decide.test.ts` › "an open PR whose title is not the issue's is retitled to it, alongside the unit's own action"; `packages/core/test/rule-cases.ts` › "the issue renamed with its PR open: the PR takes the new title" |
+| Wanted: end to end | the issue renamed after open-pr: the PR is retitled once at the next sync and not again | test | `packages/cli/test/integration/pr-body.test.ts` › "story PR title" › "the issue renamed after open-pr: …, once" |
+| Port: editPullRequestTitle and PR title | gh, glab and FakeRemote rename a PR and report its title | test | `packages/adapters/test/contract/remote.ts` › "editPullRequestTitle renames the PR, which findPullRequest and findPullRequests then report"; gh/glab unit tests › "editPullRequestTitle replaces the title" (GitLab draft prefix not covered: review F1) |
+| Wanted: the gate's title check goes | the `ready` gate prompt no longer asks for a hand rename | agent | `.agents/workflows/release.yaml` ready prompt (read in review) |
 
 ## Easy to miss
 
@@ -16,6 +18,7 @@ An open story PR follows its issue's title, so a release PR opened as "Release" 
 
 ## Not proven yet
 
+- Review #1, blocking F1: on GitLab, a draft MR's title is `Draft: <title>`, so every norn draft MR looks mistitled. The first sync retitles it to the bare issue title, which also clears its draft status. Findings: the file passed to review.
 - Not run against real gh/glab: `gh pr edit --title`, `glab mr update --title … --yes`, and the `title` field in `gh pr list/view --json`, the gh GraphQL node and the GitLab GraphQL node are the documented flags and fields, checked only against the scripted CLIs.
 - e2e transcripts were not run locally (CI does); a retitle fires only when the PR and issue titles differ, which they don't in the existing flows.
 
@@ -28,4 +31,4 @@ An open story PR follows its issue's title, so a release PR opened as "Release" 
 
 ## Resume
 
-Implementation done and committed; next is the workflow's next step (review / CI).
+Rework review #1 F1 (blocking): drop GitLab's draft prefix before comparing titles, keep the MR a draft when retitling it, and add a glab fixture with a real `Draft: ` title. F2 (minor): give retitle_pr its own act-failure slot.
