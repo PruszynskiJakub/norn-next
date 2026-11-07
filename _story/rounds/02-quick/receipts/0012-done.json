@@ -1,0 +1,1 @@
+{"kind":"done","receipt_id":"01M6TRNY5C4EPGMGDWVCMD852Q","run_id":"01M6TRMQA7WACB2YKT8MZKVPR2","step":"describe","attempt":1,"at":"2026-11-07T10:25:46.157Z","by":"agent","who":"claude","outcome":"done","handoff":"pr.md written: appendProgress fix summary, W1/W2 evidence from unit tests (no QA), two-way door, handoff-only blast radius"}
