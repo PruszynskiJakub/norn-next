@@ -46,7 +46,7 @@ export function heldHere(obs: Observed, story: StoryFacts): boolean {
   return writtenHere(story.claim, obs.heartbeat_id);
 }
 
-/** Commit edits to each unit's handoff.md (agents and people write Goal/Progress/Resume) before a handoff point. */
+/** Commit edits to each unit's handoff (agents and people write it; norn never does) before a handoff point. */
 async function commitHandoffs(obs: Observed, story: StoryFacts): Promise<string[]> {
   const out: string[] = [];
   for (const u of story.units) {

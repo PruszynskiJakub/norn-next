@@ -89,7 +89,7 @@ An agent that dies is classified `died` and retried; one that goes quiet is nudg
 
 ## What gets committed, and where run state lives
 
-A step boundary commits only the agent's work and the unit's handoff, `handoffs/<unit>.md` in the spec folder (`_story.md` for the story, `<nn>-<slug>.md` for a slice), and pushes the unit's branch. A story's PR holds the code, the spec and the handoffs, nothing of norn's own. A handoff is prose only (Goal, Progress, Resume): the status it used to carry (step, attempt, counters, last outcome) is printed by `norn brief` and `norn story checkout` above it. Each boundary commit carries trailers naming the story, slice and step; one that ends a step also names its outcome and the step it led to (`Norn-Outcome`, `Norn-Next`), which is what another machine reads as the story's last boundary.
+A step boundary commits only the agent's work and the unit's handoff, `handoffs/<unit>.md` in the spec folder (`_story.md` for the story, `<nn>-<slug>.md` for a slice), and pushes the unit's branch. A story's PR holds the code, the spec and the handoffs, nothing of norn's own. A handoff is prose only and holds the unit's current state (Goal, Done means, Easy to miss, Not proven yet, Notes, Resume), at most 8 KB: `norn done` refuses a larger one. norn never writes into it; the unit's status is printed by `norn brief` and `norn story checkout` above it, and what happened is in the receipts, which the brief lists as History. Each boundary commit carries trailers naming the story, slice and step; one that ends a step also names its outcome and the step it led to (`Norn-Outcome`, `Norn-Next`), which is what another machine reads as the story's last boundary.
 
 A unit's **run state** (`state.json`, the numbered receipts, the pinned workflow, logs of failed checks and QA evidence) lives on the machine that runs the story, in the checkout's machine dir: `~/.norn/repos/<id>/runs/<story>/<unit>/`. It is in no worktree and on no branch, so removing a worktree or running `git clean -fdx` leaves the story where it was, and it leaves the machine only as the story's record, when norn pushes it to the record ref.
 
@@ -106,7 +106,7 @@ How handover and takeover work, with and without a record on the ref, is in [Rec
 
 ## Skills
 
-A step's craft is in a skill: `norn init` copies norn's skills into `.agents/skills/` and links them from each agent's skill folder. The `norn` skill is the protocol every step follows (read the brief, work in scope, report once); the others do one kind of step each. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing or not linked, and fails on a bundled skill that differs from the running norn's copy. The `norn-review` skill also reads `REVIEW.md` at the repo root: paths a review ignores, what counts as failure in this repo and what not to report. `norn init` writes a short starter when the repo has none and never changes yours.
+A step's craft is in a skill: `norn init` copies norn's skills into `.agents/skills/` and links them from each agent's skill folder. The brief carries the protocol every step follows (work in scope, keep the handoff, report once) and names the step's skill; the `norn` skill only sends an agent to the brief, and the others do one kind of step each. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing or not linked, and fails on a bundled skill that differs from the running norn's copy. The `norn-review` skill also reads `REVIEW.md` at the repo root: paths a review ignores, what counts as failure in this repo and what not to report. `norn init` writes a short starter when the repo has none and never changes yours.
 
 A bundled skill (a `norn`-prefixed folder in `.agents/skills/`) that differs from the running norn's copy is **drift**. A unit keeps running on the skills its worktree holds, as it keeps its pinned workflow: its agent steps start, and `norn brief`, `norn story start` and `norn story chat` work there. The inbox shows the difference as a Check item, and the new copies arrive when the story branch merges its base. When the main checkout drifted, the inbox names `norn upgrade` and a commit. Your own skills, without the `norn-` prefix, are never checked.
 
@@ -142,10 +142,10 @@ A repo without the key works as before; `doctor` and `status` hint to run `norn 
 | mode | Who starts a story's unattended agent steps: a person (`manual`) or norn (`auto`). |
 | receipt | An immutable, numbered record of something that happened to a unit, written before its effect. |
 | claim | A git ref that gives one checkout the right to drive a story. |
-| handoff | `handoffs/<unit>.md` in the spec folder, on the unit's branch: goal, progress and the next action, so anyone can continue. |
+| handoff | `handoffs/<unit>.md` in the spec folder, on the unit's branch: the unit's current state (goal, what done means, what is easy to miss or not proven yet, notes, the next action), rewritten by whoever works on it, so anyone can continue. What happened is in the receipts. |
 | run state | A unit's state, receipts, pinned workflow, logs and evidence, kept in the checkout's machine dir (`~/.norn/repos/<id>/runs/`), never in a worktree or on a branch; it leaves the machine only as the record. |
 | record | A story's run state packed into one commit on `refs/norn/runs/<story>` on the remote: pushed on a claim release, by `open-pr`, at the end, and under `remote` whenever it changed. |
-| brief | What `norn brief` tells the agent of a step: where it is, the skill, the inputs and how to report. |
+| brief | What `norn brief` tells the agent of a step: the work and its skill, why this attempt, how to report, what to read, the handoff and the unit's history, and how to work. |
 | inbox | Everything that needs a person, with the command that resolves each item (`norn status`). |
 | tick | One pass of the heartbeat: observe, decide, act. |
 | worktree | The git worktree a unit works in. |

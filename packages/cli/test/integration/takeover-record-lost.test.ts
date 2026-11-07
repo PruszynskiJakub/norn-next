@@ -152,7 +152,8 @@ describe("checkout with the record lost starts a new round from the branch (B25,
     // The brief says the record was lost and to check the branch first
     const brief = await B.at(s.wt(B.root), "brief");
     expect(brief.exit).toBe(0);
-    const why = brief.stdout.slice(brief.stdout.indexOf("## Why this attempt"), brief.stdout.indexOf("## Your work"));
+    const from = brief.stdout.indexOf("## Why this attempt");
+    const why = brief.stdout.slice(from, brief.stdout.indexOf("\n## ", from + 1));
     expect(why.toLowerCase()).toContain(line);
     expect(why).toContain("check the branch");
     const json = await B.at(s.wt(B.root), "brief", "--json");

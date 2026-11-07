@@ -22,7 +22,7 @@ import { effectiveMode } from "./policy.ts";
 import { epoch, iso } from "./time.ts";
 import { edgeOf, reportableOutcomes, stepOf } from "./workflow.ts";
 import { cmd } from "./commands.ts";
-import { handoffCounters, handoffLastOutcome } from "./handoff.ts";
+import { HANDOFF_MAX_BYTES, HANDOFF_SECTIONS, handoffBytes, handoffCounters, handoffLastOutcome } from "./handoff.ts";
 import { branchRewrittenLine, recordLostLine } from "./apply.ts";
 
 export interface BriefInput {
@@ -121,7 +121,20 @@ export interface BriefCheck {
 }
 
 export interface BriefJson {
-  where: { story: string; slice: string | null; step: string; attempt: number; counters: string; last_outcome: string; mode: Mode; mode_note: string | null; attended: boolean; run_id: string | null };
+  where: {
+    story: string;
+    slice: string | null;
+    step: string;
+    attempt: number;
+    counters: string;
+    /** counters at their max: one more send-back along their edge makes the unit stuck */
+    at_limit: Array<{ name: string; value: number; max: number }>;
+    last_outcome: string;
+    mode: Mode;
+    mode_note: string | null;
+    attended: boolean;
+    run_id: string | null;
+  };
   /** why this run is not a first entry of the step; null when it is, or when Rework already says why */
   history: {
     /** A session of this attempt ended without reporting; this is a fresh one */
@@ -134,7 +147,8 @@ export interface BriefJson {
     record_lost?: { holder: string | null; line: string } | null;
   } | null;
   work: { skill: string; instructions: string | null; description: string | null };
-  inputs: Array<{ kind: string; label: string; ref: string }>;
+  /** `purpose`: what to read the input for */
+  inputs: Array<{ kind: string; label: string; ref: string; purpose?: string }>;
   rework: {
     /** `<step>.<outcome>` that sent the work back */
     from: string;
@@ -164,12 +178,18 @@ export interface BriefJson {
   rulings: Ruling[];
   context: {
     handoff: string | null;
+    /** the handoff's size; past `max` the brief shows only its start */
+    handoff_bytes: { bytes: number; max: number; truncated: boolean } | null;
     /** the report (`<step>#<attempt>`) whose handoff Resume was dropped: it was written for that step, not this one */
     resume_dropped: string | null;
     answers: Array<{ question: string; answer: string }>;
     /** findings of the previous step on a forward entry: for information, not rework */
     notes: { step: string; outcome: string; items: Finding[] } | null;
   };
+  /** What happened in this unit, one line per receipt, oldest first; `omitted`: earlier lines left out */
+  log: { lines: string[]; omitted: number; command: string } | null;
+  /** the handoff's file, for the protocol's handoff rules */
+  handoff_file: string;
   /** `verdict`: reportable only when the worst verdict of the criteria report is this one */
   finish: Array<{ command: string; means: string; verdict?: string }>;
   /** The criteria the `--criteria` report must cover, when declared */
@@ -183,8 +203,8 @@ export interface Briefing {
 }
 
 const TAIL_LINES = 60;
-/** evidence files listed by name in the markdown; the JSON lists them all */
-const MAX_FILES = 50;
+/** evidence files named in the markdown; the JSON lists them all */
+const NAMED_FILES = 5;
 
 /** Shift markdown headings so the shallowest becomes level `min` (handoff nests under Context). */
 function demoteHeadings(md: string, min: number): string {
@@ -211,7 +231,9 @@ export function renderBrief(input: BriefInput): Briefing {
     rework: rw,
     checks: checksSince(input, step),
     rulings: rulingsFor(input),
-    context: { handoff: handoff.text, resume_dropped: handoff.resume_dropped, answers: answers(input), notes: rw ? null : notes(input) },
+    context: { handoff: handoff.text, handoff_bytes: handoff.bytes, resume_dropped: handoff.resume_dropped, answers: answers(input), notes: rw ? null : notes(input) },
+    log: receiptLog(input),
+    handoff_file: `${input.paths.spec_dir}/${unitHandoffPath(input.unit.dir)}`,
     finish: finish(step),
     criteria: criteriaFor(input),
     limits: limits(input, step),
@@ -228,6 +250,10 @@ function where(input: BriefInput, step: AgentStep): BriefJson["where"] {
     step: st.step,
     attempt: st.attempt,
     counters: handoffCounters(st, input.workflow),
+    at_limit: Object.entries(input.workflow.counters ?? {}).flatMap(([name, c]) => {
+      const value = st.counters[name] ?? 0;
+      return c.max > 0 && value >= c.max ? [{ name, value, max: c.max }] : [];
+    }),
     last_outcome: handoffLastOutcome(st),
     mode,
     mode_note: downgraded ? "auto requested, no runner; running manual" : null,
@@ -242,16 +268,16 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): Br
     if (typeof i === "object") return [{ kind: "file", label: i.label ?? i.file, ref: `${p.spec_dir}/${i.file}` }];
     switch (i) {
       case "spec":
-        return [{ kind: i, label: "Story spec", ref: p.story_file }];
+        return [{ kind: i, label: "Story spec", ref: p.story_file, purpose: "what the story asks (its user stories) and, once planned, how it is built (its Plan)" }];
       case "slice":
-        return p.slice_file ? [{ kind: i, label: "Slice", ref: p.slice_file }] : [];
+        return p.slice_file ? [{ kind: i, label: "Slice", ref: p.slice_file, purpose: "this slice's scope and acceptance criteria, each with its verifier" }] : [];
       case "slices":
-        return [{ kind: i, label: "Slices", ref: `${p.spec_dir}/slices/` }];
+        return [{ kind: i, label: "Slices", ref: `${p.spec_dir}/slices/`, purpose: "every slice file: scope, dependencies, acceptance criteria" }];
       case "diff":
-        return input.diff_range ? [{ kind: i, label: "Diff", ref: `git diff ${input.diff_range}` }] : [];
+        return input.diff_range ? [{ kind: i, label: "Diff", ref: `git diff ${input.diff_range}`, purpose: "the change so far, against the story's base" }] : [];
       case "handoff":
         // its text is already under Context: name the file to update, not one to read again
-        return [{ kind: i, label: "Handoff (text under Context; update it here)", ref: `${p.spec_dir}/${unitHandoffPath(input.unit.dir)}` }];
+        return [{ kind: i, label: "Handoff", ref: `${p.spec_dir}/${unitHandoffPath(input.unit.dir)}`, purpose: "the unit's current state, shown under Context: keep it current here" }];
       // Point at Rework only when it holds something for this input
       case "last_check":
         return [{ kind: i, label: "Last failing check", ref: rw?.check ? "see Rework" : "none" }];
@@ -368,13 +394,86 @@ function history(input: BriefInput, rw: BriefJson["rework"]): BriefJson["history
  * The handoff body for Context. Its Resume is the next action of whoever reported last; when
  * that was another step or attempt, it is dropped so it is not taken as this step's instruction.
  */
-function handoffFor({ state: st, receipts, handoff }: BriefInput): { text: string | null; resume_dropped: string | null } {
-  const body = handoff?.trim();
-  if (!body) return { text: null, resume_dropped: null };
+function handoffFor({ state: st, receipts, handoff }: BriefInput): { text: string | null; bytes: BriefJson["context"]["handoff_bytes"]; resume_dropped: string | null } {
+  const whole = handoff?.trim();
+  if (!whole) return { text: null, bytes: null, resume_dropped: null };
+  // A runaway handoff (a script gone wrong, a pasted log) never floods the brief: show its start only
+  const size = handoffBytes(whole);
+  const shown = 2 * HANDOFF_MAX_BYTES;
+  const body = size > shown ? `${cutBytes(whole, shown)}\n\n_… cut: the handoff is ${Math.ceil(size / 1024)} KB; \`norn done\` refuses one over ${HANDOFF_MAX_BYTES / 1024} KB._` : whole;
+  const bytes = { bytes: size, max: HANDOFF_MAX_BYTES, truncated: size > shown };
   const last = receipts.findLast(({ receipt: r }) => r.kind === "done" || r.kind === "ask" || r.kind === "stuck")?.receipt;
   const foreign = last && (last.step !== st.step || last.attempt !== st.attempt) ? `${last.step}#${last.attempt}` : null;
   const text = foreign ? dropSection(body, "Resume", `_Resume omitted: ${foreign} wrote it for its own step; it does not apply to ${st.step}._`) : body;
-  return { text: demoteHeadings(text, 3), resume_dropped: foreign && text !== body ? foreign : null };
+  return { text: demoteHeadings(text, 3), bytes, resume_dropped: foreign && text !== body ? foreign : null };
+}
+
+/** The first `max` bytes of `text`, cut at a line end. */
+function cutBytes(text: string, max: number): string {
+  const enc = new TextEncoder();
+  let out = "";
+  for (const line of text.split("\n")) {
+    if (enc.encode(`${out}${line}\n`).length > max) break;
+    out += `${line}\n`;
+  }
+  return out.trimEnd();
+}
+
+/** Receipt lines the brief shows under History; earlier ones are counted, not shown. */
+const LOG_LINES = 25;
+const oneLine = (text: string, max = 160) => {
+  const t = text.replace(/\s+/g, " ").trim();
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+};
+
+/** One line for a receipt, or null for one that only records bookkeeping (a regular run start). */
+export function receiptLine(r: Receipt): string | null {
+  const at = `${r.step}#${r.attempt ?? "?"}`;
+  const by = "who" in r && r.who ? ` by ${r.who}` : "";
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  switch (r.kind) {
+    case "done":
+      return `${at} reported \`${r.outcome}\`${r.findings?.length ? ` (${plural(r.findings.length, "finding")})` : ""}: ${oneLine(r.handoff)}`;
+    case "ask":
+      return `${at} asked: ${oneLine(r.question)}`;
+    case "answer":
+      return `${at} answer${by}: ${oneLine(r.answer)}`;
+    case "stuck":
+      return `${at} stuck: ${oneLine(r.reason)}`;
+    case "approve":
+      return `${at} approve${by}${r.comment?.trim() ? `: ${oneLine(r.comment)}` : ""}`;
+    case "reject":
+      return `${at} reject${by}: ${r.comment?.trim() ? oneLine(r.comment) : "(no comment given)"}`;
+    case "unstick":
+      return `${at} unstuck${by}${r.to ? ` to ${r.to}` : ""}${r.comment?.trim() ? `: ${oneLine(r.comment)}` : ""}`;
+    case "mode":
+      return `mode ${r.previous} → ${r.mode}`;
+    case "check":
+      return `${at} check \`${r.outcome}\`${r.outcome === "fail" ? ` (exit ${r.exit_code ?? "none"}${r.reason ? `, ${r.reason}` : ""})` : ""} in ${duration(r.duration_ms)}`;
+    case "started":
+      return r.retry ? `${at} fresh session started` : null;
+    case "classify":
+      return `${at} \`${r.outcome}\` → ${r.route}${r.detail ? `: ${oneLine(r.detail)}` : ""}`;
+    case "workflow":
+      return `workflow switched to ${r.name}, at ${r.to}`;
+    case "take":
+      return `taken over${r.previous_holder ? ` from ${r.previous_holder}` : ""}${r.forced ? " (forced)" : ""}${r.record_lost ? ", record lost" : ""}`;
+    case "update":
+      return `sent back through the base update: ${r.from} → ${r.to}`;
+    case "round":
+      return `round started: ${r.workflow} at ${r.to}${r.forced ? " (forced)" : ""}`;
+  }
+}
+
+/** History: the unit's receipts as one line each, the last `LOG_LINES` of them. */
+function receiptLog(input: BriefInput): BriefJson["log"] {
+  const lines = input.receipts.flatMap(({ receipt }) => {
+    const l = receiptLine(receipt);
+    return l === null ? [] : [l];
+  });
+  if (!lines.length) return null;
+  const omitted = Math.max(0, lines.length - LOG_LINES);
+  return { lines: lines.slice(omitted), omitted, command: cmd.runList(input.unit.key) };
 }
 
 /** Replace the body of the markdown section titled `title` (any level, up to the next heading as high) with `note`. */
@@ -560,26 +659,49 @@ function criteriaLines(out: string[], items: readonly CriterionVerdict[] | undef
 
 function evidenceLines(out: string[], e: BriefEvidence | null): void {
   if (!e) return;
-  out.push(`- Evidence: \`${e.dir}/\``);
-  for (const f of e.files.slice(0, MAX_FILES)) out.push(`  - ${f}`);
-  if (e.files.length > MAX_FILES) out.push(`  - … ${e.files.length - MAX_FILES} more`);
-  out.push("");
+  // A folder and a count, the likely entry points named first: the agent lists the rest when it needs them
+  const first = /^(report|summary|readme|person)/i;
+  const named = [...e.files.filter((f) => first.test(f)), ...e.files.filter((f) => !first.test(f))].slice(0, NAMED_FILES);
+  const more = e.files.length - named.length;
+  const files = e.files.length ? ` — ${e.files.length} file${e.files.length === 1 ? "" : "s"}: ${named.join(", ")}${more ? ` and ${more} more` : ""}` : "";
+  out.push(`- Evidence: \`${e.dir}/\`${files}`, "");
 }
 
+/** How to work: the step protocol every brief carries, so no other file has to be read for it. */
+export function protocolLines(handoffFile: string): string[] {
+  return [
+    "- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.",
+    "- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, `.norn-unit`, `.env.norn`), and do not survey the repository, `.agents/`, `.claude/` or the machine to find your bearings.",
+    "- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in `.env.norn`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.",
+    `- The handoff \`${handoffFile}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:`,
+    ...HANDOFF_SECTIONS.map(([h, holds]) => `  - **${h}**: ${holds}.`),
+    `  Keep it under ${HANDOFF_MAX_BYTES / 1024} KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.`,
+    "- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the `--handoff` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter `criteria`, the criteria report, a finding's `criterion`), always next to what it says.",
+    "- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs `--findings` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.",
+    "- Of the norn commands, run only `brief`, `done`, `ask` and `stuck`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise `norn ask`.",
+    "- Never `git push` (only norn pushes), and never switch branches or worktrees. Never run a `gh` or `glab` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.",
+    "- Never edit anything under `runs/` (norn's run state, kept outside the worktree). The repo's workflows (`.agents/workflows/`) and its norn config in `.agents/` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.",
+  ];
+}
+
+/**
+ * The brief, ordered for the reader: what to do and why this attempt, how to finish, then what to read
+ * and the state behind it, the protocol, and only the limits that matter.
+ */
 function markdown(b: BriefJson): string {
   const w = b.where;
   const out: string[] = [];
   const unitKey = w.slice ?? w.story;
   out.push(`# norn brief — ${unitKey} · ${w.step} #${w.attempt}`, "");
+  out.push("You do one step of a larger delivery and report how it ended, once; code decides what happens next.", "");
+  if (w.attended) out.push("**Attended step:** work with the person in this session, and report `done` only once they agree.", "");
+  if (w.mode_note) out.push(`Mode: ${w.mode} (${w.mode_note}).`, "");
+  for (const c of w.at_limit) out.push(`**Last round on \`${c.name}\` (${c.value}/${c.max}):** if the work is sent back along it once more, the unit goes stuck.`, "");
 
-  out.push("## Where you are", "");
-  out.push(`- Story: ${w.story}`);
-  if (w.slice) out.push(`- Slice: ${w.slice}`);
-  out.push(`- Step: ${w.step} (attempt ${w.attempt})`);
-  out.push(`- Counters: ${w.counters}`);
-  out.push(`- Last outcome: ${w.last_outcome}`);
-  out.push(`- Mode: ${w.mode}${w.mode_note ? ` (${w.mode_note})` : ""}${w.attended ? " · attended: work with the person in this session" : ""}`);
-  if (w.run_id) out.push(`- Run: ${w.run_id}`);
+  out.push("## Your work", "");
+  out.push(`Use the \`${b.work.skill}\` skill.`);
+  if (b.work.description) out.push("", b.work.description);
+  if (b.work.instructions) out.push("", b.work.instructions.trim());
   out.push("");
 
   const h = b.history;
@@ -592,12 +714,12 @@ function markdown(b: BriefJson): string {
       );
     if (h.record_lost)
       out.push(
-        `${h.record_lost.line[0]?.toUpperCase()}${h.record_lost.line.slice(1)}. This round's record starts here: nothing earlier attempts did is recorded, but their work may be on the branch. Before you start, check the branch for what is already done (\`git log\`, the handoff's Progress, the diff against the base) and build on it.`,
+        `${h.record_lost.line[0]?.toUpperCase()}${h.record_lost.line.slice(1)}. This round's record starts here: nothing earlier attempts did is recorded, but their work may be on the branch. Before you start, check the branch for what is already done (\`git log\`, the handoff, the diff against the base) and build on it.`,
         "",
       );
     if (h.retry)
       out.push(
-        `A previous session of this attempt ended without reporting (\`${h.retry.outcome}\`${h.retry.detail ? `: ${h.retry.detail}` : ""}). This is a fresh session: nothing it did counts as reported. Look at \`git status\`, \`git log\` and the handoff's Progress for partial work, then finish the step.`,
+        `A previous session of this attempt ended without reporting (\`${h.retry.outcome}\`${h.retry.detail ? `: ${h.retry.detail}` : ""}). This is a fresh session: nothing it did counts as reported. Look at \`git status\`, \`git log\` and the handoff for partial work, then finish the step.`,
         "",
       );
     if (h.earlier) {
@@ -609,71 +731,7 @@ function markdown(b: BriefJson): string {
     }
   }
 
-  out.push("## Your work", "");
-  out.push(`Use the \`${b.work.skill}\` skill.`);
-  if (b.work.description) out.push("", b.work.description);
-  if (b.work.instructions) out.push("", b.work.instructions.trim());
-  out.push("");
-
-  out.push("## Inputs", "");
-  if (!b.inputs.length) out.push("- (none)");
-  for (const i of b.inputs) out.push(`- ${i.label}: \`${i.ref}\``);
-  out.push("");
-
-  if (b.rework) {
-    const rw = b.rework;
-    const round = rw.counter ? ` (fix round ${rw.counter.name} ${rw.counter.value}/${rw.counter.max})` : "";
-    out.push("## Rework", "", `You are here because \`${rw.from}\` sent the work back${round}. Address the points below first.`, "");
-    const d = rw.decision;
-    if (d) {
-      out.push(`### Rejected at ${d.step}${d.by ? ` by ${d.by}` : ""}`, "");
-      out.push(d.comment ? quote(d.comment) : "(no comment given; ask the person or see the evidence)", "");
-      if (d.judged) {
-        out.push(`What was judged: ${d.judged.step}#${d.judged.attempt} reported \`${d.judged.outcome}\`:`, "", quote(d.judged.handoff), "");
-        criteriaLines(out, d.judged.criteria);
-        evidenceLines(out, d.judged.evidence);
-      }
-    }
-    const c = rw.check;
-    if (c) {
-      out.push(`### Failing check (${c.step})`, "");
-      out.push(`- Command: \`${c.command}\``);
-      out.push(`- Exit code: ${c.exit_code ?? "none"}${c.reason ? ` (${c.reason})` : ""}`);
-      if (c.log) out.push(`- Full log: \`${c.log}\``);
-      out.push("", "```text", c.output_tail, "```", "");
-    }
-    const r = rw.report;
-    if (r) {
-      out.push(`### ${r.step}#${r.attempt} reported \`${r.outcome}\``, "", quote(r.handoff), "");
-      criteriaLines(out, r.criteria);
-    }
-    const f = rw.findings;
-    if (f) {
-      out.push(`### Findings (${f.step}: ${f.outcome})`, "");
-      if (f.items.some((x) => x.severity === "minor" || x.severity === "nit")) out.push("Fix every blocking and major finding; minor and nit ones are for you to weigh.", "");
-      findingLines(out, f.items);
-    }
-    if (r) evidenceLines(out, r.evidence);
-    if (rw.detail) out.push(`### ${rw.from}`, "", rw.detail, "");
-    const bs = rw.base;
-    if (bs) {
-      const branch = bs.ref.replace(/^refs\/(remotes|heads)\//, "");
-      out.push("### Base update (merge skill, base mode)", "");
-      out.push(`Merge \`${bs.sha}\` (${branch}) into the story branch in this worktree, resolve, commit the merge; never rebase:`, "");
-      out.push("```sh", `git merge --no-ff ${bs.sha}`, "```", "");
-      out.push(`Conflicting paths: ${bs.conflicts.length ? bs.conflicts.map((p) => `\`${p}\``).join(", ") : "(not reported)"}`, "");
-      out.push("Resolve each conflict by intent; resolve to existing behaviour only. When no resolution fits without new behaviour, run `git merge --abort` (the worktree stays clean) and report `" + cmd.stuck("<why>") + "`. Otherwise commit the merge, run the checks, and report done. Do not push.", "");
-    }
-  }
-
-  if (b.checks) {
-    out.push("## Checks since the last report", "", `These checks ran on the code since ${b.checks.since} reported; nothing else has run on it yet.`, "");
-    for (const c of b.checks.items) {
-      const exit = c.outcome === "fail" ? ` (exit ${c.exit_code ?? "none"}${c.reason ? `, ${c.reason}` : ""})` : "";
-      out.push(`- ${c.step}#${c.attempt} \`${c.outcome}\`${exit} in ${duration(c.duration_ms)} — \`${c.command}\` — output: \`${c.log}\``);
-    }
-    out.push("");
-  }
+  if (b.rework) reworkLines(out, b.rework);
 
   if (b.rulings.length) {
     out.push(
@@ -687,19 +745,100 @@ function markdown(b: BriefJson): string {
     out.push("");
   }
 
+  finishLines(out, b);
+
+  out.push("## Inputs", "");
+  if (!b.inputs.length) out.push("- (none)");
+  for (const i of b.inputs) out.push(`- ${i.label}: \`${i.ref}\`${i.purpose ? ` — ${i.purpose}` : ""}`);
+  out.push("");
+
   out.push("## Context", "");
   if (b.context.answers.length) {
     out.push("Answers to your questions in this step:", "");
     for (const a of b.context.answers) out.push(`- Q: ${a.question}`, `  A: ${a.answer}`);
     out.push("");
   }
-  out.push(b.context.handoff ? b.context.handoff : "No handoff yet — you are the first run of this unit.", "");
+  out.push(b.context.handoff ? b.context.handoff : `No handoff yet: write it at \`${b.handoff_file}\` as you work (its sections are under How to work).`, "");
   const n = b.context.notes;
   if (n) {
     out.push(`### Notes from ${n.step} (non-blocking)`, "", `${n.step} reported \`${n.outcome}\` with these notes, for information:`, "");
     findingLines(out, n.items);
   }
 
+  if (b.checks) {
+    out.push("## Checks since the last report", "", `These checks ran on the code since ${b.checks.since} reported; nothing else has run on it yet.`, "");
+    for (const c of b.checks.items) {
+      const exit = c.outcome === "fail" ? ` (exit ${c.exit_code ?? "none"}${c.reason ? `, ${c.reason}` : ""})` : "";
+      out.push(`- ${c.step}#${c.attempt} \`${c.outcome}\`${exit} in ${duration(c.duration_ms)} — \`${c.command}\` — output: \`${c.log}\``);
+    }
+    out.push("");
+  }
+
+  if (b.log) {
+    out.push("## History", "", "What happened in this unit so far, oldest first, from its receipts:", "");
+    if (b.log.omitted) out.push(`- … ${b.log.omitted} earlier (\`${b.log.command}\`)`);
+    for (const l of b.log.lines) out.push(`- ${l}`);
+    out.push("");
+  }
+
+  out.push("## How to work", "", ...protocolLines(b.handoff_file), "");
+
+  const l = b.limits;
+  const limits = [
+    ...(l.attended ? [] : [`- Deadline: ${l.deadline} (until ${l.deadline_at})`]),
+    ...(l.slot === null ? [] : [`- Ports: \`PORT_BASE=${l.port_base}\` (slot ${l.slot}, in \`.env.norn\`)`]),
+    ...(!l.attended && l.nudges_left === 0 ? ["- No reminders left: end your turn only after a report."] : []),
+  ];
+  if (limits.length) out.push("## Limits", "", ...limits, "");
+  return `${out.join("\n").trimEnd()}\n`;
+}
+
+function reworkLines(out: string[], rw: NonNullable<BriefJson["rework"]>): void {
+  const round = rw.counter ? ` (fix round ${rw.counter.name} ${rw.counter.value}/${rw.counter.max})` : "";
+  out.push("## Rework", "", `You are here because \`${rw.from}\` sent the work back${round}. Address the points below first.`, "");
+  const d = rw.decision;
+  if (d) {
+    out.push(`### Rejected at ${d.step}${d.by ? ` by ${d.by}` : ""}`, "");
+    out.push(d.comment ? quote(d.comment) : "(no comment given; ask the person or see the evidence)", "");
+    if (d.judged) {
+      out.push(`What was judged: ${d.judged.step}#${d.judged.attempt} reported \`${d.judged.outcome}\`:`, "", quote(d.judged.handoff), "");
+      criteriaLines(out, d.judged.criteria);
+      evidenceLines(out, d.judged.evidence);
+    }
+  }
+  const c = rw.check;
+  if (c) {
+    out.push(`### Failing check (${c.step})`, "");
+    out.push(`- Command: \`${c.command}\``);
+    out.push(`- Exit code: ${c.exit_code ?? "none"}${c.reason ? ` (${c.reason})` : ""}`);
+    if (c.log) out.push(`- Full log: \`${c.log}\``);
+    out.push("", "```text", c.output_tail, "```", "");
+  }
+  const r = rw.report;
+  if (r) {
+    out.push(`### ${r.step}#${r.attempt} reported \`${r.outcome}\``, "", quote(r.handoff), "");
+    criteriaLines(out, r.criteria);
+  }
+  const f = rw.findings;
+  if (f) {
+    out.push(`### Findings (${f.step}: ${f.outcome})`, "");
+    if (f.items.some((x) => x.severity === "minor" || x.severity === "nit")) out.push("Fix every blocking and major finding; minor and nit ones are for you to weigh.", "");
+    findingLines(out, f.items);
+  }
+  if (r) evidenceLines(out, r.evidence);
+  if (rw.detail) out.push(`### ${rw.from}`, "", rw.detail, "");
+  const bs = rw.base;
+  if (bs) {
+    const branch = bs.ref.replace(/^refs\/(remotes|heads)\//, "");
+    out.push("### Base update (merge skill, base mode)", "");
+    out.push(`Merge \`${bs.sha}\` (${branch}) into the story branch in this worktree, resolve, commit the merge; never rebase:`, "");
+    out.push("```sh", `git merge --no-ff ${bs.sha}`, "```", "");
+    out.push(`Conflicting paths: ${bs.conflicts.length ? bs.conflicts.map((p) => `\`${p}\``).join(", ") : "(not reported)"}`, "");
+    out.push("Resolve each conflict by intent; resolve to existing behaviour only. When no resolution fits without new behaviour, run `git merge --abort` (the worktree stays clean) and report `" + cmd.stuck("<why>") + "`. Otherwise commit the merge, run the checks, and report done. Do not push.", "");
+  }
+}
+
+function finishLines(out: string[], b: BriefJson): void {
   out.push("## Finish with exactly one of", "");
   for (const f of b.finish) out.push(`- \`${f.command}\` — ${f.means}${f.verdict ? ` (only when the worst verdict is \`${f.verdict}\`)` : ""}`);
   if (b.finish.some((f) => f.command.includes("--criteria"))) {
@@ -715,16 +854,5 @@ function markdown(b: BriefJson): string {
     } else out.push("The story spec's Acceptance section names the criteria; use its ids.", "");
     out.push("Add `--note \"<text>\"` (and `--note-criterion <id>`) for a question a person should see without blocking the work.");
   }
-  out.push("", "Then end your turn. Never edit `runs/`; never push.", "");
-
-  out.push("## Limits", "");
-  const l = b.limits;
-  if (l.attended) out.push("- Attended step: no deadline or nudges");
-  else {
-    out.push(`- Deadline: ${l.deadline} (until ${l.deadline_at})`);
-    out.push(`- Nudges left: ${l.nudges_left}`);
-  }
-  out.push(`- Fresh-session retries left: ${l.retries_left}`);
-  out.push(l.slot === null ? "- Port slot: none" : `- Port slot: ${l.slot} (PORT_BASE=${l.port_base})`);
-  return `${out.join("\n")}\n`;
+  out.push("", "Then end your turn.", "");
 }

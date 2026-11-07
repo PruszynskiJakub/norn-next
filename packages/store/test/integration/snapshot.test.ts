@@ -1,3 +1,4 @@
+import { HANDOFF_SKELETON } from "@norn/core";
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -61,7 +62,7 @@ describe("loadSnapshot", () => {
     expect(u1?.unapplied.map((r) => r.n)).toEqual([2]);
     expect(u1?.receipts?.length).toBe(2);
     expect(u1?.workflow?.workflow.name).toBe("slice");
-    expect(u1?.handoff?.body).toBe("## Goal\n\n## Progress\n\n## Resume\n");
+    expect(u1?.handoff?.body).toBe(HANDOFF_SKELETON);
     expect(u1?.errors).toEqual([]);
     expect(u2).toMatchObject({ state: null, workflow: null, unapplied: [], errors: [] });
   });

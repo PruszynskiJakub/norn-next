@@ -6,15 +6,15 @@
  * `CriteriaReport`, its coverage against the unit's frontmatter `criteria`, and the outcome against its worst verdict; notes never block and never change the route.
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
-import { cmd, checkReport, cursorStep, enteringReceipt, reportableOutcomes, verdictCounts } from "@norn/core";
+import { isAbsolute, join, relative, resolve } from "node:path";
+import { cmd, checkReport, cursorStep, enteringReceipt, HANDOFF_MAX_BYTES, HANDOFF_SECTIONS, handoffBytes, reportableOutcomes, verdictCounts } from "@norn/core";
 import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, validate } from "@norn/schema";
-import { appendTrace, ensureEvidenceDir, traceEvent } from "@norn/store";
+import { appendTrace, ensureEvidenceDir, handoffProse, readText, traceEvent } from "@norn/store";
 import { defineCommand, type ParsedArgs, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
 import { type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
-import { appendProgress, reported, reportedFor, reportHeader, reportTarget, writeReport } from "../runtime/report.ts";
+import { reported, reportedFor, reportHeader, reportTarget, writeReport } from "../runtime/report.ts";
 
 const SEVERITIES = new Set(["blocking", "major", "minor", "nit"]);
 const str = (v: unknown) => (typeof v === "string" && v.trim() ? v : undefined);
@@ -68,6 +68,23 @@ function parseCriteria(text: string, file: string): CriterionVerdict[] {
   const v = validate("criteria-report", raw);
   if (!v.ok) throw refuse(`criteria file ${file} does not validate: ${v.errors.map((e) => `${e.path || "/"} ${e.message}`).join("; ")}`, how, "invalid_criteria", { errors: v.errors });
   return v.value;
+}
+
+/**
+ * The handoff is the unit's current state; one grown past the limit has turned into a log (repros,
+ * tables, a diary of attempts) that every later brief would carry.
+ */
+function refuseLongHandoff(s: UnitSession): void {
+  const raw = readText(s.handoffFile);
+  const bytes = raw === null ? 0 : handoffBytes(handoffProse(raw));
+  if (bytes <= HANDOFF_MAX_BYTES) return;
+  const kb = (n: number) => `${Math.ceil(n / 1024)} KB`;
+  throw refuse(
+    `the handoff ${relative(s.worktree, s.handoffFile)} is ${kb(bytes)}; it may hold at most ${kb(HANDOFF_MAX_BYTES)}`,
+    `rewrite it as the unit's current state (${HANDOFF_SECTIONS.map(([h]) => h).join(", ")}): move repros, logs and tables into an evidence folder (\`--evidence <dir>\`) or a findings file and leave a one-line pointer to each, then report again`,
+    "handoff_too_large",
+    { bytes, max: HANDOFF_MAX_BYTES },
+  );
 }
 
 /** `--note` values in order; each `--note-criterion` belongs to the `--note` before it. */
@@ -154,6 +171,7 @@ export const doneCommand = defineCommand({
     if (outcome === "ask" || outcome === "stuck") throw refuse(`'${outcome}' is reported with its own verb`, outcome === "ask" ? cmd.ask() : cmd.stuck(), "use_verb");
     if (!valid.includes(outcome))
       throw refuse(`outcome '${outcome}' is not declared at step ${t.s.state.step}; valid: ${valid.join(", ")}`, valid.map((o) => cmd.done(o)).join(" | "), "invalid_outcome", { valid });
+    refuseLongHandoff(t.s);
 
     let findings: Finding[] | undefined;
     const findingsFile = opt.str(args, "findings");
@@ -195,7 +213,6 @@ export const doneCommand = defineCommand({
     // evidence sits beside the receipt it belongs to; copied before the receipt lands
     if (evidencePath) ensureEvidenceDir(t.s.runsDir, t.run_id, evidencePath);
     const written = writeReport(t, receipt);
-    appendProgress(t.s.handoffFile, `${t.s.state.step}#${t.s.state.attempt} ${outcome}: ${handoff}`);
     // The report counted in the trace — unverified per capability, unchecked coverage
     if (report)
       appendTrace(

@@ -32,7 +32,7 @@ steps:
       Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one,
       otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask.
       A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the
-      suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Progress and
+      suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Notes and
       the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
       changing any code, then fix the cause.
     outcomes:
