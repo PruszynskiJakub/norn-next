@@ -13,6 +13,7 @@ workflow: refinement
 status: active
 intake_at: 2026-11-07T10:20:30.339Z
 body_hash: b2602b599264402664956616635e6f81374086e676888e0b2632baeddffbb2ae
+refined_body_hash: b2602b599264402664956616635e6f81374086e676888e0b2632baeddffbb2ae
 ---
 
 # Give a step's agent a map and a short brief, and keep norn's own state out of its context
