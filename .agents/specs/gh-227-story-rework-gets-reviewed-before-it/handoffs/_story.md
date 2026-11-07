@@ -33,4 +33,4 @@ Story-level rework in the `story` workflow is reviewed before it reaches the PR:
 
 ## Resume
 
-Review approved with no findings; the next step is the round's check (`test`).
+pr.md written (no QA ran; evidence is the tests, the new test confirmed failing against main's story.yaml). Next: open the draft PR.
