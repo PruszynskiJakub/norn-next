@@ -10,7 +10,7 @@ labels:
   - norn
   - norn:wf:reproduce
 workflow: reproduce
-status: new
+status: active
 intake_at: 2026-11-07T09:59:04.159Z
 body_hash: 7344eb87494d987938f303ea4d22e8cc5fa99411b81e2aa8b9e6eaa2aa3c0cac
 ---
