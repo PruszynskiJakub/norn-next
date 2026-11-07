@@ -8,11 +8,13 @@ const pr = (over: Partial<PrFacts> = {}): PrFacts => ({
   repo: REPO,
   author: "PruszynskiJakub",
   head: "gh-12-fix-login",
+  title: "Fix login",
   cross_repo: false,
   labels: [],
   body: "",
   closing: [],
   issues: {},
+  files: [],
   ...over,
 });
 
@@ -100,10 +102,40 @@ describe("(c) Dependabot and everything else", () => {
   });
 });
 
+describe("installed bundled skill copies", () => {
+  const copy = ".agents/skills/norn-review/SKILL.md";
+  test("refuses a story PR that edits an installed norn skill copy, and says to edit the bundled source", () => {
+    const v = processCheck(pr({ closing: [12], files: ["packages/cli/assets/skills/norn-review/SKILL.md", copy] }));
+    expect(v).toMatchObject({ ok: false, error: expect.stringContaining(copy), do_instead: expect.stringContaining("packages/cli/assets/skills/") });
+  });
+  test("refuses a bypass PR that edits one too", () => {
+    const v = processCheck(
+      pr({ head: "bypass/30-x", labels: ["bypass"], body: "Closes #30", issues: { 30: { number: 30, labels: ["bypass"], body: "see #29" } }, files: [copy] }),
+    );
+    expect(v.ok).toBe(false);
+  });
+  test("a release PR may update the copies, from a story branch or a bypass", () => {
+    expect(processCheck(pr({ head: "gh-12-release", title: "Release 0.25.0", closing: [12], files: [copy] })).ok).toBe(true);
+    expect(
+      processCheck(
+        pr({ head: "bypass/release-0.27.0", title: "Release 0.27.0", labels: ["bypass"], body: "Closes #30", issues: { 30: { number: 30, labels: ["bypass"], body: "see #29" } }, files: [copy] }),
+      ).ok,
+    ).toBe(true);
+  });
+  test("repo-local skills and look-alike paths are not installed norn copies", () => {
+    for (const f of [".agents/skills/release/SKILL.md", ".agents/skills/issue/SKILL.md", "docs/.agents/skills/norn-x.md", ".agents/workflows/quick.yaml"])
+      expect(processCheck(pr({ closing: [12], files: [f] })).ok).toBe(true);
+  });
+  test("a title that only mentions a release is not a release PR", () => {
+    expect(processCheck(pr({ title: "Fix the Release 0.25.0 notes", closing: [12], files: [copy] })).ok).toBe(false);
+  });
+});
+
 describe("gathering facts with gh", () => {
   const ghPr = (over: Record<string, unknown> = {}) => ({
     author: { login: "PruszynskiJakub" },
     headRefName: "bypass/30-fix-release",
+    title: "Fix release",
     isCrossRepository: false,
     labels: [{ name: "bypass" }],
     body: "Closes #31",
@@ -118,7 +150,7 @@ describe("gathering facts with gh", () => {
     expect(runCheck(REPO, 5, fail)).toMatchObject({ ok: false, error: expect.stringContaining("could not read PR #5"), do_instead: expect.stringContaining("Re-run") });
   });
   test("a closed number gh cannot read as an issue (e.g. the PR itself) is a refusal, not a crash", () => {
-    const run = (args: string[]) => (args[0] === "pr" ? ghPr() : fail(args));
+    const run = (args: string[]) => (args[0] === "pr" ? ghPr() : args[0] === "api" ? [[]] : fail(args));
     expect(runCheck(REPO, 31, run)).toMatchObject({ ok: false, error: expect.stringContaining("#31") });
   });
   test("reads the bypass issue and passes; other repositories' closing references are ignored", () => {
@@ -131,8 +163,18 @@ describe("gathering facts with gh", () => {
               { number: 7, repository: { name: "x", owner: { login: "other" } } },
             ],
           })
-        : { labels: [{ name: "bypass" }], body: "norn cannot do it: #29" };
+        : args[0] === "api"
+          ? [[]]
+          : { labels: [{ name: "bypass" }], body: "norn cannot do it: #29" };
     expect(gatherFacts(REPO, 33, run).closing).toEqual([30]);
     expect(runCheck(REPO, 33, run)).toMatchObject({ ok: true });
+  });
+  test("reads every page of the PR's changed files, renames by both names", () => {
+    const run = (args: string[]) =>
+      args[0] === "pr"
+        ? ghPr({ headRefName: "gh-12-x", title: "x", labels: [], closingIssuesReferences: [{ number: 12, repository: { name: "norn", owner: { login: "PruszynskiJakub" } } }] })
+        : [[{ filename: "a.ts" }], [{ filename: "b.ts", previous_filename: ".agents/skills/norn-qa/SKILL.md" }]];
+    expect(gatherFacts(REPO, 34, run).files).toEqual(["a.ts", "b.ts", ".agents/skills/norn-qa/SKILL.md"]);
+    expect(runCheck(REPO, 34, run).ok).toBe(false);
   });
 });
