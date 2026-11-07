@@ -35,8 +35,7 @@ Nobody can see how much of this orientation each step costs, so no change to it 
 
 The guiding rule: each change removes more context and machinery than it adds.
 
-- norn records what each run spends on orientation, so every later change shows its effect.
-- The brief is the agent's first prompt. It holds the step's work, the person's words, references to the files it may need (path plus what kind of file it is, never their content), the protocol once, and how to finish. norn's own state shows only when it changes what the agent should do.
+- The first prompt is one line: run `norn brief` and do what it says. The brief holds the step's work, the person's words, references to the files it may need (path plus what kind of file it is, never their content), the protocol once, and how to finish. norn's own state shows only when it changes what the agent should do.
 - AGENTS.md is a map of 500 words or fewer; the detail it holds today moves to `docs/dev/`, opened on demand.
 - `.agents/RULES.md` goes. The few invariants that must not break are stated once in plain sentences in the developer docs; what norn does for a user lives in the user docs; what a change must do lives in its spec and tests. Comments explain why, never cite ids.
 - The norn skill shrinks to a fallback for manual sessions; workflow instructions keep only what is specific to their step.
@@ -47,18 +46,7 @@ The guiding rule: each change removes more context and machinery than it adds.
 
 ### Orientation metrics
 
-- B1 As a person improving norn, I want each agent run to record what it spent before doing work, so that I can compare runs before and after a change.
-  Example: a run reports `done`; `norn run view <run>` shows `Orientation: 54,210 tokens on the first turn · 10 tool calls before the first edit · 6 files read, never edited`.
-- B2 As a person, I want the same numbers as columns in `norn run list`, so that I can compare runs side by side.
-  Example: `norn run list` shows columns `first-turn tokens` and `calls before edit` for each run.
-- B3 As a person, I want a number norn cannot measure shown as unknown, never guessed.
-  Example: a codex run whose transcript has no token counts shows `tokens on the first turn: unknown`; the other two numbers still show.
-- B4 As a person, I want a run that never edited a file shown as such, not as zero.
-  Example: a review run with no edit shows `calls before the first edit: no edit` and `files read, never edited: 9`.
-- B5 As a person, I want runs from before this ships shown without metrics.
-  Example: an old run in `norn run list` shows `–` in both columns.
-- B6 As a program, I want the metrics in `--json`.
-  Example: `norn run view <run> --json` has an `orientation` object with the three numbers, `null` for an unknown one.
+B1–B6 were dropped at plan (see Out of scope); their ids are not reused.
 
 ### The brief
 
@@ -95,16 +83,19 @@ The guiding rule: each change removes more context and machinery than it adds.
 
 ### Starting a step and one home per instruction
 
-- B20 As a step's agent launched by norn, I want the brief as my first prompt, so that I start on the work without a skill and a command first.
-  Example: in auto mode the session's first prompt is the brief's markdown itself.
-- B21 As a person starting an attended step, I want the start command to give the agent the brief too.
-  Example: `norn story start gh-274 --print` prints a command whose prompt is the brief, not "Use the norn skill, then run `norn brief`".
+- B20 As a step's agent launched by norn, I want a one-line first prompt, ``Run `norn brief` in this worktree and do what it says.``, so that I start on the brief without loading a skill first.
+  Example: in auto mode the session's first prompt is that line; the agent's `norn brief` prints the work.
+
+- B21 As a person starting an attended step, I want the start command to use the same one-line prompt.
+  Example: `norn story start gh-274 --print` prints a command whose prompt is ``Run `norn brief` in this worktree and do what it says.``, not "Use the norn skill, then run `norn brief`".
+
 - B22 As a step's agent, I want the protocol stated once, in the brief: the outcomes to finish with, plus three lines (report exactly once then end the turn; never push or switch branches; never edit norn's run state).
-  Example: the brief's last section lists the outcomes and those three lines; nothing else in the session repeats them.
+  Example: the brief's "Finish with" section (placed as B48 orders it) lists the outcomes and those three lines; nothing else in the session repeats them.
 - B23 As a person running a step by hand, I want the norn skill to still work, shrunk to "run `norn brief` in this worktree and do what it says".
   Example: in a fresh session in a unit worktree, "use the norn skill" leads to `norn brief` and the same work as B20.
-- B24 As a step's agent resumed in a later session (fresh-session retry, answer after the session is gone), I want the same brief as the first prompt.
-  Example: a retry after a died session starts with the brief of attempt 2.
+- B24 As a step's agent resumed in a later session (fresh-session retry, answer after the session is gone), I want the same one-line first prompt.
+  Example: a retry after a died session starts with that line and gets the brief of attempt 2.
+
 - B25 As a step's agent, I want a step's instructions to hold only what is specific to that step; repo-wide prose (the dev-build warning, rule ids) is said once, in AGENTS.md.
   Example: this repo's `implement` brief no longer carries the dev-build warning; AGENTS.md does.
 
@@ -114,8 +105,8 @@ The guiding rule: each change removes more context and machinery than it adds.
   Example: a step launched by norn does not load the person's mail, calendar or time-tracking servers or their personal skills; the repo's own MCP servers (from its `.mcp.json`, when there is one) and skills load.
 - B27 As a person who wants their own setup in step sessions, I want to override it the way I override agent args today.
   Example: setting `agents.claude.args` in the user config replaces the built-in args, clean profile included.
-- B28 As a person, I want my own `norn story chat` sessions to keep my full setup.
-  Example: an orient session still loads the person's skills and MCP servers.
+- B28 Dropped at plan: `norn story chat` gets the clean profile too (it uses the same `agents.claude.args`); a person who wants their setup there overrides the args (B27).
+
 - B29 As a person, I want it said plainly if the clean profile cannot leave something out.
   Example: if the person's user-level CLAUDE.md still loads in a clean session, `docs/limitations.md` says so.
 
@@ -179,8 +170,101 @@ The guiding rule: each change removes more context and machinery than it adds.
 - Starting the next round behind one gate after triage — its own story (file with `/issue`).
 - Shared step definitions across workflows and an overlay of shipped skills and workflows by repo files — its own story (file with `/issue`).
 - An index of rules or recalling rules through hooks — the rules file is removed (B42).
+- Orientation metrics (former B1–B6) — dropped at plan: more machinery than they would save; the Problem's numbers were measured by hand and can be again.
+- The brief pasted as the first prompt — a one-line prompt that runs `norn brief` removes the skill hop without rendering the brief at launch.
 - Closing #133 — superseded by B38–B40; the person closes it.
 
 ## Open questions
 
 None.
+
+## Plan
+
+Guiding rule for every slice: remove more than you add. The plan adds no new action shape, receipt field, adapter method or command.
+
+### Seams
+- **S1 core `renderBrief`, through its `Briefing` (markdown + `BriefJson`).** Observes B7–B18, B22, B34, B35, B48, B49.
+  Prior art: `brief.test.ts` (snapshot and field tests over hand-built `BriefInput`), `criteria.test.ts`, `base-sync.test.ts`.
+- **S2 the agent protocol through the cli harness** (`createHarness`, `FakeRunner`): the first prompt a launch, fresh retry or resend gets, what `story start --print` prints, and the briefing `norn brief` stores and `run view` shows. Observes B19–B21, B24.
+  Prior art: `agent-protocol.test.ts`, `prompts.test.ts` (cli integration and core unit), `story-start.test.ts`; the slice-workflow and recovery effect transcripts.
+- **S3 config resolution and the Claude adapter's `launchCommand`.** Observes B26, B27.
+  Prior art: `config.test.ts`, `config-runtime.test.ts`, the claude adapter tests under `packages/adapters/test/claude/`.
+- **S4 the report and decision commands through the cli harness, observed in the unit's handoff file**: `done`, `ask`, `stuck`, `story approve|reject|answer`. Observes B30–B33, B36, B37.
+  Prior art: `handoffs-folder.test.ts`, `story-decision.test.ts`, `agent-protocol.test.ts`.
+- **S5 the repo lints** (`test/repo/docs.test.ts` with the doc set in `test/support/docs.ts`; `test/repo/repo.test.ts`). Observes B38, B40, B42, B45, B47.
+  Prior art: the rules-file, link and glossary tests in those two files.
+- **S6 `norn init` through the cli harness.** Observes B41.
+  Prior art: `init-review.test.ts`, `init-version.test.ts`.
+
+### Coverage
+| Behaviour | Seam | Test kind | Notes |
+|---|---|---|---|
+| B1–B6 | — | — | dropped at plan |
+| B7 | S1 | unit | first attempt: story and step only |
+| B8 | S1 | unit | |
+| B9 | S1 | unit | only the counter of the edge taken |
+| B10 | S1 | unit | |
+| B11 | S1 | unit | each of the three thresholds, and absent otherwise |
+| B12 | S1 | unit | a huge handoff in the input leaves the markdown small |
+| B13 | S1 | unit | |
+| B14 | S1 | unit | no log text in the markdown |
+| B15 | S1 | unit | answer, note, ruling quoted |
+| B16 | S1 | unit | |
+| B17 | S1 | unit | no code paths under Inputs |
+| B18 | S1 | unit | `BriefJson` keeps every field it has today |
+| B19 | S2 | integration | stored briefing equals the printed markdown |
+| B20 | S2 | integration | `FakeRunner` launch prompt |
+| B21 | S2 | integration | `story start --print` |
+| B22 | S1 | unit | plus review: the norn skill and workflows no longer repeat it |
+| B23 | — | review + QA | norn skill text (`packages/cli/assets/skills/norn`); QA: fresh session in a unit worktree |
+| B24 | S2 | integration | fresh retry and resend use the same line |
+| B25 | — | review | instructions in `.agents/workflows/` and the shipped copies |
+| B26 | S3 | unit | built-in args; what a real session loads is QA by a person |
+| B27 | S3 | unit | user `args` replace the list |
+| B28 | — | — | dropped at plan |
+| B29 | — | review + QA | `docs/limitations.md` names whatever QA finds still loading |
+| B30 | S4 | integration | |
+| B31 | S4 | integration | |
+| B32 | S4 | integration | reject with reason, answer |
+| B33 | S4 | integration | refusal, nothing appended, no receipt |
+| B34 | S1 | unit | plus review of the norn skill and workflow texts |
+| B35 | S1 | unit | |
+| B36 | S4 | integration | old Goal/Progress/Resume handoff kept, entry below |
+| B37 | S4 | integration | reject writes one entry, no `## Progress` |
+| B38 | S5 | unit (lint) | word cap; content by review |
+| B39 | — | review | the five `docs/dev/` files |
+| B40 | S5 | unit (lint) | |
+| B41 | S6 | integration | writes when absent, leaves an existing one |
+| B42 | S5 | unit (lint) | |
+| B43 | — | review | |
+| B44 | S5 | unit (lint) | no link into RULES.md; where the content went, review |
+| B45 | S5 | unit (lint) | new lint: no rule, story or review id in a package source comment or printed string |
+| B46 | — | review | refinement workflow (both copies) and refine skill |
+| B47 | S5 | unit (lint) | |
+| B48 | S1 | unit | section order |
+| B49 | S1 | unit | |
+
+### Prefactoring
+None. Handoff writes already go through one place (the report runtime's `appendProgress` / `receiptsWritten`); the journal replaces it there.
+
+### Implementation decisions
+- D1 One first prompt everywhere: `AUTO_PROMPT` becomes ``Run `norn brief` in this worktree and do what it says.``, used by the auto launch, the fresh retry, the launch-prompt resend and `startCommandFor` (story start). A string change only: no new action shape, the agent's `norn brief` still starts a manual run (MO3 unchanged). The golden corpus is re-decided (`bun run golden -- --update`) and the slice-workflow and recovery transcripts rewritten for the new string. `NUDGE_TEXT` stays.
+- D2 Only the markdown is trimmed. `BriefJson` keeps every field it has today (B18), the handoff text included; inputs gain a `description` beside `ref`. The `norn brief` command stops reading the failing check's log text and the handoff body for the markdown; evidence folders are counted, not listed.
+- D3 The generic descriptions (B12, B35, B49) are one fixed table in the brief module keyed by input kind (story spec, slice file, handoff journal, diff, findings, check log, evidence folder, record). No per-file reading.
+- D4 Limits show only when close (B11): on the last fresh-session retry, with one nudge or none left, or with under 20% of the deadline left; one line each.
+- D5 Journal entry format: a heading `### <step>#<attempt> <outcome> · <YYYY-MM-DD>` for a report (`ask` and `stuck` as the outcome word, their question or reason as the text), `### <step> <approve|reject> · <date>` for a gate ruling with its reason, `### answer · <date>` with question and answer, then the text. Written by the command that writes the receipt, right after it (P6), in the report runtime; it replaces `appendProgress`, the reject progress line, `HANDOFF_SKELETON` and `tidyHandoff`. start_run no longer creates a skeleton handoff; the first entry creates the file. An existing handoff is appended to, never rewritten (B36).
+- D6 The 150-word cap (B33) counts whitespace-separated words of `--handoff`; over it, `done` refuses with code `handoff_too_long` before any receipt is written.
+- D7 Clean profile: the built-in `agents.claude.args` gain the Claude flags that restrict settings to project and local sources (`--setting-sources project,local`) beside `--permission-mode auto`. It applies to every Claude launch, `story chat` included (B28 dropped). If the spike (Risks) shows user MCP servers or claude.ai connectors still load, the Claude adapter's `launchCommand` adds strict MCP config with the repo's `.mcp.json` when one exists; what still loads after that goes into `docs/limitations.md` (B29).
+- D8 AGENTS.md map: the docs lint counts whitespace-separated words of the whole file (cap 500); `docs/dev/*.md` join the doc set (links, anchors, commands, glossary). The rule-id tests and the pinned id list go.
+- D9 RULES.md removal: the file is deleted; its about ten invariants are rewritten as plain sentences in `docs/dev/contracts.md`; user-facing behaviour only it described moves to `docs/concepts.md` / `docs/reference.md` or is dropped; every reference to it (CONTRIBUTING, REVIEW.md, the triage and refinement workflows in both places, the issue skill, docs/concepts) is removed or repointed. Refinement's instructions say "update the user docs your change alters".
+- D10 Ids out of code (B45): one scripted pass strips rule, story and review ids from package source comments and printed strings (refusal and noop texts like `(K1)` point at a file that no longer exists); a comment left with no words is deleted or rewritten as the reason by hand. Test names keep their ids. Schema descriptions change, so `bun run schema:emit` and `bun run docs:emit` run with it, and decide reasons change, so the golden corpus is re-decided in the same slice. A new lint in `repo.test.ts` fails on an id in a package source comment or string literal.
+- D11 The norn skill (source in `packages/cli/assets/skills/norn`, copy rewritten by init) shrinks to "run `norn brief` in this worktree and do what it says", plus the four commands it may run. Repo-wide prose moves out of `.agents/workflows/` instructions into AGENTS.md (B25); shipped workflows change in both places.
+
+### Testing decisions
+A good test drives a seam from outside: S1 builds a `BriefInput` and reads the markdown and JSON; S2, S4 and S6 run CLI commands in the harness and read what a person or agent would see (printed output, the `FakeRunner`'s prompt, the handoff file on disk); S3 reads resolved config and the argv. No test reads the brief module's helpers or the report runtime's internals. Faked: only the system boundaries the harness already fakes (runner, remote, notifier, clock). Lints are unit tier. What a real Claude session loads (B26, B29) and the norn skill working in a fresh session (B23) are QA by a person; no test starts a real agent.
+
+### Risks
+- Claude's flags may not drop everything (B26): user skills, user CLAUDE.md, claude.ai connectors and user-scope MCP servers each come from a different place. A spike in the profile slice launches one session with the flags and lists what loaded before D7 is built; whatever cannot be dropped is documented (B29).
+- `--setting-sources project,local` could also drop something a step needs from user settings (auth, a model alias); the same spike checks a step still runs.
+- D10 is the largest diff of the story (about 4,800 id mentions in 201 files) and touches goldens, schemas and the generated reference at once; it goes in its own slice, after RULES.md is gone, so a conflict with other open stories is resolved once.
+- The golden corpus and effect transcripts change twice (D1, D10); each slice re-decides them and the diff is reviewed as the whole behaviour change.
