@@ -76,5 +76,5 @@ Two-machine operation was only simulated on one Mac (`NORN_MACHINE`). Everything
   - Rate limits or a GitHub outage stop observation. A remote call that hangs costs a tick up to 2 minutes before it fails.
   - A sleeping laptop pauses every watch, and claims expire. They are reacquired cleanly after wake, but nothing moves in the meantime.
 - **Workflows are pinned per unit.** Editing a workflow does not affect units already in flight. This is intended, but surprising.
-- **`heartbeat_id` per checkout, not per process** (a deliberate choice, see `AGENTS.md`). Two `watch` processes on one checkout share it and renew the same claim; the tick lock refuses a tick while another runs, so they take turns and a second one gains nothing.
+- **`heartbeat_id` per checkout, not per process** (a deliberate choice, see [Development › Decisions](development.md#decisions)). Two `watch` processes on one checkout share it and renew the same claim; the tick lock refuses a tick while another runs, so they take turns and a second one gains nothing.
 - **Observability covers only what goes through norn.** `norn run view --why` and `norn run list` replay norn's own decisions exactly. Anything a person or agent does outside norn, such as pane keystrokes or hand merges, shows up only as later-observed facts, without the reason.

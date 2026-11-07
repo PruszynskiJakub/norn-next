@@ -4,7 +4,7 @@
  */
 import { relative } from "node:path";
 import { type Receipt, type ReceiptOf, receiptNumber, ulid } from "@norn/schema";
-import { appendReceipt, handoffProse, readText, writeHandoffBody } from "@norn/store";
+import { appendReceipt } from "@norn/store";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
 import { cmd, currentRun, implicitAskOpen, standingReport } from "@norn/core";
@@ -67,53 +67,6 @@ export function writeReport(t: ReportTarget, receipt: Receipt) {
   }
   const r = appendReceipt(t.s.runsDir, receipt);
   return { n: r.n, file: relative(t.s.worktree, r.file) };
-}
-
-/** Progress line of a gate rejection, e.g. `human-qa#1 reject: AC7 shows raw HTML`. */
-export function rejectProgress(r: Receipt): string {
-  const comment = r.kind === "reject" ? r.comment?.trim() : undefined;
-  return `${r.step}#${r.attempt} reject${r.who ? ` by ${r.who}` : ""}: ${comment || "(no comment given)"}`;
-}
-
-/**
- * A gate rejection is a milestone of its unit. Every writer of a unit's receipts calls this once
- * they are written (receipt first): act's `writeReceipts` and a person's local delivery — so each
- * `reject` among them appends its progress line to the handoff whichever route brought it.
- */
-export function receiptsWritten(handoffFile: string | null, receipts: readonly Receipt[]): void {
-  if (!handoffFile) return;
-  for (const r of receipts) if (r.kind === "reject") appendProgress(handoffFile, rejectProgress(r));
-}
-
-/** The agent's milestone: one line appended to the Progress section of handoff.md. */
-export function appendProgress(handoffFile: string, line: string): void {
-  const raw = readText(handoffFile);
-  const body = raw === null ? "## Goal\n\n## Progress\n\n## Resume\n" : handoffProse(raw);
-  const text = `- ${line.replace(/\s*\n\s*/g, " ").trim()}`;
-  const lines = body.split("\n");
-  // The one Progress section at whatever heading level the agent wrote (the brief shows
-  // the handoff demoted to ###, and agents write it back in that shape); it ends at the next heading as high.
-  const at = lines.findIndex((l) => /^#{1,6}\s+Progress\s*$/.test(l));
-  if (at < 0) {
-    writeHandoffBody(handoffFile, `${body.replace(/\n*$/, "\n")}\n## Progress\n\n${text}\n`);
-    return;
-  }
-  const level = headingLevel(lines[at] ?? "");
-  let end = lines.findIndex((l, i) => i > at && headingLevel(l) > 0 && headingLevel(l) <= level);
-  if (end < 0) end = lines.length;
-  let insert = end;
-  while (insert > at + 1 && (lines[insert - 1] ?? "").trim() === "") insert--;
-  const block = insert === at + 1 ? ["", text] : [text];
-  lines.splice(insert, 0, ...block);
-  // keep one blank line before the next section
-  const next = insert + block.length;
-  if (next < lines.length && (lines[next] ?? "").trim() !== "") lines.splice(next, 0, "");
-  writeHandoffBody(handoffFile, lines.join("\n"));
-}
-
-/** The level of a markdown ATX heading line, 0 when the line is not one. */
-function headingLevel(line: string): number {
-  return /^(#{1,6})\s/.exec(line)?.[1]?.length ?? 0;
 }
 
 /** The reply to a report: the receipt as data, and markdown that tells the agent to end its turn. */

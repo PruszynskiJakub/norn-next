@@ -278,21 +278,21 @@ describe("claim races and forced takes", () => {
     expect(JSON.parse(readFileSync(join(storyRuns(winRoot), "receipts", file), "utf8"))).toMatchObject({ kind: "take", previous_holder: "bob@repo-b", expired: true });
   });
 
-  test("before expiry a take needs --force; the forced take is journaled in the claim and the handoff", async () => {
+  test("before expiry a take needs --force; the forced take is journaled in the claim and the take receipt, never in the handoff", async () => {
     const r1 = await B.norn("story", "checkout", "gh-7");
     expect(r1.exit).toBe(5);
     expect(r1.value).toMatchObject({ code: "claim_held", do_instead: expect.stringContaining("--force") });
     step();
     const r2 = await B.norn("story", "checkout", "gh-7", "--force");
     expect(r2.exit).toBe(0);
-    const v = r2.value as { forced: boolean; claim: { forced_from: string }; journal: { line: string; pushed: boolean } };
+    const v = r2.value as { forced: boolean; claim: { forced_from: string }; journal: { line: string; note: string } };
     expect(v.forced).toBe(true);
     expect(v.claim.forced_from).toMatch(/^(tester@box|carol@repo-c) /);
-    expect(v.journal.pushed).toBe(true);
+    expect(v.journal).toMatchObject({ line: expect.stringContaining("take --force by bob@repo-b"), note: "journaled in the claim blob (forced_from) and the take receipt" });
     const blob = sh(B.root, ["cat-file", "-p", "refs/norn/claims/gh-7"]);
     expect(JSON.parse(blob)).toMatchObject({ holder: "bob@repo-b", forced_from: v.claim.forced_from });
     sh(h.root, ["fetch", "-q", "origin"]);
-    expect(h.git(["show", `origin/gh-7-add-login-form:${SPEC}/${unitHandoffPath(STORY_UNIT_DIR)}`])).toContain("take --force by bob@repo-b");
+    expect(h.git(["show", `origin/gh-7-add-login-form:${SPEC}/${unitHandoffPath(STORY_UNIT_DIR)}`])).not.toContain("take --force");
   });
 
   test("story close is refused on a story another machine holds, whether this checkout has it or not; nothing changes (B38)", async () => {

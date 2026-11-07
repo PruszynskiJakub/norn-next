@@ -1,8 +1,8 @@
 /** Exact commands shown to people and naming conventions shared by decide, inbox and handoff. */
 import { sliceDirName, storyDirName, type UnitState, versionMatch } from "@norn/schema";
 
-/** The whole first prompt of an auto-mode agent session. */
-export const AUTO_PROMPT = "Use the norn skill, then run `norn brief`.";
+/** The whole first prompt of an agent session on a step: the brief carries the step and its protocol. */
+export const AUTO_PROMPT = "Run `norn brief` in this worktree and do the step it gives you.";
 
 /** Text typed into a silent/timed-out/stalled session. */
 export const NUDGE_TEXT =
