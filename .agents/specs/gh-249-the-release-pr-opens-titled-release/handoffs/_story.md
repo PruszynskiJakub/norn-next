@@ -7,7 +7,7 @@ An open story PR follows its issue's title, so a release PR opened as "Release" 
 - decide emits `retitle_pr` (rule `remote.pr_title`) for an open PR whose title differs from the issue's: `packages/core/test/unit/decide.test.ts` ("an open PR whose title is not the issue's is retitled to it…"), plus a rule case in `packages/core/test/rule-cases.ts`.
 - End to end over the harness: the issue renamed after open-pr → the PR is retitled at the next remote sync, exactly once, and not again at the sync after: `packages/cli/test/integration/pr-body.test.ts` ("story PR title"). Red with the decide rule disabled, green with it.
 - RemotePort `editPullRequestTitle` and `RemotePullRequest.title` hold for gh, glab and FakeRemote: contract test "editPullRequestTitle renames the PR, which findPullRequest and findPullRequests then report" (`packages/adapters/test/contract/remote.ts`), and gh/glab unit tests over the fixtures.
-- `bun run test` (1286 pass) and `bun run typecheck` green.
+- `bun run test` (1291 pass after merging main 7fd61b2) and `bun run typecheck` green.
 
 ## Easy to miss
 
