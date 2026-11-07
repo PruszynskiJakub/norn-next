@@ -34,4 +34,4 @@ The spec has no frontmatter `criteria`; rows are its Wanted items.
 
 ## Resume
 
-Review approved on the merged HEAD. Next is describe, then CI on PR #287.
+describe#2 rewrote pr.md for the merged HEAD. Next: open-pr updates PR #287 with it, then ci.

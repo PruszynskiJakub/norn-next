@@ -23,11 +23,11 @@ The `norn-review` skill gets a new first step (check the earlier findings) and D
 
 ## Evidence
 
-No QA ran; the entries are tests in `packages/core/test/unit/brief.test.ts` (unit suite and typecheck green at review).
+No QA ran; the entries are tests in `packages/core/test/unit/brief.test.ts` (on the merged HEAD: unit tier 1291 pass, typecheck clean).
 
 - **Review steps declare `last_findings`, and a re-review checks each earlier finding first**
   **Before:** review#2's brief said earlier findings were history only; Last findings was `none`.
-  **After:** "the earlier review's findings are listed to check, fixed or not, and Inputs points at them": `history.earlier.findings == EARLIER`, Last findings → `see Earlier findings`, markdown lists `### Earlier findings (review#1)`. A step without `last_findings` keeps the old text; no earlier findings → `none`.
+  **After:** "the earlier review's findings are listed to check, fixed or not, and Inputs points at them": `history.earlier.findings == EARLIER`, the JSON Last findings ref → `see Earlier findings`, markdown lists `### Earlier findings (review#1)`. A step without `last_findings` keeps the old text; no earlier findings → `none`.
 - **Rework is blocking and major only; minor and nit stay notes**
   **Before:** every finding listed together, "minor and nit ones are for you to weigh".
   **After:** "implement's Rework sorts the findings…": blocking and major under Findings, minor and nit under `### Notes (review: minor and nit)` with "do not fix them in this round". The existing snapshot "rework after review findings lists them" changes accordingly.
