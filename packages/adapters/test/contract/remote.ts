@@ -14,6 +14,7 @@ export type RemoteContractTest =
   | "findPullRequest: null for a branch without one"
   | "openDraftPullRequest opens a draft the branch then finds"
   | "findPullRequest picks the newest of a branch's PRs"
+  | "editPullRequestTitle renames the PR, which findPullRequest and findPullRequests then report"
   | "findPullRequests: every branch's PR as findPullRequest finds it, null without one"
   | "pullRequestCi: none, pending, failure and success of a PR's head (B18)"
   | "createIssue opens an issue with the labels and assignee, which intake then lists (B18)"
@@ -137,6 +138,15 @@ export function remoteContract(name: string, make: () => RemoteSubject, opts: Co
         s.setCi(pr.number, ci);
         expect(await s.port.pullRequestCi(pr.number)).toBe(ci);
       }
+    });
+
+    t("editPullRequestTitle renames the PR, which findPullRequest and findPullRequests then report", async () => {
+      const { port } = await seeded();
+      const pr = await port.openDraftPullRequest({ head: "gh-1-add-login", base: "main", title: "Release", body: "" });
+      expect(pr.title).toBe("Release");
+      await port.editPullRequestTitle(pr.number, "Release 0.22.0");
+      expect((await port.findPullRequest("gh-1-add-login"))?.title).toBe("Release 0.22.0");
+      expect((await port.findPullRequests(["gh-1-add-login"])).get("gh-1-add-login")?.title).toBe("Release 0.22.0");
     });
 
     t("findPullRequest picks the newest of a branch's PRs", async () => {

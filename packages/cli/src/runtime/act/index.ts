@@ -27,7 +27,7 @@ import { ActEnv, QueueFull, claimLost } from "./env.ts";
 import { applyReceipts, startRun, nudge, retryFresh, classify } from "./session.ts";
 import { runCheck } from "./check.ts";
 import { runGit } from "./git-step.ts";
-import { startUnit, markDone, rejectReceipt, claim, renewAll, intake, mirror, cleanupMerged, closeClosedIssueStory,
+import { startUnit, markDone, rejectReceipt, claim, renewAll, intake, mirror, retitlePr, cleanupMerged, closeClosedIssueStory,
   moveRecord, pushRecord, setAsideRecordAct, roundMigrate, roundStart, retryRecords } from "./lifecycle.ts";
 
 export interface ActRecord {
@@ -251,6 +251,8 @@ export class Actor extends ActEnv {
         return { ok: true };
       case "update_story_mirror":
         return mirror(this, a);
+      case "retitle_pr":
+        return retitlePr(this, a);
       case "cleanup_merged_story":
         return cleanupMerged(this, a);
       case "close_story":

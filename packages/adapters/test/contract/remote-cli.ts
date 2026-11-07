@@ -64,7 +64,7 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
     labels: i.labels.map((l) => ({ id: `L_${l}`, name: l, description: "", color: "ededed" })),
     updatedAt: AT,
   });
-  const prJson = (p: Pr) => ({ number: p.number, url: `https://github.com/acme/app/pull/${p.number}`, state: "OPEN", isDraft: p.draft, headRefName: p.head, headRefOid: SHA, baseRefName: p.base, mergedAt: null, mergeCommit: null, mergedBy: null });
+  const prJson = (p: Pr) => ({ number: p.number, url: `https://github.com/acme/app/pull/${p.number}`, title: p.title, state: "OPEN", isDraft: p.draft, headRefName: p.head, headRefOid: SHA, baseRefName: p.base, mergedAt: null, mergeCommit: null, mergedBy: null });
   const exec: Exec = async (argv) => {
     const [bin, a, b] = argv;
     if (bin !== "gh") throw new Error(`scripted gh: not a gh call: ${argv.join(" ")}`);
@@ -137,6 +137,12 @@ export function scriptedGh(login = "octocat"): ScriptedRemote {
       const p = prs.find((x) => argv[3] === `https://github.com/acme/app/pull/${x.number}`);
       return p ? ok(prJson(p)) : { code: 1, stdout: "", stderr: "no pull requests found" };
     }
+    if (a === "pr" && b === "edit" && flag(argv, "--title") !== undefined) {
+      const p = prs.find((x) => x.number === Number(argv[3]));
+      if (!p) return { code: 1, stdout: "", stderr: `no pull requests found for branch "${argv[3]}"` };
+      p.title = flag(argv, "--title")!;
+      return ok(`https://github.com/acme/app/pull/${p.number}\n`);
+    }
     if (a === "pr" && b === "checks" && flag(argv, "--json") === "bucket") {
       // gh: exit 8 while a check is pending, 1 when one failed, JSON printed either way; no check at all exits 1
       const p = prs.find((x) => x.number === Number(argv[3]));
@@ -167,7 +173,7 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
     labels: i.labels,
     updated_at: AT,
   });
-  const mrJson = (m: Pr) => ({ iid: m.number, web_url: `https://gitlab.com/acme/app/-/merge_requests/${m.number}`, state: "opened", draft: m.draft, source_branch: m.head, target_branch: m.base, merged_at: null, sha: SHA, merge_commit_sha: null, squash_commit_sha: null, merged_by: null, merge_user: null });
+  const mrJson = (m: Pr) => ({ iid: m.number, web_url: `https://gitlab.com/acme/app/-/merge_requests/${m.number}`, title: m.title, state: "opened", draft: m.draft, source_branch: m.head, target_branch: m.base, merged_at: null, sha: SHA, merge_commit_sha: null, squash_commit_sha: null, merged_by: null, merge_user: null });
   const exec: Exec = async (argv, opts) => {
     const [bin, a, b] = argv;
     if (bin !== "glab") throw new Error(`scripted glab: not a glab call: ${argv.join(" ")}`);
@@ -190,7 +196,7 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
       const query = flag(argv, "-f")?.replace(/^query=/, "") ?? "";
       if (!/project\(fullPath: "acme\/app"\)/.test(query)) throw new Error(`scripted glab: unexpected graphql: ${query}`);
       const branches = JSON.parse(/sourceBranches: (\[[^\]]*\])/.exec(query)![1]!) as string[];
-      const nodes = mrs.filter((m) => branches.includes(m.head)).map((m) => ({ iid: String(m.number), webUrl: `https://gitlab.com/acme/app/-/merge_requests/${m.number}`, state: "opened", draft: m.draft, sourceBranch: m.head, targetBranch: m.base, mergedAt: null, diffHeadSha: SHA, mergeCommitSha: null, squashCommitSha: null, mergeUser: null }));
+      const nodes = mrs.filter((m) => branches.includes(m.head)).map((m) => ({ iid: String(m.number), webUrl: `https://gitlab.com/acme/app/-/merge_requests/${m.number}`, title: m.title, state: "opened", draft: m.draft, sourceBranch: m.head, targetBranch: m.base, mergedAt: null, diffHeadSha: SHA, mergeCommitSha: null, squashCommitSha: null, mergeUser: null }));
       return ok({ data: { project: { mergeRequests: { pageInfo: { hasNextPage: false }, nodes } } } });
     }
     if (a === "issue" && b === "view") {
@@ -231,6 +237,12 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
       const m: Pr = { number: 7 + mrs.length, head: flag(argv, "--source-branch")!, base: flag(argv, "--target-branch")!, title: flag(argv, "--title")!, draft: argv.includes("--draft") };
       mrs.push(m);
       return ok(`Creating ${m.draft ? "draft " : ""}merge request for ${m.head} into ${m.base} in acme/app\n\n!${m.number} ${m.title} (${m.head})\n https://gitlab.com/acme/app/-/merge_requests/${m.number}\n`);
+    }
+    if (a === "mr" && b === "update" && flag(argv, "--title") !== undefined) {
+      const m = mrs.find((x) => x.number === Number(argv[3]));
+      if (!m) return { code: 1, stdout: "", stderr: "ERROR: 404 Not Found" };
+      m.title = flag(argv, "--title")!;
+      return ok(`- Updating merge request !${m.number}\n!${m.number} ${m.title} (${m.head})\n https://gitlab.com/acme/app/-/merge_requests/${m.number}\n`);
     }
     if (a === "mr" && b === "view") {
       const m = mrs.find((x) => x.number === Number(argv[3]));

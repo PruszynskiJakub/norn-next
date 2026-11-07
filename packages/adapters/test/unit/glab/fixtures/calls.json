@@ -125,7 +125,19 @@
    "-",
    "--yes"
   ],
-  "stdout": "- Updating merge request !9\n\u2713 updated description\n!9 Fix crash on save (gl-4-fix-crash-on-save)\n https://gitlab.com/acme/app/-/merge_requests/9\n"
+  "stdout": "- Updating merge request !9\n✓ updated description\n!9 Fix crash on save (gl-4-fix-crash-on-save)\n https://gitlab.com/acme/app/-/merge_requests/9\n"
+ },
+ {
+  "argv": [
+   "glab",
+   "mr",
+   "update",
+   "9",
+   "--title",
+   "Fix crash on save 0.22.0",
+   "--yes"
+  ],
+  "stdout": "- Updating merge request !9\n✓ updated title\n!9 Fix crash on save 0.22.0 (gl-4-fix-crash-on-save)\n https://gitlab.com/acme/app/-/merge_requests/9\n"
  },
  {
   "argv": [

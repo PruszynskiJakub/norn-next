@@ -61,6 +61,7 @@ describe("glab adapter", () => {
     expect(await glab.findPullRequest("gl-3-add-login-page")).toEqual({
       number: 8,
       url: "https://gitlab.com/acme/app/-/merge_requests/8",
+      title: "Add login page",
       state: "merged",
       is_draft: false,
       head_sha: "d".repeat(40),
@@ -82,6 +83,11 @@ describe("glab adapter", () => {
   test("editPullRequestBody passes the body on stdin", async () => {
     await glab.editPullRequestBody(9, "## Summary\n\nSaves no longer crash.\n\nCloses #4");
     expect(stdins).toContain("## Summary\n\nSaves no longer crash.\n\nCloses #4");
+  });
+
+  test("editPullRequestTitle replaces the title", async () => {
+    await glab.editPullRequestTitle(9, "Fix crash on save 0.22.0");
+    expect(await glab.editPullRequestTitle(10, "x").catch((e) => e.code)).toBe("glab_failed");
   });
 
   test("replaceIssueLabel unlabels the old label and labels the new one in one update (B19)", async () => {

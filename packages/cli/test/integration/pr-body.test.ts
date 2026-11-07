@@ -1,6 +1,7 @@
 /**
  * The story PR body is the agent's `pr.md` in the spec folder with the issue link under it;
  * without the file it is the link alone, and a PR already open gets the new body after rework.
+ * The PR's title follows the issue's: a rename after open-pr reaches the PR after the next sync.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
@@ -94,5 +95,23 @@ describe("story PR body", () => {
     expect(h.remote.bodies.get(n)).toBe(`## Summary\n\ncount items\n\n---\n\n${link()}`);
     // the body file is the agent's work: committed with the step
     expect(h.git(["status", "--porcelain"], wt())).toBe("");
+  });
+});
+
+describe("story PR title", () => {
+  test("the issue renamed after open-pr: the open PR takes the new title after the next remote sync, once", async () => {
+    const n = h.remote.prs[0]!.number;
+    expect(h.remote.prs[0]!.title).toBe("Count items");
+    h.remote.issues = h.remote.issues.map((i) => (i.number === 7 ? { ...i, title: "Count items 0.22.0" } : i));
+    h.clock.advance(6 * 60_000); // past remote.sync_interval
+    for (let i = 0; i < 4 && h.remote.prs[0]!.title !== "Count items 0.22.0"; i++) await tick();
+    expect(h.remote.prs[0]!.title).toBe("Count items 0.22.0");
+    expect(h.remote.calls.filter((c) => c === `pr title ${n}`)).toHaveLength(1);
+    // the next sync sees the PR titled like the issue: nothing renames it again
+    h.clock.advance(6 * 60_000);
+    await tick();
+    await tick();
+    expect(h.remote.calls.filter((c) => c === `pr title ${n}`)).toHaveLength(1);
+    expect(h.state(runs())).toMatchObject({ step: "ready", status: "parked" });
   });
 });

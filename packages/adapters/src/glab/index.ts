@@ -35,6 +35,7 @@ interface GlIssue {
 interface GlMr {
   iid: number;
   web_url: string;
+  title?: string;
   state: string;
   draft?: boolean;
   work_in_progress?: boolean;
@@ -85,6 +86,7 @@ function mapMr(m: GlMr): RemotePullRequest {
     state: m.state === "merged" ? "merged" : m.state === "opened" ? "open" : "closed", // locked → closed
     is_draft: m.draft ?? m.work_in_progress ?? false,
     head_sha: m.sha ?? "",
+    ...(m.title === undefined ? {} : { title: m.title }),
     ...(merge ? { merge_commit_sha: merge } : {}),
     ...(by ? { merged_by: by } : {}),
     merged_at: m.merged_at ?? null,
@@ -97,6 +99,7 @@ function mapMr(m: GlMr): RemotePullRequest {
 interface GlMrNode {
   iid: string;
   webUrl: string;
+  title?: string;
   state: string;
   draft?: boolean;
   sourceBranch: string;
@@ -113,13 +116,14 @@ const MRS_PER_QUERY = 100;
 
 /** Every merge request of `branches`, any state, as GitLab GraphQL lists it. JSON strings are GraphQL strings. */
 export function mrsQuery(fullPath: string, branches: readonly string[]): string {
-  const node = "iid webUrl state draft sourceBranch targetBranch mergedAt diffHeadSha mergeCommitSha squashCommitSha mergeUser { username }";
+  const node = "iid webUrl title state draft sourceBranch targetBranch mergedAt diffHeadSha mergeCommitSha squashCommitSha mergeUser { username }";
   return `query { project(fullPath: ${JSON.stringify(fullPath)}) { mergeRequests(sourceBranches: ${JSON.stringify(branches)}, first: ${MRS_PER_QUERY}) { pageInfo { hasNextPage } nodes { ${node} } } } }`;
 }
 
 const restMr = (n: GlMrNode): GlMr => ({
   iid: Number(n.iid),
   web_url: n.webUrl,
+  ...(n.title === undefined ? {} : { title: n.title }),
   state: n.state,
   ...(n.draft === undefined ? {} : { draft: n.draft }),
   source_branch: n.sourceBranch,
@@ -213,6 +217,9 @@ export function createGlab(opts: GlabOptions): RemotePort {
     },
     async editPullRequestBody(number, body) {
       okOrThrow(await run(["mr", "update", String(number), ...repo, "--description-file", "-", "--yes"], body), "glab mr update", "glab");
+    },
+    async editPullRequestTitle(number, title) {
+      okOrThrow(await run(["mr", "update", String(number), ...repo, "--title", title, "--yes"]), "glab mr update", "glab");
     },
     async createIssue({ title, body, labels, assignee }) {
       const out = okOrThrow(
