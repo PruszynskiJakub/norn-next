@@ -492,7 +492,7 @@ export interface HookInstallResult {
 
 export interface AgentLaunchRequest {
   cwd: string;
-  /** first prompt: "Use the norn skill, then run `norn brief`." */
+  /** first prompt (`AUTO_PROMPT`, or a nudge on a resumed session) */
   prompt: string;
   model?: string;
   /** agent-tool session id to resume in the same session */

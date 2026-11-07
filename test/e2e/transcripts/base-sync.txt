@@ -385,7 +385,7 @@
   spawn repo $ git rev-list --left-right --count <sha:14>...<sha:12> --
   spawn repo $ git merge-base <sha:14> <sha:12>
   spawn repo $ git merge-tree --write-tree --name-only --no-messages <sha:14> <sha:12>
-  A.runner.launch title="gh-7 resolve" cwd=<dir>/repo-worktrees/gh-7-add-login-form argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Use the norn skill, then run `norn brief`."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:21>","NORN_SLOT":"1","NORN_STORY":"gh-7"}
+  A.runner.launch title="gh-7 resolve" cwd=<dir>/repo-worktrees/gh-7-add-login-form argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Run `norn brief` in this worktree and do the step it gives you."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:21>","NORN_SLOT":"1","NORN_STORY":"gh-7"}
   spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo-worktrees/gh-7-add-login-form $ git add -A -- .agents/specs/gh-7-add-login-form/handoffs/_story.md

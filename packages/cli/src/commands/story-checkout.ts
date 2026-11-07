@@ -11,7 +11,7 @@ export const storyCheckoutCommand = defineCommand({
   summary: "Take a story over on this machine: claim it, check out its branches, print the handoff",
   usage: "norn story checkout [<story>] [--force]",
   options: { force: { type: "boolean" } },
-  optionHelp: { "--force": "take over a claim another machine still holds (journaled in the claim and the handoff)" },
+  optionHelp: { "--force": "take over a claim another machine still holds (journaled in the claim and the take receipt)" },
   positionals: { max: 1 },
   async run(ctx, args) {
     const key = await resolveStory(ctx, args.positionals[0], args.json === true, aStory("story checkout", cmd.storyCheckout));

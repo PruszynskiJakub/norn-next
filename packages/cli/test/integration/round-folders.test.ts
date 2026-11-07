@@ -97,7 +97,7 @@ describe("a new story's record is round 1 (B30, B31)", () => {
     expect(git("ls-tree", "-r", "--name-only", `origin/${BRANCH}`, "--", spec).split("\n")).toEqual([`${spec}/${unitHandoffPath(STORY_UNIT_DIR)}`, `${spec}/spec.md`]);
   });
 
-  test("AC2: the handoff is handoffs/_story.md, and its Goal / Progress / Resume survive the step's report", async () => {
+  test("AC2: the handoff is handoffs/_story.md, and the step's report leaves it exactly as written", async () => {
     const file = handoff();
     const before = h.read(file);
     const body = before.replace(/## Goal\n[\s\S]*$/, "## Goal\nShip the round thing.\n\n## Progress\n- first milestone\n\n## Resume\nRun the review.\n");
@@ -106,10 +106,8 @@ describe("a new story's record is round 1 (B30, B31)", () => {
     expect((await inWt("done", "changes_requested", "--handoff", "one blocker", "--findings", writeFindings())).exit).toBe(0);
     await tickUntil(() => h.state(round1())?.step === "implement");
     const after = h.read(file);
-    expect(after).toContain("## Goal\nShip the round thing.");
-    expect(after).toContain("- first milestone");
-    expect(after).toContain("- review#1 changes_requested: one blocker");
-    expect(after).toContain("## Resume\nRun the review.");
+    // norn writes nothing into it: the report's summary is in its receipt, which the brief lists as History
+    expect(after).toBe(body);
     expect(existsSync(join(round1(), "handoff.md"))).toBe(false);
   });
 });
