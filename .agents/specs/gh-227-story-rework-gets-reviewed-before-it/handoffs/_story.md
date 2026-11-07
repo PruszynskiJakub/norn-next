@@ -4,6 +4,13 @@ Story-level rework in the `story` workflow is reviewed before it reaches the PR:
 
 ## Done means
 
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| Rework is reviewed | `implement.done → review`; review is `norn-review` with inputs `[spec, diff, last_findings]`; `approve → test`, `changes_requested → implement` counted by `review_loop` | test | `packages/cli/test/unit/assets.test.ts` › "story reviews its rework before the check, and a round without rework never reaches review" |
+| A round without rework never runs review | `implement.done` is the only edge into review; update still goes straight to test | test | same test (`into("review")` and `targets("story", "update")`) |
+| Both copies change together | `.agents/workflows/story.yaml` matches the shipped copy | test | `test/repo/repo.test.ts` › "the repo's copies of the shipped workflows have the same steps and edges" |
+| Amend the `story` sketch in `.agents/RULES.md` | the issue's third Wanted item | — | not applicable: the file no longer exists in the repo |
+
 - `packages/cli/test/unit/assets.test.ts` "story reviews its rework before the check, and a round without rework never reaches review": implement's only edge is to review, review is `norn-review` with inputs `[spec, diff, last_findings]`, its edges and counter, and `implement.done` is the only edge into review (update still goes straight to test).
 - `test/repo/repo.test.ts` "the repo's copies of the shipped workflows have the same steps and edges": `.agents/workflows/story.yaml` matches the shipped copy.
 - Core's `validateWorkflowDefinition` and `checkWorkflowLevel(…, "story")` report no issues on either copy (checked by hand with a scratch script).
@@ -26,4 +33,4 @@ Story-level rework in the `story` workflow is reviewed before it reaches the PR:
 
 ## Resume
 
-Nothing left in implement; the next step is the round's check.
+Review approved with no findings; the next step is the round's check (`test`).
