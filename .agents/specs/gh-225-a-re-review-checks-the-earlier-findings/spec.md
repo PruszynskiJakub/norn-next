@@ -13,7 +13,7 @@ labels:
   - norn:risk:high
   - norn:wf:quick
 workflow: quick
-status: new
+status: active
 intake_at: 2026-11-07T22:33:43.386Z
 body_hash: 69246fc543a768abe751f319bf1c24b6a288b9081dfcc59e3159b84a2f0c7ef6
 ---
