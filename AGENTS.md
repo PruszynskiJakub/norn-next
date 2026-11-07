@@ -8,7 +8,7 @@ The map for an agent in this repo: the commands, the rules every change follows,
 bun install
 bun run test        # the unit tier, in seconds: your loop after each change; the lints run inside it
 bun run typecheck   # tsc --noEmit over every package
-bun run test:e2e    # the e2e tier (CI runs it in shards); `bun run test:e2e <file>` runs one file
+bun run test:e2e    # the e2e tier runs in CI; `bun run test:e2e <file>` runs one file (e.g. to rewrite its transcript)
 bun run test:integration  # the integration tier: CI runs it, never a local check
 bun run schema:emit # after changing a schema
 bun run docs:emit   # after changing a command, flag, config key or shipped workflow
@@ -34,12 +34,12 @@ Dependencies point one way only: `schema ← core ← store ← adapters ← cli
 
 ## Process
 
-- **Hard rule.** Change the repo only inside a norn step: after `norn brief`, in that unit's worktree. An ad-hoc session reads, explores, discusses and drafts issues; it never commits or creates a branch (the person runs `/issue` to hand work over). The bypass and the one-time bootstrap happen only when the person asks. Inside a step only norn's run state is off limits; keep the unit's handoff (`handoffs/<unit>.md` in its spec folder) current.
+- **Hard rule.** Change the repo only inside a norn step: after `norn brief`, in that unit's worktree. An ad-hoc session reads, explores, discusses and drafts issues; it never commits or creates a branch (the person runs `/issue` to hand work over). The bypass and the one-time bootstrap happen only when the person asks. Inside a step, of the repo's files only norn's run state is off limits (`.agents/workflows/` and the norn config are ordinary files), and the brief's How to work has the rest; keep the unit's handoff (`handoffs/<unit>.md` in its spec folder) current.
 - **Released binary vs code under change.** `norn brief`, `norn done`, hooks and `watch` run the released `norn`. To exercise your change run `bun packages/cli/src/main.ts …`, never `norn …`, and only in a throwaway git repo under `$TMPDIR`: a unit worktree is a live norn unit, and a dev build there would act on its claim and run state.
 - **Only a person starts the next round** (`norn story edit gh-N --workflow <name> [--at <step>]`).
 - **Bundled copies.** Edit a bundled skill in `packages/cli/assets/skills/`, never its `.agents/skills/norn*` copy. Change a shipped workflow in both `packages/cli/assets/workflows/` and `.agents/workflows/`. Never run the person-only skills `issue` and `release-start`.
 - **Never edit `CHANGELOG.md`.** The release step writes it.
-- **Friction.** When norn gets in the way, say so in the handoff. The rest of the process: [Development › Process](docs/development.md#process).
+- **Friction.** When norn gets in the way, say so in one line under the handoff's Notes. The rest of the process: [Development › Process](docs/development.md#process).
 
 ## Rules
 

@@ -5,7 +5,7 @@ description: Prepares a norn release in the release workflow's prepare step — 
 
 # Release: prepare
 
-You write what the release says and which version it is. norn then opens the draft PR with your `pr.md` as its body, waits for its CI, and a person judges the version and the changelog at the `ready` gate. Follow the `norn` skill for the brief, the handoff and the report; this skill is the craft.
+You write what the release says and which version it is. norn then opens the draft PR with your `pr.md` as its body, waits for its CI, and a person judges the version and the changelog at the `ready` gate. The brief carries the handoff and report rules; this skill is the craft.
 
 ## 1. Inputs
 
@@ -74,7 +74,7 @@ Only `norn`-prefixed folders: `release`, `release-start` and `issue` are this re
 
 ## 8. Rename the issue
 
-`gh issue edit <N> --title "Release X.Y.Z"`. The story mirrors the title, the open PR takes it at the next remote sync, and the squash commit on main takes the PR's title. This is the one remote write this step allows, an exception to the `norn` skill's rule; never edit the issue body.
+`gh issue edit <N> --title "Release X.Y.Z"`. The story mirrors the title, the open PR takes it at the next remote sync, and the squash commit on main takes the PR's title. This is the one remote write this step allows, an exception to the brief's rule on remote writes; never edit the issue body.
 
 ## 9. Report
 

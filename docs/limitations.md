@@ -17,7 +17,7 @@ Two-machine operation was only simulated on one Mac (`NORN_MACHINE`). Everything
 - **Secrets in pushed text.** Handoffs are committed, and check output, receipts, logs and evidence are pushed to the story's record ref (`refs/norn/runs/<story>`), unredacted. Keep secrets out of check output and evidence.
 - **No write-back to GitHub or GitLab** beyond pushes and the draft PR: no status comment edited in place, no `norn:stuck` label.
 - **No permission profiles per step.** Claude runs in its `auto` permission mode by default; a permission prompt the agent is blocked on shows up as an Answer item.
-- **No hard-deny hook.** Pushing, writing to the remote with `gh`/`glab` and editing norn's run state are forbidden by the `norn` skill, not blocked by a hook.
+- **No hard-deny hook.** Pushing, writing to the remote with `gh`/`glab` and editing norn's run state are forbidden by the brief's rules, not blocked by a hook.
 - **No guards on transitions** (`when:`), no per-slice mode, no `fork`/`join` steps: conditions are outcomes, a person's QA is a gate, and `attended: true` on a step covers the precise cases.
 - **One remote and project per repository.**
 - **No web cockpit, and no command that mines the trace for workflow changes.**

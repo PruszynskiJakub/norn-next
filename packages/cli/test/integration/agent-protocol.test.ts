@@ -258,7 +258,7 @@ describe("manual mode: tick → brief → done → tick", () => {
     const r = await inWt(wt(), "done", "done", "--handoff", "x", "--json");
     expect(r.exit).toBe(3);
     expect(r.value).toMatchObject({ code: "handoff_too_large", details: { max: 8192 } });
-    expect((r.value as { do_instead: string }).do_instead).toContain("move repros, logs and tables into an evidence folder");
+    expect((r.value as { do_instead: string }).do_instead).toContain("move long repros and logs into the folder you pass with `--evidence <dir>`");
     expect(receipts(runs())).toHaveLength(count);
     if (before === null) rmSync(file);
     else writeFileSync(file, before);
@@ -293,7 +293,7 @@ describe("manual mode: tick → brief → done → tick", () => {
     const v = r.value as { run_id: string; started: boolean; markdown: string };
     expect(v.started).toBe(true);
     expect(v.run_id).not.toBe(runId);
-    expect(v.markdown).toContain("## History\n\nWhat happened in this unit so far, oldest first, from its receipts:\n\n");
+    expect(v.markdown).toContain("## History\n\nWhat happened so far, oldest first, from the receipts (for a story, its current round only):\n\n");
     expect(v.markdown).toContain("- implement#1 reported `done`: form renders; tests added");
     runId = v.run_id;
   });
