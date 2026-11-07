@@ -121,6 +121,9 @@ export class Actor extends ActEnv {
   private recordFailure(d: Decision, result: ActionResult): void {
     const a = d.action;
     if (a.kind === "push_record") return this.recordPushFailure(a, d.rule, result);
+    // A retitle rides along with the unit's own action and the next sync retries it, so it must
+    // neither replace that action's failure nor clear it
+    if (a.kind === "retitle_pr") return;
     if (!a.unit || a.kind === "claim" || a.kind === "noop") return;
     const key = a.unit.key;
     const prev = this.failures[key];

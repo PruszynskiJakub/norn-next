@@ -91,8 +91,11 @@ export class FakeRemote implements RemotePort {
     this.calls.push(`pr~ ${n}`);
     this.bodies.set(n, body);
   }
+  /** set → `editPullRequestTitle` throws it, renaming nothing */
+  titleError: Error | null = null;
   async editPullRequestTitle(n: number, title: string) {
     this.calls.push(`pr title ${n}`);
+    if (this.titleError) throw this.titleError;
     this.prs = this.prs.map((p) => (p.number === n ? { ...p, title } : p));
   }
   /** set → `createIssue` throws it */

@@ -77,16 +77,22 @@ export function mapIssue(i: GlIssue): RemoteIssue {
   };
 }
 
+/** The prefixes GitLab reads a draft from; it keeps a merge request's draft state in its title. */
+const DRAFT_PREFIX = /^\s*(?:\[draft\]|\(draft\)|draft:)\s*/i;
+
 function mapMr(m: GlMr): RemotePullRequest {
+  const isDraft = m.draft ?? m.work_in_progress ?? false;
+  // The port's title is the PR's own, so a draft's prefix is not reported as part of it
+  const title = m.title === undefined ? undefined : isDraft ? m.title.replace(DRAFT_PREFIX, "") : m.title;
   const merge = m.merge_commit_sha ?? m.squash_commit_sha ?? null;
   const by = m.merge_user?.username ?? m.merged_by?.username ?? null;
   return {
     number: m.iid,
     url: m.web_url,
     state: m.state === "merged" ? "merged" : m.state === "opened" ? "open" : "closed", // locked → closed
-    is_draft: m.draft ?? m.work_in_progress ?? false,
+    is_draft: isDraft,
     head_sha: m.sha ?? "",
-    ...(m.title === undefined ? {} : { title: m.title }),
+    ...(title === undefined ? {} : { title }),
     ...(merge ? { merge_commit_sha: merge } : {}),
     ...(by ? { merged_by: by } : {}),
     merged_at: m.merged_at ?? null,
@@ -219,7 +225,9 @@ export function createGlab(opts: GlabOptions): RemotePort {
       okOrThrow(await run(["mr", "update", String(number), ...repo, "--description-file", "-", "--yes"], body), "glab mr update", "glab");
     },
     async editPullRequestTitle(number, title) {
-      okOrThrow(await run(["mr", "update", String(number), ...repo, "--title", title, "--yes"]), "glab mr update", "glab");
+      // A title without the draft prefix would mark a draft MR ready, so a draft keeps it
+      const mr = mapMr(await json<GlMr>(["mr", "view", String(number), ...repo, "--output", "json"]));
+      okOrThrow(await run(["mr", "update", String(number), ...repo, "--title", mr.is_draft ? `Draft: ${title}` : title, "--yes"]), "glab mr update", "glab");
     },
     async createIssue({ title, body, labels, assignee }) {
       const out = okOrThrow(

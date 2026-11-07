@@ -7,7 +7,8 @@ import { NETWORK_TIMEOUT_MS } from "@norn/store";
 
 const stdins: Array<string | undefined> = [];
 const timeouts: Array<number | undefined> = [];
-const base = fixtureExec(calls as ExecFixture[]);
+const argvs: string[][] = [];
+const base = fixtureExec(calls as ExecFixture[], argvs);
 const exec: Exec = (argv, opts) => {
   stdins.push(opts?.stdin);
   timeouts.push(opts?.timeoutMs);
@@ -76,7 +77,7 @@ describe("glab adapter", () => {
 
   test("openDraftPullRequest passes body on stdin", async () => {
     const mr = await glab.openDraftPullRequest({ head: "gl-4-fix-crash-on-save", base: "main", title: "Fix crash on save", body: "Closes #4" });
-    expect(mr).toMatchObject({ number: 9, state: "open", is_draft: true, head_sha: "e".repeat(40), head: "gl-4-fix-crash-on-save", base_branch: "main", merged_at: null });
+    expect(mr).toMatchObject({ number: 9, title: "Fix crash on save", state: "open", is_draft: true, head_sha: "e".repeat(40), head: "gl-4-fix-crash-on-save", base_branch: "main", merged_at: null });
     expect(stdins).toContain("Closes #4");
   });
 
@@ -86,8 +87,16 @@ describe("glab adapter", () => {
   });
 
   test("editPullRequestTitle replaces the title", async () => {
-    await glab.editPullRequestTitle(9, "Fix crash on save 0.22.0");
+    argvs.length = 0;
+    await glab.editPullRequestTitle(21, "Fix crash on save 0.22.0");
+    expect(argvs.at(-1)).toEqual(["glab", "mr", "update", "21", "--title", "Fix crash on save 0.22.0", "--yes"]);
     expect(await glab.editPullRequestTitle(10, "x").catch((e) => e.code)).toBe("glab_failed");
+  });
+
+  test("editPullRequestTitle keeps a draft MR's Draft: prefix, so the MR stays a draft", async () => {
+    argvs.length = 0;
+    await glab.editPullRequestTitle(9, "Fix crash on save 0.22.0");
+    expect(argvs.at(-1)).toEqual(["glab", "mr", "update", "9", "--title", "Draft: Fix crash on save 0.22.0", "--yes"]);
   });
 
   test("replaceIssueLabel unlabels the old label and labels the new one in one update (B19)", async () => {

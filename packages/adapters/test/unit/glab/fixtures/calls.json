@@ -113,7 +113,7 @@
    "--output",
    "json"
   ],
-  "stdout": "{\"id\": 501, \"iid\": 9, \"project_id\": 7, \"title\": \"Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"}"
+  "stdout": "{\"id\": 501, \"iid\": 9, \"project_id\": 7, \"title\": \"Draft: Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"}"
  },
  {
   "argv": [
@@ -134,10 +134,33 @@
    "update",
    "9",
    "--title",
+   "Draft: Fix crash on save 0.22.0",
+   "--yes"
+  ],
+  "stdout": "- Updating merge request !9\n✓ updated title\n!9 Draft: Fix crash on save 0.22.0 (gl-4-fix-crash-on-save)\n https://gitlab.com/acme/app/-/merge_requests/9\n"
+ },
+ {
+  "argv": [
+   "glab",
+   "mr",
+   "view",
+   "21",
+   "--output",
+   "json"
+  ],
+  "stdout": "{\"id\": 521, \"iid\": 21, \"project_id\": 7, \"title\": \"Fix crash on save\", \"state\": \"opened\", \"draft\": false, \"work_in_progress\": false, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/21\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\"}"
+ },
+ {
+  "argv": [
+   "glab",
+   "mr",
+   "update",
+   "21",
+   "--title",
    "Fix crash on save 0.22.0",
    "--yes"
   ],
-  "stdout": "- Updating merge request !9\n✓ updated title\n!9 Fix crash on save 0.22.0 (gl-4-fix-crash-on-save)\n https://gitlab.com/acme/app/-/merge_requests/9\n"
+  "stdout": "- Updating merge request !21\n✓ updated title\n!21 Fix crash on save 0.22.0 (gl-4-fix-crash-on-save)\n https://gitlab.com/acme/app/-/merge_requests/21\n"
  },
  {
   "argv": [
@@ -161,7 +184,7 @@
    "--output",
    "json"
   ],
-  "stdout": "{\"id\": 501, \"iid\": 11, \"project_id\": 7, \"title\": \"Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\", \"head_pipeline\": {\"id\": 901, \"status\": \"success\"}}"
+  "stdout": "{\"id\": 501, \"iid\": 11, \"project_id\": 7, \"title\": \"Draft: Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\", \"head_pipeline\": {\"id\": 901, \"status\": \"success\"}}"
  },
  {
   "argv": [
@@ -172,7 +195,7 @@
    "--output",
    "json"
   ],
-  "stdout": "{\"id\": 501, \"iid\": 12, \"project_id\": 7, \"title\": \"Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\", \"head_pipeline\": {\"id\": 902, \"status\": \"running\"}}"
+  "stdout": "{\"id\": 501, \"iid\": 12, \"project_id\": 7, \"title\": \"Draft: Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\", \"head_pipeline\": {\"id\": 902, \"status\": \"running\"}}"
  },
  {
   "argv": [
@@ -183,7 +206,7 @@
    "--output",
    "json"
   ],
-  "stdout": "{\"id\": 501, \"iid\": 13, \"project_id\": 7, \"title\": \"Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\", \"head_pipeline\": {\"id\": 903, \"status\": \"failed\"}}"
+  "stdout": "{\"id\": 501, \"iid\": 13, \"project_id\": 7, \"title\": \"Draft: Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\", \"head_pipeline\": {\"id\": 903, \"status\": \"failed\"}}"
  },
  {
   "argv": [
@@ -194,7 +217,7 @@
    "--output",
    "json"
   ],
-  "stdout": "{\"id\": 501, \"iid\": 14, \"project_id\": 7, \"title\": \"Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\", \"head_pipeline\": null}"
+  "stdout": "{\"id\": 501, \"iid\": 14, \"project_id\": 7, \"title\": \"Draft: Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\", \"head_pipeline\": null}"
  },
  {
   "argv": [
@@ -205,6 +228,6 @@
    "--output",
    "json"
   ],
-  "stdout": "{\"id\": 501, \"iid\": 15, \"project_id\": 7, \"title\": \"Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\", \"head_pipeline\": {\"id\": 905, \"status\": \"manual\"}}"
+  "stdout": "{\"id\": 501, \"iid\": 15, \"project_id\": 7, \"title\": \"Draft: Fix crash on save\", \"state\": \"opened\", \"draft\": true, \"work_in_progress\": true, \"source_branch\": \"gl-4-fix-crash-on-save\", \"target_branch\": \"main\", \"merged_at\": null, \"web_url\": \"https://gitlab.com/acme/app/-/merge_requests/9\", \"sha\": \"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\", \"head_pipeline\": {\"id\": 905, \"status\": \"manual\"}}"
  }
 ]

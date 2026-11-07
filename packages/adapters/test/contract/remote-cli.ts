@@ -234,14 +234,18 @@ export function scriptedGlab(login = "tanuki"): ScriptedRemote {
       return ok(mrs.filter((m) => m.head === head).map(mrJson)); // glab's order is not the adapter's to trust
     }
     if (a === "mr" && b === "create") {
-      const m: Pr = { number: 7 + mrs.length, head: flag(argv, "--source-branch")!, base: flag(argv, "--target-branch")!, title: flag(argv, "--title")!, draft: argv.includes("--draft") };
+      // GitLab keeps a draft in its title, so a draft MR's title comes back prefixed
+      const draft = argv.includes("--draft");
+      const m: Pr = { number: 7 + mrs.length, head: flag(argv, "--source-branch")!, base: flag(argv, "--target-branch")!, title: `${draft ? "Draft: " : ""}${flag(argv, "--title")!}`, draft };
       mrs.push(m);
       return ok(`Creating ${m.draft ? "draft " : ""}merge request for ${m.head} into ${m.base} in acme/app\n\n!${m.number} ${m.title} (${m.head})\n https://gitlab.com/acme/app/-/merge_requests/${m.number}\n`);
     }
     if (a === "mr" && b === "update" && flag(argv, "--title") !== undefined) {
       const m = mrs.find((x) => x.number === Number(argv[3]));
       if (!m) return { code: 1, stdout: "", stderr: "ERROR: 404 Not Found" };
+      // a title without the draft prefix marks the MR ready, as GitLab does
       m.title = flag(argv, "--title")!;
+      m.draft = /^\s*(\[draft\]|\(draft\)|draft:)/i.test(m.title);
       return ok(`- Updating merge request !${m.number}\n!${m.number} ${m.title} (${m.head})\n https://gitlab.com/acme/app/-/merge_requests/${m.number}\n`);
     }
     if (a === "mr" && b === "view") {

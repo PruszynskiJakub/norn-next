@@ -5,7 +5,7 @@
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { join } from "node:path";
-import { repoConfigPath, workflowsDir } from "@norn/store";
+import { readActFailures, repoConfigPath, workflowsDir } from "@norn/store";
 import { createHarness, type Harness, issue } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
 import { runStateOf } from "../../../../test/support/run-state.ts";
@@ -113,5 +113,21 @@ describe("story PR title", () => {
     await tick();
     expect(h.remote.calls.filter((c) => c === `pr title ${n}`)).toHaveLength(1);
     expect(h.state(runs())).toMatchObject({ step: "ready", status: "parked" });
+  });
+
+  test("a failed rename records no failure for the story unit; the next sync tries again", async () => {
+    const n = h.remote.prs[0]!.number;
+    const tries = () => h.remote.calls.filter((c) => c === `pr title ${n}`).length;
+    const before = tries();
+    h.remote.titleError = new Error("gh pr edit: HTTP 502");
+    h.remote.issues = h.remote.issues.map((i) => (i.number === 7 ? { ...i, title: "Count items 0.23.0" } : i));
+    h.clock.advance(6 * 60_000);
+    for (let i = 0; i < 4 && tries() === before; i++) await tick();
+    expect(tries()).toBe(before + 1);
+    expect(readActFailures(h.root)).toEqual({});
+    h.remote.titleError = null;
+    h.clock.advance(6 * 60_000);
+    for (let i = 0; i < 4 && h.remote.prs[0]!.title !== "Count items 0.23.0"; i++) await tick();
+    expect(h.remote.prs[0]!.title).toBe("Count items 0.23.0");
   });
 });
