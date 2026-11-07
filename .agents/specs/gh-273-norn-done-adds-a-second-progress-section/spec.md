@@ -8,7 +8,7 @@ title: norn done adds a second Progress section when the handoff's headings are 
 assignee: PruszynskiJakub
 labels:
   - norn
-  - norn:wf:reproduce
+  - norn:wf:quick
 workflow: quick
 status: active
 intake_at: 2026-11-07T09:59:04.159Z
