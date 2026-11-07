@@ -3,7 +3,8 @@
 # base, cut slices from the plan against that base, approve them, run the slices, bring the story up
 # to date again, verify the whole story once (QA over every slice's criteria), describe it, open the
 # draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a person at ready.
-# Rework found by the story-level test, QA or CI is done in the story worktree.
+# Rework found by the story-level test, QA, CI or a person is done in the story worktree and reviewed
+# before it is checked again.
 # QA reports a verdict per acceptance criterion (criteria: required) and may only report the outcome
 # matching its worst verdict; `unverified` (could not check here) goes to a person at human-qa.
 # A story waiting at human-qa or ready goes back through update when the base moved
@@ -86,7 +87,16 @@ steps:
     skill: norn-implement
     inputs: [spec, handoff, last_check, last_findings]
     outcomes:
-      done: { to: test, means: "every rework point has a passing test" }
+      done: { to: review, means: "every rework point has a passing test" }
+  # only rework reaches implement, and slices are reviewed before they integrate: this reviews the
+  # story-level rework, so a round without rework never runs it
+  review:
+    type: agent
+    skill: norn-review
+    inputs: [spec, diff, last_findings]
+    outcomes:
+      approve:           { to: test, means: "the rework does what the findings and the story ask and nothing else, no blocking findings" }
+      changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
   describe:
     type: agent
     skill: norn-pr
@@ -136,6 +146,7 @@ counters:
   ci_loop: { max: 3 }
   qa_loop: { max: 2 }
   ready_loop: { max: 2 }
+  review_loop: { max: 3 }
   # reset each time their update merges cleanly: only repeated conflicts on one base move count
   sync_conflict_loop: { max: 2, reset_on: sync.done }
   base_conflict_loop: { max: 2, reset_on: update.done }
