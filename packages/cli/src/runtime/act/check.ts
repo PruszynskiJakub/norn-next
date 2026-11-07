@@ -11,7 +11,7 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { type Action, type ActionResult } from "@norn/core";
-import { assertValid, type CheckOrder, type ReceiptOf, SLOTS, ulid } from "@norn/schema";
+import { assertValid, type CheckOrder, type ReceiptOf, ulid } from "@norn/schema";
 import {
   acquireRunLease,
   appendReceipt,
@@ -33,7 +33,7 @@ import {
 } from "@norn/store";
 import { nornEntry } from "../shim.ts";
 import { runShell, type ShellResult, tailLines } from "../shell.ts";
-import { stopStrayListeners } from "../strays.ts";
+import { slotPorts, stopStrayListeners } from "../strays.ts";
 import { type ActEnv, QueueFull } from "./env.ts";
 
 /** Start the command in the worktree with `.env.norn`; `norn check-run` writes the check receipt. */
@@ -53,7 +53,6 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
   await sweepCheckOrders(act);
   // the process env is inherited by `norn check-run`, not written: the order holds only `.env.norn`, the step env and NORN_HOME
   const env = definedOnly({ ...(readEnvNorn(a.cwd) ?? {}), ...a.env, NORN_HOME: act.root });
-  const portBase = Number({ ...act.ctx.env, ...env }.PORT_BASE);
   const order: CheckOrder = {
     version: 1,
     home: act.ctx.home,
@@ -68,7 +67,7 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
     cwd: a.cwd,
     env,
     timeout_ms: a.timeout_ms,
-    ports: Number.isInteger(portBase) && portBase > 0 ? { from: portBase, to: portBase + SLOTS.ports_per_slot - 1 } : null,
+    ports: slotPorts({ ...act.ctx.env, ...env }.PORT_BASE),
   };
   const path = checkOrderPath(act.ctx.home, a.run_id);
   let started = false;
