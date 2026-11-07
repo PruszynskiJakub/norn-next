@@ -13,7 +13,9 @@ Before the first question, explore the project (and the spec, slice or diff bein
 
 Walk down each branch of the design tree, resolving decisions one by one. Ask **one question per turn**, never lettered sub-questions, in plain text, each with your recommended answer, and wait for the reply before continuing.
 
-When an answer is terse ("remove these", "X can go"), state your interpretation in one line ("Read as: drop B3 and B4, keep B5.") and carry on with the next question; the person corrects it if it is wrong. Do not spend a turn asking what they meant.
+When an answer is terse ("remove these", "X can go"), state your interpretation in one line ("Read as: drop the export and the size limit, keep the sort order.") and carry on with the next question; the person corrects it if it is wrong. Do not spend a turn asking what they meant.
+
+Name things by what they say, never by a number or id: "the warning on open cards", not "story 2" or "question 1".
 
 Chase vagueness: "fast", "simple", "secure", "like X" get a concrete number, example or rule. Name a contradiction the moment it appears, and ask which side wins. Never re-ask a settled question.
 
