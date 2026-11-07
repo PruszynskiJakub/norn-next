@@ -11,7 +11,7 @@ Write for the branch as it is now. Each time the PR is opened or updated its bod
 
 ## 1. Read
 
-- The spec: its Problem, numbered Behaviour items and Plan. Use the spec's words for things, never your own synonyms.
+- The spec: its Problem Statement, numbered User Stories and Plan. Use the spec's words for things, never your own synonyms.
 - The whole diff against the base.
 - The proof, from the strongest source the round has:
   - **QA ran** (you are given criteria reports and evidence folders): the latest criteria report of the change as a whole, not an earlier one a later fix superseded, and the evidence files it names.
@@ -32,7 +32,7 @@ Write the body as Markdown to the file you were told to write it to, in exactly 
 
 ## Evidence
 
-- **B1** <criterion in a few words>
+- **<what the user story says, in a few words>**
   **Before:** <what happened before, or "did not exist">
   **After:** <what was observed, with a link to the evidence>
 
@@ -67,10 +67,10 @@ Keep only the names a reviewer needs to place the change.
 
 ### Evidence
 
-One entry per criterion, in spec order, each at most three lines. The ids are the spec's Behaviour items (`B1`); a spec without them (an issue mirrored as it was filed) gets one entry per point of its Wanted section, numbered `W1`, `W2`, ….
+One entry per user story, in spec order, each at most three lines, headed by what the story says in a few words, never by a number. A spec without user stories (an issue mirrored as it was filed) gets one entry per point of its Wanted section, headed the same way.
 
 - A screenshot beats output; output beats a test name. For a visible change, link the before and after screenshots.
-- Link an evidence file by its path in the story's record, `evidence/<unit>/<run_id>/<file>`, where `<unit>` is `_story` or the slice's `<nn>-<slug>`: `![B2 after](evidence/01-parser/01ABC/shot.png)`. You are told where each unit's evidence folders are. The evidence is not on the branch: when the PR is opened or updated, each such link is rewritten to the file's URL in the pushed record, where an image renders inline. Never link evidence by a local path or a branch URL. With no evidence folders given, link none.
+- Link an evidence file by its path in the story's record, `evidence/<unit>/<run_id>/<file>`, where `<unit>` is `_story` or the slice's `<nn>-<slug>`: `![open-cards warning, after](evidence/01-parser/01ABC/shot.png)`. You are told where each unit's evidence folders are. The evidence is not on the branch: when the PR is opened or updated, each such link is rewritten to the file's URL in the pushed record, where an image renders inline. Never link evidence by a local path or a branch URL. With no evidence folders given, link none.
 - For a test, name it and show what it asserts in one line of pseudocode, and that it failed before and passes now. Do not paste the test's setup.
 - A criterion that was not shown, that only a person could judge, or that could not be checked: say so, and say how to check it. Never dress it up as passed. Gaps the review accepted go in one line after the entries.
 

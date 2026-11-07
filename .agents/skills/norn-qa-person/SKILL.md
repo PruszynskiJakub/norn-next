@@ -10,7 +10,7 @@ The person decides; you run things and record. Without this, an agent copies its
 1. **Find the agent's evidence pack.** Your instructions say where it is: each unit's latest criteria report and its evidence folder (`report.md` and one file per criterion). Note what it checked, what it saw, and what it left for a person (`person` and `unverified` verdicts, each with its `how`). No pack: every criterion is the person's to check.
 2. **Set up for the person** on the branch in this worktree, as it is, with the ports and environment configured for it: run the test suite, start the app. If the branch head moved since the pack was made, its passes judged older code: say so, and treat what the change touched as unchecked.
 3. **Walk the person through what is left for them**, one criterion at a time, with what the agent prepared. Then ask which of the pack's passes they want to question; they may fail one. The ones they accept as the agent observed them are their `pass`, with the agent's evidence.
-4. **Remarks of their own.** If the person tried the app on their own, take their list of remarks and tie each to a criterion (for a story: a Behaviour item); a remark on a criterion fails it. For a remark outside the criteria, the person chooses:
+4. **Remarks of their own.** If the person tried the app on their own, take their list of remarks and tie each to a criterion (for a story: a user story); a remark on a criterion fails it. For a remark outside the criteria, the person chooses:
    - **follow up** (the default, so QA does not grow the slice): a new story the person files;
    - **pull it in**: it fails this slice or story, like a criterion;
    - **drop it**: noted only.
