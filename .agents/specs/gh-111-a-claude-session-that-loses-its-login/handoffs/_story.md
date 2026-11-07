@@ -2,7 +2,7 @@
 
 A Claude session that loses its login mid-step parks on an implicit ask that says "agent logged out — run `/login` in the pane", instead of going `agent.silent` → nudges → `stuck`.
 
-## Done means
+## Proof
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -10,7 +10,7 @@ A Claude session that loses its login mid-step parks on an implicit ask that say
 | Treated like the usage-limit wait, no nudges spent | the logged-out fact parks on `agent.ask.implicit` with that reason and spends no nudge ; the park holds through the idle notification that follows | test | `packages/adapters/test/unit/claude/claude.test.ts` › "the idle notification after a failed login is dropped…" (refineHooks); `packages/core/test/unit/decide.test.ts` › "a logged-out session parks on an implicit ask…" (still parked 30 min later, `nudges_used` 0) |
 | After the login, the run continues in the same session | the session's next prompt after `/login` ends the park and the run goes on, nudges untouched | test | `packages/core/test/unit/decide.test.ts` › "a logged-out session parks on an implicit ask…" (a later `UserPromptSubmit` → `agent.ask.implicit.resolved`, run goes on) |
 
-- `bun run test` (1292 pass) and `bun run typecheck`: green.
+- `bun run test` (1292 pass) and `bun run typecheck`: green, re-run by review#3 on the current HEAD.
 - CI rework (ci_loop 1): `packages/cli/test/integration/agent-protocol.test.ts` › "installed hook commands use event names the hook accepts" now sends `StopFailure` an `authentication_failed` payload; the file passes locally (29 pass).
 
 ## Easy to miss
@@ -30,4 +30,4 @@ A Claude session that loses its login mid-step parks on an implicit ask that say
 
 ## Resume
 
-CI fix committed; next is the workflow's step after implement (CI re-runs on the pushed branch).
+Review #3 approved the current HEAD (no findings); next is the workflow's step after review (CI on the pushed branch).
