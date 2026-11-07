@@ -35,4 +35,4 @@ An open story PR follows its issue's title, so a release PR opened as "Release" 
 
 ## Resume
 
-Review #2 approved. Next: QA of the criteria above; the gate-prompt row is an agent check.
+pr.md in the spec folder describes the branch as it is (summary, test evidence, merge danger; no QA ran). Next: open or update the story PR with it.
