@@ -4,9 +4,12 @@ CI's process check refuses a PR that edits the installed skill copies `.agents/s
 
 ## Done means
 
-- `scripts/process-check.ts` refuses a story or bypass PR whose changed files (renames by both names) include `.agents/skills/norn*` unless its title is `Release X.Y.Z`, telling the author to edit `packages/cli/assets/skills/` instead: `test/repo/process-check.test.ts` › "installed bundled skill copies" and the paginated-files gather test.
-- `skillsDriftHint.unit` reads "…runs use this worktree's copies until the base is merged in, or until this branch's edit to them is reverted": `packages/core/test/unit/skills-drift.test.ts`; the integration and e2e pins carry the same text.
-- `bun run test` and `bun run typecheck` green.
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| Wanted: process check | a story or bypass PR touching `.agents/skills/norn*` is refused unless titled `Release X.Y.Z`, and told to edit `packages/cli/assets/skills/` | test | `test/repo/process-check.test.ts` › "installed bundled skill copies" (story refused with source hint; bypass refused; release via story branch or bypass passes; repo-local skills and look-alikes pass; a title that only mentions a release is refused) |
+| Wanted: process check sees every file | changed files come from every page, renames by both names | test | `test/repo/process-check.test.ts` › "reads every page of the PR's changed files, renames by both names" |
+| Wanted: drift hint | `skillsDriftHint.unit` names both causes: merge the base in, or revert this branch's edit | test | `packages/core/test/unit/skills-drift.test.ts` › "drifted skills in the inbox"; same text pinned in `packages/cli/test/integration/skills-drift-hold.test.ts` and `test/e2e/base-sync.test.ts` |
+| Local loop | `bun run test` and `bun run typecheck` green | test | review run: 1288 pass, 0 fail; tsc clean |
 
 ## Easy to miss
 
