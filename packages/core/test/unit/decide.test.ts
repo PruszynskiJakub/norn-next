@@ -260,6 +260,15 @@ describe("classification", () => {
     ];
     const a = only(facts([solo(running(), { hooks })]));
     expect(a).toMatchObject({ kind: "park", rule: "agent.ask.implicit", state: { park: { kind: "ask", reason: "agent logged out — run `/login` in the pane" }, nudges_used: 0 } });
+    if (a.kind !== "park") return;
+    // the Claude adapter drops the idle notification that follows, so past the stalled window the
+    // hooks still end on the failed login: the unit stays parked and no nudge is spent
+    const later = T0 + 30 * 60_000;
+    const unitAction = (s: StoryFacts) => decide(facts([s], {}, later), WORKFLOWS, CONFIG).map((d) => d.action).filter((x) => !isSideAction(x));
+    expect(unitAction(solo(a.state, { hooks, last_activity_at: T0 - 10 }))).toMatchObject([{ kind: "noop", rule: "unit.parked.ask" }]);
+    // after `/login` the next prompt in the same session ends the wait and the run goes on
+    const prompt = { event: "turn_start" as const, at: at(later - 1000), agent: "claude", native: "UserPromptSubmit", cwd: "/w" };
+    expect(unitAction(solo(a.state, { hooks: [...hooks, prompt] }))[0]).toMatchObject({ kind: "apply_receipts", rule: "agent.ask.implicit.resolved", state: { status: "running", park: null, nudges_used: 0 } });
   });
   test("BS5.1 (dogfood D3): an owed commit deferred by an agent's merge never takes the unit's action", () => {
     const midMerge = (s: StoryFacts, inProgress: { operation: "merge" | null; unmerged: string[] }) => {

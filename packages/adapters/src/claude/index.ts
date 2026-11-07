@@ -144,14 +144,32 @@ export function parseHookEvent(arg: string, payload: unknown, env: Record<string
 }
 
 /**
+ * Claude's own pass over a run's hook facts, in trace order; other agents' facts pass through
+ * unchanged. Pure.
+ * - A `permission_prompt` gets the tool call it asks about (see `withPendingCommand`).
+ * - The idle notification that follows a failed login is dropped: the session went back to its
+ *   prompt still logged out, and as a `turn_end` it would end the logged-out wait (and later be
+ *   nudged) before anyone ran `/login`. The wait holds until the session's next other fact.
+ */
+function refineHooks(hooks: readonly HookFact[]): HookFact[] {
+  const loggedOut = new Set<string | undefined>();
+  return withPendingCommand(hooks).filter((h) => {
+    if (h.agent !== NAME) return true;
+    if (h.native === "Notification" && h.event === "turn_end") return !loggedOut.has(h.agent_session_id);
+    if (h.native === "StopFailure" && h.event === "waiting_input") loggedOut.add(h.agent_session_id);
+    else loggedOut.delete(h.agent_session_id);
+    return true;
+  });
+}
+
+/**
  * Give each Claude `permission_prompt` fact the tool call it is asking about. The
  * Notification payload names no command; Claude Code runs PreToolUse *before* its permission
  * check, so the pending call is the latest tool fact of the same session — if that is a
  * PreToolUse (a later PostToolUse means it already ran). Sets `tool` and `command` as
- * `Tool(input)` (Claude's permission-rule syntax, e.g. `Bash(rm -rf build)`). Pure; facts in
- * trace order; other agents' facts pass through unchanged.
+ * `Tool(input)` (Claude's permission-rule syntax, e.g. `Bash(rm -rf build)`).
  */
-function refineHooks(hooks: readonly HookFact[]): HookFact[] {
+function withPendingCommand(hooks: readonly HookFact[]): HookFact[] {
   return hooks.map((h, i) => {
     if (h.agent !== NAME || h.event !== "permission_prompt" || h.tool) return h;
     for (let j = i - 1; j >= 0; j--) {

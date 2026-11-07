@@ -98,6 +98,16 @@ describe("claude refineHooks (§10 implicit ask shows the command)", () => {
     const codexPerm = { ...perm, agent: "codex" };
     expect(refine([pre, codexPerm])[1]).toEqual(codexPerm);
   });
+  test("the idle notification after a failed login is dropped, so the logged-out wait holds until the session acts again", () => {
+    const prompt = f("user-prompt-submit", payloads.UserPromptSubmit);
+    const loggedOut = f("stop-failure", payloads.StopFailureAuth);
+    const idle = f("notification", payloads.NotificationIdle);
+    expect(refine([prompt, loggedOut, idle, idle])).toEqual([prompt, loggedOut]);
+    // a new turn after the /login ends the wait; a later idle notification is an ordinary turn end again
+    expect(refine([loggedOut, idle, prompt, idle])).toEqual([loggedOut, prompt, idle]);
+    // another session's failed login does not swallow this session's idle notification
+    expect(refine([{ ...loggedOut, agent_session_id: "zzz" }, idle])).toEqual([{ ...loggedOut, agent_session_id: "zzz" }, idle]);
+  });
 });
 
 describe("claude hookResponse", () => {

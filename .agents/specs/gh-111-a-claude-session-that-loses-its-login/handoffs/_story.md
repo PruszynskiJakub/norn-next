@@ -7,10 +7,10 @@ A Claude session that loses its login mid-step parks on an implicit ask that say
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
 | Adapter recognises the logged-out state | `StopFailure` with `error: authentication_failed` becomes a `waiting_input` fact "agent logged out — run `/login` in the pane"; other errors ignored; hook installed | test | `packages/adapters/test/unit/claude/claude.test.ts` › "claude StopFailure …" and "claude hooks install" (key list has `StopFailure`) |
-| Treated like the usage-limit wait, no nudges spent | the logged-out fact parks on `agent.ask.implicit` with that reason and spends no nudge | test | partial: `packages/core/test/unit/decide.test.ts` › "a logged-out session parks on an implicit ask that says so, spending no nudge" proves the first park only; the following idle notification un-parks it (review finding below) |
-| After the login, the run continues in the same session | a later non-wait hook or a person's answer ends the park | test | UNTRACED (relies on the existing implicit-ask resolution; no test for this story) |
+| Treated like the usage-limit wait, no nudges spent | the logged-out fact parks on `agent.ask.implicit` with that reason and spends no nudge ; the park holds through the idle notification that follows | test | `packages/adapters/test/unit/claude/claude.test.ts` › "the idle notification after a failed login is dropped…" (refineHooks); `packages/core/test/unit/decide.test.ts` › "a logged-out session parks on an implicit ask…" (still parked 30 min later, `nudges_used` 0) |
+| After the login, the run continues in the same session | a later non-wait hook or a person's answer ends the park | test | `packages/core/test/unit/decide.test.ts` › "a logged-out session parks on an implicit ask…" (a later `UserPromptSubmit` → `agent.ask.implicit.resolved`, run goes on) |
 
-- `bun run test` and `bun run typecheck`: green in test#1.
+- `bun run test` and `bun run typecheck`: green after the rework.
 
 ## Easy to miss
 
@@ -19,14 +19,13 @@ A Claude session that loses its login mid-step parks on an implicit ask that say
 
 ## Not proven yet
 
-- **Review finding (blocking): the park does not hold.** About 60 s after the failed login, Claude Code's `idle_prompt` notification (mapped to `turn_end`) arrives; `implicitAskResolved` (`packages/core/src/decide/agent.ts:419`) ends any implicit ask on a newer non-wait hook, so the ask resolves as "moved on" while the session is still logged out, the run later goes `agent.stalled`, and nudges are spent. Needs a fix and a decide test with a later `idle_prompt` hook.
-- "After the login, the run continues in the same session" has no test of its own (UNTRACED).
 - The `StopFailure` payload shape (`error`, `error_details`, `last_assistant_message`) comes from the Claude Code hooks docs and the strings in its binary (see the issue's Triage); the fixture `StopFailureAuth` is written by hand, not recorded from a real logout.
 
 ## Notes
 
+- The idle-notification fix lives in the Claude adapter's `refineHooks`, not in decide: after a logged-out `StopFailure`, that session's idle `Notification` (`turn_end`) facts are dropped until any other fact of the session arrives. Decide stays agent-neutral; its test feeds the hooks as refined (no decide test can see the drop itself, so the adapter test is the seam for that half).
 - Only `authentication_failed` is mapped. `billing_error` could deserve the same treatment, but that is outside this story.
 
 ## Resume
 
-Rework: keep the logged-out implicit ask parked through the idle notification that follows it (fix in decide's implicit-ask resolution or in the Claude adapter's `refineHooks`), then add decide tests for a later `idle_prompt` (stays parked, no nudge) and a later `UserPromptSubmit` (resolves).
+Review the rework (adapter `refineHooks` drop of the post-logout idle notification, plus the decide tests).
