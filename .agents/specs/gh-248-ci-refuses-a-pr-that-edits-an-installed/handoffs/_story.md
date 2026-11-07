@@ -29,4 +29,4 @@ CI's process check refuses a PR that edits the installed skill copies `.agents/s
 
 ## Resume
 
-Implement is done; next is whatever the quick workflow runs after implement (review / CI).
+pr.md is written for the branch as it is (summary, test evidence, merge danger); next a person opens or merges the PR. The live check takes effect only after merge.
