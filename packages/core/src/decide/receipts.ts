@@ -25,9 +25,9 @@ import type { RepoWorkflows } from "./index.ts";
 export function isSideAction(a: { kind: string; op?: unknown }): boolean {
   return (a.kind === "claim" && a.op === "renew") || isTailAction(a);
 }
-/** A side action act performs after every other action of the tick: the record push. */
+/** A side action act performs after every other action of the tick: the record push, a PR retitle. */
 export function isTailAction(a: { kind: string }): boolean {
-  return a.kind === "push_record";
+  return a.kind === "push_record" || a.kind === "retitle_pr";
 }
 
 export class Ctx {

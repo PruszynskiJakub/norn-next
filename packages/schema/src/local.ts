@@ -141,6 +141,8 @@ export const PullRequestEntry = Type.Object({
   merge_commit_sha: Type.Optional(Type.String()),
   merged_by: Type.Optional(Type.String()),
   merged_at: Type.Optional(Nullable(Type.String())),
+  /** absent in a cache an older norn wrote */
+  title: Type.Optional(Type.String()),
   head: Type.Optional(Type.String()),
   /** older name of `base_branch`, read from a cache an older norn wrote; nothing writes it */
   base: Type.Optional(Type.String()),

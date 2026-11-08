@@ -68,6 +68,7 @@ const REMOTE_CALLS: Record<string, (...a: never[]) => string> = {
   pullRequestCi: (n: number) => `pullRequestCi ${n}`,
   openDraftPullRequest: (o: { head: string; base: string; title: string }) => `openDraftPullRequest ${o.head} → ${o.base} ${JSON.stringify(o.title)}`,
   editPullRequestBody: (n: number) => `editPullRequestBody ${n}`,
+  editPullRequestTitle: (n: number, title: string) => `editPullRequestTitle ${n} ${JSON.stringify(title)}`,
   createIssue: (o: { title: string; labels: string[] }) => `createIssue ${JSON.stringify(o.title)} ${o.labels.join(",")}`,
   newIssueUrl: (o: { labels: string[] }) => `newIssueUrl ${o.labels.join(",")}`,
   rawFileUrl: (o: { path: string }) => `rawFileUrl ${o.path}`,
