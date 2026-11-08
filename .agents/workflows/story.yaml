@@ -2,7 +2,8 @@
 # ci.yml wait. Delivers a story a refinement round planned: sync, cut slices against the current base,
 # approve them, run the slices, update, check, QA the whole story once, describe, open the draft PR,
 # wait for its CI, and wait for a person at ready. The local check runs the unit tier and the type
-# check; CI runs every tier, integration and e2e sharded.
+# check; CI runs every tier, integration and e2e sharded. Story-level rework is reviewed before it is
+# checked again.
 # A story waiting at human-qa or ready goes back through update when the base moved under it in a way
 # that conflicts (base.stale: conflict).
 name: story
@@ -83,7 +84,16 @@ steps:
     inputs: [spec, handoff, last_check, last_findings]
     instructions: "Run `bun run test` (the unit tier) after each change, and the type check; the integration and e2e tiers run in CI, which the `ci` check waits for, so do not run them before handing back."
     outcomes:
-      done: { to: test, means: "every rework point has a passing test" }
+      done: { to: review, means: "every rework point has a passing test" }
+  # only rework reaches implement, and slices are reviewed before they integrate: this reviews the
+  # story-level rework, so a round without rework never runs it
+  review:
+    type: agent
+    skill: norn-review
+    inputs: [spec, diff, last_findings]
+    outcomes:
+      approve:           { to: test, means: "the rework does what the findings and the story ask and nothing else, no blocking findings" }
+      changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
   describe:
     type: agent
     skill: norn-pr
@@ -127,6 +137,7 @@ counters:
   ci_loop: { max: 3 }
   qa_loop: { max: 2 }
   ready_loop: { max: 2 }
+  review_loop: { max: 3 }
   # reset each time their update merges cleanly: only repeated conflicts on one base move count
   sync_conflict_loop: { max: 2, reset_on: sync.done }
   base_conflict_loop: { max: 2, reset_on: update.done }

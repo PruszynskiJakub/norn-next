@@ -8,6 +8,9 @@
  *   (b) it is labelled `bypass`, closes an issue labelled `bypass`, and that issue links another issue;
  *   (c) its author is Dependabot.
  * (a) and (b) also need a branch in this repository: a fork PR is input to an issue, not merged as is.
+ * Neither (a) nor (b) may touch an installed bundled skill copy (`.agents/skills/norn*`) unless it is
+ * a release PR (titled `Release X.Y.Z`): `norn upgrade` overwrites those copies from the released
+ * binary, so an edit made there is reverted silently once main moves to the next release.
  *
  *   bun scripts/process-check.ts <pr-number>   (needs GH_TOKEN; GITHUB_REPOSITORY names the repo)
  */
@@ -23,6 +26,7 @@ export interface PrFacts {
   repo: string;
   author: string;
   head: string;
+  title: string;
   /** the head branch lives in a fork */
   cross_repo: boolean;
   labels: string[];
@@ -31,6 +35,8 @@ export interface PrFacts {
   closing: number[];
   /** the issues the PR closes, by number, for the bypass rule; absent ones count as unknown */
   issues: Record<number, IssueFacts>;
+  /** every path the PR changes, a rename by both its old and its new name */
+  files: string[];
 }
 
 export type Verdict = { ok: true; reason: string } | { ok: false; error: string; do_instead: string };
@@ -39,6 +45,10 @@ export const BYPASS_LABEL = "bypass";
 const DEPENDABOT = new Set(["dependabot[bot]", "app/dependabot", "dependabot"]);
 /** storyBranch(`gh-<N>`, slug): STORY_KEY_PATTERN + "-" + SLUG_PATTERN (packages/schema/src/common.ts). */
 const STORY_BRANCH = /^gh-([1-9][0-9]*)-[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** Installed copies of the bundled skills; `release`, `release-start` and `issue` are repo-local. */
+const INSTALLED_SKILL = /^\.agents\/skills\/norn[^/]*(?:\/|$)/;
+/** The release workflow and its bypass both title the PR after the issue it renames. */
+const RELEASE_TITLE = /^Release \d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const KEYWORDS = "close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved";
 
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -77,7 +87,19 @@ export function closedIssues(f: PrFacts): number[] {
 
 export function processCheck(f: PrFacts): Verdict {
   if (DEPENDABOT.has(f.author)) return { ok: true, reason: "Dependabot PR" };
+  const origin = processOrigin(f);
+  if (!origin.ok) return origin;
+  const copies = f.files.filter((p) => INSTALLED_SKILL.test(p));
+  if (copies.length && !RELEASE_TITLE.test(f.title))
+    return refuse(
+      `PR edits installed bundled skill copies (${listed(copies)}); \`norn upgrade\` overwrites them from the released binary, reverting the edit`,
+      "Edit the skill's source in packages/cli/assets/skills/ instead and revert the change to .agents/skills/; the release PR copies the sources over.",
+    );
+  return origin;
+}
 
+/** Rules (a)–(c): where the PR comes from. */
+function processOrigin(f: PrFacts): Verdict {
   const closes = closedIssues(f);
   const fork = f.cross_repo
     ? refuse(
@@ -122,6 +144,8 @@ export function processCheck(f: PrFacts): Verdict {
   );
 }
 
+const listed = (paths: string[]) => (paths.length > 3 ? `${paths.slice(0, 3).join(", ")} and ${paths.length - 3} more` : paths.join(", "));
+
 const refuse = (error: string, do_instead: string): Verdict => ({ ok: false, error, do_instead });
 
 /** Runs `gh <args>` and returns its parsed JSON; throws on failure. */
@@ -136,11 +160,14 @@ const gh: Gh = (args) => {
 interface GhPr {
   author: { login: string };
   headRefName: string;
+  title: string;
   isCrossRepository: boolean;
   labels: Array<{ name: string }>;
   body: string;
   closingIssuesReferences: Array<{ number: number; repository: { name: string; owner: { login: string } } }>;
 }
+/** One page of `GET /repos/{repo}/pulls/{n}/files` */
+type GhFilesPage = Array<{ filename: string; previous_filename?: string }>;
 interface GhIssue {
   labels: Array<{ name: string }>;
   body: string;
@@ -148,17 +175,21 @@ interface GhIssue {
 
 /** The facts for `processCheck`. An issue `gh` cannot read (e.g. `Closes #<a PR>`) is left out of `issues`. */
 export function gatherFacts(repo: string, pr: number, run: Gh = gh): PrFacts {
-  const p = run(["pr", "view", String(pr), "--repo", repo, "--json", "author,headRefName,isCrossRepository,labels,body,closingIssuesReferences"]) as GhPr;
+  const p = run(["pr", "view", String(pr), "--repo", repo, "--json", "author,headRefName,title,isCrossRepository,labels,body,closingIssuesReferences"]) as GhPr;
+  // the REST list, paginated: `gh pr view --json files` stops at 100 files
+  const pages = run(["api", "--paginate", "--slurp", `repos/${repo}/pulls/${pr}/files`]) as GhFilesPage[];
   const same = (r: GhPr["closingIssuesReferences"][number]) => `${r.repository.owner.login}/${r.repository.name}`.toLowerCase() === repo.toLowerCase();
   const facts: PrFacts = {
     repo,
     author: p.author.login,
     head: p.headRefName,
+    title: p.title ?? "",
     cross_repo: p.isCrossRepository,
     labels: p.labels.map((l) => l.name),
     body: p.body ?? "",
     closing: p.closingIssuesReferences.filter(same).map((r) => r.number),
     issues: {},
+    files: pages.flat().flatMap((f) => (f.previous_filename ? [f.filename, f.previous_filename] : [f.filename])),
   };
   if (facts.labels.includes(BYPASS_LABEL))
     for (const n of closedIssues(facts)) {

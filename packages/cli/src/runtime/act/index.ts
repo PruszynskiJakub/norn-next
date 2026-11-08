@@ -27,7 +27,7 @@ import { ActEnv, QueueFull, claimLost } from "./env.ts";
 import { applyReceipts, startRun, nudge, retryFresh, classify } from "./session.ts";
 import { runCheck } from "./check.ts";
 import { runGit } from "./git-step.ts";
-import { startUnit, markDone, rejectReceipt, claim, renewAll, intake, mirror, cleanupMerged, closeClosedIssueStory,
+import { startUnit, markDone, rejectReceipt, claim, renewAll, intake, mirror, retitlePr, cleanupMerged, closeClosedIssueStory,
   moveRecord, pushRecord, setAsideRecordAct, roundMigrate, roundStart, retryRecords } from "./lifecycle.ts";
 
 export interface ActRecord {
@@ -121,6 +121,9 @@ export class Actor extends ActEnv {
   private recordFailure(d: Decision, result: ActionResult): void {
     const a = d.action;
     if (a.kind === "push_record") return this.recordPushFailure(a, d.rule, result);
+    // A retitle rides along with the unit's own action and the next sync retries it, so it must
+    // neither replace that action's failure nor clear it
+    if (a.kind === "retitle_pr") return;
     if (!a.unit || a.kind === "claim" || a.kind === "noop") return;
     const key = a.unit.key;
     const prev = this.failures[key];
@@ -251,6 +254,8 @@ export class Actor extends ActEnv {
         return { ok: true };
       case "update_story_mirror":
         return mirror(this, a);
+      case "retitle_pr":
+        return retitlePr(this, a);
       case "cleanup_merged_story":
         return cleanupMerged(this, a);
       case "close_story":

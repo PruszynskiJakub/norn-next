@@ -214,6 +214,20 @@ describe("single-purpose workflows (#136)", () => {
     expect(readSkill("norn-pr")).toContain("`evidence/<unit>/<run_id>/<file>`");
   });
 
+  // Slices are reviewed before they integrate, so only story-level rework would reach the PR unreviewed
+  test("story reviews its rework before the check, and a round without rework never reaches review", () => {
+    expect(targets("story", "implement")).toEqual({ done: "review" });
+    expect(wf("story").steps.review).toMatchObject({ type: "agent", skill: "norn-review", inputs: ["spec", "diff", "last_findings"] });
+    expect(wf("story").steps.review?.outcomes).toMatchObject({ changes_requested: { counter: "review_loop" } });
+    expect(targets("story", "review")).toEqual({ approve: "test", changes_requested: "implement" });
+    const into = (step: string) =>
+      Object.entries(wf("story").steps).flatMap(([from, s]) =>
+        Object.entries(s.outcomes).filter(([, e]) => outcomeEdge(e as Parameters<typeof outcomeEdge>[0]).to === step).map(([o]) => `${from}.${o}`),
+      );
+    expect(into("review")).toEqual(["implement.done"]);
+    expect(targets("story", "update")).toMatchObject({ done: "test" });
+  });
+
   test("slice has no QA: implement, test, review, integrate", () => {
     expect(types("slice")).toEqual({ implement: "agent", test: "check", review: "agent", integrate: "git", merge: "agent" });
     expect(targets("slice", "review")).toEqual({ approve: "integrate", changes_requested: "implement" });

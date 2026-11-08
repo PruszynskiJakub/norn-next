@@ -122,8 +122,8 @@ export const cmd = {
 
 /** What the inbox says about bundled skills that differ from the running norn's. */
 export const skillsDriftHint = {
-  /** The Check item of a unit whose worktree copies differ; its runs use them */
-  unit: (running: string, names: readonly string[]) => `skills differ from norn ${running} (${names.join(", ")}): runs use this worktree's copies until the base is merged in`,
+  /** The Check item of a unit whose worktree copies differ, from a stale base or an edit on the branch; its runs use them */
+  unit: (running: string, names: readonly string[]) => `skills differ from norn ${running} (${names.join(", ")}): runs use this worktree's copies until the base is merged in, or until this branch's edit to them is reverted`,
   /** The repo-level item when the main checkout itself drifted */
   repo: (running: string) => `skills differ from norn ${running}: run \`${cmd.upgrade()}\` and commit`,
 };

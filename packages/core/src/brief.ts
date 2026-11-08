@@ -139,8 +139,11 @@ export interface BriefJson {
   history: {
     /** A session of this attempt ended without reporting; this is a fresh one */
     retry: { outcome: string; detail: string | null; at: string } | null;
-    /** An earlier attempt of this step reported on older code, and the outcomes recorded since */
-    earlier: { attempt: number; outcome: string; since: string[] } | null;
+    /**
+     * An earlier attempt of this step reported on older code, and the outcomes recorded since.
+     * `findings`: that report's findings, when the step declares `last_findings` — checked first, fixed or not
+     */
+    earlier: { attempt: number; outcome: string; since: string[]; findings?: Finding[] } | null;
     /** A takeover restarted the step because the story branch was rewritten since the record */
     rewritten?: { gone: string; head: string; line: string } | null;
     /** A takeover found no record and started this round from the branch */
@@ -225,11 +228,12 @@ export function renderBrief(input: BriefInput): Briefing {
   if (!step || step.type !== "agent") throw new Error(`norn brief: ${st.step} is not an agent step`);
   const rw = rework(input, step);
   const handoff = handoffFor(input);
+  const hist = history(input, step, rw);
   const json: BriefJson = {
     where: where(input, step),
-    history: history(input, rw),
+    history: hist,
     work: { skill: step.skill, instructions: step.instructions ?? null, description: step.description ?? null },
-    inputs: inputs(input, step, rw),
+    inputs: inputs(input, step, rw, hist),
     rework: rw,
     checks: checksSince(input, step),
     rulings: rulingsFor(input),
@@ -264,7 +268,7 @@ function where(input: BriefInput, step: AgentStep): BriefJson["where"] {
   };
 }
 
-function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): BriefJson["inputs"] {
+function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"], hist: BriefJson["history"]): BriefJson["inputs"] {
   const p = input.paths;
   return (step.inputs ?? defaultInputs(input.unit)).flatMap((i): BriefJson["inputs"] => {
     if (typeof i === "object") return [{ kind: "file", label: i.label ?? i.file, ref: `${p.spec_dir}/${i.file}` }];
@@ -284,7 +288,7 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): Br
       case "last_check":
         return [{ kind: i, label: "Last failing check", ref: rw?.check ? "see Rework" : "none" }];
       case "last_findings":
-        return [{ kind: i, label: "Last findings", ref: rw && (rw.findings || rw.report || rw.decision) ? "see Rework" : "none" }];
+        return [{ kind: i, label: "Last findings", ref: rw && (rw.findings || rw.report || rw.decision) ? "see Rework" : hist?.earlier?.findings ? "see Earlier findings" : "none" }];
       // Run state is in the machine dir, not the worktree; evidence is linked by its record path
       case "record":
         return (input.record ?? []).flatMap((u) => [
@@ -370,13 +374,14 @@ function movesAfter(receipts: readonly NumberedReceipt[], from: number): string[
 }
 
 /** History when this is not a first entry and Rework does not already explain it. */
-function history(input: BriefInput, rw: BriefJson["rework"]): BriefJson["history"] {
+function history(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): BriefJson["history"] {
   const { state: st, receipts } = input;
   const died = st.retries_used > 0 ? receipts.findLast(({ receipt: r }) => r.kind === "classify" && r.route === "retry" && r.step === st.step && r.attempt === st.attempt)?.receipt : undefined;
   const retry = died?.kind === "classify" ? { outcome: `${died.step}.${died.outcome}`, detail: died.detail ?? null, at: died.at } : null;
   const idx = rw ? -1 : receipts.findLastIndex(({ receipt: r }) => r.kind === "done" && r.step === st.step && r.attempt !== st.attempt);
   const prev = receipts[idx]?.receipt;
-  const earlier = prev?.kind === "done" ? { attempt: prev.attempt, outcome: prev.outcome, since: movesAfter(receipts, idx) } : null;
+  const recheck = prev?.kind === "done" && prev.findings?.length && (step.inputs ?? []).includes("last_findings") ? { findings: [...prev.findings] } : {};
+  const earlier = prev?.kind === "done" ? { attempt: prev.attempt, outcome: prev.outcome, since: movesAfter(receipts, idx), ...recheck } : null;
   // This attempt is the one a takeover started because the branch was rewritten —
   // the last such take, with every receipt after it written at this cursor (the step it restarted
   // may be another than the one it was written at)
@@ -781,10 +786,16 @@ function markdown(b: BriefJson): string {
       );
     if (h.earlier) {
       const since = h.earlier.since.length > 12 ? ["…", ...h.earlier.since.slice(-12)] : h.earlier.since;
-      out.push(
-        `${w.step}#${h.earlier.attempt} reported \`${h.earlier.outcome}\` on older code.${since.length ? ` Since then: ${since.join(" → ")}.` : ""} Do this step again in full on the current HEAD: what earlier attempts found or observed is history, not a result for this one.`,
-        "",
-      );
+      const head = `${w.step}#${h.earlier.attempt} reported \`${h.earlier.outcome}\` on older code.${since.length ? ` Since then: ${since.join(" → ")}.` : ""}`;
+      if (h.earlier.findings) {
+        out.push(
+          `${head} First check each earlier finding below against the current code: fixed or not. Then do this step again in full on the current HEAD.`,
+          "",
+          `### Earlier findings (${w.step}#${h.earlier.attempt})`,
+          "",
+        );
+        findingLines(out, h.earlier.findings);
+      } else out.push(`${head} Do this step again in full on the current HEAD: what earlier attempts found or observed is history, not a result for this one.`, "");
     }
   }
 
@@ -806,7 +817,7 @@ function markdown(b: BriefJson): string {
 
   out.push("## Inputs", "");
   if (!b.inputs.length) out.push("- (none)");
-  // last_check / last_findings point at Rework, which is above: no line of their own
+  // last_check / last_findings point at Rework or Earlier findings, both above: no line of their own
   for (const i of b.inputs.filter((x) => x.kind !== "last_check" && x.kind !== "last_findings")) out.push(`- ${i.label}: \`${i.ref}\`${i.purpose ? ` — ${i.purpose}` : ""}`);
   out.push("");
 
@@ -880,9 +891,19 @@ function reworkLines(out: string[], rw: NonNullable<BriefJson["rework"]>): void 
   }
   const f = rw.findings;
   if (f) {
-    out.push(`### Findings (${f.step}: ${f.outcome})`, "");
-    if (f.items.some((x) => x.severity === "minor" || x.severity === "nit")) out.push("Fix every blocking and major finding; minor and nit ones are for you to weigh.", "");
-    findingLines(out, f.items);
+    // Only blocking and major findings are rework: fixing a minor one costs a commit and another review round
+    const minor = (x: Finding) => x.severity === "minor" || x.severity === "nit";
+    const fix = f.items.filter((x) => !minor(x));
+    const notes = f.items.filter(minor);
+    if (fix.length) {
+      out.push(`### Findings (${f.step}: ${f.outcome})`, "");
+      if (notes.length) out.push("Rework is the blocking and major findings: fix each one.", "");
+      findingLines(out, fix);
+    }
+    if (notes.length) {
+      out.push(`### Notes (${f.step}: minor and nit)`, "", "Leave these as notes: do not fix them in this round.", "");
+      findingLines(out, notes);
+    }
   }
   if (r) evidenceLines(out, r.evidence);
   if (rw.detail) out.push(`### ${rw.from}`, "", rw.detail, "");

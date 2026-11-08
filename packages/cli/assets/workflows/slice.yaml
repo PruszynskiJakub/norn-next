@@ -19,7 +19,7 @@ steps:
   review:
     type: agent
     skill: norn-review
-    inputs: [slice, spec, diff]
+    inputs: [slice, spec, diff, last_findings]
     outcomes:
       approve:           { to: integrate, means: "all criteria met, no blocking findings" }
       changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }

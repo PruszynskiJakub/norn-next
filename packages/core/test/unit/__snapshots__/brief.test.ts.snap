@@ -217,11 +217,16 @@ You are here because \`review.changes_requested\` sent the work back (fix round 
 
 ### Findings (review: changes_requested)
 
-Fix every blocking and major finding; minor and nit ones are for you to weigh.
+Rework is the blocking and major findings: fix each one.
 
 1. **blocking** [B3] Password not validated — \`src/login.ts:12\`
    Repro: POST /login with empty password
-2. **minor** Naming
+
+### Notes (review: minor and nit)
+
+Leave these as notes: do not fix them in this round.
+
+1. **minor** Naming
    rename x to email
 
 ## Finish with exactly one of
@@ -911,6 +916,165 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 - test#1 check \`pass\` in 0s
 - review#2 reported \`approve\`: h
 - qa#2 \`died\` → retry: launch_unknown
+
+## How to work
+
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
+  - **Goal**: what this unit must achieve, in one or two lines.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
+  - **Easy to miss**: the rule or edge case the quick path would break.
+  - **Not proven yet**: what is still open or unverified.
+  - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
+  - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Ports: \`PORT_BASE=4030\` (slot 3, in \`.env.norn\`)
+"
+`;
+
+exports[`Re-entry, fresh sessions, handoff and criteria a re-review that declares last_findings checks the earlier findings first the earlier review's findings are listed to check, fixed or not, and Inputs points at them 1`] = `
+"# norn brief — gh-1/02 · review #2
+
+You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Your work
+
+Use the \`review\` skill.
+
+## Why this attempt
+
+review#1 reported \`changes_requested\` on older code. Since then: implement.done → test.pass. First check each earlier finding below against the current code: fixed or not. Then do this step again in full on the current HEAD.
+
+### Earlier findings (review#1)
+
+1. **blocking** Count off by one — \`src/count.ts:12\`
+2. **minor** Name the helper after what it returns
+
+## Finish with exactly one of
+
+- \`norn done approve --handoff "…"\` — all criteria met, no blocking findings
+- \`norn done changes_requested --handoff "…"\` — blocking findings in the receipt
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
+
+## Inputs
+
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
+- Diff: \`git diff gh-1-login...HEAD\` — the change so far, against the story's base
+
+## Context
+
+No handoff yet; write one as you work (its sections are under How to work).
+
+## Checks since the last report
+
+These checks ran on the code since implement#2 reported; nothing else has run on it yet.
+
+- test#1 \`pass\` in 0s — \`bun test\` — output: \`/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form/receipts/0005-check.json\`
+
+## History
+
+What happened so far, oldest first, from the receipts (for a story, its current round only):
+
+- review#1 reported \`changes_requested\` (2 findings): h
+- implement#2 reported \`done\`: h
+- test#1 check \`pass\` in 0s
+
+## How to work
+
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
+  - **Goal**: what this unit must achieve, in one or two lines.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
+  - **Easy to miss**: the rule or edge case the quick path would break.
+  - **Not proven yet**: what is still open or unverified.
+  - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
+  - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Ports: \`PORT_BASE=4030\` (slot 3, in \`.env.norn\`)
+"
+`;
+
+exports[`Re-entry, fresh sessions, handoff and criteria implement's Rework sorts the findings: blocking and major to fix, minor and nit left as notes 1`] = `
+"# norn brief — gh-1/02 · implement #2
+
+You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Your work
+
+Use the \`implement\` skill.
+
+## Rework
+
+You are here because \`review.changes_requested\` sent the work back (fix round review_loop 1/3). Address the points below first.
+
+### review#1 reported \`changes_requested\`
+
+> h
+
+### Findings (review: changes_requested)
+
+Rework is the blocking and major findings: fix each one.
+
+1. **blocking** Count off by one
+2. **major** Empty list crashes the footer
+
+### Notes (review: minor and nit)
+
+Leave these as notes: do not fix them in this round.
+
+1. **minor** Name the helper after what it returns
+2. **nit** Trailing space in the label
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — every acceptance criterion (or rework point) has a passing test
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
+
+## Inputs
+
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
+
+## Context
+
+No handoff yet; write one as you work (its sections are under How to work).
+
+## History
+
+What happened so far, oldest first, from the receipts (for a story, its current round only):
+
+- review#1 reported \`changes_requested\` (4 findings): h
 
 ## How to work
 

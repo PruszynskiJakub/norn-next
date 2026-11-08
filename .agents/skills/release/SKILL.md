@@ -74,7 +74,7 @@ Only `norn`-prefixed folders: `release`, `release-start` and `issue` are this re
 
 ## 8. Rename the issue
 
-`gh issue edit <N> --title "Release X.Y.Z"`. The story mirrors the title, and the squash commit on main takes the PR's title. This is the one remote write this step allows, an exception to the brief's rule on remote writes; never edit the issue body.
+`gh issue edit <N> --title "Release X.Y.Z"`. The story mirrors the title, the open PR takes it at the next remote sync, and the squash commit on main takes the PR's title. This is the one remote write this step allows, an exception to the brief's rule on remote writes; never edit the issue body.
 
 ## 9. Report
 
