@@ -3,7 +3,7 @@
  * to `test` in the same commit (refactor plan Phase 1). No defect is open here.
  */
 import { describe, expect, test } from "bun:test";
-import type { LeaseFile, UnitState } from "@norn/schema";
+import type { LeaseFile, UnitState, UnitStateRecord } from "@norn/schema";
 import { applyReceipts, routeOf } from "../../src/apply.ts";
 import { decide } from "../../src/decide/index.ts";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "../../src/facts.ts";
@@ -13,14 +13,14 @@ const RUN = "01JDDDDDDDDDDDDDDDDDDDDDDD";
 const HEADLESS = { runner: "headless", session_id: RUN };
 
 /** A solo story whose one unit has `patch` state and a run on the headless runner. */
-function solo(patch: Partial<UnitState>, run: Partial<RunFacts>): StoryFacts {
+function solo(patch: Partial<UnitStateRecord>, run: Partial<RunFacts>): StoryFacts {
   const ref = storyUnit();
   const st = stateFor(ref, SOLO_WF, patch);
   const rf: RunFacts = { run_id: RUN, session: HEADLESS, process_alive: true, pane: null, hooks: [], last_hook_at: null, last_activity_at: T0, transcript: null, ...run };
   return storyFacts("gh-1", [unitFacts(ref, SOLO_WF, st, { run: rf })], { frontmatter: { ...storyFacts("gh-1", []).frontmatter!, workflow: "solo" } });
 }
 
-const running = (p: Partial<UnitState> = {}): Partial<UnitState> => ({
+const running = (p: Partial<UnitStateRecord> = {}): Partial<UnitStateRecord> => ({
   status: "running",
   run: { run_id: RUN, step: "implement", attempt: 1, started_at: at(T0 - 20 * 60_000), how: "auto", session: HEADLESS, agent: "claude", agent_session_id: "cs-1" },
   updated_at: at(T0 - 20 * 60_000),

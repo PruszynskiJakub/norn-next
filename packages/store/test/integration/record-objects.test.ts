@@ -23,7 +23,7 @@ afterAll(() => {
   }
 });
 
-const state = (unit: string, slice: string | null, step: string) =>
+const state = (unit: string, slice: string | null, step: string, over: Record<string, unknown> = {}) =>
   JSON.stringify({
     version: 1,
     story: "gh-9",
@@ -47,6 +47,7 @@ const state = (unit: string, slice: string | null, step: string) =>
     updated_at: "2099-01-15T10:00:00.000Z",
     last_tick_id: null,
     mode: "manual",
+    ...over,
   });
 
 describe("readRecordObjects", () => {
@@ -69,5 +70,20 @@ describe("readRecordObjects", () => {
       ["gh-9", "review"],
       ["gh-9/01", "implement"],
     ]);
+  });
+
+  test("a state an older norn wrote reads normalised, never as an error", async () => {
+    const root = tmp();
+    await gitOk(root, ["init", "-q"]);
+    const blob = async (text: string) => (await gitOk(root, ["hash-object", "-w", "--stdin"], text)).trim();
+    const tree = async (lines: string[]) => (await gitOk(root, ["mktree"], `${lines.join("\n")}\n`)).trim();
+    // merged mid-round: done at the step it stood on
+    const story = await tree([`100644 blob ${await blob(state("_story", null, "review", { status: "done" }))}\tstate.json`]);
+    const top = await tree([`040000 tree ${story}\t_story`]);
+    const sha = (await gitOk(root, ["commit-tree", top, "-m", "record"])).trim();
+
+    const r = await readRecordObjects(root, "gh-9", sha);
+    expect(r.errors).toEqual([]);
+    expect(r.units.map((u) => [u.key, u.state.step, u.state.status])).toEqual([["gh-9", "$done", "done"]]);
   });
 });

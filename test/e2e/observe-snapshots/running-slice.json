@@ -285,7 +285,6 @@
             "last_hook_at": null,
             "pane": {
               "alive": true,
-              "since": null,
               "state": "working"
             },
             "process_alive": null,

@@ -10,15 +10,18 @@ import {
   type LastOutcome,
   type ParkInfo,
   type ParkKind,
+  type ReadyState,
   type Receipt,
   type ReceiptOf,
   type UnitState,
+  type UnitStateRecord,
   type Workflow,
 } from "@norn/schema";
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
 import { edgeOf, OVERRIDABLE_ROUTES, stepOf } from "./workflow.ts";
 import { cmd } from "./commands.ts";
 import { stepLimits } from "./policy.ts";
+import { toDone, toParked, toReady, toRunning, toStuck } from "./unit-state.ts";
 import { waitsForBaseUpdate } from "./verbs.ts";
 
 export interface ApplyContext {
@@ -120,7 +123,7 @@ export function initialState(args: {
   round?: number;
 }): UnitState {
   const { unit, workflow, now } = args;
-  const base: UnitState = {
+  const base: ReadyState = {
     version: 1,
     story: unit.story,
     slice: unit.slice,
@@ -149,32 +152,22 @@ export function initialState(args: {
 }
 
 /** Enter `name`: new attempt, within-step limits reset, status by step type (gate/attended park). */
-function enterStep(prev: UnitState, wf: Workflow, name: string, now: string): UnitState {
-  const st: UnitState = { ...prev, visits: { ...prev.visits } };
+function enterStep(prev: UnitStateRecord, wf: Workflow, name: string, now: string): UnitState {
+  const visits = { ...prev.visits, [name]: (prev.visits[name] ?? 0) + 1 };
+  const st = toReady({ ...prev, visits, attempt: visits[name] as number, step: name, step_entered_at: now, nudges_used: 0, retries_used: 0 });
   const step = stepOf(wf, name);
-  st.visits[name] = (st.visits[name] ?? 0) + 1;
-  st.attempt = st.visits[name];
-  st.step = name;
-  st.step_entered_at = now;
-  st.nudges_used = 0;
-  st.retries_used = 0;
-  st.run = null;
-  st.park = null;
-  st.status = "ready";
-  if (!step) return park(st, "workflow", `step '${name}' does not exist in workflow ${wf.name}`, now, "stuck");
-  if (step.type === "gate") return park(st, "gate", step.prompt ?? `approve or reject ${name}`, now);
-  if (step.type === "agent" && step.attended) return park(st, "attended", `attended step ${name}: work with the agent in the worktree`, now);
+  if (!step) return toStuck(st, parkOf("workflow", `step '${name}' does not exist in workflow ${wf.name}`, now));
+  if (step.type === "gate") return toParked(st, parkOf("gate", step.prompt ?? `approve or reject ${name}`, now));
+  if (step.type === "agent" && step.attended) return toParked(st, parkOf("attended", `attended step ${name}: work with the agent in the worktree`, now));
   return st;
 }
 
-function park(st: UnitState, kind: ParkKind, reason: string, at: string, status: "parked" | "stuck" = "parked", receipt_id?: string): UnitState {
-  const p: ParkInfo = { kind, reason, since: at };
+/** A park in state.json's key order: kind, reason, since, receipt_id, then what its writer adds. */
+function parkOf<K extends ParkKind>(kind: K, reason: string, since: string, receipt_id?: string): ParkInfo & { kind: K } {
+  const p: ParkInfo & { kind: K } = { kind, reason, since };
   if (receipt_id) p.receipt_id = receipt_id;
-  return { ...st, status, park: p };
+  return p;
 }
-
-const stuckPark = (st: UnitState, kind: ParkKind, reason: string, at: string, receipt_id?: string) =>
-  park(st, kind, reason, at, "stuck", receipt_id);
 
 /** Apply every receipt numbered above `state.applied_through`, ascending. Pure. */
 export function applyReceipts(state: UnitState, receipts: readonly NumberedReceipt[], ctx: ApplyContext): ApplyResult {
@@ -253,11 +246,11 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
     case "started": {
       if (step.type !== "agent") return { reject: `${st.step} is a ${step.type} step, not an agent step` };
       if (!r.run_id) return { reject: "started receipt without run_id" };
-      if (st.run?.run_id === r.run_id) return { state: { ...st, run: runFrom(st, r) }, log: `run ${r.run_id} updated` };
-      if (st.status === "running" && st.run) return { reject: `step ${st.step}#${st.attempt} already has run ${st.run.run_id}` };
-      if (st.status === "parked" && st.park?.kind !== "attended") return { reject: `unit is parked on ${st.park?.kind}` };
+      if (st.run && st.run.run_id === r.run_id) return { state: { ...st, run: runFrom(st, r) }, log: `run ${r.run_id} updated` };
+      if (st.status === "running") return { reject: `step ${st.step}#${st.attempt} already has run ${st.run.run_id}` };
+      if (st.status === "parked" && st.park.kind !== "attended") return { reject: `unit is parked on ${st.park.kind}` };
       return {
-        state: { ...st, status: "running", park: null, run: runFrom(st, r) },
+        state: toRunning(st, runFrom(st, r)),
         log: `${st.step}#${st.attempt} started (${r.how}${r.retry ? ", retry" : ""})`,
       };
     }
@@ -273,17 +266,17 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       if (step.type !== "agent") return { reject: `${st.step} is a ${step.type} step; ask is for agent steps` };
       if (st.run && r.run_id && st.run.run_id !== r.run_id) return { reject: `stale run ${r.run_id}` };
       if (edgeOf(wf, st.step, "ask")) return take(st, "ask", r, ctx, lastOutcome("ask"));
-      const parked = park(st, "ask", r.question, r.at, "parked", r.receipt_id);
-      if (r.command && parked.park) parked.park.command = r.command;
-      if (r.implicit && parked.park) {
+      const p = parkOf("ask", r.question, r.at, r.receipt_id);
+      if (r.command) p.command = r.command;
+      if (r.implicit) {
         // What the tick needs to resolve the implicit ask or type an answer into the prompt
-        parked.park.implicit = r.choice || r.screen ? "pane" : "hook";
-        if (r.options?.length) parked.park.options = r.options;
-        if (r.choice) parked.park.choice = r.choice;
-        if (r.screen) parked.park.screen = r.screen;
+        p.implicit = r.choice || r.screen ? "pane" : "hook";
+        if (r.options?.length) p.options = r.options;
+        if (r.choice) p.choice = r.choice;
+        if (r.screen) p.screen = r.screen;
       }
       return {
-        state: { ...parked, last_outcome: lastOutcome("ask") },
+        state: { ...toParked(st, p), last_outcome: lastOutcome("ask") },
         log: `${st.step}#${st.attempt} asks: ${r.question}`,
       };
     }
@@ -293,26 +286,25 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       // A person's stuck (`norn run cancel`) ends the run here; the step's `stuck` edge is the agent's
       if (r.by !== "human" && edgeOf(wf, st.step, "stuck")) return take(st, "stuck", r, ctx, lastOutcome("stuck"));
       return {
-        state: { ...stuckPark(st, "stuck", r.reason, r.at, r.receipt_id), last_outcome: lastOutcome("stuck") },
+        state: { ...toStuck(st, parkOf("stuck", r.reason, r.at, r.receipt_id)), last_outcome: lastOutcome("stuck") },
         log: `${st.step}#${st.attempt} stuck: ${r.reason}`,
       };
     }
     case "answer": {
       if (st.status !== "parked" || st.park?.kind !== "ask")
         return { reject: st.park?.kind === "gate" ? "gate needs approve or reject" : "unit is not waiting for an answer" };
-      const resumed: UnitState = { ...st, park: null };
+      const run = st.run;
       // The agent moved on by itself, or `norn story answer` already typed it: nothing to deliver
-      if ((r.by === "agent" || r.delivered) && st.run) return { state: { ...resumed, status: "running" }, log: `answered: ${r.answer}` };
+      if ((r.by === "agent" || r.delivered) && run) return { state: toRunning(st, run), log: `answered: ${r.answer}` };
       // Same session while it lives; manual runs get the answer from the person; else fresh session from the handoff
-      if (st.run?.session)
-        return { state: { ...resumed, status: "running" }, log: `answered: ${r.answer}`, deliver: r.answer };
-      if (st.run?.how === "manual") return { state: { ...resumed, status: "running" }, log: `answered: ${r.answer}` };
-      return { state: { ...resumed, status: "ready", run: null }, log: `answered: ${r.answer}` };
+      if (run?.session) return { state: toRunning(st, run), log: `answered: ${r.answer}`, deliver: r.answer };
+      if (run?.how === "manual") return { state: toRunning(st, run), log: `answered: ${r.answer}` };
+      return { state: toReady(st), log: `answered: ${r.answer}` };
     }
     case "approve":
     case "reject": {
       if (step.type !== "gate" || st.park?.kind !== "gate") return { reject: `${st.step} is not a gate waiting for a decision` };
-      return take({ ...st, park: null, status: "ready" }, r.kind, r, ctx, lastOutcome(r.kind));
+      return take(toReady(st), r.kind, r, ctx, lastOutcome(r.kind));
     }
     case "check": {
       if (step.type !== "check") return { reject: `${st.step} is a ${step.type} step, not a check` };
@@ -394,7 +386,7 @@ function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, las
   const edge = edgeOf(wf, from, outcome);
   if (!edge) {
     const reason = `${from}.${outcome} has no route`;
-    return { state: { ...stuckPark(st, "stuck", reason, r.at, r.receipt_id), last_outcome: last }, log: reason };
+    return { state: { ...toStuck(st, parkOf("stuck", reason, r.at, r.receipt_id)), last_outcome: last }, log: reason };
   }
   let counters = st.counters;
   let counter: Advance["counter"];
@@ -404,11 +396,11 @@ function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, las
     if (value + 1 > max) {
       // The edge is not taken; the outcome becomes `exhausted` → $stuck
       const reason = `${edge.counter} ${value}/${max} at ${from}.${outcome}`;
-      const parked = stuckPark(st, "exhausted", reason, r.at, r.receipt_id);
+      const p = parkOf("exhausted", reason, r.at, r.receipt_id);
       // The way out is the edge's target with the counter reset; record it, never parse `reason`
-      if (parked.park) parked.park.counter = { name: edge.counter, max, outcome, to: edge.to };
+      p.counter = { name: edge.counter, max, outcome, to: edge.to };
       return {
-        state: { ...parked, last_outcome: { ...last, outcome: "exhausted", source: "classified" } },
+        state: { ...toStuck(st, p), last_outcome: { ...last, outcome: "exhausted", source: "classified" } },
         log: `exhausted: ${reason}`,
       };
     }
@@ -423,12 +415,11 @@ function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, las
   const advance: Advance = { from, outcome, to: edge.to, ...(counter ? { counter } : {}), ...(reset.length ? { reset } : {}) };
   const counted = counter ? ` [${counter.name} ${counter.value}/${counter.max}]` : "";
   const log = `${from}.${outcome} → ${edge.to}${counted}${reset.length ? ` (reset ${reset.join(", ")})` : ""}`;
-  const base: UnitState = { ...st, counters, last_outcome: last };
-  if (edge.to === "$done")
-    return { state: { ...base, step: "$done", status: "done", run: null, park: null }, log, advance };
+  const base = { ...st, counters, last_outcome: last };
+  if (edge.to === "$done") return { state: toDone(base), log, advance };
   if (edge.to === "$stuck") {
     const reason = r.kind === "stuck" ? r.reason : `${from}.${outcome} → $stuck`;
-    return { state: stuckPark(base, "stuck", reason, r.at, r.receipt_id), log, advance };
+    return { state: toStuck(base, parkOf("stuck", reason, r.at, r.receipt_id)), log, advance };
   }
   return { state: enterStep(base, wf, edge.to, ctx.now), log, advance };
 }
@@ -438,7 +429,7 @@ function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<Ret
   const o = r.outcome;
   if (o === "exhausted") {
     const reason = r.detail ?? `exhausted at ${st.step}`;
-    return { state: { ...stuckPark(st, "exhausted", reason, r.at, r.receipt_id), last_outcome: last }, log: `exhausted: ${reason}` };
+    return { state: { ...toStuck(st, parkOf("exhausted", reason, r.at, r.receipt_id)), last_outcome: last }, log: `exhausted: ${reason}` };
   }
   if (step.type !== "agent") {
     if (!(CLASSIFIED_OUTCOMES[step.type] as readonly string[]).includes(o))
@@ -446,12 +437,12 @@ function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<Ret
     // A git step that cannot run (dirty worktree, diverged branch) parks under Unblock with the reason
     if (step.type === "git" && o === "stuck") {
       const reason = r.detail ?? `${st.step}: stuck`;
-      return { state: { ...stuckPark(st, "stuck", reason, r.at, r.receipt_id), last_outcome: last }, log: `${st.step} stuck: ${reason}` };
+      return { state: { ...toStuck(st, parkOf("stuck", reason, r.at, r.receipt_id)), last_outcome: last }, log: `${st.step} stuck: ${reason}` };
     }
     if (step.type === "gate") {
       // Only `stale` is tick-classified at a gate, and only through a declared route
       if (o !== "stale" || st.park?.kind !== "gate" || !edgeOf(ctx.workflow, st.step, o)) return { reject: `outcome '${o}' cannot be classified at gate ${st.step}` };
-      return take({ ...st, park: null, status: "ready" }, o, r, ctx, last);
+      return take(toReady(st), o, r, ctx, last);
     }
     return take(st, o, r, ctx, last);
   }
@@ -461,7 +452,7 @@ function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<Ret
 
 function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ctx: ApplyContext, last: LastOutcome): Step1 {
   const o = r.outcome;
-  const withLast = (s: UnitState) => ({ ...s, last_outcome: last });
+  const withLast = <S extends UnitState>(s: S): S => ({ ...s, last_outcome: last });
   switch (o) {
     case "silent":
     case "timeout":
@@ -470,20 +461,23 @@ function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
       // fresh session, counted as a retry, not a nudge
       if (r.route === "retry") return retryRoute(st, step, r, ctx, withLast, o);
       const max = stepLimits(ctx.workflow, step).nudges;
-      if (st.nudges_used < max)
+      if (st.nudges_used < max) {
+        // A nudge is typed into the live session; with none there is nothing to type into
+        if (!st.run) return { reject: "no run to nudge" };
         return {
-          state: withLast({ ...st, nudges_used: st.nudges_used + 1, status: "running" }),
+          state: withLast(toRunning({ ...st, nudges_used: st.nudges_used + 1 }, st.run)),
           log: `${o}: nudge ${st.nudges_used + 1}/${max}`,
           route: "nudge",
         };
+      }
       const reason = `${o}: nudges ${st.nudges_used}/${max} at ${st.step}`;
-      return { state: withLast(stuckPark(st, "exhausted", reason, r.at, r.receipt_id)), log: `exhausted: ${reason}` };
+      return { state: withLast(toStuck(st, parkOf("exhausted", reason, r.at, r.receipt_id))), log: `exhausted: ${reason}` };
     }
     case "died":
       return retryRoute(st, step, r, ctx, withLast, o);
     case "ask": {
       const q = r.detail ?? "the agent is waiting for input";
-      return { state: withLast(park(st, "ask", q, r.at, "parked", r.receipt_id)), log: `asks: ${q}` };
+      return { state: withLast(toParked(st, parkOf("ask", q, r.at, r.receipt_id))), log: `asks: ${q}` };
     }
     default:
       return { reject: `outcome '${o}' cannot be classified for an agent step` };
@@ -491,16 +485,16 @@ function agentRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ct
 }
 
 /** Retry: a fresh session for the same step while retries last, else exhausted. */
-function retryRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ctx: ApplyContext, withLast: (s: UnitState) => UnitState, o: string): Step1 {
+function retryRoute(st: UnitState, step: AgentStep, r: ReceiptOf<"classify">, ctx: ApplyContext, withLast: <S extends UnitState>(s: S) => S, o: string): Step1 {
   const max = stepLimits(ctx.workflow, step).retries;
   if (st.retries_used < max)
     return {
-      state: withLast({ ...st, retries_used: st.retries_used + 1, status: "ready", run: null }),
+      state: withLast(toReady({ ...st, retries_used: st.retries_used + 1 })),
       log: `${o}: retry ${st.retries_used + 1}/${max} in a fresh session`,
       route: "retry",
     };
   const reason = `${o}: retries ${st.retries_used}/${max} at ${st.step}`;
-  return { state: withLast(stuckPark(st, "exhausted", reason, r.at, r.receipt_id)), log: `exhausted: ${reason}` };
+  return { state: withLast(toStuck(st, parkOf("exhausted", reason, r.at, r.receipt_id))), log: `exhausted: ${reason}` };
 }
 
 /**

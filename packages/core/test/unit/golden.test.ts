@@ -12,7 +12,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ResolvedConfig } from "@norn/schema";
-import { GitAction, ParkKind } from "@norn/schema";
+import { GitAction, ParkKind, validate } from "@norn/schema";
 import type { Decision } from "../../src/actions.ts";
 import { decide, type RepoWorkflows } from "../../src/decide/index.ts";
 import type { Facts } from "../../src/facts.ts";
@@ -47,6 +47,28 @@ describe("golden decisions", () => {
   }
 });
 
+// ---------------------------------------------------------------- written states
+
+/** Every state an action would write: its `state`, a round's `ended`, and each `finish[].state`. */
+function writtenStates(action: unknown): unknown[] {
+  if (!action || typeof action !== "object") return [];
+  const a = action as { state?: unknown; ended?: unknown; finish?: Array<{ state?: unknown }> };
+  return [a.state, a.ended, ...(a.finish ?? []).map((f) => f.state)].filter((s) => s !== undefined && s !== null);
+}
+
+describe("every state decide writes is a legal UnitState", () => {
+  // store writes state.json against the permissive read shape, so a writer that slips past the
+  // types through a cast would reach disk; the strict union is held here instead
+  for (const [name, c] of cases)
+    test(name, () => {
+      for (const d of c.decisions)
+        for (const st of writtenStates(d.action)) {
+          const v = validate("state", st);
+          if (!v.ok) throw new Error(`${d.rule}: ${JSON.stringify(v.errors)}`);
+        }
+    });
+});
+
 // ---------------------------------------------------------------- rule coverage
 
 const DECIDE_DIR = join(import.meta.dir, "..", "..", "src", "decide");
@@ -77,13 +99,15 @@ const SERIALIZED_GIT = ["integrate", "update"];
  * The template literals decide/ builds rule ids from. A new one fails this test until it is
  * listed here and its ids are added to `expected` below.
  */
-const TEMPLATES = ["${rule}.${res.route ?? (stuck ? \"stuck\" : \"route\")}", "${rule}.nudge", "${rule}.nudge.resume", "${rule}.resume", "${rule}.retry", "${rule}.retry.no_nudge", "${rule}.surface", "git.${step.action}", "git.${step.action}.queued", "unit.parked.${st.park?.kind ?? \"?\"}"];
+const TEMPLATES = ["${rule}.${res.route ?? (stuck ? \"stuck\" : \"route\")}", "${rule}.nudge", "${rule}.nudge.resume", "${rule}.resume", "${rule}.retry", "${rule}.retry.no_nudge", "${rule}.surface", "git.${step.action}", "git.${step.action}.queued", "unit.parked.${st.park.kind}"];
 
 /**
  * Ids decide can emit that no golden or hand-built case reaches, each with why. Keep this short:
  * prefer adding a case to `rule-cases.ts`.
  */
-const UNREACHABLE: Record<string, string> = {};
+const UNREACHABLE: Record<string, string> = {
+  "unit.no_step": "a ready or running unit at $done reads as done, and one at a step its workflow lacks parks on workflow.drift first",
+};
 
 /** Template literals on decide/ lines that set a rule (`rule`, `noop(`) whose fixed text is rule-like. */
 function templatesInSource(): string[] {

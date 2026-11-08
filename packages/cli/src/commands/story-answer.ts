@@ -11,7 +11,7 @@
  * A failed delivery writes no receipt, keeps the unit parked, is kept as the unit's act failure
  * and names how to reach the pane.
  */
-import { cmd, isParked, nextCommand, optionIndex, optionsLine, promptKeys, type SessionRef } from "@norn/core";
+import { cmd, isParked, nextCommand, optionIndex, optionsLine, paneLeftPrompt, promptKeys, type SessionRef } from "@norn/core";
 import { type Receipt, ulid, type UnitState } from "@norn/schema";
 import { machineHolder, readActFailures, writeActFailures } from "@norn/store";
 import { defineCommand } from "../command.ts";
@@ -74,7 +74,7 @@ async function typeIntoPrompt(ctx: Context, t: Target, st: UnitState, route: Rou
   if (!runner.sendKeys) throw fail(`runner ${runner.name} cannot type into a prompt`);
   // the prompt as it is now: the agent may have moved on, or the menu may differ from the parked one
   const pane = await runner.paneState(session).catch(() => null);
-  if (pane && pane.alive && pane.state !== "waiting_input" && pane.state !== "unknown")
+  if (pane && paneLeftPrompt(pane))
     throw refuse(`${t.key}'s agent no longer waits on the prompt (pane is ${pane.state})`, `${cmd.tick()} (it records that the agent moved on)`, "prompt_gone");
   const prompt = pane?.state === "waiting_input" && pane.prompt ? pane.prompt : { options: park.options ?? [], choice: park.choice ?? null };
   if (prompt.options.length && optionIndex(prompt.options, text) === null)

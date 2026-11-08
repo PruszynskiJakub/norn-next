@@ -88,7 +88,7 @@ export function createHeadlessRunner(opts: HeadlessRunnerOptions): RunnerPort {
 
     async paneState(session): Promise<PaneState> {
       // No screen to read: report liveness only, never a completion signal.
-      return { alive: await this.isAlive(session), state: "unknown", since: null };
+      return { alive: await this.isAlive(session), state: "unknown" };
     },
 
     async isAlive(session) {

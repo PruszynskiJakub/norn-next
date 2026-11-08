@@ -12,9 +12,11 @@ import { existsSync } from "node:fs";
 import {
   type ActFailure,
   type FileError,
+  hookActivity,
   hookWindowMs,
   type NumberedReceipt,
   openNotes,
+  type OwedRecord,
   RE_ENTRY_KINDS,
   readyApproval,
   recordPushSlot,
@@ -28,7 +30,7 @@ import { type HookFact, type LeaseFile, parseDuration, type ReceiptOf, type Reje
 import type { LoadedConfig } from "./config.ts";
 import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
-import { readRejectedReceipts } from "./local.ts";
+import { owedRecords, readPendingRecords, readRejectedReceipts } from "./local.ts";
 import { listSuperseded, type SupersededCopy } from "./superseded.ts";
 import { type BackfillRun, backfillHookFiles } from "./hook-backfill.ts";
 import { type LeaseListing, type LeaseLiveness, listLeases } from "./leases.ts";
@@ -133,6 +135,8 @@ export interface LocalFacts {
   norn?: { running: string; repo: string | null; skills_drift?: string[] };
   /** Records this checkout set aside as superseded (`Facts.superseded`) */
   superseded: SupersededCopy[];
+  /** Owed base-branch records norn stopped retrying (`Facts.owed_records`) */
+  owed_records: OwedRecord[];
 }
 
 export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Promise<LocalFacts> {
@@ -213,7 +217,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   const mainDrift = drift(root);
   const norn =
     opts.running !== undefined && snapshot.config.ok ? { running: opts.running, repo: snapshot.config.config.norn_version ?? null, ...(mainDrift ? { skills_drift: mainDrift } : {}) } : undefined;
-  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root), ...(norn ? { norn } : {}), superseded: listSuperseded(root) };
+  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root), ...(norn ? { norn } : {}), superseded: listSuperseded(root), owed_records: owedRecords(readPendingRecords(root)) };
 }
 
 /**
@@ -248,7 +252,8 @@ function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, index: R
     step_runs = [...cursor.runs].map(([run_id, r]) => {
       const own = hooks.filter((h) => h.run_id === run_id);
       const last = own.at(-1);
-      return { run_id, last_hook_at: last ? Date.parse(last.at) : null, ended: r.died || last?.event === "session_end" };
+      // hooks only: a run ended when its agent reported it, never by what a pane shows
+      return { run_id, last_hook_at: last ? Date.parse(last.at) : null, ended: r.died || hookActivity(own).kind === "ended" };
     });
   }
   const failure = failures[u.unit.key];

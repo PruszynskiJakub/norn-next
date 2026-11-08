@@ -6,8 +6,8 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Receipt, STORY_UNIT_DIR } from "@norn/schema";
-import { heartbeatFilePath, readTrace, repoConfigPath, workflowsDir, handoffPath } from "@norn/store";
+import { CLAIMS_PREFIX, type Receipt, STORY_UNIT_DIR } from "@norn/schema";
+import { bindNornHome, heartbeatFilePath, heartbeatId, readTrace, repoConfigPath, workflowsDir, handoffPath } from "@norn/store";
 import { humanTickLines } from "../../src/commands/watch.ts";
 import { type CliResult, type TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
@@ -318,6 +318,29 @@ describe("approve (gate)", () => {
 describe("mailbox: a second clone while this one holds the claim", () => {
   let b: (...argv: string[]) => Promise<CliResult>;
   let importTick: TickReport;
+
+  test("another clone of the same user@machine sees the claim as other in its views, as its verbs do", async () => {
+    // Same USER and NORN_MACHINE as the holder: only the heartbeat tells the two checkouts apart
+    const twinRoot = join(h.dir, "twin");
+    const twinHome = join(h.dir, "twin-home");
+    mkdirSync(twinHome);
+    sh(h.dir, ["clone", "-q", h.remoteDir, twinRoot]);
+    const twinWt = `${twinRoot}-worktrees/gh-5-pay-invoices`;
+    sh(twinRoot, ["worktree", "add", "-q", "-b", "gh-5-pay-invoices", twinWt, "origin/gh-5-pay-invoices"]);
+    writeFileSync(join(twinWt, ".norn-unit"), `repo=${twinRoot}\nstory=gh-5\nslice=\nunit=_story\nspec_dir=${spec5}\n`);
+    sh(twinRoot, ["fetch", "-q", "origin", `+${CLAIMS_PREFIX}*:${CLAIMS_PREFIX}*`]);
+    // The twin has a heartbeat of its own: two recorded ids, not one against none
+    bindNornHome(twinRoot, twinHome);
+    expect(heartbeatId(twinRoot, Date.now())).not.toBe(JSON.parse(h.read(heartbeatFilePath(h.root))).heartbeat_id);
+    const deps = { ...h.deps, cwd: twinRoot, env: { ...h.deps.env, NORN_HOME_DIR: twinHome, USER: "tester", NORN_MACHINE: "box" } };
+    const twin = (...argv: string[]) => runChecked(argv, deps);
+
+    const list = (await twin("story", "list", "--json")).value as { stories: Array<{ key: string; claim: { state: string; holder: string | null } }> };
+    expect(list.stories.find((s) => s.key === "gh-5")?.claim).toMatchObject({ state: "other", holder: "tester@box" });
+    const status = (await twin("status", "--json")).value as { groups: Record<string, Array<{ story: string }>> };
+    expect(Object.values(status.groups).flat().filter((i) => i.story === "gh-5")).toEqual([]);
+    held(await twin("story", "edit", "gh-5", "--auto"));
+  });
 
   test("non-holder approve (with a stale local copy) posts to refs/norn/inbox/<story>/<ulid>; mode refuses", async () => {
     // the colleague checks the story out while gh-5 still works: that local copy goes stale
@@ -1047,7 +1070,7 @@ describe("gh-71 B11–B17, B32: --force ends an unfinished round, --at alone mov
     expect(rejected.decisions.filter((d) => d.unit === "gh-21").map((d) => d.rule)).toEqual(["round.workflow_changed"]);
     expect(existsSync(join(record21(), "rounds/02-story"))).toBe(false);
     expect(t.state(runs21())).toMatchObject({ workflow: "triage", step: "confirm", status: "parked", park: parked?.park });
-    expect(t.state(runs21())?.ended).toBeUndefined();
+    expect(t.state(runs21())).not.toHaveProperty("ended");
     // the gate still waits for the person: approve applies to it
     const inbox = (await t.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; command: string }>> };
     expect(inbox.groups.approve).toContainEqual(expect.objectContaining({ story: "gh-21", command: "norn story approve gh-21" }));
@@ -1070,7 +1093,7 @@ describe("gh-71 B11–B17, B32: --force ends an unfinished round, --at alone mov
     });
     expect(runs21()).toBe(join(record21(), "rounds/02-story"));
     expect(t.state(runs21())).toMatchObject({ workflow: "story", round: 2, step: "refine" });
-    expect(t.state(runs21())?.ended).toBeUndefined();
+    expect(t.state(runs21())).not.toHaveProperty("ended");
   });
 
   test("B15 (AC6, AC8): --at alone moves the same round's cursor, counters kept; an unknown step names the round's steps", async () => {
@@ -1111,6 +1134,6 @@ describe("gh-71 B11–B17, B32: --force ends an unfinished round, --at alone mov
     expect(runs21()).toBe(join(record21(), "rounds/03-quick"));
     expect(t.state(runs21())).toMatchObject({ workflow: "quick", round: 3, step: "work" });
     expect(t.state(join(record21(), "rounds/02-story"))).toMatchObject({ step: "$done", status: "done" });
-    expect(t.state(join(record21(), "rounds/02-story"))?.ended).toBeUndefined();
+    expect(t.state(join(record21(), "rounds/02-story"))).not.toHaveProperty("ended");
   });
 });

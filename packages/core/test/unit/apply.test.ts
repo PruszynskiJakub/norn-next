@@ -77,7 +77,7 @@ describe("rejections and idempotence", () => {
 
   test("receipts ≤ applied_through are skipped: re-applying is a no-op", () => {
     const st = stateFor(SLICE, SLICE_WF);
-    const rs = [numbered(1, started(st)), numbered(2, done("done")({ ...st, run: { run_id: RUN } as UnitState["run"] }))];
+    const rs = [numbered(1, started(st)), numbered(2, done("done")({ ...st, run: { run_id: RUN } } as UnitState))];
     const once = applyReceipts(st, rs, ctx());
     expect(once.applied).toEqual([1, 2]);
     const twice = applyReceipts(once.state, rs, ctx());
@@ -195,6 +195,17 @@ describe("classified outcomes", () => {
     expect(r.route).toBe("retry");
     const relaunched = run(r.state, SOLO_WF, (s) => ({ ...started(s), run_id: "01JFFFFFFFFFFFFFFFFFFFFFFF" }), classify("died"));
     expect(relaunched.state.park?.reason).toBe("died: retries 1/1 at implement");
+  });
+
+  test("a nudge or a retry on a unit parked on an ask clears the park; a nudge with no run is rejected", () => {
+    const asked = run(live, SOLO_WF, classify("ask")).state;
+    expect(asked).toMatchObject({ status: "parked", park: { kind: "ask" }, run: { run_id: RUN } });
+    expect(run(asked, SOLO_WF, classify("silent")).state).toMatchObject({ status: "running", park: null, run: { run_id: RUN }, nudges_used: 1 });
+    expect(run(asked, SOLO_WF, classify("died")).state).toMatchObject({ status: "ready", park: null, run: null, retries_used: 1 });
+    const idle = stateFor(storyUnit(), SOLO_WF);
+    const r = run(idle, SOLO_WF, classify("silent"));
+    expect(r.rejected.map((x) => x.reason)).toEqual(["no run to nudge"]);
+    expect(r.state).toMatchObject({ status: "ready", run: null, nudges_used: 0 });
   });
 
   test("a workflow may override a classified route", () => {

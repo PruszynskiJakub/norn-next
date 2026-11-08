@@ -38,6 +38,10 @@ export const PendingRecordEntry = Type.Object({
   attempts: NonNegInt,
   reason: Type.String(),
   merge: Type.Optional(StoryMerge),
+  /** attempts the base refused (push rejected/auth/other, spec.md unpatchable); absent = 0 */
+  refusals: Type.Optional(NonNegInt),
+  /** ms epoch when norn stopped retrying; absent = retried every sync_interval */
+  stopped_at: Type.Optional(Type.Number()),
 });
 export type PendingRecordEntry = Static<typeof PendingRecordEntry>;
 

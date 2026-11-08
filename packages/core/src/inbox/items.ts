@@ -12,8 +12,9 @@ import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, s
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
-import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, skillsDiffer, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, skillsDiffer, issueProblem, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyLanded, storyPhase, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
+import { hookActivity } from "../session.ts";
 import { isParked } from "../verbs.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -91,7 +92,7 @@ export function heartbeatDown(facts: Facts, config: ResolvedConfig): { holder: s
   if (!hb || heartbeatUp(facts, config)) return null;
   const auto = (s: StoryFacts) => effectiveMode(s.mode, false, facts.machine.runner).mode === "auto";
   const live = (u: UnitFacts) => !!u.state && u.state.status !== "done" && u.state.status !== "corrupt";
-  const needs = facts.stories.some((s) => s.claim.state === "mine" && auto(s) && !storyFinished(s) && s.units.some(live));
+  const needs = facts.stories.some((s) => s.claim.state === "mine" && auto(s) && !storyFinished(storyPhase(s, facts.repo.default_branch)) && s.units.some(live));
   if (!needs) return null;
   return { holder: facts.machine.holder, since: hb.last_tick_at === null ? null : iso(hb.last_tick_at), for_ms: hb.last_tick_at === null ? null : facts.now - hb.last_tick_at };
 }
@@ -310,7 +311,7 @@ function personStart(uf: UnitFacts, story: StoryFacts, facts: Facts, config: Res
  * tick starts it — else Your turn with the command that ticks.
  */
 function notStartedItem(story: StoryFacts, facts: Facts, config: ResolvedConfig): InboxItem | null {
-  if (story.claim.state !== "mine" || isStarted(story) || storyFinished(story) || !story.frontmatter) return null;
+  if (story.claim.state !== "mine" || isStarted(story) || storyFinished(storyPhase(story, facts.repo.default_branch)) || !story.frontmatter) return null;
   const up = heartbeatUp(facts, config);
   const base = { id: `not-started:${story.key}`, story: story.key, slice: null, step: null, since: story.frontmatter.intake_at, url: story.frontmatter.url };
   if (up) return { ...base, group: "running", title: "taken in — the next tick starts it", command: cmd.storyView(story.key) };
@@ -435,7 +436,7 @@ function mergeItem(story: StoryFacts, st: UnitState, base: string): InboxItem | 
   const pr = knownPr(story);
   // A branch already contained in origin/<base> (merged by ancestry, e.g. a merge commit
   // pushed by hand) needs no merge, even while the PR still reads `open`.
-  if (!pr || pr.state !== "open" || story.merged_by_ancestry || story.frontmatter?.status === "done") return null;
+  if (!pr || pr.state !== "open" || storyLanded(storyPhase(story, base))) return null;
   const draft = pr.is_draft;
   const cli = prCli(story);
   const details = [pr.url];
@@ -504,9 +505,6 @@ function staleItem(story: StoryFacts, base: string): InboxItem | null {
   };
 }
 
-/** The story's work is on its base — merged (PR or ancestry), or spec.md records it done (the durable record when no PR was fetched). */
-const landed = (story: StoryFacts, base: string): boolean => mergedIntoBase(story, base) || story.frontmatter?.status === "done";
-
 /**
  * An issue change on a finished round (label removed, unassigned, unseen) parks nothing;
  * it is a Check item while the round stays finished, read from `issue_seen` between syncs. A closed
@@ -514,7 +512,7 @@ const landed = (story: StoryFacts, base: string): boolean => mergedIntoBase(stor
  */
 function finishedRoundRemoteItem(story: StoryFacts, config: ResolvedConfig, base: string): InboxItem | null {
   const st = storyUnit(story)?.state;
-  if (st?.status !== "done" || landed(story, base)) return null;
+  if (st?.status !== "done" || storyLanded(storyPhase(story, base))) return null;
   // between syncs the issue is not fetched: the one the last sync saw keeps the item put
   const issue = story.issue !== undefined ? story.issue : story.issue_seen?.issue;
   const reason = issueProblem({ ...story, issue }, config.label);
@@ -553,15 +551,13 @@ function retargetItem(story: StoryFacts, base: string): InboxItem | null {
   };
 }
 
-/** Hook events after which an attended agent waits for its person. */
-const WAITING_HOOKS = new Set(["turn_end", "waiting_input", "permission_prompt"]);
-const WAITING_PANE = new Set(["idle", "done", "waiting_input"]);
-
 /**
  * When the attended agent of the unit's current run started waiting for its person (ms epoch),
- * or null while it works, is gone, or the step is not attended. The wait starts at the first of the
- * run's trailing waiting hooks, so Claude's `idle_prompt` (~60 s after `Stop`) does not restart it;
- * with no hook since the last activity, a pane that went idle afterwards starts it.
+ * or null while it works, is gone, or the step is not attended. A turn end is the person's turn as
+ * much as a prompt is; the wait starts at the first of the run's trailing waits and turn ends, so
+ * Claude's `idle_prompt` (~60 s after `Stop`) does not restart it, and a session that ended just
+ * before them waits for no one. The wait comes from hooks only: a pane carries no time of change
+ * to start it from.
  */
 export function attendedWaitSince(uf: UnitFacts): number | null {
   const st = uf.state;
@@ -570,19 +566,9 @@ export function attendedWaitSince(uf: UnitFacts): number | null {
   const step = uf.workflow ? stepOf(uf.workflow, st.step) : null;
   if (step?.type !== "agent" || !step.attended) return null;
   if (rf.process_alive === false || rf.pane?.alive === false) return null;
-  let since: number | null = null;
-  for (let i = rf.hooks.length - 1; i >= 0; i--) {
-    const h = rf.hooks[i];
-    if (!h || !WAITING_HOOKS.has(h.event)) {
-      if (h?.event === "session_end") return null;
-      break;
-    }
-    since = epoch(h.at);
-  }
-  if (since !== null) return since;
-  const pane = rf.pane;
-  if (pane && WAITING_PANE.has(pane.state) && pane.since !== null && pane.since > (rf.last_hook_at ?? 0)) return pane.since;
-  return null;
+  const hook = hookActivity(rf.hooks);
+  if (hook.kind !== "waiting" && hook.kind !== "turn_ended") return null;
+  return hook.before === "ended" ? null : hook.idle_since;
 }
 
 /** Where the unit's current run lives (a worktree on disk, as decide requires), for front ends that look for its pane. */
@@ -620,7 +606,6 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     since,
     ...extra,
   });
-  const park = st.park;
   // A story held here from its record alone has no branch, so nothing runs in
   // it — a run its record names belongs to the previous holder's session, and nothing can start
   if (story.record_only && (st.status === "running" || st.status === "ready"))
@@ -628,22 +613,28 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       id: `record-only:${key}:${st.step}#${st.attempt}`,
     });
   switch (st.status) {
-    case "parked":
-      if (park?.kind === "ask") return answerItem(uf, st, park, item);
-      if (park?.kind === "gate") {
-        const judged = judgedDetail(story, uf);
-        const reject = `or reject: ${cmd.storyReject(key)}`;
-        const { detail, full } = gateChecks(story, uf);
-        const fullText = [judged?.full, full].filter(Boolean).join("\n\n");
-        return item("approve", park.reason, cmd.storyApprove(key), park.since, { detail: [judged?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
+    case "parked": {
+      const park = st.park;
+      switch (park.kind) {
+        case "ask":
+          return answerItem(uf, st, park, item);
+        case "gate": {
+          const judged = judgedDetail(story, uf);
+          const reject = `or reject: ${cmd.storyReject(key)}`;
+          const { detail, full } = gateChecks(story, uf);
+          const fullText = [judged?.full, full].filter(Boolean).join("\n\n");
+          return item("approve", park.reason, cmd.storyApprove(key), park.since, { detail: [judged?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
+        }
+        case "attended": {
+          const start = personStart(uf, story, facts, config);
+          return item("your_turn", `${st.step}: attended step — work with the agent`, start.command, park.since, start.detail ? { detail: start.detail } : {});
+        }
       }
-      if (park?.kind === "attended") {
-        const start = personStart(uf, story, facts, config);
-        return item("your_turn", `${st.step}: attended step — work with the agent`, start.command, park.since, start.detail ? { detail: start.detail } : {});
-      }
-      return item("unblock", park?.reason ?? "parked", unstickCommand(key, st), park?.since ?? st.updated_at);
-    case "stuck":
-      return item("unblock", park?.reason ?? "stuck", unstickCommand(key, st), park?.since ?? st.updated_at, park?.receipt_id ? { id: park.receipt_id } : {});
+    }
+    case "stuck": {
+      const park = st.park;
+      return item("unblock", park.reason, unstickCommand(key, st), park.since, park.receipt_id ? { id: park.receipt_id } : {});
+    }
     case "running": {
       // The agent never took its launch prompt — a person looks at the pane
       const unsent = launchPromptMissed(uf, st);
@@ -680,15 +671,16 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       return item("running", `${st.step} #${st.attempt} (queued)`, cmd.runList(key), st.step_entered_at);
     }
     case "done": {
+      const park = st.park;
       if (uf.unit.slice === null) {
         // A round receipt rejected because its workflow file changed — the edit again
-        if (park?.kind === "workflow")
+        if (park)
           return item("your_turn", `${story.key}: ${park.reason}`, park.command ?? cmd.storyEdit(story.key, { workflow: "<name>" }), park.since, { id: `round_rejected:${key}:${park.receipt_id ?? park.since}` });
         const merge = mergeItem(story, st, facts.repo.default_branch);
         if (merge) return merge;
         // A finished round with no PR — the next round or closing the issue is the
         // person's; generic, never a recommendation read off the last step's outcome
-        if (!landed(story, facts.repo.default_branch) && !knownPr(story))
+        if (!storyLanded(storyPhase(story, facts.repo.default_branch)) && !knownPr(story))
           return item("your_turn", `${story.key}: ${st.workflow} round done, no PR`, cmd.storyEdit(story.key, { workflow: "<name>" }), st.updated_at, {
             id: `round_done:${key}:${uf.record ?? st.workflow}`,
             detail: "or close the issue",
@@ -817,12 +809,37 @@ function supersededItems(facts: Facts): InboxItem[] {
 }
 
 /**
+ * A merged story whose `status: done` record the base kept refusing (a protected branch, a spec
+ * that will not patch): norn stopped retrying, so only a person can land it. Not filtered on the
+ * claim, the story is already cleaned up; gone once observe sees the base read done.
+ */
+function owedRecordItems(facts: Facts): InboxItem[] {
+  const base = facts.repo.default_branch;
+  return (facts.owed_records ?? []).map((r) => {
+    const url = facts.stories.find((s) => s.key === r.story)?.frontmatter?.url;
+    return {
+      id: `record_owed:${r.story}`,
+      group: "unblock" as const,
+      story: r.story,
+      slice: null,
+      step: null,
+      title: `${r.story} merged, but ${base} refused its status: done record ${r.refusals} times`,
+      // the push reason carries its own by-hand hint; the detail gives it once
+      detail: `${r.reason.replace(/: set status: .*$/, "")}. norn stopped retrying; set status: done in ${r.spec_dir}/spec.md on ${base} (by a PR if the branch is protected); the item clears once norn sees it there`,
+      command: cmd.sync(),
+      since: r.stopped_at,
+      ...(url ? { url } : {}),
+    };
+  });
+}
+
+/**
  * A mailbox receipt this holder's tick rejected, one Check item each, so a stale
  * answer never vanishes silently. Gone once a later answer or approval of the story is accepted (observe
  * leaves it out) or the story finishes; there is no dismiss command.
  */
-function rejectedItems(story: StoryFacts): InboxItem[] {
-  if (storyFinished(story)) return [];
+function rejectedItems(story: StoryFacts, base: string): InboxItem[] {
+  if (storyFinished(storyPhase(story, base))) return [];
   return (story.rejected_mailbox ?? []).map((r) => {
     // the step the unit is at now (the story is held here), else where it was when the receipt was rejected
     const now = story.units.find((u) => u.unit.key === r.unit)?.state?.step ?? r.at_step;
@@ -857,7 +874,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   for (const story of facts.stories) {
     const claim = story.claim.state;
     if (claim === "other") continue;
-    if ((claim === "none" || claim === "expired") && isStarted(story) && !storyFinished(story)) {
+    if ((claim === "none" || claim === "expired") && isStarted(story) && !storyFinished(storyPhase(story, facts.repo.default_branch))) {
       const since = story.claim.state === "expired" ? story.claim.blob.expires_at : (story.frontmatter?.intake_at ?? iso(facts.now));
       add({
         id: `unclaimed:${story.key}`,
@@ -899,7 +916,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     add(finishedRoundRemoteItem(story, config, facts.repo.default_branch));
     for (const it of foreignCommitItems(story)) add(it);
     add(recordPushItem(story));
-    for (const it of rejectedItems(story)) add(it);
+    for (const it of rejectedItems(story, facts.repo.default_branch)) add(it);
     for (const it of noteItems(story)) add(it);
     for (const uf of story.units) {
       add(unitInboxItem(story, uf, facts, config));
@@ -912,6 +929,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   add(repoSkillsDriftItem(facts));
   add(baseRunStateItem(facts));
   for (const it of supersededItems(facts)) add(it);
+  for (const it of owedRecordItems(facts)) add(it);
   // The version item comes first, whatever its age
   const pinned = (it: InboxEntry) => (it.id.startsWith(VERSION_ITEM) ? 0 : 1);
   for (const g of INBOX_GROUPS) groups[g].sort((a, b) => pinned(a) - pinned(b) || epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));

@@ -13,7 +13,7 @@ export interface CounterView {
 }
 
 export interface ClaimView {
-  /** none / mine (this user@machine or heartbeat) / other / expired / corrupt */
+  /** none / mine (this checkout's heartbeat) / other (another heartbeat, even of this user@machine) / expired / corrupt */
   state: "none" | "mine" | "other" | "expired" | "corrupt";
   holder: string | null;
   expires_at: string | null;

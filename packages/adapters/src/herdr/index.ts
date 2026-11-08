@@ -182,12 +182,12 @@ export function createHerdrRunner(opts: HerdrRunnerOptions = {}): RunnerPort {
         const out = (await herdr(["pane", "get", pane])) as { result?: { pane?: HerdrPane } };
         info = out?.result?.pane;
       } catch (err) {
-        if ((err as { code?: string }).code === "session_gone") return { alive: false, state: "unknown", since: null };
+        if ((err as { code?: string }).code === "session_gone") return { alive: false, state: "unknown" };
         throw err;
       }
       const alive = await this.isAlive(session);
       const state = STATE_MAP[info?.agent_status ?? "unknown"] ?? "unknown";
-      const result: PaneState = { alive, state, since: null };
+      const result: PaneState = { alive, state };
       if (state === "waiting_input") {
         const screen = await herdr(["pane", "read", pane, "--source", "visible", "--lines", "30"]).catch(() => null);
         if (typeof screen === "string" && screen.trim() !== "") {

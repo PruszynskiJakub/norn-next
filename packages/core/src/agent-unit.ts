@@ -76,8 +76,8 @@ const no = (error: string, do_instead: string, code: string): CliError => ({ err
 export function agentWorkRefusal(s: AgentUnit, verb: string): CliError | null {
   const st = s.state;
   const key = s.unit.key;
-  if (st.status === "done" || st.step === "$done") return no(`unit ${key} is done; there is nothing to ${verb}`, "end your turn", "unit_done");
-  if (st.status === "stuck") return no(`unit ${key} is stuck: ${st.park?.reason ?? "unknown"}`, `end your turn; a person unblocks it with: ${cmd.runRerun(key)}`, "unit_stuck");
+  if (st.step === "$done") return no(`unit ${key} is done; there is nothing to ${verb}`, "end your turn", "unit_done");
+  if (st.status === "stuck") return no(`unit ${key} is stuck: ${st.park.reason}`, `end your turn; a person unblocks it with: ${cmd.runRerun(key)}`, "unit_stuck");
   const step = cursorStep(s);
   if (!step) return no(`step '${st.step}' does not exist in workflow ${s.workflow.name}`, `end your turn; a person fixes it with: ${cmd.runRerun(key, { step: "<step>" })}`, "no_step");
   if (step.type === "gate") return no(`${st.step} is a gate: a person decides, not an agent`, `end your turn; a person runs: ${cmd.storyApprove(key)} (or ${cmd.storyReject(key)})`, "gate_step");

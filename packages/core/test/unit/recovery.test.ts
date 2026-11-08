@@ -8,7 +8,7 @@
  *   - R7: runs record their machine; a foreign run is judged by hooks and the claim, never by pid
  */
 import { describe, expect, test } from "bun:test";
-import type { UnitState } from "@norn/schema";
+import type { UnitState, UnitStateRecord } from "@norn/schema";
 import type { Action } from "../../src/actions.ts";
 import { NUDGE_TEXT } from "../../src/commands.ts";
 import { decide } from "../../src/decide/index.ts";
@@ -26,13 +26,13 @@ const only = (f: Facts): Action => {
   return d.action;
 };
 
-function solo(patch: Partial<UnitState> = {}, run: Partial<RunFacts> | null = null, unit: Partial<UnitFacts> = {}, story: Partial<StoryFacts> = {}): StoryFacts {
+function solo(patch: Partial<UnitStateRecord> = {}, run: Partial<RunFacts> | null = null, unit: Partial<UnitFacts> = {}, story: Partial<StoryFacts> = {}): StoryFacts {
   const ref = storyUnit();
   const st = stateFor(ref, SOLO_WF, patch);
   const rf: RunFacts | null = run && { run_id: RUN, session: { runner: "herdr", session_id: "s1" }, process_alive: true, pane: null, hooks: [], last_hook_at: null, last_activity_at: T0, transcript: null, ...run };
   return storyFacts("gh-1", [unitFacts(ref, SOLO_WF, st, { run: rf, ...unit })], { ...story, frontmatter: { ...storyFacts("gh-1", []).frontmatter!, workflow: "solo" } });
 }
-const running = (p: Partial<UnitState> = {}, session: { runner: string; session_id: string } = { runner: "herdr", session_id: "s1" }): Partial<UnitState> => ({
+const running = (p: Partial<UnitStateRecord> = {}, session: { runner: string; session_id: string } = { runner: "herdr", session_id: "s1" }): Partial<UnitStateRecord> => ({
   status: "running",
   run: { run_id: RUN, step: "implement", attempt: 1, started_at: at(T0 - 20 * 60_000), how: "auto", session, agent: "claude", agent_session_id: "cs-1" },
   updated_at: at(T0 - 20 * 60_000),
@@ -153,7 +153,7 @@ describe("R7: liveness across machines", () => {
     const foreign = (takenAgo: number) =>
       solo(
         running({ run: { ...running().run!, machine: "ann@pc", heartbeat_id: "01JFFFFFFFFFFFFFFFFFFFFFFF", started_at: at(T0 - 60 * 60_000 + 60_000) }, updated_at: at(T0 - 60 * 60_000) }),
-        { process_alive: false, pane: { alive: false, state: "unknown", since: null }, last_activity_at: null },
+        { process_alive: false, pane: { alive: false, state: "unknown" }, last_activity_at: null },
         {},
         { claim: { state: "mine", sha: "c1", blob: { version: 1, story: "gh-1", holder: "jakub@mac", heartbeat_id: HB, acquired_at: at(T0 - takenAgo), renewed_at: at(), expires_at: at(T0 + 600_000), last_tick_id: null } } },
       );

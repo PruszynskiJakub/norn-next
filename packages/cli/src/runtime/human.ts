@@ -55,7 +55,6 @@ export async function projectView(ctx: Context, opts: { inboxOnly?: boolean } = 
     now: ctx.clock.now(),
     env: ctx.env,
     holder: machineHolder(ctx.env),
-    heartbeatId: recordedHeartbeatId(ctx.root),
     version: ctx.version,
     bundledSkills: bundledSkillSet(ctx.env),
     ...(runner ? { runnerCapabilities: runner.capabilities } : {}),

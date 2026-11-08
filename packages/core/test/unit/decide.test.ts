@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { type AgentStep, type LeaseFile, roundRecordPath, type UnitState, type Workflow } from "@norn/schema";
+import { type AgentStep, type HookEventKind, type LeaseFile, roundRecordPath, type UnitState, type UnitStateRecord, type Workflow } from "@norn/schema";
 import { type Action, legacyAction } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { decide, isSideAction, unitDecision } from "../../src/decide/index.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
-import { isCodePath, isIntakeCommit, isStepBoundary, nornTrailers } from "../../src/policy.ts";
+import { isCodePath, isIntakeCommit, isStepBoundary, nornTrailers, roundFinished } from "../../src/policy.ts";
 import type { RunFacts, StoryFacts, UnitFacts } from "../../src/facts.ts";
 import type { WorktreeStatus } from "../../src/ports.ts";
 import { sha256 } from "../../src/hash.ts";
@@ -41,13 +41,13 @@ const only = (f: Parameters<typeof decide>[0], unit = "gh-1"): Action => {
 };
 
 /** A story on the solo workflow (story-level agent step), with its state patched. */
-function solo(patch: Partial<UnitState> = {}, run: Partial<RunFacts> | null = null, story: Partial<StoryFacts> = {}, key = "gh-1", intake = T0 - 3_600_000, wf: Workflow = SOLO_WF) {
+function solo(patch: Partial<UnitStateRecord> = {}, run: Partial<RunFacts> | null = null, story: Partial<StoryFacts> = {}, key = "gh-1", intake = T0 - 3_600_000, wf: Workflow = SOLO_WF) {
   const unit = storyUnit(key);
   const st = stateFor(unit, wf, patch);
   const rf: RunFacts | null = run && { run_id: RUN, session: { runner: "herdr", session_id: "s1" }, process_alive: true, pane: null, hooks: [], last_hook_at: null, last_activity_at: T0, transcript: "/t.jsonl", ...run };
   return storyFacts(key, [unitFacts(unit, wf, st, { run: rf, worktree: { path: `/r-worktrees/${key}-login`, exists: true, status: null, last_commit_at: null, last_file_change_at: null, slot: 1 } })], { ...story, frontmatter: { ...storyFacts(key, []).frontmatter!, workflow: "solo", intake_at: at(intake) } });
 }
-const running = (p: Partial<UnitState> = {}): Partial<UnitState> => ({
+const running = (p: Partial<UnitStateRecord> = {}): Partial<UnitStateRecord> => ({
   status: "running",
   run: { run_id: RUN, step: "implement", attempt: 1, started_at: at(T0 - 60_000), how: "auto", session: { runner: "herdr", session_id: "s1" } },
   updated_at: at(T0 - 60_000),
@@ -147,7 +147,7 @@ describe("corrupt units", () => {
     s.units[0]!.errors = [{ file: "runs/_story/state.json", errors: [{ path: "/step", message: "bad" }] }];
     s.units[0]!.unapplied = [numbered(1, receipt(s.units[0]!.state!, "done", { outcome: "done", handoff: "" }))];
     expect(kinds(facts([s]))).toEqual(["gh-1 mark_corrupt unit.corrupt"]);
-    s.units[0]!.state = { ...s.units[0]!.state!, status: "corrupt" };
+    s.units[0]!.state = { ...s.units[0]!.state!, status: "corrupt" } as UnitState;
     expect(kinds(facts([s]))).toEqual(["gh-1 noop unit.corrupt"]);
   });
   test("gh-79: the corrupt item says what failed, so a duplicate receipt names the other file", () => {
@@ -221,8 +221,24 @@ describe("classification", () => {
     expect(kinds(facts([solo(st, { hooks: [{ event: "turn_end", at: at(T0 - 1000), agent: "claude", native: "Stop", cwd: "/w" }] })]))).toEqual(["gh-1 noop agent.running"]);
   });
   test("nudges exhausted → classify to $stuck", () => {
-    const a = only(facts([solo(running({ nudges_used: 2, updated_at: at(T0 - 5000) }), { pane: { alive: true, state: "idle", since: T0 - 1000 } })]));
+    const a = only(facts([solo(running({ nudges_used: 2, updated_at: at(T0 - 5000) }), { hooks: [{ event: "turn_end", at: at(T0 - 1000), agent: "claude", native: "Stop", cwd: "/w" }] })]));
     expect(a).toMatchObject({ kind: "classify", outcome: "silent", state: { status: "stuck", park: { kind: "exhausted", reason: "silent: nudges 2/2 at implement" } }, kill: null });
+  });
+  test("an idle pane alone never ends a turn", () => {
+    expect(kinds(facts([solo(running(), { pane: { alive: true, state: "idle" } })]))).toEqual(["gh-1 noop agent.running"]);
+  });
+  test("hook and pane are judged apart: a hook counts only when newer than the last state write; a blocked pane parks as it is now", () => {
+    const old = (event: HookEventKind) => ({ hooks: [{ event, at: at(T0 - 90_000), agent: "claude", native: "Notification", cwd: "/w" }] });
+    const fresh = (event: HookEventKind) => ({ hooks: [{ event, at: at(T0 - 1000), agent: "claude", native: "Stop", cwd: "/w" }] });
+    const idle = { pane: { alive: true, state: "idle" as const } };
+    const blocked = { pane: { alive: true, state: "waiting_input" as const } };
+    // a wait or session end from before the last state write, with an idle pane, ends no turn
+    expect(kinds(facts([solo(running(), { ...old("permission_prompt"), ...idle })]))).toEqual(["gh-1 noop agent.running"]);
+    expect(kinds(facts([solo(running(), { ...old("session_end"), ...idle })]))).toEqual(["gh-1 noop agent.running"]);
+    // the same wait, fresh, parks with the idle pane beside it
+    expect(only(facts([solo(running(), { ...fresh("permission_prompt"), ...idle })]))).toMatchObject({ kind: "park", rule: "agent.ask.implicit" });
+    // a blocked pane parks whatever the hooks say, fresh or stale
+    for (const hooks of [old("session_end"), fresh("turn_end"), fresh("session_end")]) expect(only(facts([solo(running(), { ...hooks, ...blocked })]))).toMatchObject({ kind: "park", rule: "agent.ask.implicit" });
   });
   test("died → retry_fresh with a new launch and started receipt", () => {
     const a = only(facts([solo(running(), { process_alive: false })]));
@@ -281,7 +297,7 @@ describe("classification", () => {
     // nothing in progress: the recovered commit comes first, as before
     expect(only(facts([midMerge(solo(running(), {}), { operation: null, unmerged: [] })]))).toMatchObject({ kind: "commit_push", rule: "recover.commit" });
     // a second permission prompt mid-merge (pane waiting after an answered ask) parks again as an implicit ask
-    const pane = { alive: true, state: "waiting_input" as const, since: null, detail: "Do you want to proceed?\n ❯ 1. Yes\n   2. No" };
+    const pane = { alive: true, state: "waiting_input" as const, detail: "Do you want to proceed?\n ❯ 1. Yes\n   2. No" };
     expect(only(facts([midMerge(solo(running(), { pane }), merging)]))).toMatchObject({ kind: "park", rule: "agent.ask.implicit" });
     // the deadline still fires, and a died agent is still retried
     const old = running({ run: { ...running().run!, started_at: at(T0 - 61 * 60_000) }, updated_at: at(T0 - 61 * 60_000) });
@@ -314,14 +330,18 @@ describe("classification", () => {
   });
 });
 
+/** A slice patched `running` holds the run a running unit always has. */
+const withRun = (p: Partial<UnitStateRecord>): Partial<UnitStateRecord> =>
+  p.status === "running" && !p.run ? { ...p, run: { run_id: RUN, step: p.step ?? SLICE_WF.start, attempt: 1, started_at: at(T0 - 60_000), how: "auto" } } : p;
+
 /** Story on STORY_WF positioned at `step`, with optional slices. */
-function storyAt(step: string, extra: Partial<StoryFacts> = {}, slices: Array<{ nn: string; deps?: string[]; state?: Partial<UnitState> | null; status?: "planned" | "integrated" }> = []) {
+function storyAt(step: string, extra: Partial<StoryFacts> = {}, slices: Array<{ nn: string; deps?: string[]; state?: Partial<UnitStateRecord> | null; status?: "planned" | "integrated" }> = []) {
   const unit = storyUnit();
   const st = stateFor(unit, STORY_WF, { step, visits: { [step]: 1 }, status: "ready", park: null });
   const units = [unitFacts(unit, STORY_WF, st)];
   for (const s of slices) {
     const ref = sliceUnit("gh-1", s.nn, `s${s.nn}`);
-    if (s.state !== undefined && s.state !== null) units.push(unitFacts(ref, SLICE_WF, stateFor(ref, SLICE_WF, s.state)));
+    if (s.state !== undefined && s.state !== null) units.push(unitFacts(ref, SLICE_WF, stateFor(ref, SLICE_WF, withRun(s.state))));
   }
   return storyFacts("gh-1", units, { slices: slices.map((s) => sliceFile("gh-1", s.nn, `s${s.nn}`, s.deps ?? [], s.status ?? "planned")), ...extra });
 }
@@ -378,6 +398,7 @@ describe("slices step", () => {
     expect(a.starts[0]).toMatchObject({
       workflow: "slice",
       slice_status: "active",
+      story_status: null,
       worktree: { path: "/r-worktrees/gh-1-login--02-s02", branch: "gh-1/02-s02", from: "gh-1-login", slot: 1 },
       state: { story: "gh-1", slice: "gh-1/02", unit_dir: "02-s02", step: "implement", workflow_hash: sha256(WORKFLOWS.slice!.source) },
     });
@@ -394,7 +415,7 @@ describe("slices step", () => {
     expect(stuck.kind === "classify" && stuck.commit?.trailers).not.toHaveProperty("Norn-Outcome");
   });
   test("gh-79: every slice stuck — a corrupt one is pointed at run view --why, since run rerun refuses a corrupt unit", () => {
-    const stuck = (state: Partial<UnitState>) => {
+    const stuck = (state: Partial<UnitStateRecord>) => {
       const a = only(facts([storyAt("slices", {}, [{ nn: "01", status: "integrated" }, { nn: "02", deps: ["gh-1/01"], state }])]));
       return a.kind === "classify" ? a.receipts[0]?.receipt : null;
     };
@@ -429,16 +450,18 @@ describe("story lifecycle", () => {
     const f = storyAt("ready", { pr: { number: 7, url: "u", state: "merged", is_draft: false, head_sha: "", head: "gh-1-login", base_branch: "main", merged_at: at() } }, [{ nn: "01", status: "integrated" }]);
     expect(only(facts([f]))).toMatchObject({ kind: "cleanup_merged_story", local_branches: ["gh-1/01-s01", "gh-1-login"], remote_branches: ["gh-1/01-s01"], refs: ["refs/norn/claims/gh-1"], story_status: "done" });
   });
-  test("gh-88 GR6: a PR merged while parked at a gate → the cleanup records every unfinished unit done; the inbox then has nothing for it", () => {
+  test("gh-88 GR6: a PR merged while parked at a gate → the cleanup records every unfinished unit done at $done; the inbox then has nothing for it", () => {
     const pr = { number: 7, url: "u", state: "merged" as const, is_draft: false, head_sha: "", head: "gh-1-login", base_branch: "main", merged_at: at() };
     const f = storyAt("ready", { pr }, [{ nn: "01", status: "integrated", state: { status: "done" } }, { nn: "02", state: { status: "stuck", park: { kind: "ask", reason: "q", since: at() } } }]);
     f.units[0]!.state = { ...f.units[0]!.state!, status: "parked", park: { kind: "gate", reason: "PR ready?", since: at() } };
     const a = only(facts([f]));
     if (a.kind !== "cleanup_merged_story") throw new Error(a.kind);
     expect(a.finish.map((x) => [x.unit.key, x.state.status, x.state.park, x.state.run, x.state.step, x.state.last_tick_id])).toEqual([
-      ["gh-1", "done", null, null, "ready", TICK],
-      ["gh-1/02", "done", null, null, f.units[2]!.state!.step, TICK],
+      ["gh-1", "done", null, null, "$done", TICK],
+      ["gh-1/02", "done", null, null, "$done", TICK],
     ]);
+    // the merge ends the round, so a next round starts without --force
+    expect(a.finish.every((x) => roundFinished(x.state))).toBe(true);
     // after the cleanup: spec.md done, the claim gone, the units as act wrote them
     const after = structuredClone(f);
     after.frontmatter = { ...after.frontmatter!, status: "done" };
@@ -446,7 +469,7 @@ describe("story lifecycle", () => {
     for (const x of a.finish) after.units.find((u) => u.unit.key === x.unit.key)!.state = x.state;
     const items = Object.values(buildInbox(facts([after]), CONFIG).groups).flat().filter((i) => i.story === "gh-1");
     expect(items.filter((i) => i.group !== "recently_done")).toEqual([]);
-    expect(items.map((i) => i.id)).toContain("recently_done:gh-1:ready#1");
+    expect(items.map((i) => i.id)).toContain("recently_done:gh-1:$done#1");
   });
   test("issue closed / unlabelled / PR closed → park remote under Unblock, once", () => {
     const closed = storyAt("test", { issue: null });
@@ -572,7 +595,7 @@ describe("gh-79: a rebasing story worktree holds the story-level writes", () => 
     expect(kinds(facts([f]))).toEqual(["gh-1 cleanup_merged_story remote.pr_merged"]);
   });
   test("a rebasing slice is judged progressing, not by its rewound stuck state", () => {
-    const stuck: Partial<UnitState> = { status: "stuck", park: { kind: "exhausted", reason: "review_loop 3/3", since: at() } };
+    const stuck: Partial<UnitStateRecord> = { status: "stuck", park: { kind: "exhausted", reason: "review_loop 3/3", since: at() } };
     const f = storyAt("slices", {}, [{ nn: "01", state: stuck }]);
     f.frontmatter = { ...f.frontmatter!, refined_body_hash: sha256("body") };
     expect(kinds(facts([f]))[0]).toContain("slices.slice_stuck");
@@ -621,7 +644,7 @@ describe("mailbox", () => {
     expect(only(facts([f]))).toMatchObject({ kind: "import_mailbox" });
   });
   test("a receipt naming its unit is routed to that unit, even when another unit has the same cursor", () => {
-    const gate: Partial<UnitState> = { step: "human-qa", attempt: 1, visits: { "human-qa": 1 }, status: "parked", park: { kind: "gate", reason: "x", since: at() } };
+    const gate: Partial<UnitStateRecord> = { step: "human-qa", attempt: 1, visits: { "human-qa": 1 }, status: "parked", park: { kind: "gate", reason: "x", since: at() } };
     const story = storyAt("slices", {}, [{ nn: "01", state: gate }, { nn: "02", state: gate }]);
     const s2 = story.units[2]!;
     const r = { ...receipt(s2.state!, "approve", {}, "human"), slice: s2.unit.slice };
@@ -668,6 +691,13 @@ describe("intake and start", () => {
     // Committed in the worktree intake creates, no step yet, not pushed before the claim
     expect(d?.action).toMatchObject({ commit: { cwd: "/r-worktrees/gh-5-fix", branch: "gh-5-fix", message: "norn: intake gh-5 Fix", trailers: { "Norn-Story": "gh-5", "Norn-Tick": TICK }, push: false } });
     expect(d?.action.kind === "intake_story" && Object.keys(d.action.commit.trailers)).toEqual(["Norn-Story", "Norn-Tick"]);
+  });
+  test("a story start writes spec.md active unless it already says so", () => {
+    const f = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)]);
+    f.frontmatter = { ...f.frontmatter!, status: "new" };
+    expect(only(facts([f]))).toMatchObject({ kind: "start_unit", rule: "story.start", story_status: "active" });
+    f.frontmatter = { ...f.frontmatter!, status: "active" };
+    expect(only(facts([f]))).toMatchObject({ kind: "start_unit", rule: "story.start", story_status: null });
   });
   test("story unit starts with its pinned workflow; invalid workflows are refused", () => {
     const f = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)]);
@@ -740,7 +770,7 @@ describe("audit fixes", () => {
   test("B2: an answer to a headless run resumes the agent session with the answer as the prompt", () => {
     const s = solo(running({ status: "parked", park: { kind: "ask", reason: "Q?", since: at() } }), { process_alive: false });
     const u = s.units[0]!;
-    u.state = { ...u.state!, run: { ...u.state!.run!, agent: "claude", agent_session_id: "cs-1", session: { runner: "headless", session_id: "h1" } } };
+    u.state = { ...u.state!, run: { ...u.state!.run!, agent: "claude", agent_session_id: "cs-1", session: { runner: "headless", session_id: "h1" } } } as UnitState;
     u.unapplied = [numbered(1, receipt(u.state, "answer", { answer: "use oauth" }, "human"))];
     const a = only(facts([s]));
     expect(a).toMatchObject({ kind: "apply_receipts", input: null, launch: { run_id: RUN, agent: "claude", resume: "cs-1", prompt: "use oauth" }, state: { status: "running", applied_through: 2 } });
@@ -760,7 +790,7 @@ describe("audit fixes", () => {
     const startedAgo = (min: number) => running({ run: { ...running().run!, started_at: at(T0 - min * 60_000) }, updated_at: at(T0 - min * 60_000) });
     const { nudges: _n, retries: _r, ...bare } = SOLO_WF.steps.implement as AgentStep;
     const withDefaults: Workflow = { ...SOLO_WF, steps: { implement: bare }, defaults: { deadline: "30m", nudges: 0, stalled: "40m" } };
-    const decided = (st: Partial<UnitState>, wf: Workflow, activity = T0) => only(facts([solo(st, { last_activity_at: activity }, {}, "gh-1", T0 - 3_600_000, wf)]));
+    const decided = (st: Partial<UnitStateRecord>, wf: Workflow, activity = T0) => only(facts([solo(st, { last_activity_at: activity }, {}, "gh-1", T0 - 3_600_000, wf)]));
     // defaults: deadline 30m, no nudges left → a timeout goes stuck
     expect(decided(startedAgo(31), withDefaults)).toMatchObject({ kind: "classify", outcome: "timeout", state: { status: "stuck" } });
     // a step's own deadline wins over defaults
@@ -797,7 +827,7 @@ describe("audit fixes", () => {
     const parkedBy = only(facts([storyAt("slices", {}, [{ nn: "01", state: stuckSlice }])]));
     if (parkedBy.kind !== "classify" || !parkedBy.state) throw new Error("expected the slices step to classify stuck");
     const storyStuck = parkedBy.state;
-    const withSlice = (slice: Partial<UnitState>) => {
+    const withSlice = (slice: Partial<UnitStateRecord>) => {
       const f = storyAt("slices", {}, [{ nn: "01", state: slice }]);
       f.units[0]!.state = storyStuck;
       return f;
@@ -810,7 +840,7 @@ describe("audit fixes", () => {
     expect(a.kind === "apply_receipts" && a.receipts[0]?.receipt).toMatchObject({ kind: "unstick", by: "norn", step: "slices" });
     // stuck for another reason at the slices step (a remote change): never resumed by norn
     const remote = withSlice({ status: "running" });
-    remote.units[0]!.state = { ...storyStuck, park: { kind: "remote", reason: "remote: issue closed", since: at() } };
+    remote.units[0]!.state = { ...storyStuck, park: { kind: "remote", reason: "remote: issue closed", since: at() } } as UnitState;
     expect(kinds(facts([remote]))[0]).toBe("gh-1 noop unit.stuck");
   });
 
@@ -920,9 +950,9 @@ describe("trace compatibility", () => {
 
 describe("gh-71 D5/D6: a finished round (B21, B24, B25, B35)", () => {
   /** The story unit at `$done` (a finished round), in round `round` of the story workflow. */
-  const finished = (extra: Partial<StoryFacts> = {}, patch: Partial<UnitState> = {}, round = 1) => {
+  const finished = (extra: Partial<StoryFacts> = {}, patch: Partial<UnitStateRecord> = {}, round = 1) => {
     const f = storyAt("$done", extra);
-    f.units[0]!.state = { ...f.units[0]!.state!, status: "done", ...patch };
+    f.units[0]!.state = { ...f.units[0]!.state!, status: "done", ...patch } as UnitState;
     f.units[0]!.record = roundRecordPath(round, "story");
     return f;
   };
@@ -1001,7 +1031,7 @@ describe("gh-71 D5/D6: a finished round (B21, B24, B25, B35)", () => {
 describe("gh-71 D1: round.start and the receipts after the round receipt", () => {
   const done = (): StoryFacts => {
     const f = storyAt("$done");
-    f.units[0]!.state = { ...f.units[0]!.state!, status: "done" };
+    f.units[0]!.state = { ...f.units[0]!.state!, status: "done" } as UnitState;
     f.units[0]!.record = roundRecordPath(1, "story");
     return f;
   };

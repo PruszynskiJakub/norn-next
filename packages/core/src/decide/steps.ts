@@ -45,6 +45,8 @@ export function startStoryUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts): void
     workflow_source: loaded.source,
     worktree: null,
     slice_status: null,
+    // The observed frontmatter is the story worktree's spec.md, the same file act patches.
+    story_status: fm.status === "active" ? null : "active",
     receipts: [],
     state,
     commit: commitFor(ctx, story, uf, `norn: start ${story.key} (${fm.workflow})`, state.step),
@@ -254,6 +256,7 @@ export function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
       workflow_source: loaded.source,
       worktree,
       slice_status: "active" as const,
+      story_status: null,
       receipts: [],
       state,
       commit: commitFor(ctx, story, null, `norn: start ${s.key} (${name})`, state.step, { fresh: { path, branch, slice: s.key, push: true } }),

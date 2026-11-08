@@ -47,6 +47,7 @@ import {
   onlyNornCommitsSince,
   readEnvNorn,
   readLocalStoryRefs,
+  recordedHeartbeatId,
   runHooks,
   scanWorktrees,
   type StorySnapshot,
@@ -91,9 +92,11 @@ export interface LoadProjectViewOptions {
   /** ms epoch; default Date.now() */
   now?: number;
   env?: Record<string, string | undefined>;
-  /** `user@machine` whose claims count as `mine`; default this machine's (`machineHolder`) */
+  /** `user@machine` this view names as this machine (heartbeat line, facts); default `machineHolder`.
+   *  Never decides whose a claim is: another checkout of the same user@machine holds its claims elsewhere. */
   holder?: string;
-  /** this machine's heartbeat id, also counted as `mine` */
+  /** this checkout's heartbeat id, whose claims count as `mine`; default the recorded one
+   *  (`recordedHeartbeatId`), null = none */
   heartbeatId?: string | null;
   /** what the configured runner can do; `open` makes Your turn show `norn story start` */
   runnerCapabilities?: RunnerCapabilities;
@@ -337,7 +340,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   for (const [list, alive] of [[leases.dead, false], [leases.live, true]] as const)
     for (const entry of list) if (entry.lease.run_id && entry.lease.kind !== "slot") leaseByRun.set(entry.lease.run_id, { entry, alive });
 
-  const me = { heartbeat_id: opts.heartbeatId ?? null };
+  // Read after bindNornHome: the recorded heartbeat lives in the bound machine dir
+  const me = { heartbeat_id: opts.heartbeatId !== undefined ? opts.heartbeatId : recordedHeartbeatId(opts.repoRoot) };
 
   const remoteName = config.git_remote;
   const baseRef = snap.base_ref;
@@ -360,8 +364,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
 
   local.stories.forEach((ls, i) => {
     const story = ls.snapshot;
-    let claim = classifyClaim(claims[i] ?? { state: "none" }, me, now);
-    if (claim.state === "other" && claim.blob.holder === holder) claim = { ...claim, state: "mine" };
+    const claim = classifyClaim(claims[i] ?? { state: "none" }, me, now);
     const finished = isClosedStatus(story.frontmatter?.status);
 
     const units: UnitFacts[] = ls.units.map((lu) => unitFacts(lu, lu.hooks, leaseByRun));
@@ -459,7 +462,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     repo: { root: opts.repoRoot, default_branch: defaultBranch, remote: config.git_remote },
     machine: {
       holder,
-      heartbeat_id: opts.heartbeatId ?? null,
+      heartbeat_id: me.heartbeat_id,
       runner,
       ...(runner && opts.runnerCapabilities ? { runner_capabilities: { ...opts.runnerCapabilities } } : {}),
       leases: leases.live.map((e) => e.lease),
@@ -472,6 +475,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     ...(local.snapshot.base_run_state.length ? { base_run_state: local.snapshot.base_run_state } : {}),
     // Records set aside as superseded (loadLocalFacts, as observe)
     ...(local.superseded.length ? { superseded: local.superseded } : {}),
+    ...(local.owed_records.length ? { owed_records: local.owed_records } : {}),
     orphans: { worktrees: [], branches: [] },
   };
   // Is this checkout's heartbeat down while it holds auto work?

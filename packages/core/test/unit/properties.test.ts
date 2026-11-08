@@ -260,14 +260,11 @@ function expectCounters(st: UnitState, wf: Workflow): void {
 }
 
 function expectWellFormed(st: UnitState): void {
+  // The strict union: each status with only the park, run and cursor legal in it
   const v = validate("state", st);
   if (!v.ok) throw new Error(`state fails its schema: ${JSON.stringify(v.errors)}\n${JSON.stringify(st)}`);
-  const parkedLike = st.status === "parked" || st.status === "stuck";
-  if (parkedLike !== (st.park !== null)) throw new Error(`status ${st.status} with park ${JSON.stringify(st.park)}`);
-  // A finished story whose issue changed (closed, unassigned) is parked `remote` at `$done`
-  const remoteAtDone = st.step === "$done" && st.status === "stuck" && st.park?.kind === "remote";
-  if ((st.step === "$done") !== (st.status === "done") && !remoteAtDone) throw new Error(`step ${st.step} with status ${st.status}`);
-  if (st.status === "running" && !st.run) throw new Error(`running without a run: ${JSON.stringify(st.last_outcome)}`);
+  // What the discriminator cannot say: stuck at `$done` is only a finished round held for its PR or its workflow
+  if (st.status === "stuck" && st.step === "$done" && st.park.kind !== "remote" && st.park.kind !== "workflow") throw new Error(`stuck at $done on ${st.park.kind}`);
 }
 
 interface Episode {

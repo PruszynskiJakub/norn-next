@@ -26,7 +26,7 @@ import {
   validate,
 } from "@norn/schema";
 import { appendDurable, atomicWrite, isErrno, readText, safeUnlink } from "./fsx.ts";
-import { HOOKS_DIR, hookFilePath, hooksDir, machineDir } from "./paths.ts";
+import { HOOKS_DIR, hookFilePath, hooksDir, machineDir, STOP_BLOCKS_DIR } from "./paths.ts";
 import { machineRunsDir } from "./run-state.ts";
 
 function eventTime(ev: TraceEvent): string {
@@ -474,7 +474,7 @@ export function listHookFiles(root: string): HookFileEntry[] {
 }
 
 /**
- * One run's side files: its `briefings/<run>/` and `transcripts/<run>/`, and the session log an
+ * One run's side files: its `briefings/<run>/`, `stop-blocks/<run>/` and `transcripts/<run>/`, and the session log an
  * older norn's headless runner wrote at `runs/<run>.log`, their size and newest write.
  */
 export interface RunTraceEntry {
@@ -486,10 +486,10 @@ export interface RunTraceEntry {
   newestMs: number;
 }
 
-/** The runs that have briefings, transcripts or an old session log, sorted by run id. */
+/** The runs that have briefings, refused turn ends, transcripts or an old session log, sorted by run id. */
 export function listRunTraces(root: string): RunTraceEntry[] {
   const runs = new Map<string, RunTraceEntry>();
-  for (const kind of ["briefings", "transcripts"]) {
+  for (const kind of ["briefings", STOP_BLOCKS_DIR, "transcripts"]) {
     for (const run of listDir(join(machineDir(root), kind))) {
       const dir = join(machineDir(root), kind, run);
       const st = statOrNull(dir);

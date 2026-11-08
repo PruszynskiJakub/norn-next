@@ -201,7 +201,7 @@ export interface SliceFileFacts {
 export type ClaimState =
   /** no claim ref */
   | { state: "none" }
-  /** held by this heartbeat (or this machine's heartbeat_id), not expired */
+  /** held by this checkout's heartbeat, not expired */
   | { state: "mine"; blob: ClaimBlob; sha: string }
   /** held by someone else, not expired */
   | { state: "other"; blob: ClaimBlob; sha: string }
@@ -241,6 +241,20 @@ export interface LocalRecord {
    * story's record ref here: everything in it is on the ref, as after a clean release
    */
   on_ref: boolean;
+}
+
+/** A merged story's base-branch done record norn stopped retrying (`records.json`), because the base kept refusing it. */
+export interface OwedRecord {
+  story: string;
+  spec_dir: string;
+  /** attempts the base refused */
+  refusals: number;
+  /** why the last attempt failed */
+  reason: string;
+  /** ISO time of the last attempt */
+  attempted_at: string;
+  /** ISO time norn stopped retrying */
+  stopped_at: string;
 }
 
 /** A record this checkout set aside as superseded, `<machine dir>/superseded/<name>/`. */
@@ -456,6 +470,8 @@ export interface Facts {
   base_run_state?: string[];
   /** Records this checkout set aside as superseded, by name. Absent = none. */
   superseded?: SupersededRecord[];
+  /** Merged stories whose base-branch done record norn stopped retrying (records.json). Absent = none. */
+  owed_records?: OwedRecord[];
   /** worktrees/branches with no matching unit */
   orphans: { worktrees: string[]; branches: string[] };
   /**

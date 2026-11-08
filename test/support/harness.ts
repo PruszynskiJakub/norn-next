@@ -153,7 +153,7 @@ export class FakeRunner implements RunnerPort {
   doctor: ReturnType<typeof Bun.spawn> | null = null;
   sent: Array<{ session: SessionRef; text: string }> = [];
   killed: SessionRef[] = [];
-  pane: PaneState = { alive: true, state: "working", since: null };
+  pane: PaneState = { alive: true, state: "working" };
   /** set → `send` throws it */
   sendError: Error | null = null;
   /** Sessions `findSessions` reports */

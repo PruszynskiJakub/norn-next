@@ -1,7 +1,7 @@
 /** act: unit and story lifecycle — start, done, rejected receipts, claims, intake, mirror, merged clean-up and base records. */
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import { cmd, type Action, type ActionResult, nornTrailers, type UnitRef, type WorktreeSpec } from "@norn/core";
+import { cmd, type Action, type ActionResult, nornTrailers, recordOnBase, recordRetryDue, recordStopsAt, type UnitRef, type WorktreeSpec } from "@norn/core";
 import { type ClaimBlob, HANDOFFS_DIR, parseDuration, recordRef, ROUNDS_DIR, RUNS_DIR, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
@@ -100,9 +100,9 @@ export async function startUnit(act: ActEnv, a: Extract<Action, { kind: "start_u
   });
   act.writeReceipts(loc, a.receipts);
   if (a.state) act.writeUnitState(a.unit, runsDir, a.state);
-  if (a.unit.slice === null) {
-    const r = patchStoryFile(storyFile(join(wtPath, story.spec_dir)), { status: "active" }, wtPath);
-    detail.story_status = r.ok ? "active" : r.reason;
+  if (a.story_status) {
+    const r = patchStoryFile(storyFile(join(wtPath, story.spec_dir)), { status: a.story_status }, wtPath);
+    detail.story_status = r.ok ? a.story_status : r.reason;
   }
   detail.commit = await act.commit(a.commit, a.unit, a.state);
   return { ok: true, detail };
@@ -334,8 +334,8 @@ export async function closeClosedIssueStory(act: ActEnv, a: Extract<Action, { ki
 }
 
 /** One attempt at a base-branch done record; keeps it in `records.json` until it lands (idempotent: `unchanged` counts). */
-async function record(act: ActEnv, p: PendingRecord): Promise<RecordResult | { state: "failed"; reason: string }> {
-  const res = await markStoryOnBase({
+async function record(act: ActEnv, p: PendingRecord): Promise<RecordResult & { stopped?: true }> {
+  const res: RecordResult = await markStoryOnBase({
     root: act.root,
     remote: act.obs.remote,
     git: act.git,
@@ -345,22 +345,42 @@ async function record(act: ActEnv, p: PendingRecord): Promise<RecordResult | { s
     status: p.status,
     trailers: { "Norn-Story": p.story, "Norn-Tick": act.tick },
     ...(p.merge ? { merge: p.merge } : {}),
-  }).catch((e: Error) => ({ state: "failed" as const, reason: e.message }));
+  }).catch((e: Error) => ({ state: "failed" as const, branch: act.obs.facts.repo.default_branch, reason: e.message, kind: "waiting" as const }));
   const rest = readPendingRecords(act.root).filter((r) => r.story !== p.story);
-  if (res.state === "deferred" || res.state === "failed") rest.push({ ...p, attempted_at: act.ctx.clock.now(), attempts: p.attempts + 1, reason: res.reason });
+  let stopped = false;
+  if (res.state === "deferred" || res.state === "failed") {
+    const refusals = (p.refusals ?? 0) + (res.kind === "refused" ? 1 : 0);
+    const now = act.ctx.clock.now();
+    const stopped_at = recordStopsAt(refusals, p.stopped_at, now);
+    stopped = stopped_at !== undefined && p.stopped_at === undefined;
+    rest.push({ ...p, attempted_at: now, attempts: p.attempts + 1, reason: res.reason, ...(refusals ? { refusals } : {}), ...(stopped_at !== undefined ? { stopped_at } : {}) });
+  }
   writePendingRecords(act.root, rest);
-  return res;
+  return stopped ? { ...res, stopped: true } : res;
 }
 
-/** Retry owed base-branch records, at most once per `remote.sync_interval` each. */
-export async function retryRecords(act: ActEnv): Promise<Array<{ story: string; state: string; reason?: string }>> {
+export type RecordRetry = { story: string; state: string; reason?: string; stopped?: true };
+
+/**
+ * Retry owed base-branch records, at most once per `remote.sync_interval` each, until the base
+ * refuses RECORD_REFUSALS times; a record the base already reads closed is dropped without a push.
+ */
+export async function retryRecords(act: ActEnv): Promise<RecordRetry[]> {
   const every = parseDuration(act.config.sync_interval);
   const now = act.ctx.clock.now();
-  const out: Array<{ story: string; state: string; reason?: string }> = [];
+  const out: RecordRetry[] = [];
   for (const p of readPendingRecords(act.root)) {
-    if (now - p.attempted_at < every) continue;
+    // before the throttle and for stopped records too: a landed PR or another checkout's record
+    // clears it from facts already observed, with no fetch and no push
+    const story = act.obs.facts.stories.find((s) => s.key === p.story);
+    if (recordOnBase(story, !act.obs.remote)) {
+      writePendingRecords(act.root, readPendingRecords(act.root).filter((r) => r.story !== p.story));
+      out.push({ story: p.story, state: "unchanged" });
+      continue;
+    }
+    if (!recordRetryDue(p, now, every)) continue;
     const r = await record(act, p);
-    out.push({ story: p.story, state: r.state, ...("reason" in r ? { reason: r.reason } : {}) });
+    out.push({ story: p.story, state: r.state, ...("reason" in r ? { reason: r.reason } : {}), ...(r.stopped ? { stopped: true as const } : {}) });
   }
   return out;
 }

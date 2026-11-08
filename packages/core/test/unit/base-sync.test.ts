@@ -9,7 +9,7 @@ import type { Action, Decision } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { renderBrief } from "../../src/brief.ts";
 import { decide } from "../../src/decide/index.ts";
-import { mergedIntoBase } from "../../src/policy.ts";
+import { storyMerged, storyPhase } from "../../src/policy.ts";
 import type { NumberedReceipt, StoryBase, StoryFacts } from "../../src/facts.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
 import { baseUpdateStep, checkWorkflowLevel, isStale, validateWorkflowDefinition } from "../../src/workflow.ts";
@@ -294,15 +294,15 @@ describe("base sync replay", () => {
     s.base = base({ behind: 5 });
     expect(buildInbox(s.facts(), CONFIG).groups.your_turn[0]).toMatchObject({ command: "gh pr merge 7", detail: "https://github.com/o/r/pull/7 · behind main by 5" });
     // running: refused
-    const running = { ...s.state, step: "update", status: "running" as const };
+    const running = { ...s.state, step: "update", status: "running" as const } as UnitState;
     expect(apply(running).rejected[0]?.reason).toContain("update needs it done, at a gate, stuck or held by drifted skills");
     // Ready at an agent step — only when the receipt names the drifted skills that held it
-    const held = { ...s.state, step: "resolve", status: "ready" as const };
+    const held = { ...s.state, step: "resolve", status: "ready" as const } as UnitState;
     expect(apply(held).rejected[0]?.reason).toContain("update needs it done");
     expect(apply(held, { skills_drift: ["norn"] } as Partial<Receipt>).state).toMatchObject({ step: "update", status: "ready" });
-    expect(apply({ ...held, step: "test" }, { skills_drift: ["norn"] } as Partial<Receipt>).rejected[0]?.reason).toContain("update needs it done");
+    expect(apply({ ...held, step: "test" } as UnitState, { skills_drift: ["norn"] } as Partial<Receipt>).rejected[0]?.reason).toContain("update needs it done");
     // stuck
-    expect(apply({ ...running, status: "stuck", park: { kind: "stuck", reason: "x", since: at() } }).state).toMatchObject({ step: "update", status: "ready", park: null });
+    expect(apply({ ...running, status: "stuck", park: { kind: "stuck", reason: "x", since: at() } } as UnitState).state).toMatchObject({ step: "update", status: "ready", park: null });
   });
 
   test("7 (core): update stuck (dirty worktree, diverged branch) → $stuck with the reason", () => {
@@ -333,12 +333,12 @@ describe("base sync replay", () => {
     expect(d.rule).toBe("remote.park");
     expect(d.action).toMatchObject({ kind: "park", commit: { message: "norn: gh-1 stuck (remote: PR merged into release, not main)" } });
     expect(s.state.park).toMatchObject({ kind: "remote", reason: "remote: PR merged into release, not main" });
-    expect(mergedIntoBase(s.facts().stories[0] as StoryFacts, "main")).toBe(false);
-    expect(mergedIntoBase({ ...(s.facts().stories[0] as StoryFacts), pr: { ...s.pr, base_branch: "main" } }, "main")).toBe(true);
+    expect(storyMerged(storyPhase(s.facts().stories[0] as StoryFacts, "main"))).toBeNull();
+    expect(storyMerged(storyPhase({ ...(s.facts().stories[0] as StoryFacts), pr: { ...s.pr, base_branch: "main" } }, "main"))).toBe("pr");
     // a PR cached by an older norn names its target only as `base`: still read (until 0.11.0)
     const legacy = (target: string): StoryFacts["pr"] => ({ number: 7, url: "u", state: "merged", is_draft: false, head_sha: SHA("h"), base: target });
-    expect(mergedIntoBase({ ...(s.facts().stories[0] as StoryFacts), pr: legacy("release") }, "main")).toBe(false);
-    expect(mergedIntoBase({ ...(s.facts().stories[0] as StoryFacts), pr: legacy("main") }, "main")).toBe(true);
+    expect(storyMerged(storyPhase({ ...(s.facts().stories[0] as StoryFacts), pr: legacy("release") }, "main"))).toBeNull();
+    expect(storyMerged(storyPhase({ ...(s.facts().stories[0] as StoryFacts), pr: legacy("main") }, "main"))).toBe("pr");
     // an open PR on the wrong base is a Check item (retarget)
     s.pr = { ...s.pr, state: "open" };
     expect(buildInbox(s.facts(), CONFIG).groups.check.map((i) => i.id)).toContain("retarget:gh-1:7:release");
@@ -388,7 +388,7 @@ describe("base sync replay", () => {
     const s = run(wf);
     expect(s.state).toMatchObject({ step: "ready", status: "parked", counters: { base_conflict_loop: 0, stale_loop: 3 } });
     // journaled: every clean update after a conflict carries the reset in its advance (trace, commit, handoff line)
-    const res = applyReceipts({ ...s.state, step: "update", status: "running", counters: { base_conflict_loop: 1, stale_loop: 0 } }, [{ n: s.state.applied_through + 1, file: "", receipt: { kind: "classify", receipt_id: deriveUlid("01JGGGGGGGGGGGGGGGGGGGGGGG", 1), run_id: null, step: "update", attempt: s.state.attempt, at: at(), by: "norn", outcome: "done", rule: "git.update", route: "test" } }], { workflow: wf, now: at() });
+    const res = applyReceipts({ ...s.state, step: "update", status: "running", counters: { base_conflict_loop: 1, stale_loop: 0 } } as UnitState, [{ n: s.state.applied_through + 1, file: "", receipt: { kind: "classify", receipt_id: deriveUlid("01JGGGGGGGGGGGGGGGGGGGGGGG", 1), run_id: null, step: "update", attempt: s.state.attempt, at: at(), by: "norn", outcome: "done", rule: "git.update", route: "test" } }], { workflow: wf, now: at() });
     expect(res.advance).toEqual({ from: "update", outcome: "done", to: "test", reset: ["base_conflict_loop"] });
     expect(res.log.at(-1)).toContain("(reset base_conflict_loop)");
     // a repeated conflict on one base move still exhausts it

@@ -81,12 +81,12 @@ describe("a person's stuck at the cursor of a running unit (B51, D4)", () => {
     await tick();
     expect(h.state(runs5())).toMatchObject({ step: "implement", attempt: 1, status: "stuck", park: { kind: "stuck", reason: "cancelled by person" } });
     // past the stalled window and the deadline, with the pane gone: still stuck, nothing typed or started
-    h.runner.pane = { alive: false, state: "done", since: null };
+    h.runner.pane = { alive: false, state: "done" };
     for (let i = 0; i < 3; i++) {
       h.clock.advance(2 * 60 * 60_000);
       await h.tick();
     }
-    h.runner.pane = { alive: true, state: "working", since: null };
+    h.runner.pane = { alive: true, state: "working" };
     expect(h.state(runs5())).toMatchObject({ step: "implement", attempt: 1, status: "stuck" });
     expect(h.runner.launches.filter((l) => l.cwd === wt5()).length).toBe(1);
     expect(h.runner.sent.filter((s) => s.session.session_id === session)).toEqual([]);

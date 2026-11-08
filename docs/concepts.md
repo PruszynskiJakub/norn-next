@@ -69,7 +69,7 @@ Three things decide where a person comes in:
 | Your turn | an attended step to start or to come back to, or a manual step that is ready |
 | Answer | an agent asked a question, or a permission prompt blocks it |
 | Approve | a gate waits for you |
-| Unblock | a step is stuck, an action failed, or a counter ran out |
+| Unblock | a step is stuck, an action failed, a counter ran out, or the base refused a merged story's done record |
 | Check | something to look at: a story that conflicts with its base, a PR to merge |
 | Unclaimed | a story no checkout drives |
 | Running | agent steps in progress, for reference |

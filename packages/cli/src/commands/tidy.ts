@@ -14,17 +14,20 @@
  *     (`--retain`, else `trace.retain`, default and minimum 14d); `trace/workflows/`
  *     is never pruned. Only tidy prunes the trace, never watch or a tick.
  *   - the hook files of units with no live run untouched within the window, and the
- *     briefings, transcripts and old `runs/<run_id>.log` session logs of runs that are not
+ *     briefings, refused turn ends (`stop-blocks/<run_id>/`), transcripts and old
+ *     `runs/<run_id>.log` session logs of runs that are not
  *     live whose newest file is older than the window;
  *     never a live run's, nor `backfill.json`, the caches or the locks.
  *   - rejected mailbox receipts (`rejected.json`) cleared and rejected before the window
+ *   - owed base-branch records norn stopped retrying whose story is gone from the base, and
+ *     their Unblock item with them
  * Nothing with unique work is removed; such items are listed under `kept` with the reason.
  */
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { deleteTraceDays, pruneRejectedReceipts, pruneSuperseded, rejectedReceiptsPath, deleteTracePaths, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore } from "@norn/store";
+import { deleteTraceDays, dropRecords, pruneRejectedReceipts, pruneSuperseded, rejectedReceiptsPath, deleteTracePaths, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
@@ -33,7 +36,7 @@ import { leaseLiveness } from "../runtime/leases.ts";
 import { type Observed, observe } from "../runtime/observe/index.ts";
 import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
 import { checkRetain, MIN_TRACE_RETAIN, retainCutoffDay, unitTracesBefore } from "../runtime/trace-retention.ts";
-import { cmd, storyFinished } from "@norn/core";
+import { cmd, recordPrunable, storyFinished, storyPhase } from "@norn/core";
 
 /** A reservation lives only while a receipt is being written; older ones are crash leftovers. */
 const RESERVE_STALE_MS = 60_000;
@@ -90,7 +93,7 @@ function retainWindow(ctx: Context, flag: string | undefined): { retain: string;
 export const tidyCommand = defineCommand({
   name: "tidy",
   version: "acts",
-  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations, Herdr panes of runs that reported done, and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain",
+  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations, Herdr panes of runs that reported done, stopped base-branch records whose story is gone, and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain",
   usage: "norn tidy [--dry-run] [--retain <duration>]",
   options: { "dry-run": { type: "boolean" }, retain: { type: "string" } },
   async run(ctx, args) {
@@ -175,20 +178,21 @@ export const tidyCommand = defineCommand({
       }
       // Cleared rejected mailbox receipts age out with the trace that also records them; an open
       // one (its Check item still shown: no answer or approval since, story not finished) stays
-      const open = new Set(obs.facts.stories.filter((s) => !storyFinished(s)).flatMap((s) => (s.rejected_mailbox ?? []).map((r) => r.receipt_id)));
+      const open = new Set(obs.facts.stories.filter((s) => !storyFinished(storyPhase(s, obs.facts.repo.default_branch))).flatMap((s) => (s.rejected_mailbox ?? []).map((r) => r.receipt_id)));
       // A rejected.json that cannot be pruned is one kept item; the rest of tidy goes on
       const pruned = await pruneRejectedReceipts(root, new Date(ctx.clock.now() - window.ms).toISOString(), open, dry);
       if (pruned.error) kept.push({ item: rejectedReceiptsPath(root), reason: pruned.error });
       const rejected = pruned.removed.map((r) => r.receipt_id);
       // Records set aside as superseded go once older than the window; their Check item with them
       const superseded = pruneSuperseded(root, new Date(ctx.clock.now() - window.ms).toISOString(), dry).map((c) => c.name);
+      const owed = dropRecords(root, (r) => !recordPrunable(r, obs.facts.stories), dry).map((r) => r.story);
       const bytes = [...days, ...hook_files, ...runs].reduce((n, d) => n + d.bytes, 0);
       const trace = { retain: window.retain, days, hook_files, runs, bytes };
 
       const verb = dry ? "would_remove" : "removed";
       return {
         dry_run: dry,
-        [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves, rejected_receipts: rejected, superseded, ...(herdrClosed ? { herdr: herdrClosed } : {}) },
+        [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves, rejected_receipts: rejected, superseded, ...(owed.length ? { owed_records: owed } : {}), ...(herdrClosed ? { herdr: herdrClosed } : {}) },
         trace,
         kept,
       };

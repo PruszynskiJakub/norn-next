@@ -3,6 +3,7 @@ import {
   type AgentStep,
   parseDuration,
   type ReceiptOf,
+  type RunningState,
   type UnitState,
   type Workflow,
 } from "@norn/schema";
@@ -13,7 +14,9 @@ import type { NumberedReceipt, RunFacts, StoryFacts, UnitFacts } from "../facts.
 import { effectiveMode, firstLine, sessionStartedNoTurn, stepLimits, unitWorktree } from "../policy.ts";
 import { promptKeys } from "../prompt.ts";
 import type { RunnerCapabilities, SessionRef } from "../ports.ts";
+import { movedSince, paneLeftPrompt, sessionActivity } from "../session.ts";
 import { epoch } from "../time.ts";
+import { toReady } from "../unit-state.ts";
 import { stepOf } from "../workflow.ts";
 import { applyCtx, commitFor, type Ctx, emitApplied, endedWith, nextReceiptNumber, nornReceipt, synth, unitItem } from "./receipts.ts";
 
@@ -52,7 +55,7 @@ export function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Unit
         if (!resumed) return ctx.noop(uf.unit, "answer.resume.queued", `answer waits: max_agents ${ctx.config.max_agents} in use`);
         extra.push(resumed.receipt);
         ({ state, launch } = resumed);
-      } else state = { ...res.state, status: "ready", run: null };
+      } else state = toReady(res.state);
     }
   }
   // `story edit --at` / `run rerun` re-enter a step: the old run's session must not keep working
@@ -192,11 +195,10 @@ function resumeLaunch(
 }
 
 /** Classification of a live agent run from facts. */
-export function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, step: AgentStep): void {
+export function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: RunningState, wf: Workflow, step: AgentStep): void {
   const ref = uf.unit;
   const run = st.run;
   const rf = uf.run;
-  if (!run) return ctx.noop(ref, "agent.running.no_run", "running without a run record");
   if (!rf || rf.run_id !== run.run_id) return ctx.noop(ref, "agent.running.unobserved", `no facts for run ${run.run_id}`);
   const now = ctx.facts.now;
   const touched = Math.max(epoch(run.started_at), epoch(st.updated_at));
@@ -219,11 +221,14 @@ export function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Unit
   let detail: string | undefined;
   if (died) [outcome, rule, detail] = ["died", "agent.died", diedDetail(rf, now - epoch(run.started_at))];
   else if (!step.attended) {
-    const waiting = (rf.pane?.state === "waiting_input" && (rf.pane.since ?? touched + 1) > touched) || (lastHook && (lastHook.event === "waiting_input" || lastHook.event === "permission_prompt") && hookAt > touched);
+    const { hook, pane } = sessionActivity(rf);
+    // the pane reports a wait as it is now: a pane still waiting after the last state write is still
+    // waiting; a hook counts only when newer than that write
+    const waiting = pane?.kind === "waiting" || (hook.kind === "waiting" && hook.at > touched);
     const deadline = parseDuration(limits.deadline);
-    const turnEnded =
-      (lastHook && (lastHook.event === "turn_end" || lastHook.event === "session_end") && hookAt > touched) ||
-      ((rf.pane?.state === "idle" || rf.pane?.state === "done") && (rf.pane.since ?? 0) > touched);
+    // hooks alone end a turn: an idle pane carries no time, so it cannot be told apart from the
+    // moment right after a nudge, before the agent takes it up
+    const turnEnded = (hook.kind === "turn_ended" || hook.kind === "ended") && hook.at > touched;
     if (waiting) return parkOnImplicitAsk(ctx, story, uf, st, wf, rf, lastHook);
     // The agent session started but never took its launch prompt
     const launch = launchPromptCheck(ctx, story, uf, st, rf);
@@ -401,9 +406,6 @@ function parkOnImplicitAsk(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
   });
 }
 
-/** Hook events that are the agent waiting, not moving on. */
-const WAITING_EVENTS = new Set(["waiting_input", "permission_prompt"]);
-
 /**
  * Why an implicit ask is over, or null: the pane that raised it no longer waits for input, a
  * newer hook event for the run arrived (not another wait), or — handled by the agent verbs — the
@@ -415,8 +417,8 @@ export function implicitAskResolved(st: UnitState, uf: UnitFacts): string | null
   if (park?.kind !== "ask" || !park.implicit || !st.run || rf?.run_id !== st.run.run_id) return null;
   const since = epoch(park.since);
   const pane = rf.pane;
-  if (park.implicit === "pane" && pane?.alive && pane.state !== "waiting_input" && pane.state !== "unknown") return `the pane no longer waits for input (${pane.state})`;
-  const hook = rf.hooks.find((h) => epoch(h.at) > since && !WAITING_EVENTS.has(h.event));
+  if (park.implicit === "pane" && pane && paneLeftPrompt(pane)) return `the pane no longer waits for input (${pane.state})`;
+  const hook = movedSince(rf.hooks, since);
   return hook ? `hook ${hook.native} at ${hook.at}` : null;
 }
 
@@ -439,8 +441,8 @@ export const LAUNCH_PROMPT_MS = 60_000;
  * `run.prompt_resent_at`); 60 s after that re-send the run is `silent` ("launch prompt not
  * received"). Only for local sessions of a runner that can type; otherwise the usual rules.
  */
-function launchPromptCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, rf: RunFacts): "acted" | [string, string, string] | null {
-  const run = st.run as NonNullable<UnitState["run"]>;
+function launchPromptCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: RunningState, rf: RunFacts): "acted" | [string, string, string] | null {
+  const run = st.run;
   const start = sessionStartedNoTurn(rf);
   if (!start) return null;
   if (!run.session || foreignRun(ctx, run) || run.session.runner !== ctx.facts.machine.runner || !runnerCaps(ctx).send) return null;
@@ -448,7 +450,7 @@ function launchPromptCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
   const now = ctx.facts.now;
   if (!run.prompt_resent_at) {
     if (now - startedAt < LAUNCH_PROMPT_MS) return null;
-    const state: UnitState = { ...st, run: { ...run, prompt_resent_at: ctx.nowIso }, last_tick_id: ctx.facts.tick_id };
+    const state: RunningState = { ...st, run: { ...run, prompt_resent_at: ctx.nowIso }, last_tick_id: ctx.facts.tick_id };
     ctx.emit({
       kind: "nudge",
       unit: uf.unit,

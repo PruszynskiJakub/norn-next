@@ -4,7 +4,8 @@ import type { Decision } from "../../src/actions.ts";
 import { inboxChanges } from "../../src/inbox/history.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
 import { nextCommand, rerunWarning, startAgentCommand } from "../../src/commands.ts";
-import type { StoryFacts } from "../../src/facts.ts";
+import type { OwedRecord, StoryFacts } from "../../src/facts.ts";
+import { RECORD_REFUSALS, recordOnBase, recordPrunable, recordRetryDue, recordStopsAt } from "../../src/policy.ts";
 import type { RemotePullRequest } from "../../src/ports.ts";
 import { at, CONFIG, facts, numbered, receipt, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyFacts, storyUnit, T0, unitFacts } from "../fixtures.ts";
 
@@ -268,7 +269,7 @@ describe("inbox history", () => {
   const gate = stateFor(unit, SLICE_WF, { step: "human-qa", status: "parked", park: { kind: "gate", reason: "approve or reject human-qa", since: at(T0 - 60_000) } });
 
   test("items needing a person appear once with their since; running items are not tracked", () => {
-    const f = facts([storyFacts("gh-1", [unitFacts(unit, SLICE_WF, gate), unitFacts(sliceUnit("gh-1", "03", "c"), SLICE_WF, stateFor(sliceUnit("gh-1", "03", "c"), SLICE_WF, { status: "running" }))])]);
+    const f = facts([storyFacts("gh-1", [unitFacts(unit, SLICE_WF, gate), unitFacts(sliceUnit("gh-1", "03", "c"), SLICE_WF, stateFor(sliceUnit("gh-1", "03", "c"), SLICE_WF, { status: "running", run: { run_id: "01JDDDDDDDDDDDDDDDDDDDDDDD", step: "implement", attempt: 1, started_at: at(), how: "auto" } }))])]);
     const first = inboxChanges({}, buildInbox(f, CONFIG), f, []);
     expect(first.changes).toEqual([
       expect.objectContaining({ event: "appeared", id: "approve:gh-1/02:human-qa#1", group: "approve", slice: "gh-1/02", step: "human-qa", at: at(T0 - 60_000), command: "norn story approve gh-1/02" }),
@@ -412,5 +413,61 @@ describe("the way out of a run-out counter", () => {
   test("nudges, retries and other stuck reasons keep the plain rerun", () => {
     expect(nextCommand("gh-1/02", stuckOn())).toBe("norn run rerun gh-1/02");
     expect(nextCommand("gh-1/02", stuckOn(undefined, "stuck"))).toBe("norn run rerun gh-1/02");
+  });
+});
+
+describe("owed base records norn stopped retrying", () => {
+  const owed: OwedRecord = { story: "gh-7", spec_dir: ".agents/specs/gh-7-login", refusals: 3, reason: "push to main rejected (rejected): set status: done by hand", attempted_at: at(T0 - 60_000), stopped_at: at(T0 - 60_000) };
+  const done = (patch: Partial<StoryFacts>) => storyFacts("gh-7", [], { claim: { state: "none" }, ...patch });
+
+  test("one notified Unblock item per stopped record, pointing at norn sync", () => {
+    const inbox = buildInbox(facts([done({ base_status: "active" })], { owed_records: [owed] }), CONFIG);
+    const items = inbox.groups.unblock.filter((i) => i.id === "record_owed:gh-7");
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      story: "gh-7",
+      command: "norn sync",
+      since: owed.stopped_at,
+      url: "https://github.com/o/r/issues/7",
+      title: "gh-7 merged, but main refused its status: done record 3 times",
+    });
+    expect(items[0]?.detail).toStartWith("push to main rejected (rejected). norn stopped retrying");
+    expect(items[0]?.detail).toContain(".agents/specs/gh-7-login/spec.md on main");
+  });
+
+  test("no item without a stopped record, and none without a url when the story left facts", () => {
+    expect(buildInbox(facts([]), CONFIG).groups.unblock.some((i) => i.id.startsWith("record_owed:"))).toBe(false);
+    const [item] = buildInbox(facts([], { owed_records: [owed] }), CONFIG).groups.unblock;
+    expect(item?.id).toBe("record_owed:gh-7");
+    expect(item && "url" in item).toBe(false);
+  });
+
+  test("recordRetryDue: a stopped record is never due; a live one waits for the sync interval", () => {
+    expect(recordRetryDue({ attempted_at: T0 - 10 * 60_000, stopped_at: T0 - 10 * 60_000 }, T0, 5 * 60_000)).toBe(false);
+    expect(recordRetryDue({ attempted_at: T0 - 60_000 }, T0, 5 * 60_000)).toBe(false);
+    expect(recordRetryDue({ attempted_at: T0 - 5 * 60_000 }, T0, 5 * 60_000)).toBe(true);
+  });
+
+  test("recordStopsAt: unset below the bound, now at it, an earlier stop kept", () => {
+    expect(recordStopsAt(RECORD_REFUSALS - 1, undefined, T0)).toBeUndefined();
+    expect(recordStopsAt(RECORD_REFUSALS, undefined, T0)).toBe(T0);
+    expect(recordStopsAt(RECORD_REFUSALS + 1, T0 - 1, T0)).toBe(T0 - 1);
+  });
+
+  test("recordOnBase: the fetched base with a remote, the frontmatter solo", () => {
+    const fm = (status: "active" | "done") => ({ ...(storyFacts("gh-7", []).frontmatter as NonNullable<StoryFacts["frontmatter"]>), status });
+    expect(recordOnBase(done({ base_status: "done" }), false)).toBe(true);
+    expect(recordOnBase(done({ base_status: "dropped" }), false)).toBe(true);
+    expect(recordOnBase(done({ base_status: null, frontmatter: fm("done") }), false)).toBe(false);
+    expect(recordOnBase(done({ frontmatter: fm("done") }), true)).toBe(true);
+    expect(recordOnBase(done({ frontmatter: fm("active"), base_status: "done" }), true)).toBe(false);
+    expect(recordOnBase(undefined, false)).toBe(false);
+  });
+
+  test("recordPrunable: only a stopped record whose story is gone; never a record still retried", () => {
+    const present = [{ key: "gh-7" }];
+    expect(recordPrunable({ story: "gh-9", stopped_at: T0 }, present)).toBe(true);
+    expect(recordPrunable({ story: "gh-7", stopped_at: T0 }, present)).toBe(false);
+    expect(recordPrunable({ story: "gh-9" }, present)).toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { HookEventKind, HookFact, UnitState } from "@norn/schema";
+import type { HookEventKind, HookFact, UnitState, UnitStateRecord } from "@norn/schema";
 import type { RunFacts } from "../../src/facts.ts";
 import { attendedWaitSince, buildInbox } from "../../src/inbox/items.ts";
 import type { PaneState } from "../../src/ports.ts";
@@ -17,7 +17,7 @@ function runFacts(hooks: HookFact[], patch: Partial<RunFacts> = {}): RunFacts {
   return { run_id: RUN, session: null, process_alive: true, pane: null, hooks, last_hook_at: last ? Date.parse(last.at) : null, last_activity_at: null, transcript: null, ...patch };
 }
 
-function refining(run: RunFacts | null, patch: Partial<UnitState> = {}) {
+function refining(run: RunFacts | null, patch: Partial<UnitStateRecord> = {}) {
   const st = stateFor(STORY, STORY_WF, {
     status: "running",
     run: { run_id: RUN, step: "refine", attempt: 1, started_at: at(T0), how: "manual", agent: "claude", agent_session_id: "sess-1" },
@@ -48,10 +48,17 @@ describe("attended wait", () => {
     expect(attendedWaitSince(refining(runFacts([hook("turn_end", T0), hook("session_end", T0 + MIN)])))).toBeNull();
   });
 
-  test("with no hook since the last activity, a pane that went idle afterwards starts it", () => {
-    const pane: PaneState = { alive: true, state: "idle", since: T0 + 5 * MIN };
-    expect(attendedWaitSince(refining(runFacts([hook("tool_use", T0)], { pane })))).toBe(T0 + 5 * MIN);
-    expect(attendedWaitSince(refining(runFacts([hook("tool_use", T0 + 6 * MIN)], { pane })))).toBeNull();
+  test("a session end just before the trailing waits ends the wait; a started session is not waiting", () => {
+    expect(attendedWaitSince(refining(runFacts([hook("turn_end", T0), hook("session_end", T0 + MIN), hook("turn_end", T0 + 2 * MIN)])))).toBeNull();
+    expect(attendedWaitSince(refining(runFacts([hook("session_start", T0, "SessionStart")])))).toBeNull();
+    expect(attendedWaitSince(refining(runFacts([hook("session_start", T0, "SessionStart"), hook("turn_end", T0 + MIN)])))).toBe(T0 + MIN);
+  });
+
+  test("a pane with no waiting hook is not a wait", () => {
+    for (const state of ["idle", "done", "waiting_input"] as const) {
+      const pane: PaneState = { alive: true, state };
+      expect(attendedWaitSince(refining(runFacts([hook("tool_use", T0)], { pane })))).toBeNull();
+    }
   });
 
   test("unattended steps and other runs are not attended waits", () => {

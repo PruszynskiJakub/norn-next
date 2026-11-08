@@ -4,7 +4,7 @@
  * inbox item listing what a person checks, note items and their acknowledgement by `approve`.
  */
 import { describe, expect, test } from "bun:test";
-import { type AgentStep, type Criterion, type CriterionVerdict, deriveUlid, type Receipt, type UnitState, type Workflow } from "@norn/schema";
+import { type AgentStep, type Criterion, type CriterionVerdict, deriveUlid, type Receipt, type UnitState, type UnitStateRecord, type Workflow } from "@norn/schema";
 import type { Action } from "../../src/actions.ts";
 import { renderBrief } from "../../src/brief.ts";
 import { checkReport, openNotes, verdictCounts, worstVerdict } from "../../src/criteria.ts";
@@ -224,7 +224,7 @@ describe("the Notes group", () => {
   const slice = { story: "gh-1", slice: "gh-1/01", dir: "01-a", key: "gh-1/01" };
   const sliceNote = doneReceipt("pass", { criteria: [PASS("AC1"), PASS("AC2"), PASS("AC3")], notes: [{ text: "title length is measured after trimming" }, { text: "counted after trimming", criterion: "AC3" }] });
   /** the story unit at `storyStep`, the slice waiting at its human-qa gate with two notes of its own */
-  function withSliceNotes(storyPatch: Partial<UnitState>) {
+  function withSliceNotes(storyPatch: Partial<UnitStateRecord>) {
     const notes = openNotes([{ unit: "gh-1/01", receipts: [numbered(1, sliceNote)] }]);
     const storySt = stateFor(storyUnit(), QA_WF, storyPatch);
     const sliceSt = stateFor(slice, QA_WF, { step: "human-qa", status: "parked", park: { kind: "gate", reason: "check", since: at() } });
@@ -233,7 +233,7 @@ describe("the Notes group", () => {
   }
 
   test("a slice's two notes are Notes items, below Running, naming the story gate that clears them; they need no one", () => {
-    const inbox = withSliceNotes({ step: "qa", status: "running" });
+    const inbox = withSliceNotes({ step: "qa", status: "running", run: { run_id: "01JDDDDDDDDDDDDDDDDDDDDDDD", step: "qa", attempt: 1, started_at: at(), how: "auto" } });
     expect(INBOX_GROUPS.indexOf("notes")).toBe(INBOX_GROUPS.indexOf("running") + 1);
     expect(INBOX_GROUPS.at(-1)).toBe("recently_done");
     expect(inbox.groups.check).toEqual([]);
@@ -251,7 +251,7 @@ describe("the Notes group", () => {
   });
 
   test("a slice gate lists the slice's own open notes, saying they stay open", () => {
-    const gate = withSliceNotes({ step: "qa", status: "running" }).groups.approve.find((i) => i.slice === "gh-1/01");
+    const gate = withSliceNotes({ step: "qa", status: "running", run: { run_id: "01JDDDDDDDDDDDDDDDDDDDDDDD", step: "qa", attempt: 1, started_at: at(), how: "auto" } }).groups.approve.find((i) => i.slice === "gh-1/01");
     expect(gate?.detail).toContain("open notes (cleared by gh-1 ready approval): gh-1/01 qa: title length is measured after trimming; gh-1/01 qa (AC3): counted after trimming");
     expect(gate?.full).toContain("Open notes on this slice (cleared by gh-1 ready approval; approving this gate leaves them open):");
     expect(gate?.full).toContain(`- gh-1/01 qa (AC3): counted after trimming [note:${sliceNote.receipt_id}:2]`);

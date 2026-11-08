@@ -21,7 +21,7 @@ describe("headless runner (real processes)", () => {
     expect(session.process?.pid).toBeGreaterThan(0);
     expect(session.process?.pid_start).toBeTruthy();
     expect(await runner.isAlive(session)).toBe(true);
-    expect(await runner.paneState(session)).toEqual({ alive: true, state: "unknown", since: null });
+    expect(await runner.paneState(session)).toEqual({ alive: true, state: "unknown" });
 
     // same pid, different start time → not ours
     expect(await runner.isAlive({ ...session, process: { pid: session.process!.pid, pid_start: "Thu Jan 1 00:00:00 1970" } })).toBe(false);

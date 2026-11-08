@@ -468,7 +468,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     const before = h.git(["rev-parse", "HEAD"], wt());
     const pushed = h.git(["ls-remote", "origin", "refs/heads/gh-11-merge-safely"]).split("\t")[0];
     const prompt = herdr.parsePanePrompt(SCREEN);
-    h.runner.pane = { alive: true, state: "waiting_input", since: null, detail: SCREEN, ...(prompt ? { prompt } : {}) };
+    h.runner.pane = { alive: true, state: "waiting_input", detail: SCREEN, ...(prompt ? { prompt } : {}) };
     h.clock.advance(10_000);
     const t = await h.tick();
     expect(kinds(t)).toEqual(["gh-11 agent.ask.implicit"]);
@@ -511,7 +511,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     expect((await h.norn("story", "answer", "gh-11", "1")).exit).toBe(0);
     // the agent's note in its handoff is what norn's owed commit carries
     noteInHandoff(wt(), ".agents/specs/gh-11-merge-safely", "merged main; markers left in a.txt");
-    h.runner.pane = { alive: true, state: "working", since: null };
+    h.runner.pane = { alive: true, state: "working" };
     h.clock.advance(10_000);
     const held = await h.tick();
     expect(kinds(held)).toEqual([expect.stringMatching(/^gh-11 receipts\.apply FAILED .*held: conflict markers in a\.txt \(commit [0-9a-f]{12}\)/)]);
@@ -528,7 +528,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     expect(ok.value).toMatchObject({ base_merge: { sha: sibling, merge, head } });
     expect(h.git(["log", "-1", "--format=%P", merge], wt()).split(" ")).toHaveLength(2);
 
-    h.runner.pane = { alive: true, state: "working", since: null };
+    h.runner.pane = { alive: true, state: "working" };
     await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready");
     const why = (await h.norn("run", "view", "gh-11", "--why", "--transition", "resolve.done")).stdout;
     expect(why).toContain(`by merge commit ${merge}`);

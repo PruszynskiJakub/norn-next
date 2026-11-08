@@ -174,6 +174,8 @@ export interface StartUnitAction extends UnitBase, Transition {
   worktree: WorktreeSpec | null;
   /** frontmatter status change for a slice (planned → active) */
   slice_status: "active" | null;
+  /** the story's spec.md status to write (new → active); null for a slice, or when spec.md already says active */
+  story_status: "active" | null;
 }
 
 /**

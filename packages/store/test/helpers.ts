@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach } from "bun:test";
-import { type Receipt, type UnitState, ulid } from "@norn/schema";
+import { type Receipt, type UnitState, type UnitStateRecord, ulid } from "@norn/schema";
 import { sha256 } from "../src/index.ts";
 
 const dirs: string[] = [];
@@ -40,7 +40,7 @@ export function receipt(over: Record<string, unknown> = {}): Receipt {
   return { ...base, ...extra, ...over } as Receipt;
 }
 
-export function state(over: Partial<UnitState> = {}): UnitState {
+export function state(over: Partial<UnitStateRecord> = {}): UnitState {
   return {
     version: 1,
     story: "gh-12",
@@ -64,5 +64,5 @@ export function state(over: Partial<UnitState> = {}): UnitState {
     updated_at: AT,
     last_tick_id: null,
     ...over,
-  };
+  } as UnitState;
 }

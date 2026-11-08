@@ -91,7 +91,7 @@ async function untilRunning(h: Harness): Promise<UnitState> {
 /** The agent's pane shows the permission dialog; one tick parks the unit on it. */
 async function parkOnPrompt(h: Harness): Promise<UnitState> {
   const prompt = herdr.parsePanePrompt(SCREEN);
-  h.runner.pane = { alive: true, state: "waiting_input", since: null, detail: SCREEN, ...(prompt ? { prompt } : {}) };
+  h.runner.pane = { alive: true, state: "waiting_input", detail: SCREEN, ...(prompt ? { prompt } : {}) };
   h.clock.advance(10_000);
   expect(acted(await h.tick())).toEqual(["gh-9 agent.ask.implicit"]);
   const st = h.state(runs(h)) as UnitState;
@@ -133,7 +133,7 @@ describe("R6.1: the agent's report while parked on an implicit ask (acceptance 9
     const tail = receipts(h).slice(-2);
     expect(tail.map((x) => `${x.kind}:${x.by}`)).toEqual(["answer:agent", "done:agent"]);
     expect(tail[0]).toMatchObject({ answer: "the agent moved on: reported norn done done" });
-    h.runner.pane = { alive: true, state: "working", since: null };
+    h.runner.pane = { alive: true, state: "working" };
     h.clock.advance(10_000);
     const t = await h.tick();
     expect(acted(t)).toEqual(["gh-9 receipts.apply"]);
@@ -181,7 +181,7 @@ describe("R6.2/R6.3: norn answer types into the prompt (acceptance 9)", () => {
     expect(r.exit).toBe(0);
     expect(h.runner.keyed).toEqual([{ session: expect.objectContaining({ pane_id: "p-1" }), keys: [{ text: "3" }, { key: "enter" }] }]);
     expect(receipts(h).at(-1)).toMatchObject({ kind: "answer", by: "human", answer: "3", delivered: true });
-    h.runner.pane = { alive: true, state: "working", since: null };
+    h.runner.pane = { alive: true, state: "working" };
     h.clock.advance(10_000);
     const t = await h.tick();
     expect(acted(t)).toEqual(["gh-9 receipts.apply"]);
@@ -208,7 +208,7 @@ describe("B6: the agent's report after a person's `norn answer`, before the tick
     expect(r.value).toMatchObject({ ok: true, kind: "done" });
     expect(r.exit).toBe(0);
     expect(receipts(h).slice(-2).map((x) => `${x.kind}:${x.by}`)).toEqual(["answer:human", "done:agent"]);
-    h.runner.pane = { alive: true, state: "working", since: null };
+    h.runner.pane = { alive: true, state: "working" };
     h.clock.advance(10_000);
     expect(acted(await h.tick())).toEqual(["gh-9 receipts.apply"]);
     expect(h.state(runs(h))).toMatchObject({ step: "$done", status: "done" });
@@ -227,7 +227,7 @@ describe("B11: the tick and the agent resolve the same implicit ask", () => {
     await untilRunning(h);
     await parkOnPrompt(h);
     // the pane moved on, and while this tick observes it the agent reports
-    h.runner.pane = { alive: true, state: "working", since: null };
+    h.runner.pane = { alive: true, state: "working" };
     let report: Awaited<ReturnType<typeof runCli>> | null = null;
     h.runner.onPaneState = async () => {
       report = await runChecked(["done", "done", "--handoff", "fixed"], { ...h.deps, cwd: wt(h) });

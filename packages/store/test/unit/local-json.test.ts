@@ -8,6 +8,9 @@ import {
   readActFailures,
   readBaseFacts,
   readCockpitFile,
+  dropRecords,
+  owedRecords,
+  readPendingRecords,
   readHeartbeatFile,
   readLocalJson,
   readPrFacts,
@@ -86,5 +89,33 @@ describe("readLocalJson (BUG-4)", () => {
     const l = await acquireLock(path, { self: { pid: process.pid, pid_start: "me" }, liveness: async () => true });
     expect(l.ok).toBe(true);
     if (l.ok) expect(l.reclaimed?.holder.pid_start).toBe("unreadable");
+  });
+});
+
+describe("records.json: owed base-branch records", () => {
+  const T = Date.parse("2026-10-23T10:00:00.000Z");
+  const live = { story: "gh-1", spec_dir: ".agents/specs/gh-1-a", status: "done", attempted_at: T, attempts: 1, reason: "fetch main: offline" };
+  const stopped = { story: "gh-2", spec_dir: ".agents/specs/gh-2-b", status: "done", attempted_at: T, attempts: 4, reason: "push to main rejected (rejected)", refusals: 3, stopped_at: T + 1 };
+
+  test("a file written before refusals and stopped_at still reads; a new one reads its fields back", () => {
+    const r = repo();
+    put(r, "records.json", { records: [live, stopped] });
+    expect(readPendingRecords(r)).toEqual([live, stopped] as never);
+    expect(localEvents(r)).toEqual([]);
+  });
+
+  test("only stopped records are owed facts, their epochs as ISO", () => {
+    expect(owedRecords([live, stopped] as never)).toEqual([
+      { story: "gh-2", spec_dir: ".agents/specs/gh-2-b", refusals: 3, reason: stopped.reason, attempted_at: new Date(T).toISOString(), stopped_at: new Date(T + 1).toISOString() },
+    ]);
+  });
+
+  test("dropRecords keeps what keep accepts, and writes nothing when dry", () => {
+    const r = repo();
+    put(r, "records.json", { records: [live, stopped] });
+    expect(dropRecords(r, (x) => x.stopped_at === undefined, true).map((x) => x.story)).toEqual(["gh-2"]);
+    expect(readPendingRecords(r)).toHaveLength(2);
+    expect(dropRecords(r, (x) => x.stopped_at === undefined, false).map((x) => x.story)).toEqual(["gh-2"]);
+    expect(readPendingRecords(r).map((x) => x.story)).toEqual(["gh-1"]);
   });
 });
