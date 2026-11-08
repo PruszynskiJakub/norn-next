@@ -12,6 +12,7 @@ import { existsSync } from "node:fs";
 import {
   type ActFailure,
   type FileError,
+  hookActivity,
   hookWindowMs,
   type NumberedReceipt,
   openNotes,
@@ -251,7 +252,8 @@ function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, index: R
     step_runs = [...cursor.runs].map(([run_id, r]) => {
       const own = hooks.filter((h) => h.run_id === run_id);
       const last = own.at(-1);
-      return { run_id, last_hook_at: last ? Date.parse(last.at) : null, ended: r.died || last?.event === "session_end" };
+      // hooks only: a run ended when its agent reported it, never by what a pane shows
+      return { run_id, last_hook_at: last ? Date.parse(last.at) : null, ended: r.died || hookActivity(own).kind === "ended" };
     });
   }
   const failure = failures[u.unit.key];

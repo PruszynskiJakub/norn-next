@@ -4,6 +4,7 @@
  */
 import { BUILT_IN_LIMITS, HANDOFFS_DIR, isClosedStatus, type Mode, parseDuration, type ResolvedConfig, RUNS_DIR, SPECS_DIR, type Step, type UnitState, type Workflow } from "@norn/schema";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "./facts.ts";
+import { hookActivity } from "./session.ts";
 import { stepOf } from "./workflow.ts";
 
 /** The issue label that picks a story's workflow at intake (`norn:wf:<name>`); it follows the round after. */
@@ -129,9 +130,9 @@ export function heartbeatUp(facts: Facts, config: ResolvedConfig): boolean {
 
 /** The run's newest `session_start` hook when no turn came after it, else null. */
 export function sessionStartedNoTurn(rf: RunFacts): RunFacts["hooks"][number] | null {
-  const i = rf.hooks.findLastIndex((h) => h.event === "session_start");
-  if (i < 0 || rf.hooks.slice(i + 1).some((h) => h.event !== "session_start")) return null;
-  return rf.hooks[i] as RunFacts["hooks"][number];
+  // hooks only: a launch prompt is judged by what the agent reported, never by the pane
+  const h = hookActivity(rf.hooks);
+  return h.kind === "starting" ? h.last : null;
 }
 
 /** The first non-blank line of a text, trimmed (a pending command shown in one line). */

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type AgentStep, type LeaseFile, roundRecordPath, type UnitState, type Workflow } from "@norn/schema";
+import { type AgentStep, type HookEventKind, type LeaseFile, roundRecordPath, type UnitState, type Workflow } from "@norn/schema";
 import { type Action, legacyAction } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { decide, isSideAction, unitDecision } from "../../src/decide/index.ts";
@@ -226,6 +226,19 @@ describe("classification", () => {
   });
   test("an idle pane alone never ends a turn", () => {
     expect(kinds(facts([solo(running(), { pane: { alive: true, state: "idle" } })]))).toEqual(["gh-1 noop agent.running"]);
+  });
+  test("hook and pane are judged apart: a hook counts only when newer than the last state write; a blocked pane parks as it is now", () => {
+    const old = (event: HookEventKind) => ({ hooks: [{ event, at: at(T0 - 90_000), agent: "claude", native: "Notification", cwd: "/w" }] });
+    const fresh = (event: HookEventKind) => ({ hooks: [{ event, at: at(T0 - 1000), agent: "claude", native: "Stop", cwd: "/w" }] });
+    const idle = { pane: { alive: true, state: "idle" as const } };
+    const blocked = { pane: { alive: true, state: "waiting_input" as const } };
+    // a wait or session end from before the last state write, with an idle pane, ends no turn
+    expect(kinds(facts([solo(running(), { ...old("permission_prompt"), ...idle })]))).toEqual(["gh-1 noop agent.running"]);
+    expect(kinds(facts([solo(running(), { ...old("session_end"), ...idle })]))).toEqual(["gh-1 noop agent.running"]);
+    // the same wait, fresh, parks with the idle pane beside it
+    expect(only(facts([solo(running(), { ...fresh("permission_prompt"), ...idle })]))).toMatchObject({ kind: "park", rule: "agent.ask.implicit" });
+    // a blocked pane parks whatever the hooks say, fresh or stale
+    for (const hooks of [old("session_end"), fresh("turn_end"), fresh("session_end")]) expect(only(facts([solo(running(), { ...hooks, ...blocked })]))).toMatchObject({ kind: "park", rule: "agent.ask.implicit" });
   });
   test("died → retry_fresh with a new launch and started receipt", () => {
     const a = only(facts([solo(running(), { process_alive: false })]));

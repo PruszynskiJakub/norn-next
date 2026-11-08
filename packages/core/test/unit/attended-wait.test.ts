@@ -48,6 +48,12 @@ describe("attended wait", () => {
     expect(attendedWaitSince(refining(runFacts([hook("turn_end", T0), hook("session_end", T0 + MIN)])))).toBeNull();
   });
 
+  test("a session end just before the trailing waits ends the wait; a started session is not waiting", () => {
+    expect(attendedWaitSince(refining(runFacts([hook("turn_end", T0), hook("session_end", T0 + MIN), hook("turn_end", T0 + 2 * MIN)])))).toBeNull();
+    expect(attendedWaitSince(refining(runFacts([hook("session_start", T0, "SessionStart")])))).toBeNull();
+    expect(attendedWaitSince(refining(runFacts([hook("session_start", T0, "SessionStart"), hook("turn_end", T0 + MIN)])))).toBe(T0 + MIN);
+  });
+
   test("a pane with no waiting hook is not a wait", () => {
     for (const state of ["idle", "done", "waiting_input"] as const) {
       const pane: PaneState = { alive: true, state };

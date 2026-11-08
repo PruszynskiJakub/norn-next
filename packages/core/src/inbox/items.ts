@@ -14,6 +14,7 @@ import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from ".
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, skillsDiffer, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
+import { hookActivity } from "../session.ts";
 import { isParked } from "../verbs.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -553,14 +554,13 @@ function retargetItem(story: StoryFacts, base: string): InboxItem | null {
   };
 }
 
-/** Hook events after which an attended agent waits for its person. */
-const WAITING_HOOKS = new Set(["turn_end", "waiting_input", "permission_prompt"]);
-
 /**
  * When the attended agent of the unit's current run started waiting for its person (ms epoch),
- * or null while it works, is gone, or the step is not attended. The wait starts at the first of the
- * run's trailing waiting hooks, so Claude's `idle_prompt` (~60 s after `Stop`) does not restart it.
- * The wait comes from hooks only: a pane carries no time of change to start it from.
+ * or null while it works, is gone, or the step is not attended. A turn end is the person's turn as
+ * much as a prompt is; the wait starts at the first of the run's trailing waits and turn ends, so
+ * Claude's `idle_prompt` (~60 s after `Stop`) does not restart it, and a session that ended just
+ * before them waits for no one. The wait comes from hooks only: a pane carries no time of change
+ * to start it from.
  */
 export function attendedWaitSince(uf: UnitFacts): number | null {
   const st = uf.state;
@@ -569,16 +569,9 @@ export function attendedWaitSince(uf: UnitFacts): number | null {
   const step = uf.workflow ? stepOf(uf.workflow, st.step) : null;
   if (step?.type !== "agent" || !step.attended) return null;
   if (rf.process_alive === false || rf.pane?.alive === false) return null;
-  let since: number | null = null;
-  for (let i = rf.hooks.length - 1; i >= 0; i--) {
-    const h = rf.hooks[i];
-    if (!h || !WAITING_HOOKS.has(h.event)) {
-      if (h?.event === "session_end") return null;
-      break;
-    }
-    since = epoch(h.at);
-  }
-  return since;
+  const hook = hookActivity(rf.hooks);
+  if (hook.kind !== "waiting" && hook.kind !== "turn_ended") return null;
+  return hook.before === "ended" ? null : hook.idle_since;
 }
 
 /** Where the unit's current run lives (a worktree on disk, as decide requires), for front ends that look for its pane. */
