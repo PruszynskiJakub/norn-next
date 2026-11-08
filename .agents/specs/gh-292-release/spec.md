@@ -4,7 +4,7 @@ slug: release
 provider: gh
 number: 292
 url: https://github.com/PruszynskiJakub/norn-next/issues/292
-title: Release
+title: Release 0.28.0
 assignee: PruszynskiJakub
 labels:
   - norn
