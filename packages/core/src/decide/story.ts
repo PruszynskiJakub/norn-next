@@ -125,6 +125,7 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
     return ctx.emit({ kind: "round_migrate", unit: ref, rule: "round.migrate", from, to: roundRunStatePath(story, 1, su.state.workflow) });
   }
 
+  retitlePr(ctx, story, ref);
   if (!ctx.has(ref.key)) storyLifecycle(ctx, story, fm, su);
   if (!ctx.has(ref.key) && story.mailbox?.length) importMailbox(ctx, story);
 
@@ -324,6 +325,17 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
     });
   }
   if (story.issue) mirror(ctx, story, fm, su, story.issue);
+}
+
+/**
+ * An open PR takes the issue's title. The PR is observed only on a sync tick, with the issue,
+ * so the issue's title is compared, not the mirror, which that same tick may still be updating.
+ */
+function retitlePr(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
+  const pr = story.pr;
+  const title = story.issue?.title;
+  if (pr?.state !== "open" || pr.title === undefined || !title || pr.title === title) return;
+  ctx.emit({ kind: "retitle_pr", unit: ref, rule: "remote.pr_title", number: pr.number, title });
 }
 
 /** A slice that is neither integrated nor dropped (an unreadable file counts as unfinished). */

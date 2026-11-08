@@ -68,10 +68,8 @@ steps:
     type: gate
     prompt: >-
       Read the draft release PR: the proposed version and its reason, and the new CHANGELOG.md section.
-      Check the PR title reads `Release X.Y.Z` (edit it if a rework changed the version: open-pr sets
-      the title only when it opens the PR); the squash commit takes it. Approve to mark the release
-      finished (a person merges the PR; CI then tags and publishes), or reject with the version or
-      changelog changes you want.
+      Approve to mark the release finished (a person merges the PR; CI then tags and publishes), or
+      reject with the version or changelog changes you want.
     outcomes:
       approve: $done
       reject:  { to: prepare, counter: ready_loop }

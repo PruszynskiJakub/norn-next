@@ -246,6 +246,13 @@ export async function mirror(act: ActEnv, a: Extract<Action, { kind: "update_sto
   return { ok: true, detail: await act.commit(a.commit, null, null) };
 }
 
+export async function retitlePr(act: ActEnv, a: Extract<Action, { kind: "retitle_pr" }>): Promise<ActionResult> {
+  const remote = act.obs.ports.remote;
+  if (!remote) throw new Error("no remote provider configured");
+  await remote.editPullRequestTitle(a.number, a.title);
+  return { ok: true, detail: { pr: a.number, title: a.title } };
+}
+
 /** The archive push (`pushHeldRecord`, the one closing and every claim release make too) before any cleanup; a failure says why the cleanup waits. */
 async function archiveRecord(act: ActEnv, key: string): Promise<{ archive: Record<string, unknown> } | { error: string; detail: Record<string, unknown> }> {
   const branch = act.obs.facts.stories.find((s) => s.key === key)?.branch ?? null;

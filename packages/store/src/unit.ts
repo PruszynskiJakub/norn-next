@@ -178,8 +178,3 @@ export function tidyHandoff(file: string): boolean {
   return true;
 }
 
-/** Replace the written part; an older norn's generated blocks go with it. */
-export function writeHandoffBody(file: string, body: string): Handoff {
-  atomicWrite(file, body);
-  return { header: "", heartbeat: [], body, raw: body };
-}

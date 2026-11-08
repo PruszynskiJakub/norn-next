@@ -14,7 +14,7 @@ const STATUS_END = "<!-- /norn:status -->";
  */
 export const HANDOFF_SECTIONS: ReadonlyArray<readonly [heading: string, holds: string]> = [
   ["Goal", "what this unit must achieve, in one or two lines"],
-  ["Done means", "each check that proves the goal, and what shows it: a test, a command, an evidence file"],
+  ["Proof", "each thing the goal needs, and what proves it: a named test, a command, an evidence file"],
   ["Easy to miss", "the rule or edge case the quick path would break"],
   ["Not proven yet", "what is still open or unverified"],
   ["Notes", "decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam"],

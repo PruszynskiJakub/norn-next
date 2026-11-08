@@ -36,7 +36,7 @@ async function unitHead(ctx: Context, t: Target): Promise<string | null> {
   return null;
 }
 
-/** Decide the gate: the receipt (a rejection's milestone in handoff.md follows it on every route). */
+/** Decide the gate: write the receipt; the next brief carries a rejection from it. */
 async function decideGate(ctx: Context, args: ParsedArgs, kind: "approve" | "reject") {
   const verb = `story ${kind}`;
   const d = delegation(ctx, args, verb);

@@ -9,6 +9,8 @@
  *   that story this tick, reporting each as `skipped: claim lost`. See decide's `isSideAction`.
  * - Side action: a story's `push_record` does not occupy its unit's one action either;
  *   act performs it after every other action of the tick (after the branch push).
+ * - Side action: a story's `retitle_pr` touches only the remote PR, so it does not occupy
+ *   its unit's one action either; act performs it after every other action of the tick.
  * - Decide is pure and replayable: it uses `facts.now` for every timestamp and
  *   `deriveUlid(facts.tick_id, i)` (from @norn/schema) for every new id (receipt_id, run_id).
  * - Every action is a plain JSON value (it is written to the trace verbatim).
@@ -356,6 +358,13 @@ export interface UpdateStoryMirrorAction extends UnitBase {
   commit: BoundaryCommit | null;
 }
 
+/** An open story PR whose title is not the issue's gets the issue's title; the squash commit takes it. */
+export interface RetitlePrAction extends UnitBase {
+  kind: "retitle_pr";
+  number: number;
+  title: string;
+}
+
 /** PR merged → story done; remove worktrees, branches, claim and mailbox refs. */
 export interface CleanupMergedStoryAction extends UnitBase {
   kind: "cleanup_merged_story";
@@ -519,6 +528,7 @@ export type UnitAction =
   | ClaimAction
   | NotifyAction
   | UpdateStoryMirrorAction
+  | RetitlePrAction
   | CleanupMergedStoryAction
   | CloseStoryAction
   | RoundMigrateAction
