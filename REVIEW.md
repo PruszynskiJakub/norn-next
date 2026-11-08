@@ -13,6 +13,16 @@ Generated or recorded, rewritten by a command, never by hand:
 
 Judge the change that made them move, not the files.
 
+## Sensitive paths
+
+A diff that touches any of these gets the security checklist:
+
+- `.github/workflows/`
+- `scripts/`
+- `packages/schema/src/`
+- `packages/store/`
+- `packages/cli/src/runtime/shim.ts`
+
 ## What counts as a failure
 
 - **A persisted format that breaks old records.** A schema in `packages/schema/src/` changed so that a `state.json`, receipt, trace, claim or config an older norn wrote no longer validates or reads the same.
