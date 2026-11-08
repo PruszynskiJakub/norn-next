@@ -448,6 +448,19 @@ describe("story lifecycle", () => {
     f.frontmatter = { ...f.frontmatter!, refined_body_hash: sha256("body") };
     expect(only(facts([f]))).toMatchObject({ kind: "update_story_mirror", fields: { title: "Login v2", body_hash: sha256("new body") }, notify: { title: "issue body changed since refine", group: "your_turn" } });
   });
+  test("an open PR whose title is not the issue's is retitled to it, alongside the unit's own action", () => {
+    const pr = { number: 7, url: "u", state: "open" as const, is_draft: true, head_sha: "", title: "Release", head: "gh-1-login", base_branch: "main", merged_at: null };
+    const retitles = (f: StoryFacts) => decide(facts([f]), WORKFLOWS, CONFIG).map((d) => d.action).filter((x) => x.kind === "retitle_pr");
+    expect(retitles(storyAt("ready", { pr }))).toEqual([{ kind: "retitle_pr", unit: storyUnit(), rule: "remote.pr_title", number: 7, title: "Login form" }]);
+    // the issue renamed since the last mirror: the same sync tick mirrors it and retitles the PR to it
+    const renamed = storyAt("ready", { pr });
+    renamed.issue = { ...renamed.issue!, title: "Release 0.22.0" };
+    expect(kinds(facts([renamed]))).toEqual(["gh-1 retitle_pr remote.pr_title", "gh-1 update_story_mirror remote.mirror"]);
+    expect(retitles(renamed)).toMatchObject([{ number: 7, title: "Release 0.22.0" }]);
+    // the title already matches, the PR is not open, a cache an older norn wrote has no title, or the issue is not observed: nothing
+    for (const f of [storyAt("ready", { pr: { ...pr, title: "Login form" } }), storyAt("ready", { pr: { ...pr, state: "closed" } }), storyAt("ready", { pr: { ...pr, title: undefined } }), storyAt("ready", { pr, issue: undefined })])
+      expect(retitles(f)).toEqual([]);
+  });
   test("S4: a mirror commit carries the story unit's step (commitFor); none before the story starts", () => {
     const f = storyAt("test");
     f.issue = { ...f.issue!, title: "Login v2" };

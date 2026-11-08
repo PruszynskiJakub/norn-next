@@ -111,7 +111,7 @@ describe("drifted skills in the inbox", () => {
     expect(items[0]).toMatchObject({
       story: "gh-1",
       step: "implement",
-      title: "skills differ from norn 0.19.0 (norn, norn-implement): runs use this worktree's copies until the base is merged in",
+      title: "skills differ from norn 0.19.0 (norn, norn-implement): runs use this worktree's copies until the base is merged in, or until this branch's edit to them is reverted",
       command: "norn story view gh-1",
     });
     expect(inbox.groups.unblock).toEqual([]);

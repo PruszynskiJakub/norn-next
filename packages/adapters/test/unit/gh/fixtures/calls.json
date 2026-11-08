@@ -73,9 +73,9 @@
    "--limit",
    "1",
    "--json",
-   "number,url,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy"
+   "number,url,title,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy"
   ],
-  "stdout": "[{\"baseRefName\": \"main\", \"headRefName\": \"gh-12-add-login-page\", \"isDraft\": false, \"mergedAt\": \"2026-10-22T08:00:00Z\", \"number\": 40, \"state\": \"MERGED\", \"url\": \"https://github.com/acme/app/pull/40\", \"headRefOid\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"mergeCommit\": {\"oid\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}, \"mergedBy\": {\"login\": \"jpruszynski\"}}]"
+  "stdout": "[{\"baseRefName\": \"main\", \"headRefName\": \"gh-12-add-login-page\", \"isDraft\": false, \"mergedAt\": \"2026-10-22T08:00:00Z\", \"number\": 40, \"title\": \"Add login page\", \"state\": \"MERGED\", \"url\": \"https://github.com/acme/app/pull/40\", \"headRefOid\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"mergeCommit\": {\"oid\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}, \"mergedBy\": {\"login\": \"jpruszynski\"}}]"
  },
  {
   "argv": [
@@ -89,7 +89,7 @@
    "--limit",
    "1",
    "--json",
-   "number,url,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy"
+   "number,url,title,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy"
   ],
   "stdout": "[]\n"
  },
@@ -118,9 +118,9 @@
    "view",
    "https://github.com/acme/app/pull/41",
    "--json",
-   "number,url,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy"
+   "number,url,title,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy"
   ],
-  "stdout": "{\"baseRefName\": \"main\", \"headRefName\": \"gh-15-fix-crash-on-save\", \"isDraft\": true, \"mergedAt\": null, \"number\": 41, \"state\": \"OPEN\", \"url\": \"https://github.com/acme/app/pull/41\", \"headRefOid\": \"cccccccccccccccccccccccccccccccccccccccc\", \"mergeCommit\": null, \"mergedBy\": null}"
+  "stdout": "{\"baseRefName\": \"main\", \"headRefName\": \"gh-15-fix-crash-on-save\", \"isDraft\": true, \"mergedAt\": null, \"number\": 41, \"title\": \"Fix crash on save\", \"state\": \"OPEN\", \"url\": \"https://github.com/acme/app/pull/41\", \"headRefOid\": \"cccccccccccccccccccccccccccccccccccccccc\", \"mergeCommit\": null, \"mergedBy\": null}"
  },
  {
   "argv": [
@@ -130,6 +130,17 @@
    "41",
    "--body",
    "## Summary\n\nSaves no longer crash.\n\nCloses #15"
+  ],
+  "stdout": "https://github.com/acme/app/pull/41\n"
+ },
+ {
+  "argv": [
+   "gh",
+   "pr",
+   "edit",
+   "41",
+   "--title",
+   "Fix crash on save 0.22.0"
   ],
   "stdout": "https://github.com/acme/app/pull/41\n"
  },

@@ -291,6 +291,8 @@ export interface RemotePullRequest {
   /** login of whoever merged it */
   merged_by?: string;
   merged_at?: string | null;
+  /** The PR's title; absent in a PR an older norn cached (`pr.json`) */
+  title?: string;
   /** head branch name */
   head?: string;
   /**
@@ -342,6 +344,8 @@ export interface RemotePort {
   openDraftPullRequest(opts: { head: string; base: string; title: string; body: string }): Promise<RemotePullRequest>;
   /** Replace the body of an open PR/MR */
   editPullRequestBody(number: number, body: string): Promise<void>;
+  /** Replace the title of an open PR/MR */
+  editPullRequestTitle(number: number, title: string): Promise<void>;
   /** Open an issue with these labels, assigned to `assignee` (a login) */
   createIssue(opts: { title: string; body: string; labels: string[]; assignee: string }): Promise<RemoteIssue>;
   /** The remote's new-issue page in the browser with `labels` filled in; creates nothing */

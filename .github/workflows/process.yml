@@ -4,6 +4,7 @@
 #   (a) head branch gh-<N>-<slug> and the PR closes #N;
 #   (b) PR labelled `bypass`, closes an issue labelled `bypass` that links another issue;
 #   (c) author dependabot[bot].
+# (a) and (b) refuse edits to .agents/skills/norn* outside a release PR (titled `Release X.Y.Z`).
 # pull_request_target, not pull_request: this workflow file and the script both come from the base
 # branch, so a PR cannot change the rule it is checked by. Safe because nothing from the PR runs:
 # the job checks out only the base commit, never the head, and its token is read-only.

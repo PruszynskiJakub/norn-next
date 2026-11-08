@@ -82,7 +82,7 @@ export class FakeRemote implements RemotePort {
   }
   async openDraftPullRequest(o: { head: string; base: string; title: string; body: string }) {
     this.calls.push(`pr+ ${o.head}`);
-    const pr: RemotePullRequest = { number: 100 + this.prs.length, url: `https://github.com/o/r/pull/${100 + this.prs.length}`, state: "open", is_draft: true, head_sha: "", head: o.head, base_branch: o.base, merged_at: null };
+    const pr: RemotePullRequest = { number: 100 + this.prs.length, url: `https://github.com/o/r/pull/${100 + this.prs.length}`, state: "open", is_draft: true, head_sha: "", title: o.title, head: o.head, base_branch: o.base, merged_at: null };
     this.prs.push(pr);
     this.bodies.set(pr.number, o.body);
     return pr;
@@ -90,6 +90,13 @@ export class FakeRemote implements RemotePort {
   async editPullRequestBody(n: number, body: string) {
     this.calls.push(`pr~ ${n}`);
     this.bodies.set(n, body);
+  }
+  /** set → `editPullRequestTitle` throws it, renaming nothing */
+  titleError: Error | null = null;
+  async editPullRequestTitle(n: number, title: string) {
+    this.calls.push(`pr title ${n}`);
+    if (this.titleError) throw this.titleError;
+    this.prs = this.prs.map((p) => (p.number === n ? { ...p, title } : p));
   }
   /** set → `createIssue` throws it */
   createError: Error | null = null;
