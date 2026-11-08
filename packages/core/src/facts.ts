@@ -201,7 +201,7 @@ export interface SliceFileFacts {
 export type ClaimState =
   /** no claim ref */
   | { state: "none" }
-  /** held by this heartbeat (or this machine's heartbeat_id), not expired */
+  /** held by this checkout's heartbeat, not expired */
   | { state: "mine"; blob: ClaimBlob; sha: string }
   /** held by someone else, not expired */
   | { state: "other"; blob: ClaimBlob; sha: string }

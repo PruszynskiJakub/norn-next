@@ -187,9 +187,9 @@ export function formatInbox(view: ProjectView, opts: { details?: boolean; home?:
     }
     out.push("");
   }
-  // Stories another machine holds, from local refs only
+  // Stories another checkout holds (this machine's or another's), from local refs only
   if (view.elsewhere?.length) {
-    out.push(`Held elsewhere (${view.elsewhere.length}) · on another machine`);
+    out.push(`Held elsewhere (${view.elsewhere.length}) · in another checkout`);
     for (const e of view.elsewhere) out.push(`  ${e.key.padEnd(10)} ${e.title} · ${elsewhereStanding(e)}`, `      $ ${cmd.storyView(e.key)}`);
     out.push("");
   }

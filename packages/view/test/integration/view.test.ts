@@ -8,6 +8,7 @@ import {
   appendHookTrace,
   appendReceipt,
   bindNornHome,
+  heartbeatId,
   appendTrace,
   leasesDir,
   machineDir,
@@ -157,8 +158,8 @@ async function seed() {
   mkdirSync(leasesDir(home), { recursive: true });
   writeFileSync(join(leasesDir(home), "agent-1.json"), JSON.stringify(lease));
 
-  // claim held by me
-  const blob: ClaimBlob = { version: 1, story: "gh-12", holder: "me@box", heartbeat_id: ulid(NOW), acquired_at: ago(100), renewed_at: ago(2), expires_at: ago(-8), last_tick_id: null };
+  // claim held by this checkout's heartbeat
+  const blob: ClaimBlob = { version: 1, story: "gh-12", holder: "me@box", heartbeat_id: heartbeatId(repo, NOW), acquired_at: ago(100), renewed_at: ago(2), expires_at: ago(-8), last_tick_id: null };
   const c = await acquireClaim(repo, null, blob, { now: NOW });
   if (!c.ok) throw new Error("claim");
   // the heartbeat is up: auto stories here wait on their runs, not on `norn watch`
@@ -280,11 +281,12 @@ describe("loadProjectView", () => {
     expect(t.errors.map((e) => e.file)).toEqual(["2026-10-22.jsonl:1"]);
   });
 
-  test("dead lease → alive false; claim by someone else hides the story from the inbox", async () => {
+  test("dead lease → alive false; a claim of another checkout, even of this user@machine, hides the story from the inbox", async () => {
     const { repo, home } = await seed();
-    const v = await loadProjectView({ repoRoot: repo, home, now: NOW, holder: "you@there", liveness: () => false, env: {} });
+    const v = await loadProjectView({ repoRoot: repo, home, now: NOW, holder: "me@box", heartbeatId: "01JFFFFFFFFFFFFFFFFFFFFFFF", liveness: () => false, env: {} });
     expect(v.runs[0]?.alive).toBe(false);
     expect(v.stories[0]?.claim.state).toBe("other");
+    expect(v.stories[0]?.claim.holder).toBe("me@box");
     expect(v.inbox.pending).toBe(0);
     expect(formatStatus(v)).toContain("held by me@box");
   });
@@ -348,7 +350,7 @@ describe("loadProjectView", () => {
     expect(v.stories[0]?.slices.map((s) => [s.key, s.status, s.park?.reason])).toEqual([["gh-7/01", "parked", "blocked"]]);
   });
 
-  test("the default holder is this machine's (machineHolder): its claims are mine", async () => {
+  test("by default the holder is machineHolder and the recorded heartbeat decides `mine`", async () => {
     const { repo, home } = await seed();
     const v = await loadProjectView({ repoRoot: repo, home, now: NOW, liveness: () => true, env: { USER: "me", NORN_MACHINE: "box" } });
     expect(v.holder).toBe("me@box");
