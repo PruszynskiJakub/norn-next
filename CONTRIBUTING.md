@@ -72,7 +72,7 @@ Only when norn cannot deliver the change (for example, a broken release blocks i
 3. Branch `bypass/<bypass issue>-<slug>` from `main`, make the change.
 4. Open a PR labelled `bypass` whose body says `Closes #<bypass issue>`.
 
-The CI process check passes a PR only if it comes from a story branch `gh-N-<slug>` and closes #N, or meets the bypass rules above, or is from Dependabot.
+The CI process check passes a PR only if it comes from a story branch `gh-N-<slug>` and closes #N, or meets the bypass rules above, or is from Dependabot. It also refuses a PR that edits the installed skill copies `.agents/skills/norn*` unless it is a release PR (titled `Release X.Y.Z`): edit the bundled source in `packages/cli/assets/skills/` instead.
 
 ## GitHub settings the repo relies on
 

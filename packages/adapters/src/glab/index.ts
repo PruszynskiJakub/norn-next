@@ -35,6 +35,7 @@ interface GlIssue {
 interface GlMr {
   iid: number;
   web_url: string;
+  title?: string;
   state: string;
   draft?: boolean;
   work_in_progress?: boolean;
@@ -76,15 +77,22 @@ export function mapIssue(i: GlIssue): RemoteIssue {
   };
 }
 
+/** The prefixes GitLab reads a draft from; it keeps a merge request's draft state in its title. */
+const DRAFT_PREFIX = /^\s*(?:\[draft\]|\(draft\)|draft:)\s*/i;
+
 function mapMr(m: GlMr): RemotePullRequest {
+  const isDraft = m.draft ?? m.work_in_progress ?? false;
+  // The port's title is the PR's own, so a draft's prefix is not reported as part of it
+  const title = m.title === undefined ? undefined : isDraft ? m.title.replace(DRAFT_PREFIX, "") : m.title;
   const merge = m.merge_commit_sha ?? m.squash_commit_sha ?? null;
   const by = m.merge_user?.username ?? m.merged_by?.username ?? null;
   return {
     number: m.iid,
     url: m.web_url,
     state: m.state === "merged" ? "merged" : m.state === "opened" ? "open" : "closed", // locked → closed
-    is_draft: m.draft ?? m.work_in_progress ?? false,
+    is_draft: isDraft,
     head_sha: m.sha ?? "",
+    ...(title === undefined ? {} : { title }),
     ...(merge ? { merge_commit_sha: merge } : {}),
     ...(by ? { merged_by: by } : {}),
     merged_at: m.merged_at ?? null,
@@ -97,6 +105,7 @@ function mapMr(m: GlMr): RemotePullRequest {
 interface GlMrNode {
   iid: string;
   webUrl: string;
+  title?: string;
   state: string;
   draft?: boolean;
   sourceBranch: string;
@@ -113,13 +122,14 @@ const MRS_PER_QUERY = 100;
 
 /** Every merge request of `branches`, any state, as GitLab GraphQL lists it. JSON strings are GraphQL strings. */
 export function mrsQuery(fullPath: string, branches: readonly string[]): string {
-  const node = "iid webUrl state draft sourceBranch targetBranch mergedAt diffHeadSha mergeCommitSha squashCommitSha mergeUser { username }";
+  const node = "iid webUrl title state draft sourceBranch targetBranch mergedAt diffHeadSha mergeCommitSha squashCommitSha mergeUser { username }";
   return `query { project(fullPath: ${JSON.stringify(fullPath)}) { mergeRequests(sourceBranches: ${JSON.stringify(branches)}, first: ${MRS_PER_QUERY}) { pageInfo { hasNextPage } nodes { ${node} } } } }`;
 }
 
 const restMr = (n: GlMrNode): GlMr => ({
   iid: Number(n.iid),
   web_url: n.webUrl,
+  ...(n.title === undefined ? {} : { title: n.title }),
   state: n.state,
   ...(n.draft === undefined ? {} : { draft: n.draft }),
   source_branch: n.sourceBranch,
@@ -213,6 +223,11 @@ export function createGlab(opts: GlabOptions): RemotePort {
     },
     async editPullRequestBody(number, body) {
       okOrThrow(await run(["mr", "update", String(number), ...repo, "--description-file", "-", "--yes"], body), "glab mr update", "glab");
+    },
+    async editPullRequestTitle(number, title) {
+      // A title without the draft prefix would mark a draft MR ready, so a draft keeps it
+      const mr = mapMr(await json<GlMr>(["mr", "view", String(number), ...repo, "--output", "json"]));
+      okOrThrow(await run(["mr", "update", String(number), ...repo, "--title", mr.is_draft ? `Draft: ${title}` : title, "--yes"]), "glab mr update", "glab");
     },
     async createIssue({ title, body, labels, assignee }) {
       const out = okOrThrow(

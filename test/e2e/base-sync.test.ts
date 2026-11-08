@@ -718,7 +718,7 @@ counters: { reject_loop: { max: 3 }, stale_loop: { max: 3 } }
     const groups = ((await h.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; title: string; command: string }>> }).groups;
     expect(groups.unblock ?? []).toEqual([]);
     expect(groups.check?.filter((i) => i.story === "gh-7" && i.title.startsWith("skills differ")).map((i) => [i.title, i.command])).toEqual([
-      ["skills differ from norn 0.19.0 (norn): runs use this worktree's copies until the base is merged in", "norn story view gh-7"],
+      ["skills differ from norn 0.19.0 (norn): runs use this worktree's copies until the base is merged in, or until this branch's edit to them is reverted", "norn story view gh-7"],
     ]);
     expect(readFileSync(pinnedWorkflowPath(runs()), "utf8")).toBe(pinned);
   }, 60_000);
