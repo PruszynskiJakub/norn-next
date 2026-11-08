@@ -11,7 +11,7 @@ The spec is a quick issue with no criteria frontmatter; its two Wanted items are
 | Security checklist in norn-review | bundled `norn-review` gains a generic checklist (injection, secrets, process spawning, env loading, PATH shim, tokens), applied when the diff touches `REVIEW.md` sensitive paths, findings blocking | review (docs) | `packages/cli/assets/skills/norn-review/SECURITY.md`; wired in `SKILL.md` step 3 (Sensitive paths), step 4 (Standards gets SECURITY.md, prompt item (d)); whole skill folders install, as `test/e2e/slice-workflow.test.ts` › init shows for SMELLS.md |
 | This repo lists its sensitive paths | `REVIEW.md` names `.github/workflows/`, `scripts/`, `packages/schema/src/`, `packages/store/`, `packages/cli/src/runtime/shim.ts` | review (docs) | `REVIEW.md` › `## Sensitive paths` (all five exist in the tree) |
 
-`bun run test` (1308 pass after the base merge, lints included) and `bun run typecheck` green.
+`bun run test` (1308 pass on the post-merge head, lints included) and `bun run typecheck` green; review#2 re-ran both.
 
 ## Easy to miss
 
@@ -32,4 +32,4 @@ The spec is a quick issue with no criteria frontmatter; its two Wanted items are
 
 ## Resume
 
-main (567ecf339fd5) merged in at resolve; next is the workflow's step after resolve.
+review#2 approved the post-merge head (no blocking findings); next is the workflow's step after review.
