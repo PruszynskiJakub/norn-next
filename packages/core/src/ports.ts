@@ -391,12 +391,12 @@ export interface LaunchSpec {
 /**
  * Pane state as the runner sees it. One fact among several:
  * `idle`/`done` never completes a step by itself.
+ * It is what the pane shows now, with no time of change: runners cannot tell when it changed
+ * (herdr reports no timestamp).
  */
 export interface PaneState {
   alive: boolean;
   state: "working" | "idle" | "waiting_input" | "done" | "unknown";
-  /** ms epoch of the last state change, if known */
-  since: number | null;
   /** e.g. visible permission prompt text (the full screen) */
   detail?: string;
   /** The prompt the agent waits on, as the runner parsed it from `detail`; absent = not recognized */

@@ -186,16 +186,15 @@ describe("herdr runner", () => {
     expect(await createHerdrRunner({ exec: blocked.exec }).paneState(session)).toEqual({
       alive: true,
       state: "waiting_input",
-      since: null,
       detail: fx.pane_read_visible.trim(),
     });
 
     const working = fakeExec([["pane get", ok(fx.pane_get_working)]]);
     expect(await createHerdrRunner({ exec: working.exec, process: fakeProcess(false) }).paneState({ ...session, process: { pid: 5, pid_start: "a" } }))
-      .toEqual({ alive: false, state: "working", since: null }); // herdr's status is reported, liveness comes from the pid
+      .toEqual({ alive: false, state: "working" }); // herdr's status is reported, liveness comes from the pid
 
     const gone = fakeExec([["pane get", fail(fx.error_pane_not_found)]]);
-    expect(await createHerdrRunner({ exec: gone.exec }).paneState(session)).toEqual({ alive: false, state: "unknown", since: null });
+    expect(await createHerdrRunner({ exec: gone.exec }).paneState(session)).toEqual({ alive: false, state: "unknown" });
   });
 
   test("paneState parses the prompt off a recorded permission dialog (L1)", async () => {

@@ -106,10 +106,10 @@ describe("runtime", () => {
   });
 
   test("pane gone → died → old session killed, fresh session launched", async () => {
-    h.runner.pane = { alive: false, state: "unknown", since: null };
+    h.runner.pane = { alive: false, state: "unknown" };
     h.clock.advance(10_000);
     const r = await h.tick();
-    h.runner.pane = { alive: true, state: "working", since: null };
+    h.runner.pane = { alive: true, state: "working" };
     expect(acted(r)).toEqual(["gh-9 retry_fresh"]);
     expect(h.runner.killed.map((s) => s.session_id)).toEqual(["s-1"]);
     expect(h.runner.launches).toHaveLength(2);

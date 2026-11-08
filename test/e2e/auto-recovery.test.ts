@@ -284,7 +284,7 @@ describe("R7: a run from another machine (acceptance 10)", () => {
     // the run was launched by ann's heartbeat on her machine; this checkout holds the story now
     const foreign: UnitState = { ...st, run: { ...(st.run as NonNullable<UnitState["run"]>), machine: "ann@pc", heartbeat_id: "01JFFFFFFFFFFFFFFFFFFFFFFF", process: { pid: 999_999_99, pid_start: "gone" } } };
     writeState(runs(h), foreign); // In the machine dir, nothing to commit
-    h.runner.pane = { alive: false, state: "unknown", since: null };
+    h.runner.pane = { alive: false, state: "unknown" };
     h.clock.advance(10_000);
     expect(rules(await h.tick())).toEqual(["gh-9 agent.running.foreign"]);
     // ticks keep renewing the claim; the run stays foreign and quiet

@@ -555,13 +555,12 @@ function retargetItem(story: StoryFacts, base: string): InboxItem | null {
 
 /** Hook events after which an attended agent waits for its person. */
 const WAITING_HOOKS = new Set(["turn_end", "waiting_input", "permission_prompt"]);
-const WAITING_PANE = new Set(["idle", "done", "waiting_input"]);
 
 /**
  * When the attended agent of the unit's current run started waiting for its person (ms epoch),
  * or null while it works, is gone, or the step is not attended. The wait starts at the first of the
- * run's trailing waiting hooks, so Claude's `idle_prompt` (~60 s after `Stop`) does not restart it;
- * with no hook since the last activity, a pane that went idle afterwards starts it.
+ * run's trailing waiting hooks, so Claude's `idle_prompt` (~60 s after `Stop`) does not restart it.
+ * The wait comes from hooks only: a pane carries no time of change to start it from.
  */
 export function attendedWaitSince(uf: UnitFacts): number | null {
   const st = uf.state;
@@ -579,10 +578,7 @@ export function attendedWaitSince(uf: UnitFacts): number | null {
     }
     since = epoch(h.at);
   }
-  if (since !== null) return since;
-  const pane = rf.pane;
-  if (pane && WAITING_PANE.has(pane.state) && pane.since !== null && pane.since > (rf.last_hook_at ?? 0)) return pane.since;
-  return null;
+  return since;
 }
 
 /** Where the unit's current run lives (a worktree on disk, as decide requires), for front ends that look for its pane. */

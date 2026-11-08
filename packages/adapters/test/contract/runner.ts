@@ -60,7 +60,6 @@ export function runnerContract(name: string, make: () => RunnerSubject, opts: Co
         const pane = await runner.paneState(s);
         expect(pane.alive).toBe(true);
         expect(PANE_STATES).toContain(pane.state);
-        expect(pane.since === null || typeof pane.since === "number").toBe(true);
       } finally {
         await runner.kill(s);
       }

@@ -219,11 +219,12 @@ export function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Unit
   let detail: string | undefined;
   if (died) [outcome, rule, detail] = ["died", "agent.died", diedDetail(rf, now - epoch(run.started_at))];
   else if (!step.attended) {
-    const waiting = (rf.pane?.state === "waiting_input" && (rf.pane.since ?? touched + 1) > touched) || (lastHook && (lastHook.event === "waiting_input" || lastHook.event === "permission_prompt") && hookAt > touched);
+    // the pane reports a wait as it is now: a pane still waiting after the last state write is still waiting
+    const waiting = rf.pane?.state === "waiting_input" || (lastHook && (lastHook.event === "waiting_input" || lastHook.event === "permission_prompt") && hookAt > touched);
     const deadline = parseDuration(limits.deadline);
-    const turnEnded =
-      (lastHook && (lastHook.event === "turn_end" || lastHook.event === "session_end") && hookAt > touched) ||
-      ((rf.pane?.state === "idle" || rf.pane?.state === "done") && (rf.pane.since ?? 0) > touched);
+    // hooks alone end a turn: an idle pane carries no time, so it cannot be told apart from the
+    // moment right after a nudge, before the agent takes it up
+    const turnEnded = lastHook && (lastHook.event === "turn_end" || lastHook.event === "session_end") && hookAt > touched;
     if (waiting) return parkOnImplicitAsk(ctx, story, uf, st, wf, rf, lastHook);
     // The agent session started but never took its launch prompt
     const launch = launchPromptCheck(ctx, story, uf, st, rf);

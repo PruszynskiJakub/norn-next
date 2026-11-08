@@ -41,7 +41,7 @@ const withCaps = (f: Facts, send: boolean): Facts => ({ ...f, machine: { ...f.ma
 
 /** The state an implicit ask parks the unit in (decide → apply of its ask receipt). */
 function parkedOnPrompt(): UnitState {
-  const a = only(facts([solo(running(), { pane: { alive: true, state: "waiting_input", since: null, detail: SCREEN, prompt: PROMPT } })]));
+  const a = only(facts([solo(running(), { pane: { alive: true, state: "waiting_input", detail: SCREEN, prompt: PROMPT } })]));
   if (a.kind !== "park" || !a.state) throw new Error(`expected park, got ${a.kind}`);
   return a.state;
 }
@@ -96,7 +96,7 @@ describe("§10 implicit ask from a pane prompt (L1)", () => {
 describe("R6.1: an implicit ask resolved by a later fact", () => {
   test("the pane no longer waits for input → answer by agent, the run goes on, nothing typed", () => {
     const st = parkedOnPrompt();
-    const a = only(facts([solo(st, { pane: { alive: true, state: "working", since: null } })], {}, T0 + 60_000));
+    const a = only(facts([solo(st, { pane: { alive: true, state: "working" } })], {}, T0 + 60_000));
     expect(a).toMatchObject({ kind: "apply_receipts", rule: "agent.ask.implicit.resolved", input: null, launch: null, state: { status: "running", park: null } });
     if (a.kind !== "apply_receipts") return;
     expect(a.receipts[0]?.receipt).toMatchObject({ kind: "answer", by: "agent", ask_receipt_id: st.park?.receipt_id, answer: expect.stringContaining("no longer waits for input") });
@@ -104,7 +104,7 @@ describe("R6.1: an implicit ask resolved by a later fact", () => {
 
   test("a newer hook for the run (not another wait) resolves it; a newer wait does not", () => {
     const st = parkedOnPrompt();
-    const waiting = { pane: { alive: true, state: "waiting_input" as const, since: null, prompt: PROMPT } };
+    const waiting = { pane: { alive: true, state: "waiting_input" as const, prompt: PROMPT } };
     expect(only(facts([solo(st, { ...waiting, hooks: [hook("permission_prompt", T0 + 10_000)] })], {}, T0 + 60_000))).toMatchObject({ kind: "noop", rule: "unit.parked.ask" });
     expect(only(facts([solo(st, { ...waiting, hooks: [hook("tool_use", T0 + 10_000)] })], {}, T0 + 60_000))).toMatchObject({ kind: "apply_receipts", rule: "agent.ask.implicit.resolved" });
   });
@@ -114,7 +114,7 @@ describe("R6.1: an implicit ask resolved by a later fact", () => {
     const ask = numbered(1, receipt(st0, "ask", { question: "which db?" }));
     const st = applyReceipts(st0, [ask], { workflow: SOLO_WF, now: at() }).state;
     expect(st.park?.implicit).toBeUndefined();
-    const a = only(facts([solo(st, { pane: { alive: true, state: "working", since: null }, hooks: [hook("tool_use", T0 + 10_000)] })], {}, T0 + 60_000));
+    const a = only(facts([solo(st, { pane: { alive: true, state: "working" }, hooks: [hook("tool_use", T0 + 10_000)] })], {}, T0 + 60_000));
     expect(a).toMatchObject({ kind: "noop", rule: "unit.parked.ask" });
   });
 

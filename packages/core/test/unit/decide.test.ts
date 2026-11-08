@@ -221,8 +221,11 @@ describe("classification", () => {
     expect(kinds(facts([solo(st, { hooks: [{ event: "turn_end", at: at(T0 - 1000), agent: "claude", native: "Stop", cwd: "/w" }] })]))).toEqual(["gh-1 noop agent.running"]);
   });
   test("nudges exhausted → classify to $stuck", () => {
-    const a = only(facts([solo(running({ nudges_used: 2, updated_at: at(T0 - 5000) }), { pane: { alive: true, state: "idle", since: T0 - 1000 } })]));
+    const a = only(facts([solo(running({ nudges_used: 2, updated_at: at(T0 - 5000) }), { hooks: [{ event: "turn_end", at: at(T0 - 1000), agent: "claude", native: "Stop", cwd: "/w" }] })]));
     expect(a).toMatchObject({ kind: "classify", outcome: "silent", state: { status: "stuck", park: { kind: "exhausted", reason: "silent: nudges 2/2 at implement" } }, kill: null });
+  });
+  test("an idle pane alone never ends a turn", () => {
+    expect(kinds(facts([solo(running(), { pane: { alive: true, state: "idle" } })]))).toEqual(["gh-1 noop agent.running"]);
   });
   test("died → retry_fresh with a new launch and started receipt", () => {
     const a = only(facts([solo(running(), { process_alive: false })]));
@@ -281,7 +284,7 @@ describe("classification", () => {
     // nothing in progress: the recovered commit comes first, as before
     expect(only(facts([midMerge(solo(running(), {}), { operation: null, unmerged: [] })]))).toMatchObject({ kind: "commit_push", rule: "recover.commit" });
     // a second permission prompt mid-merge (pane waiting after an answered ask) parks again as an implicit ask
-    const pane = { alive: true, state: "waiting_input" as const, since: null, detail: "Do you want to proceed?\n ❯ 1. Yes\n   2. No" };
+    const pane = { alive: true, state: "waiting_input" as const, detail: "Do you want to proceed?\n ❯ 1. Yes\n   2. No" };
     expect(only(facts([midMerge(solo(running(), { pane }), merging)]))).toMatchObject({ kind: "park", rule: "agent.ask.implicit" });
     // the deadline still fires, and a died agent is still retried
     const old = running({ run: { ...running().run!, started_at: at(T0 - 61 * 60_000) }, updated_at: at(T0 - 61 * 60_000) });

@@ -72,11 +72,11 @@ describe("audit: runtime", () => {
   test("B2: an answer to a gone session resumes the agent session with the answer as the prompt", async () => {
     const st = h.state(runs());
     appendHookTrace(h.root, { story: "gh-4" }, { type: "hook", id: ulid(h.clock.now()), fact: { event: "turn_end", at: h.clock.iso(), agent: "claude", native: "Stop", cwd: wt(), story: "gh-4", run_id: st?.run?.run_id as string, agent_session_id: "cs-1" } });
-    h.runner.pane = { alive: false, state: "unknown", since: null };
+    h.runner.pane = { alive: false, state: "unknown" };
     h.report(runs(), "answer", { answer: "use github oauth" }, "human");
     step();
     const r = await h.tick();
-    h.runner.pane = { alive: true, state: "working", since: null };
+    h.runner.pane = { alive: true, state: "working" };
     expect(acted(r)).toEqual(["gh-4 apply_receipts"]);
     const argv = h.runner.launches.at(-1)?.argv ?? [];
     expect(argv).toContain("--resume");

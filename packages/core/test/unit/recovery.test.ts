@@ -153,7 +153,7 @@ describe("R7: liveness across machines", () => {
     const foreign = (takenAgo: number) =>
       solo(
         running({ run: { ...running().run!, machine: "ann@pc", heartbeat_id: "01JFFFFFFFFFFFFFFFFFFFFFFF", started_at: at(T0 - 60 * 60_000 + 60_000) }, updated_at: at(T0 - 60 * 60_000) }),
-        { process_alive: false, pane: { alive: false, state: "unknown", since: null }, last_activity_at: null },
+        { process_alive: false, pane: { alive: false, state: "unknown" }, last_activity_at: null },
         {},
         { claim: { state: "mine", sha: "c1", blob: { version: 1, story: "gh-1", holder: "jakub@mac", heartbeat_id: HB, acquired_at: at(T0 - takenAgo), renewed_at: at(), expires_at: at(T0 + 600_000), last_tick_id: null } } },
       );

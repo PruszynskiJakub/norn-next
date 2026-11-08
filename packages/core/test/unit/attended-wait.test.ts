@@ -48,10 +48,11 @@ describe("attended wait", () => {
     expect(attendedWaitSince(refining(runFacts([hook("turn_end", T0), hook("session_end", T0 + MIN)])))).toBeNull();
   });
 
-  test("with no hook since the last activity, a pane that went idle afterwards starts it", () => {
-    const pane: PaneState = { alive: true, state: "idle", since: T0 + 5 * MIN };
-    expect(attendedWaitSince(refining(runFacts([hook("tool_use", T0)], { pane })))).toBe(T0 + 5 * MIN);
-    expect(attendedWaitSince(refining(runFacts([hook("tool_use", T0 + 6 * MIN)], { pane })))).toBeNull();
+  test("a pane with no waiting hook is not a wait", () => {
+    for (const state of ["idle", "done", "waiting_input"] as const) {
+      const pane: PaneState = { alive: true, state };
+      expect(attendedWaitSince(refining(runFacts([hook("tool_use", T0)], { pane })))).toBeNull();
+    }
   });
 
   test("unattended steps and other runs are not attended waits", () => {
