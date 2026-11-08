@@ -9,7 +9,7 @@ import type { Action, Decision } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { renderBrief } from "../../src/brief.ts";
 import { decide } from "../../src/decide/index.ts";
-import { mergedIntoBase } from "../../src/policy.ts";
+import { storyMerged, storyPhase } from "../../src/policy.ts";
 import type { NumberedReceipt, StoryBase, StoryFacts } from "../../src/facts.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
 import { baseUpdateStep, checkWorkflowLevel, isStale, validateWorkflowDefinition } from "../../src/workflow.ts";
@@ -333,12 +333,12 @@ describe("base sync replay", () => {
     expect(d.rule).toBe("remote.park");
     expect(d.action).toMatchObject({ kind: "park", commit: { message: "norn: gh-1 stuck (remote: PR merged into release, not main)" } });
     expect(s.state.park).toMatchObject({ kind: "remote", reason: "remote: PR merged into release, not main" });
-    expect(mergedIntoBase(s.facts().stories[0] as StoryFacts, "main")).toBe(false);
-    expect(mergedIntoBase({ ...(s.facts().stories[0] as StoryFacts), pr: { ...s.pr, base_branch: "main" } }, "main")).toBe(true);
+    expect(storyMerged(storyPhase(s.facts().stories[0] as StoryFacts, "main"))).toBeNull();
+    expect(storyMerged(storyPhase({ ...(s.facts().stories[0] as StoryFacts), pr: { ...s.pr, base_branch: "main" } }, "main"))).toBe("pr");
     // a PR cached by an older norn names its target only as `base`: still read (until 0.11.0)
     const legacy = (target: string): StoryFacts["pr"] => ({ number: 7, url: "u", state: "merged", is_draft: false, head_sha: SHA("h"), base: target });
-    expect(mergedIntoBase({ ...(s.facts().stories[0] as StoryFacts), pr: legacy("release") }, "main")).toBe(false);
-    expect(mergedIntoBase({ ...(s.facts().stories[0] as StoryFacts), pr: legacy("main") }, "main")).toBe(true);
+    expect(storyMerged(storyPhase({ ...(s.facts().stories[0] as StoryFacts), pr: legacy("release") }, "main"))).toBeNull();
+    expect(storyMerged(storyPhase({ ...(s.facts().stories[0] as StoryFacts), pr: legacy("main") }, "main"))).toBe("pr");
     // an open PR on the wrong base is a Check item (retarget)
     s.pr = { ...s.pr, state: "open" };
     expect(buildInbox(s.facts(), CONFIG).groups.check.map((i) => i.id)).toContain("retarget:gh-1:7:release");

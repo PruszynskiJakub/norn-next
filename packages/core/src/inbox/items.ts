@@ -12,7 +12,7 @@ import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, s
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
-import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, skillsDiffer, issueProblem, mergedIntoBase, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, skillsDiffer, issueProblem, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyLanded, storyPhase, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { hookActivity } from "../session.ts";
 import { isParked } from "../verbs.ts";
@@ -92,7 +92,7 @@ export function heartbeatDown(facts: Facts, config: ResolvedConfig): { holder: s
   if (!hb || heartbeatUp(facts, config)) return null;
   const auto = (s: StoryFacts) => effectiveMode(s.mode, false, facts.machine.runner).mode === "auto";
   const live = (u: UnitFacts) => !!u.state && u.state.status !== "done" && u.state.status !== "corrupt";
-  const needs = facts.stories.some((s) => s.claim.state === "mine" && auto(s) && !storyFinished(s) && s.units.some(live));
+  const needs = facts.stories.some((s) => s.claim.state === "mine" && auto(s) && !storyFinished(storyPhase(s, facts.repo.default_branch)) && s.units.some(live));
   if (!needs) return null;
   return { holder: facts.machine.holder, since: hb.last_tick_at === null ? null : iso(hb.last_tick_at), for_ms: hb.last_tick_at === null ? null : facts.now - hb.last_tick_at };
 }
@@ -311,7 +311,7 @@ function personStart(uf: UnitFacts, story: StoryFacts, facts: Facts, config: Res
  * tick starts it — else Your turn with the command that ticks.
  */
 function notStartedItem(story: StoryFacts, facts: Facts, config: ResolvedConfig): InboxItem | null {
-  if (story.claim.state !== "mine" || isStarted(story) || storyFinished(story) || !story.frontmatter) return null;
+  if (story.claim.state !== "mine" || isStarted(story) || storyFinished(storyPhase(story, facts.repo.default_branch)) || !story.frontmatter) return null;
   const up = heartbeatUp(facts, config);
   const base = { id: `not-started:${story.key}`, story: story.key, slice: null, step: null, since: story.frontmatter.intake_at, url: story.frontmatter.url };
   if (up) return { ...base, group: "running", title: "taken in — the next tick starts it", command: cmd.storyView(story.key) };
@@ -436,7 +436,7 @@ function mergeItem(story: StoryFacts, st: UnitState, base: string): InboxItem | 
   const pr = knownPr(story);
   // A branch already contained in origin/<base> (merged by ancestry, e.g. a merge commit
   // pushed by hand) needs no merge, even while the PR still reads `open`.
-  if (!pr || pr.state !== "open" || story.merged_by_ancestry || story.frontmatter?.status === "done") return null;
+  if (!pr || pr.state !== "open" || storyLanded(storyPhase(story, base))) return null;
   const draft = pr.is_draft;
   const cli = prCli(story);
   const details = [pr.url];
@@ -505,9 +505,6 @@ function staleItem(story: StoryFacts, base: string): InboxItem | null {
   };
 }
 
-/** The story's work is on its base — merged (PR or ancestry), or spec.md records it done (the durable record when no PR was fetched). */
-const landed = (story: StoryFacts, base: string): boolean => mergedIntoBase(story, base) || story.frontmatter?.status === "done";
-
 /**
  * An issue change on a finished round (label removed, unassigned, unseen) parks nothing;
  * it is a Check item while the round stays finished, read from `issue_seen` between syncs. A closed
@@ -515,7 +512,7 @@ const landed = (story: StoryFacts, base: string): boolean => mergedIntoBase(stor
  */
 function finishedRoundRemoteItem(story: StoryFacts, config: ResolvedConfig, base: string): InboxItem | null {
   const st = storyUnit(story)?.state;
-  if (st?.status !== "done" || landed(story, base)) return null;
+  if (st?.status !== "done" || storyLanded(storyPhase(story, base))) return null;
   // between syncs the issue is not fetched: the one the last sync saw keeps the item put
   const issue = story.issue !== undefined ? story.issue : story.issue_seen?.issue;
   const reason = issueProblem({ ...story, issue }, config.label);
@@ -683,7 +680,7 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
         if (merge) return merge;
         // A finished round with no PR — the next round or closing the issue is the
         // person's; generic, never a recommendation read off the last step's outcome
-        if (!landed(story, facts.repo.default_branch) && !knownPr(story))
+        if (!storyLanded(storyPhase(story, facts.repo.default_branch)) && !knownPr(story))
           return item("your_turn", `${story.key}: ${st.workflow} round done, no PR`, cmd.storyEdit(story.key, { workflow: "<name>" }), st.updated_at, {
             id: `round_done:${key}:${uf.record ?? st.workflow}`,
             detail: "or close the issue",
@@ -841,8 +838,8 @@ function owedRecordItems(facts: Facts): InboxItem[] {
  * answer never vanishes silently. Gone once a later answer or approval of the story is accepted (observe
  * leaves it out) or the story finishes; there is no dismiss command.
  */
-function rejectedItems(story: StoryFacts): InboxItem[] {
-  if (storyFinished(story)) return [];
+function rejectedItems(story: StoryFacts, base: string): InboxItem[] {
+  if (storyFinished(storyPhase(story, base))) return [];
   return (story.rejected_mailbox ?? []).map((r) => {
     // the step the unit is at now (the story is held here), else where it was when the receipt was rejected
     const now = story.units.find((u) => u.unit.key === r.unit)?.state?.step ?? r.at_step;
@@ -877,7 +874,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   for (const story of facts.stories) {
     const claim = story.claim.state;
     if (claim === "other") continue;
-    if ((claim === "none" || claim === "expired") && isStarted(story) && !storyFinished(story)) {
+    if ((claim === "none" || claim === "expired") && isStarted(story) && !storyFinished(storyPhase(story, facts.repo.default_branch))) {
       const since = story.claim.state === "expired" ? story.claim.blob.expires_at : (story.frontmatter?.intake_at ?? iso(facts.now));
       add({
         id: `unclaimed:${story.key}`,
@@ -919,7 +916,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
     add(finishedRoundRemoteItem(story, config, facts.repo.default_branch));
     for (const it of foreignCommitItems(story)) add(it);
     add(recordPushItem(story));
-    for (const it of rejectedItems(story)) add(it);
+    for (const it of rejectedItems(story, facts.repo.default_branch)) add(it);
     for (const it of noteItems(story)) add(it);
     for (const uf of story.units) {
       add(unitInboxItem(story, uf, facts, config));

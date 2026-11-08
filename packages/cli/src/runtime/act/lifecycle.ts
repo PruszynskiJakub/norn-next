@@ -100,9 +100,9 @@ export async function startUnit(act: ActEnv, a: Extract<Action, { kind: "start_u
   });
   act.writeReceipts(loc, a.receipts);
   if (a.state) act.writeUnitState(a.unit, runsDir, a.state);
-  if (a.unit.slice === null) {
-    const r = patchStoryFile(storyFile(join(wtPath, story.spec_dir)), { status: "active" }, wtPath);
-    detail.story_status = r.ok ? "active" : r.reason;
+  if (a.story_status) {
+    const r = patchStoryFile(storyFile(join(wtPath, story.spec_dir)), { status: a.story_status }, wtPath);
+    detail.story_status = r.ok ? a.story_status : r.reason;
   }
   detail.commit = await act.commit(a.commit, a.unit, a.state);
   return { ok: true, detail };

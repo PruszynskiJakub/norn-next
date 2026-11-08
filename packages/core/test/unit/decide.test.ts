@@ -398,6 +398,7 @@ describe("slices step", () => {
     expect(a.starts[0]).toMatchObject({
       workflow: "slice",
       slice_status: "active",
+      story_status: null,
       worktree: { path: "/r-worktrees/gh-1-login--02-s02", branch: "gh-1/02-s02", from: "gh-1-login", slot: 1 },
       state: { story: "gh-1", slice: "gh-1/02", unit_dir: "02-s02", step: "implement", workflow_hash: sha256(WORKFLOWS.slice!.source) },
     });
@@ -690,6 +691,13 @@ describe("intake and start", () => {
     // Committed in the worktree intake creates, no step yet, not pushed before the claim
     expect(d?.action).toMatchObject({ commit: { cwd: "/r-worktrees/gh-5-fix", branch: "gh-5-fix", message: "norn: intake gh-5 Fix", trailers: { "Norn-Story": "gh-5", "Norn-Tick": TICK }, push: false } });
     expect(d?.action.kind === "intake_story" && Object.keys(d.action.commit.trailers)).toEqual(["Norn-Story", "Norn-Tick"]);
+  });
+  test("a story start writes spec.md active unless it already says so", () => {
+    const f = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)]);
+    f.frontmatter = { ...f.frontmatter!, status: "new" };
+    expect(only(facts([f]))).toMatchObject({ kind: "start_unit", rule: "story.start", story_status: "active" });
+    f.frontmatter = { ...f.frontmatter!, status: "active" };
+    expect(only(facts([f]))).toMatchObject({ kind: "start_unit", rule: "story.start", story_status: null });
   });
   test("story unit starts with its pinned workflow; invalid workflows are refused", () => {
     const f = storyFacts("gh-1", [unitFacts(storyUnit(), null, null)]);

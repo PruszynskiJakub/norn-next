@@ -73,32 +73,90 @@ export function hookWindowMs(workflows: Iterable<Workflow | null | undefined>): 
 /** The story's own unit (slice null), or null before it has facts. */
 export const storyUnit = (story: StoryFacts): UnitFacts | null => story.units.find((u) => u.unit.slice === null) ?? null;
 
-/** The story unit reached `$done`, or spec.md says done/dropped — finished, never "unclaimed". */
-export function storyFinished(story: StoryFacts): boolean {
-  const status = story.frontmatter?.status;
-  if (isClosedStatus(status)) return true;
-  return storyUnit(story)?.state?.status === "done";
-}
-
 /** The PR's target branch, when the remote said (`base` is the field an older norn's cached `pr.json` holds). */
 export const prBaseBranch = (pr: StoryFacts["pr"]): string | null => pr?.base_branch ?? pr?.base ?? null;
 
+/** How the story's work reached its base. */
+export type MergedVia = "pr" | "ancestry";
+
 /**
- * The story's work landed on its base — the PR merged into the base branch, or its head is
- * already on the fetched base. A PR merged into any other branch does not count.
+ * Where a story stands, from the evidence the story itself carries: its spec.md record, a merge
+ * into the base, its story unit's state. The base's record is not part of it (see `baseClosed`).
  */
-export function mergedIntoBase(story: StoryFacts, base: string): boolean {
-  if (story.merged_by_ancestry) return true;
-  if (story.pr?.state !== "merged") return false;
+export type StoryPhase =
+  /** the story unit has no run state (spec.md may still say active, e.g. after a reset) */
+  | { phase: "not_started" }
+  | { phase: "active" }
+  /** the story unit's status is done (at `$done`, or wherever a merged clean-up left it) */
+  | { phase: "round_done" }
+  /** on the base with the done record still owed; `record` keeps a dropped record, `round_done` the unit's done */
+  | { phase: "merged"; via: MergedVia; record: "dropped" | null; round_done: boolean }
+  /** spec.md records done; `merged` says how it reached the base, when observed */
+  | { phase: "landed"; merged: MergedVia | null }
+  /** spec.md records dropped and nothing merged */
+  | { phase: "dropped" };
+
+/**
+ * The PR merged into the base branch, or the story's head is already on the fetched base. A PR
+ * merged into any other branch does not count; a PR with no known target counts.
+ */
+function mergedVia(story: StoryFacts, base: string): MergedVia | null {
+  if (story.merged_by_ancestry) return "ancestry";
+  if (story.pr?.state !== "merged") return null;
   const target = prBaseBranch(story.pr);
-  return target === null || target === base;
+  return target === null || target === base ? "pr" : null;
 }
+
+/**
+ * The story's phase. The precedence is decide's: a done record wins, then a merge (decide cleans
+ * a merged story up to done even when spec.md says dropped), then a dropped record, then the unit.
+ */
+export function storyPhase(story: StoryFacts, base: string): StoryPhase {
+  const record = story.frontmatter?.status;
+  const via = mergedVia(story, base);
+  if (record === "done") return { phase: "landed", merged: via };
+  const st = storyUnit(story)?.state;
+  if (via) return { phase: "merged", via, record: record === "dropped" ? "dropped" : null, round_done: st?.status === "done" };
+  if (record === "dropped") return { phase: "dropped" };
+  if (!st) return { phase: "not_started" };
+  // an older norn's remote park at $done reads active here though roundFinished calls it finished: the holder's tick turns it done
+  return st.status === "done" ? { phase: "round_done" } : { phase: "active" };
+}
+
+/** The story unit reached done, or spec.md says done/dropped — finished, never "unclaimed". */
+export function storyFinished(p: StoryPhase): boolean {
+  switch (p.phase) {
+    case "not_started":
+    case "active":
+      return false;
+    case "merged":
+      return p.record !== null || p.round_done;
+    default:
+      return true;
+  }
+}
+
+/** How the story's work reached its base, or null when it has not. */
+export function storyMerged(p: StoryPhase): MergedVia | null {
+  if (p.phase === "merged") return p.via;
+  if (p.phase === "landed") return p.merged;
+  return null;
+}
+
+/** The story's work is on its base, or spec.md records it done. */
+export const storyLanded = (p: StoryPhase): boolean => p.phase === "merged" || p.phase === "landed";
+
+/**
+ * The fetched base records the story closed. Kept out of the phase: it is another checkout's
+ * word, and the inbox must agree with the view, which never sees the base's record.
+ */
+export const baseClosed = (story: StoryFacts): boolean => isClosedStatus(story.base_status);
 
 /** What is wrong with the story PR on the remote (closed unmerged, merged elsewhere), or null. */
 export function prProblem(story: StoryFacts, base: string): string | null {
   if (story.pr?.state === "closed") return "remote: PR closed unmerged";
   // a merge into the wrong base skipped story review: park, never clean up
-  if (story.pr?.state === "merged" && !mergedIntoBase(story, base)) return `remote: PR merged into ${prBaseBranch(story.pr)}, not ${base}`;
+  if (story.pr?.state === "merged" && !mergedVia(story, base)) return `remote: PR merged into ${prBaseBranch(story.pr)}, not ${base}`;
   return null;
 }
 
@@ -117,6 +175,8 @@ export function issueProblem(story: StoryFacts, label: string): string | null {
  * The story's round is finished — its unit reached `$done`, or it is parked there for a
  * problem with its PR or an older norn's remote change (still finished; the holder's tick drops
  * that park). A stuck unit at `$done` on a `workflow` park is not: its round receipt was rejected.
+ * It judges the round's cursor, not the story, so it stays apart from `storyPhase`: a round can
+ * finish without the story landing, and a story can land mid-round.
  */
 export function roundFinished(
   st: UnitState | null | undefined,

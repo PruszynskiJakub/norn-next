@@ -25,7 +25,7 @@ import type { NumberedReceipt, StoryFacts, UnitFacts, UnitRef } from "../facts.t
 import { initialState } from "../apply.ts";
 import { sha256 } from "../hash.ts";
 import { bodyChangedItem } from "../inbox/items.ts";
-import { issueProblem, mergedIntoBase, prProblem, roundFinished, stepLabel, storyFinished, storyUnit, WF_LABEL } from "../policy.ts";
+import { baseClosed, issueProblem, prProblem, roundFinished, type StoryPhase, stepLabel, storyFinished, storyMerged, storyPhase, storyUnit, WF_LABEL } from "../policy.ts";
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
 import { roundRejected, toCorrupt, toDone } from "../unit-state.ts";
@@ -67,6 +67,7 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   const su = storyUnit(story);
   const claim = story.claim;
   const { facts } = ctx;
+  const phase = storyPhase(story, facts.repo.default_branch);
 
   // Claims: act only on stories this heartbeat holds. This checkout's own record of a story another heartbeat holds leaves runs/
   if (story.local_record && (claim.state === "other" || (claim.state === "expired" && claim.blob.heartbeat_id !== ctx.heartbeat))) return setAsideRecord(ctx, story, ref, claim.blob.holder);
@@ -79,11 +80,11 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
     // (or whose PR merged) is never acquired by a stale local intake or a returning checkout. Only this
     // heartbeat's own expired claim (nobody took it since) is re-acquired for a merged PR whose record
     // is not yet done, so the merge cleanup and the base record still happen.
-    const baseDone = isClosedStatus(story.base_status);
-    if (baseDone || (mergedIntoBase(story, ctx.facts.repo.default_branch) && !ours))
+    const baseDone = baseClosed(story);
+    if (baseDone || (storyMerged(phase) && !ours))
       return ctx.noop(ref, "story.finished", baseDone ? `finished: ${ctx.facts.repo.default_branch} records it ${story.base_status}; nothing to acquire` : "finished: PR merged; nothing to acquire");
     // A finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
-    if (!ours && !fresh && storyFinished(story)) return ctx.noop(ref, "story.finished", `finished (${isClosedStatus(story.frontmatter?.status) ? story.frontmatter.status : "workflow done"}); nothing to take`);
+    if (!ours && !fresh && storyFinished(phase)) return ctx.noop(ref, "story.finished", `finished (${isClosedStatus(story.frontmatter?.status) ? story.frontmatter.status : "workflow done"}); nothing to take`);
     if (!ours && !fresh) return ctx.noop(ref, "claim.unclaimed", `unclaimed — ${cmd.storyCheckout(story.key)}`);
     return ctx.emit({
       kind: "claim",
@@ -121,13 +122,13 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
 
   // A held story whose record is still flat moves into round 1 before anything else —
   // never mid-rebase, and never once its PR merged (the base keeps old records flat)
-  if (!ctx.has(ref.key) && su?.state && hasFlatRecord(su) && !rebasing(su) && !mergedIntoBase(story, ctx.facts.repo.default_branch)) {
+  if (!ctx.has(ref.key) && su?.state && hasFlatRecord(su) && !rebasing(su) && !storyMerged(phase)) {
     const from = runStatePath(story, STORY_UNIT_DIR);
     return ctx.emit({ kind: "round_migrate", unit: ref, rule: "round.migrate", from, to: roundRunStatePath(story, 1, su.state.workflow) });
   }
 
   retitlePr(ctx, story, ref);
-  if (!ctx.has(ref.key)) storyLifecycle(ctx, story, fm, su);
+  if (!ctx.has(ref.key)) storyLifecycle(ctx, story, fm, su, phase);
   if (!ctx.has(ref.key) && story.mailbox?.length) importMailbox(ctx, story);
 
   for (const uf of story.units) {
@@ -262,12 +263,12 @@ function finishMerged(ctx: Ctx, story: StoryFacts): Array<{ unit: UnitRef; state
 }
 
 /** Merged → cleanup; issue closed on a finished round → close; closed/unassigned/unlabelled → park "remote: …" (a finished round: PR only); mirror + body change. */
-function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: UnitFacts | null): void {
+function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: UnitFacts | null, phase: StoryPhase): void {
   const ref = storyRef(story);
   // Merged when the PR says so, or when its head is already on the fetched base;
   // a PR merged into another branch than the base is not merged (parked below)
-  if (mergedIntoBase(story, ctx.facts.repo.default_branch)) {
-    if (fm.status === "done") return;
+  if (phase.phase === "landed" && phase.merged) return;
+  if (phase.phase === "merged") {
     const slices = story.slices.filter((s) => s.frontmatter);
     const sliceWts = story.units.filter((u) => u.unit.slice !== null && u.worktree?.exists).map((u) => (u.worktree as { path: string }).path);
     const sliceBranches = slices.map((s) => sliceBranch(story.key, s.nn, s.slug));

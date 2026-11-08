@@ -36,7 +36,7 @@ import { leaseLiveness } from "../runtime/leases.ts";
 import { type Observed, observe } from "../runtime/observe/index.ts";
 import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
 import { checkRetain, MIN_TRACE_RETAIN, retainCutoffDay, unitTracesBefore } from "../runtime/trace-retention.ts";
-import { cmd, recordPrunable, storyFinished } from "@norn/core";
+import { cmd, recordPrunable, storyFinished, storyPhase } from "@norn/core";
 
 /** A reservation lives only while a receipt is being written; older ones are crash leftovers. */
 const RESERVE_STALE_MS = 60_000;
@@ -178,7 +178,7 @@ export const tidyCommand = defineCommand({
       }
       // Cleared rejected mailbox receipts age out with the trace that also records them; an open
       // one (its Check item still shown: no answer or approval since, story not finished) stays
-      const open = new Set(obs.facts.stories.filter((s) => !storyFinished(s)).flatMap((s) => (s.rejected_mailbox ?? []).map((r) => r.receipt_id)));
+      const open = new Set(obs.facts.stories.filter((s) => !storyFinished(storyPhase(s, obs.facts.repo.default_branch))).flatMap((s) => (s.rejected_mailbox ?? []).map((r) => r.receipt_id)));
       // A rejected.json that cannot be pruned is one kept item; the rest of tidy goes on
       const pruned = await pruneRejectedReceipts(root, new Date(ctx.clock.now() - window.ms).toISOString(), open, dry);
       if (pruned.error) kept.push({ item: rejectedReceiptsPath(root), reason: pruned.error });
