@@ -60,6 +60,20 @@ describe("claude Notification types", () => {
   });
 });
 
+describe("claude StopFailure (a turn that ended on an API error)", () => {
+  const sf = (error: string | undefined) =>
+    claudeAgent.parseHookEvent("stop-failure", { ...payloads.StopFailureAuth, error }, ENV, AT);
+  test("a failed login waits on a person to run /login, so no nudge is spent", () => {
+    expect(sf("authentication_failed")).toMatchObject({ event: "waiting_input", native: "StopFailure", message: "agent logged out — run `/login` in the pane" });
+  });
+  test("other API errors are ignored, as before", () => {
+    for (const e of ["rate_limit", "server_error", "invalid_request", "max_output_tokens", "unknown", "something_new", undefined]) expect(sf(e)).toBeNull();
+  });
+  test("its response is silent: Claude Code ignores StopFailure output", () => {
+    expect(claudeAgent.hookResponse(sf("authentication_failed")!, { block: true })).toEqual({ stdout: "", exit_code: 0 });
+  });
+});
+
 describe("claude refineHooks (§10 implicit ask shows the command)", () => {
   const f = (arg: string, p: unknown) => claudeAgent.parseHookEvent(arg, p, ENV, AT)!;
   const refine = (hooks: Parameters<NonNullable<typeof claudeAgent.refineHooks>>[0]) => claudeAgent.refineHooks!(hooks);
@@ -83,6 +97,16 @@ describe("claude refineHooks (§10 implicit ask shows the command)", () => {
   test("other agents' facts are untouched", () => {
     const codexPerm = { ...perm, agent: "codex" };
     expect(refine([pre, codexPerm])[1]).toEqual(codexPerm);
+  });
+  test("the idle notification after a failed login is dropped, so the logged-out wait holds until the session acts again", () => {
+    const prompt = f("user-prompt-submit", payloads.UserPromptSubmit);
+    const loggedOut = f("stop-failure", payloads.StopFailureAuth);
+    const idle = f("notification", payloads.NotificationIdle);
+    expect(refine([prompt, loggedOut, idle, idle])).toEqual([prompt, loggedOut]);
+    // a new turn after the /login ends the wait; a later idle notification is an ordinary turn end again
+    expect(refine([loggedOut, idle, prompt, idle])).toEqual([loggedOut, prompt, idle]);
+    // another session's failed login does not swallow this session's idle notification
+    expect(refine([{ ...loggedOut, agent_session_id: "zzz" }, idle])).toEqual([{ ...loggedOut, agent_session_id: "zzz" }, idle]);
   });
 });
 
@@ -121,7 +145,7 @@ describe("claude hooks install", () => {
     ]);
     expect(s.hooks.PreToolUse[1]).toEqual({ matcher: "*", hooks: [{ type: "command", command: "norn hook pre-tool-use --agent claude # norn-owned" }] });
     expect(Object.keys(s.hooks).sort()).toEqual(
-      ["Notification", "PostToolUse", "PreToolUse", "SessionEnd", "SessionStart", "Stop", "UserPromptSubmit"],
+      ["Notification", "PostToolUse", "PreToolUse", "SessionEnd", "SessionStart", "Stop", "StopFailure", "UserPromptSubmit"],
     );
 
     expect((await claudeAgent.installHooks(repo, "norn hook")).changed).toEqual([]);
