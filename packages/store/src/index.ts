@@ -33,6 +33,7 @@ export * from "./record-ref.ts";
 export * from "./refs.ts";
 export * from "./skills.ts";
 export * from "./snapshot.ts";
+export * from "./stop-blocks.ts";
 export * from "./tick-trace.ts";
 export * from "./trace.ts";
 export * from "./wake.ts";

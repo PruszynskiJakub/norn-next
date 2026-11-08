@@ -14,7 +14,8 @@
  *     (`--retain`, else `trace.retain`, default and minimum 14d); `trace/workflows/`
  *     is never pruned. Only tidy prunes the trace, never watch or a tick.
  *   - the hook files of units with no live run untouched within the window, and the
- *     briefings, transcripts and old `runs/<run_id>.log` session logs of runs that are not
+ *     briefings, refused turn ends (`stop-blocks/<run_id>/`), transcripts and old
+ *     `runs/<run_id>.log` session logs of runs that are not
  *     live whose newest file is older than the window;
  *     never a live run's, nor `backfill.json`, the caches or the locks.
  *   - rejected mailbox receipts (`rejected.json`) cleared and rejected before the window

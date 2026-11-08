@@ -38,7 +38,7 @@ export interface PrunedHookFile {
   bytes: number;
 }
 
-/** A run whose briefings and transcripts tidy prunes. */
+/** A run whose briefings, refused turn ends and transcripts tidy prunes. */
 export interface PrunedRun {
   run_id: string;
   /** trace-relative dirs */
@@ -48,7 +48,7 @@ export interface PrunedRun {
 
 /**
  * What tidy prunes besides day pairs — the hook files of units with no live run whose
- * last write is before `cutoffMs`, and the briefings and transcripts of runs that are not live whose
+ * last write is before `cutoffMs`, and the briefings, refused turn ends and transcripts of runs that are not live whose
  * newest file is before it. A unit counts as live while its run is running or parked, or while a
  * `started` receipt is not yet applied (a launch in flight); its runs count as live with it.
  */

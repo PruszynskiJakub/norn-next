@@ -14,7 +14,7 @@
  */
 import { cmd, type AgentAdapter, currentRun, cursorStep, type HookDecision, type HookResponse, reportableOutcomes, runAgentSession, standingReport } from "@norn/core";
 import { DEFAULT_CONFIG, type ExitCode, type HookFact, type ResolvedConfig, ulid } from "@norn/schema";
-import { appendHookTrace, bindNornHome, blockedHookCount, loadConfig, repoLayout } from "@norn/store";
+import { appendHookTrace, bindNornHome, blockedHookCount, claimStopBlock, loadConfig, repoLayout } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { withExit } from "../output.ts";
@@ -76,13 +76,30 @@ function pickAdapter(ctx: Context, root: string, config: ResolvedConfig, flag: s
 const refusableTurnEnd = (adapter: AgentAdapter, fact: HookFact): boolean =>
   adapter.tier === "blocking" && fact.event === "turn_end" && fact.agent === adapter.name && Object.hasOwn(adapter.hookEvents, fact.native) && adapter.hookEvents[fact.native] === "turn_end";
 
+/**
+ * Take one of the run's refusals. The traced count is read before this hook's line is appended, so
+ * it alone lets hooks that fire together each refuse past the cap; the exclusive refusal file holds
+ * it. A failed write refuses nothing, so the hook fact is still traced and the agent never breaks.
+ */
+function takeRefusal(root: string, s: UnitSession, runId: string): boolean {
+  try {
+    const traced = blockedHookCount(root, { story: s.unit.story, slice: s.unit.slice }, runId);
+    return traced < MAX_STOP_BLOCKS && claimStopBlock(root, runId, traced, MAX_STOP_BLOCKS);
+  } catch {
+    return false;
+  }
+}
+
 /** The fact comes from an agent session other than the one `run_id` belongs to. */
 function foreignFact(s: UnitSession, run_id: string, fact: HookFact): boolean {
   const owner = runAgentSession(s, run_id);
   return !!owner && !!fact.agent_session_id && fact.agent_session_id !== owner;
 }
 
-/** Block turn end only in an unattended agent step whose live run has not reported. */
+/**
+ * Block turn end only in an unattended agent step whose live run has not reported and still has one
+ * of its MAX_STOP_BLOCKS refusals to take; blocking takes it.
+ */
 function decideBlock(root: string, s: UnitSession | null, fact: HookFact, adapter: AgentAdapter): HookDecision {
   if (!refusableTurnEnd(adapter, fact) || !s) return { block: false };
   const step = cursorStep(s);
@@ -92,8 +109,9 @@ function decideBlock(root: string, s: UnitSession | null, fact: HookFact, adapte
   if (!run || (fact.run_id && fact.run_id !== run.run_id)) return { block: false };
   if (foreignFact(s, run.run_id, fact)) return { block: false }; // It cannot report the run, so it is not held to it
   if (standingReport(s, run.run_id)) return { block: false };
-  if (blockedHookCount(root, { story: s.unit.story, slice: s.unit.slice }, run.run_id) >= MAX_STOP_BLOCKS) return { block: false };
   const outcomes = reportableOutcomes(step);
+  // Taking a refusal must stay the last gate, so one is spent only when this hook blocks
+  if (!takeRefusal(root, s, run.run_id)) return { block: false };
   return {
     block: true,
     reason:

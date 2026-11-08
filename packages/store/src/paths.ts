@@ -169,6 +169,14 @@ export const HOOKS_DIR = "hooks";
 export const hooksDir = (root: string) => join(machineDir(root), HOOKS_DIR);
 /** The one-time backfill of the hook files from the day files (`hooks/backfill.json`). */
 export const hookBackfillPath = (root: string) => join(hooksDir(root), "backfill.json");
+/**
+ * The machine dir's `stop-blocks/<run_id>/`: one file per turn end refused for the run, named by its
+ * index below the cap. The files are only ever created exclusively, never read or parsed, so they are
+ * not JSON and have no schema.
+ */
+export const STOP_BLOCKS_DIR = "stop-blocks";
+export const stopBlocksDir = (root: string, runId: string) => join(machineDir(root), STOP_BLOCKS_DIR, runId);
+export const stopBlockPath = (root: string, runId: string, i: number) => join(stopBlocksDir(root, runId), String(i));
 /** The base branch's `.agents/specs/` materialized per tree id (store/base.ts). */
 export const baseCacheDir = (root: string) => join(machineDir(root), "base");
 /** Finished stories' records unpacked from their archive ref, one folder per record commit (`archive/<story>/<commit>/`, record-ref.ts). */
