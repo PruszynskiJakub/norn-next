@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { UnitState } from "@norn/schema";
+import type { UnitState, UnitStateRecord } from "@norn/schema";
 import { type AgentUnit, agentWorkRefusal, currentRun, cursorStep, foreignSessionRefusal, implicitAsk, implicitAskOpen, runAgentSession, standingReport } from "../../src/agent-unit.ts";
 import type { NumberedReceipt } from "../../src/facts.ts";
 import { at, numbered, receipt, SLICE_WF, sliceUnit, stateFor } from "../fixtures.ts";
@@ -7,7 +7,7 @@ import { at, numbered, receipt, SLICE_WF, sliceUnit, stateFor } from "../fixture
 const unit = sliceUnit("gh-1", "01", "a");
 const RUN = { run_id: "01JRRRRRRRRRRRRRRRRRRRRRRR", step: "implement", attempt: 1, agent: "claude", started_at: at() } as NonNullable<UnitState["run"]>;
 
-function view(patch: Partial<UnitState>, receipts: NumberedReceipt[] = [], unapplied: NumberedReceipt[] = []): AgentUnit {
+function view(patch: Partial<UnitStateRecord>, receipts: NumberedReceipt[] = [], unapplied: NumberedReceipt[] = []): AgentUnit {
   return { unit, state: stateFor(unit, SLICE_WF, patch), workflow: SLICE_WF, receipts, unapplied };
 }
 
@@ -21,19 +21,19 @@ describe("agent-unit rules", () => {
   });
 
   test("standingReport: an agent ask stands until answered; implicit asks never count", () => {
-    const st = stateFor(unit, SLICE_WF, { run: RUN });
+    const st = stateFor(unit, SLICE_WF, { status: "running", run: RUN });
     const ask = numbered(1, receipt(st, "ask", { question: "q" }));
-    expect(standingReport(view({ run: RUN }, [ask]), RUN.run_id)?.n).toBe(1);
+    expect(standingReport(view({ status: "running", run: RUN }, [ask]), RUN.run_id)?.n).toBe(1);
     const answer = numbered(2, receipt(st, "answer", { answer: "a" }, "human"));
-    expect(standingReport(view({ run: RUN }, [ask, answer]), RUN.run_id)).toBeNull();
+    expect(standingReport(view({ status: "running", run: RUN }, [ask, answer]), RUN.run_id)).toBeNull();
     const implicit = numbered(1, receipt(st, "ask", { question: "q", implicit: true }));
-    expect(standingReport(view({ run: RUN }, [implicit]), RUN.run_id)).toBeNull();
+    expect(standingReport(view({ status: "running", run: RUN }, [implicit]), RUN.run_id)).toBeNull();
   });
 
   test("implicitAsk / implicitAskOpen", () => {
-    const st = stateFor(unit, SLICE_WF, { run: RUN });
+    const st = stateFor(unit, SLICE_WF, { status: "running", run: RUN });
     const ask = numbered(1, receipt(st, "ask", { question: "q", implicit: true }));
-    const parked: Partial<UnitState> = { status: "parked", run: RUN, park: { kind: "ask", reason: "q", since: at(), receipt_id: ask.receipt.receipt_id } };
+    const parked: Partial<UnitStateRecord> = { status: "parked", run: RUN, park: { kind: "ask", reason: "q", since: at(), receipt_id: ask.receipt.receipt_id } };
     expect(implicitAskOpen(view(parked, [ask]))?.n).toBe(1);
     const answer = numbered(2, receipt(st, "answer", { answer: "a" }, "human"));
     expect(implicitAsk(view(parked, [ask, answer], [answer]))?.answered).toBe(true);
@@ -45,6 +45,8 @@ describe("agent-unit rules", () => {
     expect(cursorStep(view({}))?.type).toBe("agent");
     expect(agentWorkRefusal(view({ status: "running", run: RUN }), "brief")).toBeNull();
     expect(agentWorkRefusal(view({ step: "$done", status: "done" }), "brief")?.code).toBe("unit_done");
+    // a finished round held at $done for its PR is done for an agent too, not stuck
+    expect(agentWorkRefusal(view({ step: "$done", status: "stuck", park: { kind: "remote", reason: "remote: PR closed", since: at() } }), "brief")?.code).toBe("unit_done");
     expect(agentWorkRefusal(view({ status: "stuck" }), "brief")?.code).toBe("unit_stuck");
     expect(agentWorkRefusal(view({ step: "nope" }), "brief")?.code).toBe("no_step");
     expect(agentWorkRefusal(view({ step: "human-qa" }), "brief")?.code).toBe("gate_step");

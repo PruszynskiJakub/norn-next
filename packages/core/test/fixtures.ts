@@ -1,6 +1,7 @@
 /** Shared test fixtures: workflows, states, receipts and Facts builders. */
-import { DEFAULT_CONFIG, deriveUlid, type Receipt, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
+import { DEFAULT_CONFIG, deriveUlid, type Receipt, type ResolvedConfig, type UnitState, type UnitStateRecord, type Workflow } from "@norn/schema";
 import { initialState } from "../src/apply.ts";
+import { normalizeUnitState } from "../src/unit-state.ts";
 import type { LoadedWorkflow, RepoWorkflows } from "../src/decide/index.ts";
 import type { Facts, NumberedReceipt, SliceFileFacts, StoryFacts, UnitFacts, UnitRef, WorktreeFacts } from "../src/facts.ts";
 import { sha256 } from "../src/hash.ts";
@@ -73,8 +74,9 @@ export const CONFIG: ResolvedConfig = { ...DEFAULT_CONFIG, runner: { adapter: "h
 export const storyUnit = (key = "gh-1"): UnitRef => ({ story: key, slice: null, dir: "_story", key });
 export const sliceUnit = (story: string, nn: string, slug: string): UnitRef => ({ story, slice: `${story}/${nn}`, dir: `${nn}-${slug}`, key: `${story}/${nn}` });
 
-export function stateFor(unit: UnitRef, wf: Workflow, patch: Partial<UnitState> = {}): UnitState {
-  return { ...initialState({ unit, workflow: wf, workflowName: wf.name, workflowHash: sha256(JSON.stringify(wf)), now: at() }), ...patch };
+/** The first state patched by `patch`, read as store reads state.json: a patch that leaves a contradiction is normalised. */
+export function stateFor(unit: UnitRef, wf: Workflow, patch: Partial<UnitStateRecord> = {}): UnitState {
+  return normalizeUnitState({ ...initialState({ unit, workflow: wf, workflowName: wf.name, workflowHash: sha256(JSON.stringify(wf)), now: at() }), ...patch });
 }
 
 /** Receipt with a header matching the state's cursor. */

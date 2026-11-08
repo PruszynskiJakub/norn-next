@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { HookEventKind, HookFact, UnitState } from "@norn/schema";
+import type { HookEventKind, HookFact, UnitState, UnitStateRecord } from "@norn/schema";
 import type { RunFacts } from "../../src/facts.ts";
 import { attendedWaitSince, buildInbox } from "../../src/inbox/items.ts";
 import type { PaneState } from "../../src/ports.ts";
@@ -17,7 +17,7 @@ function runFacts(hooks: HookFact[], patch: Partial<RunFacts> = {}): RunFacts {
   return { run_id: RUN, session: null, process_alive: true, pane: null, hooks, last_hook_at: last ? Date.parse(last.at) : null, last_activity_at: null, transcript: null, ...patch };
 }
 
-function refining(run: RunFacts | null, patch: Partial<UnitState> = {}) {
+function refining(run: RunFacts | null, patch: Partial<UnitStateRecord> = {}) {
   const st = stateFor(STORY, STORY_WF, {
     status: "running",
     run: { run_id: RUN, step: "refine", attempt: 1, started_at: at(T0), how: "manual", agent: "claude", agent_session_id: "sess-1" },

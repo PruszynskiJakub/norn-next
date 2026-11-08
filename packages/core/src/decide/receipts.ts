@@ -19,6 +19,7 @@ import { unitInboxItem } from "../inbox/items.ts";
 import { nornTrailers, type StepEnd, unitWorktree } from "../policy.ts";
 import type { InboxItem } from "../ports.ts";
 import { iso } from "../time.ts";
+import { toStuck } from "../unit-state.ts";
 import type { RepoWorkflows } from "./index.ts";
 
 /** A side action rides along with its unit's one action this tick — a claim renewal, or a record push. */
@@ -239,7 +240,7 @@ export function emitApplied(
 }
 
 export function park(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, kind: "workflow" | "stuck" | "remote", reason: string, rule: string): void {
-  const state: UnitState = { ...st, status: "stuck", park: { kind, reason, since: ctx.nowIso }, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };
+  const state: UnitState = { ...toStuck(st, { kind, reason, since: ctx.nowIso }), updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };
   ctx.emit({
     kind: "park",
     unit: uf.unit,

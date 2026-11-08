@@ -8,7 +8,7 @@
  *   - R7: runs record their machine; a foreign run is judged by hooks and the claim, never by pid
  */
 import { describe, expect, test } from "bun:test";
-import type { UnitState } from "@norn/schema";
+import type { UnitState, UnitStateRecord } from "@norn/schema";
 import type { Action } from "../../src/actions.ts";
 import { NUDGE_TEXT } from "../../src/commands.ts";
 import { decide } from "../../src/decide/index.ts";
@@ -26,13 +26,13 @@ const only = (f: Facts): Action => {
   return d.action;
 };
 
-function solo(patch: Partial<UnitState> = {}, run: Partial<RunFacts> | null = null, unit: Partial<UnitFacts> = {}, story: Partial<StoryFacts> = {}): StoryFacts {
+function solo(patch: Partial<UnitStateRecord> = {}, run: Partial<RunFacts> | null = null, unit: Partial<UnitFacts> = {}, story: Partial<StoryFacts> = {}): StoryFacts {
   const ref = storyUnit();
   const st = stateFor(ref, SOLO_WF, patch);
   const rf: RunFacts | null = run && { run_id: RUN, session: { runner: "herdr", session_id: "s1" }, process_alive: true, pane: null, hooks: [], last_hook_at: null, last_activity_at: T0, transcript: null, ...run };
   return storyFacts("gh-1", [unitFacts(ref, SOLO_WF, st, { run: rf, ...unit })], { ...story, frontmatter: { ...storyFacts("gh-1", []).frontmatter!, workflow: "solo" } });
 }
-const running = (p: Partial<UnitState> = {}, session: { runner: string; session_id: string } = { runner: "herdr", session_id: "s1" }): Partial<UnitState> => ({
+const running = (p: Partial<UnitStateRecord> = {}, session: { runner: string; session_id: string } = { runner: "herdr", session_id: "s1" }): Partial<UnitStateRecord> => ({
   status: "running",
   run: { run_id: RUN, step: "implement", attempt: 1, started_at: at(T0 - 20 * 60_000), how: "auto", session, agent: "claude", agent_session_id: "cs-1" },
   updated_at: at(T0 - 20 * 60_000),

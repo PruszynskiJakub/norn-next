@@ -269,7 +269,7 @@ describe("inbox history", () => {
   const gate = stateFor(unit, SLICE_WF, { step: "human-qa", status: "parked", park: { kind: "gate", reason: "approve or reject human-qa", since: at(T0 - 60_000) } });
 
   test("items needing a person appear once with their since; running items are not tracked", () => {
-    const f = facts([storyFacts("gh-1", [unitFacts(unit, SLICE_WF, gate), unitFacts(sliceUnit("gh-1", "03", "c"), SLICE_WF, stateFor(sliceUnit("gh-1", "03", "c"), SLICE_WF, { status: "running" }))])]);
+    const f = facts([storyFacts("gh-1", [unitFacts(unit, SLICE_WF, gate), unitFacts(sliceUnit("gh-1", "03", "c"), SLICE_WF, stateFor(sliceUnit("gh-1", "03", "c"), SLICE_WF, { status: "running", run: { run_id: "01JDDDDDDDDDDDDDDDDDDDDDDD", step: "implement", attempt: 1, started_at: at(), how: "auto" } }))])]);
     const first = inboxChanges({}, buildInbox(f, CONFIG), f, []);
     expect(first.changes).toEqual([
       expect.objectContaining({ event: "appeared", id: "approve:gh-1/02:human-qa#1", group: "approve", slice: "gh-1/02", step: "human-qa", at: at(T0 - 60_000), command: "norn story approve gh-1/02" }),

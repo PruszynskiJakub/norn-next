@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type ClaimBlob, type LeaseFile, type Receipt, type UnitState, ulid } from "@norn/schema";
+import { type ClaimBlob, type LeaseFile, type Receipt, type UnitState, type UnitStateRecord, ulid } from "@norn/schema";
 import {
   acquireClaim,
   appendHookTrace,
@@ -54,7 +54,7 @@ steps:
 counters: { test_loop: { max: 3 } }
 `;
 
-function state(over: Partial<UnitState>): UnitState {
+function state(over: Partial<UnitStateRecord>): UnitState {
   return {
     version: 1,
     story: "gh-12",
@@ -78,7 +78,7 @@ function state(over: Partial<UnitState>): UnitState {
     updated_at: ago(120),
     last_tick_id: null,
     ...over,
-  };
+  } as UnitState;
 }
 
 function receipt(over: Record<string, unknown>): Receipt {
@@ -338,7 +338,7 @@ describe("loadProjectView", () => {
     // Run state is the checkout's, whichever worktree (these fixture folders are no git checkout: named from the story's)
     const u1 = runStateOf(spec, "01-login-form");
     pinWorkflow(u1, WF);
-    writeState(u1, state({ story: "gh-7", slice: "gh-7/01", unit_dir: "01-login-form", status: "parked", park: { kind: "stuck", reason: "blocked", since: ago(3), receipt_id: ASK } }));
+    writeState(u1, state({ story: "gh-7", slice: "gh-7/01", unit_dir: "01-login-form", status: "parked", park: { kind: "ask", reason: "blocked", since: ago(3), receipt_id: ASK } }));
     writeUnitMarker(sliceWt, { repo, story: "gh-7", slice: "gh-7/01", unit: "01-login-form", spec_dir: ".agents/specs/gh-7-thing" });
     // a story-shaped folder whose marker names another story is not that story's worktree
     const wrong = join(parent, "app-worktrees", "gh-8-other");

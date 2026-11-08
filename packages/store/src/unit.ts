@@ -3,20 +3,27 @@
  * workflow, logs, evidence and handoff.md.
  */
 import { mkdirSync } from "node:fs";
-import { HANDOFF_SKELETON } from "@norn/core";
+import { HANDOFF_SKELETON, normalizeUnitState } from "@norn/core";
 import type { UnitState, Workflow } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { parse as parseYaml } from "yaml";
 import { atomicCopyDir, atomicWrite, createExclusive, fileError, jsonLine, readJsonFile, readText, type ReadResult, validated } from "./fsx.ts";
 import { evidenceDir, logPath, pinnedWorkflowPath, statePath } from "./paths.ts";
 
+/** state.json as the `UnitState` it stands for: older shapes read normalised, never corrupt. */
 export function readState(unitDir: string, root?: string): ReadResult<UnitState> {
-  return readJsonFile("state", statePath(unitDir), root);
+  const r = readJsonFile("state-record", statePath(unitDir), root);
+  return r.ok ? { ...r, value: normalizeUnitState(r.value) } : r;
 }
 
-/** Validate and atomically write state.json. Callers write it last. */
+/**
+ * Validate and atomically write state.json. Callers write it last. Checked against the read
+ * shape, not the strict union: a throw here falls between the receipts and the commit point and
+ * would refold to the same throw on every tick, so a writer bug that slips past the types is
+ * written as it is and reads back normalised.
+ */
 export function writeState(unitDir: string, state: UnitState): void {
-  assertValid("state", state);
+  assertValid("state-record", state);
   atomicWrite(statePath(unitDir), jsonLine(state));
 }
 

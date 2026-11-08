@@ -1070,7 +1070,7 @@ describe("gh-71 B11–B17, B32: --force ends an unfinished round, --at alone mov
     expect(rejected.decisions.filter((d) => d.unit === "gh-21").map((d) => d.rule)).toEqual(["round.workflow_changed"]);
     expect(existsSync(join(record21(), "rounds/02-story"))).toBe(false);
     expect(t.state(runs21())).toMatchObject({ workflow: "triage", step: "confirm", status: "parked", park: parked?.park });
-    expect(t.state(runs21())?.ended).toBeUndefined();
+    expect(t.state(runs21())).not.toHaveProperty("ended");
     // the gate still waits for the person: approve applies to it
     const inbox = (await t.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; command: string }>> };
     expect(inbox.groups.approve).toContainEqual(expect.objectContaining({ story: "gh-21", command: "norn story approve gh-21" }));
@@ -1093,7 +1093,7 @@ describe("gh-71 B11–B17, B32: --force ends an unfinished round, --at alone mov
     });
     expect(runs21()).toBe(join(record21(), "rounds/02-story"));
     expect(t.state(runs21())).toMatchObject({ workflow: "story", round: 2, step: "refine" });
-    expect(t.state(runs21())?.ended).toBeUndefined();
+    expect(t.state(runs21())).not.toHaveProperty("ended");
   });
 
   test("B15 (AC6, AC8): --at alone moves the same round's cursor, counters kept; an unknown step names the round's steps", async () => {
@@ -1134,6 +1134,6 @@ describe("gh-71 B11–B17, B32: --force ends an unfinished round, --at alone mov
     expect(runs21()).toBe(join(record21(), "rounds/03-quick"));
     expect(t.state(runs21())).toMatchObject({ workflow: "quick", round: 3, step: "work" });
     expect(t.state(join(record21(), "rounds/02-story"))).toMatchObject({ step: "$done", status: "done" });
-    expect(t.state(join(record21(), "rounds/02-story"))?.ended).toBeUndefined();
+    expect(t.state(join(record21(), "rounds/02-story"))).not.toHaveProperty("ended");
   });
 });

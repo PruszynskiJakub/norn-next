@@ -175,7 +175,7 @@ describe("R5: a launch norn did not see finish (acceptance 6)", () => {
     await h.tick();
     // …and start over on a fresh story state at implement, crashing its launch the same way
     const st = h.state(runs(h)) as UnitState;
-    const ready: UnitState = { ...st, step: "implement", status: "ready", run: null, attempt: 2, visits: { implement: 2 }, retries_used: 0, nudges_used: 0 };
+    const ready = { ...st, step: "implement", status: "ready", run: null, attempt: 2, visits: { implement: 2 }, retries_used: 0, nudges_used: 0 } as UnitState;
     writeState(runs(h), ready);
     h.clock.advance(10_000);
     expect(acted(await h.tick())).toEqual(["gh-9 agent.start"]);
@@ -196,7 +196,7 @@ describe("R5: a launch norn did not see finish (acceptance 6)", () => {
     const st = h.state(runs(h)) as UnitState;
     const active = st.run?.run_id as string;
     // the person's answer left the step ready without a session (B2 fresh path) — but the run lives on
-    writeState(runs(h), { ...st, status: "ready", run: null });
+    writeState(runs(h), { ...st, status: "ready", run: null } as UnitState);
     h.clock.advance(10_000);
     hook(h, active, "tool_use");
     h.clock.advance(1000);
@@ -253,7 +253,7 @@ describe("R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8)", () => 
   test("no heartbeat for 3 watch intervals with auto work held: inbox item, no manual start hint", async () => {
     // the launch is queued forever (max_agents 0 would be config; simply stop ticking at `ready`)
     const st = h.state(runs(h)) as UnitState;
-    writeState(runs(h), { ...st, status: "ready", run: null });
+    writeState(runs(h), { ...st, status: "ready", run: null } as UnitState);
     const fresh = (await h.listed("gh-9")) as ProjectView["stories"][number];
     expect(fresh.next).not.toBe("norn watch");
     h.clock.advance(7 * 60_000);
@@ -282,7 +282,7 @@ describe("R7: a run from another machine (acceptance 10)", () => {
     const st = await untilRunning(h);
     expect(st.run).toMatchObject({ machine: "tester@box", heartbeat_id: expect.any(String) });
     // the run was launched by ann's heartbeat on her machine; this checkout holds the story now
-    const foreign: UnitState = { ...st, run: { ...(st.run as NonNullable<UnitState["run"]>), machine: "ann@pc", heartbeat_id: "01JFFFFFFFFFFFFFFFFFFFFFFF", process: { pid: 999_999_99, pid_start: "gone" } } };
+    const foreign = { ...st, run: { ...(st.run as NonNullable<UnitState["run"]>), machine: "ann@pc", heartbeat_id: "01JFFFFFFFFFFFFFFFFFFFFFFF", process: { pid: 999_999_99, pid_start: "gone" } } } as UnitState;
     writeState(runs(h), foreign); // In the machine dir, nothing to commit
     h.runner.pane = { alive: false, state: "unknown" };
     h.clock.advance(10_000);

@@ -25,7 +25,7 @@ import {
   LocalRemoteFile,
 } from "./local.ts";
 import { Receipt } from "./receipt.ts";
-import { UnitState } from "./state.ts";
+import { UnitState, UnitStateRecord } from "./state.ts";
 import { HookFact, TraceEvent } from "./trace.ts";
 import { Workflow } from "./workflow.ts";
 
@@ -37,6 +37,8 @@ export const SCHEMAS = {
   story: StoryFrontmatter,
   slice: SliceFrontmatter,
   state: UnitState,
+  // state.json as read and written: older shapes included, normalised by core normalizeUnitState
+  "state-record": UnitStateRecord,
   receipt: Receipt,
   trace: TraceEvent,
   hook: HookFact,

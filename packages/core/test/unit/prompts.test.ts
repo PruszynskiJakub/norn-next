@@ -8,7 +8,7 @@
  *   - R9.1: SessionStart without a turn → one re-send after 60 s, `silent` 60 s later
  */
 import { describe, expect, test } from "bun:test";
-import type { HookFact, UnitState } from "@norn/schema";
+import type { HookFact, UnitState, UnitStateRecord } from "@norn/schema";
 import type { Action } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { AUTO_PROMPT, NUDGE_TEXT } from "../../src/commands.ts";
@@ -28,14 +28,14 @@ const only = (f: Facts): Action => {
   if (!d) throw new Error("no decision for gh-1");
   return d.action;
 };
-function solo(patch: Partial<UnitState>, run: Partial<RunFacts> | null, unit: Partial<UnitFacts> = {}): StoryFacts {
+function solo(patch: Partial<UnitStateRecord>, run: Partial<RunFacts> | null, unit: Partial<UnitFacts> = {}): StoryFacts {
   const ref = storyUnit();
   const st = stateFor(ref, SOLO_WF, patch);
   const rf: RunFacts | null = run && { run_id: RUN, session: { runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1" }, process_alive: true, pane: null, hooks: [], last_hook_at: null, last_activity_at: T0, transcript: null, ...run };
   return storyFacts("gh-1", [unitFacts(ref, SOLO_WF, st, { run: rf, ...unit })], { frontmatter: { ...storyFacts("gh-1", []).frontmatter!, workflow: "solo" } });
 }
 const runInfo = { run_id: RUN, step: "implement", attempt: 1, started_at: at(T0 - 5 * 60_000), how: "auto" as const, session: { runner: "herdr", session_id: "w1:p1", pane_id: "w1:p1", reach: "herdr agent attach w1:p1" }, agent: "claude" };
-const running = (p: Partial<UnitState> = {}): Partial<UnitState> => ({ status: "running", run: runInfo, updated_at: at(T0 - 5 * 60_000), ...p });
+const running = (p: Partial<UnitStateRecord> = {}): Partial<UnitStateRecord> => ({ status: "running", run: runInfo, updated_at: at(T0 - 5 * 60_000), ...p });
 const hook = (event: HookFact["event"], ms: number): HookFact => ({ event, at: at(ms), agent: "claude", native: event, cwd: "/r-worktrees/gh-1-login", run_id: RUN });
 const withCaps = (f: Facts, send: boolean): Facts => ({ ...f, machine: { ...f.machine, runner: send ? "herdr" : "headless", runner_capabilities: { send, resume: true } } });
 

@@ -609,7 +609,6 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     since,
     ...extra,
   });
-  const park = st.park;
   // A story held here from its record alone has no branch, so nothing runs in
   // it — a run its record names belongs to the previous holder's session, and nothing can start
   if (story.record_only && (st.status === "running" || st.status === "ready"))
@@ -617,22 +616,28 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       id: `record-only:${key}:${st.step}#${st.attempt}`,
     });
   switch (st.status) {
-    case "parked":
-      if (park?.kind === "ask") return answerItem(uf, st, park, item);
-      if (park?.kind === "gate") {
-        const judged = judgedDetail(story, uf);
-        const reject = `or reject: ${cmd.storyReject(key)}`;
-        const { detail, full } = gateChecks(story, uf);
-        const fullText = [judged?.full, full].filter(Boolean).join("\n\n");
-        return item("approve", park.reason, cmd.storyApprove(key), park.since, { detail: [judged?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
+    case "parked": {
+      const park = st.park;
+      switch (park.kind) {
+        case "ask":
+          return answerItem(uf, st, park, item);
+        case "gate": {
+          const judged = judgedDetail(story, uf);
+          const reject = `or reject: ${cmd.storyReject(key)}`;
+          const { detail, full } = gateChecks(story, uf);
+          const fullText = [judged?.full, full].filter(Boolean).join("\n\n");
+          return item("approve", park.reason, cmd.storyApprove(key), park.since, { detail: [judged?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
+        }
+        case "attended": {
+          const start = personStart(uf, story, facts, config);
+          return item("your_turn", `${st.step}: attended step — work with the agent`, start.command, park.since, start.detail ? { detail: start.detail } : {});
+        }
       }
-      if (park?.kind === "attended") {
-        const start = personStart(uf, story, facts, config);
-        return item("your_turn", `${st.step}: attended step — work with the agent`, start.command, park.since, start.detail ? { detail: start.detail } : {});
-      }
-      return item("unblock", park?.reason ?? "parked", unstickCommand(key, st), park?.since ?? st.updated_at);
-    case "stuck":
-      return item("unblock", park?.reason ?? "stuck", unstickCommand(key, st), park?.since ?? st.updated_at, park?.receipt_id ? { id: park.receipt_id } : {});
+    }
+    case "stuck": {
+      const park = st.park;
+      return item("unblock", park.reason, unstickCommand(key, st), park.since, park.receipt_id ? { id: park.receipt_id } : {});
+    }
     case "running": {
       // The agent never took its launch prompt — a person looks at the pane
       const unsent = launchPromptMissed(uf, st);
@@ -669,9 +674,10 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       return item("running", `${st.step} #${st.attempt} (queued)`, cmd.runList(key), st.step_entered_at);
     }
     case "done": {
+      const park = st.park;
       if (uf.unit.slice === null) {
         // A round receipt rejected because its workflow file changed — the edit again
-        if (park?.kind === "workflow")
+        if (park)
           return item("your_turn", `${story.key}: ${park.reason}`, park.command ?? cmd.storyEdit(story.key, { workflow: "<name>" }), park.since, { id: `round_rejected:${key}:${park.receipt_id ?? park.since}` });
         const merge = mergeItem(story, st, facts.repo.default_branch);
         if (merge) return merge;

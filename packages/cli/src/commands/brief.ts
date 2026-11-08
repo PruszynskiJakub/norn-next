@@ -9,7 +9,7 @@
 import { readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { cmd, currentRun, cursorStep, type NumberedReceipt, type ProcessPort, renderBrief, type Ruling, standingReport, stepLimits, storyRulings } from "@norn/core";
-import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid } from "@norn/schema";
+import { type AgentStep, type ProcessIdentity, type ReceiptOf, storyBranch, ulid, type UnitState } from "@norn/schema";
 import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, readHandoff, readText, writeBriefing, readRemoteCache, spawnSyncCaptured, storyFile, traceEvent, runStateDir, storyRunStateDir } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
@@ -173,7 +173,8 @@ export const briefCommand = defineCommand({
     const slug = s.marker.spec_dir.split("/").at(-1)?.slice(s.unit.story.length + 1) ?? "";
     // A story diffs against the fetched base (`origin/main`), never the main checkout's stale local `main`
     const base = s.unit.slice ? storyBranch(s.unit.story, slug) : storyDiffBase(ctx, s.root);
-    const state = run.applied ? s.state : { ...s.state, run: { run_id: run.run_id, step: s.state.step, attempt: s.state.attempt, started_at: ctx.clock.iso(), how: "manual" as const } };
+    // Only rendered, never written: the run this brief is about to report, on the state as it stands
+    const state = run.applied ? s.state : ({ ...s.state, run: { run_id: run.run_id, step: s.state.step, attempt: s.state.attempt, started_at: ctx.clock.iso(), how: "manual" as const } } as UnitState);
     const briefing = renderBrief({
       unit: s.unit,
       state,

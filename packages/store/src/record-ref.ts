@@ -13,7 +13,7 @@ import { createHash } from "node:crypto";
 import { type Dirent, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
-import type { FileError } from "@norn/core";
+import { type FileError, normalizeUnitState } from "@norn/core";
 import { parseRoundDirName, parseSliceDirName, parseSpecDirName, RECORD_REF_PREFIX, ROUNDS_DIR, type RunStory, recordRef, sliceKey, SPECS_DIR, STORY_UNIT_DIR, treeStoryRunStatePath, type UnitState, validate, type Workflow } from "@norn/schema";
 import { fsyncTree, isErrno } from "./fsx.ts";
 import { archiveCacheDir } from "./paths.ts";
@@ -597,7 +597,7 @@ export async function readRecordObjects(root: string, story: string, sha: string
     const dir = folders.get(unit) as string;
     const statePath_ = `${dir}/state.json`;
     if (bad.has(name(statePath_))) continue;
-    const st = validate("state", JSON.parse(texts.get(statePath_) as string));
+    const st = validate("state-record", JSON.parse(texts.get(statePath_) as string));
     if (!st.ok) {
       errors.push({ file: name(statePath_), errors: st.errors });
       continue;
@@ -607,7 +607,7 @@ export async function readRecordObjects(root: string, story: string, sha: string
     if (wf && !wf.ok && wf.reason === "corrupt") errors.push(wf.error);
     const nn = unit === STORY_UNIT_DIR ? null : (parseSliceDirName(unit, { loose: true })?.nn as string);
     const slice = nn === null ? null : sliceKey(story, nn);
-    units.push({ key: slice ?? story, slice, state: st.value, workflow: wf?.ok ? wf.value : null });
+    units.push({ key: slice ?? story, slice, state: normalizeUnitState(st.value), workflow: wf?.ok ? wf.value : null });
   }
   return { units, errors };
 }

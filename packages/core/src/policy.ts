@@ -2,7 +2,7 @@
  * Rules decide and the inbox both read off Facts — each defined once here, so the tick that acts
  * and the inbox that tells a person never disagree about them.
  */
-import { BUILT_IN_LIMITS, HANDOFFS_DIR, isClosedStatus, type Mode, parseDuration, type ResolvedConfig, RUNS_DIR, SPECS_DIR, type Step, type UnitState, type Workflow } from "@norn/schema";
+import { BUILT_IN_LIMITS, HANDOFFS_DIR, isClosedStatus, type Mode, parseDuration, type ResolvedConfig, RUNS_DIR, SPECS_DIR, type Step, type DoneState, type StuckState, type UnitState, type Workflow } from "@norn/schema";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "./facts.ts";
 import { hookActivity } from "./session.ts";
 import { stepOf } from "./workflow.ts";
@@ -114,10 +114,13 @@ export function issueProblem(story: StoryFacts, label: string): string | null {
 }
 
 /**
- * The story's round is finished — its unit reached `$done`, or an older norn
- * parked it there for a remote change (read as finished; the holder's tick drops that park).
+ * The story's round is finished — its unit reached `$done`, or it is parked there for a
+ * problem with its PR or an older norn's remote change (still finished; the holder's tick drops
+ * that park). A stuck unit at `$done` on a `workflow` park is not: its round receipt was rejected.
  */
-export function roundFinished(st: UnitState | null | undefined): boolean {
+export function roundFinished(
+  st: UnitState | null | undefined,
+): st is DoneState | (StuckState & { step: "$done"; park: { kind: "remote" } }) {
   if (st?.step !== "$done") return false;
   return st.status === "done" || (st.status === "stuck" && st.park?.kind === "remote");
 }

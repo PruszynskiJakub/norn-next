@@ -3,6 +3,7 @@ import {
   type AgentStep,
   parseDuration,
   type ReceiptOf,
+  type RunningState,
   type UnitState,
   type Workflow,
 } from "@norn/schema";
@@ -15,6 +16,7 @@ import { promptKeys } from "../prompt.ts";
 import type { RunnerCapabilities, SessionRef } from "../ports.ts";
 import { movedSince, paneLeftPrompt, sessionActivity } from "../session.ts";
 import { epoch } from "../time.ts";
+import { toReady } from "../unit-state.ts";
 import { stepOf } from "../workflow.ts";
 import { applyCtx, commitFor, type Ctx, emitApplied, endedWith, nextReceiptNumber, nornReceipt, synth, unitItem } from "./receipts.ts";
 
@@ -53,7 +55,7 @@ export function applyAction(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: Unit
         if (!resumed) return ctx.noop(uf.unit, "answer.resume.queued", `answer waits: max_agents ${ctx.config.max_agents} in use`);
         extra.push(resumed.receipt);
         ({ state, launch } = resumed);
-      } else state = { ...res.state, status: "ready", run: null };
+      } else state = toReady(res.state);
     }
   }
   // `story edit --at` / `run rerun` re-enter a step: the old run's session must not keep working
@@ -193,11 +195,10 @@ function resumeLaunch(
 }
 
 /** Classification of a live agent run from facts. */
-export function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, step: AgentStep): void {
+export function classifyRun(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: RunningState, wf: Workflow, step: AgentStep): void {
   const ref = uf.unit;
   const run = st.run;
   const rf = uf.run;
-  if (!run) return ctx.noop(ref, "agent.running.no_run", "running without a run record");
   if (!rf || rf.run_id !== run.run_id) return ctx.noop(ref, "agent.running.unobserved", `no facts for run ${run.run_id}`);
   const now = ctx.facts.now;
   const touched = Math.max(epoch(run.started_at), epoch(st.updated_at));
@@ -440,8 +441,8 @@ export const LAUNCH_PROMPT_MS = 60_000;
  * `run.prompt_resent_at`); 60 s after that re-send the run is `silent` ("launch prompt not
  * received"). Only for local sessions of a runner that can type; otherwise the usual rules.
  */
-function launchPromptCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, rf: RunFacts): "acted" | [string, string, string] | null {
-  const run = st.run as NonNullable<UnitState["run"]>;
+function launchPromptCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: RunningState, rf: RunFacts): "acted" | [string, string, string] | null {
+  const run = st.run;
   const start = sessionStartedNoTurn(rf);
   if (!start) return null;
   if (!run.session || foreignRun(ctx, run) || run.session.runner !== ctx.facts.machine.runner || !runnerCaps(ctx).send) return null;
@@ -449,7 +450,7 @@ function launchPromptCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
   const now = ctx.facts.now;
   if (!run.prompt_resent_at) {
     if (now - startedAt < LAUNCH_PROMPT_MS) return null;
-    const state: UnitState = { ...st, run: { ...run, prompt_resent_at: ctx.nowIso }, last_tick_id: ctx.facts.tick_id };
+    const state: RunningState = { ...st, run: { ...run, prompt_resent_at: ctx.nowIso }, last_tick_id: ctx.facts.tick_id };
     ctx.emit({
       kind: "nudge",
       unit: uf.unit,

@@ -14,6 +14,7 @@ import {
   writeReceiptAt,
   writeState,
 } from "../../src/index.ts";
+import type { UnitState } from "@norn/schema";
 import { receipt, state, tmp } from "../helpers.ts";
 
 describe("atomic files", () => {
@@ -103,6 +104,23 @@ describe("committed runs/ JSON is one line", () => {
       expect(text.slice(0, -1)).not.toContain("\n");
     }
     expect(readFileSync(join(u, "receipts/0001-done.json"), "utf8")).toBe(`${JSON.stringify(r)}\n`);
+  });
+  test.each<[string, Record<string, unknown>, Record<string, unknown>]>([
+    ["done at a step", { status: "done" }, { step: "$done", status: "done" }],
+    ["running without a run", { status: "running" }, { status: "stuck", park: { kind: "stuck", reason: "running without a run record" } }],
+    ["parked on a stuck kind", { status: "parked", park: { kind: "stuck", reason: "blocked", since: "2026-10-23T12:00:00.000Z" } }, { status: "stuck", park: { kind: "stuck", reason: "blocked" } }],
+  ])("a state.json an older norn wrote %s reads normalised, not corrupt", (_n, over, read) => {
+    const u = tmp();
+    mkdirSync(u, { recursive: true });
+    writeFileSync(join(u, "state.json"), `${JSON.stringify({ ...state(), ...over })}\n`);
+    expect(readState(u)).toMatchObject({ ok: true, value: read });
+  });
+  test("writeState accepts the read shape, so a writer bug never throws before the commit point; it reads back normalised", () => {
+    const u = tmp();
+    const legacy = { ...state(), status: "running" } as UnitState;
+    expect(() => writeState(u, legacy)).not.toThrow();
+    expect(readState(u)).toMatchObject({ ok: true, value: { status: "stuck", park: { kind: "stuck" } } });
+    expect(() => writeState(u, { ...state(), status: "waiting" } as unknown as UnitState)).toThrow();
   });
   test("older pretty-printed receipts and state.json still read", () => {
     const u = tmp();

@@ -28,6 +28,7 @@ import { bodyChangedItem } from "../inbox/items.ts";
 import { issueProblem, mergedIntoBase, prProblem, roundFinished, stepLabel, storyFinished, storyUnit, WF_LABEL } from "../policy.ts";
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
+import { roundRejected, toCorrupt, toDone } from "../unit-state.ts";
 import { edgeOf, isStale, stepOf } from "../workflow.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
 import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitBranch, unitItem } from "./receipts.ts";
@@ -255,7 +256,7 @@ function finishMerged(ctx: Ctx, story: StoryFacts): Array<{ unit: UnitRef; state
   for (const u of story.units) {
     const st = u.state;
     if (!st || u.errors.length || st.status === "done") continue;
-    out.push({ unit: u.unit, state: { ...st, step: "$done", status: "done", park: null, run: null, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id } });
+    out.push({ unit: u.unit, state: { ...toDone(st), updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id } });
   }
   return out;
 }
@@ -298,7 +299,7 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
   const reason = prReason ?? (finished ? null : issueProblem(story, ctx.config.label));
   // An older norn parked a finished round for an issue change — drop that park
   if (finished && st && su && st.status === "stuck" && !prReason) {
-    const state: UnitState = { ...st, status: "done", park: null, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };
+    const state: UnitState = { ...toDone(st), updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id };
     return ctx.emit({
       kind: "mark_done",
       unit: ref,
@@ -462,7 +463,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
     const marked = uf.state !== null && own && !onBranch && !uf.errors.some((e) => /(^|\/)state\.json$/.test(e.file));
     const reason = `corrupt: ${uf.errors.map((e) => e.file).join(", ")} failed validation`;
     const state: UnitState | null = marked
-      ? { ...(uf.state as UnitState), status: "corrupt", park: { kind: "corrupt", reason, since: ctx.nowIso }, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id }
+      ? { ...toCorrupt(uf.state!, reason, ctx.nowIso), updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id }
       : null;
     return ctx.emit({ kind: "mark_corrupt", unit: ref, rule: "unit.corrupt", errors: uf.errors, state, notify });
   }
@@ -528,19 +529,19 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       return ctx.noop(ref, ref.slice ? "slice.done" : "story.round_done", ref.slice ? "integrated" : "round done");
     case "stuck":
       if (slicesCanResume(story, uf, st, wf)) return resumeSlices(ctx, story, uf, st, wf);
-      return ctx.noop(ref, "unit.stuck", `stuck: ${st.park?.reason ?? "?"} — ${cmd.runRerun(ref.key)}`);
+      return ctx.noop(ref, "unit.stuck", `stuck: ${st.park.reason} — ${cmd.runRerun(ref.key)}`);
     case "parked": {
       // An implicit ask a later fact shows the agent has moved past resolves itself
       const moved = implicitAskResolved(st, uf);
       if (moved) return resolveImplicitAsk(ctx, story, uf, st, wf, moved);
       // A story waiting at a gate with a `stale` route goes back to update when the base moved under it
-      if (ref.slice === null && st.park?.kind === "gate" && story.base && edgeOf(wf, st.step, "stale") && isStale(wf, story.base)) {
+      if (ref.slice === null && st.park.kind === "gate" && story.base && edgeOf(wf, st.step, "stale") && isStale(wf, story.base)) {
         const b = story.base;
         const detail = `${b.behind} behind, conflicts: ${b.conflicts.length ? b.conflicts.join(", ") : "none"}`;
         return classifyNorn(ctx, story, uf, st, wf, "stale", "gate.stale", detail, { receiptRule: "base moved", base: baseOf(b) });
       }
       // Parked keeps the claim; a restart never answers
-      return ctx.noop(ref, `unit.parked.${st.park?.kind ?? "?"}`, st.park?.reason ?? "parked");
+      return ctx.noop(ref, `unit.parked.${st.park.kind}`, st.park.reason);
     }
   }
 
@@ -583,8 +584,8 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
     const again = cmd.storyEdit(story.key, { workflow: r.workflow, at: r.to, force: r.forced });
     const reason = `workflow ${r.workflow} changed since ${again}; run it again`;
     // An unfinished (forced) round is untouched — its own gate, ask or stuck park stays
-    if (!roundFinished(st)) return reject(reason, "round.workflow_changed");
-    return reject(reason, "round.workflow_changed", { ...moved, park: { kind: "workflow", reason, since: ctx.nowIso, receipt_id: r.receipt_id, command: again } });
+    if (!roundFinished(moved)) return reject(reason, "round.workflow_changed");
+    return reject(reason, "round.workflow_changed", roundRejected(moved, { kind: "workflow", reason, since: ctx.nowIso, receipt_id: r.receipt_id, command: again }));
   }
   if (!stepOf(loaded.workflow, r.to)) return reject(`workflow ${r.workflow} has no step '${r.to}'`);
   const n = (st.round ?? 1) + 1;
@@ -595,9 +596,7 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
   // A forced round ends at $done in its own state, recorded as ended by the person at its step
   const at = st.step;
   const ended: UnitState =
-    roundFinished(st) || at === "$done"
-      ? { ...through, status: "done", park: null }
-      : { ...through, step: "$done", status: "done", park: null, run: null, ended: { by: "person", at, receipt_id: r.receipt_id } };
+    roundFinished(st) || at === "$done" ? toDone(through) : { ...toDone(through), ended: { by: "person", at, receipt_id: r.receipt_id } };
   const mode = st.mode ?? story.mode;
   const state = initialState({ unit: uf.unit, workflow: loaded.workflow, workflowName: r.workflow, workflowHash: r.workflow_hash, now: ctx.nowIso, tick_id: ctx.facts.tick_id, at: r.to, round: n, ...(mode ? { mode } : {}) });
   ctx.emit({

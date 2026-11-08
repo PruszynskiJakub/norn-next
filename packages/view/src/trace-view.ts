@@ -51,7 +51,7 @@ export interface LoadTraceViewOptions {
 
 /** How a round's record says it ended; null while it is under way. */
 function roundEnd(st: UnitState | null): RoundView["ended"] {
-  if (st?.ended) return { by: "person", at: st.ended.at };
+  if (st && "ended" in st && st.ended) return { by: "person", at: st.ended.at };
   return st?.status === "done" ? { by: "workflow", at: "$done" } : null;
 }
 

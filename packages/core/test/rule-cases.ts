@@ -3,7 +3,7 @@
  * is a whole decide input and the rule it must fire; `golden.test.ts` runs them and counts them
  * toward rule coverage. Built from `fixtures.ts`.
  */
-import type { LeaseFile, ResolvedConfig, UnitState, Workflow } from "@norn/schema";
+import type { LeaseFile, ResolvedConfig, UnitState, UnitStateRecord, Workflow } from "@norn/schema";
 import type { RepoWorkflows } from "../src/decide/index.ts";
 import type { Facts, RunFacts, StoryFacts, UnitFacts } from "../src/facts.ts";
 import { sha256 } from "../src/hash.ts";
@@ -49,7 +49,7 @@ const checkLease = (): LeaseFile => ({ version: 1, kind: "check", repo: "/x", st
  * The story unit of `gh-1` on `wf`, its state patched, with a live run's facts when `run` is given.
  * Its refine is recorded as finished, so a cursor past refine does not mirror first.
  */
-function story(wf: Workflow, patch: Partial<UnitState> = {}, run: Partial<RunFacts> | null = null, sf: Partial<StoryFacts> = {}, uf: Partial<UnitFacts> = {}): StoryFacts {
+function story(wf: Workflow, patch: Partial<UnitStateRecord> = {}, run: Partial<RunFacts> | null = null, sf: Partial<StoryFacts> = {}, uf: Partial<UnitFacts> = {}): StoryFacts {
   const unit = storyUnit();
   const st = stateFor(unit, wf, patch);
   const rf: RunFacts | null = run && { run_id: RUN, session: { runner: "herdr", session_id: "s1" }, process_alive: true, pane: null, hooks: [], last_hook_at: null, last_activity_at: T0, transcript: "/t.jsonl", ...run };
@@ -58,7 +58,7 @@ function story(wf: Workflow, patch: Partial<UnitState> = {}, run: Partial<RunFac
 }
 
 /** A running agent run of the cursor step, started `ago` ms before T0. */
-function running(step: string, ago = MIN, p: Partial<UnitState> = {}): Partial<UnitState> {
+function running(step: string, ago = MIN, p: Partial<UnitStateRecord> = {}): Partial<UnitStateRecord> {
   return {
     status: "running",
     park: null,
@@ -72,17 +72,17 @@ function running(step: string, ago = MIN, p: Partial<UnitState> = {}): Partial<U
 /** A hook fact for the run `ago` ms before T0. */
 const hook = (event: RunFacts["hooks"][number]["event"], ago = 1000) => ({ event, at: at(T0 - ago), agent: "claude", native: event, cwd: STORY_WT }) as RunFacts["hooks"][number];
 
-const ready = (step: string, p: Partial<UnitState> = {}): Partial<UnitState> => ({ status: "ready", park: null, step, ...p });
+const ready = (step: string, p: Partial<UnitStateRecord> = {}): Partial<UnitStateRecord> => ({ status: "ready", park: null, step, ...p });
 const noWorktree: Partial<UnitFacts> = { worktree: { ...worktree(STORY_WT), exists: false } };
 const config = (p: Partial<ResolvedConfig> = {}): ResolvedConfig => ({ ...CONFIG, ...p });
 const machine = (p: Partial<Facts["machine"]>): Partial<Facts> => ({ machine: { ...facts([]).machine, ...p } });
 
 /** A story at its slices step with the given slice files and slice units. */
-function atSlices(files: StoryFacts["slices"], slices: UnitFacts[] = [], p: Partial<UnitState> = {}): StoryFacts {
+function atSlices(files: StoryFacts["slices"], slices: UnitFacts[] = [], p: Partial<UnitStateRecord> = {}): StoryFacts {
   const s = story(STORY_WF, ready("slices", p));
   return { ...s, slices: files, units: [...s.units, ...slices] };
 }
-function sliceAt(nn: string, slug: string, patch: Partial<UnitState>, uf: Partial<UnitFacts> = {}): UnitFacts {
+function sliceAt(nn: string, slug: string, patch: Partial<UnitStateRecord>, uf: Partial<UnitFacts> = {}): UnitFacts {
   const unit = sliceUnit("gh-1", nn, slug);
   return unitFacts(unit, SLICE_WF, stateFor(unit, SLICE_WF, patch), uf);
 }
@@ -150,7 +150,6 @@ function cases(): RuleCase[] {
   }
   out.push(c("the pinned workflow changed outside norn", "workflow.drift", facts([story(SOLO_WF, {}, null, {}, { workflow_hash: "edited" })])));
   out.push(c("a rebase waits in the unit's worktree past the step's deadline", "unit.rebase_in_progress", facts([story(SOLO_WF, running("implement", 2 * HOUR), null, {}, { worktree: { ...worktree(STORY_WT), in_progress: { operation: "rebase", unmerged: ["X.txt"] } } })])));
-  out.push(c("a ready unit whose cursor is $done", "unit.no_step", facts([story(SOLO_WF, ready("$done"))])));
   // A held story whose record is still flat moves into round 1 first
   // Run state an older norn left on a held unit's branch
   const onBranch = { branch_record: { path: ".agents/specs/gh-1-login/runs", copy: ["_story"], holds: ["_story"] }, record: "_story" };
@@ -204,7 +203,6 @@ function cases(): RuleCase[] {
 
   // ---- agent steps: running
   out.push(c("an attended run in progress", "agent.attended.running", facts([story(STORY_WF, running("refine"), {})])));
-  out.push(c("running without a run record", "agent.running.no_run", facts([story(SOLO_WF, { ...running("implement"), run: null })])));
   out.push(c("running with no facts for the run", "agent.running.unobserved", facts([story(SOLO_WF, running("implement"))])));
   out.push(c("no activity for the stalled window", "agent.stalled.nudge", facts([story(SOLO_WF, running("implement", 20 * MIN), { last_activity_at: T0 - 20 * MIN })])));
   out.push(c("the deadline passed", "agent.timeout.nudge", facts([story(SOLO_WF, running("implement", 2 * HOUR), { hooks: [hook("tool_use")], last_activity_at: T0 - 1000 })])));
@@ -221,7 +219,7 @@ function cases(): RuleCase[] {
   {
     // Resume instead of send, but max_agents is full and the lease is not the run's own
     const run = running("implement");
-    const st = { ...run, run: { ...run.run!, agent_session_id: "sess-1" } } as Partial<UnitState>;
+    const st = { ...run, run: { ...run.run!, agent_session_id: "sess-1" } } as Partial<UnitStateRecord>;
     out.push(
       c(
         "a resumed nudge waits for a free agent slot",
@@ -236,7 +234,7 @@ function cases(): RuleCase[] {
   {
     const parked = (uf: Partial<UnitFacts>) => {
       const run = running("implement");
-      const st = { ...run, status: "parked", park: { kind: "ask", reason: "Q?", since: at() }, run: { ...run.run!, agent_session_id: "sess-1" } } as Partial<UnitState>;
+      const st = { ...run, status: "parked", park: { kind: "ask", reason: "Q?", since: at() }, run: { ...run.run!, agent_session_id: "sess-1" } } as Partial<UnitStateRecord>;
       const s = story(SOLO_WF, st, null, {}, uf);
       const unit = s.units[0] as UnitFacts;
       unit.unapplied = [numbered(1, receipt(unit.state as UnitState, "answer", { answer: "yes" }, "human"))];
@@ -263,7 +261,7 @@ function cases(): RuleCase[] {
     const files = [sliceFile("gh-1", "01", "form", [], "active"), sliceFile("gh-1", "02", "api", [], "active")];
     const a = sliceAt("01", "form", ready("integrate"), { worktree: worktree("/r-worktrees/gh-1-login--01-form") });
     const b = sliceAt("02", "api", ready("integrate"), { worktree: worktree("/r-worktrees/gh-1-login--02-api") });
-    out.push(c("a second slice integrate in the same tick", "git.integrate.queued", facts([atSlices(files, [a, b], { status: "running" })])));
+    out.push(c("a second slice integrate in the same tick", "git.integrate.queued", facts([atSlices(files, [a, b])])));
     const base = { ref: "refs/remotes/origin/main", sha: "b".repeat(40), head: "c".repeat(40), merge_base: "d".repeat(40), behind: 1, ahead: 1, conflicts: [] };
     const upd = story(GIT_WF, ready("update"), null, { base });
     out.push(c("a story update after a slice integrate in the same tick", "git.update.queued", facts([{ ...upd, slices: [files[0] as StoryFacts["slices"][number]], units: [a, ...upd.units] }])));
@@ -301,7 +299,7 @@ function cases(): RuleCase[] {
       status: "stuck",
       park: { kind: "stuck", reason: "no slice files", since: at(), receipt_id: rid },
       last_outcome: { step: "slices", outcome: "stuck", at: at(), receipt_id: rid },
-    } as Partial<UnitState>);
+    } as Partial<UnitStateRecord>);
     out.push(c("a stuck slices step resumes once a slice can start", "slices.resume", facts([s])));
   }
   return out;
