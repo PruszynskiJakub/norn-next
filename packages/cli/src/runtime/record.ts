@@ -7,6 +7,9 @@
  *     (`failed`, with the reason) — nothing is forced and the main checkout is untouched.
  *   - solo (no remote): commit in the main checkout only when it is on the base branch.
  * `deferred` when the spec file is not on the base branch yet (the merge has not reached it).
+ * Each deferred or failed attempt carries a kind: `refused` when the base said no (a push rejected
+ * for any reason but network or stale, a spec.md that will not patch), which counts toward the
+ * bound after which norn stops retrying; `waiting` for anything that clears by itself.
  *
  * The done record carries how the PR landed: spec file frontmatter `merge:` (StoryMerge — pr, url,
  * head_sha, merge_commit_sha, merged_by, merged_at, by_ancestry), mirrored as commit trailers
@@ -15,14 +18,14 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import type { GitPort, StoryFacts } from "@norn/core";
+import type { GitPort, RecordFailure, StoryFacts } from "@norn/core";
 import { isGitSha, LEGACY_SPEC_FILE, SPEC_FILE, type StoryMerge, type StoryStatus } from "@norn/schema";
 import { patchStoryFile, storyFile } from "@norn/store";
 
 export type RecordResult =
   | { state: "pushed" | "committed"; sha: string | null; branch: string }
   | { state: "unchanged"; branch: string }
-  | { state: "deferred" | "failed"; branch: string; reason: string };
+  | { state: "deferred" | "failed"; branch: string; reason: string; kind: RecordFailure };
 
 export async function markStoryOnBase(opts: {
   root: string;
@@ -46,10 +49,10 @@ export async function markStoryOnBase(opts: {
   const message = `norn: ${opts.story} ${opts.status} (PR merged)`;
   if (!remote) {
     const branch = (await git.status(root).catch(() => null))?.branch;
-    if (branch !== base) return { state: "deferred", branch: base, reason: `main checkout is on ${branch ?? "a detached HEAD"}, not ${base}` };
+    if (branch !== base) return { state: "deferred", branch: base, reason: `main checkout is on ${branch ?? "a detached HEAD"}, not ${base}`, kind: "waiting" };
     const file = storyFile(join(root, spec_dir));
     const r = patchStoryFile(file, patch, root);
-    if (!r.ok) return { state: "deferred", branch: base, reason: `${relative(root, file)}: ${r.reason}` };
+    if (!r.ok) return { state: "deferred", branch: base, reason: `${relative(root, file)}: ${r.reason}`, kind: "refused" };
     const sha = await git.commit(root, { message, trailers, paths: [relative(root, file)] });
     return sha ? { state: "committed", sha, branch: base } : { state: "unchanged", branch: base };
   }
@@ -58,11 +61,11 @@ export async function markStoryOnBase(opts: {
     () => null,
     (e: unknown) => (e instanceof Error ? e.message : String(e)),
   );
-  if (fetched !== null) return { state: "failed", branch: base, reason: `fetch ${base}: ${fetched}` };
+  if (fetched !== null) return { state: "failed", branch: base, reason: `fetch ${base}: ${fetched}`, kind: "waiting" };
   // The base holds spec.md, or story.md for a story an older norn intook
   const onBase = async (name: string) => ((await git.hasPath(root, tracking, join(spec_dir, name))) ? join(spec_dir, name) : null);
   const rel = (await onBase(SPEC_FILE)) ?? (await onBase(LEGACY_SPEC_FILE));
-  if (!rel) return { state: "deferred", branch: base, reason: `${join(spec_dir, SPEC_FILE)} is not on ${remote}/${base} yet` };
+  if (!rel) return { state: "deferred", branch: base, reason: `${join(spec_dir, SPEC_FILE)} is not on ${remote}/${base} yet`, kind: "waiting" };
   const tmp = mkdtempSync(join(tmpdir(), "norn-record-"));
   const wt = join(tmp, "wt");
   try {
@@ -70,13 +73,17 @@ export async function markStoryOnBase(opts: {
       () => null,
       (e: unknown) => (e instanceof Error ? e.message : String(e)),
     );
-    if (added !== null) return { state: "failed", branch: base, reason: `worktree: ${added}` };
+    if (added !== null) return { state: "failed", branch: base, reason: `worktree: ${added}`, kind: "waiting" };
     const r = patchStoryFile(join(wt, rel), patch, wt);
-    if (!r.ok) return { state: "failed", branch: base, reason: `${rel}: ${r.reason}` };
+    if (!r.ok) return { state: "failed", branch: base, reason: `${rel}: ${r.reason}`, kind: "refused" };
     const sha = await git.commit(wt, { message, trailers, paths: [rel] });
     if (!sha) return { state: "unchanged", branch: base };
     const p = await git.push(wt, remote, `HEAD:refs/heads/${base}`);
-    if (!p.ok) return { state: "failed", branch: base, reason: `push to ${base} rejected (${p.reason}): set status: ${opts.status} in ${rel} by hand` };
+    if (!p.ok) {
+      // a network or stale push says nothing about the base: the next retry refetches and tries again
+      const kind = p.reason === "network" || p.reason === "stale" ? "waiting" : "refused";
+      return { state: "failed", branch: base, reason: `push to ${base} rejected (${p.reason}): set status: ${opts.status} in ${rel} on ${base} by hand (a PR if the branch is protected)`, kind };
+    }
     await git.updateRef(root, { ref: tracking, sha });
     return { state: "pushed", sha, branch: base };
   } finally {

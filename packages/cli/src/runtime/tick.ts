@@ -11,6 +11,7 @@ import { acquireTickLock, appendTick, appendTrace, markTick, trackInbox } from "
 import type { Context } from "../context.ts";
 import { busyError } from "../output.ts";
 import { type ActRecord, Actor } from "./act/index.ts";
+import type { RecordRetry } from "./act/lifecycle.ts";
 import { type Observed, observe, type SyncMode, type SyncReport } from "./observe/index.ts";
 import { tickTiming } from "./timing.ts";
 
@@ -31,7 +32,7 @@ export interface TickReport {
   trace: string;
   failed: number;
   /** Owed base-branch records retried this tick */
-  records?: Array<{ story: string; state: string; reason?: string }>;
+  records?: RecordRetry[];
   /** Orphan worktrees/branches seen this tick (also in the trace facts); `norn tidy` cleans them */
   orphans?: Facts["orphans"];
   /** The tick's slowest phase (its full timing is in the trace record) */

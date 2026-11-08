@@ -813,6 +813,31 @@ function supersededItems(facts: Facts): InboxItem[] {
 }
 
 /**
+ * A merged story whose `status: done` record the base kept refusing (a protected branch, a spec
+ * that will not patch): norn stopped retrying, so only a person can land it. Not filtered on the
+ * claim, the story is already cleaned up; gone once observe sees the base read done.
+ */
+function owedRecordItems(facts: Facts): InboxItem[] {
+  const base = facts.repo.default_branch;
+  return (facts.owed_records ?? []).map((r) => {
+    const url = facts.stories.find((s) => s.key === r.story)?.frontmatter?.url;
+    return {
+      id: `record_owed:${r.story}`,
+      group: "unblock" as const,
+      story: r.story,
+      slice: null,
+      step: null,
+      title: `${r.story} merged, but ${base} refused its status: done record ${r.refusals} times`,
+      // the push reason carries its own by-hand hint; the detail gives it once
+      detail: `${r.reason.replace(/: set status: .*$/, "")}. norn stopped retrying; set status: done in ${r.spec_dir}/spec.md on ${base} (by a PR if the branch is protected); the item clears once norn sees it there`,
+      command: cmd.sync(),
+      since: r.stopped_at,
+      ...(url ? { url } : {}),
+    };
+  });
+}
+
+/**
  * A mailbox receipt this holder's tick rejected, one Check item each, so a stale
  * answer never vanishes silently. Gone once a later answer or approval of the story is accepted (observe
  * leaves it out) or the story finishes; there is no dismiss command.
@@ -908,6 +933,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   add(repoSkillsDriftItem(facts));
   add(baseRunStateItem(facts));
   for (const it of supersededItems(facts)) add(it);
+  for (const it of owedRecordItems(facts)) add(it);
   // The version item comes first, whatever its age
   const pinned = (it: InboxEntry) => (it.id.startsWith(VERSION_ITEM) ? 0 : 1);
   for (const g of INBOX_GROUPS) groups[g].sort((a, b) => pinned(a) - pinned(b) || epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));

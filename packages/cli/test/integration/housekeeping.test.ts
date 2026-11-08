@@ -178,7 +178,7 @@ describe("GR6 record on the base branch", () => {
   const opts = (h: Harness) => ({ root: h.root, remote: "origin", git: gitAdapter.createGit(), base: "main", spec_dir: ".agents/specs/gh-5-merged", story: "gh-5", status: "done" as const, trailers: { "Norn-Story": "gh-5" } });
 
   test("deferred while the spec file is not on the base branch", async () => {
-    expect(await markStoryOnBase(opts(h))).toMatchObject({ state: "deferred" });
+    expect(await markStoryOnBase(opts(h))).toMatchObject({ state: "deferred", kind: "waiting" });
   });
 
   test("after the merge: committed in a throwaway worktree and pushed to the base branch; main checkout untouched (story.md an older norn wrote)", async () => {

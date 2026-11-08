@@ -203,3 +203,46 @@ export function isCodePath(path: string): boolean {
  */
 export const isIntakeCommit = (trailers: Record<string, string>, story: string): boolean =>
   trailers["Norn-Story"] === story && !!trailers["Norn-Tick"] && !("Norn-Step" in trailers) && !("Norn-Slice" in trailers);
+
+/**
+ * How many times the base may refuse an owed done record before norn stops retrying it and
+ * tells the person. A `rejected` push lumps a race on the base together with a protected branch;
+ * each retry refetches, so a race does not repeat three times in a row, but a refusal that is
+ * never lifted needs a person. The attempt at merged clean-up counts, so norn stops after it and
+ * RECORD_REFUSALS - 1 retries.
+ */
+export const RECORD_REFUSALS = 3;
+
+/** Why an owed record attempt failed: `waiting` clears by itself (offline, not on the base yet); `refused` is the base saying no. */
+export type RecordFailure = "waiting" | "refused";
+
+/**
+ * The base already reads the story closed, so its owed done record has nothing left to do.
+ * With a remote only the fetched base is the record: a local frontmatter that says done may
+ * never have been pushed. Solo, the main checkout's frontmatter is the record.
+ */
+export function recordOnBase(story: StoryFacts | undefined, solo: boolean): boolean {
+  return !!story && isClosedStatus(solo ? story.frontmatter?.status : story.base_status);
+}
+
+// The two rules below take epochs, not Facts: act applies them to records.json while it retries,
+// and they live here so the bound is defined once beside the inbox item that reports it.
+
+/** An owed record is retried once per sync interval until norn stops retrying it. */
+export function recordRetryDue(p: { attempted_at: number; stopped_at?: number }, now: number, everyMs: number): boolean {
+  return p.stopped_at === undefined && now - p.attempted_at >= everyMs;
+}
+
+/** When norn stops retrying an owed record: kept once set, `now` once the base refused RECORD_REFUSALS times. */
+export function recordStopsAt(refusals: number, prev: number | undefined, now: number): number | undefined {
+  return prev ?? (refusals >= RECORD_REFUSALS ? now : undefined);
+}
+
+/**
+ * `norn tidy` drops an owed record only when norn stopped retrying it and its story is gone from
+ * the observed stories, so nothing can ever land it. A record still retried is never dropped:
+ * while the merge has not reached the base its story is absent from the stories too.
+ */
+export function recordPrunable(p: { story: string; stopped_at?: number }, stories: readonly Pick<StoryFacts, "key">[]): boolean {
+  return p.stopped_at !== undefined && !stories.some((s) => s.key === p.story);
+}

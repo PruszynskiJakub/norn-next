@@ -243,6 +243,20 @@ export interface LocalRecord {
   on_ref: boolean;
 }
 
+/** A merged story's base-branch done record norn stopped retrying (`records.json`), because the base kept refusing it. */
+export interface OwedRecord {
+  story: string;
+  spec_dir: string;
+  /** attempts the base refused */
+  refusals: number;
+  /** why the last attempt failed */
+  reason: string;
+  /** ISO time of the last attempt */
+  attempted_at: string;
+  /** ISO time norn stopped retrying */
+  stopped_at: string;
+}
+
 /** A record this checkout set aside as superseded, `<machine dir>/superseded/<name>/`. */
 export interface SupersededRecord {
   /** `<story>-<ulid>` */
@@ -456,6 +470,8 @@ export interface Facts {
   base_run_state?: string[];
   /** Records this checkout set aside as superseded, by name. Absent = none. */
   superseded?: SupersededRecord[];
+  /** Merged stories whose base-branch done record norn stopped retrying (records.json). Absent = none. */
+  owed_records?: OwedRecord[];
   /** worktrees/branches with no matching unit */
   orphans: { worktrees: string[]; branches: string[] };
   /**

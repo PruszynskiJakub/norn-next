@@ -13,7 +13,7 @@
  * Every read is validated: a file that is unreadable or of the wrong shape reads as
  * empty through `readLocalJson`, never as a cast of what was there. Paths are in paths.ts.
  */
-import type { StoryFacts } from "@norn/core";
+import type { OwedRecord, StoryFacts } from "@norn/core";
 import { type RejectedMailboxReceipt, type StoryMerge, validate } from "@norn/schema";
 import { atomicWriteJson, readText } from "./fsx.ts";
 import { acquireLock } from "./lock.ts";
@@ -196,6 +196,10 @@ export interface PendingRecord {
   reason: string;
   /** how the PR landed (the done record), written into spec.md `merge:` with the status */
   merge?: StoryMerge;
+  /** attempts the base refused; absent = 0 */
+  refusals?: number;
+  /** ms epoch when norn stopped retrying; absent = still retried */
+  stopped_at?: number;
 }
 
 export function readPendingRecords(root: string): PendingRecord[] {
@@ -204,6 +208,24 @@ export function readPendingRecords(root: string): PendingRecord[] {
 
 export function writePendingRecords(root: string, records: PendingRecord[]): void {
   atomicWriteJson(pendingRecordsPath(root), { records });
+}
+
+/** Rewrite `records.json` with only the records `keep` accepts; the dropped ones (nothing is written when `dry`). */
+export function dropRecords(root: string, keep: (r: PendingRecord) => boolean, dry: boolean): PendingRecord[] {
+  const all = readPendingRecords(root);
+  const dropped = all.filter((r) => !keep(r));
+  if (dropped.length && !dry) writePendingRecords(root, all.filter(keep));
+  return dropped;
+}
+
+/** A stopped owed record as a fact (`Facts.owed_records`); the one mapping act, observe and the view share. */
+export function toOwedRecord(r: PendingRecord & { stopped_at: number }): OwedRecord {
+  return { story: r.story, spec_dir: r.spec_dir, refusals: r.refusals ?? 0, reason: r.reason, attempted_at: new Date(r.attempted_at).toISOString(), stopped_at: new Date(r.stopped_at).toISOString() };
+}
+
+/** The records norn stopped retrying, as facts. */
+export function owedRecords(records: readonly PendingRecord[]): OwedRecord[] {
+  return records.filter((r): r is PendingRecord & { stopped_at: number } => r.stopped_at !== undefined).map(toOwedRecord);
 }
 
 const KEEP_FOREIGN = 5000;

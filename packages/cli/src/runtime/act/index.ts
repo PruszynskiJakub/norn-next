@@ -22,13 +22,13 @@ import {
   type Facts,
   type InboxGroup,
 } from "@norn/core";
-import { deleteMailbox, reclaimLeases, writeActFailures, writeState, writeUnitMarker } from "@norn/store";
+import { deleteMailbox, owedRecords, readPendingRecords, reclaimLeases, writeActFailures, writeState, writeUnitMarker } from "@norn/store";
 import { ActEnv, QueueFull, claimLost } from "./env.ts";
 import { applyReceipts, startRun, nudge, retryFresh, classify } from "./session.ts";
 import { runCheck } from "./check.ts";
 import { runGit } from "./git-step.ts";
 import { startUnit, markDone, rejectReceipt, claim, renewAll, intake, mirror, retitlePr, cleanupMerged, closeClosedIssueStory,
-  moveRecord, pushRecord, setAsideRecordAct, roundMigrate, roundStart, retryRecords } from "./lifecycle.ts";
+  moveRecord, pushRecord, setAsideRecordAct, roundMigrate, roundStart, type RecordRetry, retryRecords } from "./lifecycle.ts";
 
 export interface ActRecord {
   decision: Decision;
@@ -308,6 +308,10 @@ export class Actor extends ActEnv {
         u.unapplied = u.unapplied.filter((r) => r.n > st.applied_through);
       }
     }
+    // Records retried this tick may have stopped or cleared: read them back as the next observe would
+    const owed = owedRecords(readPendingRecords(this.ctx.root));
+    if (owed.length) f.owed_records = owed;
+    else delete f.owed_records;
     return f;
   }
 
@@ -320,8 +324,8 @@ export class Actor extends ActEnv {
     for (const g of NOTIFY_GROUPS) for (const item of inbox.groups[g]) await this.notify(item);
   }
 
-  /** Retry owed base-branch records, at most once per `remote.sync_interval` each. */
-  retryRecords(): Promise<Array<{ story: string; state: string; reason?: string }>> {
+  /** Retry owed base-branch records (lifecycle.ts retryRecords). */
+  retryRecords(): Promise<RecordRetry[]> {
     return retryRecords(this);
   }
 }

@@ -19,13 +19,15 @@
  *     live whose newest file is older than the window;
  *     never a live run's, nor `backfill.json`, the caches or the locks.
  *   - rejected mailbox receipts (`rejected.json`) cleared and rejected before the window
+ *   - owed base-branch records norn stopped retrying whose story is gone from the base, and
+ *     their Unblock item with them
  * Nothing with unique work is removed; such items are listed under `kept` with the reason.
  */
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
 import { ulid } from "@norn/schema";
-import { deleteTraceDays, pruneRejectedReceipts, pruneSuperseded, rejectedReceiptsPath, deleteTracePaths, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore } from "@norn/store";
+import { deleteTraceDays, dropRecords, pruneRejectedReceipts, pruneSuperseded, rejectedReceiptsPath, deleteTracePaths, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
@@ -34,7 +36,7 @@ import { leaseLiveness } from "../runtime/leases.ts";
 import { type Observed, observe } from "../runtime/observe/index.ts";
 import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
 import { checkRetain, MIN_TRACE_RETAIN, retainCutoffDay, unitTracesBefore } from "../runtime/trace-retention.ts";
-import { cmd, storyFinished } from "@norn/core";
+import { cmd, recordPrunable, storyFinished } from "@norn/core";
 
 /** A reservation lives only while a receipt is being written; older ones are crash leftovers. */
 const RESERVE_STALE_MS = 60_000;
@@ -91,7 +93,7 @@ function retainWindow(ctx: Context, flag: string | undefined): { retain: string;
 export const tidyCommand = defineCommand({
   name: "tidy",
   version: "acts",
-  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations, Herdr panes of runs that reported done, and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain",
+  summary: "Report or clean orphan worktrees, branches, stale leases, receipt reservations, Herdr panes of runs that reported done, stopped base-branch records whose story is gone, and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain",
   usage: "norn tidy [--dry-run] [--retain <duration>]",
   options: { "dry-run": { type: "boolean" }, retain: { type: "string" } },
   async run(ctx, args) {
@@ -183,13 +185,14 @@ export const tidyCommand = defineCommand({
       const rejected = pruned.removed.map((r) => r.receipt_id);
       // Records set aside as superseded go once older than the window; their Check item with them
       const superseded = pruneSuperseded(root, new Date(ctx.clock.now() - window.ms).toISOString(), dry).map((c) => c.name);
+      const owed = dropRecords(root, (r) => !recordPrunable(r, obs.facts.stories), dry).map((r) => r.story);
       const bytes = [...days, ...hook_files, ...runs].reduce((n, d) => n + d.bytes, 0);
       const trace = { retain: window.retain, days, hook_files, runs, bytes };
 
       const verb = dry ? "would_remove" : "removed";
       return {
         dry_run: dry,
-        [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves, rejected_receipts: rejected, superseded, ...(herdrClosed ? { herdr: herdrClosed } : {}) },
+        [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves, rejected_receipts: rejected, superseded, ...(owed.length ? { owed_records: owed } : {}), ...(herdrClosed ? { herdr: herdrClosed } : {}) },
         trace,
         kept,
       };

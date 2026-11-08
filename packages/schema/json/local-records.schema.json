@@ -70,6 +70,13 @@
                 "type": "boolean"
               }
             }
+          },
+          "refusals": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "stopped_at": {
+            "type": "number"
           }
         }
       }

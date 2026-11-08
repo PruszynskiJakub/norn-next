@@ -472,6 +472,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     ...(local.snapshot.base_run_state.length ? { base_run_state: local.snapshot.base_run_state } : {}),
     // Records set aside as superseded (loadLocalFacts, as observe)
     ...(local.superseded.length ? { superseded: local.superseded } : {}),
+    ...(local.owed_records.length ? { owed_records: local.owed_records } : {}),
     orphans: { worktrees: [], branches: [] },
   };
   // Is this checkout's heartbeat down while it holds auto work?

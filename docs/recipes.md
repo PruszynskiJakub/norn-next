@@ -70,6 +70,14 @@ norn story update-branch gh-3
 
 The story goes back through its update step; you approve the `ready` gate again afterwards, since the head changed. You may also push to the story branch yourself at any time: norn merges your push in and never loses it.
 
+## The base refused a merged story's done record
+
+Once a story PR merges, norn marks the story's `spec.md` `status: done` on the base branch. It pushes fast-forward only and never forces the push. A fetch that fails or a push that hits the network only waits for the next try, about every 5 minutes with the sync. If the base refuses the record 3 times (a protected branch, a spec that will not patch), norn stops retrying.
+
+**You see:** an Unblock item such as `gh-3 merged, but main refused its status: done record 3 times`, with the last refusal in its detail.
+
+Set `status: done` in the story's `spec.md` on the base yourself and commit it, by a PR if the branch is protected. The item clears once norn sees the base read done, within one sync under `watch` or right away with `norn sync`. If the story's spec is gone from the base, `norn tidy` drops the record.
+
 ## Write your own workflow
 
 1. Copy one of the workflows in `.agents/workflows/` under a new name, for example `docs.yaml`, and change its `name:`.
