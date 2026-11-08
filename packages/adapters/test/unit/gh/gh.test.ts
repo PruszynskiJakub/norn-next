@@ -38,6 +38,7 @@ describe("gh adapter", () => {
     expect(await gh.findPullRequest("gh-12-add-login-page")).toEqual({
       number: 40,
       url: "https://github.com/acme/app/pull/40",
+      title: "Add login page",
       state: "merged",
       is_draft: false,
       head_sha: "a".repeat(40),
@@ -61,12 +62,17 @@ describe("gh adapter", () => {
 
   test("openDraftPullRequest", async () => {
     const pr = await gh.openDraftPullRequest({ head: "gh-15-fix-crash-on-save", base: "main", title: "Fix crash on save", body: "Closes #15" });
-    expect(pr).toMatchObject({ number: 41, state: "open", is_draft: true, head_sha: "c".repeat(40), head: "gh-15-fix-crash-on-save", base_branch: "main", merged_at: null });
+    expect(pr).toMatchObject({ number: 41, title: "Fix crash on save", state: "open", is_draft: true, head_sha: "c".repeat(40), head: "gh-15-fix-crash-on-save", base_branch: "main", merged_at: null });
   });
 
   test("editPullRequestBody replaces the body", async () => {
     await gh.editPullRequestBody(41, "## Summary\n\nSaves no longer crash.\n\nCloses #15");
     expect(await gh.editPullRequestBody(42, "x").catch((e) => e.code)).toBe("gh_failed");
+  });
+
+  test("editPullRequestTitle replaces the title", async () => {
+    await gh.editPullRequestTitle(41, "Fix crash on save 0.22.0");
+    expect(await gh.editPullRequestTitle(42, "x").catch((e) => e.code)).toBe("gh_failed");
   });
 
   test("replaceIssueLabel removes the old label only when the issue carries it (B19)", async () => {

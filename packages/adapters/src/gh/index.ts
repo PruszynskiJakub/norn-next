@@ -21,7 +21,7 @@ export interface GhOptions {
 export const issueKey = (number: number): string => storyKey("gh", number);
 
 const ISSUE_FIELDS = "number,url,title,body,state,assignees,labels,updatedAt";
-const PR_FIELDS = "number,url,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy";
+const PR_FIELDS = "number,url,title,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit,mergedBy";
 
 interface GhIssue {
   number: number;
@@ -37,6 +37,7 @@ interface GhIssue {
 interface GhPr {
   number: number;
   url: string;
+  title?: string;
   state: string;
   isDraft?: boolean;
   headRefName: string;
@@ -69,6 +70,7 @@ function mapPr(p: GhPr): RemotePullRequest {
     state: s === "MERGED" ? "merged" : s === "OPEN" ? "open" : "closed",
     is_draft: p.isDraft ?? false,
     head_sha: p.headRefOid ?? "",
+    ...(p.title === undefined ? {} : { title: p.title }),
     ...(p.mergeCommit?.oid ? { merge_commit_sha: p.mergeCommit.oid } : {}),
     ...(p.mergedBy?.login ? { merged_by: p.mergedBy.login } : {}),
     merged_at: p.mergedAt ?? null,
@@ -90,7 +92,7 @@ function ciOf(buckets: readonly string[]): PullRequestCi {
 
 /** How many branches one GraphQL query asks for: one alias each. */
 const PRS_PER_QUERY = 50;
-const PR_NODE = "number url state isDraft headRefName headRefOid baseRefName mergedAt mergeCommit { oid } mergedBy { login }";
+const PR_NODE = "number url title state isDraft headRefName headRefOid baseRefName mergedAt mergeCommit { oid } mergedBy { login }";
 
 /**
  * One aliased `pullRequests(headRefName:)` per branch, newest first like `gh pr list`,
@@ -176,6 +178,9 @@ export function createGh(opts: GhOptions): RemotePort {
     },
     async editPullRequestBody(number, body) {
       okOrThrow(await run(["pr", "edit", String(number), ...repo, "--body", body]), "gh pr edit", "gh");
+    },
+    async editPullRequestTitle(number, title) {
+      okOrThrow(await run(["pr", "edit", String(number), ...repo, "--title", title]), "gh pr edit", "gh");
     },
     async createIssue({ title, body, labels, assignee }) {
       const out = okOrThrow(
