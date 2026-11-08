@@ -244,16 +244,18 @@ function claimBlob(ctx: Ctx, story: string, prev: ClaimBlob | null): ClaimBlob {
 }
 
 /**
- * A merged PR is the story's final outcome, so every unit not yet done is recorded done
+ * A merged PR is the story's final outcome, so every unit not yet done is recorded done at `$done`
  * with the cleanup: a gate, ask or stuck still open at merge time is moot and leaves nothing in the
- * inbox, and `story wait --until done` returns. A unit whose files failed validation stays as it is.
+ * inbox, and `story wait --until done` returns. The merge ends the round wherever it stood, so the
+ * next round starts unforced; visits, last_outcome and the trace keep the step that was left.
+ * A unit whose files failed validation stays as it is.
  */
 function finishMerged(ctx: Ctx, story: StoryFacts): Array<{ unit: UnitRef; state: UnitState }> {
   const out: Array<{ unit: UnitRef; state: UnitState }> = [];
   for (const u of story.units) {
     const st = u.state;
     if (!st || u.errors.length || st.status === "done") continue;
-    out.push({ unit: u.unit, state: { ...st, status: "done", park: null, run: null, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id } });
+    out.push({ unit: u.unit, state: { ...st, step: "$done", status: "done", park: null, run: null, updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id } });
   }
   return out;
 }
