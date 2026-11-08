@@ -1,0 +1,300 @@
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:44.5165538Z packages/adapters/test/integration/process/process.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:44.5166141Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:44.5166705Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:44.5167145Z (pass) process port > real: self is alive, a bogus pid is not [65.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:44.5167884Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:44.5168194Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:44.9532148Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:44.9534390Z packages/cli/test/integration/story-create.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:44.9536302Z (pass) with a title (B18) > --body-file sets the body [626.02ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:45.2014701Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:45.2045266Z packages/cli/test/integration/non-holder-views.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:45.2114559Z (pass) a story held elsewhere under local (B18, B19) > F15: a step parked on $stuck and resumed by run rerun ends no step: the last boundary stays [3034.05ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:45.3014974Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:45.3065305Z packages/cli/test/integration/init-review.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:45.3071200Z (pass) norn init writes a starter REVIEW.md > a repo without one gets the starter, and init says so [626.02ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:45.6055899Z (pass) norn init writes a starter REVIEW.md > a repo's own REVIEW.md is kept as it is [306.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:45.6102593Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:45.6127690Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.0388400Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.0396829Z packages/cli/test/integration/story-create.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.0438524Z (pass) at a terminal without a title (B19) > prompts for the title and opens the editor for the body [1088.04ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.0481227Z (pass) at a terminal without a title (B19) > an empty title creates nothing (exit 2) [9.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.0715258Z (pass) a script without a title (B20) > --json or no TTY is a usage error naming --title; nothing is prompted [24.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.0877707Z (pass) an unknown workflow (B21) > is refused before anything is created, listing the workflows [14.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.1196231Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.1226872Z packages/cli/test/integration/audit.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.1227875Z (pass) owed base records the base keeps refusing > three refusals stop the retries with a notified Unblock item; the base reading done clears it without a push [1563.05ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.2193236Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.2217697Z packages/cli/test/integration/story-create.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.2227218Z (pass) the remote failing (B22) > names the failure, points at norn doctor and leaves nothing locally [133.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.2665263Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.2671006Z packages/cli/test/integration/audit.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.2675110Z (pass) owed base records the base keeps refusing > tidy drops a stopped record whose story is gone, never one whose story is present nor one still retried [144.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.2845125Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.2867895Z packages/cli/test/integration/story-create.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.2868862Z (pass) the intake failing after the issue exists (B22) > prints the created story with exit 0 and points at norn sync, never at a second create [63.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.2963084Z (pass) --web (B23) > opens the remote's new-issue page with the norn and workflow labels; creates nothing [15.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.3142140Z (pass) --web (B23) > an unknown workflow is refused before the page opens [16.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.3865866Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.3869283Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.4409945Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.4439538Z packages/cli/test/integration/delegated.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.4485418Z (pass) a delegated reject (B21) > reject --delegated --reason sends the unit back as the person's would, marked in run list and listed in story view [3085.08ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.6715826Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.6779835Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.7130992Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.7205476Z packages/cli/test/integration/herdr-plugin.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.7224672Z (pass) herdr plugin > the manifest parses, has the pick pane and the open/next/pick actions, and names only scripts that exist
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.7225898Z (pass) herdr plugin > B8: the actions and panes run the new commands [6.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:46.7957973Z (pass) herdr plugin > P8: next.sh branches on the refusal's code, not its text, and keeps escaped quotes [73.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.0195302Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.0218390Z packages/cli/test/integration/layout-guard.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.0236990Z (pass) old layout: every command refuses and names norn upgrade (B18, B19) > only the config at its old place > status, tick and watch refuse (exit 3, old_layout) naming the main checkout, do_instead norn upgrade; a CliError with --json [39.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.0512307Z (pass) old layout: every command refuses and names norn upgrade (B18, B19) > only the workflows at its old place > status, tick and watch refuse (exit 3, old_layout) naming the main checkout, do_instead norn upgrade; a CliError with --json [29.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.0562127Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.0601037Z packages/cli/test/integration/audit.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.0601572Z (pass) owed base records the base keeps refusing > an unreachable remote never counts as a refusal [784.02ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.1167543Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.1185751Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.1244508Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.1265051Z packages/cli/test/integration/layout-guard.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.1278723Z (pass) old layout: every command refuses and names norn upgrade (B18, B19) > only the machine files at its old place > status, tick and watch refuse (exit 3, old_layout) naming the main checkout, do_instead norn upgrade; a CliError with --json [76.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.1598761Z (pass) old layout: every command refuses and names norn upgrade (B18, B19) > init refuses with do_instead norn upgrade and writes nothing (B19) [36.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.2011360Z (pass) both layouts: every command refuses naming both paths, reads and moves nothing (B17) > the config in both places [42.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.2640411Z (pass) both layouts: every command refuses naming both paths, reads and moves nothing (B17) > the workflows in both places [63.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.2927336Z (pass) both layouts: every command refuses naming both paths, reads and moves nothing (B17) > the machine files in both places [28.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.3508977Z (pass) norn doctor reports the layout as a failed repo check (B20) > old layout: doctor and doctor --repo fail naming norn upgrade and move nothing [57.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.4095692Z (pass) norn doctor reports the layout as a failed repo check (B20) > both layout: doctor and doctor --repo fail naming norn upgrade and move nothing [57.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.4520524Z (pass) old layout in a unit worktree's session (B18, D5) > norn hook exits 0, records nothing and blocks nothing [22.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.4562106Z (pass) old layout in a unit worktree's session (B18, D5) > brief, done, ask and stuck refuse like any command [2.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.8925003Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.8960492Z packages/cli/test/integration/story-start.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:47.8975418Z (pass) norn story start (B28) > taken in, not started: refused with the command that starts it; the inbox says so [921.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:48.1910089Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:48.1937198Z packages/cli/test/integration/non-holder-views.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:48.1957850Z (pass) a story held elsewhere under local (B18, B19) > AC4: no boundary commit yet (the start, a mirror and an ask commit are none): 'no boundary pushed yet' [2995.06ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:48.7557686Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:48.7582371Z packages/cli/test/integration/layout-guard.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:48.7645959Z (pass) a unit worktree's own old files are ignored (B21) > brief, done and the agent hooks work, reading config and workflows from the main checkout [239.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:48.7985780Z (pass) a unit worktree's own old files are ignored (B21) > ask works [44.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:48.8615749Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:48.8646014Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.3474653Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.3486012Z packages/cli/test/integration/story-start.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.3503744Z (pass) norn story start (B28) > an attended step, a runner that cannot open terminals: the inbox and open give the start command [1455.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.3825831Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.3874537Z packages/cli/test/integration/takeover-record.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.3890822Z (pass) checkout unpacks the record from the ref and continues (B22) > AC3: a force-pushed story branch: the record is kept, review restarts as attempt 3 with the reason in checkout and the brief (B24, T5a) [5569.11ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.7021243Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.7022275Z packages/cli/test/integration/story-start.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.7023068Z (pass) norn story start (B28) > without a target a person picks from the units a person can start only (B28, B57) [355.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.8786480Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.8815659Z packages/cli/test/integration/rename-continuity.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.8817904Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.8818642Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:49.8819394Z (pass) printed commands renamed, nothing else (B69, B70) > why on a tick recorded before the rename is a labelled version mismatch, its diff only the command [494.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:50.1075948Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:50.1081361Z packages/cli/test/integration/story-start.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:50.1109710Z (pass) norn story start (B28) > a runner that opens terminals: story start opens one in the worktree; --print prints the command [406.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:50.8256025Z (pass) norn story start (B28) > a step a person does not start is refused (nothing_to_open); with no target, nothing to pick (B59) [718.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:50.9296831Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:50.9318475Z packages/cli/test/integration/rename-continuity.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:50.9324912Z (pass) printed commands renamed, nothing else (B69, B70) > the unit stuck under the old norn continues after the upgrade with no migration [1055.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:50.9849209Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:50.9855681Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.0022513Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.0023414Z packages/cli/test/integration/non-holder-views.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.0024501Z (pass) the tick fetches only the record refs it needs (B30) > AC5: gh-9 held by A, gh-10 held by B with a ref, a closed gh-4 with a ref: B fetches refs/norn/runs/gh-9 only; views fetch and write nothing [2809.02ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.1111591Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.1134998Z packages/cli/test/integration/upgrade.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.1157897Z (pass) norn upgrade on the old layout (B11, B12, B13) > the config and workflows are staged git renames, nothing committed; the output lists each move and ends with the commit (B11) [10.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.1159146Z (pass) norn upgrade on the old layout (B11, B12, B13) > the machine-local files are in the machine dir with the same heartbeat; .agents/norn/ is gone (B12)
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.1272767Z (pass) norn upgrade on the old layout (B11, B12, B13) > norn's old .gitignore line is gone and staged; the person's lines are untouched (B13) [16.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.1724298Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.1731781Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.1732630Z (pass) mode, agent and workflow over ticks (B10, B13, B24, B25, B33) > B24: an issue without a norn:wf: label is taken in on the team's workflow; a labelled one on its own [218.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.1733688Z (pass) mode, agent and workflow over ticks (B10, B13, B24, B25, B33) > B10, B13: my mode auto starts gh-1 with the agent I named; the workflow's mode manual holds gh-2
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.1734850Z (pass) mode, agent and workflow over ticks (B10, B13, B24, B25, B33) > B13: a step naming gemini, with no agents entry, launches Gemini
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.4885904Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.4904814Z packages/cli/test/integration/upgrade.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.4905460Z (pass) norn upgrade on the old layout (B11, B12, B13) > the next tick recognises its own claim [362.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.6911025Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.6911937Z packages/cli/test/integration/non-holder-views.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.6912784Z (pass) the tick fetches only the record refs it needs (B30) > F10: another clone of the same user@host is another checkout: it sees A's stories as held elsewhere [690.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.7325013Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.7335525Z packages/cli/test/integration/upgrade.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.7336411Z (pass) norn upgrade on the old layout (B11, B12, B13) > a second run says nothing to move, exits 0 and changes nothing (B14) [243.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.9977783Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.9978793Z packages/cli/test/integration/non-holder-views.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:51.9979894Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:52.0000098Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:52.1060894Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:52.1070651Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:52.1087112Z (pass) mode, agent and workflow over ticks (B10, B13, B24, B25, B33) > B10: the story's own mode beats the workflow's [931.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:52.1145118Z (pass) mode, agent and workflow over ticks (B10, B13, B24, B25, B33) > B33: .env.norn holds only NORN_SLOT and PORT_BASE, slot n from port 4000 + 10·n
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:52.2186119Z (pass) mode, agent and workflow over ticks (B10, B13, B24, B25, B33) > B38: a slice that still has criteria needs shows under Unblock with norn upgrade, not as corrupt [114.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:52.5034978Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:52.5091008Z packages/cli/test/integration/story-start.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:52.5130467Z (pass) norn story start (B28) > a manual unit ready at a step that is not an agent step is not offered (B28, B57) [1673.02ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:52.6435591Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:52.6445505Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:54.5934849Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:54.6004274Z packages/cli/test/integration/tidy-herdr.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:54.6020039Z (pass) norn tidy closes Herdr panes of runs that reported done > finds only done runs recorded on this machine [1.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:54.7214353Z (pass) norn tidy closes Herdr panes of runs that reported done > another runner: tidy leaves Herdr alone [139.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.0236273Z (pass) norn tidy closes Herdr panes of runs that reported done > Herdr as the runner: --dry-run lists, tidy closes the done run's workspace only [299.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.1456090Z (pass) norn tidy closes Herdr panes of runs that reported done > a Herdr that cannot be reached is reported under kept, and the rest of tidy still runs [122.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.1857313Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.1906140Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.2979940Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.3000134Z packages/cli/test/integration/run-state-machine-dir.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.3029190Z (pass) gh-9 runs with its run state in the machine dir > AC1: through implement and review, git status never shows a run-state file; they are under <machine dir>/runs/gh-9/_story/ [3724.08ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.3196303Z (pass) gh-9 runs with its run state in the machine dir > AC6: the boundary after `norn done done` holds exactly the agent's files (norn writes nothing into the handoff), with the S4 trailers [21.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.3928571Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.3931237Z packages/cli/test/integration/rebase-rewind.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.3932433Z (pass) gh-79: a tick mid-rebase > mid-rebase the run state is not rewound, and the tick writes nothing [256.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.4480888Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.4520339Z packages/cli/test/integration/upgrade.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.4523686Z (pass) norn migrate is a deprecated alias of norn upgrade > it stages the same moves upgrade stages, with the same JSON value, and says on stderr that it is now norn upgrade [3632.08ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.5183864Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.5185233Z packages/cli/test/integration/rebase-rewind.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.5191332Z (pass) gh-79: a tick mid-rebase > after `git rebase --abort` the unit is not corrupt [127.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.5643940Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.5707153Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.6886770Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.6887397Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.6888227Z (pass) the agent command a launch runs (B14, B15) > B14: setting a model keeps the built-in --permission-mode auto, and the model is passed [1.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.6892592Z (pass) the agent command a launch runs (B14, B15) > B15: args: [] launches claude with no permission mode
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.8782368Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.8783062Z packages/cli/test/integration/takeover-record.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:55.8783917Z (pass) checkout unpacks the record from the ref and continues (B22) > AC3: a record whose unapplied receipts move the cursor first: the step the cursor reaches restarts, and the brief says why (review F3) [6496.10ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.1652457Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.1661661Z packages/cli/test/integration/run-state-machine-dir.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.1662336Z (pass) a worktree is disposable > setup: gh-10 parked on an ask [845.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.2786754Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.2817776Z packages/cli/test/integration/upgrade.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.2819847Z (pass) norn upgrade --json (B11) > gives {moves, staged, commit} [98.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.4345119Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.4349048Z packages/cli/test/integration/run-state-machine-dir.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.4349906Z (pass) a worktree is disposable > AC2: after `git clean -fdx` in its worktree and a tick, the story is at the same step, attempt and counters [270.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.5588529Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.5589497Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.5590269Z (pass) a notification that fails to send (B47) > B47: the tick goes on and the trace keeps the send error [1.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.7083153Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.7105162Z packages/cli/test/integration/run-state-machine-dir.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.7110755Z (pass) a worktree is disposable > AC6: `uncommitted` counts the unit's handoff only: never a run-state file, never the agent's files of a live session (D8) [274.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.7714729Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.7715975Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.7717048Z (pass) the tick interval and claim timing (B34, B35) > B34: no recorded interval → 30s built in; claim lease 10m renewed every 3m20s (B35) [26.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.8840278Z (pass) the tick interval and claim timing (B34, B35) > B34: norn tick --interval records it; a plain tick keeps it; the claim follows (B35) [112.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.9432650Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.9435105Z packages/cli/test/integration/run-state-machine-dir.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.9435994Z (pass) a worktree is disposable > #265: recover.commit commits the dirty handoff alone: never a run-state path from the machine dir, never the agent's files [234.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:56.9979822Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.0011869Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.0014115Z (pass) the tick interval and claim timing (B34, B35) > B34: ticks every 2 minutes with --interval 2m keep the heartbeat up: no norn watch item [115.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.0015308Z (pass) the tick interval and claim timing (B34, B35) > a bad --interval is a usage error [3.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.1187823Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.1188397Z packages/cli/test/integration/upgrade.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.1189137Z (pass) norn upgrade refuses and moves nothing (B15, B16, B17) > with the tick lock held the way watch holds it: exit 3, do_instead to stop watch and run it again (B15) [62.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.1316355Z (pass) norn upgrade refuses and moves nothing (B15, B16, B17) > in a unit worktree: exit 3, do_instead names the main checkout's path (B16) [11.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.1706488Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.1707321Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.1707974Z (pass) norn init sets up the agents in use only (B13) > B1: a plain init installs hooks and skills for Claude only [150.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.1722661Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.1723120Z packages/cli/test/integration/upgrade.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.1724314Z (pass) norn upgrade refuses and moves nothing (B15, B16, B17) > with one part in both places: exit 3 naming both paths (B17) [41.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.3243887Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.3262999Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.3267609Z (pass) norn init sets up the agents in use only (B13) > B13: an agent in use — the default agent or one a workflow step names — is set up too [157.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.3855081Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.3856510Z packages/cli/test/integration/run-state-machine-dir.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.3857505Z (pass) a worktree is disposable > AC3:the story worktree removed while parked on an ask, `norn story start` recreates it: status shows the same ask, same attempt [442.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.4288807Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.4289602Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.4290342Z (pass) norn init sets up the agents in use only (B13) > B1, B7: an old key in the user file refuses init before it writes anything [103.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.4290940Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.4291589Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.5115574Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.5116684Z packages/cli/test/integration/run-state-machine-dir.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.5117661Z (pass) a worktree is disposable > AC4: a receipt in the machine dir that fails validation makes gh-10 corrupt, and gh-9 is not [127.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.9264856Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.9265870Z packages/cli/test/integration/upgrade.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:57.9266585Z (pass) a rerun finishes an interrupted migration (B11, B12) > config and workflows moved, the trace not: migrate moves the trace [107.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:58.5314948Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:58.5344408Z packages/cli/test/integration/run-state-machine-dir.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:58.5355303Z (pass) parallel slices and a crash between a receipt and state (B4: S3) > AC5: two slices running at once each write only their own <machine dir>/runs/gh-11/<nn>-<slug>/ [1018.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:58.6176535Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:58.6177207Z packages/cli/test/integration/upgrade.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:58.6178013Z (pass) a rerun finishes a trace move cut short (B12, D6) > part of the trace in the machine dir, the rest at its old place: migrate moves the rest [97.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:58.6819997Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:58.6820853Z packages/cli/test/integration/run-state-machine-dir.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:58.6821724Z (pass) parallel slices and a crash between a receipt and state (B4: S3) > AC5: a receipt written but its state.json not (a crash between them) is re-applied by the next tick [152.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:59.1722726Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:59.1723572Z packages/cli/test/integration/upgrade.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:59.1724591Z (pass) a rerun finishes a trace move cut short (B12, D6) > a file in both places is refused naming both paths [557.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:59.2805068Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:59.2805725Z packages/cli/test/integration/takeover-record.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:19:59.2806729Z (pass) checkout unpacks the record from the ref and continues (B22) > AC4: a story whose branch is gone: checkout unpacks the record without the ancestry check and continues (B33) [3402.02ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.1031502Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.1032145Z packages/cli/test/integration/upgrade.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.1043853Z (pass) an untracked old workflow file (B11) > is moved plainly and listed as untracked [147.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.1757690Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.1758288Z packages/cli/test/integration/run-state-machine-dir.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.1759177Z (pass) parallel slices and a crash between a receipt and state (B4: S3) > AC5: a tick while a detached check run is writing its receipt waits; a crash's leftovers are ignored; the next tick applies the receipt once [1494.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.2473752Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.2499939Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.3574797Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.3575456Z packages/cli/test/integration/upgrade.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.3579039Z (pass) norn upgrade moves old config keys (gh-64 B40–B45, D13) > B40: the user file is rewritten in place, comments kept; the team file's remote.provider becomes provider, staged [3.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.3632324Z (pass) norn upgrade moves old config keys (gh-64 B40–B45, D13) > B41, B42: team limits fill each workflow's defaults: and default_mode each workflow's mode, keeping a workflow's own [6.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.3634491Z (pass) norn upgrade moves old config keys (gh-64 B40–B45, D13) > B43: personal and machine keys leave the team file, each listed with its value
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.3635529Z (pass) norn upgrade moves old config keys (gh-64 B40–B45, D13) > B43: a team notifiers list is offered in the user file's new shape, not the old key
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.3636474Z (pass) norn upgrade moves old config keys (gh-64 B40–B45, D13) > B43: a team limit no workflow takes is listed with its value
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.3637525Z (pass) norn upgrade moves old config keys (gh-64 B40–B45, D13) > B41: a workflow stored as JSON gains the defaults and mode too, still JSON
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.3671596Z (pass) norn upgrade moves old config keys (gh-64 B40–B45, D13) > B44: criteria needs are stripped from every slice, staged [4.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.4106796Z (pass) norn upgrade moves old config keys (gh-64 B40–B45, D13) > B45, B55: the config loads again; a second run changes nothing; nothing is committed [43.00ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.5986313Z (pass) norn upgrade leaves a new-style config alone > B45: a user and team file with no old key, in odd formatting, are neither rewritten nor staged [173.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.7649886Z (pass) norn upgrade on the new layout while watch holds the tick lock > exit 3, do_instead to stop watch and run it again; a rerun is refused the same way and nothing changes [167.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.9387662Z (pass) norn upgrade on old team values of the wrong shape > B43: a scalar remote, limits or default_mode is removed and listed once with its value [173.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.9660607Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:00.9661466Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:02.1298397Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:02.1299006Z packages/cli/test/integration/takeover-record.test.ts:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:02.1299763Z (pass) checkout unpacks the record from the ref and continues (B22) > AC4: a record made without a branch (no Norn-Branch-Commit) is checked out the same way and continues (B33) [2850.10ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:03.6049450Z (pass) a story held only from its record (B33, 10-R3-F2) > under remote, B's tick pushes the record of a branchless story it holds (no Norn-Branch-Commit); status lists it; B hands it over with the record pushed and the claim released [1192.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:04.7399775Z (pass) a record checkout cannot take takes nothing: no claim, no worktree, no run state (review F1) > a record that fails validation is refused before the claim [965.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:05.9725205Z (pass) a record checkout cannot take takes nothing: no claim, no worktree, no run state (review F1) > a record that cannot be fetched is refused before the claim [1232.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:07.4295968Z (pass) checkout is one transaction: every remote check before the claim (review#2 F2, F5) > a rewritten branch meeting a diverged local branch: refused before the claim; once reconciled, checkout still restarts the step [1288.02ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:08.6845536Z (pass) checkout is one transaction: every remote check before the claim (review#2 F2, F5) > the record ref moving while the claim is taken (a still-running holder pushed): the claim is given back and nothing is placed [1255.02ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.7419451Z (pass) a record lease another checkout broke is one Check item, not a push every tick (08-F4) > under remote: B's push is refused as stale once; later ticks do not retry; checkout here re-reads the ref and the next tick pushes on top of it [1855.04ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.7799607Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.7800960Z ##[endgroup]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.7984601Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.7985015Z 1 tests failed:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.7985460Z (fail) watch pauses ticks on a version mismatch (B11, D8) > AC2: a matching version resumes ticks; a later mismatch with another version notifies again [1448.01ms]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.7985799Z 
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.7985850Z  264 pass
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.7985962Z  1 fail
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.7986433Z  1652 expect() calls
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.7986571Z Ran 265 tests across 24 files. [39.87s]
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.8012018Z error: script "test:integration" exited with code 1
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.8027134Z ##[error]Process completed with exit code 1.
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.8112748Z Post job cleanup.
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.8674798Z [command]/usr/bin/git version
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.8709447Z git version 2.56.0
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.8729885Z Copying '/home/runner/.gitconfig' to '/home/runner/work/_temp/81777245-db38-4111-bdb2-4dca8937ad01/.gitconfig'
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.8736495Z Temporarily overriding HOME='/home/runner/work/_temp/81777245-db38-4111-bdb2-4dca8937ad01' before making global git config changes
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.8737298Z Adding repository directory to the temporary git global config as a safe directory
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.8740259Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/norn-next/norn-next
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.8775613Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.8809911Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.9020035Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.9043342Z http.https://github.com/.extraheader
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.9053816Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.9087965Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.9313608Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.9384680Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.9706622Z Cleaning up orphan processes
+integration (shard 1/4)	UNKNOWN STEP	2026-11-08T12:20:10.9948599Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
