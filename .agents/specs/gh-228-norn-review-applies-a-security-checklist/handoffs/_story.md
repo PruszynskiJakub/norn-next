@@ -32,4 +32,4 @@ The spec is a quick issue with no criteria frontmatter; its two Wanted items are
 
 ## Resume
 
-review#2 approved the post-merge head (no blocking findings); next is the workflow's step after review.
+pr.md rewritten by describe#2 for the post-merge head (sensitive-paths wiring in SKILL.md steps 3 and 4). Next: norn updates PR #286 with it.
