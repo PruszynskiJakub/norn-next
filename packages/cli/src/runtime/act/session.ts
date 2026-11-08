@@ -20,6 +20,7 @@ import {
   writeTranscriptSnapshot,
 } from "@norn/store";
 import { ensureShim, withNornOnPath } from "../shim.ts";
+import { type StoppedListener, slotPorts, stopStrayListeners } from "../strays.ts";
 import { runnerFor } from "../../wiring.ts";
 import { type ActEnv, QueueFull, ReceiptTaken } from "./env.ts";
 import type { UnitLoc } from "../observe/index.ts";
@@ -31,8 +32,12 @@ async function killSession(act: ActEnv, session: SessionRef | null): Promise<boo
   return true;
 }
 
-/** Launch an agent session for a run, holding an agent lease. */
-async function launchSession(act: ActEnv, unit: UnitRef, launch: AgentLaunch): Promise<{ session: SessionRef; lease: string }> {
+/**
+ * Launch an agent session for a run, holding an agent lease. A fresh session (a new run or a fresh
+ * retry) first stops what an earlier session left listening on the slot's ports from this worktree;
+ * a resumed one keeps its own servers.
+ */
+async function launchSession(act: ActEnv, unit: UnitRef, launch: AgentLaunch, fresh: boolean): Promise<{ session: SessionRef; lease: string; stopped: StoppedListener[] }> {
   const runner = act.obs.ports.runner;
   if (!runner) throw new Error("no runner configured");
   const agent = act.obs.ports.agents[launch.agent];
@@ -48,6 +53,8 @@ async function launchSession(act: ActEnv, unit: UnitRef, launch: AgentLaunch): P
   if (!lease.ok) throw new QueueFull(`queued: max_agents ${act.config.max_agents} in use`);
   try {
     const env = { ...(readEnvNorn(launch.cwd) ?? {}), ...launch.env, NORN_HOME: act.root };
+    const ports = fresh ? slotPorts(({ ...act.ctx.env, ...env } as Record<string, string | undefined>).PORT_BASE) : null;
+    const stopped = ports ? await stopStrayListeners(launch.cwd, ports) : [];
     const cfg = act.config.agents[launch.agent];
     const cmd = agent.launchCommand({
       cwd: launch.cwd,
@@ -65,7 +72,7 @@ async function launchSession(act: ActEnv, unit: UnitRef, launch: AgentLaunch): P
     // one (pane runners) it carries the worktree and stays live while the run is running (leases.ts).
     if (session.process) updateLease(act.ctx.home, lease.entry.file, { ...lease.entry.lease, holder: session.process });
     else updateLease(act.ctx.home, lease.entry.file, { ...lease.entry.lease, worktree: launch.cwd });
-    return { session, lease: lease.entry.file };
+    return { session, lease: lease.entry.file, stopped };
   } catch (e) {
     releaseLease(act.ctx.home, lease.entry.file);
     throw e;
@@ -113,7 +120,7 @@ export async function applyReceipts(act: ActEnv, a: Extract<Action, { kind: "app
   const killed = await killSession(act, a.kill ?? null);
   if (a.launch) {
     // Resume the same agent session with the answer as the prompt (headless / session gone)
-    ({ session: resumed } = await launchAfterReceipts(act, a.unit, loc, a.receipts, a.launch));
+    ({ session: resumed } = await launchAfterReceipts(act, a.unit, loc, a.receipts, a.launch, { fresh: false }));
     if (state) state = recordSession(act, a.unit, loc.runsDir, state, a.receipts, resumed);
   } else
     try {
@@ -180,13 +187,13 @@ const startedPaths = (loc: UnitLoc) => [loc.handoffFile];
 
 export async function startRun(act: ActEnv, a: Extract<Action, { kind: "start_run" }>): Promise<ActionResult> {
   const loc = act.unitLoc(a.unit);
-  const { session, lease } = await launchAfterReceipts(act, a.unit, loc, a.receipts, a.launch);
+  const { session, lease, stopped } = await launchAfterReceipts(act, a.unit, loc, a.receipts, a.launch, { fresh: true });
   act.effectsOk.add("launch");
   const state = a.state ? recordSession(act, a.unit, loc.runsDir, a.state, a.receipts, session) : null;
   if (state) act.writeUnitState(a.unit, loc.runsDir, state);
   // Commit and push the handoff now when it is new (its skeleton) — never the agent's fresh work
   const committed = await act.commit(a.commit, a.unit, state, a.commit ? startedPaths(loc).map((p) => relative(a.commit?.cwd ?? "", p)) : undefined);
-  return { ok: true, detail: { session, lease, ...committed } };
+  return { ok: true, detail: { session, lease, ...committed, ...strays(stopped) } };
 }
 
 /**
@@ -194,13 +201,13 @@ export async function startRun(act: ActEnv, a: Extract<Action, { kind: "start_ru
  * then the launch. A failed launch leaves the started receipt; the next tick applies it and
  * classification (stalled/timeout) bounds the run.
  */
-async function launchAfterReceipts(act: ActEnv, unit: UnitRef, loc: UnitLoc, receipts: NewReceipt[], launch: AgentLaunch, beforeLaunch?: () => Promise<unknown>) {
+async function launchAfterReceipts(act: ActEnv, unit: UnitRef, loc: UnitLoc, receipts: NewReceipt[], launch: AgentLaunch, opts: { fresh: boolean; beforeLaunch?: () => Promise<unknown> }) {
   const listing = await listLeases(act.ctx.home, act.liveness());
   const agents = listing.live.filter((e) => e.lease.kind === "agent" && e.lease.run_id !== launch.run_id).length;
   if (agents >= act.config.max_agents) throw new QueueFull(`queued: max_agents ${act.config.max_agents} in use`);
   act.writeReceipts(loc, receipts);
-  await beforeLaunch?.();
-  return launchSession(act, unit, launch);
+  await opts.beforeLaunch?.();
+  return launchSession(act, unit, launch, opts.fresh);
 }
 
 /**
@@ -217,10 +224,13 @@ export async function nudge(act: ActEnv, a: Extract<Action, { kind: "nudge" }>):
     const launch = a.launch;
     const kill = a.kill;
     try {
-      ({ session: resumed } = await launchAfterReceipts(act, a.unit, loc, a.receipts, launch, async () => {
-        await killSession(act, kill);
-        // the old process held the run's agent lease; the resumed one takes it over
-        await act.releaseRunLeases(a.unit, ["agent"], launch.run_id);
+      ({ session: resumed } = await launchAfterReceipts(act, a.unit, loc, a.receipts, launch, {
+        fresh: false,
+        beforeLaunch: async () => {
+          await killSession(act, kill);
+          // the old process held the run's agent lease; the resumed one takes it over
+          await act.releaseRunLeases(a.unit, ["agent"], launch.run_id);
+        },
       }));
     } catch (e) {
       if (e instanceof QueueFull) throw e;
@@ -252,10 +262,11 @@ export async function retryFresh(act: ActEnv, a: Extract<Action, { kind: "retry_
   const loc = act.unitLoc(a.unit);
   let state = a.state;
   let session: SessionRef | null = null;
+  let stopped: StoppedListener[] = [];
   await act.releaseRunLeases(a.unit, ["agent"]);
   if (a.launch) {
     // receipts, kill the old session, then the fresh one
-    ({ session } = await launchAfterReceipts(act, a.unit, loc, a.receipts, a.launch, () => killSession(act, a.kill)));
+    ({ session, stopped } = await launchAfterReceipts(act, a.unit, loc, a.receipts, a.launch, { fresh: true, beforeLaunch: () => killSession(act, a.kill) }));
     act.effectsOk.add("launch");
     if (state) state = recordSession(act, a.unit, loc.runsDir, state, a.receipts, session);
   } else {
@@ -264,8 +275,11 @@ export async function retryFresh(act: ActEnv, a: Extract<Action, { kind: "retry_
   }
   if (state) act.writeUnitState(a.unit, loc.runsDir, state);
   const committed = await act.commit(a.commit, a.unit, state);
-  return { ok: true, detail: { session, ...committed } };
+  return { ok: true, detail: { session, ...committed, ...strays(stopped) } };
 }
+
+/** What a launch stopped, recorded in the action's detail (the tick's trace) as a check records it in its output. */
+const strays = (stopped: StoppedListener[]) => (stopped.length ? { stopped_listeners: stopped } : {});
 
 export async function classify(act: ActEnv, a: Extract<Action, { kind: "classify" }>): Promise<ActionResult> {
   const loc = act.unitLoc(a.unit);

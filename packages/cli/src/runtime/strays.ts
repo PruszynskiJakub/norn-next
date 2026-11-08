@@ -1,18 +1,30 @@
 /**
  * A process an agent left behind (a dev or smoke server started from inside the worktree)
- * keeps listening on the worktree's slot ports after its run ended, and the next check fails with
- * "address in use". Before a check, norn stops every listener on the slot's ports whose working
- * directory is inside the worktree; a listener started anywhere else is left alone. Best effort:
- * without `lsof` nothing is stopped.
+ * keeps listening on the worktree's slot ports after its run ended, and the next check or agent run
+ * fails with "address in use". Before a check, and before a fresh agent session, norn stops every
+ * listener on the slot's ports whose working directory is inside the worktree; a listener started
+ * anywhere else is left alone. Best effort: without `lsof` nothing is stopped.
  */
 import { realpathSync } from "node:fs";
 import { sep } from "node:path";
+import { SLOTS } from "@norn/schema";
 import { spawnBounded } from "@norn/store";
 
 export interface StoppedListener {
   pid: number;
   port: number;
   command: string;
+}
+
+export interface SlotPorts {
+  from: number;
+  to: number;
+}
+
+/** The slot's port range from its `PORT_BASE`; null when there is none to guard. */
+export function slotPorts(portBase: string | undefined): SlotPorts | null {
+  const base = Number(portBase);
+  return Number.isInteger(base) && base > 0 ? { from: base, to: base + SLOTS.ports_per_slot - 1 } : null;
 }
 
 /** A pid probe: bounded, and not told to the spawn observer (its argv carries live pids). */
@@ -49,7 +61,7 @@ const alive = (pid: number) => {
   }
 };
 
-export async function stopStrayListeners(worktree: string, ports: { from: number; to: number }, graceMs = 2_000): Promise<StoppedListener[]> {
+export async function stopStrayListeners(worktree: string, ports: SlotPorts, graceMs = 2_000): Promise<StoppedListener[]> {
   let root: string;
   try {
     root = realpathSync(worktree);
