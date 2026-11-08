@@ -1,0 +1,1 @@
+{"kind":"classify","receipt_id":"01M6W06DYX44HSAJBGNSASWPWJ","run_id":"01M6VYRNJB5KF5PTKEQGXEX7DK","step":"refine","attempt":1,"at":"2026-11-07T21:56:21.088Z","by":"norn","who":"jakubpruszynski@mac","tick_id":"01M6W06DYX470SFA880EW8ECBM","outcome":"died","rule":"agent.died","route":"retry","detail":"process gone, no receipt","counter":{"name":"retries","value":1,"max":1}}
