@@ -253,6 +253,23 @@ describe("classification", () => {
     expect(a).toMatchObject({ kind: "park", rule: "agent.ask.implicit", state: { park: { kind: "ask", reason: "Allow rm -rf?" } }, notify: { group: "answer", detail: "pending command: rm -rf build" } });
     expect(a.kind === "park" && a.receipts[0]?.receipt).toMatchObject({ kind: "ask", implicit: true, command: "rm -rf build" });
   });
+  test("a logged-out session parks on an implicit ask that says so, spending no nudge", () => {
+    const hooks = [
+      { event: "turn_start" as const, at: at(T0 - 20), agent: "claude", native: "UserPromptSubmit", cwd: "/w" },
+      { event: "waiting_input" as const, at: at(T0 - 10), agent: "claude", native: "StopFailure", cwd: "/w", message: "agent logged out — run `/login` in the pane" },
+    ];
+    const a = only(facts([solo(running(), { hooks })]));
+    expect(a).toMatchObject({ kind: "park", rule: "agent.ask.implicit", state: { park: { kind: "ask", reason: "agent logged out — run `/login` in the pane" }, nudges_used: 0 } });
+    if (a.kind !== "park") return;
+    // the Claude adapter drops the idle notification that follows, so past the stalled window the
+    // hooks still end on the failed login: the unit stays parked and no nudge is spent
+    const later = T0 + 30 * 60_000;
+    const unitAction = (s: StoryFacts) => decide(facts([s], {}, later), WORKFLOWS, CONFIG).map((d) => d.action).filter((x) => !isSideAction(x));
+    expect(unitAction(solo(a.state, { hooks, last_activity_at: T0 - 10 }))).toMatchObject([{ kind: "noop", rule: "unit.parked.ask" }]);
+    // after `/login` the next prompt in the same session ends the wait and the run goes on
+    const prompt = { event: "turn_start" as const, at: at(later - 1000), agent: "claude", native: "UserPromptSubmit", cwd: "/w" };
+    expect(unitAction(solo(a.state, { hooks: [...hooks, prompt] }))[0]).toMatchObject({ kind: "apply_receipts", rule: "agent.ask.implicit.resolved", state: { status: "running", park: null, nudges_used: 0 } });
+  });
   test("BS5.1 (dogfood D3): an owed commit deferred by an agent's merge never takes the unit's action", () => {
     const midMerge = (s: StoryFacts, inProgress: { operation: "merge" | null; unmerged: string[] }) => {
       const u = s.units[0]!;
@@ -447,6 +464,19 @@ describe("story lifecycle", () => {
     f.issue = { ...f.issue!, title: "Login v2", body: "new body" };
     f.frontmatter = { ...f.frontmatter!, refined_body_hash: sha256("body") };
     expect(only(facts([f]))).toMatchObject({ kind: "update_story_mirror", fields: { title: "Login v2", body_hash: sha256("new body") }, notify: { title: "issue body changed since refine", group: "your_turn" } });
+  });
+  test("an open PR whose title is not the issue's is retitled to it, alongside the unit's own action", () => {
+    const pr = { number: 7, url: "u", state: "open" as const, is_draft: true, head_sha: "", title: "Release", head: "gh-1-login", base_branch: "main", merged_at: null };
+    const retitles = (f: StoryFacts) => decide(facts([f]), WORKFLOWS, CONFIG).map((d) => d.action).filter((x) => x.kind === "retitle_pr");
+    expect(retitles(storyAt("ready", { pr }))).toEqual([{ kind: "retitle_pr", unit: storyUnit(), rule: "remote.pr_title", number: 7, title: "Login form" }]);
+    // the issue renamed since the last mirror: the same sync tick mirrors it and retitles the PR to it
+    const renamed = storyAt("ready", { pr });
+    renamed.issue = { ...renamed.issue!, title: "Release 0.22.0" };
+    expect(kinds(facts([renamed]))).toEqual(["gh-1 retitle_pr remote.pr_title", "gh-1 update_story_mirror remote.mirror"]);
+    expect(retitles(renamed)).toMatchObject([{ number: 7, title: "Release 0.22.0" }]);
+    // the title already matches, the PR is not open, a cache an older norn wrote has no title, or the issue is not observed: nothing
+    for (const f of [storyAt("ready", { pr: { ...pr, title: "Login form" } }), storyAt("ready", { pr: { ...pr, state: "closed" } }), storyAt("ready", { pr: { ...pr, title: undefined } }), storyAt("ready", { pr, issue: undefined })])
+      expect(retitles(f)).toEqual([]);
   });
   test("S4: a mirror commit carries the story unit's step (commitFor); none before the story starts", () => {
     const f = storyAt("test");

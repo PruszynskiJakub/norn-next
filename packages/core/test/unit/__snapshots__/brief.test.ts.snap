@@ -15,34 +15,36 @@ Use the \`implement\` skill.
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
-- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — the unit's current state, shown under Context: keep it current here
+- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — write the unit's current state here (shown under Context)
 
 ## Context
 
-No handoff yet: write it at \`.agents/specs/gh-1-login/handoffs/02-form.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -72,34 +74,36 @@ Base mode: merge the base commit named in Rework; never rebase.
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
-- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — the unit's current state, shown under Context: keep it current here
+- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — write the unit's current state here (shown under Context)
 
 ## Context
 
-No handoff yet: write it at \`.agents/specs/gh-1-login/handoffs/02-form.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -141,15 +145,21 @@ You are here because \`test.fail\` sent the work back (fix round test_loop 1/5).
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
-- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — the unit's current state, shown under Context: keep it current here
+- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — write the unit's current state here (shown under Context)
 
 ## Context
+
+This handoff has an older Progress section: as you refresh it, fold what still matters into Notes and Not proven yet and drop the lines History already says.
 
 ### Goal
 Login form
@@ -159,27 +169,25 @@ Login form
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
 - implement#1 reported \`done\`: h
 - test#1 check \`fail\` (exit 1) in 0.9s
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -209,11 +217,16 @@ You are here because \`review.changes_requested\` sent the work back (fix round 
 
 ### Findings (review: changes_requested)
 
-Fix every blocking and major finding; minor and nit ones are for you to weigh.
+Rework is the blocking and major findings: fix each one.
 
 1. **blocking** [B3] Password not validated — \`src/login.ts:12\`
    Repro: POST /login with empty password
-2. **minor** Naming
+
+### Notes (review: minor and nit)
+
+Leave these as notes: do not fix them in this round.
+
+1. **minor** Naming
    rename x to email
 
 ## Finish with exactly one of
@@ -222,40 +235,42 @@ Fix every blocking and major finding; minor and nit ones are for you to weigh.
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
-- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — the unit's current state, shown under Context: keep it current here
+- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — write the unit's current state here (shown under Context)
 
 ## Context
 
-No handoff yet: write it at \`.agents/specs/gh-1-login/handoffs/02-form.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
 - review#1 reported \`changes_requested\` (2 findings): h
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -283,12 +298,16 @@ Use the \`refine\` skill.
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
-- Handoff: \`.agents/specs/gh-1-login/handoffs/_story.md\` — the unit's current state, shown under Context: keep it current here
+- Handoff: \`.agents/specs/gh-1-login/handoffs/_story.md\` — write the unit's current state here (shown under Context)
 
 ## Context
 
@@ -297,31 +316,29 @@ Answers to your questions in this step:
 - Q: Email or username?
   A: Email
 
-No handoff yet: write it at \`.agents/specs/gh-1-login/handoffs/_story.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
 - refine#1 asked: Email or username?
 - refine#1 answer: Email
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/_story.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/_story.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 "
@@ -352,40 +369,40 @@ You are here because \`qa.fail\` sent the work back (fix round qa_loop 1/2). Add
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
-- Last failing check: \`none\`
-- Last findings: \`see Rework\`
 
 ## Context
 
-No handoff yet: write it at \`.agents/specs/gh-1-login/handoffs/02-form.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
 - qa#1 reported \`fail\`: QA via curl: FAIL B12 'delete already-deleted -> 404': ids of deleted items are reused, so a retried DELETE removes a newer item. Repro in B12-repro.md.
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -426,40 +443,40 @@ You are here because \`qa.fail\` sent the work back (fix round qa_loop 1/2). Add
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
-- Last failing check: \`none\`
-- Last findings: \`see Rework\`
 
 ## Context
 
-No handoff yet: write it at \`.agents/specs/gh-1-login/handoffs/02-form.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
 - qa#1 reported \`fail\` (1 finding): QA via curl: FAIL B12 'delete already-deleted -> 404': ids of deleted items are reused, so a retried DELETE removes a newer item. Repro in B12-repro.md.
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -499,21 +516,23 @@ What was judged: qa#1 reported \`partial\`:
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
-- Last failing check: \`none\`
-- Last findings: \`see Rework\`
 
 ## Context
 
-No handoff yet: write it at \`.agents/specs/gh-1-login/handoffs/02-form.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
 - review#1 reported \`approve\` (2 findings): h
 - qa#1 reported \`partial\`: AC7 needs a browser; steps in AC7.md
@@ -521,20 +540,18 @@ What happened in this unit so far, oldest first, from its receipts:
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -574,41 +591,41 @@ What was judged: qa#1 reported \`partial\`:
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
-- Last failing check: \`none\`
-- Last findings: \`see Rework\`
 
 ## Context
 
-No handoff yet: write it at \`.agents/specs/gh-1-login/handoffs/02-form.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
 - qa#1 reported \`partial\`: h
 - human-qa#1 reject: (no comment given)
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -636,46 +653,48 @@ Use the \`qa\` skill.
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
-- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — the unit's current state, shown under Context: keep it current here
+- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — write the unit's current state here (shown under Context)
 
 ## Context
 
-No handoff yet: write it at \`.agents/specs/gh-1-login/handoffs/02-form.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
-### Notes from review (non-blocking)
+## Non-blocking findings from review
 
-review reported \`approve\` with these notes, for information:
+review reported \`approve\` with these findings, for information; they are not rework:
 
 1. **minor** Raw HTML shown as row error — \`src/views.ts:191\`
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
 - review#1 reported \`approve\` (1 finding): h
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -709,40 +728,42 @@ rebase onto gh-1-login conflicts in src/a.ts, src/b.ts
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
-- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — the unit's current state, shown under Context: keep it current here
+- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — write the unit's current state here (shown under Context)
 
 ## Context
 
-No handoff yet: write it at \`.agents/specs/gh-1-login/handoffs/02-form.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
 - integrate#1 \`conflict\` → merge: rebase onto gh-1-login conflicts in src/a.ts, src/b.ts
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -769,17 +790,21 @@ Use the \`review\` skill.
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
-- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — the unit's current state, shown under Context: keep it current here
+- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — write the unit's current state here (shown under Context)
 
 ## Context
 
-No handoff yet: write it at \`.agents/specs/gh-1-login/handoffs/02-form.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
 ## Checks since the last report
 
@@ -789,27 +814,25 @@ These checks ran on the code since implement#1 reported; nothing else has run on
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
 - implement#1 reported \`done\`: h
 - test#1 check \`pass\` in 1m 23s
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -843,6 +866,10 @@ qa#1 reported \`fail\` on older code. Since then: implement.done → test.pass �
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
 \`--criteria <file>\`: a JSON array with one verdict per acceptance criterion — \`pass\` (with \`evidence\`), \`fail\` (with \`repro\`), \`person\` (with \`how\`), \`unverified\` (with \`reason\` and \`how\`). Worst verdict: fail > unverified > person > pass. Write the file outside the repository, next to your evidence (e.g. \`$TMPDIR/criteria.json\`); never under \`runs/\`.
 
 One entry for each of these criteria, and no other id:
@@ -857,17 +884,19 @@ One entry for each of these criteria, and no other id:
 ]
 \`\`\`
 
-Add \`--note "<text>"\` (and \`--note-criterion <id>\`) for a question a person should see without blocking the work.
+Add \`--note "<text>"\` (and \`--note-criterion <id>\`) for a question a person should see in their inbox without blocking the work; it is not the handoff's Notes.
 
-Then end your turn.
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
 - Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
-- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — the unit's current state, shown under Context: keep it current here
+- Handoff: \`.agents/specs/gh-1-login/handoffs/02-form.md\` — write the unit's current state here (shown under Context)
 
 ## Context
+
+This handoff has an older Progress section: as you refresh it, fold what still matters into Notes and Not proven yet and drop the lines History already says.
 
 ### Goal
 Footer shows the total.
@@ -880,7 +909,7 @@ _Resume omitted: review#2 wrote it for its own step; it does not apply to qa._
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
 - qa#1 reported \`fail\` (1 finding): h
 - implement#2 reported \`done\`: h
@@ -890,20 +919,177 @@ What happened in this unit so far, oldest first, from its receipts:
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Ports: \`PORT_BASE=4030\` (slot 3, in \`.env.norn\`)
+"
+`;
+
+exports[`Re-entry, fresh sessions, handoff and criteria a re-review that declares last_findings checks the earlier findings first the earlier review's findings are listed to check, fixed or not, and Inputs points at them 1`] = `
+"# norn brief — gh-1/02 · review #2
+
+You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Your work
+
+Use the \`review\` skill.
+
+## Why this attempt
+
+review#1 reported \`changes_requested\` on older code. Since then: implement.done → test.pass. First check each earlier finding below against the current code: fixed or not. Then do this step again in full on the current HEAD.
+
+### Earlier findings (review#1)
+
+1. **blocking** Count off by one — \`src/count.ts:12\`
+2. **minor** Name the helper after what it returns
+
+## Finish with exactly one of
+
+- \`norn done approve --handoff "…"\` — all criteria met, no blocking findings
+- \`norn done changes_requested --handoff "…"\` — blocking findings in the receipt
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
+
+## Inputs
+
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
+- Diff: \`git diff gh-1-login...HEAD\` — the change so far, against the story's base
+
+## Context
+
+No handoff yet; write one as you work (its sections are under How to work).
+
+## Checks since the last report
+
+These checks ran on the code since implement#2 reported; nothing else has run on it yet.
+
+- test#1 \`pass\` in 0s — \`bun test\` — output: \`/r-worktrees/gh-1-login--02-form/.agents/specs/gh-1-login/runs/02-form/receipts/0005-check.json\`
+
+## History
+
+What happened so far, oldest first, from the receipts (for a story, its current round only):
+
+- review#1 reported \`changes_requested\` (2 findings): h
+- implement#2 reported \`done\`: h
+- test#1 check \`pass\` in 0s
+
+## How to work
+
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
+  - **Goal**: what this unit must achieve, in one or two lines.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
+  - **Easy to miss**: the rule or edge case the quick path would break.
+  - **Not proven yet**: what is still open or unverified.
+  - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
+  - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+
+## Limits
+
+- Deadline: 60m (until 2026-10-23T11:00:00.000Z)
+- Ports: \`PORT_BASE=4030\` (slot 3, in \`.env.norn\`)
+"
+`;
+
+exports[`Re-entry, fresh sessions, handoff and criteria implement's Rework sorts the findings: blocking and major to fix, minor and nit left as notes 1`] = `
+"# norn brief — gh-1/02 · implement #2
+
+You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Your work
+
+Use the \`implement\` skill.
+
+## Rework
+
+You are here because \`review.changes_requested\` sent the work back (fix round review_loop 1/3). Address the points below first.
+
+### review#1 reported \`changes_requested\`
+
+> h
+
+### Findings (review: changes_requested)
+
+Rework is the blocking and major findings: fix each one.
+
+1. **blocking** Count off by one
+2. **major** Empty list crashes the footer
+
+### Notes (review: minor and nit)
+
+Leave these as notes: do not fix them in this round.
+
+1. **minor** Name the helper after what it returns
+2. **nit** Trailing space in the label
+
+## Finish with exactly one of
+
+- \`norn done done --handoff "…"\` — every acceptance criterion (or rework point) has a passing test
+- \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
+- \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
+
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
+
+## Inputs
+
+- Slice: \`.agents/specs/gh-1-login/slices/02-form.md\` — this slice's scope and acceptance criteria, each with its verifier
+
+## Context
+
+No handoff yet; write one as you work (its sections are under How to work).
+
+## History
+
+What happened so far, oldest first, from the receipts (for a story, its current round only):
+
+- review#1 reported \`changes_requested\` (4 findings): h
+
+## How to work
+
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
+  - **Goal**: what this unit must achieve, in one or two lines.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
+  - **Easy to miss**: the rule or edge case the quick path would break.
+  - **Not proven yet**: what is still open or unverified.
+  - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
+  - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -939,47 +1125,47 @@ You are here because \`qa.fail\` sent the work back (fix round qa_loop 1/2). Add
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-projects-and-items/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
-- Handoff: \`.agents/specs/gh-1-projects-and-items/handoffs/_story.md\` — the unit's current state, shown under Context: keep it current here
-- Last failing check: \`none\`
-- Last findings: \`see Rework\`
+- Handoff: \`.agents/specs/gh-1-projects-and-items/handoffs/_story.md\` — write the unit's current state here (shown under Context)
 
 ## Context
 
-No handoff yet: write it at \`.agents/specs/gh-1-projects-and-items/handoffs/_story.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
-- refine#1 reported \`done\`: Spec written below the story text in story.md (frontmatter unchanged): Context, B1-B32 (persistence/Inbox, projects API, items API, API-wide validation, web UI…
-- plan#1 reported \`done\`: plan.md written: seams S1 store.ts openStore(path,{now})->Store (all SQLite + domain rules, StoreError invalid|not_found), S2 createApp(store) fetch handler (a…
-- slice#1 reported \`done\`: 4 slices in slices/: 01 store (P1 createApp extraction + S1 store, B1-B3,B5-B22 at store level), 02 JSON API + server wiring (S2 api.ts + S3 server.ts, B1-B5..…
+- refine#1 reported \`done\`: Spec written below the story text in story.md (frontmatter unchanged): Context, B1-B32 (persistence/Inbox, projects API, items API, API-wide validation, web…
+- plan#1 reported \`done\`: plan.md written: seams S1 store.ts openStore(path,{now})->Store (all SQLite + domain rules, StoreError invalid|not_found), S2 createApp(store) fetch handler…
+- slice#1 reported \`done\`: 4 slices in slices/: 01 store (P1 createApp extraction + S1 store, B1-B3,B5-B22 at store level), 02 JSON API + server wiring (S2 api.ts + S3 server.ts,…
 - approve-plan#1 approve by jakubpruszynski@MacBook-Pro-Jakub-2
 - slices#1 \`done\` → test: 4 slice(s) integrated
 - test#1 check \`pass\` in 1.6s
-- qa#1 reported \`fail\`: Story QA via curl on :4040: 31/32 Behaviour items + tests AC pass. FAIL B12/edge 'delete already-deleted -> 404': ids of deleted items/projects are reused (INT…
+- qa#1 reported \`fail\`: Story QA via curl on :4040: 31/32 Behaviour items + tests AC pass. FAIL B12/edge 'delete already-deleted -> 404': ids of deleted items/projects are reused…
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-projects-and-items/handoffs/_story.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-1-projects-and-items/handoffs/_story.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 
@@ -1019,46 +1205,46 @@ What was judged: qa#1 reported \`partial\`:
 - \`norn ask "<question>"\` — you need a person's answer to continue; the step parks until answered
 - \`norn stuck "<reason>"\` — you cannot continue; a person unblocks the step
 
-Then end your turn.
+- \`--handoff "…"\`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.
+- Any \`done\` also takes \`--findings <file>\` (needed when the outcome sends the work back: what failed, with its repro) and \`--evidence <dir>\` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.
+- \`norn ask "<one self-contained question>" [--option "<a>" --option "<b>"]\` when you need a person's decision; \`norn stuck "<reason>"\` says what would unblock it.
+
+Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.
 
 ## Inputs
 
 - Slice: \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/slices/03-due-dates-in-project-lists.md\` — this slice's scope and acceptance criteria, each with its verifier
 - Story spec: \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
-- Handoff: \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/handoffs/03-due-dates-in-project-lists.md\` — the unit's current state, shown under Context: keep it current here
-- Last failing check: \`none\`
-- Last findings: \`see Rework\`
+- Handoff: \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/handoffs/03-due-dates-in-project-lists.md\` — write the unit's current state here (shown under Context)
 
 ## Context
 
-No handoff yet: write it at \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/handoffs/03-due-dates-in-project-lists.md\` as you work (its sections are under How to work).
+No handoff yet; write one as you work (its sections are under How to work).
 
 ## History
 
-What happened in this unit so far, oldest first, from its receipts:
+What happened so far, oldest first, from the receipts (for a story, its current round only):
 
-- implement#1 reported \`done\`: AC1,AC2,AC4,AC5,AC6 covered by red→green tests in test/web.test.ts (248 pass, typecheck clean). views.ts: itemRow shows due label + li.overdue + <input type=da…
+- implement#1 reported \`done\`: AC1,AC2,AC4,AC5,AC6 covered by red→green tests in test/web.test.ts (248 pass, typecheck clean). views.ts: itemRow shows due label + li.overdue + <input…
 - test#1 check \`pass\` in 1.3s
-- review#1 reported \`approve\` (3 findings): review#1: approve. AC1/2/4/5/6 tested via HTTP (248 pass, tsc clean); AC3 person + AC7 browser left to QA. Minor: script shows raw HTML body on 404/5xx; li.ove…
-- qa#1 reported \`partial\`: qa#1 partial: AC1,AC2,AC4,AC5,AC6 pass via curl against real server :4050 (today 2026-10-23). AC3 person: confirm #c53727 overdue date vs #808080 (row itself u…
-- human-qa#1 reject by jakubpruszynski@MacBook-Pro-Jakub-2: AC7: on 404/5xx the inline due-date editor shows the raw HTML error page as the row's error text (review F1, confirmed by QA). Show a short human message inste…
+- review#1 reported \`approve\` (3 findings): review#1: approve. AC1/2/4/5/6 tested via HTTP (248 pass, tsc clean); AC3 person + AC7 browser left to QA. Minor: script shows raw HTML body on 404/5xx;…
+- qa#1 reported \`partial\`: qa#1 partial: AC1,AC2,AC4,AC5,AC6 pass via curl against real server :4050 (today 2026-10-23). AC3 person: confirm #c53727 overdue date vs #808080 (row itself…
+- human-qa#1 reject by jakubpruszynski@MacBook-Pro-Jakub-2: AC7: on 404/5xx the inline due-date editor shows the raw HTML error page as the row's error text (review F1, confirmed by QA). Show a short human message…
 
 ## How to work
 
-- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, \`.norn-unit\`, \`.env.norn\`), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/handoffs/03-due-dates-in-project-lists.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:
+- The handoff \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/handoffs/03-due-dates-in-project-lists.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
-  - **Done means**: each check that proves the goal, and what shows it: a test, a command, an evidence file.
+  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
   - **Not proven yet**: what is still open or unverified.
   - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
-  Keep it under 8 KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.
-- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`), always next to what it says.
-- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs \`--findings\` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`.
+  Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
+- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
 - Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
 - Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
 

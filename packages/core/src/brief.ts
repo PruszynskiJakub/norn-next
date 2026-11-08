@@ -139,8 +139,11 @@ export interface BriefJson {
   history: {
     /** A session of this attempt ended without reporting; this is a fresh one */
     retry: { outcome: string; detail: string | null; at: string } | null;
-    /** An earlier attempt of this step reported on older code, and the outcomes recorded since */
-    earlier: { attempt: number; outcome: string; since: string[] } | null;
+    /**
+     * An earlier attempt of this step reported on older code, and the outcomes recorded since.
+     * `findings`: that report's findings, when the step declares `last_findings` — checked first, fixed or not
+     */
+    earlier: { attempt: number; outcome: string; since: string[]; findings?: Finding[] } | null;
     /** A takeover restarted the step because the story branch was rewritten since the record */
     rewritten?: { gone: string; head: string; line: string } | null;
     /** A takeover found no record and started this round from the branch */
@@ -178,8 +181,10 @@ export interface BriefJson {
   rulings: Ruling[];
   context: {
     handoff: string | null;
-    /** the handoff's size; past `max` the brief shows only its start */
+    /** the handoff's size; `norn done` refuses it past `max`, and the brief cuts it past twice that */
     handoff_bytes: { bytes: number; max: number; truncated: boolean } | null;
+    /** what the agent must do about the handoff before it reports (too large, or an older shape), if anything */
+    handoff_warning: string | null;
     /** the report (`<step>#<attempt>`) whose handoff Resume was dropped: it was written for that step, not this one */
     resume_dropped: string | null;
     answers: Array<{ question: string; answer: string }>;
@@ -223,15 +228,16 @@ export function renderBrief(input: BriefInput): Briefing {
   if (!step || step.type !== "agent") throw new Error(`norn brief: ${st.step} is not an agent step`);
   const rw = rework(input, step);
   const handoff = handoffFor(input);
+  const hist = history(input, step, rw);
   const json: BriefJson = {
     where: where(input, step),
-    history: history(input, rw),
+    history: hist,
     work: { skill: step.skill, instructions: step.instructions ?? null, description: step.description ?? null },
-    inputs: inputs(input, step, rw),
+    inputs: inputs(input, step, rw, hist),
     rework: rw,
     checks: checksSince(input, step),
     rulings: rulingsFor(input),
-    context: { handoff: handoff.text, handoff_bytes: handoff.bytes, resume_dropped: handoff.resume_dropped, answers: answers(input), notes: rw ? null : notes(input) },
+    context: { handoff: handoff.text, handoff_bytes: handoff.bytes, handoff_warning: handoff.warning, resume_dropped: handoff.resume_dropped, answers: answers(input), notes: rw ? null : notes(input) },
     log: receiptLog(input),
     handoff_file: `${input.paths.spec_dir}/${unitHandoffPath(input.unit.dir)}`,
     finish: finish(step),
@@ -262,7 +268,7 @@ function where(input: BriefInput, step: AgentStep): BriefJson["where"] {
   };
 }
 
-function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): BriefJson["inputs"] {
+function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"], hist: BriefJson["history"]): BriefJson["inputs"] {
   const p = input.paths;
   return (step.inputs ?? defaultInputs(input.unit)).flatMap((i): BriefJson["inputs"] => {
     if (typeof i === "object") return [{ kind: "file", label: i.label ?? i.file, ref: `${p.spec_dir}/${i.file}` }];
@@ -277,12 +283,12 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): Br
         return input.diff_range ? [{ kind: i, label: "Diff", ref: `git diff ${input.diff_range}`, purpose: "the change so far, against the story's base" }] : [];
       case "handoff":
         // its text is already under Context: name the file to update, not one to read again
-        return [{ kind: i, label: "Handoff", ref: `${p.spec_dir}/${unitHandoffPath(input.unit.dir)}`, purpose: "the unit's current state, shown under Context: keep it current here" }];
+        return [{ kind: i, label: "Handoff", ref: `${p.spec_dir}/${unitHandoffPath(input.unit.dir)}`, purpose: "write the unit's current state here (shown under Context)" }];
       // Point at Rework only when it holds something for this input
       case "last_check":
         return [{ kind: i, label: "Last failing check", ref: rw?.check ? "see Rework" : "none" }];
       case "last_findings":
-        return [{ kind: i, label: "Last findings", ref: rw && (rw.findings || rw.report || rw.decision) ? "see Rework" : "none" }];
+        return [{ kind: i, label: "Last findings", ref: rw && (rw.findings || rw.report || rw.decision) ? "see Rework" : hist?.earlier?.findings ? "see Earlier findings" : "none" }];
       // Run state is in the machine dir, not the worktree; evidence is linked by its record path
       case "record":
         return (input.record ?? []).flatMap((u) => [
@@ -368,13 +374,14 @@ function movesAfter(receipts: readonly NumberedReceipt[], from: number): string[
 }
 
 /** History when this is not a first entry and Rework does not already explain it. */
-function history(input: BriefInput, rw: BriefJson["rework"]): BriefJson["history"] {
+function history(input: BriefInput, step: AgentStep, rw: BriefJson["rework"]): BriefJson["history"] {
   const { state: st, receipts } = input;
   const died = st.retries_used > 0 ? receipts.findLast(({ receipt: r }) => r.kind === "classify" && r.route === "retry" && r.step === st.step && r.attempt === st.attempt)?.receipt : undefined;
   const retry = died?.kind === "classify" ? { outcome: `${died.step}.${died.outcome}`, detail: died.detail ?? null, at: died.at } : null;
   const idx = rw ? -1 : receipts.findLastIndex(({ receipt: r }) => r.kind === "done" && r.step === st.step && r.attempt !== st.attempt);
   const prev = receipts[idx]?.receipt;
-  const earlier = prev?.kind === "done" ? { attempt: prev.attempt, outcome: prev.outcome, since: movesAfter(receipts, idx) } : null;
+  const recheck = prev?.kind === "done" && prev.findings?.length && (step.inputs ?? []).includes("last_findings") ? { findings: [...prev.findings] } : {};
+  const earlier = prev?.kind === "done" ? { attempt: prev.attempt, outcome: prev.outcome, since: movesAfter(receipts, idx), ...recheck } : null;
   // This attempt is the one a takeover started because the branch was rewritten —
   // the last such take, with every receipt after it written at this cursor (the step it restarted
   // may be another than the one it was written at)
@@ -394,48 +401,105 @@ function history(input: BriefInput, rw: BriefJson["rework"]): BriefJson["history
  * The handoff body for Context. Its Resume is the next action of whoever reported last; when
  * that was another step or attempt, it is dropped so it is not taken as this step's instruction.
  */
-function handoffFor({ state: st, receipts, handoff }: BriefInput): { text: string | null; bytes: BriefJson["context"]["handoff_bytes"]; resume_dropped: string | null } {
+function handoffFor({ state: st, receipts, handoff }: BriefInput): {
+  text: string | null;
+  bytes: BriefJson["context"]["handoff_bytes"];
+  warning: string | null;
+  resume_dropped: string | null;
+} {
   const whole = handoff?.trim();
-  if (!whole) return { text: null, bytes: null, resume_dropped: null };
-  // A runaway handoff (a script gone wrong, a pasted log) never floods the brief: show its start only
-  const size = handoffBytes(whole);
-  const shown = 2 * HANDOFF_MAX_BYTES;
-  const body = size > shown ? `${cutBytes(whole, shown)}\n\n_… cut: the handoff is ${Math.ceil(size / 1024)} KB; \`norn done\` refuses one over ${HANDOFF_MAX_BYTES / 1024} KB._` : whole;
-  const bytes = { bytes: size, max: HANDOFF_MAX_BYTES, truncated: size > shown };
+  if (!whole) return { text: null, bytes: null, warning: null, resume_dropped: null };
   const last = receipts.findLast(({ receipt: r }) => r.kind === "done" || r.kind === "ask" || r.kind === "stuck")?.receipt;
   const foreign = last && (last.step !== st.step || last.attempt !== st.attempt) ? `${last.step}#${last.attempt}` : null;
-  const text = foreign ? dropSection(body, "Resume", `_Resume omitted: ${foreign} wrote it for its own step; it does not apply to ${st.step}._`) : body;
-  return { text: demoteHeadings(text, 3), bytes, resume_dropped: foreign && text !== body ? foreign : null };
+  // Another step's Resume goes first, so a cut below never lands in it
+  const body = foreign ? dropSection(whole, "Resume", `_Resume omitted: ${foreign} wrote it for its own step; it does not apply to ${st.step}._`) : whole;
+  const size = handoffBytes(whole);
+  const shown = 2 * HANDOFF_MAX_BYTES;
+  // A runaway handoff (a script gone wrong, a pasted log) never floods the brief: its start and its Resume
+  const text = handoffBytes(body) > shown ? cutHandoff(body, shown, size) : body;
+  const kb = Math.ceil(size / 1024);
+  const progress = /^#{1,6}\s+Progress\s*$/m.test(whole);
+  const fold = progress ? "fold its Progress section into Notes and Not proven yet, " : "";
+  const warning =
+    size > HANDOFF_MAX_BYTES
+      ? `**The handoff is ${kb} KB; \`norn done\` refuses one over ${HANDOFF_MAX_BYTES / 1024} KB.** Before you report, open it and rewrite it as the unit's current state: ${fold}drop what History already says, and move long repros and logs into the folder you pass with \`--evidence\`.`
+      : progress
+        ? "This handoff has an older Progress section: as you refresh it, fold what still matters into Notes and Not proven yet and drop the lines History already says."
+        : null;
+  return { text: demoteHeadings(text, 3), bytes: { bytes: size, max: HANDOFF_MAX_BYTES, truncated: text !== body }, warning, resume_dropped: foreign && body !== whole ? foreign : null };
 }
 
-/** The first `max` bytes of `text`, cut at a line end. */
+/** The section titled `title` (any level, up to the next heading as high), and the text without it. */
+function splitSection(md: string, title: string): { section: string; rest: string } {
+  const lines = md.split("\n");
+  const start = lines.findIndex((l) => new RegExp(`^#{1,6}\\s+${title}\\s*$`, "i").test(l));
+  if (start < 0) return { section: "", rest: md };
+  const level = (lines[start]?.match(/^#+/)?.[0] ?? "#").length;
+  let end = lines.findIndex((l, i) => i > start && /^(#{1,6})\s/.test(l) && (l.match(/^#+/)?.[0] ?? "").length <= level);
+  if (end < 0) end = lines.length;
+  return { section: lines.slice(start, end).join("\n").trim(), rest: [...lines.slice(0, start), ...lines.slice(end)].join("\n").trim() };
+}
+
+/** A handoff cut to about `max` bytes: its start (an open code fence closed) and its Resume, whole. */
+function cutHandoff(md: string, max: number, size: number): string {
+  const { section, rest } = splitSection(md, "Resume");
+  const resume = section ? cutBytes(section, max / 4) : "";
+  const head = closeFence(cutBytes(rest, max - handoffBytes(resume)));
+  const note = `_… cut here: the handoff is ${Math.ceil(size / 1024)} KB; open the file to rewrite it._`;
+  return [head, note, resume].filter(Boolean).join("\n\n");
+}
+
+/** Close a code fence left open by a cut, so the rest of the brief is not read as code. */
+function closeFence(md: string): string {
+  const fences = md.split("\n").filter((l) => /^\s*(```|~~~)/.test(l)).length;
+  return fences % 2 ? `${md}\n\`\`\`` : md;
+}
+
+/** The first `max` bytes of `text`: whole lines, or the start of the first line when it alone is longer. */
 function cutBytes(text: string, max: number): string {
   const enc = new TextEncoder();
-  let out = "";
+  const out: string[] = [];
+  let used = 0;
   for (const line of text.split("\n")) {
-    if (enc.encode(`${out}${line}\n`).length > max) break;
-    out += `${line}\n`;
+    const n = enc.encode(line).length + 1;
+    if (used + n > max) {
+      if (!out.length) {
+        let part = "";
+        for (const ch of line) {
+          used += enc.encode(ch).length;
+          if (used > max) break;
+          part += ch;
+        }
+        out.push(part);
+      }
+      break;
+    }
+    out.push(line);
+    used += n;
   }
-  return out.trimEnd();
+  return out.join("\n").trimEnd();
 }
 
 /** Receipt lines the brief shows under History; earlier ones are counted, not shown. */
 const LOG_LINES = 25;
 const oneLine = (text: string, max = 160) => {
-  const t = text.replace(/\s+/g, " ").trim();
-  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+  const chars = Array.from(text.replace(/\s+/g, " ").trim());
+  if (chars.length <= max) return chars.join("");
+  const cut = chars.slice(0, max - 1).join("");
+  const word = cut.lastIndexOf(" ");
+  return `${word > max / 2 ? cut.slice(0, word) : cut}…`;
 };
 
 /** One line for a receipt, or null for one that only records bookkeeping (a regular run start). */
 export function receiptLine(r: Receipt): string | null {
   const at = `${r.step}#${r.attempt ?? "?"}`;
-  const by = "who" in r && r.who ? ` by ${r.who}` : "";
+  const by = `${"who" in r && r.who ? ` by ${r.who}` : ""}${"delegated" in r && r.delegated ? " (delegated)" : ""}`;
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
   switch (r.kind) {
     case "done":
-      return `${at} reported \`${r.outcome}\`${r.findings?.length ? ` (${plural(r.findings.length, "finding")})` : ""}: ${oneLine(r.handoff)}`;
+      return `${at} reported \`${r.outcome}\`${r.findings?.length ? ` (${plural(r.findings.length, "finding")})` : ""}${r.handoff.trim() ? `: ${oneLine(r.handoff)}` : ""}`;
     case "ask":
-      return `${at} asked: ${oneLine(r.question)}`;
+      return r.implicit ? `${at} waited on a prompt in its pane: ${oneLine(r.question)}` : `${at} asked: ${oneLine(r.question)}`;
     case "answer":
       return `${at} answer${by}: ${oneLine(r.answer)}`;
     case "stuck":
@@ -445,7 +509,7 @@ export function receiptLine(r: Receipt): string | null {
     case "reject":
       return `${at} reject${by}: ${r.comment?.trim() ? oneLine(r.comment) : "(no comment given)"}`;
     case "unstick":
-      return `${at} unstuck${by}${r.to ? ` to ${r.to}` : ""}${r.comment?.trim() ? `: ${oneLine(r.comment)}` : ""}`;
+      return `${at} unstuck${by}${r.to ? ` to ${r.to}` : ""}${r.reset?.length ? ` (reset ${r.reset.join(", ")})` : ""}${r.comment?.trim() ? `: ${oneLine(r.comment)}` : ""}`;
     case "mode":
       return `mode ${r.previous} → ${r.mode}`;
     case "check":
@@ -457,7 +521,7 @@ export function receiptLine(r: Receipt): string | null {
     case "workflow":
       return `workflow switched to ${r.name}, at ${r.to}`;
     case "take":
-      return `taken over${r.previous_holder ? ` from ${r.previous_holder}` : ""}${r.forced ? " (forced)" : ""}${r.record_lost ? ", record lost" : ""}`;
+      return `taken over${r.previous_holder ? ` from ${r.previous_holder}` : ""}${r.forced ? " (forced)" : ""}${r.record_lost ? ", record lost" : ""}${r.rewritten ? `, branch rewritten: ${r.step} restarted` : ""}`;
     case "update":
       return `sent back through the base update: ${r.from} → ${r.to}`;
     case "round":
@@ -670,15 +734,13 @@ function evidenceLines(out: string[], e: BriefEvidence | null): void {
 /** How to work: the step protocol every brief carries, so no other file has to be read for it. */
 export function protocolLines(handoffFile: string): string[] {
   return [
-    "- Load the skill named under Your work and follow it for the craft; this brief's instructions add to it. Rework, when there is one, comes first.",
-    "- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (the handoff, `.norn-unit`, `.env.norn`), and do not survey the repository, `.agents/`, `.claude/` or the machine to find your bearings.",
+    "- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (`.norn-unit`, `.env.norn`; open the handoff only to rewrite it), and do not survey the repository, `.agents/`, `.claude/` or the machine to find your bearings.",
     "- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in `.env.norn`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.",
-    `- The handoff \`${handoffFile}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: History above is what happened, kept by norn. Its sections:`,
+    `- The handoff \`${handoffFile}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:`,
     ...HANDOFF_SECTIONS.map(([h, holds]) => `  - **${h}**: ${holds}.`),
-    `  Keep it under ${HANDOFF_MAX_BYTES / 1024} KB: repros, logs and tables go into an evidence folder or a findings file, with a one-line pointer. Refresh it at each milestone and right before you report.`,
-    "- Name a user story, criterion, finding, seam or question by what it says, not by a number or id, in whatever a person or the next agent reads: an ask, the `--handoff` summary, a note, the handoff, a findings file. A criterion's id goes only where norn reads it (frontmatter `criteria`, the criteria report, a finding's `criterion`), always next to what it says.",
-    "- Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with one command from Finish with: the outcome whose meaning is true, not the one you hoped for. Pass every findings file and evidence folder your skill wrote; an outcome that sends the work back needs `--findings` with what failed and its repro. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn. Resumed with an answer, continue the same step and report again at its end.",
-    "- Of the norn commands, run only `brief`, `done`, `ask` and `stuck`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise `norn ask`.",
+    `  Keep it under ${HANDOFF_MAX_BYTES / 1024} KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.`,
+    "- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the `--handoff` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter `criteria`, the criteria report, a finding's `criterion`, the traceability table) always stands next to what it says.",
+    "- Of the norn commands, run only `brief`, `done`, `ask` and `stuck`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise `norn ask`. After a long session or a lost thread, run `norn brief` again: it is rendered from the unit's state each time.",
     "- Never `git push` (only norn pushes), and never switch branches or worktrees. Never run a `gh` or `glab` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.",
     "- Never edit anything under `runs/` (norn's run state, kept outside the worktree). The repo's workflows (`.agents/workflows/`) and its norn config in `.agents/` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.",
   ];
@@ -724,10 +786,16 @@ function markdown(b: BriefJson): string {
       );
     if (h.earlier) {
       const since = h.earlier.since.length > 12 ? ["…", ...h.earlier.since.slice(-12)] : h.earlier.since;
-      out.push(
-        `${w.step}#${h.earlier.attempt} reported \`${h.earlier.outcome}\` on older code.${since.length ? ` Since then: ${since.join(" → ")}.` : ""} Do this step again in full on the current HEAD: what earlier attempts found or observed is history, not a result for this one.`,
-        "",
-      );
+      const head = `${w.step}#${h.earlier.attempt} reported \`${h.earlier.outcome}\` on older code.${since.length ? ` Since then: ${since.join(" → ")}.` : ""}`;
+      if (h.earlier.findings) {
+        out.push(
+          `${head} First check each earlier finding below against the current code: fixed or not. Then do this step again in full on the current HEAD.`,
+          "",
+          `### Earlier findings (${w.step}#${h.earlier.attempt})`,
+          "",
+        );
+        findingLines(out, h.earlier.findings);
+      } else out.push(`${head} Do this step again in full on the current HEAD: what earlier attempts found or observed is history, not a result for this one.`, "");
     }
   }
 
@@ -749,7 +817,8 @@ function markdown(b: BriefJson): string {
 
   out.push("## Inputs", "");
   if (!b.inputs.length) out.push("- (none)");
-  for (const i of b.inputs) out.push(`- ${i.label}: \`${i.ref}\`${i.purpose ? ` — ${i.purpose}` : ""}`);
+  // last_check / last_findings point at Rework or Earlier findings, both above: no line of their own
+  for (const i of b.inputs.filter((x) => x.kind !== "last_check" && x.kind !== "last_findings")) out.push(`- ${i.label}: \`${i.ref}\`${i.purpose ? ` — ${i.purpose}` : ""}`);
   out.push("");
 
   out.push("## Context", "");
@@ -758,10 +827,11 @@ function markdown(b: BriefJson): string {
     for (const a of b.context.answers) out.push(`- Q: ${a.question}`, `  A: ${a.answer}`);
     out.push("");
   }
-  out.push(b.context.handoff ? b.context.handoff : `No handoff yet: write it at \`${b.handoff_file}\` as you work (its sections are under How to work).`, "");
+  if (b.context.handoff_warning) out.push(b.context.handoff_warning, "");
+  out.push(b.context.handoff ? b.context.handoff : "No handoff yet; write one as you work (its sections are under How to work).", "");
   const n = b.context.notes;
   if (n) {
-    out.push(`### Notes from ${n.step} (non-blocking)`, "", `${n.step} reported \`${n.outcome}\` with these notes, for information:`, "");
+    out.push(`## Non-blocking findings from ${n.step}`, "", `${n.step} reported \`${n.outcome}\` with these findings, for information; they are not rework:`, "");
     findingLines(out, n.items);
   }
 
@@ -775,8 +845,8 @@ function markdown(b: BriefJson): string {
   }
 
   if (b.log) {
-    out.push("## History", "", "What happened in this unit so far, oldest first, from its receipts:", "");
-    if (b.log.omitted) out.push(`- … ${b.log.omitted} earlier (\`${b.log.command}\`)`);
+    out.push("## History", "", "What happened so far, oldest first, from the receipts (for a story, its current round only):", "");
+    if (b.log.omitted) out.push(`- … ${b.log.omitted} earlier lines (a person sees them with \`${b.log.command}\`)`);
     for (const l of b.log.lines) out.push(`- ${l}`);
     out.push("");
   }
@@ -821,9 +891,19 @@ function reworkLines(out: string[], rw: NonNullable<BriefJson["rework"]>): void 
   }
   const f = rw.findings;
   if (f) {
-    out.push(`### Findings (${f.step}: ${f.outcome})`, "");
-    if (f.items.some((x) => x.severity === "minor" || x.severity === "nit")) out.push("Fix every blocking and major finding; minor and nit ones are for you to weigh.", "");
-    findingLines(out, f.items);
+    // Only blocking and major findings are rework: fixing a minor one costs a commit and another review round
+    const minor = (x: Finding) => x.severity === "minor" || x.severity === "nit";
+    const fix = f.items.filter((x) => !minor(x));
+    const notes = f.items.filter(minor);
+    if (fix.length) {
+      out.push(`### Findings (${f.step}: ${f.outcome})`, "");
+      if (notes.length) out.push("Rework is the blocking and major findings: fix each one.", "");
+      findingLines(out, fix);
+    }
+    if (notes.length) {
+      out.push(`### Notes (${f.step}: minor and nit)`, "", "Leave these as notes: do not fix them in this round.", "");
+      findingLines(out, notes);
+    }
   }
   if (r) evidenceLines(out, r.evidence);
   if (rw.detail) out.push(`### ${rw.from}`, "", rw.detail, "");
@@ -841,6 +921,12 @@ function reworkLines(out: string[], rw: NonNullable<BriefJson["rework"]>): void 
 function finishLines(out: string[], b: BriefJson): void {
   out.push("## Finish with exactly one of", "");
   for (const f of b.finish) out.push(`- \`${f.command}\` — ${f.means}${f.verdict ? ` (only when the worst verdict is \`${f.verdict}\`)` : ""}`);
+  out.push(
+    "",
+    "- `--handoff \"…\"`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.",
+    "- Any `done` also takes `--findings <file>` (needed when the outcome sends the work back: what failed, with its repro) and `--evidence <dir>` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.",
+    "- `norn ask \"<one self-contained question>\" [--option \"<a>\" --option \"<b>\"]` when you need a person's decision; `norn stuck \"<reason>\"` says what would unblock it.",
+  );
   if (b.finish.some((f) => f.command.includes("--criteria"))) {
     out.push(
       "",
@@ -852,7 +938,11 @@ function finishLines(out: string[], b: BriefJson): void {
       for (const c of b.criteria) out.push(`- \`${c.id}\` (verifier: ${c.verifier})`);
       out.push("", "```json", `[\n${b.criteria.map((c) => `  { "id": "${c.id}", "verdict": "…" }`).join(",\n")}\n]`, "```", "");
     } else out.push("The story spec's Acceptance section names the criteria; use its ids.", "");
-    out.push("Add `--note \"<text>\"` (and `--note-criterion <id>`) for a question a person should see without blocking the work.");
+    out.push("Add `--note \"<text>\"` (and `--note-criterion <id>`) for a question a person should see in their inbox without blocking the work; it is not the handoff's Notes.");
   }
-  out.push("", "Then end your turn.", "");
+  out.push(
+    "",
+    "Report exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.",
+    "",
+  );
 }

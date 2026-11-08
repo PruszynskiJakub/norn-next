@@ -258,7 +258,7 @@ describe("manual mode: tick → brief → done → tick", () => {
     const r = await inWt(wt(), "done", "done", "--handoff", "x", "--json");
     expect(r.exit).toBe(3);
     expect(r.value).toMatchObject({ code: "handoff_too_large", details: { max: 8192 } });
-    expect((r.value as { do_instead: string }).do_instead).toContain("move repros, logs and tables into an evidence folder");
+    expect((r.value as { do_instead: string }).do_instead).toContain("move long repros and logs into the folder you pass with `--evidence <dir>`");
     expect(receipts(runs())).toHaveLength(count);
     if (before === null) rmSync(file);
     else writeFileSync(file, before);
@@ -293,7 +293,7 @@ describe("manual mode: tick → brief → done → tick", () => {
     const v = r.value as { run_id: string; started: boolean; markdown: string };
     expect(v.started).toBe(true);
     expect(v.run_id).not.toBe(runId);
-    expect(v.markdown).toContain("## History\n\nWhat happened in this unit so far, oldest first, from its receipts:\n\n");
+    expect(v.markdown).toContain("## History\n\nWhat happened so far, oldest first, from the receipts (for a story, its current round only):\n\n");
     expect(v.markdown).toContain("- implement#1 reported `done`: form renders; tests added");
     runId = v.run_id;
   });
@@ -421,7 +421,12 @@ describe("norn hook robustness", () => {
       const m = /^norn hook (\S+) --agent (\S+) # norn-owned$/.exec(command);
       expect(m).not.toBeNull();
       expect(m?.[2]).toBe("claude");
-      const payload: Record<string, unknown> = native === "Notification" ? { message: "Claude needs your permission to use Bash", notification_type: "permission_prompt" } : {};
+      // events that map only some payloads need one that maps, or nothing is traced
+      const payloads: Record<string, Record<string, unknown>> = {
+        Notification: { message: "Claude needs your permission to use Bash", notification_type: "permission_prompt" },
+        StopFailure: { error: "authentication_failed" },
+      };
+      const payload = payloads[native] ?? {};
       // no hook_event_name: the argument alone must identify the event
       expect((await hook(wt(), m?.[1] as string, payload, "--agent", m?.[2] as string)).exit).toBe(0);
     }

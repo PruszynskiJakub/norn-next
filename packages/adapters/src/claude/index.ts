@@ -32,6 +32,7 @@ export const hookEvents = {
   PostToolUse: "tool_use",
   Notification: "waiting_input", // refined by notification_type, see NOTIFICATION_EVENTS
   Stop: "turn_end",
+  StopFailure: "waiting_input", // refined by error, see STOP_FAILURE_EVENTS
   SessionEnd: "session_end",
 } as const satisfies Record<string, HookEventKind>;
 
@@ -60,6 +61,16 @@ const NOTIFICATION_EVENTS: Record<string, HookEventKind | null> = {
   quota_auto_resume_fired: null,
   quota_auto_resume_disabled: null,
   plugin_notification: null,
+};
+
+/**
+ * Claude Code `StopFailure.error` (the turn ended on an API error; output is ignored) → event and
+ * the line a person reads. A failed login leaves the session unable to act on any prompt, so it
+ * waits on a person (`/login` in the pane) like the usage-limit wait, rather than ending a turn
+ * that would be nudged. Other errors are ignored: the idle notification still ends the turn.
+ */
+const STOP_FAILURE_EVENTS: Record<string, { event: HookEventKind; message: string }> = {
+  authentication_failed: { event: "waiting_input", message: "agent logged out — run `/login` in the pane" },
 };
 
 /** Notification without `notification_type` (older Claude Code): classify by the message text. */
@@ -103,6 +114,11 @@ export function parseHookEvent(arg: string, payload: unknown, env: Record<string
     if (!mapped) return null;
     // a permission prompt's pending command comes from the preceding PreToolUse: refineHooks
     event = mapped;
+  } else if (native === "StopFailure") {
+    const error = field(payload, "error");
+    const mapped = error === undefined || !Object.hasOwn(STOP_FAILURE_EVENTS, error) ? undefined : STOP_FAILURE_EVENTS[error];
+    if (!mapped) return null;
+    [event, message] = [mapped.event, mapped.message];
   } else if (native === "UserPromptSubmit") {
     message = field(payload, "prompt");
   } else if (native === "Stop") {
@@ -128,14 +144,32 @@ export function parseHookEvent(arg: string, payload: unknown, env: Record<string
 }
 
 /**
+ * Claude's own pass over a run's hook facts, in trace order; other agents' facts pass through
+ * unchanged. Pure.
+ * - A `permission_prompt` gets the tool call it asks about (see `withPendingCommand`).
+ * - The idle notification that follows a failed login is dropped: the session went back to its
+ *   prompt still logged out, and as a `turn_end` it would end the logged-out wait (and later be
+ *   nudged) before anyone ran `/login`. The wait holds until the session's next other fact.
+ */
+function refineHooks(hooks: readonly HookFact[]): HookFact[] {
+  const loggedOut = new Set<string | undefined>();
+  return withPendingCommand(hooks).filter((h) => {
+    if (h.agent !== NAME) return true;
+    if (h.native === "Notification" && h.event === "turn_end") return !loggedOut.has(h.agent_session_id);
+    if (h.native === "StopFailure" && h.event === "waiting_input") loggedOut.add(h.agent_session_id);
+    else loggedOut.delete(h.agent_session_id);
+    return true;
+  });
+}
+
+/**
  * Give each Claude `permission_prompt` fact the tool call it is asking about. The
  * Notification payload names no command; Claude Code runs PreToolUse *before* its permission
  * check, so the pending call is the latest tool fact of the same session — if that is a
  * PreToolUse (a later PostToolUse means it already ran). Sets `tool` and `command` as
- * `Tool(input)` (Claude's permission-rule syntax, e.g. `Bash(rm -rf build)`). Pure; facts in
- * trace order; other agents' facts pass through unchanged.
+ * `Tool(input)` (Claude's permission-rule syntax, e.g. `Bash(rm -rf build)`).
  */
-function refineHooks(hooks: readonly HookFact[]): HookFact[] {
+function withPendingCommand(hooks: readonly HookFact[]): HookFact[] {
   return hooks.map((h, i) => {
     if (h.agent !== NAME || h.event !== "permission_prompt" || h.tool) return h;
     for (let j = i - 1; j >= 0; j--) {

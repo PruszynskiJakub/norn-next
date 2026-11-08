@@ -110,6 +110,8 @@ function cases(): RuleCase[] {
     const past = story(STORY_WF, ready("slices"));
     out.push(c("refine finished: the body hash is recorded", "remote.mirror.refined", facts([{ ...past, frontmatter: { ...past.frontmatter!, refined_body_hash: undefined } }])));
     out.push(c("the issue body changed after refine", "remote.mirror.body_changed", facts([{ ...s, issue: { ...s.issue!, body: "new body" } }])));
+    const pr = { number: 7, url: "u", state: "open" as const, is_draft: true, head_sha: "", title: "Login form", head: "gh-1-login", base_branch: "main", merged_at: null };
+    out.push(c("the issue renamed with its PR open: the PR takes the new title", "remote.pr_title", facts([{ ...s, pr, issue: { ...s.issue!, title: "Login form v2" } }])));
   }
 
   // ---- mailbox

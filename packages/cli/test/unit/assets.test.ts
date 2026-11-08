@@ -214,6 +214,20 @@ describe("single-purpose workflows (#136)", () => {
     expect(readSkill("norn-pr")).toContain("`evidence/<unit>/<run_id>/<file>`");
   });
 
+  // Slices are reviewed before they integrate, so only story-level rework would reach the PR unreviewed
+  test("story reviews its rework before the check, and a round without rework never reaches review", () => {
+    expect(targets("story", "implement")).toEqual({ done: "review" });
+    expect(wf("story").steps.review).toMatchObject({ type: "agent", skill: "norn-review", inputs: ["spec", "diff", "last_findings"] });
+    expect(wf("story").steps.review?.outcomes).toMatchObject({ changes_requested: { counter: "review_loop" } });
+    expect(targets("story", "review")).toEqual({ approve: "test", changes_requested: "implement" });
+    const into = (step: string) =>
+      Object.entries(wf("story").steps).flatMap(([from, s]) =>
+        Object.entries(s.outcomes).filter(([, e]) => outcomeEdge(e as Parameters<typeof outcomeEdge>[0]).to === step).map(([o]) => `${from}.${o}`),
+      );
+    expect(into("review")).toEqual(["implement.done"]);
+    expect(targets("story", "update")).toMatchObject({ done: "test" });
+  });
+
   test("slice has no QA: implement, test, review, integrate", () => {
     expect(types("slice")).toEqual({ implement: "agent", test: "check", review: "agent", integrate: "git", merge: "agent" });
     expect(targets("slice", "review")).toEqual({ approve: "integrate", changes_requested: "implement" });
@@ -262,7 +276,7 @@ describe("skills", () => {
     const skill = readSkill("norn");
     for (const s of ["norn brief", "norn status", "norn story start <unit>", "How to work"]) expect(skill).toContain(s);
     const protocol = protocolLines("handoffs/_story.md").join("\n");
-    for (const s of ["`brief`", "`done`", "`ask`", "`stuck`", "--handoff", "--findings", "what to do instead", "handoffs/_story.md", "Goal", "Done means", "Easy to miss", "Not proven yet", "Notes", "Resume", "8 KB", "git push", "runs/", "gh", "glab"])
+    for (const s of ["`brief`", "`done`", "`ask`", "`stuck`", "--handoff", "`--evidence <dir>`", "handoffs/_story.md", "Goal", "Proof", "Easy to miss", "Not proven yet", "Notes", "Resume", "8 KB", "git push", "runs/", "gh", "glab"])
       expect(protocol).toContain(s);
   });
 
@@ -353,8 +367,8 @@ describe("skills", () => {
     // an UNTRACED row blocks, unless the verifier is agent or person: those point at QA
     expect(text).toMatch(/`UNTRACED` row is a blocking Spec finding, unless the criterion's `verifier`[^.]*`agent` or `person`/);
     for (const s of ["QA (agent)", "QA (person)", "counts as `verifier: test`"]) expect(text).toContain(s);
-    // the table goes into the handoff's Done means section, an UNTRACED row also under Not proven yet
-    expect(text).toMatch(/Write the table into the handoff's Done means section\*\*/);
+    // the table goes into the handoff's Proof section, an UNTRACED row also under Not proven yet
+    expect(text).toMatch(/Write the table into the handoff's Proof section\*\*/);
     expect(text).toContain("`UNTRACED` row also goes under Not proven yet");
     // a craft skill does not cite the rule ids of norn's own rules file
     expect(text).not.toMatch(/\bQV\d/);
@@ -368,7 +382,7 @@ describe("skills", () => {
     expect(refine).toContain("nothing cites a story by its number");
     for (const skill of ["norn-refine", "norn-slice", "norn-review", "norn-qa", "norn-plan", "norn-pr"]) expect(readSkill(skill)).not.toMatch(/\bUS\d|US<n>/);
     // the step protocol and the interview speak in words, to a person and in files
-    expect(protocolLines("handoffs/_story.md").join("\n")).toContain("by what it says, not by a number or id");
+    expect(protocolLines("handoffs/_story.md").join("\n")).toContain("Never an id alone");
     expect(readSkill("norn-interview")).toMatch(/never by a number or id/);
   });
 
