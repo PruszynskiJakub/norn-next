@@ -2,7 +2,7 @@
 id: gh-301/02
 title: Hook answers decided in core and encoded per agent tool
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
