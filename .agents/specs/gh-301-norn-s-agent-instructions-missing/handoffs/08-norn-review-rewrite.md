@@ -4,11 +4,14 @@ Development › Skills states when a bundled skill is exact and when it gives pr
 
 ## Proof
 
-- Exact-versus-principled rule in Development › Skills (AC1): `test/repo/docs.test.ts` › "Development › Skills › says when a bundled skill is exact and when it gives principles" (red first); docs lint green in `bun run test`.
-- `norn-review` keeps the two axes, table, findings JSON with blocking flag, checks of blocking findings and `REVIEW.md` precedence, and holds no quoted subagent prompt or word cap (AC2): `packages/cli/test/unit/assets.test.ts` › "norn-review keeps its contracts and gives its axes principles, not fixed prompts or word caps" (red first), plus the existing pins "norn-review traces every user story…" and "norn-review reads REVIEW.md, verifies each blocking candidate…", unchanged and green.
-- Command-running subagents get no push, no branch or worktree switch, no delivery-tool command, no writes under run state, each with its reason (AC3): `packages/cli/test/unit/assets.test.ts` › "norn-review gives a subagent that runs commands the rules its work can break, each with its reason" (red first).
-- Before/after on past diffs (AC4, verifier agent): old and new outputs in the step's evidence (`gh249-*`, `gh273-*`, `comparison.md`).
-- `bun run test` 1562 pass, `bun run typecheck` green.
+Review #1: approve, no blocking findings (one minor, AC3 wording, for the person). `bun run test` 1562 pass, `bun run typecheck` green.
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | Development › Skills says when a skill is exact (code reads the output, tuned to the agent tool) and otherwise gives failure prevented, outcome, principles with reasons, numbered steps only where order matters | test | `test/repo/docs.test.ts` › "Development › Skills › says when a bundled skill is exact and when it gives principles" |
+| AC2 | rewritten `norn-review` keeps two axes, traceability table, findings JSON with blocking flag, verification of blocking candidates, `REVIEW.md` precedence; no word-for-word subagent prompts or word caps | test | `packages/cli/test/unit/assets.test.ts` › "norn-review keeps its contracts and gives its axes principles, not fixed prompts or word caps", with "norn-review traces every user story and criterion to a test…" and "norn-review reads REVIEW.md, verifies each blocking candidate…" |
+| AC3 | command-running subagents get no push, no branch/worktree switch, no delivery-tool (norn) command, no run-state writes, each with its reason | test | `packages/cli/test/unit/assets.test.ts` › "norn-review gives a subagent that runs commands the rules its work can break, each with its reason" |
+| AC4 | old and new `norn-review` on two past diffs: new raises the held defect on the first, no blocking finding on the second; outputs in evidence | agent | QA (agent): implement's evidence `gh249-*`, `gh273-*`, `comparison.md` |
 
 ## Easy to miss
 
@@ -26,4 +29,4 @@ Development › Skills states when a bundled skill is exact and when it gives pr
 
 ## Resume
 
-Review this slice.
+QA this slice: give AC4 its verdict from `comparison.md` (as worded neither version meets it; the new one loses nothing against the old), and have the person confirm the AC3 "delivery tool" wording.
