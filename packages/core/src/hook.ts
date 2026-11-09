@@ -35,8 +35,12 @@ export function foreignFact(s: AgentUnit, run_id: string, fact: HookFact): boole
   return !!owner && !!fact.agent_session_id && fact.agent_session_id !== owner;
 }
 
-const reportLine = (step: Step): string =>
-  `\`${cmd.done(`<${reportableOutcomes(step).join("|")}>`)}\`, \`${cmd.ask()}\` or \`${cmd.stuck()}\``;
+const doneLine = (step: Step): string => `\`${cmd.done(`<${reportableOutcomes(step).join("|")}>`)}\``;
+
+const reportLine = (step: Step): string => `${doneLine(step)}, \`${cmd.ask()}\` or \`${cmd.stuck()}\``;
+
+/** An attended step's questions go to the person in the session, so its report never offers `norn ask`. */
+const ATTENDED_LINE = "report `norn done` only once the person agrees the work is finished, and ask in this session rather than with `norn ask`.";
 
 /** Block the turn end only in an unattended agent step whose live run has not reported. */
 function turnEndBlock({ session: s, fact, adapter }: HookAnswerInput): HookAnswer {
@@ -76,7 +80,9 @@ function sessionNote({ session: s, fact }: HookAnswerInput): HookAnswer {
   return {
     kind: "context",
     text: [
-      `norn: this session works step ${s.state.step} of ${s.unit.key}. Report exactly once: ${reportLine(step)}.`,
+      step.attended
+        ? `norn: this session works step ${s.state.step} of ${s.unit.key}. Report exactly once: ${doneLine(step)} or \`${cmd.stuck()}\`; ${ATTENDED_LINE}`
+        : `norn: this session works step ${s.state.step} of ${s.unit.key}. Report exactly once: ${reportLine(step)}.`,
       "The hard rules:",
       ...rules,
       `Run \`${cmd.brief()}\` for the rest.`,
@@ -89,7 +95,7 @@ function attendedReminder({ session: s, fact }: HookAnswerInput): HookAnswer {
   if (fact.event !== "turn_start" || !agentStep(s)?.attended) return ALLOW;
   return {
     kind: "context",
-    text: "norn: report `norn done` only once the person agrees the work is finished, and ask in this session rather than with `norn ask`.",
+    text: `norn: ${ATTENDED_LINE}`,
   };
 }
 

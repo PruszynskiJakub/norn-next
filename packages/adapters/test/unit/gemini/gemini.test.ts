@@ -18,6 +18,12 @@ describe("gemini adapter", () => {
     expect(f("after-agent", payloads.AfterAgent)).toMatchObject({ event: "turn_end", native: "AfterAgent", message: "Finished.", agent_session_id: "gem-1" });
   });
 
+  test("SessionStart carries its source in message, the session note's trigger", () => {
+    const f = (p: unknown) => geminiAgent.parseHookEvent("session-start", p, {}, AT);
+    expect(f(payloads.SessionStart)).toMatchObject({ event: "session_start", native: "SessionStart", message: "resume", agent_session_id: "gem-1" });
+    expect(f(payloads.SessionStartClear)).toMatchObject({ event: "session_start", native: "SessionStart", message: "clear", agent_session_id: "gem-2" });
+  });
+
   test("AfterAgent deny response", () => {
     const fact = geminiAgent.parseHookEvent("after-agent", payloads.AfterAgent, {}, AT)!;
     expect(JSON.parse(geminiAgent.hookResponse(fact, { kind: "block", reason: "report" }).stdout)).toEqual({ decision: "deny", reason: "report" });

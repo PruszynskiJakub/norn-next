@@ -100,7 +100,10 @@ describe("hookAnswer: the session-start note", () => {
   });
 
   test("an attended step is re-oriented too", () => {
-    expect(contextOf(ask({ session: attendedSession(), fact: SESSION_START }))).toContain("step refine of gh-2");
+    const text = contextOf(ask({ session: attendedSession(), fact: SESSION_START }));
+    expect(text).toContain("step refine of gh-2");
+    expect(text).not.toContain("`norn ask \"<question>\"`");
+    expect(text).toContain("ask in this session rather than with `norn ask`");
   });
 
   test("start-up, an unknown source, no loadable unit or a cursor not at an agent step add nothing", () => {
