@@ -8,7 +8,7 @@ title: "norn's agent instructions: missing reasons, environment, precedence, rep
 assignee: PruszynskiJakub
 labels:
   - norn
-  - norn:wf:story
+  - norn:wf:refinement
 workflow: refinement
 status: active
 intake_at: 2026-11-09T09:31:42.577Z
