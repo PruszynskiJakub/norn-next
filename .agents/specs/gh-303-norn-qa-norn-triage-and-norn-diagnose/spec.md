@@ -9,7 +9,7 @@ assignee: PruszynskiJakub
 labels:
   - norn
 workflow: triage
-status: new
+status: active
 intake_at: 2026-11-09T11:32:10.430Z
 body_hash: 53f954b3a159c98e1961440eb9a2bbd7535d8a2c789f5e075439eeb98eed2e3c
 ---
