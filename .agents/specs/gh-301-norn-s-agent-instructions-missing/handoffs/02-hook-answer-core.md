@@ -9,7 +9,18 @@ Move the hook's decision into a pure core function answering allow, block the tu
 - Encodings (AC2): `claude.test.ts` › "claude hookResponse"; `codex.test.ts` › "deny on PreToolUse and context on SessionStart and UserPromptSubmit; allow for the rest"; `gemini.test.ts` › "deny on BeforeTool and context on SessionStart and BeforeAgent; {} for the rest".
 - Allow for what a tool or event cannot carry (AC3): the same tests' allow cases, and `opencode.test.ts` › "it can carry no answer: every answer is allow, and no tool call is read".
 - `toolCall` over recorded payloads (AC4): `claude.test.ts` › "claude toolCall" (Bash in full past 300 chars, Write/Edit/MultiEdit/NotebookEdit, EnterWorktree, else null); codex and gemini "toolCall: …" tests.
-- `bun run test` (1577 pass) and `bun run typecheck` green.
+- `bun run test` (1577 pass) and `bun run typecheck` green (re-run in review #1).
+- Review #1: approve, 2 minor notes (findings file passed with the report).
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | core answers the turn-end block exactly as the cli did, attended steps never block; `norn hook` still blocks, caps and allows, taking a capped refusal only after core says block | test | `packages/core/test/unit/hook-answer.test.ts` › "hookAnswer: the turn-end block"; `packages/cli/test/integration/agent-protocol.test.ts` › "attended steps never block", "blocks are bounded per run"; `packages/cli/test/integration/stop-block-cap.test.ts` (CI) |
+| AC2 | deny on PreToolUse / BeforeTool and context on SessionStart, UserPromptSubmit / BeforeAgent, encoded per Claude, Codex, Gemini | test | `claude.test.ts` › "claude hookResponse"; `codex.test.ts` › "deny on PreToolUse and context on SessionStart and UserPromptSubmit; allow for the rest"; `gemini.test.ts` › "deny on BeforeTool and context on SessionStart and BeforeAgent; {} for the rest" |
+| AC3 | OpenCode, or any answer an event cannot carry, emits allow | test | `opencode.test.ts` › "it can carry no answer: every answer is allow, and no tool call is read"; the allow cases of the three tests above |
+| AC4 | `toolCall` over recorded payloads: shell → full command, file tools → paths, `EnterWorktree` → worktree switch, else null | test | `claude.test.ts` › "claude toolCall"; `codex.test.ts` › "toolCall: the shell tool's full command and apply_patch's files; anything else null"; `gemini.test.ts` › "toolCall: run_shell_command's full command, write_file and replace's path; anything else null" |
+| AC5 | outside a unit worktree, or on an error gathering facts or deciding, `norn hook` answers allow | test | `agent-protocol.test.ts` › "norn hook robustness" › "outside a unit worktree: no-op, nothing traced", "garbage stdin, unknown events and unknown agents never fail" (CI) |
+| story | an agent tool that can't add context or refuse a tool use skips that part | test | as AC3 |
+| story | hooks stay fast, no-op outside a unit worktree and allow on their own failure | test | as AC5 |
 
 ### Easy to miss
 
@@ -30,4 +41,4 @@ Move the hook's decision into a pure core function answering allow, block the tu
 
 ### Resume
 
-Nothing left in this slice; the next step runs the checks (`bun run test`, `bun run typecheck`).
+Review approved; nothing left in this slice. The next step is QA.
