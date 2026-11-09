@@ -5,7 +5,7 @@ description: Resolves merge, rebase or cherry-pick conflicts by the intent of bo
 
 # Merge
 
-Without this, conflicts get resolved by picking a winner and one side's work quietly disappears. You are combining work: both sides' intended behaviour survives. Commit locally; never push.
+Without this, conflicts get resolved by picking a winner and one side's work quietly disappears. You are combining work: both sides' intended behaviour survives. Commit locally.
 
 ## Start in the right mode
 
