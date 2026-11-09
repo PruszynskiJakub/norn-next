@@ -20,7 +20,6 @@ You work on the current base. Try what the issue describes there.
 - About behaviour: run it the way a user would (the command, the request, the page), from this checkout's code, never from an installed release. Run it somewhere disposable (a throwaway directory or repository), never somewhere your run could change real state.
 - About code, docs or tests: read them, and run the test that covers it.
 - Back every claim about what code or config does with the `file:line` usages that consume it, not only where it is defined. Never infer behaviour from a schema, a type or the docs alone: a key can be defined and documented yet never read. Name any such key as defined but never read.
-- Have a subagent do the reading, so the files stay out of the context you judge and write the comment in: give it the claim to check and where to start, and it comes back with the `file:line` usages and its conclusion, not the files themselves. Open a cited line yourself only when the conclusion turns on it. When you cannot start subagents, read the code yourself.
 - Record the exact commands and what you saw. When you only read the code and did not run it, say so and why.
 
 Use the `norn-diagnose` loop only when the symptom does not show on the first try; stop at a repro, never at a cause you guessed.

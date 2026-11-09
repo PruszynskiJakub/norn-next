@@ -11,11 +11,7 @@ Without this, an agent reads code, picks the first plausible theory and fixes a 
 
 ## 1. Build a loop
 
-**This is the skill.** Spend most of your effort here; bisecting, hypotheses and probes only consume the loop.
-
-**Find the code involved in a subagent**, so the files it reads do not fill the context the loop and the probes need: give it the symptom and where it shows, and it comes back with the path through the code (`file:line` for each hop) and the seams a loop could drive, not the files themselves. When you cannot start subagents, explore the code yourself.
-
-In rough order of preference:
+**This is the skill.** Spend most of your effort here; bisecting, hypotheses and probes only consume the loop. In rough order of preference:
 
 - a failing test at whatever seam reaches the bug;
 - a `curl` script, a CLI run on a fixture diffed against a known-good output, or a headless browser script;
@@ -44,11 +40,7 @@ Cut inputs, callers, config, data and user actions one at a time, re-running aft
 
 ## 3. Hypothesise
 
-Write **3–5 ranked hypotheses** before testing any; one anchors on the first idea. Each is **falsifiable**: "if X is the cause, changing Y makes the bug go away (or Z makes it worse)". No prediction, no hypothesis.
-
-Your own list starts from the idea you had while exploring. When that idea keeps winning, or the list reads as variations of it, ask a fresh subagent given only the loop and the symptom (not your hypotheses, not the files you suspect) for its own; merge the two lists and rank them together before testing any. When you cannot start subagents, write the list yourself and make at least one hypothesis point away from your first idea.
-
-Show the list to a person when one is present; do not wait for them.
+Write **3–5 ranked hypotheses** before testing any; one anchors on the first idea. Each is **falsifiable**: "if X is the cause, changing Y makes the bug go away (or Z makes it worse)". No prediction, no hypothesis. Show the list to a person when one is present; do not wait for them.
 
 ## 4. Instrument
 
