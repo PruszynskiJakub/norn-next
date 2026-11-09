@@ -2,7 +2,7 @@
 id: gh-301/01
 title: Every hard rule in How to work gives its reason
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
