@@ -3,7 +3,8 @@
  * native payload on stdin. Normalizes it through the agent adapter, appends the hook fact to
  * the unit's hook file and the trace, and on turn end of an UNATTENDED step whose run has no
  * report yet answers with the adapter's block response telling the agent to report. Attended
- * steps never block.
+ * steps never block a turn end; in any step a tool call that pushes, switches branch or worktree,
+ * or changes the remote is denied with the rule's reason.
  *
  * Must be fast and must never break the agent: outside a `.norn-unit` worktree it is a no-op,
  * and any failure is swallowed into the adapter's "allow" answer (`{}`), exit 0.
@@ -12,9 +13,9 @@
  * `--agent` (a configured agent name or an adapter name; `norn init` always installs it), else
  * NORN_AGENT, else the first configured adapter (claude first) that recognizes the event.
  */
-import { type AgentAdapter, currentRun, foreignFact, type HookAnswer, hookAnswer, type HookResponse } from "@norn/core";
+import { type AgentAdapter, checkoutNames, currentRun, foreignFact, type HookAnswer, hookAnswer, type HookResponse, type ToolCall } from "@norn/core";
 import { DEFAULT_CONFIG, type ExitCode, type HookFact, type ResolvedConfig, ulid } from "@norn/schema";
-import { appendHookTrace, bindNornHome, blockedHookCount, claimStopBlock, loadConfig, repoLayout } from "@norn/store";
+import { appendHookTrace, bindNornHome, blockedHookCount, claimStopBlock, loadConfig, repoLayout, spawnSyncCaptured } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { withExit } from "../output.ts";
@@ -82,11 +83,26 @@ function takeRefusal(root: string, s: UnitSession, runId: string): boolean {
 }
 
 /**
+ * The bare `git checkout <name>` names of a shell call that resolve to a commit in the worktree,
+ * the one fact core needs to tell a branch switch from a path checkout. Asked only for those
+ * commands, so other tool calls stay fast; a git that cannot answer throws, and the hook allows.
+ */
+function resolvedCommits(worktree: string, env: Record<string, string | undefined>, call: ToolCall | null): string[] {
+  if (call?.kind !== "shell") return [];
+  return checkoutNames(call.command).filter((name) => {
+    const r = spawnSyncCaptured(["git", "rev-parse", "--verify", "--quiet", `${name}^{commit}`], { cwd: worktree, env, timeoutMs: 2000 });
+    if (r.exitedDueToTimeout || r.exitCode === null) throw new Error("git rev-parse did not answer");
+    return r.exitCode === 0;
+  });
+}
+
+/**
  * Core decides; a turn-end block still has to take one of the run's MAX_STOP_BLOCKS refusals.
  * Taking one stays the last gate, so a refusal is spent only when this hook blocks.
  */
-function gatedAnswer(root: string, s: UnitSession | null, fact: HookFact, adapter: AgentAdapter, payload: unknown): HookAnswer {
-  const decided = hookAnswer({ session: s, fact, toolCall: adapter.toolCall(fact.native, payload), adapter });
+function gatedAnswer(ctx: Context, root: string, worktree: string, s: UnitSession | null, fact: HookFact, adapter: AgentAdapter, payload: unknown): HookAnswer {
+  const toolCall = s ? adapter.toolCall(fact.native, payload) : null;
+  const decided = hookAnswer({ session: s, fact, toolCall, adapter, commits: resolvedCommits(worktree, ctx.env, toolCall) });
   if (decided.kind !== "block") return decided;
   const run = s && currentRun(s);
   return run && takeRefusal(root, s, run.run_id) ? decided : { kind: "allow" };
@@ -107,7 +123,7 @@ function answer(r: HookResponse): unknown {
 export const hookEventCommand = defineCommand({
   name: "hook",
   version: "exempt",
-  summary: "Agent hook entry point: record a lifecycle fact; refuse an unreported turn end",
+  summary: "Agent hook entry point: record a lifecycle fact; refuse an unreported turn end or a tool call that breaks a hard rule",
   usage: "norn hook <event> [--agent claude]  (payload JSON on stdin)",
   options: { agent: { type: "string" } },
   positionals: { min: 0, max: 8 },
@@ -144,10 +160,10 @@ export const hookEventCommand = defineCommand({
         // Another agent session's fact is not the run's (no silent, nudge or snapshot from it)
         if (run && !foreignFact(session, run.run_id, fact)) fact.run_id = run.run_id;
       }
-      const decided = gatedAnswer(root, session, fact, adapter, payload);
+      const decided = gatedAnswer(ctx, root, found.worktree, session, fact, adapter, payload);
       // The unit is the worktree's, whether the fact names a run or not
       const unit = { story: found.marker.story, slice: found.marker.slice ?? null };
-      appendHookTrace(root, unit, { type: "hook", id: ulid(ctx.clock.now()), fact, ...(decided.kind === "block" ? { blocked: true, reason: decided.reason } : {}) });
+      appendHookTrace(root, unit, { type: "hook", id: ulid(ctx.clock.now()), fact, ...(decided.kind === "block" || decided.kind === "deny" ? { blocked: true, reason: decided.reason } : {}) });
       return answer(adapter.hookResponse(fact, decided));
     } catch {
       return {}; // never break the agent

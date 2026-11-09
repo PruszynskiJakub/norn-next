@@ -6,7 +6,9 @@
 import type { HookFact } from "@norn/schema";
 import { type AgentUnit, currentRun, cursorStep, runAgentSession, standingReport } from "./agent-unit.ts";
 import { cmd } from "./commands.ts";
+import { HARD_RULES, type HardRuleId } from "./hard-rules.ts";
 import type { AgentAdapter, HookAnswer, ToolCall } from "./ports.ts";
+import { shellRefusal } from "./shell-refusals.ts";
 import { reportableOutcomes } from "./workflow.ts";
 
 export interface HookAnswerInput {
@@ -15,7 +17,11 @@ export interface HookAnswerInput {
   fact: HookFact;
   toolCall: ToolCall | null;
   adapter: Pick<AgentAdapter, "name" | "tier" | "hookEvents">;
+  /** of the command's bare `git checkout <name>` names (`checkoutNames`), those the cli resolved to a commit */
+  commits?: readonly string[];
 }
+
+export { checkoutNames } from "./shell-refusals.ts";
 
 const ALLOW: HookAnswer = { kind: "allow" };
 
@@ -54,6 +60,32 @@ function turnEndBlock({ session: s, fact, adapter }: HookAnswerInput): HookAnswe
   };
 }
 
+/** What the person can do instead, said after the rule's reason. */
+const REFUSAL_HINT: Partial<Record<HardRuleId, string>> = {
+  "no-push": "if you want this pushed, run it yourself",
+  "no-switch": "if you want another branch or worktree, switch it yourself",
+  "no-remote-write": "if you want this on the remote, run it yourself",
+};
+
+function refusal(id: HardRuleId): HookAnswer {
+  const r = HARD_RULES.find((h) => h.id === id);
+  if (!r) return ALLOW;
+  const hint = REFUSAL_HINT[id];
+  return { kind: "deny", reason: `norn refused this call. ${r.rule}: ${r.reason}${hint ? `; ${hint}` : ""}.` };
+}
+
+/**
+ * Refuse a tool call that breaks a hard rule, in attended and unattended steps alike. No cap: each
+ * refusal stops only that call and never holds the session, so it can repeat on every retry.
+ */
+function toolRefusal({ session, toolCall, commits }: HookAnswerInput): HookAnswer | null {
+  if (!session || !toolCall) return null;
+  if (toolCall.kind === "worktree_switch") return refusal("no-switch");
+  if (toolCall.kind !== "shell") return null;
+  const id = shellRefusal(toolCall.command, commits);
+  return id ? refusal(id) : null;
+}
+
 export function hookAnswer(input: HookAnswerInput): HookAnswer {
-  return turnEndBlock(input);
+  return toolRefusal(input) ?? turnEndBlock(input);
 }

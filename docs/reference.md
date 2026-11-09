@@ -481,7 +481,7 @@ norn stuck "<reason>"
 
 ##### `norn hook`
 
-Agent hook entry point: record a lifecycle fact; refuse an unreported turn end
+Agent hook entry point: record a lifecycle fact; refuse an unreported turn end or a tool call that breaks a hard rule
 
 ```sh
 norn hook <event> [--agent claude]  (payload JSON on stdin)

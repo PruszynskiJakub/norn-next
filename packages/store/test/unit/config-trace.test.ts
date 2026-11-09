@@ -179,6 +179,16 @@ describe("trace", () => {
     appendFileSync(day, '{"type":"tick","tick_id":"x"}\n');
     expect(readTrace(repo, { types: ["tick"] }).errors.map((e) => e.file)).toEqual(["2026-10-23.jsonl:5"]);
   });
+  test("the blocked count counts only turn-end blocks, never a refused tool call", () => {
+    const repo = tmp();
+    const runId = "01M5MA3PG0DB4G1MJNV0HKQYSA"; // a ulid of AT
+    const unit = { story: "gh-12" };
+    const fact = (event: "turn_end" | "tool_use", native: string) => ({ event, at: AT, agent: "claude", native, cwd: "/w", story: "gh-12", run_id: runId });
+    for (let i = 0; i < 5; i++) appendHookTrace(repo, unit, { type: "hook", id: ulid(), blocked: true, reason: "norn refused this call", fact: fact("tool_use", "PreToolUse") });
+    expect(blockedHookCount(repo, unit, runId)).toBe(0);
+    appendHookTrace(repo, unit, { type: "hook", id: ulid(), blocked: true, reason: "report first", fact: fact("turn_end", "Stop") });
+    expect(blockedHookCount(repo, unit, runId)).toBe(1);
+  });
   test("B4: the trace-read observer sees every day file each reader opens", () => {
     const repo = tmp();
     const runId = "01M5MA3PG0DB4G1MJNV0HKQYSA"; // a ulid of AT
