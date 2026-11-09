@@ -37,6 +37,8 @@ Traceability (review #1, all at seam S1, the brief renderer):
 - The no-survey entry's rule is the "This brief is complete…" sentence only; "Read the Inputs…" stays guidance in front of it in the bullet.
 - The four-commands bullet keeps its trailing "it is rendered from the unit's state each time"; its reason now says nearly the same. Left in place so the snapshot diff is only the added reasons; gh-301/03 rewrites that bullet anyway.
 
+- Merged the story branch in twice (it moved mid-merge as gh-301/04 integrated). Conflicts with gh-301/03 (skill precedence, subagents) and gh-301/04 (Where you run): kept every hard rule's reason from HARD_RULES, 03's "a skill," in the four-commands bullet plus its two new bullets, and 04's Where you run section; brief.test.ts keeps all three describes. The snapshot was regenerated and holds both the reasons and Where you run. `bun run test` 1574 pass, `bun run typecheck` clean.
+
 ## Resume
 
-Review #1 approved with no findings; next is whatever step the workflow gives after review.
+The merge is done and committed (e163d3ae7); next is integrate, taking the slice in by a merge.
