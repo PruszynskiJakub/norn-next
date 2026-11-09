@@ -4,10 +4,14 @@
 
 ### Proof
 
-- AC1 (section after the friction lists `approve`/`reject` comments with gate, round, words, delegated marked, and asks which last): `packages/cli/test/unit/assets.test.ts` › "norn-retro lists the gate rulings after the friction and asks which read as a lasting preference" (went red first).
-- AC2 (`REVIEW.md` vs `AGENTS.md` else `CLAUDE.md`, each naming File, Section, Wording, Ruling; missing file proposed for creation; existing line cited, no duplicate): same file › "norn-retro proposes a REVIEW.md or agent instructions line naming file, section, wording and ruling" (went red first).
-- AC3 (still changes no file): same file › "norn-retro changes no file" (new pin of the existing text; green before and after).
-- `bun run test` (1562 pass) and `bun run typecheck` green.
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | after the friction, a section lists `approve`/`reject` comments with gate, round, words, delegated marked, and asks which read as lasting | test | `packages/cli/test/unit/assets.test.ts` › "norn-retro lists the gate rulings after the friction and asks which read as a lasting preference" |
+| AC2 | proposes a `REVIEW.md` line (how code is judged) or `AGENTS.md`, else `CLAUDE.md` (how agents work), naming file, section, wording and ruling | test | `packages/cli/test/unit/assets.test.ts` › "norn-retro proposes a REVIEW.md or agent instructions line naming file, section, wording and ruling" |
+| AC3 | `norn-retro` still changes no file | test | `packages/cli/test/unit/assets.test.ts` › "norn-retro changes no file" |
+| AC4 | an agent run proposes creating a missing target file, and cites an already-stated line instead of a duplicate | agent | QA (agent) |
+
+`bun run test` (1562 pass) and `bun run typecheck` green at review.
 
 ### Easy to miss
 
