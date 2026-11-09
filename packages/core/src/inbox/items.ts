@@ -84,15 +84,18 @@ function undeliveredNudge(story: StoryFacts, uf: UnitFacts, facts: Facts): { out
 
 /**
  * This checkout's heartbeat is down — its last tick is older than 3 × watch interval
- * (or no tick ever ran) while a story it holds has a unit in auto mode. Null when it is up, when
- * nothing here needs it, or when the heartbeat was not observed.
+ * (or no tick ever ran) while a story it holds has a unit in auto mode, or a unit in any mode
+ * with receipts only a tick applies. Null when it is up, when nothing here needs it, or when the
+ * heartbeat was not observed.
  */
 export function heartbeatDown(facts: Facts, config: ResolvedConfig): { holder: string; since: string | null; for_ms: number | null } | null {
   const hb = facts.heartbeat;
   if (!hb || heartbeatUp(facts, config)) return null;
   const auto = (s: StoryFacts) => effectiveMode(s.mode, false, facts.machine.runner).mode === "auto";
   const live = (u: UnitFacts) => !!u.state && u.state.status !== "done" && u.state.status !== "corrupt";
-  const needs = facts.stories.some((s) => s.claim.state === "mine" && auto(s) && !storyFinished(storyPhase(s, facts.repo.default_branch)) && s.units.some(live));
+  // A manual step needs the heartbeat too: an agent's `norn brief` and `norn done` change nothing until a tick applies them
+  const waits = (s: StoryFacts) => s.units.some((u) => (auto(s) && live(u)) || u.unapplied.length > 0);
+  const needs = facts.stories.some((s) => s.claim.state === "mine" && !storyFinished(storyPhase(s, facts.repo.default_branch)) && waits(s));
   if (!needs) return null;
   return { holder: facts.machine.holder, since: hb.last_tick_at === null ? null : iso(hb.last_tick_at), for_ms: hb.last_tick_at === null ? null : facts.now - hb.last_tick_at };
 }
@@ -303,6 +306,21 @@ function personStart(uf: UnitFacts, story: StoryFacts, facts: Facts, config: Res
   const start = startCommandFor(uf, story, config);
   if (!facts.machine.runner_capabilities?.open) return { command: start };
   return { command: cmd.storyStart(uf.unit.key), detail: `by hand: ${start}` };
+}
+
+/**
+ * What an agent did at the cursor step that no tick has applied yet: `started` once it ran
+ * `norn brief`, then its report once it made one. Null when nothing waits. A second agent for
+ * that step would only be refused (one run, one report), so the inbox never offers to start one.
+ */
+function unappliedRun(uf: UnitFacts): { what: string; since: string } | null {
+  const st = uf.state;
+  if (!st) return null;
+  const here = uf.unapplied.map((r) => r.receipt).filter((r) => r.step === st.step && r.attempt === st.attempt);
+  const report = here.findLast((r) => r.by === "agent" && (r.kind === "done" || r.kind === "stuck" || (r.kind === "ask" && !r.implicit)));
+  if (report) return { what: `reported \`${report.kind === "done" ? `norn done ${report.outcome}` : `norn ${report.kind}`}\``, since: report.at };
+  const started = here.findLast((r) => r.kind === "started");
+  return started ? { what: "started", since: started.at } : null;
 }
 
 /**
@@ -606,6 +624,11 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
     since,
     ...extra,
   });
+  // What an agent did that only a tick applies: with no heartbeat, `norn watch` is the person's next move
+  const tickWait = (pending: { what: string; since: string }): InboxItem =>
+    heartbeatDown(facts, config)
+      ? item("running", `${st.step} #${st.attempt} (${pending.what}, waiting for the heartbeat — ${cmd.watch()})`, cmd.watch(), pending.since)
+      : item("running", `${st.step} #${st.attempt} (${pending.what})`, cmd.runList(key), pending.since);
   // A story held here from its record alone has no branch, so nothing runs in
   // it — a run its record names belongs to the previous holder's session, and nothing can start
   if (story.record_only && (st.status === "running" || st.status === "ready"))
@@ -626,6 +649,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
           return item("approve", park.reason, cmd.storyApprove(key), park.since, { detail: [judged?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
         }
         case "attended": {
+          const pending = unappliedRun(uf);
+          if (pending) return tickWait(pending);
           const start = personStart(uf, story, facts, config);
           return item("your_turn", `${st.step}: attended step — work with the agent`, start.command, park.since, start.detail ? { detail: start.detail } : {});
         }
@@ -652,6 +677,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
           detail: "attended step: answer in the agent's pane; it reports when you agree",
         });
       }
+      const pending = unappliedRun(uf);
+      if (pending && heartbeatDown(facts, config)) return tickWait(pending);
     }
       return item("running", `${st.step} #${st.attempt}${st.run ? ` (${st.run.how})` : ""}`, cmd.runList(key), st.run?.started_at ?? st.step_entered_at);
     case "ready": {
@@ -659,6 +686,8 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
       if (step?.type === "agent") {
         const { mode, downgraded } = effectiveMode(story.mode, !!step.attended, facts.machine.runner);
         if (mode === "manual") {
+          const pending = unappliedRun(uf);
+          if (pending) return tickWait(pending);
           const start = personStart(uf, story, facts, config);
           const detail = [downgraded ? "auto requested, no runner; running manual" : null, start.detail].filter(Boolean).join(" · ");
           return item("your_turn", `${st.step} is ready (manual): start an agent in the worktree`, start.command, st.step_entered_at, detail ? { detail } : {});

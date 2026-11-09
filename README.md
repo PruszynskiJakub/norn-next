@@ -63,7 +63,7 @@ Next steps
   2. Commit and push the setup: `git add .agents .claude REVIEW.md .gitignore && git commit -m "Set up norn" && git push`.
   3. Check this machine: `norn doctor`.
   4. Make a first story: an issue labelled `norn` and assigned to you, e.g. `gh issue create --label norn --assignee @me --title "…"`.
-  5. Pick it up: `norn sync`, then `norn status` shows what needs you and the command for each item; `norn watch` keeps norn working.
+  5. Pick it up: `norn sync`, keep `norn watch` running (it moves every step on, in manual mode too), and `norn status` shows what needs you and the command for each item.
 ```
 
 Do the first three. `norn status` then has nothing for you yet:
@@ -81,11 +81,11 @@ Config is optional: a solo developer on GitHub with Claude Code writes none. It 
 ```sh
 gh issue create --label norn --assignee @me --title "Add CSV export of orders"
 norn sync      # the issue becomes story gh-N: a branch, a worktree, a spec folder
-norn watch     # keeps norn working; Ctrl-C finishes the current tick and releases claims
+norn watch     # the heartbeat: keep it running, in manual mode too; Ctrl-C finishes the current tick and releases claims
 norn status    # in another terminal: what needs you, with the command for each item
 ```
 
-1. A new story runs the `triage` workflow. In manual mode (the default) `norn status` shows its first agent step as ready, with the command that starts it: `norn story start gh-N` with the Herdr runner, otherwise a line that opens your agent in the story's worktree on its brief.
+1. A new story runs the `triage` workflow. In manual mode (the default) `norn status` shows its first agent step as ready, with the command that starts it: `norn story start gh-N` with the Herdr runner, otherwise a line that opens your agent in the story's worktree on its brief. Without Herdr you paste that line into a terminal of its own; the agent reads its brief, works and reports with `norn done`, and `norn watch` applies the report and moves the story to its next step. Without `norn watch` running, nothing moves: the report waits for a tick, and `norn status` says so.
 2. The triage agent checks the issue against your code, posts its findings and one recommendation as an issue comment, and labels the issue's kind, risk and priority. The round ends there.
 3. You start the next round: `norn story edit gh-N --workflow quick` for a small change, `--workflow refinement` to agree a spec and plan with an agent first, then `--workflow story` to build it in slices.
 4. The workflow runs. Whenever an agent asks, a gate waits for your approval or something is stuck, the item appears in `norn status` with the command that resolves it (`norn story answer`, `norn story approve`, `norn run rerun`, …).

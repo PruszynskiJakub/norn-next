@@ -58,6 +58,12 @@ A check that failed on a glitch (a CI hiccup, machine load, a flaky test) sends 
 
 Do what the reason asks (grant access, fix the environment, settle a contradiction in the spec, ideally in the spec file itself), then `norn run rerun <unit>`. If the step should go somewhere else, add `--step <step>`.
 
+## `norn status` keeps asking you to start the same step
+
+**You see:** a manual step stays "ready: start an agent", and each agent you start runs `norn brief` and ends at once, refused with `already_reported`.
+
+No heartbeat runs on this checkout, so the agent's `norn brief` and `norn done` wait for a tick that never comes. Run `norn tick` once to apply them, then keep `norn watch` running (or a cron tick, below) while you work. `norn status` shows the step as waiting for the heartbeat, with an Unblock item that names `norn watch`, whenever receipts wait for a tick and no heartbeat runs.
+
 ## The base moved under a story
 
 norn merges the base into the story branch in an `update` step, never by rebasing. When the merge conflicts, a `resolve` step has an agent resolve it, and the story goes on.

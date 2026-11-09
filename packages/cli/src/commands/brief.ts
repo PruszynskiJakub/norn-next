@@ -151,7 +151,12 @@ export const briefCommand = defineCommand({
     let run = currentRun(s);
     if (run) {
       const report = standingReport(s, run.run_id);
-      if (report) throw refuse(`this run already reported \`${reportCommand(report.receipt)}\`; exactly one report per run`, "end your turn", "already_reported");
+      if (report) {
+        // An unapplied report waits for a tick: without a heartbeat nobody applies it, so say who does
+        const waits = s.unapplied.some((r) => r.receipt.receipt_id === report.receipt.receipt_id);
+        const next = waits ? `end your turn; a tick applies the report: tell the person to run ${cmd.tick()} if ${cmd.watch()} is not running on this checkout` : "end your turn";
+        throw refuse(`this run already reported \`${reportCommand(report.receipt)}\`; exactly one report per run`, next, "already_reported");
+      }
       refuseForeignSession(ctx, s, run.run_id, "brief"); // Never join another session's run
     }
     const pending = s.unapplied.filter((r) => r.receipt.kind !== "started" && r.receipt.kind !== "mode");

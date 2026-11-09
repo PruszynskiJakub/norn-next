@@ -277,11 +277,15 @@ describe("manual mode: tick → brief → done → tick", () => {
     // norn writes nothing into the handoff: the summary lives in the receipt, which the brief lists as History
     expect(existsSync(handoffFile) ? readFileSync(handoffFile, "utf8") : null).toBe(handoffBefore);
 
-    for (const argv of [["done", "done", "--handoff", "again"], ["ask", "q?"], ["stuck", "r"], ["brief"]]) {
+    for (const argv of [["done", "done", "--handoff", "again"], ["ask", "q?"], ["stuck", "r"]]) {
       const again = await inWt(wt(), ...argv);
       expect(again.exit).toBe(3);
       expect(again.value).toMatchObject({ code: "already_reported", do_instead: "end your turn" });
     }
+    // a fresh agent the inbox sent here learns that only a tick moves the step on
+    const brief = await inWt(wt(), "brief");
+    expect(brief.exit).toBe(3);
+    expect(brief.value).toMatchObject({ code: "already_reported", do_instead: "end your turn; a tick applies the report: tell the person to run norn tick if norn watch is not running on this checkout" });
     expect((await stop(wt())).value).toEqual({}); // reported → turn end allowed
   });
 

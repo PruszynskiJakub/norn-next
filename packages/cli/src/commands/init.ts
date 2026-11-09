@@ -143,7 +143,7 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
   // The labels line above says how to get a label norn could not create
   const issueCreate = PROVIDERS[r.remote.provider].issueCreate;
   steps.push(`Make a first story: an issue labelled \`${label}\` and assigned to you${issueCreate ? `, e.g. \`${issueCreate(label)}\`` : ""}.`);
-  steps.push(`Pick it up: \`${cmd.sync()}\`, then \`${cmd.status()}\` shows what needs you and the command for each item; \`${cmd.watch()}\` keeps norn working.`);
+  steps.push(`Pick it up: \`${cmd.sync()}\`, keep \`${cmd.watch()}\` running (it moves every step on, in manual mode too), and \`${cmd.status()}\` shows what needs you and the command for each item.`);
   return steps;
 }
 

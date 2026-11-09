@@ -193,4 +193,27 @@ describe("R4.3 / R5.5: inbox items", () => {
     expect(heartbeatDown({ ...facts([solo({}, null, {}, { mode: "manual" })]), heartbeat: { last_tick_at: null } }, CONFIG)).toBeNull();
     expect(heartbeatDown(facts([solo()]), CONFIG)).toBeNull();
   });
+
+  test("a manual step an agent started or reported is never offered to a second agent; with no heartbeat, the inbox says `norn watch`", () => {
+    const manual = (kinds: Array<"started" | "done">, heartbeat: { last_tick_at: number | null }): Facts => {
+      const s = solo({}, null, {}, { mode: "manual" });
+      const u = s.units[0] as UnitFacts;
+      const st = { ...(u.state as UnitState), run: { run_id: RUN, step: "implement", attempt: 1, started_at: at(), how: "manual" as const } };
+      const r = { started: receipt(st, "started", { how: "manual", agent: "claude", worktree: WT }), done: receipt(st, "done", { outcome: "done" }) };
+      u.unapplied = kinds.map((k, i) => numbered(i + 1, r[k]));
+      return { ...facts([s]), heartbeat };
+    };
+    const rows = (f: Facts, g: "your_turn" | "running" | "unblock") => buildInbox(f, CONFIG).groups[g].map((i) => [i.title, i.command]);
+
+    // no tick ever ran: the brief and the report wait for one, and nothing starts a second agent
+    const reported = manual(["started", "done"], { last_tick_at: null });
+    expect(rows(reported, "your_turn")).toEqual([]);
+    expect(rows(reported, "running")).toEqual([["implement #1 (reported `norn done done`, waiting for the heartbeat — norn watch)", "norn watch"]]);
+    expect(rows(reported, "unblock")).toEqual([["no heartbeat on jakub@mac yet — run `norn watch`", "norn watch"]]);
+    // the heartbeat is up: the next tick applies the start, so the step is just running
+    const started = manual(["started"], { last_tick_at: T0 - 5_000 });
+    expect(rows(started, "your_turn")).toEqual([]);
+    expect(rows(started, "running")).toEqual([["implement #1 (started)", "norn run list gh-1"]]);
+    expect(rows(started, "unblock")).toEqual([]);
+  });
 });
