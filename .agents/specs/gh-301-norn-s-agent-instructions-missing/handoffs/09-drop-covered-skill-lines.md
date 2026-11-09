@@ -2,8 +2,12 @@
 Bundled skills stop repeating the push and branch rules the brief's How to work already states (D15), and no bundled skill names the mode, so the brief alone adapts the skills to the step.
 
 ### Proof
-- AC1 (the four lines dropped, "Commit locally" kept, nothing else dropped): `packages/cli/test/unit/assets.test.ts` › skills › "skills leave the push and branch rules to the brief, keeping committing locally as craft". It went red before the skill edits. It also pins the text that stays around each removed sentence. The diff in `packages/cli/assets/skills/` is exactly four one-line edits.
-- AC2 (no skill names the mode): `assets.test.ts` › skills › "%s names no mode", run once per bundled skill. It passed from the start, because no skill names the mode today; it guards against regressions.
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | "never push" gone from norn-implement and norn-merge (Commit locally kept), "Never push." from norn-diagnose, "Never create or switch branches for it." from norn-prototype, nothing else dropped | test | `packages/cli/test/unit/assets.test.ts` › skills › "skills leave the push and branch rules to the brief, keeping committing locally as craft" |
+| AC2 | no bundled skill names the mode (auto or manual) | test | `packages/cli/test/unit/assets.test.ts` › skills › "%s names no mode" (each skill) |
+
+- The diff in `packages/cli/assets/skills/` is exactly four one-line edits; the AC1 test also pins the text kept around each removed sentence.
 - `bun run test` (1580 pass) and `bun run typecheck` are green.
 
 ### Easy to miss
@@ -17,4 +21,4 @@ Nothing.
 - How "names the mode" is read: prose that pairs auto/manual with mode/step/story, either way round (e.g. "auto mode", "mode is manual"). Plain "manual" in another sense, such as norn-retro's "a manual check", is allowed. So are the supervisors' `--auto` and `--manual` flags.
 
 ### Resume
-Implementation is done and committed. Next comes the slice's test check, then review.
+Review #1 approved with no findings. Next comes the slice's QA or gate, per the workflow.
