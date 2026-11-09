@@ -2,7 +2,7 @@
 id: gh-301/08
 title: norn-review rewritten to the exact-versus-principled rule
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

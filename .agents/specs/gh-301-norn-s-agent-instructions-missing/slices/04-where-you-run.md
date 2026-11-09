@@ -2,7 +2,7 @@
 id: gh-301/04
 title: Where you run opens every brief
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
