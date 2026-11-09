@@ -9,17 +9,17 @@ In any unit step, the pre-tool hook refuses a `git push`, a branch or worktree s
 - Docs (AC7): `docs/limitations.md` entry "The hooks are a reminder, not a sandbox", pinned by `test/repo/docs.test.ts` › "limitations: the hooks entry" › "says the hooks are a reminder, not a sandbox, and names what they miss…" (red when the entry is reworded; checked by hand); docs lint green. `docs/reference.md` re-emitted for the `norn hook` summary.
 - `bun run test` and `bun run typecheck` green.
 
-Review #1 traceability:
+Review #2 traceability (current HEAD; unit tier and typecheck green):
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
 | AC1 | `git push` denied with the no-push reason, after env vars, `-C`/`-c`, in any segment, attended or not | test | `packages/core/test/unit/hook-refusals.test.ts` › "the denial carries the no-push rule…", "attended steps are refused alike"; S3 `packages/cli/test/integration/hook-refusals.test.ts` › "a git push is denied with the rule's reason…" |
 | AC2 | switches denied; a bare checkout only when it resolves to a commit and no `--` follows | test | core › "%p is refused with the no-switch reason", "a bare checkout is refused only when…"; S3 › "a bare checkout is denied only when its name resolves…" |
-| AC3 | gh/glab writes on the list denied with the remote reason | test | core › "%p is refused with the remote rule's reason" — gh, and since rework glab note/update/approve/revoke |
+| AC3 | gh/glab writes on the list denied with the remote reason | test | core › "%p is refused with the remote rule's reason" — gh, and glab create/merge/reopen/note/update/approve/revoke |
 | AC4 | unlisted gh/glab commands, quoted pushes and unreadable commands allowed | test | core › "%p is allowed" |
 | AC5 | refused on every retry, traced `blocked`, turn-end cap untouched | test | core › "a refused call is refused on every retry"; `packages/store/test/unit/config-trace.test.ts` › "the blocked count counts only turn-end blocks…"; S3 › "tool refusals leave the end-of-turn cap its full number of blocks" |
 | AC6 | installed hooks answer with no reinstall; allow outside a unit and on its own failure | test | S3 › "the PreToolUse hook norn init installed today…", "outside a unit worktree it allows", "when its own git fails, it allows" |
-| AC7 | limitations entry: hooks are a reminder, not a sandbox, naming what they miss; docs lint passes | test | since rework `test/repo/docs.test.ts` › "limitations: the hooks entry" |
+| AC7 | limitations entry: hooks are a reminder, not a sandbox, naming what they miss; docs lint passes | test | `test/repo/docs.test.ts` › "limitations: the hooks entry"; docs lint in the unit tier |
 
 ## Easy to miss
 - PostToolUse/AfterTool also map to `tool_use`; only the pre event yields a `toolCall`, so only it is refused.
