@@ -450,7 +450,7 @@ describe("skills", () => {
 
   test("norn-diagnose explores the code in a subagent and may ask a fresh one, given only the loop and the symptom, for hypotheses", () => {
     const text = readSkill("norn-diagnose");
-    expect(text).toMatch(/subagent[^\n]*code involved/);
+    expect(text).toMatch(/code involved in a subagent/);
     expect(text).toMatch(/fresh subagent[^\n]*only the loop and the symptom/);
     // the unanchored list comes before any hypothesis is tested
     expect(text.indexOf("fresh subagent")).toBeLessThan(text.indexOf("## 4. Instrument"));
