@@ -24,6 +24,7 @@ import { edgeOf, reportableOutcomes, stepOf } from "./workflow.ts";
 import { cmd } from "./commands.ts";
 import { HANDOFF_MAX_BYTES, HANDOFF_SECTIONS, handoffBytes, handoffCounters, handoffLastOutcome } from "./handoff.ts";
 import { branchRewrittenLine, recordLostLine } from "./apply.ts";
+import { ruleWithReason } from "./hard-rules.ts";
 
 export interface BriefInput {
   unit: UnitRef;
@@ -734,15 +735,15 @@ function evidenceLines(out: string[], e: BriefEvidence | null): void {
 /** How to work: the step protocol every brief carries, so no other file has to be read for it. */
 export function protocolLines(handoffFile: string): string[] {
   return [
-    "- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (`.norn-unit`, `.env.norn`; open the handoff only to rewrite it), and do not survey the repository, `.agents/`, `.claude/` or the machine to find your bearings.",
-    "- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in `.env.norn`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.",
+    `- Read the Inputs before you change anything; after that, read only the code and docs your work touches. ${ruleWithReason("no-survey")}`,
+    `- ${ruleWithReason("this-step")} Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.`,
     `- The handoff \`${handoffFile}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:`,
     ...HANDOFF_SECTIONS.map(([h, holds]) => `  - **${h}**: ${holds}.`),
     `  Keep it under ${HANDOFF_MAX_BYTES / 1024} KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.`,
     "- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the `--handoff` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter `criteria`, the criteria report, a finding's `criterion`, the traceability table) always stands next to what it says.",
-    "- Of the norn commands, run only `brief`, `done`, `ask` and `stuck`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise `norn ask`. After a long session or a lost thread, run `norn brief` again: it is rendered from the unit's state each time.",
-    "- Never `git push` (only norn pushes), and never switch branches or worktrees. Never run a `gh` or `glab` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.",
-    "- Never edit anything under `runs/` (norn's run state, kept outside the worktree). The repo's workflows (`.agents/workflows/`) and its norn config in `.agents/` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.",
+    `- ${ruleWithReason("four-commands")} Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.`,
+    `- ${ruleWithReason("no-push")} ${ruleWithReason("no-switch")} ${ruleWithReason("no-remote-write")}`,
+    `- ${ruleWithReason("no-run-state")} The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.`,
   ];
 }
 

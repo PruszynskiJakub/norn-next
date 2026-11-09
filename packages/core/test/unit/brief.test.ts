@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { Finding, Receipt, UnitState, Workflow } from "@norn/schema";
 import { applyReceipts } from "../../src/apply.ts";
 import { type BriefInput, renderBrief, storyRulings } from "../../src/brief.ts";
+import { HARD_RULES } from "../../src/hard-rules.ts";
 import type { NumberedReceipt, UnitRef } from "../../src/facts.ts";
 import { at, numbered, receipt, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyUnit } from "../fixtures.ts";
 
@@ -672,5 +673,41 @@ describe("the brief as a map: History from receipts, state shown only when it ma
   test("History tells an implicit ask from a question the agent asked", () => {
     const rs = [numbered(1, receipt(st, "ask", { question: "Allow bun test?", implicit: true })), numbered(2, receipt(st, "done", { outcome: "done", handoff: "  " }))];
     expect(renderBrief(input(st, rs)).json.log?.lines).toEqual(["implement#1 waited on a prompt in its pane: Allow bun test?", "implement#1 reported `done`"]);
+  });
+});
+
+describe("How to work gives every hard rule its reason", () => {
+  const howToWork = () => {
+    const md = renderBrief(input(stateFor(SLICE, SLICE_WF), [])).markdown;
+    return md.slice(md.indexOf("## How to work"), md.indexOf("## Limits"));
+  };
+
+  test("the no-survey rule says the brief holds what the step needs and other units are not this unit's", () => {
+    expect(howToWork()).toContain(
+      "do not survey the repository, `.agents/`, `.claude/` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.",
+    );
+  });
+
+  test("the four-commands rule says why, read-only commands included", () => {
+    expect(howToWork()).toContain(
+      "run only `brief`, `done`, `ask` and `stuck` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only `norn status --json` or `norn story view` is forbidden too.",
+    );
+  });
+
+  test("the run state, no-push and no-switch rules say what breaks", () => {
+    const text = howToWork();
+    expect(text).toContain("Never edit anything under `runs/` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit `corrupt`.");
+    expect(text).toContain("Never `git push` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects.");
+    expect(text).toContain("Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report.");
+  });
+
+  test("every hard rule comes from the one list, each with a non-empty reason after it", () => {
+    const text = howToWork();
+    expect(HARD_RULES.length).toBeGreaterThanOrEqual(7);
+    for (const r of HARD_RULES) {
+      expect(r.reason.trim().length).toBeGreaterThan(0);
+      expect(r.reason).not.toMatch(/\.$/);
+      expect(text).toContain(`${r.rule} — ${r.reason}.`);
+    }
   });
 });

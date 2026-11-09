@@ -821,7 +821,7 @@ describe("the new layout in product docs (B22)", () => {
     const rules = protocolLines(".agents/specs/gh-1-x/handoffs/_story.md");
     const never = rules.filter((l) => /\bnever edit\b/i.test(l));
     expect(never).toHaveLength(1);
-    const offLimits = (never[0] as string).split(/\.\s/)[0] as string;
+    const offLimits = (never[0] as string).split(/\.\s| — /)[0] as string; // the rule, before its reason
     expect([...offLimits.matchAll(CODE_SPAN)].map((m) => m[0])).toEqual(["`runs/`"]);
     expect(offLimits).not.toContain("handoff");
     expect(never[0]).toContain("`.agents/workflows/`");

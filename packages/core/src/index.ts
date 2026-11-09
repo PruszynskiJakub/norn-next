@@ -12,6 +12,7 @@ export * from "./criteria.ts";
 export * from "./decide/index.ts";
 export * from "./follow-up.ts";
 export * from "./handoff.ts";
+export * from "./hard-rules.ts";
 export * from "./hash.ts";
 export * from "./inbox/history.ts";
 export * from "./inbox/items.ts";
