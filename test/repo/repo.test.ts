@@ -818,7 +818,7 @@ describe("the new layout in product docs (B22)", () => {
   });
 
   test("the brief's protocol puts only runs/ off limits; workflows and config are ordinary files", () => {
-    const rules = protocolLines(".agents/specs/gh-1-x/handoffs/_story.md");
+    const rules = protocolLines({ handoff_file: ".agents/specs/gh-1-x/handoffs/_story.md", attended: false });
     const never = rules.filter((l) => /\bnever edit\b/i.test(l));
     expect(never).toHaveLength(1);
     const offLimits = (never[0] as string).split(/\.\s/)[0] as string;

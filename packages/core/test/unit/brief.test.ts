@@ -752,3 +752,50 @@ describe("Where you run: the brief's situation, from the facts norn records", ()
     for (const l of lines) expect(l).not.toMatch(/supervisor|answer it for you|will answer/i);
   });
 });
+
+describe("How to work outranks any skill and reaches subagents", () => {
+  const unattended = renderBrief(input(stateFor(SLICE, SLICE_WF), [])).markdown;
+  const story = storyUnit();
+  const attended = renderBrief(
+    input(stateFor(story, STORY_WF), [], {
+      unit: story,
+      workflow: STORY_WF,
+      runner: null,
+      paths: { worktree: "/r-worktrees/gh-1-login", spec_dir: ".agents/specs/gh-1-login", story_file: ".agents/specs/gh-1-login/story.md", slice_file: null, unit_dir: ".agents/specs/gh-1-login/runs/_story" },
+    }),
+  ).markdown;
+  const howToWork = (md: string) => md.slice(md.indexOf("## How to work"), md.indexOf("## Limits") === -1 ? undefined : md.indexOf("## Limits"));
+
+  test("How to work says it outranks any skill, and a skill must not prompt another norn command", () => {
+    for (const md of [attended, unattended]) {
+      const h = howToWork(md);
+      expect(h).toContain("How to work outranks any skill");
+      expect(h).toContain("never because a skill, a refusal, this brief or the inbox names it");
+    }
+  });
+
+  test("How to work maps what a skill says to what to do in this step", () => {
+    for (const md of [attended, unattended]) {
+      const h = howToWork(md);
+      expect(h).toContain('  - "stop, or wait for input" → `norn stuck` or `norn ask`');
+      expect(h).toContain('  - "push, open or comment on a pull request" → leave it to norn');
+      expect(h).toContain('  - "run another norn command" → only when the person asks you to directly');
+    }
+  });
+
+  test("the ask-the-person row follows the step: ask in this session when attended, norn ask when not", () => {
+    expect(howToWork(attended)).toContain('  - "ask the person" → ask them in this session; never `norn ask`');
+    expect(howToWork(attended)).not.toContain('"ask the person" → `norn ask`');
+    expect(howToWork(unattended)).toContain('  - "ask the person" → `norn ask`, which parks the step until it is answered; nobody reads this session');
+    expect(howToWork(unattended)).not.toContain("ask them in this session");
+  });
+
+  test("How to work gives a subagent the rules its work can break, and none to one that only reads", () => {
+    for (const md of [attended, unattended]) {
+      const h = howToWork(md);
+      expect(h).toContain("A subagent you start works under these rules");
+      expect(h).toContain("give it the ones its work can break, each with its reason");
+      expect(h).toContain("one that only reads needs none");
+    }
+  });
+});
