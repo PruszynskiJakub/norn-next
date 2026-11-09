@@ -13,6 +13,7 @@ workflow: refinement
 status: active
 intake_at: 2026-11-09T09:31:42.577Z
 body_hash: 329716d682d106f375e4f1b9743bfca38b5fafbe9635e8350d56bb42bfb36e4b
+refined_body_hash: 329716d682d106f375e4f1b9743bfca38b5fafbe9635e8350d56bb42bfb36e4b
 ---
 
 # norn's agent instructions: missing reasons, environment, precedence, repetition and preferences, and too much procedure
