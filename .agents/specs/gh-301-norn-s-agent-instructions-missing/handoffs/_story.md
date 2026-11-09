@@ -6,33 +6,30 @@ Close the seven gaps in norn's agent instructions: reasons for How to work's rul
 
 ## Proof
 
-- Refinement: spec.md holds Problem Statement, Solution, 46 user stories, Out of Scope and Further Notes; no open questions. Confirmed by a delegate answering for Jakub.
-- Slicing: ten slice files in `slices/` (01 rule reasons, 02 hook answers in core + adapter encodings and `toolCall`, 03 precedence and subagents, 04 Where you run, 05 shell refusals + limitations doc, 06 run state write refusals, 07 session-start note and attended reminder, 08 `norn-review` rewrite + exact-vs-principled rule + comparison, 09 dropped skill lines, 10 `norn-retro` preferences); every user story cited by some criterion; 44 criteria mirrored in spec.md's frontmatter. `bun test test/repo` green.
-- Plan: spec.md's Plan section has five seams (the brief renderer; a pure hook-answer function in core; `norn hook` through the cli harness; each adapter's `hookResponse` and new `toolCall`; skill and doc text via `assets.test.ts` pins, the docs lint and review), a coverage row for every user story, three prefactors, decisions D1–D17 and risks. Agreed by the delegate for Jakub. `bun test test/repo` green.
+- Refinement, slicing and plan: spec.md (46 user stories; Plan with five seams, D1–D17) and ten slice files, 44 criteria in spec.md's frontmatter; agreed by the delegate for Jakub.
+- Build: slices 01–10 integrated; test#1 (`bun install --frozen-lockfile && bun run test && bun run typecheck`) pass.
+- QA #1: 43 of 44 criteria pass, one line each in the run's evidence `report.md`. Observed through the real `norn brief` / `norn hook` cli path in a throwaway repo: the brief in all 12 combinations of attended, mode and runner; ~70 shell commands (push, switch and remote-write refusals, reads allowed); file-tool writes under run state (relative, symlinked, new paths); session notes and the attended reminder for Claude, Codex and Gemini; OpenCode allows; fails open outside a unit, on garbage input, with a broken PATH or corrupt state. norn-retro run on two fixture repos: proposes creating a missing `REVIEW.md`, and cites the line where it already says it.
 
 ## Easy to miss
 
 - The hooks are a reminder, not a sandbox: they fail open, judge `gh`/`glab` against a list of known writes (everything else allowed), and inspect file tools only for writes under the checkout's whole `runs/` folder.
-- Tool refusals are traced `blocked`, but the turn-end cap must count only `turn_end` lines (D9), or three denied pushes spend the run's turn-end blocks.
+- Tool refusals are traced `blocked`, but the turn-end cap counts only `turn_end` lines (D9); QA saw 56 refusals and still 3 turn-end blocks.
 - The `--json` brief replaces the prose `mode_note` with the fact `mode_requested` and gains `runner` (D1).
 - A bare `git checkout <name>` is refused only when the cli's rev-parse resolves it and no `--` follows (D6).
-- The permission-prompt line in Where you run is for unattended steps only.
 - The skill lines dropped are exactly the four in D15; "Commit locally" stays.
 
 ## Not proven yet
 
-- Everything past slicing: build, QA. The Codex and Gemini deny and added-context encodings are taken from their docs, not observed.
+- The norn-review before/after on two past diffs (`08.AC4`, the rewrite loses nothing) is **not met as worded**. On gh-273, the diff whose review passed clean, the new skill raises one blocking finding in both samples. That finding (a `#` line inside a fenced block ends Progress) is a real regression at 4b9567c that the original review missed: QA's `08-gh273-probe.txt` shows it, and the old skill raises it too. On gh-249 the new skill raised the original GitLab-draft defect in QA's re-run and missed it in implement's run. Jakub decides at the PR (D17) whether this counts as losing nothing or another clean diff is needed; QA's `08-AC4.md` has the table.
+- Codex and Gemini encodings were checked against payloads modelled on their docs, not against the live tools.
 
 ## Notes
 
-- Slice graph: critical path two levels (01 or 02 → 05/06/07). The rules list carries its reasons from slice 01, so the hook slices reuse real text. Slice 02 holds the whole hook-answer contract (union, encodings, `toolCall`) so 05–07 don't each add it. 03 has no edge on 01 despite both editing How to work (merge conflict only).
-- Slice 10's missing-file and duplicate cases are an agent check (the Plan had them at review) so QA gives them a verdict.
-
-- The person chose one story for all seven gaps; slice along brief and hooks versus skills. Prefactors (one hard-rules list in core; the turn-end decision moved into a pure core hook-answer function; `protocolLines` takes the step) land first.
-- The `norn-review` before/after comparison is QA by an agent (verifier: agent): old and new outputs go in the evidence; Jakub reviews at the PR.
-- `norn-fsd-round` is out of scope for the subagent rule (it runs outside a step).
-- Claude's hook installer already registers SessionStart, UserPromptSubmit and PreToolUse, so existing installs need no reinstall; OpenCode is `hooks` tier and gets allow only.
+- For the person, from QA: in an attended brief the skill mapping still reads "stop, or wait for input → `norn stuck` or `norn ask`" next to "never `norn ask`". norn-review words the "no norn command" subagent rule as "No command of the delivery tool", because the craft-skill lint bans the word; confirm that wording.
+- Reviewer re-runs are single samples of a non-deterministic judge.
+- `norn-fsd-round` is out of scope for the subagent rule (it runs outside a step). Claude's hook installer already registers SessionStart, UserPromptSubmit and PreToolUse, so existing installs need no reinstall; OpenCode gets allow only.
+- Friction: no real story's record had a gate ruling that reads as lasting, so QA built a fixture (a bare remote holding `refs/norn/runs/gh-7`) for the retro check.
 
 ## Resume
 
-Slices written; next is the person's approval of the slice files, then 01, 02, 03, 04, 08, 09 and 10 start in parallel; 05, 06 and 07 wait on 01 and 02.
+A person judges the norn-review before/after comparison (QA evidence `08-AC4.md`) and confirms the two wording notes; then the story goes on to its PR.
