@@ -126,3 +126,108 @@ One change across the brief, the hooks and the bundled skills:
 - Slice along the line the issue draws: brief and hooks (reasons, Where you run, precedence, subagents, hooks) are independent of skills (exact versus principled, the `norn-review` rewrite and comparison, `norn-retro`). The skill lines dropped must be exactly those the brief now covers.
 - Changes the brief's JSON contract and the hook answers; their tests and every user change with them. Bundled skills are edited at their source, never their installed copies.
 
+
+## Plan
+
+### Seams
+
+- **S1 The brief renderer, through `renderBrief` (its markdown and its `BriefJson`).** Observes the reasons in How to work, Where you run in every situation, precedence and the skill mapping rendered per step, the subagent rule, and the `where` facts of the `--json` brief.
+  Prior art: core's `brief.test.ts` (`renderBrief` over fixture state, receipts and workflows, with snapshots), and the protocol pins in cli's `assets.test.ts`.
+- **S2 A pure hook-answer function in core, through its input (the unit's session, the hook fact, the normalized tool call, the facts the cli gathered) and its answer.** Observes the session-start note, the refusals of pushes, branch and worktree switches, remote-changing `gh`/`glab` commands and file writes under run state, each with its reason; reads and unlisted commands allowed; the attended reminder; no cap on refusals; the existing turn-end block.
+  Prior art: none at this seam (the decision lives in the cli `hook` command today); the block cases in cli's `agent-protocol.test.ts` and `stop-block-cap.test.ts` are the behaviour it keeps.
+- **S3 `norn hook` through the cli harness.** Observes the wiring end to end: no-op outside a unit worktree, "allow" on any failure of its own, the new answers working with the hooks already installed, one case per answer kind, and tool refusals not spending the turn-end cap.
+  Prior art: `agent-protocol.test.ts` (its "norn hook robustness" and "attended steps never block" blocks) and `stop-block-cap.test.ts`.
+- **S4 Each agent adapter, through `hookResponse` and the new `toolCall`.** Observes how Claude, Codex and Gemini encode a denial and added context, how each tool's native call becomes a shell command or a file write, and that an adapter unable to encode an answer emits allow (OpenCode).
+  Prior art: the adapters' `claude.test.ts`, `codex.test.ts` and the Gemini and OpenCode unit tests, over recorded `hook-payloads.json` fixtures.
+- **S5 Skill and doc text, through the term pins in `assets.test.ts`, the docs lint and review.** Observes the rewritten `norn-review` (its kept contracts and its subagent rules), the `norn-retro` preferences, the dropped skill lines, the exact-versus-principled rule in the contributor docs, and the docs saying the hooks are a reminder, not a sandbox. The `norn-review` before/after comparison on past diffs is QA by an agent.
+  Prior art: `assets.test.ts` ("norn-fsd-round states the supervisor protocol", "the norn skill sends the agent to the brief"); the docs lint in `test/repo/docs.test.ts`.
+
+### Coverage
+
+| User story | Seam | Test kind | Notes |
+|---|---|---|---|
+| the no-survey rule says why | S1 | unit | rendered from the one rules list |
+| the only-four-commands rule says why, read-only commands included | S1 | unit | |
+| the run state rule says a hand edit makes the unit `corrupt` | S1 | unit | |
+| the no-push rule says a push has no receipt | S1 | unit | |
+| the no-switch rule says it leaves the unit's branch | S1 | unit | |
+| every other hard rule carries its reason | S1 | unit | every entry of the rules list has a reason |
+| the other-commands rule names a skill among what must not prompt one | S1 | unit | |
+| Where you run opens every brief | S1 | unit | |
+| attended: the person is here, ask here, done once they agree | S1 | unit | |
+| unattended: names the runner, nobody reads chat, ask via `norn ask` | S1 | unit | |
+| auto: the report starts the next step; the handoff must stand alone | S1 | unit | |
+| manual: the next step waits for a person | S1 | unit | |
+| auto without a runner: runs manual, and what that means | S1 | unit | from `mode_requested` ≠ `mode` |
+| a permission prompt parks the step | S1 | unit | unattended steps only |
+| Where you run replaces the mode line and the Attended banner | S1 | unit | also the banner pin in `agent-protocol.test.ts` |
+| `--json` brief carries the runner, facts only | S1 | unit | `mode_note` gone |
+| Where you run states only what norn records | S1 | unit | each line maps to a `where` fact; review checks the wording |
+| How to work outranks any skill | S1 | unit | |
+| the four-row skill mapping | S1 | unit | |
+| the "ask the person" row rendered for the step | S1 | unit | attended and unattended snapshots |
+| a re-orientation note after compact, resume or clear | S2 | unit | plus one S3 case and S4 encoding |
+| no note at start-up | S2 | unit | |
+| `git push` refused with its reason | S2 | unit | plus one S3 case |
+| branch or worktree switch refused with its reason | S2 | unit | the rev-parse fact given as input |
+| remote-changing `gh`/`glab` refused, judged against the list | S2 | unit | |
+| unlisted `gh`/`glab` commands allowed, reads included | S2 | unit | |
+| file-tool writes under run state refused; reads and shell not inspected | S2 | unit | path resolution in S3 |
+| attended reminder on every prompt | S2 | unit | plus S4 encoding |
+| refusals repeat with no cap | S2 | unit | S3: the turn-end cap untouched by tool refusals |
+| fast, no-op outside a unit, allow on own failure | S3 | integration | |
+| an agent tool that cannot refuse or add context skips that part | S4 | unit | OpenCode fixture |
+| already-installed hooks take the new answers without reinstall | S3 | integration | hooks installed as `norn init` writes them today |
+| docs say the hooks are a reminder, not a sandbox | S5 | review | `docs/limitations.md` entry rewritten; docs lint |
+| How to work's subagent rule | S1 | unit | |
+| `norn-review` gives command-running subagents their rules | S5 | unit | term pins |
+| the exact-versus-principled rule in the contributor docs | S5 | review | Development › Skills |
+| `norn-review` rewritten to the rule, contracts kept | S5 | unit | term pins for the axes, table, findings JSON and checks of blocking findings; review |
+| the rewrite shown to lose nothing on past diffs | S5 | QA (agent) | old and new outputs in the step's evidence and the PR |
+| skills drop only lines the brief covers, and stay mode-unaware | S5 | unit | pins that the dropped lines stay gone |
+| `norn-retro` lists gate rulings and asks which last | S5 | unit | term pins; review |
+| a `REVIEW.md` line for a ruling on how code is judged | S5 | unit | term pins; review |
+| an agent instructions file line for a ruling on how agents work | S5 | unit | term pins; review |
+| each proposal names file, section, wording and ruling | S5 | unit | term pins; review |
+| a missing target file: propose creating it | S5 | review | |
+| a preference already stated: cite it, no duplicate | S5 | review | |
+| `norn-retro` still changes no file | S5 | unit | existing pin kept |
+
+### Prefactoring
+
+1. **One list of the hard rules, in core**, each entry with its rule text and the reason it holds, from which How to work renders exactly as today (the reasons are empty until the change lands). It makes the reasons in How to work, the session-start note and the refusal reasons one text, so the brief and the hooks never word a rule two ways.
+2. **Move the turn-end block decision from the cli `hook` command into a pure hook-answer function in core.** Taking one of the capped refusals stays in the cli as the last gate, after core says the turn end would be blocked. It gives S2 its seam, so every new hook answer is a unit test.
+3. **`protocolLines` takes the step** (today only the handoff path), so How to work can render the "ask the person" row for an attended or an unattended step.
+
+No general shell parser: the refusals judge each command segment with a small tokenizer that lives with them.
+
+### Implementation decisions
+
+- D1 **`where` in the JSON brief replaces `mode_note` with `mode_requested`** (the story's mode before the fallback) **and gains `runner`** (`herdr`, `headless` or null). Facts only, as the machine contract asks; the markdown renders the fallback's meaning. Nothing outside the brief and its test reads `mode_note`.
+- D2 **Where you run** is a section right after the brief's opening line, built from `attended`, `mode`, `mode_requested` and `runner`. Attended: the person works here, ask here, report `done` once they agree. Unattended: the runner, nobody reads this session, ask with `norn ask` (it parks the step), and a permission prompt parks the step until a person answers. Auto: the report starts the next step at once and the next agent has only the handoff and receipts. Manual: the next step waits for a person. Fallback: auto was asked, no runner, so it runs manual. It replaces the "Attended step" banner and the mode line; the at-limit counter line stays where it is.
+- D3 **How to work** gains the reason on every hard rule (from the rules list), "How to work outranks any skill" with the four-row mapping (its "ask the person" row reads "ask in this session" when attended and "`norn ask`" when not), "a skill" among what must not prompt another norn command, and the subagent rule: a subagent works under these rules, gets the ones its work can break with their reasons, and one that only reads needs none.
+- D4 **The hook answer** becomes one of: allow, block the turn end (with its reason), deny the tool call (with its reason), add context (with its text). It replaces `HookDecision`; each adapter's `hookResponse` encodes what its tool supports and emits allow for the rest. Claude: PreToolUse `permissionDecision: deny`, SessionStart and UserPromptSubmit `additionalContext`. Codex: the same shape on its PreToolUse, SessionStart and UserPromptSubmit. Gemini: BeforeTool `decision: deny`, SessionStart and BeforeAgent `additionalContext`. OpenCode (`hooks` tier): allow only.
+- D5 **A pure `toolCall(native, payload)` port method on the agent adapter** returns a shell command (in full) or a file write (its paths), or null. Claude: `Bash`; `Write`, `Edit`, `MultiEdit`, `NotebookEdit`; `EnterWorktree` as a worktree switch. Codex: its shell tool; `apply_patch`'s file paths. Gemini: `run_shell_command`; `write_file`, `replace`. It is not persisted: `HookFact` and the trace schema stay unchanged, because `HookFact.command` is a 300-character summary that can hide a push past its cut.
+- D6 **Refused shell commands**, judged per segment (split on `;`, `&&`, `||`, `|` and newlines; leading env assignments and `git -C <dir>`/`-c k=v` options skipped): `git push`; `git switch`; `git checkout` with `-b`, `-B`, `--orphan` or `--detach`; `git checkout -`; `gh pr checkout`; `glab mr checkout`; `git worktree add|move|remove`; a bare `git checkout <name>` only when the cli's one `git rev-parse --verify --quiet <name>^{commit}` resolves it and no `--` follows (the cli gathers that fact; core decides). Anything the tokenizer cannot read is allowed.
+- D7 **The `gh`/`glab` write list** is the spec's: create, edit, comment, review, ready, merge, close, reopen on pull requests, merge requests and issues; labels; release create and delete; repo edit and delete; `api` with a method other than GET or with field or input flags (`-f`, `-F`, `--field`, `--raw-field`, `--input`). Every other subcommand is allowed.
+- D8 **A file write is refused when its path resolves under the checkout's whole `runs/` folder** in the machine dir. The cli resolves it (relative to the payload's cwd, the nearest existing parent through realpath) and passes it in; another unit's state is just as off limits.
+- D9 **Tool refusals are traced as `blocked` with their reason; the turn-end cap counts only `turn_end` lines.** `blockedHookCount` filters on the fact's event. No trace schema change, and a refusal stays visible in the trace.
+- D10 **The session-start note** is added for any session source but start-up (Claude's compact, resume and clear; Codex's and Gemini's equivalents): the unit, the step, its reportable outcomes, the hard rules with their reasons, and "run `norn brief` for the rest". It needs a unit worktree with a loadable state at an agent step; otherwise allow.
+- D11 **The attended reminder** is one line added on each prompt only while the cursor is at an attended agent step: report `norn done` once the person agrees the work is finished, and ask in this session rather than with `norn ask`.
+- D12 **Refusals apply in attended and unattended steps alike**, need a loadable unit session, and fail open: any error in gathering facts or deciding answers allow.
+- D13 **Docs**: `docs/limitations.md`'s "No hard-deny hook" entry becomes "the hooks are a reminder, not a sandbox", naming what they miss (shell writes under run state, unlisted remote writes, other norn commands) as still forbidden by the brief. The exact-versus-principled rule goes into Development › Skills.
+- D14 **`norn-review`** is rewritten to the rule: it keeps the two axes, the traceability table, the findings JSON, the checks of blocking findings and `REVIEW.md`'s precedence, and turns its fixed subagent prompts and word caps into what each axis must cover and why. Any subagent that runs commands is given no push, no branch or worktree switch, no norn command and no writes under run state, each with its reason.
+- D15 **The skill lines dropped** are exactly: "never push" in `norn-implement` and `norn-merge` ("Commit locally" stays, as craft); "Never push." in `norn-diagnose`; "Never create or switch branches for it." in `norn-prototype`. No bundled skill names the mode.
+- D16 **`norn-retro`** gains a section after the friction: list the story's gate rulings (`approve` and `reject` comments with gate, round and words; delegated ones marked), ask which read as lasting, and propose for each a line for `REVIEW.md` (how code is judged) or the repo's agent instructions file (`AGENTS.md`, else `CLAUDE.md`, how agents work), naming the file, section, wording and source ruling; propose creating a missing file; cite an existing line instead of duplicating it. It still writes no file.
+- D17 **The before/after comparison** is QA by an agent: it runs the old and new `norn-review` on at least two past diffs from merged stories' delivery records — one whose review raised a blocking finding that held and was fixed in rework, one that review approved clean — and passes when the new skill raises the same defect on the first and no blocking finding on the second. Non-blocking differences are noted. Both outputs go in the step's evidence, and the PR's before/after evidence. Jakub reviews at the PR.
+
+### Testing decisions
+
+A good test drives the seam's public interface and asserts what an agent or the agent tool would see: the brief's text and JSON, the hook's answer, the bytes an adapter writes. Never the rules list's internals or the tokenizer directly; the tokenizer is covered through S2's answers on whole commands. Core's tests build session, fact and tool call from the existing fixtures and `@norn/schema` shapes. The git `rev-parse` result and the resolved run state path are facts passed into S2, so S2 needs no git or file system; S3 exercises them for real in the harness. The agent tools' payloads are a system boundary: S4 uses recorded fixtures, extended with PreToolUse, SessionStart and UserPromptSubmit payloads per tool. Brief snapshots change only for the intended Where you run and How to work text; review reads that snapshot diff. Skill text is pinned by terms, not whole files.
+
+### Risks
+
+- **Codex's and Gemini's hook outputs** for deny and added context are taken from their docs, not observed; a wrong shape is silently ignored (fail open), so the rule stays text-only there. The slice building S4 records real payloads where it can and says in the handoff which encodings are unobserved.
+- **False refusals** in the shell tokenizer (a `git push` inside a quoted string or a heredoc) block legitimate work. The tokenizer errs toward allow; S2's cases include quoted and compound commands.
+- **The trace's `blocked` lines** are read by more than the cap (silent classification, `norn run list`); a tool refusal traced `blocked` could be misread as a turn-end block. The slice changing the cap checks every reader of `blocked`.
+- **Hook latency**: the rev-parse call and realpath run on every matching tool call; both are bounded to the commands that need them.
