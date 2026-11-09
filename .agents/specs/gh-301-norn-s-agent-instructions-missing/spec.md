@@ -10,7 +10,7 @@ labels:
   - norn
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-11-09T09:31:42.577Z
 body_hash: 329716d682d106f375e4f1b9743bfca38b5fafbe9635e8350d56bb42bfb36e4b
 refined_body_hash: 329716d682d106f375e4f1b9743bfca38b5fafbe9635e8350d56bb42bfb36e4b
@@ -59,6 +59,13 @@ criteria:
   - { id: "10.AC2", verifier: test }
   - { id: "10.AC3", verifier: test }
   - { id: "10.AC4", verifier: agent }
+merge:
+  pr: 304
+  url: https://github.com/PruszynskiJakub/norn-next/pull/304
+  head_sha: 4446a756ed7e5f9611c4c1c325ce358fd0f38fc5
+  merge_commit_sha: 4a38640fc0d743147af3042e81ee27806fcfd255
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-09T10:54:46.000Z
 ---
 
 # norn's agent instructions: missing reasons, environment, precedence, repetition and preferences, and too much procedure
