@@ -31,9 +31,9 @@ After a session in a unit worktree is compacted, resumed or cleared, the hook ad
 
 - Rework 1: the attended note reports `norn done` or `norn stuck` plus the reminder's own line (`ATTENDED_LINE` in `packages/core/src/hook.ts`, shared by note and reminder). Review minors left as notes: no standing-report/parked guard on the note and reminder; reminder wording not shared with brief.ts; `norn hook` command summary stale.
 
-- `hookAnswer` sends events by kind: `session_start` → `sessionNote`, `turn_start` → `attendedReminder`, everything else → `turnEndBlock`. Slices 05 and 06 (refusals on `tool_use`) add their own branch here, so expect a small merge in `packages/core/src/hook.ts`.
+- Merge #1 (story branch into this slice): `hookAnswer` routes `session_start` → `sessionNote`, `turn_start` → `attendedReminder`, everything else → `runStateWriteDeny ?? turnEndBlock` (slice 06's run-state deny kept). `hook-answer.test.ts` keeps both sides' describe blocks. `bun run test` (1635 pass) and typecheck green at the merge commit.
 - Added context is never a `block`, so it never spends the turn-end cap.
 
 ### Resume
 
-Both blocking review findings are reworked and the suite is green; next is the slice's test check, then re-review.
+Merge with the story branch is committed; the next step is integrate taking this slice in.
