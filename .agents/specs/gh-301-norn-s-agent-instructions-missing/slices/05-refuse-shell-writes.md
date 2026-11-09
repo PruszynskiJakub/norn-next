@@ -1,8 +1,8 @@
 ---
 id: gh-301/05
 title: Hooks refuse pushes, branch switches and remote-changing gh/glab
-depends_on: [gh-301/01, gh-301/02]
-status: planned
+depends_on: [ gh-301/01, gh-301/02 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
