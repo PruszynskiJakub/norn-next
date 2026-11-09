@@ -412,8 +412,9 @@ describe("skills", () => {
     expect(text).not.toMatch(/\b(under|at most|within) \d+ words\b/i);
   });
 
-  test("norn-review gives a subagent that runs commands the rules its work can break, each with its reason", () => {
-    const text = readSkill("norn-review");
+  /** A subagent sees only what it is given, so one that runs commands needs each rule it could break, with the reason. */
+  const expectSubagentRules = (name: string) => {
+    const text = readSkill(name);
     const start = text.indexOf("**Subagents that run commands**");
     expect(start).toBeGreaterThan(-1);
     const rules = text.slice(start).split("\n\n")[0] as string;
@@ -422,6 +423,37 @@ describe("skills", () => {
       const line = rules.split("\n").find((l) => rule.test(l));
       expect(line).toMatch(/^\s*- .+ — .{20,}/);
     }
+  };
+
+  test("norn-review gives a subagent that runs commands the rules its work can break, each with its reason", () => {
+    expectSubagentRules("norn-review");
+  });
+
+  // Not every agent tool can start subagents, so each skill that uses them says how to do the work without.
+  test.each(["norn-review", "norn-qa", "norn-triage", "norn-diagnose"])("%s does the work itself when it cannot start subagents", (name) => {
+    expect(readSkill(name)).toMatch(/When you cannot start subagents, [^.\n]*yourself/);
+  });
+
+  test("norn-qa collects each independent criterion's evidence in its own subagent against one prepared environment", () => {
+    const text = readSkill("norn-qa");
+    // the main agent prepares once and writes the report; subagents write their criterion's evidence files
+    for (const s of ["its own subagent", "the environment you prepared", "You write the criteria report"]) expect(text).toContain(s);
+    // parallel only where criteria leave shared state alone
+    expect(text).toMatch(/in parallel only[^.\n]*shared state/);
+    expectSubagentRules("norn-qa");
+  });
+
+  test("norn-triage has a subagent read the code and bring back file:line usages and its conclusion, not the files", () => {
+    const text = readSkill("norn-triage");
+    expect(text).toMatch(/subagent[^\n]*`file:line` usages[^\n]*conclusion[^\n]*not the files/);
+  });
+
+  test("norn-diagnose explores the code in a subagent and may ask a fresh one, given only the loop and the symptom, for hypotheses", () => {
+    const text = readSkill("norn-diagnose");
+    expect(text).toMatch(/subagent[^\n]*code involved/);
+    expect(text).toMatch(/fresh subagent[^\n]*only the loop and the symptom/);
+    // the unanchored list comes before any hypothesis is tested
+    expect(text.indexOf("fresh subagent")).toBeLessThan(text.indexOf("## 4. Instrument"));
   });
 
   test("norn-retro lists the gate rulings after the friction and asks which read as a lasting preference", () => {

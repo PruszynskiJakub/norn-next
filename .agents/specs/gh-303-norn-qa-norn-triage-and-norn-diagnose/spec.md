@@ -8,6 +8,10 @@ title: norn-qa, norn-triage and norn-diagnose use subagents where they pay off
 assignee: PruszynskiJakub
 labels:
   - norn
+  - norn:kind:feature
+  - norn:priority:medium
+  - norn:risk:low
+  - norn:wf:quick
 workflow: quick
 status: active
 intake_at: 2026-11-09T11:32:10.430Z
