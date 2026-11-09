@@ -11,7 +11,7 @@ After a session in a unit worktree is compacted, resumed or cleared, the hook ad
 | AC3 | one reminder line on each prompt at an attended agent step; none at an unattended step | test | same file › "each prompt in an attended agent step carries one line…", "an unattended step, no loadable unit or a non-agent step add no line" |
 | AC4 | the hooks as `norn init` installs them return the note and the reminder, with no reinstall | test | `packages/cli/test/integration/agent-protocol.test.ts` › "attended steps never block" (integration tier, CI) |
 
-`bun run test` (1603 pass) and `bun run typecheck` are green after rework 1.
+`bun run test` (1603 pass) and `bun run typecheck` are green at review #2 (HEAD 24d80d0ee); the table was re-checked against each test.
 
 ### Easy to miss
 
@@ -26,6 +26,8 @@ After a session in a unit worktree is compacted, resumed or cleared, the hook ad
 - How Codex and Gemini encode added context comes from slice 02 and has not been seen on a real tool.
 
 ### Notes
+
+- Review #2: approve. Both blocking findings of review #1 are fixed (adapter parse tests pin Codex resume and Gemini resume/clear; the attended note offers `norn done` or `norn stuck` plus the shared attended line). Still open as notes for the person: no standing-report/parked guard on the note and reminder (`packages/core/src/hook.ts:76`); `norn hook` summary still reads "record a lifecycle fact; refuse an unreported turn end" (`packages/cli/src/commands/hook.ts:111`); `ATTENDED_LINE` is not shared with the brief's Where you run line.
 
 - Rework 1: the attended note reports `norn done` or `norn stuck` plus the reminder's own line (`ATTENDED_LINE` in `packages/core/src/hook.ts`, shared by note and reminder). Review minors left as notes: no standing-report/parked guard on the note and reminder; reminder wording not shared with brief.ts; `norn hook` command summary stale.
 
