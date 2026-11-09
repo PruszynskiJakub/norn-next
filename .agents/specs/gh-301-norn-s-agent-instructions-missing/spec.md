@@ -14,6 +14,51 @@ status: active
 intake_at: 2026-11-09T09:31:42.577Z
 body_hash: 329716d682d106f375e4f1b9743bfca38b5fafbe9635e8350d56bb42bfb36e4b
 refined_body_hash: 329716d682d106f375e4f1b9743bfca38b5fafbe9635e8350d56bb42bfb36e4b
+criteria:
+  - { id: "01.AC1", verifier: test }
+  - { id: "01.AC2", verifier: test }
+  - { id: "01.AC3", verifier: test }
+  - { id: "01.AC4", verifier: test }
+  - { id: "02.AC1", verifier: test }
+  - { id: "02.AC2", verifier: test }
+  - { id: "02.AC3", verifier: test }
+  - { id: "02.AC4", verifier: test }
+  - { id: "02.AC5", verifier: test }
+  - { id: "03.AC1", verifier: test }
+  - { id: "03.AC2", verifier: test }
+  - { id: "03.AC3", verifier: test }
+  - { id: "03.AC4", verifier: test }
+  - { id: "04.AC1", verifier: test }
+  - { id: "04.AC2", verifier: test }
+  - { id: "04.AC3", verifier: test }
+  - { id: "04.AC4", verifier: test }
+  - { id: "04.AC5", verifier: test }
+  - { id: "04.AC6", verifier: test }
+  - { id: "04.AC7", verifier: test }
+  - { id: "05.AC1", verifier: test }
+  - { id: "05.AC2", verifier: test }
+  - { id: "05.AC3", verifier: test }
+  - { id: "05.AC4", verifier: test }
+  - { id: "05.AC5", verifier: test }
+  - { id: "05.AC6", verifier: test }
+  - { id: "05.AC7", verifier: test }
+  - { id: "06.AC1", verifier: test }
+  - { id: "06.AC2", verifier: test }
+  - { id: "06.AC3", verifier: test }
+  - { id: "07.AC1", verifier: test }
+  - { id: "07.AC2", verifier: test }
+  - { id: "07.AC3", verifier: test }
+  - { id: "07.AC4", verifier: test }
+  - { id: "08.AC1", verifier: test }
+  - { id: "08.AC2", verifier: test }
+  - { id: "08.AC3", verifier: test }
+  - { id: "08.AC4", verifier: agent }
+  - { id: "09.AC1", verifier: test }
+  - { id: "09.AC2", verifier: test }
+  - { id: "10.AC1", verifier: test }
+  - { id: "10.AC2", verifier: test }
+  - { id: "10.AC3", verifier: test }
+  - { id: "10.AC4", verifier: agent }
 ---
 
 # norn's agent instructions: missing reasons, environment, precedence, repetition and preferences, and too much procedure
