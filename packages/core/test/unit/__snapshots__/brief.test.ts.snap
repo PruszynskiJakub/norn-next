@@ -5,6 +5,12 @@ exports[`renderBrief first run of implement 1`] = `
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
 
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
+
 ## Your work
 
 Use the \`implement\` skill.
@@ -65,6 +71,12 @@ exports[`renderBrief the step's description and instructions follow the skill un
 "# norn brief — gh-1/02 · implement #1
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -130,6 +142,12 @@ exports[`renderBrief rework after a failing check shows the output tail and log 
 "# norn brief — gh-1/02 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -221,6 +239,12 @@ exports[`renderBrief rework after review findings lists them 1`] = `
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
 
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
+
 ## Your work
 
 Use the \`implement\` skill.
@@ -310,7 +334,10 @@ exports[`renderBrief attended step with answers in context, manual downgrade, no
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
 
-**Attended step:** work with the person in this session, and report \`done\` only once they agree.
+## Where you run
+
+- A person works with you in this session: ask them here, not with \`norn ask\`, and report \`done\` only once they agree the work is finished.
+- Mode manual: the story asked for auto, but this machine has no runner, so nothing starts on its own: after your report, the next agent step waits for a person to start it.
 
 ## Your work
 
@@ -378,6 +405,12 @@ exports[`Rework only when sent back qa.fail without findings: the handoff verbat
 "# norn brief — gh-1/02 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -453,6 +486,12 @@ exports[`Rework only when sent back qa.fail with findings: criterion and repro, 
 "# norn brief — gh-1/02 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -533,6 +572,12 @@ exports[`Rework only when sent back gate reject with a comment: the comment verb
 "# norn brief — gh-1/02 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -615,6 +660,12 @@ exports[`Rework only when sent back gate reject without a comment says so and po
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
 
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
+
 ## Your work
 
 Use the \`implement\` skill.
@@ -695,6 +746,12 @@ exports[`Rework only when sent back review.approve → qa is forward: no Rework;
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
 
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
+
 ## Your work
 
 Use the \`qa\` skill.
@@ -769,6 +826,12 @@ exports[`Rework only when sent back integrate conflict → merge: the conflictin
 "# norn brief — gh-1/02 · merge #1
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -845,6 +908,12 @@ exports[`Checks since the last report review after a passing check lists it: ste
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
 
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
+
 ## Your work
 
 Use the \`review\` skill.
@@ -919,6 +988,12 @@ exports[`Re-entry, fresh sessions, handoff and criteria a second qa after the co
 "# norn brief — gh-1/02 · qa #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -1024,6 +1099,12 @@ exports[`Re-entry, fresh sessions, handoff and criteria a re-review that declare
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
 
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
+
 ## Your work
 
 Use the \`review\` skill.
@@ -1107,6 +1188,12 @@ exports[`Re-entry, fresh sessions, handoff and criteria implement's Rework sorts
 "# norn brief — gh-1/02 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -1195,6 +1282,12 @@ exports[`golden replays (norn-sandbox-todoist) gh-1 story: qa.fail with handoff 
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
 
+## Where you run
+
+- This step is unattended: norn does not count on a person reading this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode manual: after your report, the next agent step waits for a person to start it.
+
 ## Your work
 
 Use the \`implement\` skill.
@@ -1276,6 +1369,12 @@ exports[`golden replays (norn-sandbox-todoist) gh-2/03: human-qa.reject → impl
 "# norn brief — gh-2/03 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- This step is unattended: norn does not count on a person reading this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode manual: after your report, the next agent step waits for a person to start it.
 
 ## Your work
 

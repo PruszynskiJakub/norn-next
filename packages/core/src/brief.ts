@@ -9,6 +9,7 @@ import {
   type Mode,
   type OutcomeSpec,
   type Receipt,
+  type ResolvedConfig,
   outcomeEdge,
   parseDuration,
   receiptFileName,
@@ -26,13 +27,15 @@ import { HANDOFF_MAX_BYTES, HANDOFF_SECTIONS, handoffBytes, handoffCounters, han
 import { branchRewrittenLine, recordLostLine } from "./apply.ts";
 import { ruleWithReason } from "./hard-rules.ts";
 
+type Runner = ResolvedConfig["runner"]["adapter"];
+
 export interface BriefInput {
   unit: UnitRef;
   state: UnitState;
   workflow: Workflow;
   /** the story's mode and this machine's runner, for the effective mode */
   mode: Mode;
-  runner: string | null;
+  runner: Runner | null;
   /** absolute or repo-relative paths shown to the agent */
   paths: { worktree: string; spec_dir: string; story_file: string; slice_file: string | null; unit_dir: string };
   /** range for the `diff` input, e.g. `gh-123-login...HEAD` */
@@ -131,9 +134,13 @@ export interface BriefJson {
     /** counters at their max: one more send-back along their edge makes the unit stuck */
     at_limit: Array<{ name: string; value: number; max: number }>;
     last_outcome: string;
+    /** this step's effective mode */
     mode: Mode;
-    mode_note: string | null;
+    /** the story's mode, before an attended step or a missing runner made it manual */
+    mode_requested: Mode;
     attended: boolean;
+    /** this machine's runner; null when it has none */
+    runner: Runner | null;
     run_id: string | null;
   };
   /** why this run is not a first entry of the step; null when it is, or when Rework already says why */
@@ -250,7 +257,7 @@ export function renderBrief(input: BriefInput): Briefing {
 
 function where(input: BriefInput, step: AgentStep): BriefJson["where"] {
   const { state: st } = input;
-  const { mode, downgraded } = effectiveMode(input.mode, !!step.attended, input.runner);
+  const { mode } = effectiveMode(input.mode, !!step.attended, input.runner);
   return {
     story: st.story,
     slice: st.slice,
@@ -263,8 +270,9 @@ function where(input: BriefInput, step: AgentStep): BriefJson["where"] {
     }),
     last_outcome: handoffLastOutcome(st),
     mode,
-    mode_note: downgraded ? "auto requested, no runner; running manual" : null,
+    mode_requested: input.mode,
     attended: !!step.attended,
+    runner: input.runner,
     run_id: st.run?.run_id ?? null,
   };
 }
@@ -763,6 +771,30 @@ export function protocolLines(step: ProtocolStep): string[] {
 }
 
 /**
+ * Where you run: each line follows from one recorded fact (attended, runner, mode, mode_requested) and
+ * promises only what norn does; nobody answers an ask but a person.
+ */
+function whereYouRun(w: BriefJson["where"]): string[] {
+  const ask = "A question goes through `norn ask`, which parks the step until a person answers it.";
+  const out = w.attended
+    ? ["- A person works with you in this session: ask them here, not with `norn ask`, and report `done` only once they agree the work is finished."]
+    : [
+        w.runner
+          ? `- You run unattended in ${w.runner === "herdr" ? "a herdr pane" : "a headless session"}: no person reads this session. ${ask}`
+          : `- This step is unattended: norn does not count on a person reading this session. ${ask}`,
+        "- A permission prompt parks the step until a person answers it: prefer actions that need none.",
+      ];
+  // What the report sets off follows the story's mode and the runner: an attended step runs manual
+  // itself, yet the unattended step after it starts on its own in auto
+  const waits = "after your report, the next agent step waits for a person to start it.";
+  if (w.mode_requested === "auto" && w.runner)
+    out.push("- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.");
+  else if (w.mode_requested === "auto") out.push(`- Mode manual: the story asked for auto, but this machine has no runner, so nothing starts on its own: ${waits}`);
+  else out.push(`- Mode manual: ${waits}`);
+  return out;
+}
+
+/**
  * The brief, ordered for the reader: what to do and why this attempt, how to finish, then what to read
  * and the state behind it, the protocol, and only the limits that matter.
  */
@@ -772,8 +804,7 @@ function markdown(b: BriefJson): string {
   const unitKey = w.slice ?? w.story;
   out.push(`# norn brief — ${unitKey} · ${w.step} #${w.attempt}`, "");
   out.push("You do one step of a larger delivery and report how it ended, once; code decides what happens next.", "");
-  if (w.attended) out.push("**Attended step:** work with the person in this session, and report `done` only once they agree.", "");
-  if (w.mode_note) out.push(`Mode: ${w.mode} (${w.mode_note}).`, "");
+  out.push("## Where you run", "", ...whereYouRun(w), "");
   for (const c of w.at_limit) out.push(`**Last round on \`${c.name}\` (${c.value}/${c.max}):** if the work is sent back along it once more, the unit goes stuck.`, "");
 
   out.push("## Your work", "");
