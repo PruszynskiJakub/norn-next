@@ -12,7 +12,7 @@
 
 # The norn release this repo is set up for. Written by `norn upgrade` (and the release step); a
 # binary of another minor is refused on every command that acts.
-norn_version: 0.29.0
+norn_version: 0.30.0
 
 # Where stories come from: gh (GitHub) | glab (GitLab). Unset: read from the remote URL.
 # provider: gh
