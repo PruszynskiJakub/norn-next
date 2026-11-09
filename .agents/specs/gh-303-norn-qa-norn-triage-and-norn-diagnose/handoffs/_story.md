@@ -34,4 +34,4 @@ Tests in `packages/cli/test/unit/assets.test.ts`; `bun run test` (1730 pass) and
 
 ### Resume
 
-Review approved; the next step takes it from here.
+pr.md (spec folder) describes the branch: summary picture, test-based evidence per Wanted point (no QA ran), two-way door, blast radius agent runs. Next: norn opens the PR.
