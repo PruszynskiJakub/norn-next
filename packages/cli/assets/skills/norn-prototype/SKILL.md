@@ -41,7 +41,7 @@ Prototype: `<path>`. Question: <the question>. Verdict: <the answer, and why>.
 
 Never copy prototype code into the real code; whoever builds the decision writes it properly. Exception: a logic prototype's pure module, or a type or schema shape it settled, may be quoted in the plan.
 
-Then put back every real file the prototype edited, so nothing in the product reaches the prototype, and commit the prototype and the spec together on the branch you are on. Never create or switch branches for it.
+Then put back every real file the prototype edited, so nothing in the product reaches the prototype, and commit the prototype and the spec together on the branch you are on.
 
 ```sh
 git restore --source=HEAD --staged --worktree -- <real files the prototype edited>

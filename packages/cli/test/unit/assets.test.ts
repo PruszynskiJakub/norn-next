@@ -401,6 +401,55 @@ describe("skills", () => {
     expect(text).toContain("No findings.");
   });
 
+  test("norn-review keeps its contracts and gives its axes principles, not fixed prompts or word caps", () => {
+    const text = readSkill("norn-review");
+    // two axes, judged apart
+    for (const s of ["**Spec**", "**Standards**", "kept apart"]) expect(text).toContain(s);
+    // the findings JSON with its blocking flag
+    for (const s of ['"axis": "spec"', '"severity": "blocking"', "`severity`: `blocking` | `minor` | `nit`"]) expect(text).toContain(s);
+    // no word-for-word subagent prompt and no word cap
+    expect(prose(text)).not.toMatch(/"[^"\n]{100,}"/);
+    expect(text).not.toMatch(/\b(under|at most|within) \d+ words\b/i);
+  });
+
+  test("norn-review gives a subagent that runs commands the rules its work can break, each with its reason", () => {
+    const text = readSkill("norn-review");
+    const start = text.indexOf("**Subagents that run commands**");
+    expect(start).toBeGreaterThan(-1);
+    const rules = text.slice(start).split("\n\n")[0] as string;
+    // each rule is a bullet that says why after a dash
+    for (const rule of [/No push\b/, /No branch or worktree switch/, /No command of the delivery tool/, /No writes under (its|the delivery tool's) run state/]) {
+      const line = rules.split("\n").find((l) => rule.test(l));
+      expect(line).toMatch(/^\s*- .+ — .{20,}/);
+    }
+  });
+
+  test("norn-retro lists the gate rulings after the friction and asks which read as a lasting preference", () => {
+    const text = readSkill("norn-retro");
+    const section = text.indexOf("## 3. Propose lasting preferences");
+    expect(section).toBeGreaterThan(text.indexOf("## 2. Find the friction"));
+    const terms = ["`approve` and `reject`", "the gate, the round", "the person's words", "`delegated: true`", "mark it delegated", "which read as a lasting preference"];
+    expect(terms.filter((t) => !text.slice(section).includes(t))).toEqual([]);
+  });
+
+  test("norn-retro proposes a REVIEW.md or agent instructions line naming file, section, wording and ruling", () => {
+    const text = readSkill("norn-retro");
+    const terms = [
+      "`REVIEW.md`", "how code is judged", "`AGENTS.md`", "else `CLAUDE.md`", "how agents work",
+      "**File**", "**Section**", "**Wording**", "**Ruling**",
+      // a missing target file is proposed for creation; a preference already stated is cited, not duplicated
+      "propose creating it", "cite that line as evidence", "never propose a duplicate",
+    ];
+    expect(terms.filter((t) => !text.includes(t))).toEqual([]);
+  });
+
+  test("norn-retro changes no file", () => {
+    const text = readSkill("norn-retro");
+    expect(text).toContain("changes no file");
+    expect(text).toContain("You write no file and change nothing");
+    expect(text).toContain("Do not write it to a file, and do not apply any change");
+  });
+
   test.each(CRAFT)("%s is unaware of norn", (name) => {
     // skill names carry the `norn-` prefix; any other mention of norn is a leak
     const text = readSkill(name).replace(/\bnorn-[a-z-]+/g, "");
@@ -427,6 +476,25 @@ describe("skills", () => {
         for (const [re, say] of BANNED) if (re.test(line)) hits.push(`${name}:${i + 1} → say ${say}: ${line.trim()}`);
       });
     expect(hits).toEqual([]);
+  });
+
+  // The brief's How to work forbids pushes and branch switches for every step, so a skill repeating it can only drift from it.
+  test("skills leave the push and branch rules to the brief, keeping committing locally as craft", () => {
+    expect(readSkill("norn-implement")).not.toMatch(/never push/i);
+    expect(readSkill("norn-merge")).not.toMatch(/never push/i);
+    expect(readSkill("norn-diagnose")).not.toMatch(/Never push\./);
+    expect(readSkill("norn-prototype")).not.toMatch(/Never create or switch branches for it\./);
+    expect(readSkill("norn-implement")).toMatch(/- Commit locally\.\n/);
+    expect(readSkill("norn-merge")).toMatch(/both sides' intended behaviour survives\. Commit locally\.\n/);
+    expect(readSkill("norn-diagnose")).toMatch(/is in the commit message \(or in your hand-back\)\.\n/);
+    expect(readSkill("norn-prototype")).toMatch(/commit the prototype and the spec together on the branch you are on\.\n/);
+  });
+
+  // The brief alone adapts a step to the story's mode; the supervisors set it only through the `--auto`/`--manual` flags.
+  test.each(SKILLS)("%s names no mode", (name) => {
+    const text = readSkill(name).replace(/--(auto|manual)\b/g, "");
+    expect(text).not.toMatch(/\b(auto|manual)\b[ -]*(mode|step|story|stories)\b/i);
+    expect(text).not.toMatch(/\bmode\b[^.\n]{0,30}\b(auto|manual)\b/i);
   });
 });
 

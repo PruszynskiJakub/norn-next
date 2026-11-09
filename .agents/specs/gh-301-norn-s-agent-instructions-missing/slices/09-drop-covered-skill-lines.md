@@ -2,7 +2,7 @@
 id: gh-301/09
 title: Bundled skills drop the protocol lines the brief covers
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

@@ -16,6 +16,8 @@ export interface HookAnswerInput {
   fact: HookFact;
   toolCall: ToolCall | null;
   adapter: Pick<AgentAdapter, "name" | "tier" | "hookEvents">;
+  /** a file write's paths resolved for real, and the checkout's run state folder resolved the same way */
+  fileWrite?: { paths: string[]; runStateDir: string } | null;
 }
 
 const ALLOW: HookAnswer = { kind: "allow" };
@@ -99,8 +101,20 @@ function attendedReminder({ session: s, fact }: HookAnswerInput): HookAnswer {
   };
 }
 
+const under = (dir: string, p: string): boolean => p === dir || p.startsWith(dir.endsWith("/") ? dir : `${dir}/`);
+
+/**
+ * Deny a file-tool write landing in any unit's run state, attended or not. Only a file tool's write
+ * is judged: a shell command's writes cannot be read reliably, and a read harms nothing.
+ */
+function runStateWriteDeny({ session, toolCall, fileWrite }: HookAnswerInput): HookAnswer | null {
+  if (!session || toolCall?.kind !== "file_write" || !fileWrite) return null;
+  const hit = fileWrite.paths.find((p) => under(fileWrite.runStateDir, p));
+  return hit ? { kind: "deny", reason: `norn: \`${hit}\` is norn's run state. ${ruleWithReason("no-run-state")}` } : null;
+}
+
 export function hookAnswer(input: HookAnswerInput): HookAnswer {
   if (input.fact.event === "session_start") return sessionNote(input);
   if (input.fact.event === "turn_start") return attendedReminder(input);
-  return turnEndBlock(input);
+  return runStateWriteDeny(input) ?? turnEndBlock(input);
 }

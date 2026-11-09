@@ -143,6 +143,7 @@ norn develops norn. The person's side of the loop is in [`CONTRIBUTING.md`](../C
 
 - **Bundled skills.** `.agents/skills/norn*` are copies written by `norn init`: edit the source in `packages/cli/assets/skills/`, never the copy.
 - **Repo-local skills.** Skills without the `norn-` prefix (`release`, `release-start`, `issue`) are repo-local: edit them in place in `.agents/skills/<name>/SKILL.md` (linked from `.claude/skills/<name>`). `issue` and `release-start` are person-only (`disable-model-invocation: true`); an agent never runs them.
+- **Exact or principled.** A bundled skill is exact in two places only: where code reads what the agent produces (report outcomes, the criteria and findings JSON, a file's fixed layout), because a reworded field breaks the reader; and where it is tuned to the agent tool (such as `norn-fsd-round`'s timeouts), because the number comes from how the tool behaves, not from judgement. Everywhere else a skill states the failure it prevents and the outcome to reach, and gives principles with their reasons, so the model can fit the work to the change in front of it; it keeps numbered steps only where order matters (check earlier findings before the diff, verify a finding before deciding). A fixed prompt to paste into a subagent or a word cap is procedure in place of judgement: say what the subagent must cover and why instead.
 - **The `norn` skill** stays short and holds no workflow logic or step names: the brief carries the process, step skills carry the craft.
 
 ## Releases

@@ -130,3 +130,41 @@ describe("hookAnswer: the attended reminder", () => {
     expect(ask({ session: session({ step: "test", status: "running" }), fact: PROMPT })).toEqual({ kind: "allow" });
   });
 });
+
+describe("hookAnswer: file-tool writes under run state", () => {
+  const RUNS = "/home/me/.norn/repos/abc/runs";
+  const PRE: HookFact = { ...STOP, event: "tool_use", native: "PreToolUse" };
+  const write = (...paths: string[]): Partial<HookAnswerInput> => ({ fact: PRE, toolCall: { kind: "file_write", paths }, fileWrite: { paths, runStateDir: RUNS } });
+  const REASON = "a hand-edited file fails validation and makes the unit `corrupt`";
+
+  test("a write resolving under the checkout's runs/ folder, this unit's or another's, is denied with the corrupt reason", () => {
+    for (const p of [`${RUNS}/gh-1/01-a/state.json`, `${RUNS}/gh-7/_story/receipts/0001.json`, `${RUNS}/new.json`]) {
+      const answer = ask(write("/repo/.worktrees/gh-1/src/a.ts", p));
+      expect(answer.kind).toBe("deny");
+      expect(answer.kind === "deny" && answer.reason).toContain(REASON);
+      expect(answer.kind === "deny" && answer.reason).toContain(p);
+    }
+  });
+
+  test("it is denied in attended steps too, and every time it is retried", () => {
+    const story = storyUnit("gh-2");
+    const s: AgentUnit = { unit: story, state: stateFor(story, STORY_WF, { step: "refine", status: "running", run: { ...RUN, step: "refine" } }), workflow: STORY_WF, receipts: [], unapplied: [] };
+    const input = { session: s, ...write(`${RUNS}/gh-2/_story/state.json`) };
+    expect(ask(input).kind).toBe("deny");
+    expect(ask(input).kind).toBe("deny");
+  });
+
+  test("a write elsewhere, or beside the folder under a name that only starts like it, is allowed", () => {
+    expect(ask(write("/repo/.worktrees/gh-1/src/a.ts"))).toEqual({ kind: "allow" });
+    expect(ask(write(`${RUNS}-old/state.json`, "/home/me/.norn/repos/abc/heartbeat.json"))).toEqual({ kind: "allow" });
+  });
+
+  test("a read or a shell command under run state is not inspected", () => {
+    expect(ask({ fact: PRE, toolCall: null })).toEqual({ kind: "allow" });
+    expect(ask({ fact: PRE, toolCall: { kind: "shell", command: `echo x > ${RUNS}/gh-1/01-a/state.json` } })).toEqual({ kind: "allow" });
+  });
+
+  test("outside a loadable unit it allows", () => {
+    expect(ask({ session: null, ...write(`${RUNS}/gh-1/01-a/state.json`) })).toEqual({ kind: "allow" });
+  });
+});
