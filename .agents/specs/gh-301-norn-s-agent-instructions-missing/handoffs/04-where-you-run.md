@@ -33,7 +33,8 @@ Snapshots in `__snapshots__/brief.test.ts.snap` change only by the new section a
 - No schema or doc describes the `--json` brief's `where`, so no `schema:emit` / `docs:emit` was needed.
 - The at-limit counter line stays between the opening and Your work (D2), so it now renders under the Where you run section.
 - "Mode auto: … starts the next step at once" is not literal when the next step is attended or `max_agents` is full; left as the spec words it.
+- Merge #1 took in the story branch with a merge (no rebase): its only conflict was `packages/core/test/unit/brief.test.ts`, where this slice's "Where you run" describe block and the story's "How to work outranks any skill and reaches subagents" block were added at the same spot; both kept, one after the other. Snapshots auto-merged. `bun run test` (1570 pass) and `bun run typecheck` green after the merge.
 
 ## Resume
 
-Review #1 approved; the next step follows from the workflow (QA or the next slice).
+Merge #1 resolved the integrate conflict; integrate takes the slice in by a merge next.
