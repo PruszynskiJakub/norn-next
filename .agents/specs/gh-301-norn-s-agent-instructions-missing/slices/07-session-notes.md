@@ -2,7 +2,7 @@
 id: gh-301/07
 title: Hooks re-orient after compaction and remind attended steps
 depends_on: [ gh-301/01, gh-301/02 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
