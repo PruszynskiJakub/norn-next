@@ -1,14 +1,15 @@
 /**
  * Gemini CLI agent adapter (`blocking` tier). Hooks share Claude Code's shape and live in
  * `<repo>/.gemini/settings.json`. `AfterAgent` is the turn end; `{"decision":"deny","reason":…}`
- * makes Gemini retry the turn with `reason` as the prompt. See geminicli.com/docs/hooks.
+ * makes Gemini retry the turn with `reason` as the prompt; on BeforeTool it refuses the call, and
+ * SessionStart and BeforeAgent take `additionalContext`. See geminicli.com/docs/hooks.
  */
 import { join } from "node:path";
-import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookDecision, HookResponse } from "@norn/core";
+import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookAnswer, HookResponse, ToolCall } from "@norn/core";
 import type { HookEventKind, HookFact } from "@norn/schema";
 import * as shared from "../agent-hooks/index.ts";
 
-const { buildFact, field, isObject, jsonHookInstaller, kebab, launchEnv, nativeEvent, objField, readJsonFile, readJsonl, textOf } = shared;
+const { buildFact, contextOutput, field, fileWrite, isObject, jsonHookInstaller, jsonResponse, kebab, launchEnv, nativeEvent, objField, pendingTool, readJsonFile, readJsonl, shellCall, textOf } = shared;
 const NAME = "gemini";
 
 export const hookEvents = {
@@ -66,11 +67,21 @@ export function parseHookEvent(arg: string, payload: unknown, env: Record<string
 }
 
 /** Gemini expects JSON-only stdout; `{}` = no opinion. */
-export function hookResponse(fact: HookFact, decision: HookDecision): HookResponse {
-  if (fact.event === "turn_end" && decision.block) {
-    return { stdout: `${JSON.stringify({ decision: "deny", reason: decision.reason ?? "Report with norn done/ask/stuck before ending the turn." })}\n`, exit_code: 0 };
-  }
+export function hookResponse(fact: HookFact, answer: HookAnswer): HookResponse {
+  const native = fact.native;
+  if (answer.kind === "block" && fact.event === "turn_end" && native === "AfterAgent") return jsonResponse({ decision: "deny", reason: answer.reason });
+  if (answer.kind === "deny" && native === "BeforeTool") return jsonResponse({ decision: "deny", reason: answer.reason });
+  if (answer.kind === "context" && (native === "SessionStart" || native === "BeforeAgent")) return jsonResponse(contextOutput(native, answer.text));
   return { stdout: "{}\n", exit_code: 0 };
+}
+
+const FILE_TOOLS = new Set(["write_file", "replace"]);
+
+export function toolCall(native: string, payload: unknown): ToolCall | null {
+  const call = pendingTool(native, payload, "BeforeTool");
+  if (!call) return null;
+  if (call.tool === "run_shell_command") return shellCall(call.input);
+  return FILE_TOOLS.has(call.tool) ? fileWrite(call.input, ["file_path"]) : null;
 }
 
 /** Interactive `gemini -i "<prompt>"` (prompt then stay interactive); headless `gemini -p`; resume `--resume <id>`. */
@@ -108,6 +119,7 @@ export const geminiAgent: AgentAdapter = {
   ...jsonHookInstaller(NAME, settingsPath, hookSpecs),
   parseHookEvent,
   hookResponse,
+  toolCall,
   skillDir,
   launchCommand,
   lastAssistantMessage,

@@ -392,10 +392,13 @@ export function unitHooksChangedAt(root: string, unit: HookUnit): number | null 
   }
 }
 
-/** Hook events of `runId` that norn blocked, counted in its unit's hooks since the day the run began. */
+/**
+ * Turn ends of `runId` that norn blocked, counted in its unit's hooks since the day the run began.
+ * A refused tool call is traced `blocked` too, but only turn-end blocks are capped.
+ */
 export function blockedHookCount(root: string, unit: HookUnit, runId: string): number {
   const day = new Date(ulidTime(runId)).toISOString().slice(0, 10);
-  return (readUnitHooks(root, [unit], day)[0] ?? []).filter((e) => e.blocked && e.fact.run_id === runId).length;
+  return (readUnitHooks(root, [unit], day)[0] ?? []).filter((e) => e.blocked && e.fact.event === "turn_end" && e.fact.run_id === runId).length;
 }
 
 /** One day of the trace: its day file and, where present, its chunks file (trace-relative, sorted). */

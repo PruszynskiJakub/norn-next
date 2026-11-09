@@ -372,7 +372,20 @@ describe("attended steps never block", () => {
     expect(b?.value).toMatchObject({ unit: "gh-10", step: "refine", started: true });
     const started = receipts(pairRuns()).filter((f) => f.endsWith("-started.json"));
     expect(readReceipt(pairRuns(), started.at(-1) as string)).toMatchObject({ kind: "started", agent_session_id: "sess-pair", worktree: pairWt() });
-    expect((b?.value as { markdown: string }).markdown).toContain("**Attended step:** work with the person in this session, and report `done` only once they agree.");
+    expect((b?.value as { markdown: string }).markdown).toContain("## Where you run\n\n- A person works with you in this session: ask them here, not with `norn ask`, and report `done` only once they agree the work is finished.");
+    // The hooks as `norn init` installed them carry the session-start note and the attended reminder
+    const settings = JSON.parse(h.read(join(h.root, ".claude/settings.json"))) as { hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>> };
+    const installed = (native: string) => (/^norn hook (\S+) /.exec(settings.hooks[native]?.[0]?.hooks[0]?.command ?? "") ?? [])[1] as string;
+    const context = (r: CliResult) => (r.value as { hookSpecificOutput?: { additionalContext?: string } }).hookSpecificOutput?.additionalContext ?? "";
+    const prompt = await hook(pairWt(), installed("UserPromptSubmit"), { session_id: "sess-pair", prompt: "looks good" }, "--agent", "claude");
+    expect(context(prompt)).toBe("norn: report `norn done` only once the person agrees the work is finished, and ask in this session rather than with `norn ask`.");
+    const compact = await hook(pairWt(), installed("SessionStart"), { session_id: "sess-pair", source: "compact" }, "--agent", "claude");
+    expect(context(compact)).toContain("norn: this session works step refine of gh-10.");
+    expect(context(compact)).toContain("Run `norn brief` for the rest.");
+    expect((await hook(pairWt(), installed("SessionStart"), { session_id: "sess-pair", source: "startup" }, "--agent", "claude")).value).toEqual({});
+    // gh-9 waits at its sign-off gate: no agent step, so neither a note nor a reminder
+    expect((await hook(wt(), installed("SessionStart"), { session_id: "sess-1", source: "resume" }, "--agent", "claude")).value).toEqual({});
+    expect((await hook(wt(), installed("UserPromptSubmit"), { session_id: "sess-1", prompt: "hi" }, "--agent", "claude")).value).toEqual({});
     expect((await stop(pairWt(), "sess-pair")).value).toEqual({});
     h.clock.advance(10_000);
     await h.tick();

@@ -325,3 +325,32 @@ describe("commands and flags the docs name exist (B35)", () => {
     expect(mentions.length).toBeGreaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------------------- limitations
+
+describe("limitations: the hooks entry", () => {
+  test("says the hooks are a reminder, not a sandbox, and names what they miss as still forbidden by the brief", () => {
+    const entry = read(join(ROOT, "docs", "limitations.md"))
+      .split("\n")
+      .find((l) => l.includes("The hooks are a reminder, not a sandbox"));
+    expect(entry).toBeDefined();
+    const text = entry as string;
+    expect(text).toContain("no security boundary");
+    expect(text).toContain("still forbidden by the brief");
+    expect(text).toContain("shell writes under norn's run state");
+    expect(text).toContain("remote writes not on its list");
+    expect(text).toMatch(/every norn command but `brief`, `done`, `ask` and `stuck`/);
+  });
+});
+
+describe("Development › Skills", () => {
+  test("says when a bundled skill is exact and when it gives principles", () => {
+    const dev = read(join(ROOT, "docs", "development.md"));
+    const skills = dev.slice(dev.indexOf("## Skills"), dev.indexOf("\n## ", dev.indexOf("## Skills") + 1));
+    // exact where code reads what the agent produces, or where the text is tuned to the agent tool
+    expect(skills).toMatch(/\*\*Exact or principled\.\*\*/);
+    for (const s of ["code reads what the agent produces", "report outcomes", "criteria and findings JSON", "tuned to the agent tool", "`norn-fsd-round`'s timeouts"]) expect(skills).toContain(s);
+    // everywhere else: the failure prevented, the outcome to reach, principles with reasons, steps only where order matters
+    for (const s of ["the failure it prevents", "the outcome to reach", "principles with their reasons", "numbered steps only where order matters"]) expect(skills).toContain(s);
+  });
+});

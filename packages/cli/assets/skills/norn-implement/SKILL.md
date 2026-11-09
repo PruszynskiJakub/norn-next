@@ -22,6 +22,6 @@ Without this, code lands before its test, rework gets patched without a test tha
 
 - Stay inside the criteria and rework points. Note anything else you spot instead of changing it.
 - If a criterion is ambiguous or contradicts the code, stop and name the decision needed rather than guessing.
-- Commit locally; never push.
+- Commit locally.
 
 Done when every behaviour change (criterion or rework point) has a passing test at an agreed or fallback seam that would fail without it, the type check, linters and fast suite are green (slower tiers run in their own check), the work is committed, and the diff holds nothing unrelated.
