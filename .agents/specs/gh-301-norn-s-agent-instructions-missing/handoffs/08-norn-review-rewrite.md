@@ -17,7 +17,7 @@ Development › Skills states when a bundled skill is exact and when it gives pr
 
 ## Not proven yet
 
-- AC4 is judged by Jakub at the PR from the evidence (D17).
+- AC4 (the rewrite loses nothing on past diffs) as worded is **not met, by either version**: re-run blind, the old and the new skill both missed gh-249's original blocking defect (GitLab draft MRs lose draft status on retitle) and both raised a blocking finding on gh-273, which originally passed clean (a `#` line inside a fenced code block in Progress ends the section, shown by a probe). Against the old skill the new one loses nothing: every blocking finding it raised, the old one raised too; the old one's two extra blocking findings are an untested Wanted item (gh-249) and issue numbers in comments (gh-273, which does not hold at that head). Full table: evidence `comparison.md`. Jakub judges at the PR (D17); a person may want a third diff or a second sample.
 
 ## Notes
 
