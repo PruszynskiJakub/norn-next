@@ -56,7 +56,7 @@ Three things decide where a person comes in:
 
 - An **attended step** (`attended: true`, such as refine and plan) is an agent step done *with* a person in the agent's pane. A person always starts it.
 - A **gate** is a step with no agent: a person approves it or rejects it with what to change. The `ready` gate at the end of a delivery workflow is where you look at the PR before you merge it.
-- The **mode** of a story says who starts its other agent steps. In **manual** mode (the default) the inbox shows the step as ready and how to start it. In **auto** mode norn starts the agent itself through the runner it detects: Herdr when norn runs inside Herdr or `herdr` is installed, otherwise headless. A story's mode is, nearest first: its own (`norn story edit <story> --auto|--manual` switches it), its workflow's `mode`, `mode` in your local or user config, then `manual`.
+- The **mode** of a story says who starts its other agent steps. In **manual** mode (the default) the inbox shows the step as ready and how to start it. In **auto** mode norn starts the agent itself through the runner it detects: Herdr when norn runs inside Herdr or `herdr` is installed, otherwise headless. A story's mode is, nearest first: its own (`norn story edit <story> --auto|--manual` switches it), its workflow's `mode`, `mode` in your local or user config, then `manual`. The mode decides only who starts an agent step: in either mode the heartbeat ([One tick](#one-tick)) moves every step on, so an agent's `norn done` changes nothing until a tick applies it.
 
 `check` and `git` steps always run on their own. Gates and attended steps always wait for a person, in either mode.
 
