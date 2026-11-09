@@ -4,16 +4,19 @@ Every brief opens, right after its opening line, with a "Where you run" section 
 
 ## Proof
 
-All in `packages/core/test/unit/brief.test.ts` › "Where you run: the brief's situation, from the facts norn records" (each went red before the code):
-- Where you run opens every brief, before Your work (AC1) › "opens every brief: right after the opening line, before Your work"
-- attended: person here, ask here, done once they agree; banner gone; no permission line (AC2) › "attended: …"
-- unattended: runner named (herdr pane / headless / none), nobody reads this session, `norn ask` parks the step, permission prompt parks the step (AC3) › "unattended: …"
-- auto: report starts the next step at once, handoff must stand alone; manual: next agent step waits for a person (AC4) › "auto: … manual: …"
-- auto asked, no runner: runs manual and why; no "Mode: …" line (AC5) › "auto asked with no runner: …"
-- `--json` `where` has `attended`, `mode`, `mode_requested`, `runner`, no `mode_note` (AC6) › "the --json brief carries the facts only: …"
-- every combination of attended × mode × runner: one line per fact, none promises a supervisor (AC7) › "every combination: …"
-- Snapshots in `__snapshots__/brief.test.ts.snap` changed only by the new section and the removed banner.
-- `bun run test` (1566 pass) and `bun run typecheck` green.
+Review #1 traceability (tests read and seen asserting each item):
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | Where you run follows the opening line, before Your work, in every brief | test | `packages/core/test/unit/brief.test.ts` › "Where you run: …" › "opens every brief: right after the opening line, before Your work" |
+| AC2 | attended: person here, ask here, `done` once they agree; Attended banner gone | test | `packages/core/test/unit/brief.test.ts` › "Where you run: …" › "attended: the person is here, ask here, done once they agree; no banner and no permission line" |
+| AC3 | unattended: runner named, nobody reads this session, `norn ask` parks the step, permission prompt parks it; none when attended | test | `packages/core/test/unit/brief.test.ts` › "Where you run: …" › "unattended: names the runner, …" and "attended: …" (no permission line) |
+| AC4 | auto: report starts next step, handoff stands alone; manual: next step waits for a person | test | `packages/core/test/unit/brief.test.ts` › "Where you run: …" › "auto: the report starts the next step at once …; manual: …" |
+| AC5 | auto asked, no runner: runs manual, why, what it means; no "Mode: …" line | test | `packages/core/test/unit/brief.test.ts` › "Where you run: …" › "auto asked with no runner: …" |
+| AC6 | `--json` `where` has `attended`, `mode`, `mode_requested`, `runner`; no `mode_note` | test | `packages/core/test/unit/brief.test.ts` › "Where you run: …" › "the --json brief carries the facts only: …" |
+| AC7 | every attended × mode × runner combination: each line from one fact, no supervisor promise | test | `packages/core/test/unit/brief.test.ts` › "Where you run: …" › "every combination: each line follows from one fact, …" |
+
+Snapshots in `__snapshots__/brief.test.ts.snap` change only by the new section and the removed banner (review read the diff). `bun run test` (1566 pass) and `bun run typecheck` green at review.
 
 ## Easy to miss
 
@@ -33,4 +36,4 @@ All in `packages/core/test/unit/brief.test.ts` › "Where you run: the brief's s
 
 ## Resume
 
-Nothing left in this slice; the next step is review.
+Review #1 approved; the next step follows from the workflow (QA or the next slice).
