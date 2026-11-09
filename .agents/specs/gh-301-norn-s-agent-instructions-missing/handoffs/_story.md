@@ -32,4 +32,4 @@ Close the seven gaps in norn's agent instructions: reasons for How to work's rul
 
 ## Resume
 
-A person judges the norn-review before/after comparison (QA evidence `08-AC4.md`) and confirms the two wording notes; then the story goes on to its PR.
+pr.md in the spec folder describes the branch at its current head, one evidence entry per user story from QA #1. At the PR, Jakub judges the norn-review before/after (`08-AC4.md`), the attended stop row and the "No command of the delivery tool" wording; the AGENTS.md retro proposal was not exercised in a run.
