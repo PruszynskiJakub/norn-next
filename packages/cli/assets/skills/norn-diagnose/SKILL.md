@@ -64,4 +64,4 @@ Pick a **correct seam**: one where a test replays the bug as it occurs at the ca
 2. Fix the confirmed cause, not the symptom; one cause per fix.
 3. Watch the test pass, then re-run the phase 1 loop on the original, unminimised scenario.
 
-Done when the original loop no longer goes red, the regression test passes (or the missing seam is written down), `grep -r '\[DEBUG-'` finds nothing, throwaway harnesses are deleted, and the confirmed hypothesis is in the commit message (or in your hand-back). Never push.
+Done when the original loop no longer goes red, the regression test passes (or the missing seam is written down), `grep -r '\[DEBUG-'` finds nothing, throwaway harnesses are deleted, and the confirmed hypothesis is in the commit message (or in your hand-back).

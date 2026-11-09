@@ -27,14 +27,15 @@ Review #2 traceability (current HEAD; unit tier and typecheck green):
 - A heredoc (`<<`) or unterminated quote makes the whole command unreadable: allowed.
 
 ## Not proven yet
-- The new integration file has not been run locally (the brief forbids the integration tier before hand-back); CI runs it.
+- The new integration files (this slice's `hook-refusals.test.ts`, and the base's `hook-run-state-writes.test.ts` alongside it after the merge) have not been run locally (the brief forbids the integration tier before hand-back); CI runs it.
 
 ## Notes
 - Tokenizer and refusal list live in `packages/core/src/shell-refusals.ts`, tested only through `hookAnswer`. `(`, `)` and backticks split segments too, so `$(git push)` is refused (it would push).
 - Deny reason: "norn refused this call. <rule>: <reason>; if you want this pushed, run it yourself." built from the hard rules list.
 - glab's write sets extend gh's verbs (so the `comment` alias of `glab mr note` stays refused) plus note/update, and approve/revoke on `mr`: `ISSUE_WRITES` per tool and group.
 - Review #1's notes left for later, not fixed in rework (checkout `-- -b` refused, rev-parse timeout drops the trace line, `--git-dir x`/`gh pr --repo x` slip through, duplicated checkout parsing, cap test order, direct `checkoutNames` asserts).
+- Merge with the story branch (slices 06 run-state file-write deny, 07 session notes/attended reminder): core `hookAnswer` is session_start → note, turn_start → reminder, else `toolRefusal ?? runStateWriteDeny ?? turnEndBlock`; the cli passes both `commits` (rev-parse, only with a session) and `fileWrite`. The limitations hooks entry now also names the file-tool run-state refusal. The two deny reasons keep their own formats (this slice's "norn refused this call…" with a hint, 06's path + `ruleWithReason`).
 - Readers of `blocked` trace lines: only `blockedHookCount` (now turn_end only) and the timeline display, which shows the refusal reason.
 
 ## Resume
-Rework done; next is the test check and review. If review sends it back, start from its findings.
+Merge done and committed; next is integrate. If it conflicts again, merge the story branch in again (never rebase).

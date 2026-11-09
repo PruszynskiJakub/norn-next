@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { HookFact, UnitState, UnitStateRecord } from "@norn/schema";
 import type { AgentUnit } from "../../src/agent-unit.ts";
+import { HARD_RULES, ruleWithReason } from "../../src/hard-rules.ts";
 import type { NumberedReceipt } from "../../src/facts.ts";
 import { type HookAnswerInput, hookAnswer } from "../../src/hook.ts";
 import { at, numbered, receipt, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyUnit } from "../fixtures.ts";
@@ -65,5 +66,105 @@ describe("hookAnswer: the turn-end block", () => {
     expect(ask({ fact: { ...STOP, event: "tool_use", native: "PreToolUse" } })).toEqual({ kind: "allow" });
     expect(ask({ fact: { ...STOP, agent: "codex" } })).toEqual({ kind: "allow" });
     expect(ask({ adapter: { ...CLAUDE, tier: "hooks" } })).toEqual({ kind: "allow" });
+  });
+});
+
+const SESSION_START: HookFact = { event: "session_start", at: at(), agent: "claude", native: "SessionStart", cwd: "/repo/.worktrees/gh-1", message: "compact" };
+const PROMPT: HookFact = { event: "turn_start", at: at(), agent: "claude", native: "UserPromptSubmit", cwd: "/repo/.worktrees/gh-1", message: "go on" };
+const attendedSession = (): AgentUnit => {
+  const story = storyUnit("gh-2");
+  return { unit: story, state: stateFor(story, STORY_WF, { step: "refine", status: "running", run: { ...RUN, step: "refine" } }), workflow: STORY_WF, receipts: [], unapplied: [] };
+};
+const contextOf = (a: ReturnType<typeof hookAnswer>): string => (a.kind === "context" ? a.text : "");
+
+describe("hookAnswer: the session-start note", () => {
+  test.each(["compact", "resume", "clear"])("a session started from %s is re-oriented: unit, step, outcomes, every hard rule with its reason", (source) => {
+    const text = contextOf(ask({ fact: { ...SESSION_START, message: source } }));
+    expect(text).toContain("gh-1/01");
+    expect(text).toContain("step implement");
+    expect(text).toContain('`norn done <done> --handoff "…"`');
+    expect(text).toContain('`norn ask "<question>"`');
+    expect(text).toContain('`norn stuck "<reason>"`');
+    for (const r of HARD_RULES) expect(text).toContain(ruleWithReason(r.id));
+    expect(text).toContain("Run `norn brief` for the rest.");
+  });
+
+  test("Codex's and Gemini's session starts from resume or clear are re-oriented the same way", () => {
+    for (const agent of ["codex", "gemini"]) expect(contextOf(ask({ fact: { ...SESSION_START, agent, message: "resume" } }))).toContain("step implement of gh-1/01");
+    expect(contextOf(ask({ fact: { ...SESSION_START, agent: "gemini", message: "clear" } }))).toContain("Run `norn brief` for the rest.");
+  });
+
+  test("a review step's note names the outcomes it can report", () => {
+    const text = contextOf(ask({ session: session({ step: "review", status: "running", run: { ...RUN, step: "review" } }), fact: SESSION_START }));
+    expect(text).toContain('`norn done <approve|changes_requested> --handoff "…"`');
+  });
+
+  test("an attended step is re-oriented too", () => {
+    const text = contextOf(ask({ session: attendedSession(), fact: SESSION_START }));
+    expect(text).toContain("step refine of gh-2");
+    expect(text).not.toContain("`norn ask \"<question>\"`");
+    expect(text).toContain("ask in this session rather than with `norn ask`");
+  });
+
+  test("start-up, an unknown source, no loadable unit or a cursor not at an agent step add nothing", () => {
+    expect(ask({ fact: { ...SESSION_START, message: "startup" } })).toEqual({ kind: "allow" });
+    expect(ask({ fact: { ...SESSION_START, message: undefined } })).toEqual({ kind: "allow" });
+    expect(ask({ session: null, fact: SESSION_START })).toEqual({ kind: "allow" });
+    expect(ask({ session: session({ step: "test", status: "running" }), fact: SESSION_START })).toEqual({ kind: "allow" });
+    expect(ask({ session: session({ step: "$done", status: "done" }), fact: SESSION_START })).toEqual({ kind: "allow" });
+  });
+});
+
+describe("hookAnswer: the attended reminder", () => {
+  test("each prompt in an attended agent step carries one line: done once the person agrees, ask here", () => {
+    const text = contextOf(ask({ session: attendedSession(), fact: PROMPT }));
+    expect(text.split("\n")).toHaveLength(1);
+    expect(text).toContain("`norn done`");
+    expect(text).toContain("the person agrees the work is finished");
+    expect(text).toContain("ask in this session rather than with `norn ask`");
+  });
+
+  test("an unattended step, no loadable unit or a non-agent step add no line", () => {
+    expect(ask({ fact: PROMPT })).toEqual({ kind: "allow" });
+    expect(ask({ session: null, fact: PROMPT })).toEqual({ kind: "allow" });
+    expect(ask({ session: session({ step: "test", status: "running" }), fact: PROMPT })).toEqual({ kind: "allow" });
+  });
+});
+
+describe("hookAnswer: file-tool writes under run state", () => {
+  const RUNS = "/home/me/.norn/repos/abc/runs";
+  const PRE: HookFact = { ...STOP, event: "tool_use", native: "PreToolUse" };
+  const write = (...paths: string[]): Partial<HookAnswerInput> => ({ fact: PRE, toolCall: { kind: "file_write", paths }, fileWrite: { paths, runStateDir: RUNS } });
+  const REASON = "a hand-edited file fails validation and makes the unit `corrupt`";
+
+  test("a write resolving under the checkout's runs/ folder, this unit's or another's, is denied with the corrupt reason", () => {
+    for (const p of [`${RUNS}/gh-1/01-a/state.json`, `${RUNS}/gh-7/_story/receipts/0001.json`, `${RUNS}/new.json`]) {
+      const answer = ask(write("/repo/.worktrees/gh-1/src/a.ts", p));
+      expect(answer.kind).toBe("deny");
+      expect(answer.kind === "deny" && answer.reason).toContain(REASON);
+      expect(answer.kind === "deny" && answer.reason).toContain(p);
+    }
+  });
+
+  test("it is denied in attended steps too, and every time it is retried", () => {
+    const story = storyUnit("gh-2");
+    const s: AgentUnit = { unit: story, state: stateFor(story, STORY_WF, { step: "refine", status: "running", run: { ...RUN, step: "refine" } }), workflow: STORY_WF, receipts: [], unapplied: [] };
+    const input = { session: s, ...write(`${RUNS}/gh-2/_story/state.json`) };
+    expect(ask(input).kind).toBe("deny");
+    expect(ask(input).kind).toBe("deny");
+  });
+
+  test("a write elsewhere, or beside the folder under a name that only starts like it, is allowed", () => {
+    expect(ask(write("/repo/.worktrees/gh-1/src/a.ts"))).toEqual({ kind: "allow" });
+    expect(ask(write(`${RUNS}-old/state.json`, "/home/me/.norn/repos/abc/heartbeat.json"))).toEqual({ kind: "allow" });
+  });
+
+  test("a read or a shell command under run state is not inspected", () => {
+    expect(ask({ fact: PRE, toolCall: null })).toEqual({ kind: "allow" });
+    expect(ask({ fact: PRE, toolCall: { kind: "shell", command: `echo x > ${RUNS}/gh-1/01-a/state.json` } })).toEqual({ kind: "allow" });
+  });
+
+  test("outside a loadable unit it allows", () => {
+    expect(ask({ session: null, ...write(`${RUNS}/gh-1/01-a/state.json`) })).toEqual({ kind: "allow" });
   });
 });

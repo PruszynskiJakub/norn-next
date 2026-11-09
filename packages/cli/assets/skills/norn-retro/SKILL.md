@@ -1,6 +1,6 @@
 ---
 name: norn-retro
-description: Runs a retrospective on one finished story from its delivery record and suggests one change per friction found, each with its evidence, in the reply; changes no file. Use when a person asks for a retro or retrospective on a story, usually after its pull request merges.
+description: Runs a retrospective on one finished story from its delivery record and suggests one change per friction found, each with its evidence, and a line for each gate ruling that reads as a lasting preference, in the reply; changes no file. Use when a person asks for a retro or retrospective on a story, usually after its pull request merges.
 ---
 
 # Retro
@@ -51,7 +51,16 @@ Go through every unit. For each finding, keep the evidence as you go: the file a
 
 Rank the findings by what they cost: a person pulled in to unblock or redo work, then a rework loop, then a lost session, then a wait for an answer, then a manual check a machine could have made. A finding that recurs across slices outranks a one-off. Leave out what went smoothly.
 
-## 3. Suggest one change per finding
+## 3. Propose lasting preferences
+
+A person's ruling at a gate sometimes says how they want every story done, not only this one. Gather those so the next story starts with them.
+
+1. **List the gate rulings.** Every `approve` and `reject` in the record whose `comment` is not empty (`receipts/NNNN-approve.json`, `receipts/NNNN-reject.json`), each with the gate, the round (its folder under `_story/rounds/`, or the slice) and the person's words, quoted. When it has `delegated: true`, mark it delegated: a supervisor agent wrote it, not the person. Give your reading of each (lasting, or about this story only) and ask the person which read as a lasting preference. A delegated ruling is the supervisor's reading, so treat it as lasting only when the person says so. With no ruling that has a comment, say so in one line and propose nothing.
+2. **Pick the file by what the ruling is about.** A ruling on how code is judged (what fails review, what not to report, what to ignore) belongs in `REVIEW.md` at the repo root, which review reads. A ruling on how agents work (how to build, test, name things, ask, hand back) belongs in the repo's agent instructions file: `AGENTS.md`, else `CLAUDE.md`.
+3. **Read the target file first.** When it already states the preference, cite that line as evidence and never propose a duplicate; when it states it differently, propose the change to that line. When the file is missing, propose creating it with that line, and say the file is new.
+4. **Propose one line per lasting ruling**, naming the **File**, the **Section** it goes under (an existing heading, or a new one), the **Wording** (the line ready to paste) and the **Ruling** it comes from (its path in the record and the words quoted).
+
+## 4. Suggest one change per finding
 
 For each finding, suggest ONE concrete change, small enough to review in a minute: the exact rule text, key and value, or check command. Name the file it touches:
 
@@ -75,7 +84,7 @@ Choose where the change belongs:
 
 Never suggest a change without evidence in the record, and never two changes for one finding: pick the one that removes the cause.
 
-## 4. Give the suggestions
+## 5. Give the suggestions
 
 Answer the person in this shape. Do not write it to a file, and do not apply any change, even one that looks obvious: they decide what to apply, and may ask you to afterwards. Cite a record file by its path in the record and a handoff by its path under the story's folder `.agents/specs/<key>-<slug>/`. Quote evidence briefly and write `<REDACTED>` for any secret.
 
@@ -99,9 +108,25 @@ Read: the record ref of <key> (<n> rounds, <n> slices). Trace: <present, dates |
 
 ### 2. …
 
+## Lasting preferences
+
+Gate rulings (which read as a lasting preference? my reading after each):
+
+- `_story/rounds/01-story/receipts/0012-reject.json`, gate `<gate>`, round 1: "…" (lasting)
+- `02-invite-form/receipts/0021-approve.json`, gate `<gate>`, delegated: "…" (this story only)
+
+### 1. <The preference, in one line>
+
+- **File**: `REVIEW.md` (new file: propose creating it) | `AGENTS.md` (else `CLAUDE.md`)
+- **Section**: <an existing heading, or a new one>
+- **Wording**: <the line, ready to paste>
+- **Ruling**: `_story/rounds/01-story/receipts/0012-reject.json` ("…")
+
+<Or, when the file already says it: **Already stated**: `AGENTS.md`, section <heading>: "<the line>", cited as evidence; no new line.>
+
 ## Went well
 
 <One or two lines, or leave the section out.>
 ```
 
-Done when every unit's record is read and every finding in your reply has its evidence and one change with its file, and the working tree is exactly as you found it.
+Done when every unit's record is read, every finding in your reply has its evidence and one change with its file, every gate ruling with a comment is listed with a proposal or a cited line for each one read as lasting, and the working tree is exactly as you found it.

@@ -21,6 +21,12 @@ describe("codex adapter", () => {
     expect(f("stop", payloads.Stop)).toMatchObject({ event: "turn_end", message: "Done.", transcript: payloads.Stop.transcript_path });
   });
 
+  test("SessionStart carries its source in message, the session note's trigger", () => {
+    const f = (p: unknown) => codexAgent.parseHookEvent("session-start", p, ENV, AT);
+    expect(f(payloads.SessionStart)).toMatchObject({ event: "session_start", native: "SessionStart", message: "startup" });
+    expect(f(payloads.SessionStartResume)).toMatchObject({ event: "session_start", native: "SessionStart", message: "resume", agent_session_id: "019a-codex" });
+  });
+
   test("Stop block response", () => {
     const fact = codexAgent.parseHookEvent("stop", payloads.Stop, ENV, AT)!;
     expect(JSON.parse(codexAgent.hookResponse(fact, { kind: "block", reason: "report" }).stdout)).toEqual({ decision: "block", reason: "report" });

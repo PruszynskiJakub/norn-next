@@ -6,5 +6,6 @@
   "BeforeToolReplace": { "session_id": "gem-1", "transcript_path": "/home/u/.gemini/tmp/h/chats/session-1.json", "cwd": "/repo/.worktrees/gh-12", "timestamp": "2026-10-23T10:00:00Z", "hook_event_name": "BeforeTool", "tool_name": "replace", "tool_input": { "file_path": "/repo/.worktrees/gh-12/src/b.ts", "old_string": "a", "new_string": "b" } },
   "BeforeToolReadFile": { "session_id": "gem-1", "transcript_path": "/home/u/.gemini/tmp/h/chats/session-1.json", "cwd": "/repo/.worktrees/gh-12", "timestamp": "2026-10-23T10:00:00Z", "hook_event_name": "BeforeTool", "tool_name": "read_file", "tool_input": { "file_path": "/repo/.worktrees/gh-12/src/a.ts" } },
   "SessionStart": { "session_id": "gem-1", "transcript_path": "/home/u/.gemini/tmp/h/chats/session-1.json", "cwd": "/repo/.worktrees/gh-12", "timestamp": "2026-10-23T10:00:00Z", "hook_event_name": "SessionStart", "source": "resume" },
+  "SessionStartClear": { "session_id": "gem-2", "transcript_path": "/home/u/.gemini/tmp/h/chats/session-2.json", "cwd": "/repo/.worktrees/gh-12", "timestamp": "2026-10-23T10:00:00Z", "hook_event_name": "SessionStart", "source": "clear" },
   "BeforeAgent": { "session_id": "gem-1", "transcript_path": "/home/u/.gemini/tmp/h/chats/session-1.json", "cwd": "/repo/.worktrees/gh-12", "timestamp": "2026-10-23T10:00:00Z", "hook_event_name": "BeforeAgent", "prompt": "keep going" }
 }

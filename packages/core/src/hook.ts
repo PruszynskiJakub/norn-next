@@ -3,10 +3,10 @@
  * the normalized tool call. Pure: the cli gathers the facts and keeps the one effectful gate,
  * taking one of the run's capped turn-end refusals, for after this answers block.
  */
-import type { HookFact } from "@norn/schema";
+import type { HookFact, Step } from "@norn/schema";
 import { type AgentUnit, currentRun, cursorStep, runAgentSession, standingReport } from "./agent-unit.ts";
 import { cmd } from "./commands.ts";
-import { HARD_RULES, type HardRuleId } from "./hard-rules.ts";
+import { HARD_RULES, type HardRuleId, ruleWithReason } from "./hard-rules.ts";
 import type { AgentAdapter, HookAnswer, ToolCall } from "./ports.ts";
 import { shellRefusal } from "./shell-refusals.ts";
 import { reportableOutcomes } from "./workflow.ts";
@@ -19,6 +19,8 @@ export interface HookAnswerInput {
   adapter: Pick<AgentAdapter, "name" | "tier" | "hookEvents">;
   /** of the command's bare `git checkout <name>` names (`checkoutNames`), those the cli resolved to a commit */
   commits?: readonly string[];
+  /** a file write's paths resolved for real, and the checkout's run state folder resolved the same way */
+  fileWrite?: { paths: string[]; runStateDir: string } | null;
 }
 
 export { checkoutNames } from "./shell-refusals.ts";
@@ -40,6 +42,13 @@ export function foreignFact(s: AgentUnit, run_id: string, fact: HookFact): boole
   return !!owner && !!fact.agent_session_id && fact.agent_session_id !== owner;
 }
 
+const doneLine = (step: Step): string => `\`${cmd.done(`<${reportableOutcomes(step).join("|")}>`)}\``;
+
+const reportLine = (step: Step): string => `${doneLine(step)}, \`${cmd.ask()}\` or \`${cmd.stuck()}\``;
+
+/** An attended step's questions go to the person in the session, so its report never offers `norn ask`. */
+const ATTENDED_LINE = "report `norn done` only once the person agrees the work is finished, and ask in this session rather than with `norn ask`.";
+
 /** Block the turn end only in an unattended agent step whose live run has not reported. */
 function turnEndBlock({ session: s, fact, adapter }: HookAnswerInput): HookAnswer {
   if (!refusableTurnEnd(adapter, fact) || !s) return ALLOW;
@@ -50,12 +59,10 @@ function turnEndBlock({ session: s, fact, adapter }: HookAnswerInput): HookAnswe
   if (!run || (fact.run_id && fact.run_id !== run.run_id)) return ALLOW;
   if (foreignFact(s, run.run_id, fact)) return ALLOW; // It cannot report the run, so it is not held to it
   if (standingReport(s, run.run_id)) return ALLOW;
-  const outcomes = reportableOutcomes(step);
   return {
     kind: "block",
     reason:
-      `norn: step ${s.state.step} of ${s.unit.key} has no report for this run. Before ending your turn, report exactly once: ` +
-      `\`${cmd.done(`<${outcomes.join("|")}>`)}\`, \`${cmd.ask()}\` or \`${cmd.stuck()}\`. ` +
+      `norn: step ${s.state.step} of ${s.unit.key} has no report for this run. Before ending your turn, report exactly once: ${reportLine(step)}. ` +
       `Run \`${cmd.brief()}\` to see what each outcome means.`,
   };
 }
@@ -86,6 +93,59 @@ function toolRefusal({ session, toolCall, commits }: HookAnswerInput): HookAnswe
   return id ? refusal(id) : null;
 }
 
+type AgentStep = Extract<Step, { type: "agent" }>;
+
+const agentStep = (s: AgentUnit | null): AgentStep | null => {
+  const step = s && cursorStep(s);
+  return step?.type === "agent" ? step : null;
+};
+
+/**
+ * Every session source but start-up (compact, resume, clear) has lost the brief it was given;
+ * at start-up the agent is about to read the brief, so a note would only repeat it. A source the
+ * tool does not name is treated as start-up.
+ */
+function sessionNote({ session: s, fact }: HookAnswerInput): HookAnswer {
+  if (fact.event !== "session_start" || !fact.message || fact.message === "startup") return ALLOW;
+  const step = agentStep(s);
+  if (!s || !step) return ALLOW;
+  const rules = HARD_RULES.map((r) => `- ${ruleWithReason(r.id)}`);
+  return {
+    kind: "context",
+    text: [
+      step.attended
+        ? `norn: this session works step ${s.state.step} of ${s.unit.key}. Report exactly once: ${doneLine(step)} or \`${cmd.stuck()}\`; ${ATTENDED_LINE}`
+        : `norn: this session works step ${s.state.step} of ${s.unit.key}. Report exactly once: ${reportLine(step)}.`,
+      "The hard rules:",
+      ...rules,
+      `Run \`${cmd.brief()}\` for the rest.`,
+    ].join("\n"),
+  };
+}
+
+/** A long conversation buries the brief, so each prompt of an attended step restates how it ends. */
+function attendedReminder({ session: s, fact }: HookAnswerInput): HookAnswer {
+  if (fact.event !== "turn_start" || !agentStep(s)?.attended) return ALLOW;
+  return {
+    kind: "context",
+    text: `norn: ${ATTENDED_LINE}`,
+  };
+}
+
+const under = (dir: string, p: string): boolean => p === dir || p.startsWith(dir.endsWith("/") ? dir : `${dir}/`);
+
+/**
+ * Deny a file-tool write landing in any unit's run state, attended or not. Only a file tool's write
+ * is judged: a shell command's writes cannot be read reliably, and a read harms nothing.
+ */
+function runStateWriteDeny({ session, toolCall, fileWrite }: HookAnswerInput): HookAnswer | null {
+  if (!session || toolCall?.kind !== "file_write" || !fileWrite) return null;
+  const hit = fileWrite.paths.find((p) => under(fileWrite.runStateDir, p));
+  return hit ? { kind: "deny", reason: `norn: \`${hit}\` is norn's run state. ${ruleWithReason("no-run-state")}` } : null;
+}
+
 export function hookAnswer(input: HookAnswerInput): HookAnswer {
-  return toolRefusal(input) ?? turnEndBlock(input);
+  if (input.fact.event === "session_start") return sessionNote(input);
+  if (input.fact.event === "turn_start") return attendedReminder(input);
+  return toolRefusal(input) ?? runStateWriteDeny(input) ?? turnEndBlock(input);
 }

@@ -342,3 +342,15 @@ describe("limitations: the hooks entry", () => {
     expect(text).toMatch(/every norn command but `brief`, `done`, `ask` and `stuck`/);
   });
 });
+
+describe("Development › Skills", () => {
+  test("says when a bundled skill is exact and when it gives principles", () => {
+    const dev = read(join(ROOT, "docs", "development.md"));
+    const skills = dev.slice(dev.indexOf("## Skills"), dev.indexOf("\n## ", dev.indexOf("## Skills") + 1));
+    // exact where code reads what the agent produces, or where the text is tuned to the agent tool
+    expect(skills).toMatch(/\*\*Exact or principled\.\*\*/);
+    for (const s of ["code reads what the agent produces", "report outcomes", "criteria and findings JSON", "tuned to the agent tool", "`norn-fsd-round`'s timeouts"]) expect(skills).toContain(s);
+    // everywhere else: the failure prevented, the outcome to reach, principles with reasons, steps only where order matters
+    for (const s of ["the failure it prevents", "the outcome to reach", "principles with their reasons", "numbered steps only where order matters"]) expect(skills).toContain(s);
+  });
+});
