@@ -2,7 +2,7 @@
 id: gh-301/01
 title: Every hard rule in How to work gives its reason
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
