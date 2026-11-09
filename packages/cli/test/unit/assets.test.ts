@@ -428,6 +428,25 @@ describe("skills", () => {
       });
     expect(hits).toEqual([]);
   });
+
+  // The brief's How to work forbids pushes and branch switches for every step, so a skill repeating it can only drift from it.
+  test("skills leave the push and branch rules to the brief, keeping committing locally as craft", () => {
+    expect(readSkill("norn-implement")).not.toMatch(/never push/i);
+    expect(readSkill("norn-merge")).not.toMatch(/never push/i);
+    expect(readSkill("norn-diagnose")).not.toMatch(/Never push\./);
+    expect(readSkill("norn-prototype")).not.toMatch(/Never create or switch branches for it\./);
+    expect(readSkill("norn-implement")).toMatch(/- Commit locally\.\n/);
+    expect(readSkill("norn-merge")).toMatch(/both sides' intended behaviour survives\. Commit locally\.\n/);
+    expect(readSkill("norn-diagnose")).toMatch(/is in the commit message \(or in your hand-back\)\.\n/);
+    expect(readSkill("norn-prototype")).toMatch(/commit the prototype and the spec together on the branch you are on\.\n/);
+  });
+
+  // The brief alone adapts a step to the story's mode; the supervisors set it only through the `--auto`/`--manual` flags.
+  test.each(SKILLS)("%s names no mode", (name) => {
+    const text = readSkill(name).replace(/--(auto|manual)\b/g, "");
+    expect(text).not.toMatch(/\b(auto|manual)\b[ -]*(mode|step|story|stories)\b/i);
+    expect(text).not.toMatch(/\bmode\b[^.\n]{0,30}\b(auto|manual)\b/i);
+  });
 });
 
 describe("config starters (B49, B50)", () => {
