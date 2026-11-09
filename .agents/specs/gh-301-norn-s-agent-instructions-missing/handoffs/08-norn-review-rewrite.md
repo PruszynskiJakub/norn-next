@@ -4,7 +4,7 @@ Development › Skills states when a bundled skill is exact and when it gives pr
 
 ## Proof
 
-Review #1: approve, no blocking findings (one minor, AC3 wording, for the person). `bun run test` 1562 pass, `bun run typecheck` green.
+Review #1: approve, no blocking findings (one minor, AC3 wording, for the person). `bun run test` 1562 pass, `bun run typecheck` green. After merging the story branch in (its norn-retro tests sat next to this slice's norn-review tests in `packages/cli/test/unit/assets.test.ts`; both kept): 1624 pass, typecheck green.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
