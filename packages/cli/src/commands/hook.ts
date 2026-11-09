@@ -12,9 +12,11 @@
  * `--agent` (a configured agent name or an adapter name; `norn init` always installs it), else
  * NORN_AGENT, else the first configured adapter (claude first) that recognizes the event.
  */
-import { type AgentAdapter, currentRun, foreignFact, type HookAnswer, hookAnswer, type HookResponse } from "@norn/core";
+import { existsSync, realpathSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
+import { type AgentAdapter, currentRun, foreignFact, type HookAnswer, hookAnswer, type HookAnswerInput, type HookResponse, type ToolCall } from "@norn/core";
 import { DEFAULT_CONFIG, type ExitCode, type HookFact, type ResolvedConfig, ulid } from "@norn/schema";
-import { appendHookTrace, bindNornHome, blockedHookCount, claimStopBlock, loadConfig, repoLayout } from "@norn/store";
+import { appendHookTrace, bindNornHome, blockedHookCount, claimStopBlock, loadConfig, machineRunsDir, repoLayout } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { withExit } from "../output.ts";
@@ -82,11 +84,32 @@ function takeRefusal(root: string, s: UnitSession, runId: string): boolean {
 }
 
 /**
+ * Where a path written now would land: relative to `cwd`, its nearest existing parent through
+ * realpath and the rest appended, so a symlink or a file not there yet resolves as the write would.
+ */
+function resolveWrite(cwd: string, path: string): string {
+  let at = resolve(cwd, path);
+  const rest: string[] = [];
+  while (!existsSync(at) && dirname(at) !== at) {
+    rest.unshift(basename(at));
+    at = dirname(at);
+  }
+  return join(realpathSync(at), ...rest);
+}
+
+/** Resolved only for a file write: realpath runs on every such call, so nothing else pays for it. */
+function fileWriteFacts(root: string, cwd: string, call: ToolCall | null): HookAnswerInput["fileWrite"] {
+  if (call?.kind !== "file_write") return null;
+  return { paths: call.paths.map((p) => resolveWrite(cwd, p)), runStateDir: resolveWrite(cwd, machineRunsDir(root)) };
+}
+
+/**
  * Core decides; a turn-end block still has to take one of the run's MAX_STOP_BLOCKS refusals.
  * Taking one stays the last gate, so a refusal is spent only when this hook blocks.
  */
-function gatedAnswer(root: string, s: UnitSession | null, fact: HookFact, adapter: AgentAdapter, payload: unknown): HookAnswer {
-  const decided = hookAnswer({ session: s, fact, toolCall: adapter.toolCall(fact.native, payload), adapter });
+function gatedAnswer(root: string, cwd: string, s: UnitSession | null, fact: HookFact, adapter: AgentAdapter, payload: unknown): HookAnswer {
+  const toolCall = adapter.toolCall(fact.native, payload);
+  const decided = hookAnswer({ session: s, fact, toolCall, adapter, fileWrite: fileWriteFacts(root, cwd, toolCall) });
   if (decided.kind !== "block") return decided;
   const run = s && currentRun(s);
   return run && takeRefusal(root, s, run.run_id) ? decided : { kind: "allow" };
@@ -144,7 +167,7 @@ export const hookEventCommand = defineCommand({
         // Another agent session's fact is not the run's (no silent, nudge or snapshot from it)
         if (run && !foreignFact(session, run.run_id, fact)) fact.run_id = run.run_id;
       }
-      const decided = gatedAnswer(root, session, fact, adapter, payload);
+      const decided = gatedAnswer(root, cwd, session, fact, adapter, payload);
       // The unit is the worktree's, whether the fact names a run or not
       const unit = { story: found.marker.story, slice: found.marker.slice ?? null };
       appendHookTrace(root, unit, { type: "hook", id: ulid(ctx.clock.now()), fact, ...(decided.kind === "block" ? { blocked: true, reason: decided.reason } : {}) });
