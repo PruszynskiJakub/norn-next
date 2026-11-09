@@ -401,6 +401,32 @@ describe("skills", () => {
     expect(text).toContain("No findings.");
   });
 
+  test("norn-retro lists the gate rulings after the friction and asks which read as a lasting preference", () => {
+    const text = readSkill("norn-retro");
+    const section = text.indexOf("## 3. Propose lasting preferences");
+    expect(section).toBeGreaterThan(text.indexOf("## 2. Find the friction"));
+    const terms = ["`approve` and `reject`", "the gate, the round", "the person's words", "`delegated: true`", "mark it delegated", "which read as a lasting preference"];
+    expect(terms.filter((t) => !text.slice(section).includes(t))).toEqual([]);
+  });
+
+  test("norn-retro proposes a REVIEW.md or agent instructions line naming file, section, wording and ruling", () => {
+    const text = readSkill("norn-retro");
+    const terms = [
+      "`REVIEW.md`", "how code is judged", "`AGENTS.md`", "else `CLAUDE.md`", "how agents work",
+      "**File**", "**Section**", "**Wording**", "**Ruling**",
+      // a missing target file is proposed for creation; a preference already stated is cited, not duplicated
+      "propose creating it", "cite that line as evidence", "never propose a duplicate",
+    ];
+    expect(terms.filter((t) => !text.includes(t))).toEqual([]);
+  });
+
+  test("norn-retro changes no file", () => {
+    const text = readSkill("norn-retro");
+    expect(text).toContain("changes no file");
+    expect(text).toContain("You write no file and change nothing");
+    expect(text).toContain("Do not write it to a file, and do not apply any change");
+  });
+
   test.each(CRAFT)("%s is unaware of norn", (name) => {
     // skill names carry the `norn-` prefix; any other mention of norn is a leak
     const text = readSkill(name).replace(/\bnorn-[a-z-]+/g, "");
