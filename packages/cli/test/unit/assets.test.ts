@@ -401,6 +401,29 @@ describe("skills", () => {
     expect(text).toContain("No findings.");
   });
 
+  test("norn-review keeps its contracts and gives its axes principles, not fixed prompts or word caps", () => {
+    const text = readSkill("norn-review");
+    // two axes, judged apart
+    for (const s of ["**Spec**", "**Standards**", "kept apart"]) expect(text).toContain(s);
+    // the findings JSON with its blocking flag
+    for (const s of ['"axis": "spec"', '"severity": "blocking"', "`severity`: `blocking` | `minor` | `nit`"]) expect(text).toContain(s);
+    // no word-for-word subagent prompt and no word cap
+    expect(prose(text)).not.toMatch(/"[^"\n]{100,}"/);
+    expect(text).not.toMatch(/\b(under|at most|within) \d+ words\b/i);
+  });
+
+  test("norn-review gives a subagent that runs commands the rules its work can break, each with its reason", () => {
+    const text = readSkill("norn-review");
+    const start = text.indexOf("**Subagents that run commands**");
+    expect(start).toBeGreaterThan(-1);
+    const rules = text.slice(start).split("\n\n")[0] as string;
+    // each rule is a bullet that says why after a dash
+    for (const rule of [/No push\b/, /No branch or worktree switch/, /No command of the delivery tool/, /No writes under (its|the delivery tool's) run state/]) {
+      const line = rules.split("\n").find((l) => rule.test(l));
+      expect(line).toMatch(/^\s*- .+ — .{20,}/);
+    }
+  });
+
   test.each(CRAFT)("%s is unaware of norn", (name) => {
     // skill names carry the `norn-` prefix; any other mention of norn is a leak
     const text = readSkill(name).replace(/\bnorn-[a-z-]+/g, "");
