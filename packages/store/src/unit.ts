@@ -2,13 +2,13 @@
  * One unit's `runs/<unit>/` folder: state.json (the commit point), the pinned
  * workflow, logs, evidence and handoff.md.
  */
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { HANDOFF_SKELETON, normalizeUnitState } from "@norn/core";
 import type { UnitState, Workflow } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { parse as parseYaml } from "yaml";
-import { atomicCopyDir, atomicWrite, createExclusive, fileError, jsonLine, readJsonFile, readText, type ReadResult, validated } from "./fsx.ts";
-import { evidenceDir, logPath, pinnedWorkflowPath, statePath } from "./paths.ts";
+import { atomicCopyDir, atomicWrite, createExclusive, fileError, jsonLine, readJsonFile, readText, type ReadResult, safeUnlink, validated } from "./fsx.ts";
+import { evidenceDir, legacyHandoffFile, logPath, pinnedWorkflowPath, statePath } from "./paths.ts";
 
 /** state.json as the `UnitState` it stands for: older shapes read normalised, never corrupt. */
 export function readState(unitDir: string, root?: string): ReadResult<UnitState> {
@@ -165,10 +165,30 @@ export function handoffProse(raw: string): string {
   return h.body === raw ? raw : h.body.replace(/^\n/, "");
 }
 
-/** A unit's handoff at `file`, the path its resolver gives (`handoffPath`). */
+/**
+ * A unit's handoff at `file`, the path its resolver gives (`handoffPath`); a story still on an
+ * older norn's `handoffs/_story.md` reads from there until its next boundary moves it.
+ */
 export function readHandoff(file: string): Handoff | null {
-  const raw = readText(file);
+  const legacy = legacyHandoffFile(file);
+  const raw = readText(file) ?? (legacy ? readText(legacy) : null);
   return raw === null ? null : parseHandoff(raw);
+}
+
+/**
+ * Move the story's handoff from an older norn's `handoffs/_story.md` to `file` when only the old
+ * one exists, so a story in flight keeps its prose instead of getting a fresh skeleton. Returns
+ * the old file it removed.
+ */
+export function moveLegacyHandoff(file: string): string | null {
+  const legacy = legacyHandoffFile(file);
+  if (!legacy || existsSync(file)) return null;
+  const raw = readText(legacy);
+  if (raw === null) return null;
+  // the new file is durable before the old one goes, so a crash between them loses nothing
+  atomicWrite(file, raw);
+  safeUnlink(legacy);
+  return legacy;
 }
 
 /**

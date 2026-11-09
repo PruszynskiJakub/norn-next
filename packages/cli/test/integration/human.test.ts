@@ -819,7 +819,7 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
     expect(t.read(join(wt(), spec, "spec.md"))).toContain("workflow: story");
     // One handoff, the person's sections kept
     const handoff = t.read(handoffPath(join(wt(), spec), STORY_UNIT_DIR));
-    expect(handoffPath(join(wt(), spec), STORY_UNIT_DIR)).toBe(join(wt(), spec, "handoffs/_story.md"));
+    expect(handoffPath(join(wt(), spec), STORY_UNIT_DIR)).toBe(join(wt(), spec, "handoffs/story.md"));
     expect(handoff).toContain("## Goal\nDeliver it.");
     expect(handoff).toContain("## Resume\nRefine the spec.");
     // Your turn for refine

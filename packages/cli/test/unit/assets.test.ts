@@ -266,7 +266,7 @@ describe("skills", () => {
   });
 
   test("the norn skill and the brief's protocol name no step of any template", () => {
-    const text = `${readSkill("norn")}\n${protocolLines({ handoff_file: "handoffs/_story.md", attended: false }).join("\n")}`;
+    const text = `${readSkill("norn")}\n${protocolLines({ handoff_file: "handoffs/story.md", attended: false }).join("\n")}`;
     const reserved = new Set(["test", "slice", "slices", "plan", "ready"]); // glossary nouns / plain words
     const names = new Set(workflowFiles.flatMap((f) => Object.keys(loadWorkflow(f).steps)).filter((n) => !reserved.has(n)));
     expect([...names].filter((n) => new RegExp(`\\b${n}\\b`, "i").test(text))).toEqual([]);
@@ -275,8 +275,8 @@ describe("skills", () => {
   test("the norn skill sends the agent to the brief, whose protocol states the reporting and hard rules", () => {
     const skill = readSkill("norn");
     for (const s of ["norn brief", "norn status", "norn story start <unit>", "How to work"]) expect(skill).toContain(s);
-    const protocol = protocolLines({ handoff_file: "handoffs/_story.md", attended: false }).join("\n");
-    for (const s of ["`brief`", "`done`", "`ask`", "`stuck`", "--handoff", "`--evidence <dir>`", "handoffs/_story.md", "Goal", "Proof", "Easy to miss", "Not proven yet", "Notes", "Resume", "8 KB", "git push", "runs/", "gh", "glab"])
+    const protocol = protocolLines({ handoff_file: "handoffs/story.md", attended: false }).join("\n");
+    for (const s of ["`brief`", "`done`", "`ask`", "`stuck`", "--handoff", "`--evidence <dir>`", "handoffs/story.md", "Goal", "Proof", "Easy to miss", "Not proven yet", "Notes", "Resume", "8 KB", "git push", "runs/", "gh", "glab"])
       expect(protocol).toContain(s);
   });
 
@@ -382,7 +382,7 @@ describe("skills", () => {
     expect(refine).toContain("nothing cites a story by its number");
     for (const skill of ["norn-refine", "norn-slice", "norn-review", "norn-qa", "norn-plan", "norn-pr"]) expect(readSkill(skill)).not.toMatch(/\bUS\d|US<n>/);
     // the step protocol and the interview speak in words, to a person and in files
-    expect(protocolLines({ handoff_file: "handoffs/_story.md", attended: false }).join("\n")).toContain("Never an id alone");
+    expect(protocolLines({ handoff_file: "handoffs/story.md", attended: false }).join("\n")).toContain("Never an id alone");
     expect(readSkill("norn-interview")).toMatch(/never by a number or id/);
   });
 

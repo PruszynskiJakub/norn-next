@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { CONFIG_FILES, LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, treeHandoffPath, unitHandoffPath } from "@norn/schema";
+import { CONFIG_FILES, LEGACY_SPEC_FILE, parseSliceKey, SPEC_FILE, SPECS_DIR, STORY_UNIT_DIR, sliceDirName, storyDirName, treeHandoffPath, LEGACY_STORY_HANDOFF_PATH, unitHandoffPath } from "@norn/schema";
 
 /** The committed repo config and workflows, relative to a root, as messages name them. */
 export const REPO_CONFIG_FILE = CONFIG_FILES.repo;
@@ -203,10 +203,18 @@ export const logPath = (ud: string, runId: string) => join(ud, "logs", `${runId}
 export const evidenceDir = (ud: string, runId: string) => join(ud, "evidence", runId);
 /**
  * The resolver for a unit's handoff, keyed by the unit (`_story` or
- * `<nn>-<slug>`), not by its record folder: `<spec folder>/handoffs/<unit>.md`. Every
- * reader and writer of a handoff goes through here.
+ * `<nn>-<slug>`), not by its record folder: `<spec folder>/handoffs/story.md` or
+ * `handoffs/<nn>-<slug>.md`. Every reader and writer of a handoff goes through here.
  */
 export const handoffPath = (specDir: string, unit: string) => join(specDir, unitHandoffPath(unit));
+/**
+ * The story handoff an older norn wrote beside `file` (`handoffs/_story.md`), when `file` is the
+ * story's; null for a slice's, which never moved.
+ */
+export function legacyHandoffFile(file: string): string | null {
+  const story = unitHandoffPath(STORY_UNIT_DIR);
+  return file.endsWith(`/${story}`) ? join(file.slice(0, -story.length), LEGACY_STORY_HANDOFF_PATH) : null;
+}
 /** An older norn's handoff of `unit` in a tree's spec folder, `runs/<unit>/handoff.md`; only the record move reads it. */
 export const treeHandoffFile = (specDir: string, unit: string) => join(specDir, treeHandoffPath(unit));
 
