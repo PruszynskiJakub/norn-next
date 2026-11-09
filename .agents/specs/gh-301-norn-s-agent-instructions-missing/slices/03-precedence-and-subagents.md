@@ -2,7 +2,7 @@
 id: gh-301/03
 title: How to work outranks any skill and reaches subagents
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
