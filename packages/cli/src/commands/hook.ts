@@ -1,9 +1,10 @@
 /**
  * `norn hook <event> [--agent <name>]`: called by the agent tool's hooks with the
  * native payload on stdin. Normalizes it through the agent adapter, appends the hook fact to
- * the unit's hook file and the trace, and on turn end of an UNATTENDED step whose run has no
- * report yet answers with the adapter's block response telling the agent to report. Attended
- * steps never block.
+ * the unit's hook file and the trace, and answers with what core's `hookAnswer` decides, encoded
+ * by the adapter: a block on turn end of an UNATTENDED step whose run has no report yet (attended
+ * steps never block), a re-orientation note on a session start that is not start-up, and a
+ * reminder on each prompt of an attended step.
  *
  * Must be fast and must never break the agent: outside a `.norn-unit` worktree it is a no-op,
  * and any failure is swallowed into the adapter's "allow" answer (`{}`), exit 0.

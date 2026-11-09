@@ -3,9 +3,10 @@
  * the normalized tool call. Pure: the cli gathers the facts and keeps the one effectful gate,
  * taking one of the run's capped turn-end refusals, for after this answers block.
  */
-import type { HookFact } from "@norn/schema";
+import type { HookFact, Step } from "@norn/schema";
 import { type AgentUnit, currentRun, cursorStep, runAgentSession, standingReport } from "./agent-unit.ts";
 import { cmd } from "./commands.ts";
+import { HARD_RULES, ruleWithReason } from "./hard-rules.ts";
 import type { AgentAdapter, HookAnswer, ToolCall } from "./ports.ts";
 import { reportableOutcomes } from "./workflow.ts";
 
@@ -34,6 +35,9 @@ export function foreignFact(s: AgentUnit, run_id: string, fact: HookFact): boole
   return !!owner && !!fact.agent_session_id && fact.agent_session_id !== owner;
 }
 
+const reportLine = (step: Step): string =>
+  `\`${cmd.done(`<${reportableOutcomes(step).join("|")}>`)}\`, \`${cmd.ask()}\` or \`${cmd.stuck()}\``;
+
 /** Block the turn end only in an unattended agent step whose live run has not reported. */
 function turnEndBlock({ session: s, fact, adapter }: HookAnswerInput): HookAnswer {
   if (!refusableTurnEnd(adapter, fact) || !s) return ALLOW;
@@ -44,16 +48,53 @@ function turnEndBlock({ session: s, fact, adapter }: HookAnswerInput): HookAnswe
   if (!run || (fact.run_id && fact.run_id !== run.run_id)) return ALLOW;
   if (foreignFact(s, run.run_id, fact)) return ALLOW; // It cannot report the run, so it is not held to it
   if (standingReport(s, run.run_id)) return ALLOW;
-  const outcomes = reportableOutcomes(step);
   return {
     kind: "block",
     reason:
-      `norn: step ${s.state.step} of ${s.unit.key} has no report for this run. Before ending your turn, report exactly once: ` +
-      `\`${cmd.done(`<${outcomes.join("|")}>`)}\`, \`${cmd.ask()}\` or \`${cmd.stuck()}\`. ` +
+      `norn: step ${s.state.step} of ${s.unit.key} has no report for this run. Before ending your turn, report exactly once: ${reportLine(step)}. ` +
       `Run \`${cmd.brief()}\` to see what each outcome means.`,
   };
 }
 
+type AgentStep = Extract<Step, { type: "agent" }>;
+
+const agentStep = (s: AgentUnit | null): AgentStep | null => {
+  const step = s && cursorStep(s);
+  return step?.type === "agent" ? step : null;
+};
+
+/**
+ * Every session source but start-up (compact, resume, clear) has lost the brief it was given;
+ * at start-up the agent is about to read the brief, so a note would only repeat it. A source the
+ * tool does not name is treated as start-up.
+ */
+function sessionNote({ session: s, fact }: HookAnswerInput): HookAnswer {
+  if (fact.event !== "session_start" || !fact.message || fact.message === "startup") return ALLOW;
+  const step = agentStep(s);
+  if (!s || !step) return ALLOW;
+  const rules = HARD_RULES.map((r) => `- ${ruleWithReason(r.id)}`);
+  return {
+    kind: "context",
+    text: [
+      `norn: this session works step ${s.state.step} of ${s.unit.key}. Report exactly once: ${reportLine(step)}.`,
+      "The hard rules:",
+      ...rules,
+      `Run \`${cmd.brief()}\` for the rest.`,
+    ].join("\n"),
+  };
+}
+
+/** A long conversation buries the brief, so each prompt of an attended step restates how it ends. */
+function attendedReminder({ session: s, fact }: HookAnswerInput): HookAnswer {
+  if (fact.event !== "turn_start" || !agentStep(s)?.attended) return ALLOW;
+  return {
+    kind: "context",
+    text: "norn: report `norn done` only once the person agrees the work is finished, and ask in this session rather than with `norn ask`.",
+  };
+}
+
 export function hookAnswer(input: HookAnswerInput): HookAnswer {
+  if (input.fact.event === "session_start") return sessionNote(input);
+  if (input.fact.event === "turn_start") return attendedReminder(input);
   return turnEndBlock(input);
 }
