@@ -1,0 +1,15 @@
+{
+  "summary": "Changes requested. 1 finding, 1 blocking. Every Done-means item is traced to a test that asserts it (decide unit test and rule case, the integration test over the harness, the remote contract test and gh/glab unit tests), the unit tier (1291 pass) and the type check are green, and the release gate prompt drops the title check. No earlier findings. Blocking (standards, bug): a failed retitle_pr is recorded as an act failure in the story unit's own failures slot, so a later successful retitle never clears it (nothing adds `retitle_pr` to effectsOk) and the inbox keeps a notified Unblock item that says the retitle failed after the PR was renamed; in the same tick it also overwrites the story unit's main-action failure (such as a refused commit or push).",
+  "findings": [
+    {
+      "id": "F1",
+      "axis": "standards",
+      "severity": "blocking",
+      "file": "packages/cli/src/runtime/act/index.ts",
+      "line": 120,
+      "title": "A failed PR retitle leaves a stale Unblock item and can overwrite the story unit's failure",
+      "detail": "retitle_pr is a tail action of the story unit (`packages/core/src/decide/story.ts:338`), and its failure goes through `recordFailure` (index.ts:120-143) under `a.unit.key` with effect `retitle_pr` (effectOf's default). `retitlePr` (`packages/cli/src/runtime/act/lifecycle.ts:249-254`) never adds `retitle_pr` to `effectsOk`, and `retitle_pr` is not in DELIVERY, so `delivered || this.effectsOk.has(prev.effect)` (index.ts:138-139) is never true. A later sync that retitles successfully therefore leaves the failure in place. `actFailureItem` (`packages/core/src/inbox/items.ts:226-249`) then shows a notified Unblock item, 'retitle_pr for gh-N failed: ...', until the cursor moves. At the release `ready` gate that means until the person approves, even though the PR already has the right title. Input: a sync succeeds, `gh pr edit --title` fails once (network blip or rate limit), and the next sync's retitle succeeds. Because the tail runs after the unit's own action in the same slot, a retitle failure in the same tick also replaces that action's failure. A refused `commit` or `push`, which the inbox keeps 'until the effect succeeds', then disappears from the inbox. `push_record`, the other tail action, avoids both problems with its own slot (`recordPushFailure`, index.ts:152-167).",
+      "suggestion": "Give retitle_pr its own failure handling, as recordPushFailure does: either a separate slot or no unit failure at all, since the next sync retries anyway. Or mark the effect as succeeded (`act.effectsOk.add(\"retitle_pr\")`) and never let a tail action overwrite a different effect's failure. Add an act test: a failed retitle, then a successful one, clears the item, and a failed retitle in the same tick as a failed commit keeps the commit failure."
+    }
+  ]
+}

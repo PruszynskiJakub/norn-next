@@ -1,0 +1,68 @@
+{
+  "summary": "Changes requested. 6 findings, 3 blocking. No earlier findings were given. `bun run test` (1291 pass) and `bun run typecheck` are green. Spec: the retitle (Wanted-1, Done-1..3) is implemented and traced to tests that were read. The removal of the ready gate's title check (Wanted-2) is done in release.yaml but proven by no test, so its row is UNTRACED (F1). Standards: on GitLab, draft MRs carry a `Draft: ` title prefix that the strict title compare does not handle. Every glab story MR would be retitled at the first sync and un-drafted, or retitled on every sync, and the scripted glab hides this (F2). A failed retitle_pr overwrites the story unit's act failure, which a later successful retitle never clears, so a stale Unblock item stays at a parked gate (F3). Minor: integration-tier proofs not run locally (F4); a merge-before-sync window with no gate warning (F5); hand-set PR titles reverted with no docs line (F6).",
+  "findings": [
+    {
+      "id": "F1",
+      "axis": "spec",
+      "severity": "blocking",
+      "criterion": "Wanted-2",
+      "file": ".agents/workflows/release.yaml",
+      "line": 69,
+      "title": "The removal of the ready gate's title check is proven by no test",
+      "detail": "Spec, Wanted: \"Then the gate prompt's title check can go.\" The change removes the sentence from the `ready` gate prompt (.agents/workflows/release.yaml:69-72), but no test asserts it. The story has no frontmatter `criteria`, so this item counts as verifier: test, and the traceability row is UNTRACED. The gh/glab, decide and integration tests cover only the retitle (Wanted-1).",
+      "suggestion": "Add a test that loads the repo's release workflow and checks that the `ready` gate prompt no longer asks the person to check or edit the PR title. Or record this item with `verifier: agent` or `person` so QA proves it."
+    },
+    {
+      "id": "F2",
+      "axis": "standards",
+      "severity": "blocking",
+      "file": "packages/adapters/src/glab/index.ts",
+      "line": 89,
+      "title": "On GitLab every draft MR is retitled at the first sync and loses its draft status",
+      "detail": "The glab adapter opens the MR with `glab mr create --draft --title X` (glab/index.ts:208-210), and GitLab stores the title as `Draft: X`. Both REST (`mr view` JSON) and GraphQL return that prefixed title, and mapMr (~89) and restMr (~122) copy it raw into RemotePullRequest.title. decide's retitlePr (packages/core/src/decide/story.ts:334-339) compares `pr.title === story.issue.title` strictly, so every story MR differs at the first sync after open-pr, not only release MRs. It then emits retitle_pr with the bare title, and act runs `glab mr update N --title X --yes` (glab/index.ts:221). On GitLab a title without the Draft prefix marks the MR ready, so the MR becomes ready for review and merge before anyone decided that. If the prefix were kept, the strict compare would never match, and norn would make one remote write per story on every sync. Tests miss this because the scripted glab (packages/adapters/test/contract/remote-cli.ts:176,199,237,241-244) stores titles verbatim, with a separate `draft` boolean. The new contract test (remote.ts:143-149) asserts `pr.title === \"Release\"` right after opening a draft, which real GitLab contradicts. Verified against the code paths, glab's help text and the `Draft: ` literal in the glab 1.128.0 binary. Not run against a live GitLab.",
+      "suggestion": "In mapMr/restMr, strip a leading draft marker (Draft:, [Draft], (Draft), WIP:) from the title, since is_draft already carries draft status. In glab editPullRequestTitle, keep the MR a draft: pass --draft or re-add the prefix while is_draft. Make the scripted glab prefix `Draft: ` on `mr create --draft`, so the contract suite catches this."
+    },
+    {
+      "id": "F3",
+      "axis": "standards",
+      "severity": "blocking",
+      "file": "packages/cli/src/runtime/act/lifecycle.ts",
+      "line": 249,
+      "title": "A failed retitle_pr overwrites the story unit's act failure and never clears",
+      "detail": "retitlePr (lifecycle.ts:249-254) throws on a remote failure. Actor.run (act/index.ts:76-95) catches it, and recordFailure (index.ts:121-143) stores `{effect: \"retitle_pr\"}` unconditionally under the story unit's key. retitle_pr is a tail action, so it runs after the unit's own action in the same tick, and its failure overwrites that action's failure (a refused push or commit, a launch, an undelivered answer). That real failure is then lost, and a later successful push or commit no longer clears the entry. A stored retitle_pr failure clears only if effectsOk has \"retitle_pr\", and nothing ever adds it. So a later successful retitle leaves it in place. actFailureItem (packages/core/src/inbox/items.ts:226-249) treats it like a delivery effect, hidden only by run activity. At the `ready` gate, where a release PR waits, there is no run, so a stale Unblock item \"retitle_pr for gh-N failed\" stays until the gate is decided, even after the PR was renamed. The rule that a stored failure never clears was already there for other effects, but only this new tail action can overwrite the same tick's failure, and it is re-emitted on every sync while the titles differ.",
+      "suggestion": "Handle retitle_pr like push_record in recordFailure: return early or give it its own slot, since decide retries it every sync. Or at least add act.effectsOk.add(\"retitle_pr\") on success, and never let a tail-action failure replace another effect's failure."
+    },
+    {
+      "id": "F4",
+      "axis": "spec",
+      "severity": "minor",
+      "criterion": "Done-2",
+      "file": "packages/cli/test/integration/pr-body.test.ts",
+      "line": 101,
+      "title": "The end-to-end and contract proofs are integration tier and were not run locally",
+      "detail": "Done-2 (\"retitled at the next remote sync, exactly once\") and Done-3 (gh/glab/FakeRemote contract) are proven by integration-tier tests (pr-body.test.ts:101, adapters/test/contract/remote.ts:143). The handoff's \"1291 pass\" is the unit tier only. The tests were read and assert the items. CI has to show them green.",
+      "suggestion": "Confirm the integration and e2e tiers are green in CI before calling Done-2 and Done-3 proven."
+    },
+    {
+      "id": "F5",
+      "axis": "spec",
+      "severity": "minor",
+      "criterion": "Wanted-1",
+      "file": "packages/core/src/decide/story.ts",
+      "line": 128,
+      "title": "A merge within one sync interval of the rename still ships the old title, and the gate no longer warns",
+      "detail": "The retitle fires only on a sync tick. It also waits behind a round_migrate on the same tick, because the early return at story.ts:123-126 skips it. A person who approves and merges before the next successful sync after prepare's rename still gets a squash commit titled \"Release\". Before this change, the gate prompt asked the person to check the title. The ci step makes this window unlikely.",
+      "suggestion": "Optional: a short gate-prompt hint that the title follows the issue at the next sync, or emit the retitle before the round_migrate return."
+    },
+    {
+      "id": "F6",
+      "axis": "standards",
+      "severity": "minor",
+      "file": "packages/core/src/decide/story.ts",
+      "line": 334,
+      "title": "A PR title set by hand is reverted at every sync, and docs/ does not say so",
+      "detail": "Any title a person sets on purpose is renamed back to the issue's title at the next sync while the story is active. This follows from the spec's intent, and the handoff's Notes mention it, but nothing under docs/ tells users that the PR title now follows the issue.",
+      "suggestion": "Add one line to the user docs where the story PR body (GR9) is described."
+    }
+  ]
+}

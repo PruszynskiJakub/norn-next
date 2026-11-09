@@ -1,0 +1,5 @@
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| Wanted (1) | norn's milestone line goes into the handoff's existing Progress section at any heading level | test | `packages/cli/test/unit/report.test.ts` › "level {1,2,3,4} headings: the line lands after the last milestone of the one Progress section"; also "a deeper heading inside Progress stays in the section; the line goes after its content", "an empty Progress section gets the line after one blank line", "Progress as the last section: the line is appended at its end" |
+| Wanted (2) | appending a milestone never creates a second Progress section | test | `packages/cli/test/unit/report.test.ts` › "level {1,2,3,4} headings: ..." (whole-file `toBe`, so no extra `## Progress` is added) |
+| Repro | a handoff with `### Goal` / `### Progress` / `### Resume`, reported with `norn done`, no longer ends with a new `## Progress` | test | `packages/cli/test/unit/report.test.ts` › "level 3 headings: the line lands after the last milestone of the one Progress section" (at `appendProgress`, the seam `done.ts`, gate rejections and checkout journaling all call) |

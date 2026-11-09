@@ -1,0 +1,7 @@
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| Wanted (a) | norn's milestone line goes into the handoff's existing Progress section at any heading level | test | `packages/cli/test/unit/report.test.ts` › "level {1,2,3,4} headings: the line lands after the last milestone of the one Progress section" (exact whole-file match, levels 1-4; a fenced `#` line inside Progress is not covered and breaks it, see F1) |
+| Wanted (b) | the milestone line never creates a second Progress section | test | `packages/cli/test/unit/report.test.ts` › "level {1,2,3,4} headings: ..." (exact `toBe` shows no `## Progress` appended) |
+| Repro | a handoff with `### Goal` / `### Progress` / `### Resume`, then a `norn done` report: no new `## Progress` at the end | test | `packages/cli/test/unit/report.test.ts` › "level 3 headings: the line lands after the last milestone of the one Progress section" (at the `appendProgress` seam, which `done.ts:198`, `report.ts:86` and `checkout.ts:505` all call) |
+| Section end | a deeper heading inside Progress stays in the section; the line goes after its content | test | `packages/cli/test/unit/report.test.ts` › "a deeper heading inside Progress stays in the section; the line goes after its content" |
+| No Progress | a handoff without a Progress section still gets one `## Progress` at the end | test | `packages/cli/test/unit/report.test.ts` › "a handoff without a Progress section gets one at the end" |

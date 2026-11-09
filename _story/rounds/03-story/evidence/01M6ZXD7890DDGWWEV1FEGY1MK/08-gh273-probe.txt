@@ -1,0 +1,41 @@
+26 packages installed [123.00ms]
+=== head
+## Goal
+
+G
+
+## Progress
+
+- ran it:
+
+```sh
+- s#1 done: x
+
+# install deps
+bun install
+```
+
+## Resume
+
+R
+
+26 packages installed [48.00ms]
+=== base
+## Goal
+
+G
+
+## Progress
+
+- ran it:
+
+```sh
+# install deps
+bun install
+```
+- s#1 done: x
+
+## Resume
+
+R
+

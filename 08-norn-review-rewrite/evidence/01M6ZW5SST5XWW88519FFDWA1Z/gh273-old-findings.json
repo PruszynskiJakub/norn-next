@@ -1,0 +1,36 @@
+{
+  "summary": "Changes requested. 3 findings, 2 blocking. Every spec item is traced to a test in packages/cli/test/unit/report.test.ts, and the unit tier (1289 pass) and typecheck are green. Blocking: (F1, standards) the new comments name the issue (gh-273) and tell history, which AGENTS.md forbids; (F2, standards bug) a `# ...` line inside a fenced code block in the Progress section now ends the section, so the milestone is inserted inside the code fence. Minor: (F3) levels 5 and 6 are matched but not tested. No earlier findings (first review).",
+  "findings": [
+    {
+      "id": "F1",
+      "axis": "standards",
+      "severity": "blocking",
+      "file": "packages/cli/src/runtime/report.ts",
+      "line": 95,
+      "title": "Comments carry the issue number and history",
+      "detail": "AGENTS.md › Rules: \"Comments say why, never what or when ... No issue numbers, spec item ids or history.\" The diff adds `// gh-273 (O6, S9): the one Progress section at whatever heading level the agent wrote (the brief shows the handoff demoted to ###, and agents write it back in that shape)` at packages/cli/src/runtime/report.ts:95-96, the file doc `/** gh-273 (O6, S9): ... */` at packages/cli/test/unit/report.test.ts:1, and the suite name `describe(\"appendProgress (gh-273)\")` at packages/cli/test/unit/report.test.ts:21. Older gh-NNN comments elsewhere in the repo do not override the documented rule.",
+      "suggestion": "Drop `gh-273` from the comment, the test file doc and the describe name; keep only the why (the Progress section can be at any level because the brief demotes headings; it ends at the next heading as high or higher)."
+    },
+    {
+      "id": "F2",
+      "axis": "standards",
+      "severity": "blocking",
+      "file": "packages/cli/src/runtime/report.ts",
+      "line": 103,
+      "title": "A `#` comment in a code fence inside Progress ends the section",
+      "detail": "The section end is now any line where `headingLevel(l) > 0 && headingLevel(l) <= level` (report.ts:103), with no notion of fenced code. With `### Progress` (level 3), a level-1 match such as a shell comment `# run it` inside a ```sh block ends the section. Tried: a handoff `### Goal\\n\\nG\\n\\n### Progress\\n\\n- a\\n\\n```sh\\n# run it\\nbun test\\n```\\n\\n### Resume\\n\\nR\\n` given to appendProgress(file, \"s#1 done: x\") comes out with `- s#1 done: x` written inside the code fence, right after the opening ```sh line. Before the change only a `##` line ended the section, so a `#` shell comment was safe; the change widens the failure to every Progress section with a commented shell snippet. headingLevel likewise matches heading-like lines inside fences when looking for the Progress heading (report.ts:97).",
+      "suggestion": "Skip lines inside fenced code blocks (``` or ~~~) when looking for the Progress heading and its end; add a test with a commented shell block inside Progress."
+    },
+    {
+      "id": "F3",
+      "axis": "spec",
+      "severity": "minor",
+      "criterion": "Wanted (1)",
+      "file": "packages/cli/test/unit/report.test.ts",
+      "line": 22,
+      "title": "Heading levels 5 and 6 are not tested",
+      "detail": "Spec: \"goes into the handoff's existing Progress section at any heading level\". The regex accepts `#{1,6}` but the parametrized test runs levels 1-4 only. The mechanism is the same, so this is a note, not rework.",
+      "suggestion": "Extend the level list to [1, 2, 3, 4, 5, 6]."
+    }
+  ]
+}

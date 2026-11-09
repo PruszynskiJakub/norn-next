@@ -1,0 +1,230 @@
+[
+  {
+    "attended": false,
+    "mode": "auto",
+    "runner": "herdr",
+    "where": {
+      "story": "gh-1",
+      "slice": "gh-1/02",
+      "step": "implement",
+      "attempt": 1,
+      "counters": "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "auto",
+      "mode_requested": "auto",
+      "attended": false,
+      "runner": "herdr",
+      "run_id": null
+    }
+  },
+  {
+    "attended": false,
+    "mode": "auto",
+    "runner": "headless",
+    "where": {
+      "story": "gh-1",
+      "slice": "gh-1/02",
+      "step": "implement",
+      "attempt": 1,
+      "counters": "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "auto",
+      "mode_requested": "auto",
+      "attended": false,
+      "runner": "headless",
+      "run_id": null
+    }
+  },
+  {
+    "attended": false,
+    "mode": "auto",
+    "runner": null,
+    "where": {
+      "story": "gh-1",
+      "slice": "gh-1/02",
+      "step": "implement",
+      "attempt": 1,
+      "counters": "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "manual",
+      "mode_requested": "auto",
+      "attended": false,
+      "runner": null,
+      "run_id": null
+    }
+  },
+  {
+    "attended": false,
+    "mode": "manual",
+    "runner": "herdr",
+    "where": {
+      "story": "gh-1",
+      "slice": "gh-1/02",
+      "step": "implement",
+      "attempt": 1,
+      "counters": "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "manual",
+      "mode_requested": "manual",
+      "attended": false,
+      "runner": "herdr",
+      "run_id": null
+    }
+  },
+  {
+    "attended": false,
+    "mode": "manual",
+    "runner": "headless",
+    "where": {
+      "story": "gh-1",
+      "slice": "gh-1/02",
+      "step": "implement",
+      "attempt": 1,
+      "counters": "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "manual",
+      "mode_requested": "manual",
+      "attended": false,
+      "runner": "headless",
+      "run_id": null
+    }
+  },
+  {
+    "attended": false,
+    "mode": "manual",
+    "runner": null,
+    "where": {
+      "story": "gh-1",
+      "slice": "gh-1/02",
+      "step": "implement",
+      "attempt": 1,
+      "counters": "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "manual",
+      "mode_requested": "manual",
+      "attended": false,
+      "runner": null,
+      "run_id": null
+    }
+  },
+  {
+    "attended": true,
+    "mode": "auto",
+    "runner": "herdr",
+    "where": {
+      "story": "gh-1",
+      "slice": "gh-1/02",
+      "step": "implement",
+      "attempt": 1,
+      "counters": "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "manual",
+      "mode_requested": "auto",
+      "attended": true,
+      "runner": "herdr",
+      "run_id": null
+    }
+  },
+  {
+    "attended": true,
+    "mode": "auto",
+    "runner": "headless",
+    "where": {
+      "story": "gh-1",
+      "slice": "gh-1/02",
+      "step": "implement",
+      "attempt": 1,
+      "counters": "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "manual",
+      "mode_requested": "auto",
+      "attended": true,
+      "runner": "headless",
+      "run_id": null
+    }
+  },
+  {
+    "attended": true,
+    "mode": "auto",
+    "runner": null,
+    "where": {
+      "story": "gh-1",
+      "slice": "gh-1/02",
+      "step": "implement",
+      "attempt": 1,
+      "counters": "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "manual",
+      "mode_requested": "auto",
+      "attended": true,
+      "runner": null,
+      "run_id": null
+    }
+  },
+  {
+    "attended": true,
+    "mode": "manual",
+    "runner": "herdr",
+    "where": {
+      "story": "gh-1",
+      "slice": "gh-1/02",
+      "step": "implement",
+      "attempt": 1,
+      "counters": "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "manual",
+      "mode_requested": "manual",
+      "attended": true,
+      "runner": "herdr",
+      "run_id": null
+    }
+  },
+  {
+    "attended": true,
+    "mode": "manual",
+    "runner": "headless",
+    "where": {
+      "story": "gh-1",
+      "slice": "gh-1/02",
+      "step": "implement",
+      "attempt": 1,
+      "counters": "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "manual",
+      "mode_requested": "manual",
+      "attended": true,
+      "runner": "headless",
+      "run_id": null
+    }
+  },
+  {
+    "attended": true,
+    "mode": "manual",
+    "runner": null,
+    "where": {
+      "story": "gh-1",
+      "slice": "gh-1/02",
+      "step": "implement",
+      "attempt": 1,
+      "counters": "conflict_loop 0/2, qa_loop 0/2, review_loop 0/3, test_loop 0/5",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "manual",
+      "mode_requested": "manual",
+      "attended": true,
+      "runner": null,
+      "run_id": null
+    }
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "summary": "Changes requested. 2 findings, 1 blocking. No earlier findings (first review). Every spec item is traced to a test that asserts it (levels 1-4, deeper subheading, empty Progress, Progress last, no Progress), and the unit tier (1289 pass) and the type check are green. Blocking (standards, bug): the new section end treats any line starting with fewer or equal hashes as a heading, so a `# comment` line inside a fenced code block in a Progress section now ends the section, and the milestone is written into the middle of the code block. This is a regression in the default level-2 case too, where the old `/^##\\s/` end did not match `# ...`. Minor: the Progress lookup is case-sensitive while core's dropSection for the same handoff is not, so a `### progress` heading still gets a second `## Progress`.",
+  "findings": [
+    {
+      "id": "F1",
+      "axis": "standards",
+      "severity": "blocking",
+      "file": "packages/cli/src/runtime/report.ts",
+      "line": 103,
+      "title": "A `#` comment inside a fenced code block in Progress ends the section, and the milestone is written into the code block",
+      "detail": "`end = lines.findIndex((l, i) => i > at && headingLevel(l) > 0 && headingLevel(l) <= level)` counts every line matching `/^(#{1,6})\\s/`, including lines inside ``` fences. With a level-2 handoff `## Goal\\n\\nG\\n\\n## Progress\\n\\n- ran it:\\n\\n```sh\\n# install deps\\nbun install\\n```\\n\\n## Resume\\n\\nR\\n`, `appendProgress(f, \"s#1 done: x\")` writes `- s#1 done: x` between ```` ```sh ```` and `# install deps` (probe: scratchpad/evidence/probe/fence.ts, run with bun). Before the change the end regex was `/^##\\s/`, which never matched `# install deps`, so the line went after the fence. The handoff is committed context (S9) every later brief shows, so the corruption persists and repeats on each report. Same hazard for the heading search at line 97 (a `## Progress` line inside a fence in Goal would be taken as the section).",
+      "suggestion": "Skip lines inside fenced code blocks (toggle on lines starting with ``` or ~~~) when looking for the Progress heading and its end; add a test with a fenced `# comment` inside Progress at level 2 and level 3."
+    },
+    {
+      "id": "F2",
+      "axis": "standards",
+      "severity": "minor",
+      "file": "packages/cli/src/runtime/report.ts",
+      "line": 97,
+      "title": "Progress heading match is case-sensitive, unlike core's dropSection on the same handoff",
+      "detail": "`/^#{1,6}\\s+Progress\\s*$/` has no `i` flag, while `dropSection` in packages/core/src/brief.ts:388 matches section titles case-insensitively. A handoff with `### progress` still gets a second `## Progress` appended. The spec asks for any heading level, not any case, so this is a note; `headingLevel` also re-implements the level parsing dropSection already does (possible Duplicated Code).",
+      "suggestion": "Add the `i` flag, or share one heading/section helper with core's dropSection."
+    }
+  ]
+}

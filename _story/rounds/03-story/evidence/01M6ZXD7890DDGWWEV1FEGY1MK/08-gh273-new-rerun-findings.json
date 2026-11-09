@@ -1,0 +1,57 @@
+{
+  "summary": "Changes requested. 5 findings, 1 blocking. No earlier findings were given. The unit tier (1289 pass) and the type check are green. The fix makes appendProgress find Progress at any heading level and end it at the next heading as high or higher, and the new unit test pins levels 1-4 and the edge cases. But it brings a regression: a `#` line inside a fenced code block in Progress (a shell comment, which is common in handoffs) now counts as a heading, ends the section, and the milestone line is written inside the code block. Before this change such a level-2 handoff got the line in the right place (verified by probe against both versions). The rest are notes: the title match is case-sensitive and narrower than core's dropSection, a fenced `# Progress` above the real section is taken as the section, no test pins which section wins when a damaged handoff already has two, and the heading parsing repeats dropSection.",
+  "findings": [
+    {
+      "id": "F1",
+      "axis": "spec",
+      "severity": "blocking",
+      "criterion": "Wanted (a)",
+      "file": "packages/cli/src/runtime/report.ts",
+      "line": 103,
+      "title": "A fenced `#` line in Progress ends the section and the milestone is written inside the code block",
+      "detail": "The end search `headingLevel(l) > 0 && headingLevel(l) <= level` (report.ts:103) uses `headingLevel` (report.ts:116-118, `/^(#{1,6})\\s/`) with no fence tracking. A shell comment `# build first` inside a ```sh block counts as level 1, so a `## Progress` (or `### Progress`) section ends there. Probe on `## Goal\\n\\nG\\n\\n## Progress\\n\\n- ran:\\n\\n```sh\\n# build first\\nbun run test\\n```\\n\\n## Resume\\n\\nR\\n`: the new code writes \"- s#1 done: X\" plus a blank line right after the opening fence, inside the code. The old code (6db7dbd, end test `/^##\\s/`) put the line after the closing fence, before `## Resume`. This is a regression for handoffs that worked before, and it breaks the spec's Wanted: \"norn's milestone line goes into the handoff's existing Progress section\". Confirmed by both axes and by an independent check. No test covers fences.",
+      "suggestion": "Skip lines inside ``` and ~~~ fences when looking for the Progress heading and for the section end. Add a unit test with a fenced shell comment inside a level-2 and a level-3 Progress section."
+    },
+    {
+      "id": "F2",
+      "axis": "spec",
+      "severity": "minor",
+      "criterion": "Wanted (b)",
+      "file": "packages/cli/src/runtime/report.ts",
+      "line": 97,
+      "title": "Progress title match is case-sensitive and takes no closing hashes, so these variants still get a second section",
+      "detail": "`/^#{1,6}\\s+Progress\\s*$/` does not match `### progress`, `### Progress ###` (valid ATX) or `  ### Progress`. Each of these got a fresh `## Progress` appended at the end in a probe. Core's dropSection (packages/core/src/brief.ts:388) matches titles case-insensitively, so the brief and the writer disagree on what the section is, although the comment claims the fix works the way dropSection does. Not a regression: the old regex was just as strict.",
+      "suggestion": "Match the title case-insensitively and allow optional closing hashes, as dropSection does."
+    },
+    {
+      "id": "F3",
+      "axis": "spec",
+      "severity": "minor",
+      "file": "packages/cli/src/runtime/report.ts",
+      "line": 97,
+      "title": "A fenced `# Progress` line above the real section is taken as the Progress section",
+      "detail": "The start search also ignores fences. A fenced example in Goal that holds `# Progress` becomes a level-1 \"section\" that runs to the end of the file. The milestone line then lands after Resume, and the real `### Progress` never gets it. This is rarer than F1 and has the same fix.",
+      "suggestion": "The fence skipping from F1, applied to the start search too, with a test."
+    },
+    {
+      "id": "F4",
+      "axis": "standards",
+      "severity": "minor",
+      "file": "packages/cli/src/runtime/report.ts",
+      "line": 116,
+      "title": "The section-finding logic repeats core's dropSection and has already drifted from it",
+      "detail": "report.ts:97, :102-103 and :116-118 re-implement brief.ts:386-394's \"find the section titled X at any level, end it at the next heading as high\". The copies already differ on case (F2), and neither handles fences (F1), so a fix has to be made twice. A possible case of Duplicated Code.",
+      "suggestion": "One exported section-range helper in @norn/core, used by both (cli may depend on core)."
+    },
+    {
+      "id": "F5",
+      "axis": "spec",
+      "severity": "nit",
+      "file": "packages/cli/test/unit/report.test.ts",
+      "line": 21,
+      "title": "No test pins which Progress section gets the line when a damaged handoff already has two",
+      "detail": "For the gh-267 shape (`### Progress` and later `## Progress`), findIndex picks the first one and no third section is created. That is acceptable under \"never creates a second one\", but nothing pins the choice. The old code picked the `##` one.",
+      "suggestion": "Add a test that pins the first-match choice."
+    }
+  ]
+}

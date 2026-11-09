@@ -1,0 +1,86 @@
+{
+  "unit": "gh-9",
+  "step": "implement",
+  "attempt": 1,
+  "run_id": "03PGFN2YHGZPTV7WVS8APRV6BR",
+  "started": true,
+  "briefing": "briefings/03PGFN2YHGZPTV7WVS8APRV6BR/03PGFN2YHGZPTV7WVS8APRV6BV.md",
+  "markdown": "# norn brief — gh-9 · implement #1\n\nYou do one step of a larger delivery and report how it ended, once; code decides what happens next.\n\n## Where you run\n\n- You run unattended in a headless session: no person reads this session. A question goes through `norn ask`, which parks the step until a person answers it.\n- A permission prompt parks the step until a person answers it: prefer actions that need none.\n- Mode manual: after your report, the next agent step waits for a person to start it.\n\n## Your work\n\nUse the `norn-implement` skill.\n\n## Finish with exactly one of\n\n- `norn done done --handoff \"…\"` — the change is made\n- `norn ask \"<question>\"` — you need a person's answer to continue; the step parks until answered\n- `norn stuck \"<reason>\"` — you cannot continue; a person unblocks the step\n\n- `--handoff \"…\"`: what your skill says to hand back, in a sentence or two, the most important first; its first 160 characters are this step's line in History.\n- Any `done` also takes `--findings <file>` (needed when the outcome sends the work back: what failed, with its repro) and `--evidence <dir>` (copied into this run's evidence). Pass every findings file and evidence folder your skill wrote.\n- `norn ask \"<one self-contained question>\" [--option \"<a>\" --option \"<b>\"]` when you need a person's decision; `norn stuck \"<reason>\"` says what would unblock it.\n\nReport exactly once, from the worktree root (a report can move or remove the folder you stand in), with the outcome whose meaning is true, not the one you hoped for. A refused report says what to do instead: do exactly that, then report again; never work around a refusal. After a report succeeds, end your turn; resumed with an answer, continue the same step and report again at its end.\n\n## Inputs\n\n- Story spec: `.agents/specs/gh-9-qa-thing/spec.md` — what the story asks (its user stories) and, once planned, how it is built (its Plan)\n- Handoff: `.agents/specs/gh-9-qa-thing/handoffs/_story.md` — write the unit's current state here (shown under Context)\n\n## Context\n\n### Goal\n\n### Proof\n\n### Easy to miss\n\n### Not proven yet\n\n### Notes\n\n### Resume\n\n## How to work\n\n- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (`.norn-unit`, `.env.norn`; open the handoff only to rewrite it), and do not survey the repository, `.agents/`, `.claude/` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.\n- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in `.env.norn`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.\n- The handoff `.agents/specs/gh-9-qa-thing/handoffs/_story.md` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:\n  - **Goal**: what this unit must achieve, in one or two lines.\n  - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.\n  - **Easy to miss**: the rule or edge case the quick path would break.\n  - **Not proven yet**: what is still open or unverified.\n  - **Notes**: decisions and why, what was tried and failed, and what the next step must know, such as a repro loop or a seam.\n  - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.\n  Keep it under 8 KB: long repros and logs go into the folder you pass with `--evidence <dir>` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.\n- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the `--handoff` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter `criteria`, the criteria report, a finding's `criterion`, the traceability table) always stands next to what it says.\n- Of the norn commands, run only `brief`, `done`, `ask` and `stuck` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only `norn status --json` or `norn story view` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise `norn ask`. After a long session or a lost thread, run `norn brief` again: it is rendered from the unit's state each time.\n- Never `git push` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a `gh` or `glab` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.\n- Never edit anything under `runs/` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit `corrupt`. The repo's workflows (`.agents/workflows/`) and its norn config in `.agents/` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.\n- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:\n  - \"ask the person\" → `norn ask`, which parks the step until it is answered; nobody reads this session\n  - \"stop, or wait for input\" → `norn stuck` or `norn ask`\n  - \"push, open or comment on a pull request\" → leave it to norn\n  - \"run another norn command\" → only when the person asks you to directly\n- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under `runs/`); one that only reads needs none.\n\n## Limits\n\n- Deadline: 60m (until 2099-01-15T11:00:30.000Z)\n- Ports: `PORT_BASE=4010` (slot 1, in `.env.norn`)\n",
+  "brief": {
+    "where": {
+      "story": "gh-9",
+      "slice": null,
+      "step": "implement",
+      "attempt": 1,
+      "counters": "none",
+      "at_limit": [],
+      "last_outcome": "none",
+      "mode": "manual",
+      "mode_requested": "manual",
+      "attended": false,
+      "runner": "headless",
+      "run_id": "03PGFN2YHGZPTV7WVS8APRV6BR"
+    },
+    "history": null,
+    "work": {
+      "skill": "norn-implement",
+      "instructions": null,
+      "description": null
+    },
+    "inputs": [
+      {
+        "kind": "spec",
+        "label": "Story spec",
+        "ref": ".agents/specs/gh-9-qa-thing/spec.md",
+        "purpose": "what the story asks (its user stories) and, once planned, how it is built (its Plan)"
+      },
+      {
+        "kind": "handoff",
+        "label": "Handoff",
+        "ref": ".agents/specs/gh-9-qa-thing/handoffs/_story.md",
+        "purpose": "write the unit's current state here (shown under Context)"
+      }
+    ],
+    "rework": null,
+    "checks": null,
+    "rulings": [],
+    "context": {
+      "handoff": "### Goal\n\n### Proof\n\n### Easy to miss\n\n### Not proven yet\n\n### Notes\n\n### Resume",
+      "handoff_bytes": {
+        "bytes": 74,
+        "max": 8192,
+        "truncated": false
+      },
+      "handoff_warning": null,
+      "resume_dropped": null,
+      "answers": [],
+      "notes": null
+    },
+    "log": null,
+    "handoff_file": ".agents/specs/gh-9-qa-thing/handoffs/_story.md",
+    "finish": [
+      {
+        "command": "norn done done --handoff \"…\"",
+        "means": "the change is made"
+      },
+      {
+        "command": "norn ask \"<question>\"",
+        "means": "you need a person's answer to continue; the step parks until answered"
+      },
+      {
+        "command": "norn stuck \"<reason>\"",
+        "means": "you cannot continue; a person unblocks the step"
+      }
+    ],
+    "criteria": null,
+    "limits": {
+      "attended": false,
+      "deadline": "60m",
+      "deadline_at": "2099-01-15T11:00:30.000Z",
+      "nudges_left": 2,
+      "retries_left": 1,
+      "slot": 1,
+      "port_base": 4010
+    }
+  }
+}

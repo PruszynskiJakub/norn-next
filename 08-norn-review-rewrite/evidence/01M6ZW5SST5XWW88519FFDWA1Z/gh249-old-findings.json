@@ -1,0 +1,37 @@
+{
+  "summary": "Changes requested. 3 findings, 2 blocking. No earlier findings (first review). The unit tier (1291 pass) and the type check are green. The core behaviour is done and tested: decide emits a tail `retitle_pr` on a sync tick when the open PR's title differs from the issue's, and gh, glab and FakeRemote can read and edit the title. Blocking: (F1, spec) no test proves the second Wanted item, that the gate prompt's title check is gone; (F2, standards bug) a failed retitle goes into the story unit's general act-failure slot. There it replaces any failure the unit's own action recorded in the same tick, and a later retitle that works never clears it. Minor: (F3) none of this has been run against real gh/glab.",
+  "findings": [
+    {
+      "id": "F1",
+      "axis": "spec",
+      "severity": "blocking",
+      "criterion": "Wanted (2)",
+      "file": ".agents/workflows/release.yaml",
+      "line": 69,
+      "title": "No test proves the ready gate's title check is gone",
+      "detail": "Spec: \"Then the gate prompt's title check can go.\" The diff removes the sentence from the `ready` prompt (release.yaml:68-72), but no test asserts it. test/repo/repo.test.ts:601 parses release.yaml for the step graph only and never reads `ready.prompt`. The story has no frontmatter criteria, so the item counts as `verifier: test` and the row is UNTRACED.",
+      "suggestion": "Add an assertion to the release workflow test in test/repo/repo.test.ts that the `ready` prompt no longer asks the person to check or edit the PR title. Or have the person mark this item `agent` or `person` in the story's criteria."
+    },
+    {
+      "id": "F2",
+      "axis": "standards",
+      "severity": "blocking",
+      "file": "packages/cli/src/runtime/act/index.ts",
+      "line": 123,
+      "title": "A failed retitle overwrites the unit's act failure and is never cleared by a later successful retitle",
+      "detail": "`retitle_pr` carries the story unit's ref, so `recordFailure` handles it in the generic path (index.ts:124-135), not in a slot of its own as `push_record` has (index.ts:123, 152). Act runs tail actions last (index.ts:70). (1) On a sync tick, when the unit's own action fails (for example a mirror commit refused, effect `commit`) and the retitle fails too, `this.failures[key] = failure` replaces the commit failure with the `retitle_pr` one. The owed-commit Unblock item (items.ts:229-234) is lost. (2) A retitle success clears only when `effectsOk.has(prev.effect)` (index.ts:139), and nothing ever adds `retitle_pr` to `effectsOk` (only session.ts adds answer/resume/launch/nudge). So a transient `gh pr edit` failure at a parked `ready` gate leaves a stale 'retitle_pr for gh-N failed' Unblock item until the cursor moves, even after a later tick retitles the PR. On a `done` story unit (a release after approve, PR still open) a failure is hidden instead (items.ts:230).",
+      "suggestion": "Record retitle failures like record pushes: give them their own slot, or skip the unit slot and clear the failure on a successful retitle (add `retitle_pr` to `effectsOk` in `retitlePr`). Never overwrite a failure the same tick already recorded for the unit. Add a unit test in act for a failed retitle followed by a successful one."
+    },
+    {
+      "id": "F3",
+      "axis": "spec",
+      "severity": "minor",
+      "criterion": "Repro",
+      "file": "packages/adapters/src/glab/index.ts",
+      "line": 222,
+      "title": "Retitle checked only against scripted gh/glab",
+      "detail": "Spec Repro uses real `gh pr view --json title`. `gh pr edit --title`, `glab mr update --title … --yes`, and the `title` field in the gh GraphQL node and the GitLab GraphQL node are checked only against the scripted CLIs in packages/adapters/test/contract/remote-cli.ts. The handoff's Not proven yet says so.",
+      "suggestion": "Leave it to QA: one real run of `gh pr edit --title` and `glab mr update --title` (or the integration tier against a sandbox repo)."
+    }
+  ]
+}
