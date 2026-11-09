@@ -325,3 +325,20 @@ describe("commands and flags the docs name exist (B35)", () => {
     expect(mentions.length).toBeGreaterThan(0);
   });
 });
+
+// ---------------------------------------------------------------------------------------- limitations
+
+describe("limitations: the hooks entry", () => {
+  test("says the hooks are a reminder, not a sandbox, and names what they miss as still forbidden by the brief", () => {
+    const entry = read(join(ROOT, "docs", "limitations.md"))
+      .split("\n")
+      .find((l) => l.includes("The hooks are a reminder, not a sandbox"));
+    expect(entry).toBeDefined();
+    const text = entry as string;
+    expect(text).toContain("no security boundary");
+    expect(text).toContain("still forbidden by the brief");
+    expect(text).toContain("shell writes under norn's run state");
+    expect(text).toContain("remote writes not on its list");
+    expect(text).toMatch(/every norn command but `brief`, `done`, `ask` and `stuck`/);
+  });
+});

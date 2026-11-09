@@ -98,7 +98,15 @@ function gitRule(args: string[], commits: ReadonlySet<string>): HardRuleId | nul
 }
 
 const FORGE_VALUE_OPTIONS = new Set(["-R", "--repo"]);
-const REVIEW_WRITES = new Set(["create", "edit", "comment", "review", "ready", "merge", "close", "reopen"]);
+const GH_REVIEW_WRITES = ["create", "edit", "comment", "review", "ready", "merge", "close", "reopen"];
+/** The write verbs per review group (pull requests or merge requests) and `issue`: glab names the same writes differently. */
+const ISSUE_WRITES: Record<"gh" | "glab", Record<string, ReadonlySet<string>>> = {
+  gh: { pr: new Set(GH_REVIEW_WRITES), issue: new Set(GH_REVIEW_WRITES) },
+  glab: {
+    mr: new Set([...GH_REVIEW_WRITES, "note", "update", "approve", "revoke"]),
+    issue: new Set([...GH_REVIEW_WRITES, "note", "update"]),
+  },
+};
 const GROUP_WRITES: Record<string, ReadonlySet<string>> = {
   label: new Set(["create", "edit", "delete", "clone"]),
   release: new Set(["create", "delete"]),
@@ -124,7 +132,7 @@ function forgeRule(prog: "gh" | "glab", args: string[]): HardRuleId | null {
   const [group = "", action = "", ...rest] = afterOptions(args, FORGE_VALUE_OPTIONS);
   const review = prog === "gh" ? "pr" : "mr";
   if (group === review && action === "checkout") return "no-switch";
-  if ((group === review || group === "issue") && REVIEW_WRITES.has(action)) return "no-remote-write";
+  if (ISSUE_WRITES[prog][group]?.has(action)) return "no-remote-write";
   if (GROUP_WRITES[group]?.has(action)) return "no-remote-write";
   if (group === "api" && apiWrites([action, ...rest])) return "no-remote-write";
   return null;
