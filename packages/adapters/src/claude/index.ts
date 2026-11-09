@@ -2,24 +2,31 @@
  * Claude Code agent adapter (first-class, `blocking` tier).
  *
  * Hooks go into `<repo>/.claude/settings.json`; each runs `<hookCommand> <arg> # norn-owned`.
- * `Stop` is the blocking one: `norn hook stop` decides, `hookResponse` encodes
- * `{"decision":"block","reason":…}` per https://docs.claude.com/en/docs/claude-code/hooks.
+ * `norn hook` decides; `hookResponse` encodes per https://docs.claude.com/en/docs/claude-code/hooks:
+ * a `Stop` block as `{"decision":"block","reason":…}`, a PreToolUse denial as `permissionDecision`,
+ * added context on SessionStart and UserPromptSubmit as `additionalContext`.
  */
 import { join } from "node:path";
-import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookDecision, HookResponse } from "@norn/core";
+import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookAnswer, HookResponse, ToolCall } from "@norn/core";
 import type { HookEventKind, HookFact } from "@norn/schema";
 import {
   buildFact,
+  contextOutput,
+  denyToolOutput,
   field,
+  fileWrite,
   type HookSpec,
   isObject,
   type JsonObject,
   jsonHookInstaller,
+  jsonResponse,
   kebab,
   launchEnv,
   nativeEvent,
   objField,
+  pendingTool,
   readJsonl,
+  shellCall,
   textOf,
 } from "../agent-hooks/index.ts";
 
@@ -184,12 +191,27 @@ function withPendingCommand(hooks: readonly HookFact[]): HookFact[] {
   });
 }
 
-/** Only `Stop` (turn_end) can be blocked; everything else (incl. idle_prompt turn_end) is acknowledged silently. */
-export function hookResponse(fact: HookFact, decision: HookDecision): HookResponse {
-  if (fact.event === "turn_end" && fact.native === "Stop" && decision.block) {
-    return { stdout: `${JSON.stringify({ decision: "block", reason: decision.reason ?? "Report with norn done/ask/stuck before ending the turn." })}\n`, exit_code: 0 };
-  }
+/**
+ * Only `Stop` can be blocked (not the idle notification's turn end), only PreToolUse denied, and
+ * context added only on SessionStart and UserPromptSubmit; anything else is acknowledged silently.
+ */
+export function hookResponse(fact: HookFact, answer: HookAnswer): HookResponse {
+  const native = fact.native;
+  if (answer.kind === "block" && fact.event === "turn_end" && native === "Stop") return jsonResponse({ decision: "block", reason: answer.reason });
+  if (answer.kind === "deny" && native === "PreToolUse") return jsonResponse(denyToolOutput(native, answer.reason));
+  if (answer.kind === "context" && (native === "SessionStart" || native === "UserPromptSubmit")) return jsonResponse(contextOutput(native, answer.text));
   return { stdout: "", exit_code: 0 };
+}
+
+const FILE_TOOLS: Record<string, readonly string[]> = { Write: ["file_path"], Edit: ["file_path"], MultiEdit: ["file_path"], NotebookEdit: ["notebook_path"] };
+
+export function toolCall(native: string, payload: unknown): ToolCall | null {
+  const call = pendingTool(native, payload, "PreToolUse");
+  if (!call) return null;
+  if (call.tool === "Bash") return shellCall(call.input);
+  if (call.tool === "EnterWorktree") return { kind: "worktree_switch" };
+  const keys = FILE_TOOLS[call.tool];
+  return keys ? fileWrite(call.input, keys) : null;
 }
 
 /**
@@ -238,6 +260,7 @@ export const claudeAgent: AgentAdapter = {
   parseHookEvent,
   refineHooks,
   hookResponse,
+  toolCall,
   skillDir,
   launchCommand,
   lastAssistantMessage,

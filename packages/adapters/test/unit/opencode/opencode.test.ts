@@ -15,7 +15,16 @@ describe("opencode adapter", () => {
     expect(f("session.idle", payloads["session.idle"])).toMatchObject({ event: "turn_end", agent_session_id: "ses_01" });
     expect(f("permission.asked", payloads["permission.asked"])).toMatchObject({ event: "permission_prompt", command: "bash: git push" });
     expect(f("tool.execute.before", payloads["tool.execute.before"])).toMatchObject({ event: "tool_use", tool: "bash", command: "bun test" });
-    expect(opencodeAgent.hookResponse(f("session.idle", payloads["session.idle"])!, { block: true })).toEqual({ stdout: "", exit_code: 0 });
+  });
+
+  test("it can carry no answer: every answer is allow, and no tool call is read", () => {
+    const f = (arg: string, p: unknown) => opencodeAgent.parseHookEvent(arg, p, {}, AT)!;
+    const silent = { stdout: "", exit_code: 0 };
+    expect(opencodeAgent.hookResponse(f("session.idle", payloads["session.idle"]), { kind: "block", reason: "r" })).toEqual(silent);
+    const tool = f("tool.execute.before", payloads["tool.execute.before"]);
+    expect(opencodeAgent.hookResponse(tool, { kind: "deny", reason: "r" })).toEqual(silent);
+    expect(opencodeAgent.hookResponse(tool, { kind: "context", text: "t" })).toEqual(silent);
+    expect(opencodeAgent.toolCall("tool.execute.before", payloads["tool.execute.before"])).toBeNull();
   });
 
   test("plugin install/uninstall; never touches a foreign file", async () => {

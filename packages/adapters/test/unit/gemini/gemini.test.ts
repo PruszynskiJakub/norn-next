@@ -3,6 +3,8 @@ import { mkdtempSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { geminiAgent } from "../../../src/gemini/index.ts";
+import type { HookAnswer } from "@norn/core";
+import type { HookFact } from "@norn/schema";
 import payloads from "./fixtures/hook-payloads.json";
 
 const FIX = join(import.meta.dir, "fixtures");
@@ -18,8 +20,28 @@ describe("gemini adapter", () => {
 
   test("AfterAgent deny response", () => {
     const fact = geminiAgent.parseHookEvent("after-agent", payloads.AfterAgent, {}, AT)!;
-    expect(JSON.parse(geminiAgent.hookResponse(fact, { block: true, reason: "report" }).stdout)).toEqual({ decision: "deny", reason: "report" });
-    expect(geminiAgent.hookResponse(fact, { block: false }).stdout).toBe("{}\n");
+    expect(JSON.parse(geminiAgent.hookResponse(fact, { kind: "block", reason: "report" }).stdout)).toEqual({ decision: "deny", reason: "report" });
+    expect(geminiAgent.hookResponse(fact, { kind: "allow" }).stdout).toBe("{}\n");
+  });
+
+  test("deny on BeforeTool and context on SessionStart and BeforeAgent; {} for the rest", () => {
+    const f = (arg: string, p: unknown) => geminiAgent.parseHookEvent(arg, p, {}, AT)!;
+    const out = (fact: HookFact, a: HookAnswer) => JSON.parse(geminiAgent.hookResponse(fact, a).stdout);
+    expect(out(f("before-tool", payloads.BeforeTool), { kind: "deny", reason: "only norn pushes" })).toEqual({ decision: "deny", reason: "only norn pushes" });
+    expect(out(f("session-start", payloads.SessionStart), { kind: "context", text: "t" })).toEqual({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "t" } });
+    expect(out(f("before-agent", payloads.BeforeAgent), { kind: "context", text: "t" })).toEqual({ hookSpecificOutput: { hookEventName: "BeforeAgent", additionalContext: "t" } });
+    expect(out(f("before-tool", payloads.BeforeTool), { kind: "context", text: "t" })).toEqual({});
+    expect(out(f("notification", payloads.Notification), { kind: "deny", reason: "r" })).toEqual({});
+    expect(out(f("after-agent", payloads.AfterAgent), { kind: "context", text: "t" })).toEqual({});
+  });
+
+  test("toolCall: run_shell_command's full command, write_file and replace's path; anything else null", () => {
+    const call = (p: { hook_event_name: string }) => geminiAgent.toolCall(p.hook_event_name, p);
+    expect(call(payloads.BeforeTool)).toEqual({ kind: "shell", command: "bun test" });
+    expect(call(payloads.BeforeToolWriteFile)).toEqual({ kind: "file_write", paths: ["/repo/.worktrees/gh-12/src/a.ts"] });
+    expect(call(payloads.BeforeToolReplace)).toEqual({ kind: "file_write", paths: ["/repo/.worktrees/gh-12/src/b.ts"] });
+    expect(call(payloads.BeforeToolReadFile)).toBeNull();
+    expect(call(payloads.AfterAgent)).toBeNull();
   });
 
   test("settings.json round-trip", async () => {

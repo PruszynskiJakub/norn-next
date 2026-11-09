@@ -6,7 +6,7 @@
  */
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookDecision, HookResponse } from "@norn/core";
+import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookAnswer, HookResponse, ToolCall } from "@norn/core";
 import type { HookEventKind, HookFact } from "@norn/schema";
 import { atomicWrite } from "@norn/store";
 import * as shared from "../agent-hooks/index.ts";
@@ -89,8 +89,11 @@ export function parseHookEvent(arg: string, payload: unknown, env: Record<string
   );
 }
 
-/** OpenCode cannot block a turn end; the plugin ignores output. */
-export const hookResponse = (_fact: HookFact, _decision: HookDecision): HookResponse => ({ stdout: "", exit_code: 0 });
+/** OpenCode's plugin ignores output: no answer reaches it, so every one is allow. */
+export const hookResponse = (_fact: HookFact, _answer: HookAnswer): HookResponse => ({ stdout: "", exit_code: 0 });
+
+/** No answer can refuse a call, so none is read. */
+export const toolCall = (_native: string, _payload: unknown): ToolCall | null => null;
 
 /** Interactive `opencode --prompt "<prompt>"`; headless `opencode run "<prompt>"`; resume `--session <id>`. */
 export function launchCommand(req: AgentLaunchRequest): { argv: string[]; env: Record<string, string> } {
@@ -150,6 +153,7 @@ export const opencodeAgent: AgentAdapter = {
   },
   parseHookEvent,
   hookResponse,
+  toolCall,
   skillDir,
   launchCommand,
   lastAssistantMessage,

@@ -8,7 +8,7 @@
 import { readFile } from "node:fs/promises";
 import type { HookFact, HookEventKind } from "@norn/schema";
 import { SLICE_KEY_PATTERN, STORY_KEY_PATTERN, ULID_PATTERN, validate } from "@norn/schema";
-import type { AgentLaunchRequest } from "@norn/core";
+import type { AgentLaunchRequest, HookResponse, ToolCall } from "@norn/core";
 import { atomicWrite, json, readText } from "@norn/store";
 import { portError } from "../exec.ts";
 
@@ -171,6 +171,36 @@ export function buildFact(
   for (const [k, v] of Object.entries(opt)) if (v !== undefined) fact[k] = v;
   const r = validate("hook", fact);
   return r.ok ? r.value : null;
+}
+
+/** A JSON hook answer on stdout, exit 0. */
+export const jsonResponse = (value: unknown): HookResponse => ({ stdout: `${JSON.stringify(value)}\n`, exit_code: 0 });
+
+/** Added context in Claude Code's `hookSpecificOutput` shape, which Codex and Gemini read too. */
+export const contextOutput = (native: string, text: string) => ({ hookSpecificOutput: { hookEventName: native, additionalContext: text } });
+
+/** A refused tool call in Claude Code's `hookSpecificOutput` shape, which Codex reads too. */
+export const denyToolOutput = (native: string, reason: string) => ({
+  hookSpecificOutput: { hookEventName: native, permissionDecision: "deny", permissionDecisionReason: reason },
+});
+
+/**
+ * The tool name and input of a call about to run: only the `before` event, since a call that
+ * already ran can no longer be refused.
+ */
+export function pendingTool(native: string, payload: unknown, before: string): { tool: string; input: JsonObject } | null {
+  const tool = field(payload, "tool_name");
+  const input = objField(payload, "tool_input");
+  return native === before && tool && input ? { tool, input } : null;
+}
+
+/** A shell call of the input's full `command`; null without one. */
+export const shellCall = (input: JsonObject): ToolCall | null => (str(input.command) ? { kind: "shell", command: input.command as string } : null);
+
+/** A file write of the input's path fields that are set; null without any. */
+export function fileWrite(input: JsonObject, keys: readonly string[]): ToolCall | null {
+  const paths = keys.map((k) => str(input[k])).filter((p): p is string => p !== undefined);
+  return paths.length ? { kind: "file_write", paths } : null;
 }
 
 /** kebab-case CLI arg for a native event name: `UserPromptSubmit` → `user-prompt-submit`. */
