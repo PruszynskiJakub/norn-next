@@ -266,7 +266,7 @@ describe("skills", () => {
   });
 
   test("the norn skill and the brief's protocol name no step of any template", () => {
-    const text = `${readSkill("norn")}\n${protocolLines("handoffs/_story.md").join("\n")}`;
+    const text = `${readSkill("norn")}\n${protocolLines({ handoff_file: "handoffs/_story.md", attended: false }).join("\n")}`;
     const reserved = new Set(["test", "slice", "slices", "plan", "ready"]); // glossary nouns / plain words
     const names = new Set(workflowFiles.flatMap((f) => Object.keys(loadWorkflow(f).steps)).filter((n) => !reserved.has(n)));
     expect([...names].filter((n) => new RegExp(`\\b${n}\\b`, "i").test(text))).toEqual([]);
@@ -275,7 +275,7 @@ describe("skills", () => {
   test("the norn skill sends the agent to the brief, whose protocol states the reporting and hard rules", () => {
     const skill = readSkill("norn");
     for (const s of ["norn brief", "norn status", "norn story start <unit>", "How to work"]) expect(skill).toContain(s);
-    const protocol = protocolLines("handoffs/_story.md").join("\n");
+    const protocol = protocolLines({ handoff_file: "handoffs/_story.md", attended: false }).join("\n");
     for (const s of ["`brief`", "`done`", "`ask`", "`stuck`", "--handoff", "`--evidence <dir>`", "handoffs/_story.md", "Goal", "Proof", "Easy to miss", "Not proven yet", "Notes", "Resume", "8 KB", "git push", "runs/", "gh", "glab"])
       expect(protocol).toContain(s);
   });
@@ -382,7 +382,7 @@ describe("skills", () => {
     expect(refine).toContain("nothing cites a story by its number");
     for (const skill of ["norn-refine", "norn-slice", "norn-review", "norn-qa", "norn-plan", "norn-pr"]) expect(readSkill(skill)).not.toMatch(/\bUS\d|US<n>/);
     // the step protocol and the interview speak in words, to a person and in files
-    expect(protocolLines("handoffs/_story.md").join("\n")).toContain("Never an id alone");
+    expect(protocolLines({ handoff_file: "handoffs/_story.md", attended: false }).join("\n")).toContain("Never an id alone");
     expect(readSkill("norn-interview")).toMatch(/never by a number or id/);
   });
 
@@ -424,6 +424,32 @@ describe("skills", () => {
     }
   });
 
+  test("norn-retro lists the gate rulings after the friction and asks which read as a lasting preference", () => {
+    const text = readSkill("norn-retro");
+    const section = text.indexOf("## 3. Propose lasting preferences");
+    expect(section).toBeGreaterThan(text.indexOf("## 2. Find the friction"));
+    const terms = ["`approve` and `reject`", "the gate, the round", "the person's words", "`delegated: true`", "mark it delegated", "which read as a lasting preference"];
+    expect(terms.filter((t) => !text.slice(section).includes(t))).toEqual([]);
+  });
+
+  test("norn-retro proposes a REVIEW.md or agent instructions line naming file, section, wording and ruling", () => {
+    const text = readSkill("norn-retro");
+    const terms = [
+      "`REVIEW.md`", "how code is judged", "`AGENTS.md`", "else `CLAUDE.md`", "how agents work",
+      "**File**", "**Section**", "**Wording**", "**Ruling**",
+      // a missing target file is proposed for creation; a preference already stated is cited, not duplicated
+      "propose creating it", "cite that line as evidence", "never propose a duplicate",
+    ];
+    expect(terms.filter((t) => !text.includes(t))).toEqual([]);
+  });
+
+  test("norn-retro changes no file", () => {
+    const text = readSkill("norn-retro");
+    expect(text).toContain("changes no file");
+    expect(text).toContain("You write no file and change nothing");
+    expect(text).toContain("Do not write it to a file, and do not apply any change");
+  });
+
   test.each(CRAFT)("%s is unaware of norn", (name) => {
     // skill names carry the `norn-` prefix; any other mention of norn is a leak
     const text = readSkill(name).replace(/\bnorn-[a-z-]+/g, "");
@@ -450,6 +476,25 @@ describe("skills", () => {
         for (const [re, say] of BANNED) if (re.test(line)) hits.push(`${name}:${i + 1} → say ${say}: ${line.trim()}`);
       });
     expect(hits).toEqual([]);
+  });
+
+  // The brief's How to work forbids pushes and branch switches for every step, so a skill repeating it can only drift from it.
+  test("skills leave the push and branch rules to the brief, keeping committing locally as craft", () => {
+    expect(readSkill("norn-implement")).not.toMatch(/never push/i);
+    expect(readSkill("norn-merge")).not.toMatch(/never push/i);
+    expect(readSkill("norn-diagnose")).not.toMatch(/Never push\./);
+    expect(readSkill("norn-prototype")).not.toMatch(/Never create or switch branches for it\./);
+    expect(readSkill("norn-implement")).toMatch(/- Commit locally\.\n/);
+    expect(readSkill("norn-merge")).toMatch(/both sides' intended behaviour survives\. Commit locally\.\n/);
+    expect(readSkill("norn-diagnose")).toMatch(/is in the commit message \(or in your hand-back\)\.\n/);
+    expect(readSkill("norn-prototype")).toMatch(/commit the prototype and the spec together on the branch you are on\.\n/);
+  });
+
+  // The brief alone adapts a step to the story's mode; the supervisors set it only through the `--auto`/`--manual` flags.
+  test.each(SKILLS)("%s names no mode", (name) => {
+    const text = readSkill(name).replace(/--(auto|manual)\b/g, "");
+    expect(text).not.toMatch(/\b(auto|manual)\b[ -]*(mode|step|story|stories)\b/i);
+    expect(text).not.toMatch(/\bmode\b[^.\n]{0,30}\b(auto|manual)\b/i);
   });
 });
 

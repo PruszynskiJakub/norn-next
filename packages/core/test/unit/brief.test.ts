@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { Finding, Receipt, UnitState, Workflow } from "@norn/schema";
 import { applyReceipts } from "../../src/apply.ts";
 import { type BriefInput, renderBrief, storyRulings } from "../../src/brief.ts";
+import { HARD_RULES } from "../../src/hard-rules.ts";
 import type { NumberedReceipt, UnitRef } from "../../src/facts.ts";
 import { at, numbered, receipt, SLICE_WF, sliceUnit, STORY_WF, stateFor, storyUnit } from "../fixtures.ts";
 
@@ -103,7 +104,7 @@ describe("renderBrief", () => {
         limits: { deadline: "60m", nudges: 2, retries: 1, slot: null, port_base: null },
       }),
     );
-    expect(b.json.where).toMatchObject({ mode: "manual", attended: true, mode_note: null });
+    expect(b.json.where).toMatchObject({ mode: "manual", mode_requested: "auto", attended: true, runner: null });
     expect(b.json.context.answers).toEqual([{ question: "Email or username?", answer: "Email" }]);
     expect(b.markdown).toMatchSnapshot();
   });
@@ -672,5 +673,166 @@ describe("the brief as a map: History from receipts, state shown only when it ma
   test("History tells an implicit ask from a question the agent asked", () => {
     const rs = [numbered(1, receipt(st, "ask", { question: "Allow bun test?", implicit: true })), numbered(2, receipt(st, "done", { outcome: "done", handoff: "  " }))];
     expect(renderBrief(input(st, rs)).json.log?.lines).toEqual(["implement#1 waited on a prompt in its pane: Allow bun test?", "implement#1 reported `done`"]);
+  });
+});
+
+describe("How to work gives every hard rule its reason", () => {
+  const howToWork = () => {
+    const md = renderBrief(input(stateFor(SLICE, SLICE_WF), [])).markdown;
+    return md.slice(md.indexOf("## How to work"), md.indexOf("## Limits"));
+  };
+
+  test("the no-survey rule says the brief holds what the step needs and other units are not this unit's", () => {
+    expect(howToWork()).toContain(
+      "do not survey the repository, `.agents/`, `.claude/` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.",
+    );
+  });
+
+  test("the four-commands rule says why, read-only commands included", () => {
+    expect(howToWork()).toContain(
+      "run only `brief`, `done`, `ask` and `stuck` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only `norn status --json` or `norn story view` is forbidden too.",
+    );
+  });
+
+  test("the run state, no-push and no-switch rules say what breaks", () => {
+    const text = howToWork();
+    expect(text).toContain("Never edit anything under `runs/` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit `corrupt`.");
+    expect(text).toContain("Never `git push` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects.");
+    expect(text).toContain("Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report.");
+  });
+
+  test("every hard rule comes from the one list, each with a non-empty reason after it", () => {
+    const text = howToWork();
+    expect(HARD_RULES.length).toBeGreaterThanOrEqual(7);
+    for (const r of HARD_RULES) {
+      expect(r.reason.trim().length).toBeGreaterThan(0);
+      expect(r.reason).not.toMatch(/\.$/);
+      expect(text).toContain(`${r.rule} — ${r.reason}.`);
+      }
+    });
+  });
+
+describe("Where you run: the brief's situation, from the facts norn records", () => {
+  const story = storyUnit();
+  const storyPaths = { worktree: "/r-worktrees/gh-1-login", spec_dir: ".agents/specs/gh-1-login", story_file: ".agents/specs/gh-1-login/story.md", slice_file: null, unit_dir: ".agents/specs/gh-1-login/runs/_story" };
+  const attended = (over: Partial<BriefInput> = {}) => renderBrief(input(stateFor(story, STORY_WF), [], { unit: story, workflow: STORY_WF, paths: storyPaths, ...over }));
+  const unattended = (over: Partial<BriefInput> = {}) => renderBrief(input(stateFor(SLICE, SLICE_WF), [], over));
+  const section = (md: string) => md.slice(md.indexOf("## Where you run"), md.indexOf("## Your work"));
+  const permission = "A permission prompt parks the step until a person answers it";
+
+  test("opens every brief: right after the opening line, before Your work", () => {
+    for (const b of [attended(), unattended(), unattended({ runner: null }), unattended({ mode: "manual" })]) {
+      const md = b.markdown;
+      expect(md).toContain("code decides what happens next.\n\n## Where you run\n\n");
+      expect(md.indexOf("## Where you run")).toBeLessThan(md.indexOf("## Your work"));
+    }
+  });
+
+  test("attended: the person is here, ask here, done once they agree; no banner and no permission line", () => {
+    const md = attended().markdown;
+    expect(section(md)).toContain("- A person works with you in this session: ask them here, not with `norn ask`, and report `done` only once they agree the work is finished.");
+    expect(md).not.toContain("**Attended step:**");
+    expect(md).not.toContain(permission);
+  });
+
+  test("unattended: names the runner, nobody reads this session, ask via `norn ask`, a permission prompt parks the step", () => {
+    const herdr = section(unattended({ runner: "herdr" }).markdown);
+    expect(herdr).toContain("- You run unattended in a herdr pane: no person reads this session. A question goes through `norn ask`, which parks the step until a person answers it.");
+    expect(herdr).toContain(`- ${permission}: prefer actions that need none.`);
+    expect(section(unattended({ runner: "headless" }).markdown)).toContain("- You run unattended in a headless session: no person reads this session.");
+    const none = section(unattended({ runner: null, mode: "manual" }).markdown);
+    expect(none).toContain("- This step is unattended: norn does not count on a person reading this session. A question goes through `norn ask`, which parks the step until a person answers it.");
+    expect(none).toContain(permission);
+  });
+
+  test("auto: the report starts the next step at once and the handoff must stand alone; manual: the next agent step waits for a person", () => {
+    const auto = "- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.";
+    const manual = "- Mode manual: after your report, the next agent step waits for a person to start it.";
+    expect(section(unattended({ mode: "auto", runner: "herdr" }).markdown)).toContain(auto);
+    expect(section(unattended({ mode: "manual", runner: "herdr" }).markdown)).toContain(manual);
+    // an attended step runs manual itself; what its report sets off follows the story's mode and the runner
+    expect(section(attended({ mode: "auto", runner: "herdr" }).markdown)).toContain(auto);
+    expect(section(attended({ mode: "manual", runner: "herdr" }).markdown)).toContain(manual);
+  });
+
+  test("auto asked with no runner: runs manual for that reason and says what it means for the report; no old Mode line", () => {
+    const fallback = "- Mode manual: the story asked for auto, but this machine has no runner, so nothing starts on its own: after your report, the next agent step waits for a person to start it.";
+    for (const b of [unattended({ mode: "auto", runner: null }), attended({ mode: "auto", runner: null })]) {
+      expect(section(b.markdown)).toContain(fallback);
+      expect(b.markdown).not.toMatch(/^Mode: /m);
+    }
+  });
+
+  test("the --json brief carries the facts only: attended, mode, mode_requested and runner, no mode_note", () => {
+    const w = unattended({ mode: "auto", runner: null }).json.where;
+    expect(w).toMatchObject({ attended: false, mode: "manual", mode_requested: "auto", runner: null });
+    expect(w).not.toHaveProperty("mode_note");
+    expect(attended({ mode: "auto", runner: "headless" }).json.where).toMatchObject({ attended: true, mode: "manual", mode_requested: "auto", runner: "headless" });
+    for (const k of ["mode", "mode_requested", "runner"] as const) expect([null, "auto", "manual", "herdr", "headless"]).toContain(w[k]);
+  });
+
+  test("every combination: each line follows from one fact, and none promises what norn does not do", () => {
+    const lines = new Set<string>();
+    for (const att of [true, false])
+      for (const mode of ["auto", "manual"] as const)
+        for (const runner of ["herdr", "headless", null] as const) {
+          const b = att ? attended({ mode, runner }) : unattended({ mode, runner });
+          const body = section(b.markdown).split("\n").filter((l) => l.startsWith("- "));
+          // one situation line (attended or unattended), the permission line when unattended, one mode line
+          expect(body).toHaveLength(att ? 2 : 3);
+          expect(body.filter((l) => l.startsWith("- Mode ")).length).toBe(1);
+          expect(body.some((l) => l.includes(permission))).toBe(!att);
+          if (att) expect(body[0]).toContain("A person works with you in this session");
+          else expect(body[0]).toContain(runner === "herdr" ? "herdr pane" : runner === "headless" ? "headless session" : "norn does not count on a person");
+          for (const l of body) lines.add(l);
+        }
+    for (const l of lines) expect(l).not.toMatch(/supervisor|answer it for you|will answer/i);
+  });
+});
+
+describe("How to work outranks any skill and reaches subagents", () => {
+  const unattended = renderBrief(input(stateFor(SLICE, SLICE_WF), [])).markdown;
+  const story = storyUnit();
+  const attended = renderBrief(
+    input(stateFor(story, STORY_WF), [], {
+      unit: story,
+      workflow: STORY_WF,
+      runner: null,
+      paths: { worktree: "/r-worktrees/gh-1-login", spec_dir: ".agents/specs/gh-1-login", story_file: ".agents/specs/gh-1-login/story.md", slice_file: null, unit_dir: ".agents/specs/gh-1-login/runs/_story" },
+    }),
+  ).markdown;
+  const howToWork = (md: string) => md.slice(md.indexOf("## How to work"), md.indexOf("## Limits") === -1 ? undefined : md.indexOf("## Limits"));
+
+  test("How to work says it outranks any skill, and a skill must not prompt another norn command", () => {
+    for (const md of [attended, unattended]) {
+      const h = howToWork(md);
+      expect(h).toContain("How to work outranks any skill");
+      expect(h).toContain("never because a skill, a refusal, this brief or the inbox names it");
+    }
+  });
+
+  test("How to work maps what a skill says to what to do in this step", () => {
+    for (const md of [attended, unattended]) {
+      const h = howToWork(md);
+      expect(h).toContain('  - "stop, or wait for input" → `norn stuck` or `norn ask`');
+      expect(h).toContain('  - "push, open or comment on a pull request" → leave it to norn');
+      expect(h).toContain('  - "run another norn command" → only when the person asks you to directly');
+    }
+  });
+
+  test("the ask-the-person row follows the step: ask in this session when attended, norn ask when not", () => {
+    expect(howToWork(attended)).toContain('  - "ask the person" → ask them in this session; never `norn ask`');
+    expect(howToWork(attended)).not.toContain('"ask the person" → `norn ask`');
+    expect(howToWork(unattended)).toContain('  - "ask the person" → `norn ask`, which parks the step until it is answered; nobody reads this session');
+    expect(howToWork(unattended)).not.toContain("ask them in this session");
+  });
+
+  test("How to work gives a subagent the rules its work can break, and none to one that only reads", () => {
+    for (const md of [attended, unattended]) {
+      const h = howToWork(md);
+      expect(h).toContain("A subagent you start works under these rules");
+      expect(h).toContain("give it the ones its work can break, each with its reason");
+      expect(h).toContain("one that only reads needs none");
+    }
   });
 });

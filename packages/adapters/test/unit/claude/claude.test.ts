@@ -3,6 +3,8 @@ import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { claudeAgent } from "../../../src/claude/index.ts";
+import type { HookAnswer } from "@norn/core";
+import type { HookFact } from "@norn/schema";
 import payloads from "./fixtures/hook-payloads.json";
 
 const FIX = join(import.meta.dir, "fixtures");
@@ -70,7 +72,7 @@ describe("claude StopFailure (a turn that ended on an API error)", () => {
     for (const e of ["rate_limit", "server_error", "invalid_request", "max_output_tokens", "unknown", "something_new", undefined]) expect(sf(e)).toBeNull();
   });
   test("its response is silent: Claude Code ignores StopFailure output", () => {
-    expect(claudeAgent.hookResponse(sf("authentication_failed")!, { block: true })).toEqual({ stdout: "", exit_code: 0 });
+    expect(claudeAgent.hookResponse(sf("authentication_failed")!, { kind: "block", reason: "r" })).toEqual({ stdout: "", exit_code: 0 });
   });
 });
 
@@ -111,18 +113,59 @@ describe("claude refineHooks (§10 implicit ask shows the command)", () => {
 });
 
 describe("claude hookResponse", () => {
-  const stop = claudeAgent.parseHookEvent("stop", payloads.Stop, ENV, AT)!;
+  const f = (arg: string, p: unknown) => claudeAgent.parseHookEvent(arg, p, ENV, AT)!;
+  const stop = f("stop", payloads.Stop);
+  const out = (fact: HookFact, a: HookAnswer) => JSON.parse(claudeAgent.hookResponse(fact, a).stdout);
+  const silent = { stdout: "", exit_code: 0 };
   test("block encodes Claude Code decision JSON", () => {
-    const r = claudeAgent.hookResponse(stop, { block: true, reason: "Run norn done" });
+    const r = claudeAgent.hookResponse(stop, { kind: "block", reason: "Run norn done" });
     expect(r.exit_code).toBe(0);
     expect(JSON.parse(r.stdout)).toEqual({ decision: "block", reason: "Run norn done" });
   });
-  test("allow and non-stop events are silent", () => {
-    expect(claudeAgent.hookResponse(stop, { block: false })).toEqual({ stdout: "", exit_code: 0 });
-    const tool = claudeAgent.parseHookEvent("pre-tool-use", payloads.PreToolUse, ENV, AT)!;
-    expect(claudeAgent.hookResponse(tool, { block: true })).toEqual({ stdout: "", exit_code: 0 });
-    const idle = claudeAgent.parseHookEvent("notification", payloads.NotificationIdle, ENV, AT)!;
-    expect(claudeAgent.hookResponse(idle, { block: true })).toEqual({ stdout: "", exit_code: 0 });
+  test("deny on PreToolUse refuses the call with its reason", () => {
+    expect(out(f("pre-tool-use", payloads.PreToolUse), { kind: "deny", reason: "only norn pushes" })).toEqual({
+      hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: "only norn pushes" },
+    });
+  });
+  test("context on SessionStart and UserPromptSubmit is additionalContext", () => {
+    for (const [arg, p, native] of [["session-start", payloads.SessionStartCompact, "SessionStart"], ["user-prompt-submit", payloads.UserPromptSubmit, "UserPromptSubmit"]] as const)
+      expect(out(f(arg, p), { kind: "context", text: "run norn brief" })).toEqual({ hookSpecificOutput: { hookEventName: native, additionalContext: "run norn brief" } });
+  });
+  test("allow, and any answer the event cannot carry, are silent", () => {
+    expect(claudeAgent.hookResponse(stop, { kind: "allow" })).toEqual(silent);
+    const tool = f("pre-tool-use", payloads.PreToolUse);
+    expect(claudeAgent.hookResponse(tool, { kind: "block", reason: "r" })).toEqual(silent);
+    expect(claudeAgent.hookResponse(tool, { kind: "context", text: "t" })).toEqual(silent);
+    expect(claudeAgent.hookResponse(stop, { kind: "deny", reason: "r" })).toEqual(silent);
+    expect(claudeAgent.hookResponse(f("session-start", payloads.SessionStart), { kind: "deny", reason: "r" })).toEqual(silent);
+    expect(claudeAgent.hookResponse(f("post-tool-use", payloads.PostToolUse), { kind: "deny", reason: "r" })).toEqual(silent);
+    const idle = f("notification", payloads.NotificationIdle);
+    expect(claudeAgent.hookResponse(idle, { kind: "block", reason: "r" })).toEqual(silent);
+  });
+});
+
+describe("claude toolCall", () => {
+  const call = (p: { hook_event_name: string }) => claudeAgent.toolCall(p.hook_event_name, p);
+  test("Bash is its full command, however long", () => {
+    expect(call(payloads.PreToolUse)).toEqual({ kind: "shell", command: "bun test" });
+    const long = call(payloads.PreToolUseBashLong);
+    expect(long).toEqual({ kind: "shell", command: payloads.PreToolUseBashLong.tool_input.command });
+    expect(long?.kind === "shell" && long.command.endsWith("git push origin HEAD")).toBe(true);
+  });
+  test("Write, Edit, MultiEdit and NotebookEdit are file writes of their path", () => {
+    expect(call(payloads.PreToolUseWrite)).toEqual({ kind: "file_write", paths: ["/repo/.worktrees/gh-12/src/a.ts"] });
+    expect(call(payloads.PreToolUseEdit)).toEqual({ kind: "file_write", paths: ["/repo/.worktrees/gh-12/src/b.ts"] });
+    expect(call(payloads.PreToolUseMultiEdit)).toEqual({ kind: "file_write", paths: ["/repo/.worktrees/gh-12/src/c.ts"] });
+    expect(call(payloads.PreToolUseNotebookEdit)).toEqual({ kind: "file_write", paths: ["/repo/.worktrees/gh-12/n.ipynb"] });
+  });
+  test("EnterWorktree is a worktree switch", () => {
+    expect(call(payloads.PreToolUseEnterWorktree)).toEqual({ kind: "worktree_switch" });
+  });
+  test("anything else is null", () => {
+    expect(call(payloads.PreToolUseRead)).toBeNull();
+    expect(call(payloads.PostToolUse)).toBeNull(); // it already ran
+    expect(call(payloads.Stop)).toBeNull();
+    expect(claudeAgent.toolCall("PreToolUse", null)).toBeNull();
   });
 });
 

@@ -1,8 +1,8 @@
 ---
 id: gh-301/06
 title: Hooks refuse file-tool writes under run state
-depends_on: [gh-301/01, gh-301/02]
-status: planned
+depends_on: [ gh-301/01, gh-301/02 ]
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

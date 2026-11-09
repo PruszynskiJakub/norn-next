@@ -508,13 +508,24 @@ export interface AgentLaunchRequest {
   config: { command?: string; args?: string[]; env?: Record<string, string> };
 }
 
-/** What `norn hook` should answer to the agent tool. */
-export interface HookDecision {
-  /** refuse turn end; only honoured by `blocking` tier adapters */
-  block: boolean;
-  /** instruction shown to the agent when blocked */
-  reason?: string;
-}
+/**
+ * What `norn hook` answers the agent tool. An adapter encodes the kinds its tool and the event
+ * can carry and emits allow for the rest, so an answer never breaks a tool that cannot take it.
+ */
+export type HookAnswer =
+  | { kind: "allow" }
+  /** refuse the turn end; `reason` is the agent's next instruction */
+  | { kind: "block"; reason: string }
+  /** refuse this one tool call; `reason` is shown to the agent */
+  | { kind: "deny"; reason: string }
+  /** add `text` to the agent's context */
+  | { kind: "context"; text: string };
+
+/**
+ * A native tool call, normalized for the hook answer. Never persisted: a shell command is kept in
+ * full, because the trace's 300-character summary can hide a push past its cut.
+ */
+export type ToolCall = { kind: "shell"; command: string } | { kind: "file_write"; paths: string[] } | { kind: "worktree_switch" };
 
 export interface HookResponse {
   stdout: string;
@@ -548,8 +559,10 @@ export interface AgentAdapter {
    * this adapter's `name` may change.
    */
   refineHooks?(hooks: readonly HookFact[]): HookFact[];
-  /** Encode a decision in the agent tool's hook protocol. */
-  hookResponse(fact: HookFact, decision: HookDecision): HookResponse;
+  /** Encode an answer in the agent tool's hook protocol; allow for what the tool or event cannot carry. */
+  hookResponse(fact: HookFact, answer: HookAnswer): HookResponse;
+  /** Pure: the shell command, file write or worktree switch a native tool call makes; null for any other. */
+  toolCall(native: string, payload: unknown): ToolCall | null;
   /** Native hook event names → normalized kinds this adapter emits. */
   readonly hookEvents: Readonly<Record<string, HookEventKind>>;
   /** The repo folder this agent reads skills from; `norn init` links the bundled skills there. */

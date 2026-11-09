@@ -5,6 +5,12 @@ exports[`renderBrief first run of implement 1`] = `
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
 
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
+
 ## Your work
 
 Use the \`implement\` skill.
@@ -33,8 +39,8 @@ No handoff yet; write one as you work (its sections are under How to work).
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -44,9 +50,15 @@ No handoff yet; write one as you work (its sections are under How to work).
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -59,6 +71,12 @@ exports[`renderBrief the step's description and instructions follow the skill un
 "# norn brief — gh-1/02 · implement #1
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -92,8 +110,8 @@ No handoff yet; write one as you work (its sections are under How to work).
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -103,9 +121,15 @@ No handoff yet; write one as you work (its sections are under How to work).
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -118,6 +142,12 @@ exports[`renderBrief rework after a failing check shows the output tail and log 
 "# norn brief — gh-1/02 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -176,8 +206,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -187,9 +217,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -202,6 +238,12 @@ exports[`renderBrief rework after review findings lists them 1`] = `
 "# norn brief — gh-1/02 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -259,8 +301,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -270,9 +312,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -286,7 +334,10 @@ exports[`renderBrief attended step with answers in context, manual downgrade, no
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
 
-**Attended step:** work with the person in this session, and report \`done\` only once they agree.
+## Where you run
+
+- A person works with you in this session: ask them here, not with \`norn ask\`, and report \`done\` only once they agree the work is finished.
+- Mode manual: the story asked for auto, but this machine has no runner, so nothing starts on its own: after your report, the next agent step waits for a person to start it.
 
 ## Your work
 
@@ -327,8 +378,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/_story.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -338,9 +389,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → ask them in this session; never \`norn ask\`
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 "
 `;
 
@@ -348,6 +405,12 @@ exports[`Rework only when sent back qa.fail without findings: the handoff verbat
 "# norn brief — gh-1/02 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -391,8 +454,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -402,9 +465,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -417,6 +486,12 @@ exports[`Rework only when sent back qa.fail with findings: criterion and repro, 
 "# norn brief — gh-1/02 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -465,8 +540,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -476,9 +551,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -491,6 +572,12 @@ exports[`Rework only when sent back gate reject with a comment: the comment verb
 "# norn brief — gh-1/02 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -540,8 +627,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -551,9 +638,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -566,6 +659,12 @@ exports[`Rework only when sent back gate reject without a comment says so and po
 "# norn brief — gh-1/02 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -614,8 +713,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -625,9 +724,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -640,6 +745,12 @@ exports[`Rework only when sent back review.approve → qa is forward: no Rework;
 "# norn brief — gh-1/02 · qa #1
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -683,8 +794,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -694,9 +805,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -709,6 +826,12 @@ exports[`Rework only when sent back integrate conflict → merge: the conflictin
 "# norn brief — gh-1/02 · merge #1
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -752,8 +875,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -763,9 +886,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -778,6 +907,12 @@ exports[`Checks since the last report review after a passing check lists it: ste
 "# norn brief — gh-1/02 · review #1
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -821,8 +956,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -832,9 +967,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -847,6 +988,12 @@ exports[`Re-entry, fresh sessions, handoff and criteria a second qa after the co
 "# norn brief — gh-1/02 · qa #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -919,8 +1066,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -930,9 +1077,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -945,6 +1098,12 @@ exports[`Re-entry, fresh sessions, handoff and criteria a re-review that declare
 "# norn brief — gh-1/02 · review #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -997,8 +1156,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -1008,9 +1167,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -1023,6 +1188,12 @@ exports[`Re-entry, fresh sessions, handoff and criteria implement's Rework sorts
 "# norn brief — gh-1/02 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended in a herdr pane: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.
 
 ## Your work
 
@@ -1078,8 +1249,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-login/handoffs/02-form.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -1089,9 +1260,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -1104,6 +1281,12 @@ exports[`golden replays (norn-sandbox-todoist) gh-1 story: qa.fail with handoff 
 "# norn brief — gh-1 · implement #1
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- This step is unattended: norn does not count on a person reading this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode manual: after your report, the next agent step waits for a person to start it.
 
 ## Your work
 
@@ -1154,8 +1337,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-1-projects-and-items/handoffs/_story.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -1165,9 +1348,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 
@@ -1180,6 +1369,12 @@ exports[`golden replays (norn-sandbox-todoist) gh-2/03: human-qa.reject → impl
 "# norn brief — gh-2/03 · implement #2
 
 You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- This step is unattended: norn does not count on a person reading this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+- A permission prompt parks the step until a person answers it: prefer actions that need none.
+- Mode manual: after your report, the next agent step waits for a person to start it.
 
 ## Your work
 
@@ -1233,8 +1428,8 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 ## How to work
 
-- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings.
-- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
+- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
 - The handoff \`.agents/specs/gh-2-due-dates-with-today-and-upcoming-views/handoffs/03-due-dates-in-project-lists.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
@@ -1244,9 +1439,15 @@ What happened so far, oldest first, from the receipts (for a story, its current 
   - **Resume**: the exact next action, so a fresh agent or a person can continue from git alone.
   Keep it under 8 KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.
 - Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the \`--handoff\` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter \`criteria\`, the criteria report, a finding's \`criterion\`, the traceability table) always stands next to what it says.
-- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
-- Never \`git push\` (only norn pushes), and never switch branches or worktrees. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.
-- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree). The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- Of the norn commands, run only \`brief\`, \`done\`, \`ask\` and \`stuck\` — the brief carries this unit's state rendered fresh each time, and every other norn command drives units and gates that are the person's or shows other units' state, so a read-only \`norn status --json\` or \`norn story view\` is forbidden too. Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.
+- Never \`git push\` (only norn pushes) — a push outside norn is an effect with no receipt, and receipts come before effects. Never switch branches or worktrees — a switch leaves the unit's branch, where norn commits what is left at the report. Never run a \`gh\` or \`glab\` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine — people read the remote at once and a change there cannot be taken back quietly, so only norn makes the changes its receipts record.
+- Never edit anything under \`runs/\` (norn's run state, kept outside the worktree) — a hand-edited file fails validation and makes the unit \`corrupt\`. The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.
+- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:
+  - "ask the person" → \`norn ask\`, which parks the step until it is answered; nobody reads this session
+  - "stop, or wait for input" → \`norn stuck\` or \`norn ask\`
+  - "push, open or comment on a pull request" → leave it to norn
+  - "run another norn command" → only when the person asks you to directly
+- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under \`runs/\`); one that only reads needs none.
 
 ## Limits
 

@@ -9,6 +9,7 @@ import {
   type Mode,
   type OutcomeSpec,
   type Receipt,
+  type ResolvedConfig,
   outcomeEdge,
   parseDuration,
   receiptFileName,
@@ -24,6 +25,9 @@ import { edgeOf, reportableOutcomes, stepOf } from "./workflow.ts";
 import { cmd } from "./commands.ts";
 import { HANDOFF_MAX_BYTES, HANDOFF_SECTIONS, handoffBytes, handoffCounters, handoffLastOutcome } from "./handoff.ts";
 import { branchRewrittenLine, recordLostLine } from "./apply.ts";
+import { ruleWithReason } from "./hard-rules.ts";
+
+type Runner = ResolvedConfig["runner"]["adapter"];
 
 export interface BriefInput {
   unit: UnitRef;
@@ -31,7 +35,7 @@ export interface BriefInput {
   workflow: Workflow;
   /** the story's mode and this machine's runner, for the effective mode */
   mode: Mode;
-  runner: string | null;
+  runner: Runner | null;
   /** absolute or repo-relative paths shown to the agent */
   paths: { worktree: string; spec_dir: string; story_file: string; slice_file: string | null; unit_dir: string };
   /** range for the `diff` input, e.g. `gh-123-login...HEAD` */
@@ -130,9 +134,13 @@ export interface BriefJson {
     /** counters at their max: one more send-back along their edge makes the unit stuck */
     at_limit: Array<{ name: string; value: number; max: number }>;
     last_outcome: string;
+    /** this step's effective mode */
     mode: Mode;
-    mode_note: string | null;
+    /** the story's mode, before an attended step or a missing runner made it manual */
+    mode_requested: Mode;
     attended: boolean;
+    /** this machine's runner; null when it has none */
+    runner: Runner | null;
     run_id: string | null;
   };
   /** why this run is not a first entry of the step; null when it is, or when Rework already says why */
@@ -249,7 +257,7 @@ export function renderBrief(input: BriefInput): Briefing {
 
 function where(input: BriefInput, step: AgentStep): BriefJson["where"] {
   const { state: st } = input;
-  const { mode, downgraded } = effectiveMode(input.mode, !!step.attended, input.runner);
+  const { mode } = effectiveMode(input.mode, !!step.attended, input.runner);
   return {
     story: st.story,
     slice: st.slice,
@@ -262,8 +270,9 @@ function where(input: BriefInput, step: AgentStep): BriefJson["where"] {
     }),
     last_outcome: handoffLastOutcome(st),
     mode,
-    mode_note: downgraded ? "auto requested, no runner; running manual" : null,
+    mode_requested: input.mode,
     attended: !!step.attended,
+    runner: input.runner,
     run_id: st.run?.run_id ?? null,
   };
 }
@@ -731,19 +740,58 @@ function evidenceLines(out: string[], e: BriefEvidence | null): void {
   out.push(`- Evidence: \`${e.dir}/\`${files}`, "");
 }
 
+/** The step How to work is rendered for: its handoff, and whether a person works in its session. */
+export interface ProtocolStep {
+  handoff_file: string;
+  attended: boolean;
+}
+
 /** How to work: the step protocol every brief carries, so no other file has to be read for it. */
-export function protocolLines(handoffFile: string): string[] {
+export function protocolLines(step: ProtocolStep): string[] {
+  const handoffFile = step.handoff_file;
+  // The ask row must match the step's situation, or the mapping would contradict how the step is run
+  const ask = step.attended ? "ask them in this session; never `norn ask`" : "`norn ask`, which parks the step until it is answered; nobody reads this session";
   return [
-    "- Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (`.norn-unit`, `.env.norn`; open the handoff only to rewrite it), and do not survey the repository, `.agents/`, `.claude/` or the machine to find your bearings.",
-    "- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes. Anything that listens on a port uses the range in `.env.norn`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.",
+    `- Read the Inputs before you change anything; after that, read only the code and docs your work touches. ${ruleWithReason("no-survey")}`,
+    `- ${ruleWithReason("this-step")} Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.`,
     `- The handoff \`${handoffFile}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:`,
     ...HANDOFF_SECTIONS.map(([h, holds]) => `  - **${h}**: ${holds}.`),
     `  Keep it under ${HANDOFF_MAX_BYTES / 1024} KB: long repros and logs go into the folder you pass with \`--evidence <dir>\` or into a findings file, and the handoff names the file. The one table it holds is the traceability table a reviewing step writes, under Proof. Refresh it at each milestone and right before you report.`,
     "- Name a user story, criterion, finding, seam or question by what it says, in whatever a person or the next agent reads: an ask, the `--handoff` summary, a note, the handoff, a findings file. Never an id alone: an id (where norn reads one: frontmatter `criteria`, the criteria report, a finding's `criterion`, the traceability table) always stands next to what it says.",
-    "- Of the norn commands, run only `brief`, `done`, `ask` and `stuck`. Every other one is the person's: run it only when the person asks you to directly, never because a refusal, this brief or the inbox names it; otherwise `norn ask`. After a long session or a lost thread, run `norn brief` again: it is rendered from the unit's state each time.",
-    "- Never `git push` (only norn pushes), and never switch branches or worktrees. Never run a `gh` or `glab` command that changes the remote (creating, editing, commenting, labelling, closing, merging); reading is fine.",
-    "- Never edit anything under `runs/` (norn's run state, kept outside the worktree). The repo's workflows (`.agents/workflows/`) and its norn config in `.agents/` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.",
+    `- ${ruleWithReason("four-commands")} Every other one is the person's: run it only when the person asks you to directly, never because a skill, a refusal, this brief or the inbox names it; otherwise \`norn ask\`. After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's state each time.`,
+    `- ${ruleWithReason("no-push")} ${ruleWithReason("no-switch")} ${ruleWithReason("no-remote-write")}`,
+    `- ${ruleWithReason("no-run-state")} The repo's workflows (\`.agents/workflows/\`) and its norn config in \`.agents/\` are ordinary repo files: change them when the step asks for it; a running unit keeps its pinned copy of its workflow.`,
+    "- How to work outranks any skill: where a skill, often one written without norn in mind, says otherwise, do what this section says. What a skill says maps to this step as follows:",
+    `  - "ask the person" → ${ask}`,
+    '  - "stop, or wait for input" → `norn stuck` or `norn ask`',
+    '  - "push, open or comment on a pull request" → leave it to norn',
+    '  - "run another norn command" → only when the person asks you to directly',
+    "- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under `runs/`); one that only reads needs none.",
   ];
+}
+
+/**
+ * Where you run: each line follows from one recorded fact (attended, runner, mode, mode_requested) and
+ * promises only what norn does; nobody answers an ask but a person.
+ */
+function whereYouRun(w: BriefJson["where"]): string[] {
+  const ask = "A question goes through `norn ask`, which parks the step until a person answers it.";
+  const out = w.attended
+    ? ["- A person works with you in this session: ask them here, not with `norn ask`, and report `done` only once they agree the work is finished."]
+    : [
+        w.runner
+          ? `- You run unattended in ${w.runner === "herdr" ? "a herdr pane" : "a headless session"}: no person reads this session. ${ask}`
+          : `- This step is unattended: norn does not count on a person reading this session. ${ask}`,
+        "- A permission prompt parks the step until a person answers it: prefer actions that need none.",
+      ];
+  // What the report sets off follows the story's mode and the runner: an attended step runs manual
+  // itself, yet the unattended step after it starts on its own in auto
+  const waits = "after your report, the next agent step waits for a person to start it.";
+  if (w.mode_requested === "auto" && w.runner)
+    out.push("- Mode auto: your report starts the next step at once. The next agent has only the handoff and the receipts, so write a handoff that stands on its own.");
+  else if (w.mode_requested === "auto") out.push(`- Mode manual: the story asked for auto, but this machine has no runner, so nothing starts on its own: ${waits}`);
+  else out.push(`- Mode manual: ${waits}`);
+  return out;
 }
 
 /**
@@ -756,8 +804,7 @@ function markdown(b: BriefJson): string {
   const unitKey = w.slice ?? w.story;
   out.push(`# norn brief — ${unitKey} · ${w.step} #${w.attempt}`, "");
   out.push("You do one step of a larger delivery and report how it ended, once; code decides what happens next.", "");
-  if (w.attended) out.push("**Attended step:** work with the person in this session, and report `done` only once they agree.", "");
-  if (w.mode_note) out.push(`Mode: ${w.mode} (${w.mode_note}).`, "");
+  out.push("## Where you run", "", ...whereYouRun(w), "");
   for (const c of w.at_limit) out.push(`**Last round on \`${c.name}\` (${c.value}/${c.max}):** if the work is sent back along it once more, the unit goes stuck.`, "");
 
   out.push("## Your work", "");
@@ -851,7 +898,7 @@ function markdown(b: BriefJson): string {
     out.push("");
   }
 
-  out.push("## How to work", "", ...protocolLines(b.handoff_file), "");
+  out.push("## How to work", "", ...protocolLines({ handoff_file: b.handoff_file, attended: w.attended }), "");
 
   const l = b.limits;
   const limits = [

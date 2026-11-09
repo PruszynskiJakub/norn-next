@@ -1,17 +1,18 @@
 /**
  * Codex CLI agent adapter (`blocking` tier). Codex hooks share Claude Code's shape and live in
  * `<repo>/.codex/hooks.json`; `Stop` accepts `{"decision":"block","reason":…}` and continues the
- * turn with `reason` as the next prompt.
+ * turn with `reason` as the next prompt. PreToolUse denials and SessionStart and UserPromptSubmit
+ * context use Claude Code's `hookSpecificOutput` shape, per Codex's hook docs (not yet observed).
  * Caveat: project-local hooks only run once the project's `.codex/` layer is trusted and the hooks
  * reviewed via `/hooks` in Codex — `norn doctor` must surface that.
  */
 import { join } from "node:path";
-import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookDecision, HookResponse } from "@norn/core";
+import type { AgentAdapter, AgentFactory, AgentLaunchRequest, HookAnswer, HookResponse, ToolCall } from "@norn/core";
 import type { HookEventKind, HookFact } from "@norn/schema";
 import { SKILLS_DIR } from "@norn/store";
 import * as shared from "../agent-hooks/index.ts";
 
-const { buildFact, field, isObject, jsonHookInstaller, kebab, launchEnv, nativeEvent, objField, readJsonl, textOf } = shared;
+const { buildFact, contextOutput, denyToolOutput, field, isObject, jsonHookInstaller, jsonResponse, kebab, launchEnv, nativeEvent, objField, pendingTool, readJsonl, shellCall, textOf } = shared;
 const NAME = "codex";
 
 export const hookEvents = {
@@ -59,11 +60,30 @@ export function parseHookEvent(arg: string, payload: unknown, env: Record<string
   );
 }
 
-export function hookResponse(fact: HookFact, decision: HookDecision): HookResponse {
-  if (fact.event === "turn_end" && decision.block) {
-    return { stdout: `${JSON.stringify({ decision: "block", reason: decision.reason ?? "Report with norn done/ask/stuck before ending the turn." })}\n`, exit_code: 0 };
-  }
+export function hookResponse(fact: HookFact, answer: HookAnswer): HookResponse {
+  const native = fact.native;
+  if (answer.kind === "block" && fact.event === "turn_end" && native === "Stop") return jsonResponse({ decision: "block", reason: answer.reason });
+  if (answer.kind === "deny" && native === "PreToolUse") return jsonResponse(denyToolOutput(native, answer.reason));
+  if (answer.kind === "context" && (native === "SessionStart" || native === "UserPromptSubmit")) return jsonResponse(contextOutput(native, answer.text));
   return { stdout: "", exit_code: 0 };
+}
+
+/** Codex reports its shell tool as `Bash` in hook payloads. */
+const SHELL_TOOLS = new Set(["Bash", "shell", "local_shell", "exec_command"]);
+const PATCH_FILE = /^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$/gm;
+
+/** The files an `apply_patch` envelope adds, updates, deletes or moves to, as written in it. */
+function patchedFiles(input: shared.JsonObject): ToolCall | null {
+  const patch = [input.command, input.input, input.patch].find((v): v is string => typeof v === "string");
+  const paths = patch ? [...patch.matchAll(PATCH_FILE)].map((m) => m[1]!.trim()) : [];
+  return paths.length ? { kind: "file_write", paths } : null;
+}
+
+export function toolCall(native: string, payload: unknown): ToolCall | null {
+  const call = pendingTool(native, payload, "PreToolUse");
+  if (!call) return null;
+  if (SHELL_TOOLS.has(call.tool)) return shellCall(call.input);
+  return call.tool === "apply_patch" ? patchedFiles(call.input) : null;
 }
 
 /** Interactive `codex [resume <id>] "<prompt>"`; headless `codex exec [resume <id>] "<prompt>"`. */
@@ -110,6 +130,7 @@ export const codexAgent: AgentAdapter = {
   ...jsonHookInstaller(NAME, settingsPath, hookSpecs),
   parseHookEvent,
   hookResponse,
+  toolCall,
   skillDir,
   launchCommand,
   lastAssistantMessage,

@@ -372,7 +372,7 @@ describe("attended steps never block", () => {
     expect(b?.value).toMatchObject({ unit: "gh-10", step: "refine", started: true });
     const started = receipts(pairRuns()).filter((f) => f.endsWith("-started.json"));
     expect(readReceipt(pairRuns(), started.at(-1) as string)).toMatchObject({ kind: "started", agent_session_id: "sess-pair", worktree: pairWt() });
-    expect((b?.value as { markdown: string }).markdown).toContain("**Attended step:** work with the person in this session, and report `done` only once they agree.");
+    expect((b?.value as { markdown: string }).markdown).toContain("## Where you run\n\n- A person works with you in this session: ask them here, not with `norn ask`, and report `done` only once they agree the work is finished.");
     expect((await stop(pairWt(), "sess-pair")).value).toEqual({});
     h.clock.advance(10_000);
     await h.tick();

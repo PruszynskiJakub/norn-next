@@ -2,7 +2,7 @@
 id: gh-301/10
 title: norn-retro proposes lasting preferences from gate rulings
 depends_on: []
-status: planned
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
