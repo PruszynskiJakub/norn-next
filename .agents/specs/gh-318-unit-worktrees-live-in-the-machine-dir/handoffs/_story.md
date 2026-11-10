@@ -37,6 +37,7 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Not proven yet
 
+- The full integration and e2e tiers after the merge of origin/main 3666341f (resolve #1). Locally green: unit 1739, typecheck, e2e base-sync/slice-workflow/merged-pr, integration runtime.test.ts.
 - The integration tier as a whole on CI at this head. ci#3 failed only on a known flake: `watch-version.test.ts` cleanup threw `EFAULT` from `rmSync` on the harness temp dir after the test body passed. It also failed on other stories' CI (runs 42797767701, 42479653587), so this branch didn't cause it. The harness's `removeTree` now retries and falls back to `rm -rf`; the EFAULT path can't be reproduced locally.
 
 ## Notes
@@ -50,4 +51,4 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Resume
 
-pr.md rewritten for head 55c959ed from story QA #4 (16/16 pass, evidence run 01M72GJNXFGS3KDDQ9SY4QPT9A). Next: open-pr updates PR #320, then CI. This is the last `ci_loop` round. If CI fails, read the failure first. If it is the EFAULT again, the fallback didn't help.
+resolve #1 merged origin/main 3666341f (gh-319, gh-294) as 726e3d8f. The conflicts were in base-sync unit test and two transcripts: kept main's `pr_seen` and `findPullRequest` with this branch's `worktrees` fact and machine-dir paths. Semantic fix: main's new merged-pr e2e and runtime "PR merged after the round finished" test hand-built `<repo>-worktrees/`; they now use `h.worktree`. Next: the workflow's checks/CI on the merged head.
