@@ -17,7 +17,7 @@ One red CI run reports every failing shard, and the ci check's rework brief neve
 - The integration test needs `jq` on PATH (present on ubuntu-latest and macOS here).
 
 ## Not proven yet
-- Nothing open. CI run 42842498215 (commit 5db02efef, same repo files as the current head) passed all 9 jobs, the integration shard holding ci-check.test.ts among them.
+- Nothing open. CI run 42842498215 (commit 5db02efef, same repo files as the current head) passed all 9 jobs, the integration shard holding ci-check.test.ts among them. describe#2 rewrote pr.md for the current head.
 
 ## Notes
 - A skipped job is listed too (e.g. `package` after a red `unit`): it also never ran to the end.
@@ -27,4 +27,4 @@ One red CI run reports every failing shard, and the ci check's rework brief neve
 - `bun install` was needed in this worktree before `bun run test` / typecheck would run.
 
 ## Resume
-Review #2 approved; next is the workflow's step after review (describe/open-pr already ran: PR #333 exists).
+pr.md is current for this head; next, norn updates PR #333 with it and the ci check runs again.

@@ -24,7 +24,7 @@ No QA ran; the entries are tests (the unit-tier test check passed).
   **Before:** only `conclusion == "failure"` jobs were listed; cancelled shards vanished from the brief.
   **After:** `packages/cli/test/integration/ci-check.test.ts` › "fails on a red run with where its failures are, never its log" runs the script's own `-q` filter through `jq` on jobs {success, failure, cancelled, success, skipped} and asserts exactly the failure, cancelled and skipped `- job` lines.
 
-The integration test runs only in CI (integration tier); locally the filter was checked by running `jq` with it on the same fixture. Review accepted that other non-success conclusions (`timed_out`, `startup_failure`) are still left out: the issue names only cancelled and skipped.
+The integration test runs only in CI (integration tier): CI run 42842498215, on a commit with the same code as this head, passed all 9 jobs, the integration shard holding `ci-check.test.ts` among them. Review accepted that other non-success conclusions (`timed_out`, `startup_failure`) are still left out: the issue names only cancelled and skipped.
 
 ## Merge danger
 
