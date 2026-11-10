@@ -112,6 +112,13 @@ function cases(): RuleCase[] {
     }),
   );
   out.push(c("an unreadable claim ref", "claim.corrupt", facts([story(SOLO_WF, {}, null, { claim: { state: "corrupt", sha: "c9", error: { file: "refs/norn/claims/gh-1", errors: [{ path: "", message: "invalid JSON" }] } } })])));
+  out.push(
+    c(
+      "a finished round whose claim was released and whose PR merged afterwards is taken back for the cleanup",
+      "claim.reacquire.merged",
+      facts([story(SOLO_WF, { step: "$done", status: "done" }, null, { claim: { state: "none" }, pr: { number: 9, url: "u", state: "merged", is_draft: false, head_sha: "abc" } })]),
+    ),
+  );
   out.push(c("a story file that failed validation", "story.corrupt", facts([story(SOLO_WF, {}, null, { frontmatter: null, frontmatter_error: { file: ".agents/specs/gh-1-login/story.md", errors: [{ path: "/id", message: "bad" }] } })])));
 
   // ---- remote mirror

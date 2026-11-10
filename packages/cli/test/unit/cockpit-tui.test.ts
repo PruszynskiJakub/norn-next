@@ -76,7 +76,7 @@ const issue = (number: number, title: string, assignees: string[]): RemoteIssue 
   updated_at: AT,
 });
 
-function model(backlog?: RemoteIssue[]): CockpitModel {
+function model(backlog?: RemoteIssue[], check: InboxEntry[] = []): CockpitModel {
   const none = { your_turn: [], answer: [], approve: [], unblock: [], check: [], unclaimed: [], running: [], notes: [], recently_done: [] };
   const view: ProjectView = {
     at: AT,
@@ -94,7 +94,7 @@ function model(backlog?: RemoteIssue[]): CockpitModel {
       story(7, "Closed before it ran", { status: "not_started", step: null, steps_left: null, story_status: "done" }),
       story(8, "Fix the login", { status: "done", step: "$done", steps_left: null, story_status: "done" }),
     ],
-    inbox: { at: AT, groups: { ...none, answer: [entry("answer", 3, { step: "refine" })], approve: [entry("approve", 1), entry("approve", 2)] }, pending: 3 },
+    inbox: { at: AT, groups: { ...none, answer: [entry("answer", 3, { step: "refine" })], approve: [entry("approve", 1), entry("approve", 2)], check }, pending: 3 + check.length },
     runs: [],
     recently_done: [],
     elsewhere: [],
@@ -134,6 +134,16 @@ describe("the cockpit's tabs", () => {
     expect(f).not.toContain("no slices");
     expect(f).not.toContain("no PR");
     expect(f).toContain("1 2 3 tabs");
+  });
+
+  test("a story with more than one item row: each row says what its item asks for", () => {
+    const m = model(undefined, [entry("check", 1, { id: "check:gh-1:skills", step: null, title: "skills differ from norn 0.27.1" })]);
+    const f = renderCockpit(m, initialState(), look);
+    expect(f).toMatch(/● gh-1 +ready +approve instruction of gh-1 +30m/);
+    expect(f).toMatch(/gh-1 +skills differ from norn 0\.27\.1 +30m/);
+    expect(f).not.toContain("Pay invoices  ");
+    // a story with one item row still says what the story is
+    expect(f).toMatch(/gh-2 +ready +Ship the export +30m/);
   });
 
   test("Backlog holds what has not started; Done the closed stories, newest first, read done", () => {
