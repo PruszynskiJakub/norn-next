@@ -8,16 +8,16 @@ Prepare norn 0.31.0: changelog section, version bumps (package.json, README badg
 - `packages/cli/package.json` version, README badge `release-v0.31.0-blue` and `norn_version: 0.31.0` in `.agents/norn.config.yaml` are bumped.
 - `.agents/skills/norn*` match `packages/cli/assets/skills/norn*`. Copies that changed: norn-diagnose, norn-qa, norn-triage (subagents, #307) and norn-retro (handoff renamed to story.md, #310). None was dropped.
 - `pr.md` in the spec folder has the version, its reason and the section.
-- `bun run test` (1739 pass) and `bun run typecheck` are green.
+- `bun run test` (1733 pass) and `bun run typecheck` are green on HEAD after the merge from main (7a0c472).
 
 ## Easy to miss
 
-- The branch is one commit behind origin/main (#325). That commit touches only README line 77, not the badge, and no bundled skill, so the skill copies are correct and the merge is clean.
+- The branch now includes origin/main 7a0c472. The only commit merged in since prepare#2 is `norn: gh-317 done`, which is bookkeeping and touches only that story's spec. So the commit set, the changelog and the skill copies did not change (re-copying them left no diff).
 - The README badge's alt text is "Latest release", with no version in it, so it was left as it is.
 
 ## Not proven yet
 
-- **The issue title is still "Release".** The hook refused `gh issue edit 328 --title "Release 0.31.0"` even though this step allows it, so the person must run it. The PR picks up the title at the next sync.
+- **The issue title is still "Release".** The hook refused `gh issue edit 328 --title "Release 0.31.0"` again in prepare#3, even though this step allows it, so the person must run it. The PR picks up the title at the next sync.
 
 ## Notes
 
