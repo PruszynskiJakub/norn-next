@@ -38,4 +38,4 @@ Review #1 traceability (the spec has no numbered criteria; rows are its Wanted l
 
 ## Resume
 
-Review #1 approved; the next step is whatever the workflow routes after review (QA or the PR).
+Describe #1 wrote `pr.md` in the spec folder (summary as a decide/act diff, evidence from the tests since no QA ran, merge danger two-way / stale-gate stories). Next: norn opens or updates the PR with it; a later change to the branch means rewriting pr.md from the current diff.
