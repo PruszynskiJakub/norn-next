@@ -50,7 +50,7 @@ Every user story is covered; none UNTRACED.
 
 #### Not proven yet
 
-- Golden/transcript criterion (06.AC4: only the record-move golden cases gone, pinned outputs otherwise unchanged), `person`: ruled acceptable at human-qa#1–#4; QA #6's `06-AC4-golden.md` shows the same diff, and the corpus replay passes 329/329 (four run-state-move golden cases, one branch-tree runs/ probe line in `recovery-claim-lost.txt`, observe snapshots' version fields 0.19.0 → 0.30.0).
+- Golden/transcript criterion (06.AC4: only the record-move golden cases gone, pinned outputs otherwise unchanged), `person`: ruled acceptable at human-qa#1–#5; QA #6's `06-AC4-golden.md` shows the same diff, and the corpus replay passes 329/329 (four run-state-move golden cases, one branch-tree runs/ probe line in `recovery-claim-lost.txt`, observe snapshots' version fields 0.19.0 → 0.30.0).
 
 #### Notes
 
@@ -64,4 +64,4 @@ Every user story is covered; none UNTRACED.
 
 #### Resume
 
-QA #6 reported `partial` at 67c548055 (31/32 pass; the golden/transcript criterion is `person`). Next: human-qa confirms that criterion on this head, then describe, open-pr and CI.
+describe#5 rewrote `pr.md` for HEAD 12a93a6df from QA #6 (evidence links point at qa#6 run `01M72P04QEGAH7M7QADVQJ39WN`; code unchanged since QA). Next: open-pr updates PR #325's body, then CI on the PR merged with main.
