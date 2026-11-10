@@ -4,7 +4,7 @@
 
 #### Proof
 
-All six slices are integrated. **Review #6 at b679d458b: approve, no findings** (only a test fix since review #5; unit tier and typecheck green). **QA #5 at adb5b5a74: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (qa#5 evidence `report.md`). The golden/transcript criterion (06.AC4) is `person`.
+All six slices are integrated. **Review #6 at b679d458b: approve, no findings** (only a test fix since review #5; unit tier and typecheck green). **QA #6 at 67c548055: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (qa#6 `report.md`). The golden/transcript criterion (06.AC4) is `person`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -50,17 +50,18 @@ Every user story is covered; none UNTRACED.
 
 #### Not proven yet
 
-- Golden/transcript criterion (06.AC4: only the record-move golden cases gone, pinned outputs otherwise unchanged), `person`: ruled acceptable at human-qa#1–#4; QA #5's `06.AC4.txt` shows the same diff (four run-state-move golden cases, one branch-tree runs/ probe line in `recovery-claim-lost.txt`, observe snapshots' version fields 0.19.0 → 0.30.0).
+- Golden/transcript criterion (06.AC4: only the record-move golden cases gone, pinned outputs otherwise unchanged), `person`: ruled acceptable at human-qa#1–#4; QA #6's `06-AC4-golden.md` shows the same diff, and the corpus replay passes 329/329 (four run-state-move golden cases, one branch-tree runs/ probe line in `recovery-claim-lost.txt`, observe snapshots' version fields 0.19.0 → 0.30.0).
 
 #### Notes
 
 - Review #1 minor notes (for the person, not rework): init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before config, so a broken config with no version gets exit 3, not 6 (`upgrade.ts:52`); test-only leftovers `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move`; a few stale comments. The accepted risk (a branch-only record reads as none) is in the PR body.
 - Person decisions: init refuses pre-0.30 too; config old-key messages drop the `norn upgrade` hint; codes `version_missing`/`version_too_old`; status version item is Unblock → `norn doctor`. Flat records and old `state.json` readers stay.
-- QA note (03.AC2, seen again at QA #5): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
+- QA note (03.AC2, seen again at QA #6): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
 - CI fixes: fixtures record `norn_version` (`runningVersion(h.deps)` / `h.recordVersion()`); guard unchanged. CI tests the PR merged with main, so a new main fixture that skips `norn init` (as `merged-pr.test.ts` did) needs `h.recordVersion()`; check main's new tests after a merge. Reverse case: init records the version and `h.config` keeps it, so a main test committing only `h.recordVersion()` makes an empty commit and fails (fixed in `worktrees-machine-dir.test.ts`).
 - Release notes come from commits 5e8451d29 and b45b051f0 and the PR body. CHANGELOG is the release step's.
+- `bun run golden` (no flag) harvests cases, not a check; replay with `bun test packages/core/test/unit/golden.test.ts`.
 - Friction: the agent hook refuses `git worktree add`/`git push` even in a $TMPDIR QA repo.
 
 #### Resume
 
-Review #6 approved b679d458b with no findings. Integration shards 3 and 4 were cancelled in the last CI run and have not run on this head. Next: test, QA, then CI.
+QA #6 reported `partial` at 67c548055 (31/32 pass; the golden/transcript criterion is `person`). Next: human-qa confirms that criterion on this head, then describe, open-pr and CI.
