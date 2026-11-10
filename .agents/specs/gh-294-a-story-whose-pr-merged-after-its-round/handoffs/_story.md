@@ -6,6 +6,13 @@ When a story's PR is seen merged into the base, the story is recorded done even 
 
 ## Proof
 
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| Wanted 1 | a story whose PR is seen merged is recorded done, also when its round reached `$done` and nobody holds the claim | test | `packages/core/test/unit/decide.test.ts` › "a story whose round ran and whose PR merged is taken back for the merge cleanup though nobody holds its claim" (take-back, then `cleanup_merged_story` with `story_status: done`) |
+| Wanted 2 | each cockpit item row says what its item asks for, at least when its story has more than one row | test | `packages/cli/test/unit/cockpit-tui.test.ts` › "a story with more than one item row: each row says what its item asks for" |
+
+Review #1: approve, no blocking findings. Two minor notes (stories already closed with `norn story close` stay active; a failed worktree removal re-runs the take-back each tick) are in the review findings file.
+
 - Merged PR with no claim held is taken back, then cleaned up: `packages/core/test/unit/decide.test.ts` › "a story whose round ran and whose PR merged is taken back for the merge cleanup though nobody holds its claim". This test failed first: decide gave `noop story.finished`. It pins four things:
   - claim `none` + PR merged + round `$done` + record `active` → `claim claim.reacquire.merged`, an acquire with `expected: null`;
   - the same case mid-round is taken back too;
