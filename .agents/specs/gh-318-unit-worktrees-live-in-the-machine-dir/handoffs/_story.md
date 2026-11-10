@@ -6,7 +6,7 @@ Unit worktrees are created in the checkout's machine dir (`<machine dir>/worktre
 
 ## Proof
 
-Review #5 (at b12cc1a2): changes requested, 1 blocking finding. ci fix #5's product change holds: observe skips worktrees that are prunable or whose folder is gone (`observe/index.ts:170`), and intake skips a story whose branch is on the remote whenever its worktree is gone (`act/lifecycle.ts:230`). Unit tier 1739 pass, typecheck green. 8 related integration files pass locally. **The e2e tier is red at HEAD (73 pass, 3 fail)**: three effect transcripts were not rewritten (see Not proven yet). QA #5 at c892491c (before ci fix #5): 16/16 `pass`.
+Implement #6: review #5's blocking finding fixed. The three effect transcripts (`recovery-claim-lost.txt`, `base-sync.txt`, `e2e-slice-workflow.txt`) were rewritten; each diff drops only intake's local `git show-ref --verify --quiet refs/heads/<branch>` line, the intended effect of ci fix #5 (intake skips a story whose branch is on the remote whenever its worktree is gone, `act/lifecycle.ts:230`; observe skips prunable worktrees, `observe/index.ts:170`). Locally: e2e 76/76, unit 1739 pass, typecheck green. QA #5 at c892491c (before ci fix #5): 16/16 `pass`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -37,7 +37,6 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Not proven yet
 
-- Review #5 blocking finding (e2e tier red): intake's local `git show-ref --verify --quiet refs/heads/<branch>` is gone, so the effect transcripts of `test/e2e/recovery.test.ts` ("a claim lost mid-run"), `test/e2e/base-sync.test.ts` ("base sync with real git") and `test/e2e/slice-workflow.test.ts` ("a story through the slice workflow") each lose that one line and fail.
 - The full integration and e2e tiers on CI after ci fix #5. The EFAULT cleanup flake fix (harness `removeTree`) is still unproven on CI.
 
 ## Notes
