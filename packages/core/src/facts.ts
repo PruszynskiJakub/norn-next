@@ -178,14 +178,6 @@ export interface UnitFacts {
    * while it is non-empty.
    */
   skills_drift?: string[];
-  /**
-   * Run state an older norn left on this unit's own branch, in `path`
-   * (`<spec folder>/runs`, relative to the unit's worktree). `copy`: the units' folders there (`_story`,
-   * `<nn>-<slug>`) read as their run state, the machine dir holding none of it yet (their `state` and
-   * `errors` are the branch's); [] = only the removal is left. `holds`: every unit's folder there,
-   * copied or not (the removal takes them all). Absent = none.
-   */
-  branch_record?: { path: string; copy: string[]; holds: string[] };
 }
 
 export interface SliceFileFacts {
@@ -462,12 +454,6 @@ export interface Facts {
    * the running norn's; absent = not observed.
    */
   norn?: { running: string; repo: string | null; skills_drift?: string[] };
-  /**
-   * Stories whose run state an older norn left in the base branch's tree (the
-   * main checkout's without a fetched base), ascending; never read, only pointed to `norn upgrade`.
-   * Absent = none.
-   */
-  base_run_state?: string[];
   /** Records this checkout set aside as superseded, by name. Absent = none. */
   superseded?: SupersededRecord[];
   /** Merged stories whose base-branch done record norn stopped retrying (records.json). Absent = none. */

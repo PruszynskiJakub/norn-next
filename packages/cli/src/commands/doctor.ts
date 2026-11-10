@@ -13,7 +13,7 @@ import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, FileError, Ports, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
 import { type ConfigEntry, ExitCode, PROVIDERS, type ResolvedConfig, ulid, type VersionMatch, versionMatch } from "@norn/schema";
-import { baseRunStateStories, baseSpecsRoot, bindNornHome, cachedDefaultBranch, defaultBaseRef, type Layout, layoutProblems, loadWorkflows, gitRemoteUrl, machineDir, machineHolder, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, SKILLS_DIR, skillsDrift, skillsReport, spawnBounded, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
+import { bindNornHome, type Layout, layoutProblems, loadWorkflows, gitRemoteUrl, machineDir, machineHolder, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, SKILLS_DIR, skillsDrift, skillsReport, spawnBounded, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { CliFailure, configError, rendered, withExit } from "../output.ts";
@@ -25,7 +25,7 @@ import { effectiveRetain, formatBytes, retainCutoffDay, retainWarning } from "..
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { layoutRefusal } from "../runtime/layout.ts";
 import { hookBinary, hookCommand } from "./init.ts";
-import { baseRunStateHint, cmd } from "@norn/core";
+import { cmd } from "@norn/core";
 import { oneLine } from "@norn/view";
 
 interface RunOut {
@@ -266,8 +266,6 @@ interface RepoReport {
   skills: SkillsDriftCheck;
   workflows: Array<{ name: string; file: string; ok: boolean; issues: WorkflowIssue[] }>;
   config: { ok: boolean; file: string; present: boolean; errors: FileError["errors"] };
-  /** Run state an older norn left in the base's tree, never read: fixed by `norn upgrade` */
-  run_state: Check & { stories: string[] };
 }
 
 /**
@@ -298,29 +296,14 @@ async function repoGroup(ctx: Context): Promise<RepoReport> {
   const config = { ok: configErrors.length === 0, file: configFile, present: existsSync(repoConfigPath(root)), errors: configErrors };
   const version = versionCheck(ctx.version, usableConfig(ctx).config.norn_version);
   const skills = driftCheck(skillsDrift(join(root, SKILLS_DIR), join(assetsDir(ctx.env), "skills"), bundledSkills(ctx.env)));
-  const run_state = runStateCheck(ctx);
   return {
-    ok: version.ok && skills.ok && workflows.every((w) => w.ok) && config.ok && run_state.ok,
+    ok: version.ok && skills.ok && workflows.every((w) => w.ok) && config.ok,
     layout: { ok: true, layout: "new" },
     version,
     skills,
     workflows,
     config,
-    run_state,
   };
-}
-
-/**
- * The stories whose run state is still in the base's tree (the fetched base
- * branch, the main checkout without one); a failed check until the removal `norn upgrade` stages is committed.
- */
-function runStateCheck(ctx: Context): Check & { stories: string[] } {
-  const base = usableConfig(ctx).config.base_branch ?? cachedDefaultBranch(ctx.root) ?? "main";
-  const ref = defaultBaseRef(ctx.root, usableConfig(ctx).config.git_remote, base);
-  const tree = ref ? baseSpecsRoot(ctx.root, ref) : null;
-  const stories = baseRunStateStories(tree ?? ctx.root);
-  if (!stories.length) return { ok: true, stories };
-  return { ok: false, stories, error: baseRunStateHint.text(base, stories), do_instead: baseRunStateHint.fix() };
 }
 
 /** The layout check of the repo group, failed on an old or mixed layout with what to run. */
@@ -376,10 +359,6 @@ function formatRepo(r: RepoReport, l: ReturnType<typeof lines>, dir: string, o: 
   for (const w of r.workflows.filter((x) => !x.ok)) {
     l.line(false, `workflow ${w.name}`, w.file);
     for (const i of w.issues) l.sub(`! ${i.path || "/"}: ${i.message}`);
-  }
-  if (!r.run_state.ok) {
-    l.line(false, "run state", r.run_state.stories.join(", "));
-    l.fix(r.run_state);
   }
   l.line(r.config.ok, "config", r.config.present ? r.config.file : `${r.config.file} (none: built-in defaults)`);
   for (const e of r.config.errors) l.sub(`! ${e.path || "/"}: ${e.message}`);

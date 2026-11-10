@@ -17,7 +17,6 @@ import {
   runStatePath,
   STORY_UNIT_DIR,
   normalRecord,
-  treeRunStatePath,
   unitRecordPath,
 } from "@norn/schema";
 import { type Action, type ClaimAction, NOT_OBSERVED, type UpdateStoryMirrorAction } from "../actions.ts";
@@ -31,7 +30,7 @@ import { epoch, iso } from "../time.ts";
 import { roundRejected, toCorrupt, toDone } from "../unit-state.ts";
 import { edgeOf, isStale, stepOf } from "../workflow.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
-import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitBranch, unitItem } from "./receipts.ts";
+import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitItem } from "./receipts.ts";
 import { baseOf, classifyNorn, hasFlatRecord, recordOf, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit, usableWorkflow } from "./steps.ts";
 import { cmd } from "../commands.ts";
 
@@ -118,8 +117,6 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
   const fm = story.frontmatter;
   const halted = su?.state?.park?.kind === "remote";
 
-  moveRecords(ctx, story);
-
   // A held story whose record is still flat moves into round 1 before anything else —
   // never mid-rebase, and never once its PR merged (the base keeps old records flat)
   if (!ctx.has(ref.key) && su?.state && hasFlatRecord(su) && !rebasing(su) && !storyMerged(phase)) {
@@ -169,8 +166,7 @@ function recordOnly(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
  * Under `record.policy: remote` (read at every tick), the holder
  * pushes the story's record once its tree differs from the one on the record ref it last saw, after
  * the tick's branch pushes (a side action act performs last). A push that failed leaves the tree
- * different, so the next tick pushes again. A move off the branch this tick brings the
- * record into the machine dir as it acts, so the push rides along with it. Under `local`, nothing.
+ * different, so the next tick pushes again. Under `local`, nothing.
  * An action of this tick that pushes the record itself leaves no second push beside it: a story
  * cleaned up this tick is archived by that action, and an `open-pr` pushes the
  * record before the PR. A push refused as stale (another checkout pushed the ref)
@@ -179,8 +175,7 @@ function recordOnly(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
 function pushRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
   if ((ctx.config.record?.policy ?? "local") !== "remote" || !story.record) return;
   const { tree, pushed } = story.record;
-  const moved = ctx.decisions.some((d) => d.action.kind === "move_record" && d.action.unit?.story === story.key);
-  if (!moved && (tree === null || tree === pushed?.tree)) return;
+  if (tree === null || tree === pushed?.tree) return;
   if (ctx.decisions.some((d) => d.action.unit?.story === story.key && pushesRecordItself(d.action))) return;
   const refused = story.record_refused;
   if (refused && (refused.lease ?? null) === (pushed?.sha ?? null)) return;
@@ -190,46 +185,6 @@ function pushRecord(ctx: Ctx, story: StoryFacts, ref: UnitRef): void {
 /** An action that pushes the story's record itself: the archive at merge or close, or `open-pr`. */
 const pushesRecordItself = (a: Action): boolean =>
   a.kind === "cleanup_merged_story" || a.kind === "close_story" || (a.kind === "run_git" && a.action === "open-pr");
-
-/**
- * Run state an older norn left on a held unit's branch moves into the machine dir
- * before anything else is decided for the units it holds, one `move_record` per branch (the story's,
- * each slice's): the units read from there were read from the branch, so nothing else may act on them
- * this tick. A record whose files fail validation is not moved: the unit is marked corrupt and its
- * branch keeps its runs/. Never mid-merge or mid-rebase: the removal would land in that commit.
- */
-function moveRecords(ctx: Ctx, story: StoryFacts): void {
-  for (const uf of story.units) {
-    const br = uf.branch_record;
-    if (!br || ctx.has(uf.unit.key)) continue;
-    const moving = br.copy.map((dir) => story.units.find((u) => u.unit.dir === dir)).filter((u): u is UnitFacts => !!u && u.unit.key !== uf.unit.key && !ctx.has(u.unit.key));
-    const busy = uf.worktree?.in_progress?.operation ?? (uf.worktree?.in_progress?.unmerged.length ? "a merge" : null);
-    const wait = (why: string) => {
-      for (const u of [uf, ...moving]) if (!u.errors.length && !ctx.has(u.unit.key)) ctx.noop(u.unit, "record.move_waits", why);
-    };
-    if (busy) {
-      wait(`${busy} in progress in ${uf.worktree?.path}: the run state on ${unitBranch(story, uf)} moves once it is concluded`);
-      continue;
-    }
-    // decideUnit marks each broken unit corrupt; nothing moves off this branch while a unit with a
-    // folder on it is broken, even one read from elsewhere (its copy here may be the good one)
-    const bad = story.units.filter((u) => br.holds.includes(u.unit.dir) && u.errors.length);
-    if (bad.length) {
-      wait(`${bad.map((u) => u.unit.key).join(", ")} failed validation on ${unitBranch(story, uf)}: nothing moves`);
-      continue;
-    }
-    const copy = br.copy.map((dir) => {
-      const u = story.units.find((x) => x.unit.dir === dir);
-      // A flat story record lands in round 1 of its workflow
-      const flat = u?.state && hasFlatRecord(u) ? u.state : null;
-      return { unit: dir, from: treeRunStatePath(story, dir), to: flat ? roundRunStatePath(story, 1, flat.workflow) : runStatePath(story, dir) };
-    });
-    const commit = commitFor(ctx, story, uf, `norn: move ${uf.unit.key} run state off the branch`, uf.state?.step ?? null);
-    if (!commit) continue;
-    ctx.emit({ kind: "move_record", unit: uf.unit, rule: "record.move", path: br.path, copy, commit });
-    for (const u of moving) ctx.noop(u.unit, "record.move", `moving with ${uf.unit.key} off ${commit.branch}`);
-  }
-}
 
 function claimBlob(ctx: Ctx, story: string, prev: ClaimBlob | null): ClaimBlob {
   const expires = iso(ctx.facts.now + parseDuration(ctx.config.claim.lease));
@@ -457,11 +412,9 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
   if (uf.errors.length) {
     if (uf.state?.status === "corrupt") return ctx.noop(ref, "unit.corrupt", "corrupt; never touched");
     const notify = unitItem(ctx, story, uf, uf.state as UnitState);
-    // Only the unit's own runs/ files mark its state corrupt, and only a state.json that reads —
-    // never one read from an older norn's branch: nothing is written there
+    // Only the unit's own runs/ files mark its state corrupt, and only a state.json that reads
     const own = uf.errors.every((e) => e.file.includes(`/${unitRecordPath(ref.dir)}/`));
-    const onBranch = story.units.some((u) => u.branch_record?.copy.includes(ref.dir));
-    const marked = uf.state !== null && own && !onBranch && !uf.errors.some((e) => /(^|\/)state\.json$/.test(e.file));
+    const marked = uf.state !== null && own && !uf.errors.some((e) => /(^|\/)state\.json$/.test(e.file));
     const reason = `corrupt: ${uf.errors.map((e) => e.file).join(", ")} failed validation`;
     const state: UnitState | null = marked
       ? { ...toCorrupt(uf.state!, reason, ctx.nowIso), updated_at: ctx.nowIso, last_tick_id: ctx.facts.tick_id }

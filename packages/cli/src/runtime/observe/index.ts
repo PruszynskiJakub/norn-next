@@ -520,7 +520,6 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     heartbeat: { last_tick_at: now },
     ...(local.norn ? { norn: local.norn } : {}),
     // Run state an older norn left on the base, pointed to `norn upgrade`
-    ...(local.snapshot.base_run_state.length ? { base_run_state: local.snapshot.base_run_state } : {}),
     ...(local.superseded.length ? { superseded: local.superseded } : {}),
     ...(local.owed_records.length ? { owed_records: local.owed_records } : {}),
     orphans: { worktrees: orphanWts.sort(), branches: orphanBranches },

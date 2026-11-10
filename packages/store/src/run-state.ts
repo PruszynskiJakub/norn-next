@@ -11,7 +11,7 @@
  * units (`storyRunStateDir`); tests use them to name a fixture's files, package sources use the
  * `(root, story, unit)` functions.
  */
-import { type Dirent, existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import {
   parseRoundDirName,
@@ -22,11 +22,8 @@ import {
   roundRecordPath,
   STORY_UNIT_DIR,
   storyRunStatePath,
-  treeRunStatePath,
-  treeStoryRunStatePath,
   unitRecordPath,
 } from "@norn/schema";
-import { isErrno } from "./fsx.ts";
 import { machineDir, statePath } from "./paths.ts";
 import { archivedRecordDir } from "./record-ref.ts";
 
@@ -46,41 +43,6 @@ export const runStateStartDir = (root: string, story: RunStory, unit: string, wo
  * (`<nn>-<slug>`, `_story/rounds/01-story`): what facts and messages name it by.
  */
 export const runStateRecord = (root: string, story: RunStory, dir: string): string => relative(storyRunStateDir(root, story), dir);
-/**
- * The folder of an older norn's tree that held a story's records, `<spec folder>/runs`:
- * read only from a unit worktree's branch, to move it off; on a base or checkout tree it is
- * never read, only noticed (`baseRunStateStories`).
- */
-export const treeRunStateDir = (root: string, story: RunStory): string => join(root, treeStoryRunStatePath(story));
-/**
- * The run-state files an older norn left in the tree of `root` (a unit worktree:
- * `<spec folder>/runs/`, on its branch), absolute and sorted: every file there, the units' old handoffs
- * included (they move to `handoffs/` before the rest is removed). [] = none.
- */
-export function treeRunStateFiles(root: string, story: RunStory): string[] {
-  const base = treeRunStateDir(root, story);
-  const entries = (dir: string): Dirent[] => {
-    try {
-      return readdirSync(dir, { withFileTypes: true });
-    } catch (e) {
-      // no runs/ there; anything else (EACCES, ENOTDIR) is no answer and surfaces
-      if (isErrno(e, "ENOENT")) return [];
-      throw e;
-    }
-  };
-  const out: string[] = [];
-  const walk = (dir: string, list: Dirent[]) => {
-    for (const d of list) {
-      const p = join(dir, d.name);
-      if (d.isDirectory()) walk(p, entries(p));
-      else out.push(p);
-    }
-  };
-  walk(base, entries(base));
-  return out.sort();
-}
-/** A unit's folder in an older norn's tree (`<spec folder>/runs/<unit>`). */
-export const treeUnitRunStateDir = (root: string, story: RunStory, unit: string): string => join(root, treeRunStatePath(story, unit));
 
 /**
  * The resolver for a unit's record folder under a story's run-state folder `base`: a slice's
@@ -144,23 +106,22 @@ export const isFlatStoryRecord = (base: string) => existsSync(statePath(join(bas
  * Where a story's run state is read from — the machine dir of `checkout`,
  * or, for a finished story this machine holds no run state of, the record on its archive ref
  * here (`archive`: the checkout's archive refs, `localRecordRefs`, read only when needed), unpacked into the machine dir's cache (`archivedRecordDir`). Never an older norn's
- * `<spec folder>/runs` in a base or checkout tree: a repository still holding those is pointed to
- * `norn upgrade` instead (`baseRunStateStories`). `name` is the root a file error or a receipt names a
- * path from: none (absolute) for both.
+ * `<spec folder>/runs` in any tree, a branch's or the base's. `name` is the root a file error or a
+ * receipt names a path from: none (absolute) for both.
  */
 export function runStateSource(
   root: string,
   story: RunStory,
   opts: { checkout?: string; archive?: () => ReadonlyMap<string, string> } = {},
-): { base: string; name?: string; tree: boolean; archive?: string } {
+): { base: string; name?: string; archive?: string } {
   const checkout = opts.checkout ?? root;
   const machine = storyRunStateDir(checkout, story);
   const sha = opts.archive && !existsSync(machine) ? opts.archive().get(story.key) : undefined;
   if (sha) {
     const dir = archivedRecordDir(checkout, story.key, sha);
-    if (dir) return { base: dir, tree: false, archive: basename(dir) };
+    if (dir) return { base: dir, archive: basename(dir) };
   }
-  return { base: machine, tree: false };
+  return { base: machine };
 }
 /** A unit's run-state folder under a source's `base` (`runStateSource`). */
 export const runStateDirIn = (base: string, unit: string): string => unitDir(base, unit);

@@ -333,16 +333,14 @@ export interface UnitTraceSummary {
 }
 
 /**
- * Where a trace's record paths point: a story worktree, the main checkout, or — for a
- * story with no worktree whose records the checkout does not have — the cached copy of the
- * base branch in the machine dir (replaced when `origin/<base>` moves; `ref` is the live source).
+ * Where a trace's record paths point: the machine dir, or a finished story's archive ref.
  */
 export interface TraceRecords {
   /**
    * `machine`: the machine dir holds the run state (`root` its story folder); `archive`: a finished
    * story's record from its archive ref, unpacked into the machine dir's cache
    */
-  source: "machine" | "worktree" | "checkout" | "archive";
+  source: "machine" | "archive";
   root: string;
   /** archive: the record ref (`refs/norn/runs/<story>`) */
   ref?: string;

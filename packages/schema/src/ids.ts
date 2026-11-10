@@ -277,13 +277,6 @@ export function unitHandoffPath(unit: string): string {
  * (`handoffs/_story.md`); read only until the story's next boundary moves it to `unitHandoffPath`.
  */
 export const LEGACY_STORY_HANDOFF_PATH = `${HANDOFFS_DIR}/${STORY_UNIT_DIR}.md`;
-/**
- * Where an older norn kept a unit's handoff in its tree, `runs/<unit>/handoff.md` (the story's
- * above its round folders); read only by the move that takes it to `unitHandoffPath`.
- */
-export function treeHandoffPath(unit: string): string {
-  return `${RUNS_DIR}/${unit}/handoff.md`;
-}
 /** A story round's record folder relative to the story's run-state folder, `_story/rounds/01-triage`. */
 export function roundRecordPath(n: number, workflow: string): string {
   return `${unitRecordPath(STORY_UNIT_DIR)}/${ROUNDS_DIR}/${roundDirName(n, workflow)}`;
@@ -312,12 +305,6 @@ export const recordRunStatePath = (story: RunStory, record: string): string => `
 export const roundRunStatePath = (story: RunStory, n: number, workflow: string): string => `${storyRunStatePath(story)}/${roundRecordPath(n, workflow)}`;
 /** The folder relative to the machine dir that holds every unit's run state of a story (`runs/<story>`). */
 export const storyRunStatePath = (story: RunStory): string => `${RUNS_DIR}/${story.key}`;
-/**
- * Where an older norn kept a unit's record in a git tree, relative to its root
- * (`<spec folder>/runs/<unit>`): what is read from a branch or base tree an older norn wrote (the
- * mailbox's step stamp, the run state `norn upgrade` moves off the base).
- */
-export const treeRunStatePath = (story: RunStory, unit: string): string => `${treeStoryRunStatePath(story)}/${unitRecordPath(unit)}`;
 /** The folder of an older norn's tree that held every unit's record of a story (`<spec folder>/runs`). */
 export const treeStoryRunStatePath = (story: RunStory): string => `${story.spec_dir}/${RUNS_DIR}`;
 /** Slice branch: `gh-123/03-add-form`. */

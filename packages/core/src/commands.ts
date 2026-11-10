@@ -128,16 +128,6 @@ export const skillsDriftHint = {
   repo: (running: string) => `skills differ from norn ${running}: run \`${cmd.upgrade()}\` and commit`,
 };
 
-/**
- * What `norn status` and `norn doctor` say while the base's tree still holds
- * run state an older norn left there (never read: only archive refs are), with the stories it is for.
- */
-export const baseRunStateHint = {
-  text: (base: string, stories: readonly string[]) =>
-    `run state is still on ${base} for ${stories.length === 1 ? stories[0] : `${stories.length} stories`}: norn no longer reads it there — run \`${cmd.upgrade()}\` to move it into archive refs and commit the removal`,
-  fix: () => `run \`${cmd.upgrade()}\` and commit the removal it stages`,
-};
-
 /** Removed top-level commands; no printed command may name one. */
 export const REMOVED_COMMANDS = ["drop", "inbox", "cockpit", "orient", "open", "answer", "approve", "unstick", "update", "mode", "workflow", "take", "release", "trace", "why"] as const;
 
