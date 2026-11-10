@@ -63,4 +63,4 @@ Every user story is covered; none UNTRACED.
 
 #### Resume
 
-human-qa: the person rules on 06.AC4 (the transcript line plus the snapshot version fields; see `06.AC4.txt` in QA #3's evidence). pr.md (describe#1) still describes the branch.
+open-pr: norn updates PR #325 with pr.md (describe#2, rewritten at HEAD 6a3c4e7b7 from QA #3's evidence run 01M72J9JB8SE7CYECSGAT5YCGK); then CI must go green. The golden/transcript criterion was ruled acceptable at human-qa#2.
