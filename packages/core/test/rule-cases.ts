@@ -150,7 +150,6 @@ function cases(): RuleCase[] {
   }
   out.push(c("the pinned workflow changed outside norn", "workflow.drift", facts([story(SOLO_WF, {}, null, {}, { workflow_hash: "edited" })])));
   out.push(c("a rebase waits in the unit's worktree past the step's deadline", "unit.rebase_in_progress", facts([story(SOLO_WF, running("implement", 2 * HOUR), null, {}, { worktree: { ...worktree(STORY_WT), in_progress: { operation: "rebase", unmerged: ["X.txt"] } } })])));
-  // A held story whose record is still flat moves into round 1 first
   // Under record.policy remote, a held story whose record changed since the ref it last saw
   out.push(
     c(

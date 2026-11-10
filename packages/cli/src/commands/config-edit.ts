@@ -63,7 +63,7 @@ export const configUnsetCommand = defineCommand({
 
 /** `norn_version` is written by `norn upgrade` and `norn init` only; hand-editing stays the escape hatch. */
 function refuseWrittenByNorn(key: string): void {
-  if (key === "norn_version") throw refuse("`norn_version` is written by norn upgrade, which moves the skills and files with it", cmd.upgrade(), "written_by_norn");
+  if (key === "norn_version") throw refuse("`norn_version` is written by norn upgrade, which refreshes the bundled skills with it", cmd.upgrade(), "written_by_norn");
 }
 
 /** The file flag, else the person's pick at a terminal, else a usage error. */
