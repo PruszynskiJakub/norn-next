@@ -7,7 +7,7 @@
  * Paths come from store's `machineDir`/`machineReposDir`, never spelled by hand.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { PersonOpenSpec, RunnerPort } from "@norn/core";
 import { sliceBranch } from "@norn/schema";
@@ -263,5 +263,32 @@ describe("worktrees follow the clone and its home", () => {
     expect(existsSync(wt)).toBe(true);
     expect(branchOf(wt)).toBe(DIR);
     expect(existsSync(besideRepo(root))).toBe(false);
+  });
+
+  test("a home reached through a symlink: the worktree, a tidy orphan and a lost marker are all found under the resolved path", async () => {
+    const root = join(h.dir, "repo-d");
+    sh(h.dir, ["clone", "-q", h.remoteDir, root]);
+    sh(root, ["config", "user.email", "dan@example.com"]);
+    sh(root, ["config", "user.name", "dan"]);
+    const real = join(h.dir, "home-d-real");
+    mkdirSync(real);
+    const link = join(h.dir, "home-d-link");
+    symlinkSync(real, link);
+    const env: Record<string, string | undefined> = { ...hostEnv(), USER: "dan", NORN_MACHINE: "repo-d", NORN_HOOK_COMMAND: "norn hook" };
+    delete env.NORN_HOME_DIR;
+    const deps: CliDeps = { cwd: root, env, home: link, clock: h.clock, ports: { remote: h.remote, runner: new FakeRunner() as RunnerPort, notifiers: [] } };
+    expect((await runChecked(["tick"], deps)).exit).toBe(0);
+    const worktrees = join(machineReposDir(real), checkoutOf(root).id, "worktrees");
+    const wt = join(worktrees, DIR);
+    expect(branchOf(wt)).toBe(DIR);
+
+    const orphan = join(link, "repos", checkoutOf(root).id, "worktrees", "gh-95-orphan");
+    sh(root, ["worktree", "add", "-q", "-b", "gh-95-orphan", orphan, "main"]);
+    rmSync(join(wt, ".norn-unit"));
+    h.clock.advance(10_000);
+    const r = await runChecked(["tick", "--offline"], deps);
+    expect(r.exit).toBe(0);
+    expect((r.value as TickReport).orphans?.worktrees).toEqual([join(worktrees, "gh-95-orphan")]);
+    expect(readFileSync(join(wt, ".norn-unit"), "utf8")).toContain("story=gh-10");
   });
 });
