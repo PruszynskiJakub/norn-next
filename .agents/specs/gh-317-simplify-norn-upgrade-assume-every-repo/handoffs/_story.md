@@ -4,7 +4,7 @@
 
 #### Proof
 
-All six slices are integrated. Review #2: **approve** (both review #1 blockers fixed). Unit tier and typecheck green. **QA #2 at a9321da29: 31/32 pass, observed with the dev CLI in throwaway repos** (evidence: `report.md` in this run's QA evidence). That includes the docs criterion (03.AC11, docs:emit clean). The golden/transcript criterion (06.AC4) is `person`.
+All six slices are integrated. Review #3 at 0796297a5: **approve**, no findings (since review #2 only test fixtures changed: no `src` file, guard untouched, snapshots move only their version fields). Review #2 fixed both review #1 blockers. Unit tier and typecheck green. **QA #2 at a9321da29: 31/32 pass, observed with the dev CLI in throwaway repos** (evidence: `report.md` in this run's QA evidence). That includes the docs criterion (03.AC11, docs:emit clean). The golden/transcript criterion (06.AC4) is `person`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -51,7 +51,7 @@ Every user story is covered; none UNTRACED.
 #### Not proven yet
 
 - A person has not ruled on the golden/transcript criterion (06.AC4): one transcript line is gone (`recovery-claim-lost.txt`, the read of the branch-tree runs).
-- CI on the fixture fix (55673447f) has not run yet; locally the full integration (904 tests) and e2e (74) tiers, the unit tier and typecheck are green.
+- CI on the fixture fix (55673447f) was still running at review #3 (unit and process pass; e2e, integration, package pending); locally the full integration (904 tests) and e2e (74) tiers, the unit tier and typecheck are green.
 
 #### Notes
 
