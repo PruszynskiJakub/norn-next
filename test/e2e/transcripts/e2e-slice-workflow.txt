@@ -10,7 +10,6 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/
   A.remote.listAssignedIssues norn
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo $ git show-ref --verify --quiet refs/heads/gh-7-add-login-form
   spawn repo $ git ls-remote --exit-code --heads origin refs/heads/gh-7-add-login-form
   spawn repo $ git show-ref --verify --quiet refs/heads/gh-7-add-login-form
   spawn repo $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/main
