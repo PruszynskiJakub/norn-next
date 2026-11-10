@@ -38,8 +38,9 @@ Review #1 traceability (the spec has no frontmatter criteria; rows are its Wante
 - Check outcomes are now an open map in the schema; the pass/fail/exits rule moved to load-time validation (`unknown_outcome`).
 - Schema JSON emitted; `docs:emit` produced no change; concepts glossary and the "Write your own workflow" recipe mention `exits`.
 - Review #1 approved with no blocking findings. Note for the person: seven harvested golden cases (`packages/core/test/golden/{human,merged-pr,pr-body,runtime}-*.json`) appeared untracked at 16:21:43, after the test check, not from this change; norn's report commit sweeps them into the branch. Drop them before merge if unwanted.
+- describe#1 wrote pr.md. It calls the change one-way, because once a `stale` check receipt exists the old schema refuses it, and it tells the person to drop the seven harvested golden cases.
 - Friction: something in the test step left harvested golden files untracked in the worktree, so they ride along in the next report commit.
 
 ## Resume
 
-Review approved; next is the workflow's step after review (open-pr → ci).
+pr.md (spec folder) describes the branch as it is now: summary, test evidence, merge danger. Next: norn opens or updates the draft PR, then `ci` runs.
