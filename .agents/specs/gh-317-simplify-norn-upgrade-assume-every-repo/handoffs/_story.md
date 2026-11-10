@@ -4,7 +4,7 @@
 
 #### Proof
 
-All six slices are integrated. Review #3 at 0796297a5: approve, no findings. Unit tier and typecheck green (test#3). **QA #3 at 751452c86: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (evidence: `report.md` in this run's QA evidence). The golden/transcript criterion (06.AC4) is `person`.
+All six slices are integrated. Review #4 at 07daf021b: approve, no findings (since review #3: main merged cleanly, merged-pr fixture records norn_version; unit 1731 pass, e2e 76 pass, typecheck green). **QA #3 at 751452c86: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (evidence: `report.md` in this run's QA evidence). The golden/transcript criterion (06.AC4) is `person`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -63,4 +63,4 @@ Every user story is covered; none UNTRACED.
 
 #### Resume
 
-ci: the branch now includes main (8b6e268c1) and the merged-pr fixture fix; `merged-pr`, `base-sync` and `e2e-slice-workflow` e2e pass locally, unit tier and typecheck green. Wait for CI on PR #325; the golden/transcript criterion was ruled acceptable at human-qa#2.
+test, then the rest of the round: review #4 approved HEAD 07daf021b (main merged, merged-pr fixture fix). The golden/transcript criterion was ruled acceptable at human-qa#2.
