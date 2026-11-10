@@ -4,7 +4,7 @@
 
 #### Proof
 
-All six slices are integrated. Unit tier (1726 pass) and typecheck are green at review #1. QA #1: 30/32 pass; the docs criterion was fixed after QA; the golden/transcript criterion awaits a person. Review #1: **changes_requested**, with 2 blocking findings (see Not proven yet). Findings file: this run's review findings.
+All six slices are integrated. Review #2: **approve**. Both blocking findings from review #1 are fixed: the old-layout code is gone (the verify grep finds nothing) and `norn config` now says `norn init` records a missing norn_version, with the 0.30 path. Unit tier (1726 pass) and typecheck are green at HEAD 0a9713103. The integration tests for config, upgrade and help-tree also pass locally (65/65). QA #1: 30/32 pass; the docs criterion was fixed after QA; the golden/transcript criterion awaits a person.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -46,20 +46,20 @@ Every user story is covered by the criteria above; none is UNTRACED.
 #### Easy to miss
 
 - Fixes keep the guard as it is: fix docs, dead code and fixtures, never weaken the refusal.
-- F1's verify grep: `grep -rnw 'repoLayout\|layoutProblems\|layoutRefusal\|OLD_CONFIG_FILE\|OLD_TRACE_DIR\|OLD_WORKFLOWS_DIR\|OLD_NORN_DIR\|toOldLayout' packages test` must find nothing. Tests that use OLD_* spell the paths as literals.
+- No old-layout code comes back: `grep -rnw 'repoLayout\|layoutProblems\|layoutRefusal\|OLD_CONFIG_FILE\|OLD_TRACE_DIR\|OLD_WORKFLOWS_DIR\|OLD_NORN_DIR\|toOldLayout' packages test` finds nothing. Tests name the pre-0.13 place through the harness's `PRE_013_NORN_DIR`.
 
 #### Not proven yet
 
-- Review #1's blocking findings are fixed in implement #2 and await re-review: (F1) old-layout code removed: store `layout.ts` and its export, the `OLD_*` paths, cli `runtime/layout.ts`, harness `toOldLayout`, the development.md mentions; the tests spell `.agents/norn` through the harness's `PRE_013_NORN_DIR`; the verify grep finds nothing; the paths.ts allowance in `repo.test.ts` is down to 2. (F2) `norn config`'s note for a missing norn_version now says `norn init` records it on a new repo and a repo from an older norn needs norn 0.30.x and `norn upgrade` first; pinned by `config.test.ts` › "B4: without the key, get shows no value, that norn init records it and the 0.30 path".
-- QA has not re-checked 03.AC11 (docs) since the docs fix; a person has not ruled on 06.AC4's one-line transcript change.
-- The integration and e2e tiers run in CI only.
+- QA has not re-checked the docs criterion (03.AC11: the docs describe upgrade from 0.30 on, nothing old) since the docs fix.
+- A person has not ruled on the golden/transcript criterion (06.AC4): one transcript line is gone (`recovery-claim-lost.txt`, the read of the branch-tree runs).
+- The full integration and e2e tiers run only in CI.
 
 #### Notes
 
-- Minor notes from review #1 for the person, not rework: init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before loading config, so a broken config with no version gets exit 3, not 6 (D4, `upgrade.ts:52`); `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move` are left for tests only; the 05.AC2 hook test also passes on old code; stale comments (`observe/index.ts:522`, `view/src/load.ts:474`, `store/src/fsx.ts:16`, `docs/limitations.md:29`); commit 1ac2a0d2f's accepted risk (a branch-only record reads as none) belongs in the PR body.
+- Minor notes from review #1, still open, for the person and not for rework: init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before loading config, so a broken config with no version gets exit 3, not 6 (D4, `upgrade.ts:52`); `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move` are left for tests only; the 05.AC2 hook test also passes on old code; stale comments (`observe/index.ts:522`, `view/src/load.ts:474`, `store/src/fsx.ts:16` still says `norn upgrade` fixes needs_removed, `docs/limitations.md:29`); coverage narrower than some criteria read (watch, the unwritable remote, other skill folders); commit 1ac2a0d2f's accepted risk (a branch-only record reads as none) belongs in the PR body.
 - Earlier decisions (person): init refuses a pre-0.30 version too; config old-key messages lose their "run `norn upgrade`" hint; codes `version_missing` / `version_too_old`; the status version item is an Unblock item pointing to `norn doctor`. Flat records and older `state.json` readers stay (out of scope).
 - Release notes come from commits 5e8451d29 and b45b051f0 and the PR body. CHANGELOG is the release step's.
 
 #### Resume
 
-Review the fixes for review #1's two blocking findings (implement #2); unit tier and typecheck are green.
+Review #2 approved. Next: QA re-checks the docs criterion (03.AC11), and a person rules on the one-line transcript change (06.AC4) and on the minor notes.
