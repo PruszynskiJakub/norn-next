@@ -6,7 +6,7 @@ Unit worktrees are created in the checkout's machine dir (`<machine dir>/worktre
 
 ## Proof
 
-Review #1 at becfb596: unit tier 1734 pass, typecheck green. Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run's evidence). Golden: 0 of 136 changed. e2e: 74 pass, no pinned file rewritten. `git grep -e '-worktrees'` finds nothing in `packages/*/src` or docs.
+Implement #2 (rework of review #1): unit tier 1734 pass, typecheck green; `worktrees-machine-dir.test.ts` 10 pass locally (the new symlinked-home test fails without the fix). Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run's evidence). Golden: 0 of 136 changed. e2e: 74 pass, no pinned file rewritten. `git grep -e '-worktrees'` finds nothing in `packages/*/src` or docs.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -21,23 +21,22 @@ Review #1 at becfb596: unit tier 1734 pass, typecheck green. Built and QA'd at 2
 | 03.AC4 / story 4 | worktrees follow a home bound by `--home` or `NORN_HOME_DIR` | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "the tick creates the story worktree…" (NORN_HOME_DIR) and "a home given to the command…" |
 | 03.AC5 / story 5 | two clones keep separate worktree folders for one story key | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "two clones of one remote take in the same story…" |
 | 03.AC6 / story 6 | `--print`, the inbox start command, the brief and the Herdr tab show the machine-dir path | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "the inbox's start command, story start, --print and the Herdr tab's cwd…" and "the brief run from the worktree in the machine dir…" |
-| 03.AC7 / story 7 | `tidy` reports a clean and a dirty orphan and removes only the clean one | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "a clean and a dirty orphan are both reported…" (canonical home only, see F1) |
+| 03.AC7 / story 7 | `tidy` reports a clean and a dirty orphan and removes only the clean one | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "a clean and a dirty orphan are both reported…" and "a home reached through a symlink…" |
 | 03.AC8 / story 8 | `story start` notices a deleted story worktree and recreates it | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "a story worktree deleted from the machine dir's worktrees/…" |
 | 03.AC9 / story 9 | `status --json` shows each unit's worktree in the machine dir | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "norn status shows the running story's worktree…" and the slice test (reach plus `story list` root); `packages/view/test/integration/view.test.ts` › "reads specs from story worktrees in the checkout's machine dir" |
 | 03.AC10 | rewritten golden corpus: no decision change | test | `packages/core/test/unit/golden.test.ts` |
 | 03.AC11 / story 10 | docs say worktrees live in the machine dir under `worktrees/` | agent | QA (agent); review read `docs/concepts.md` run-state paragraph and glossary |
 
-Review findings (`findings.json` in this run): F1 blocking. `worktreesDir` uses an unresolved home but is prefix-matched against resolved `git worktree list` paths (`observe/index.ts:176`, `worktree.ts:91`). F2 minor: the decide fixture still reports `/r-worktrees`.
+Review #1 findings: F1 blocking (symlinked home broke orphan detection and marker inference) is fixed: `machineHomeOf` in `packages/store/src/paths.ts` now resolves the home (realpath of the part that exists, the rest appended; memoized once the home exists), so the machine dir and `worktreesDir` are spelled as git spells worktree paths. Proven by `worktrees-machine-dir.test.ts` › "a home reached through a symlink: the worktree, a tidy orphan and a lost marker are all found under the resolved path". F2 minor (decide fixture still reports `/r-worktrees`) left as a note, as the review asked.
 
 ## Easy to miss
 
 - Core is pure: the folder reaches decide as `Facts.repo.worktrees`, never by calling the machine dir from core.
-- macOS `/var` vs `/private/var`: worktree paths sit under the home; compare against `git worktree list`.
+- macOS `/var` vs `/private/var`: worktree paths sit under the home; compare against `git worktree list`. The machine dir is built on the resolved home for this reason; never build it from an unresolved home elsewhere.
 - `git grep -- '-worktrees'` silently treats the pattern as a path: use `git grep -e '-worktrees' <rev> -- packages/` (a `packages/*/src` pathspec glob also missed nested files).
 
 ## Not proven yet
 
-- A norn home reached through a symlink (F1): orphan detection and marker inference compare `${worktreesDir(root)}/` with resolved git paths. Not reproduced live; the shell hook refuses `git worktree add`. A harness test can reproduce it.
 - The integration tier as a whole: CI shards 1/4 and 2/4 have not reported on this branch yet.
 
 ## Notes
@@ -48,8 +47,9 @@ Review findings (`findings.json` in this run): F1 blocking. `worktreesDir` uses 
 - Slicing: the plan still holds on this base: the old path is built in exactly the places the plan lists. Slices 01 and 02 run in parallel; critical path is two levels (01 or 02 → 03). Slice 02's helper computes the old folder itself so it need not wait for 01; slice 03 points it at `worktreesDir`.
 - Slice 03 is the largest; kept whole because the move and recognition must change together to stay green. Its Notes name the fallback split (the tests for home, clones, tidy, gone-check and view into a follow-up slice) if it outgrows one context.
 - Slice 01 adds a field to observe's output, so observe snapshots change by that field only.
+- Rework of review #1: resolving in `machineHomeOf` (not only `worktreesDir`) keeps every machine-dir path in one spelling; the resolution is memoized only once the home exists, since a missing folder may still be created as a link.
 - QA: `story start --print` on an agent step running in auto is refused (`nothing_to_open`); the person-facing paths were checked on an attended step in manual mode.
 
 ## Resume
 
-Rework F1: resolve the norn home through realpath where it is bound or defaulted (`bindNornHome` and `machineHomeOf` in `packages/store/src/paths.ts`, e.g. with `realOr`), or inside `worktreesDir`. Add a test in `packages/cli/test/integration/worktrees-machine-dir.test.ts` with the command's home given as a symlink: a tidy orphan must still be reported, and a story worktree with its `.norn-unit` deleted must still be inferred. Then `bun run test` and `bun run typecheck`.
+Nothing left for implement: review the rework (the symlinked-home fix in `machineHomeOf`, `packages/store/src/paths.ts`, and its integration test).
