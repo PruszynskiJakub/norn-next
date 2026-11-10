@@ -484,6 +484,8 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
   // body: list | preview (preview below when narrow)
   const items = rows.filter((r) => r.kind === "item");
   const stories = rows.filter((r) => r.kind !== "item");
+  const itemsOf = new Map<string, number>();
+  for (const r of items) itemsOf.set(r.story, (itemsOf.get(r.story) ?? 0) + 1);
   const w = (f: (r: CockpitRow) => string, max: number) => Math.min(max, Math.max(0, ...items.map((r) => f(r).length)));
   const unitW = Math.max(w((r) => r.unit, 10), Math.min(10, Math.max(0, ...rows.map((r) => r.unit.length))));
   const stepW = w((r) => r.step ?? "", 12);
@@ -494,11 +496,13 @@ export function renderCockpit(model: CockpitModel, s: TuiState, o: Look): string
       const head = `${fit(r.unit, unitW).padEnd(unitW)}  ${fit(r.title, titleW).padEnd(titleW)}  `;
       return `${head}${fit(storySummary(r), room - head.length)}`;
     }
-    // what the story is; the item's instruction stays in the preview
+    // what the story is, the item's instruction staying in the preview; a story with more than
+    // one item row says what each asks for, or its rows read the same
     const g = r.group as InboxGroup;
     const head = `${GROUP_MARK[g] ?? "·"} ${fit(r.unit, unitW).padEnd(unitW)}  ${fit(r.step ?? "", stepW).padEnd(stepW)}  `;
     const age = r.age ?? "";
-    const t = fit(r.preview.report?.title ?? r.title, Math.max(0, room - head.length - age.length - 2));
+    const label = (itemsOf.get(r.story) ?? 0) > 1 ? r.title : (r.preview.report?.title ?? r.title);
+    const t = fit(label, Math.max(0, room - head.length - age.length - 2));
     return `${head}${t}${" ".repeat(Math.max(2, room - head.length - t.length - age.length))}${age}`;
   };
   const counts = new Map<string, number>();

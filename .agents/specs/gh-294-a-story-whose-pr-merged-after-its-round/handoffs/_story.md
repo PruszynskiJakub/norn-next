@@ -1,37 +1,37 @@
+# gh-294 — handoff
+
 ## Goal
 
-A story whose PR is seen merged into the base is recorded done, even when its round has already reached `$done` and no heartbeat holds the claim. It then leaves Needs you. Also wanted: cockpit item rows say what each item asks for.
+When a story's PR is seen merged into the base, the story is recorded done even if its round already reached `$done` and nobody holds the claim, so it leaves Needs you. Also: a cockpit item row says what its item asks for when its story has more than one row.
 
 ## Proof
 
-- Reproduced through the real CLI path (integration harness, real git, fake gh): round `$done` → `watch --max-ticks 1` releases the claim → PR merged and issue closed → `norn sync` decides `noop story.finished`, the spec stays `status: active`, and `norn status` shows Check "gh-9: remote: issue closed — the round stays finished". Evidence: `cli-repro.out` and `repro.test.ts`.
-- Minimised loop at the decide seam, red: `min.test.ts` / `min-repro.out` in evidence.
+- Merged PR with no claim held is taken back, then cleaned up: `packages/core/test/unit/decide.test.ts` › "a story whose round ran and whose PR merged is taken back for the merge cleanup though nobody holds its claim". This test failed first: decide gave `noop story.finished`. It pins four things:
+  - claim `none` + PR merged + round `$done` + record `active` → `claim claim.reacquire.merged`, an acquire with `expected: null`;
+  - the same case mid-round is taken back too;
+  - once the claim is held → `cleanup_merged_story` with `story_status: done`;
+  - no story worktree left (already cleaned up, the base still refusing the done record) → noop, no take-back loop; a record already `done` → noop.
+- Rule coverage: a hand-built case in `packages/core/test/rule-cases.ts` covers the new rule `claim.reacquire.merged`.
+- Cockpit rows: `packages/cli/test/unit/cockpit-tui.test.ts` › "a story with more than one item row: each row says what its item asks for". It failed first. A story with one item row still shows the story's title, as the existing Now-tab test pins.
+- `bun run test` (1735 pass), `bun run typecheck` green. The golden corpus is unchanged.
 
 ## Easy to miss
 
-- The existing decide test "R3.2: the base record wins — no acquire for a story the base records as done or whose PR merged" pins `claim none + pr merged + spec status new → story.finished`, for a stale local intake. A fix must keep that case apart from a story whose record is `active` and whose round ran.
-- A claim released by a clean `watch` exit is `none`, not `expired`. The restarted watch has the same heartbeat_id but is not counted as `ours`.
+- The R3.2 decide test still holds: a stale local intake (no run state, record `new`) of a merged story is never acquired, and neither is another heartbeat's expired claim.
+- The take-back requires the story worktree to exist. After `cleanup_merged_story` the worktree is gone, and if the base refuses the done record, the story reads `active` from the base with claim `none` and PR merged (golden `audit-452b16e64efb.json`, the owed-records flow in `packages/cli/test/integration/audit.test.ts`). Without the worktree condition, decide would re-acquire and re-run the cleanup on every tick.
 
 ## Not proven yet
 
-- The cockpit duplicate-row title (`packages/cli/src/runtime/cockpit-tui.ts:501`, `r.preview.report?.title ?? r.title`) was not looped. It is a separate, display-only change.
+- No new integration test. The fix is proven at the decide seam over two ticks (acquire, then cleanup). The integration tier runs in CI. The CLI repro (`repro.test.ts` in the reproduce evidence) could be added to `packages/cli/test/integration/runtime.test.ts` if review wants it.
+- Stories already closed with `norn story close` (worktree removed, record `active`, e.g. gh-222, gh-271, gh-292) are not taken back, because they have no worktree. A person lands `status: done` on the base for those by hand.
+- Between syncs, the Check item "issue closed — the round stays finished" still reads `story.pr` only (`packages/core/src/inbox/items.ts` `finishedRoundRemoteItem`). It is left out on purpose: the next sync tick records the story done and the item goes away.
 
 ## Notes
 
-**Loop.** Copy `min.test.ts` from evidence, swap `<worktree>/` for the worktree's absolute path, and run it outside the repo with `bun test --preload <worktree>/test/preload.ts min.test.ts` (~0.3 s). The test builds a story with round state `step: $done, status: done`, spec `status: active`, `pr.state: merged` and claim `none`, and asserts that decide emits `cleanup_merged_story`. It gets `noop story.finished "finished: PR merged; nothing to acquire"`. Probe across claim states: none → noop, expired-ours → `claim.reacquire` (which leads to cleanup), expired-theirs → noop.
-
-**Confirmed cause.** `packages/core/src/decide/story.ts:84`, `if (baseDone || (storyMerged(phase) && !ours)) return ctx.noop(…"story.finished"…)`. It returns before `storyLifecycle`, the only place that emits `cleanup_merged_story`. `ours` (`story.ts:77`) is true only for this heartbeat's own expired claim. Ruled out: observe missing the merge (the noop's reason says PR merged) and the cleanup failing (it is never emitted).
-
-**Contributing (Check item between syncs).** `finishedRoundRemoteItem` (`packages/core/src/inbox/items.ts:531-533`) takes the phase from `story.pr` only. `packages/view/src/load.ts:379` drops `pr_seen` and `issue_seen` when `finished`.
-
-**Seam for a regression test.**
-- decide unit: `packages/core/test/unit/decide.test.ts`, next to R3.2.
-- integration: `packages/cli/test/integration/runtime.test.ts`, following the "PR merged →" flow plus a `watch --max-ticks 1` release before the merge (the full repro in `repro.test.ts`).
-
-The `## Reproduce` comment is NOT posted: the norn PreToolUse hook refused `gh issue comment` although the reproduce brief allows exactly that one comment. Its text is in evidence as `reproduce-comment.md`, for a person to post.
-
-Friction: the reproduce brief allows one `## Reproduce` issue comment, but norn's Bash hook refuses every `gh` remote write, that comment included.
+- Decision: take back only on claim `none` + this checkout's run state + the story worktree present. Another heartbeat's expired claim stays a noop: its holder may still be acting on it, and the existing test pins that.
+- Decision on cockpit rows: show the item's title only when the story has more than one item row. That is the issue's minimum, and it keeps the existing "item row says what the story is" behaviour for single rows.
+- Friction (from reproduce): the `## Reproduce` comment was never posted, because norn's hook refuses `gh issue comment`. Its text is `reproduce-comment.md` in the reproduce evidence.
 
 ## Resume
 
-Reproduce step done. The next round (a person starts it) fixes `decideStory` so that a merged PR on a story whose record is not done is cleaned up whatever the claim state, starting from the decide seam above.
+Implement is done and committed. Next: the workflow's review/CI steps.

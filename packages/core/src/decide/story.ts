@@ -77,10 +77,17 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
     const ours = claim.state === "expired" && claim.blob.heartbeat_id === ctx.heartbeat;
     const fresh = claim.state === "none" && !su?.state && story.frontmatter?.status === "new";
     // The base record wins over any local spec — a story the base records as done
-    // (or whose PR merged) is never acquired by a stale local intake or a returning checkout. Only this
-    // heartbeat's own expired claim (nobody took it since) is re-acquired for a merged PR whose record
-    // is not yet done, so the merge cleanup and the base record still happen.
+    // (or whose PR merged) is never acquired by a stale local intake or a returning checkout. A merged
+    // PR whose record is not yet done is re-acquired so the merge cleanup records it done: by this
+    // heartbeat's own expired claim (nobody took it since), or, with no claim at all, by the checkout
+    // whose round ran and whose story worktree is still there — the claim is released once a round
+    // reaches $done, and the merge comes after. The cleanup removes that worktree, so a story whose
+    // done record the base still refuses is not taken back again. Another heartbeat's expired claim
+    // is left to its holder.
     const baseDone = baseClosed(story);
+    const takeBack = !baseDone && phase.phase === "merged" && claim.state === "none" && !!su?.state && !!story.worktree?.exists;
+    if (takeBack)
+      return ctx.emit({ kind: "claim", unit: ref, rule: "claim.reacquire.merged", op: "acquire", expected: null, blob: claimBlob(ctx, story.key, null) });
     if (baseDone || (storyMerged(phase) && !ours))
       return ctx.noop(ref, "story.finished", baseDone ? `finished: ${ctx.facts.repo.default_branch} records it ${story.base_status}; nothing to acquire` : "finished: PR merged; nothing to acquire");
     // A finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
