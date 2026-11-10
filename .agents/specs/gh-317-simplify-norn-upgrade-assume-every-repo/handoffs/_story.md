@@ -4,7 +4,7 @@
 
 #### Proof
 
-All six slices are integrated. **Review #6 at b679d458b: approve, no findings** (only a test fix since review #5; unit tier and typecheck green). **QA #6 at 67c548055: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (qa#6 `report.md`). The golden/transcript criterion (06.AC4) is `person`.
+All six slices are integrated. **Review #7 at d9330c8b2: approve, no findings** (since review #6 only the handoff and pr.md changed; unit tier 1733 pass, typecheck green, golden replay 329/329, old-layout grep empty). **QA #6 at 67c548055: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (qa#6 `report.md`). The golden/transcript criterion (06.AC4) is `person`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -64,4 +64,4 @@ Every user story is covered; none UNTRACED.
 
 #### Resume
 
-implement#7 found no code to fix (cancelled CI run, see Notes); unit tier 1733 pass and typecheck green; CI green on e9b623fe. Next: review/QA see no change since QA #6, then the ci check again.
+Review #7 approved; next is the test check, then QA on HEAD.
