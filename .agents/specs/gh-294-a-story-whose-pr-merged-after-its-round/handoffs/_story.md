@@ -11,7 +11,7 @@ When a story's PR is seen merged into the base, the story is recorded done even 
 | Wanted 1 | a story whose PR is seen merged is recorded done, also when its round reached `$done` and nobody holds the claim | test | `packages/core/test/unit/decide.test.ts` › "a story whose round ran and whose PR merged is taken back for the merge cleanup though nobody holds its claim" (take-back, then `cleanup_merged_story` with `story_status: done`); full CLI flow: `packages/cli/test/integration/runtime.test.ts` › "PR merged after the round finished" |
 | Wanted 2 | each cockpit item row says what its item asks for, at least when its story has more than one row | test | `packages/cli/test/unit/cockpit-tui.test.ts` › "a story with more than one item row: each row says what its item asks for" |
 
-Review #1: approve, no blocking findings. Two minor notes (stories already closed with `norn story close` stay active; a failed worktree removal re-runs the take-back each tick) are in the review findings file.
+Review #2: approve, no blocking findings, on the head with the integration test (`bun run test` 1735 pass, typecheck green). The two minor notes from review #1 still stand and are not fixed (stories already closed with `norn story close` stay active; a failed worktree removal re-runs the take-back each tick); they are in the review findings file.
 
 - Merged PR with no claim held is taken back, then cleaned up: `packages/core/test/unit/decide.test.ts` › "a story whose round ran and whose PR merged is taken back for the merge cleanup though nobody holds its claim". This test failed first: decide gave `noop story.finished`. It pins four things:
   - claim `none` + PR merged + round `$done` + record `active` → `claim claim.reacquire.merged`, an acquire with `expected: null`;
@@ -43,4 +43,4 @@ Review #1: approve, no blocking findings. Two minor notes (stories already close
 
 ## Resume
 
-Implement #2 is done: the integration regression test is added. Next: test, then review it. pr.md needs a line for the new integration test when describe runs again.
+Review #2 approved; the next step is describe (refresh pr.md for the added integration test).
