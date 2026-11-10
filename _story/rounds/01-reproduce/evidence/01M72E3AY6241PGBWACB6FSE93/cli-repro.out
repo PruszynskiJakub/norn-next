@@ -1,0 +1,38 @@
+bun test v1.3.13 (bf2e2cec)
+
+repro.test.ts:
+watch released: [{"story":"gh-9","ok":true,"pushed":["gh-9-fix-the-bug"],"record":{"sha":"3093d8a73076d677df49c2644c47080390b4fe2a","branch_commit":"0641cedbcd28ab7e86ffd1340a95777eef069068"}}]
+sync decisions gh-9: [{"unit":"gh-9","rule":"story.finished","kind":"noop","ok":true}]
+worktree spec status: status: active
+next tick gh-9: ["noop story.finished"]
+status:
+Check (2) · changed outside norn, worth a look
+  *          no norn version recorded: run `norn upgrade` · 0s
+      $ norn upgrade
+  gh-9       round 1 · solo · $done: gh-9: remote: issue closed — the round stays finished · 2m
+      a finished round is not parked for the issue
+      $ norn story view gh-9 --web
+
+Recently done (1) · finished in the last 24h
+  gh-9       round 1 · solo · $done: done · 2m
+      $ norn run list gh-9
+
+41 |   h.clock.advance(60_000);
+42 |   const t = await h.tick();
+43 |   console.log("next tick gh-9:", JSON.stringify(rules(t)));
+44 |   const st = await h.norn("status");
+45 |   console.log("status:\n" + st.stdout);
+46 |   expect(rules(s)).toContain("cleanup_merged_story remote.pr_merged");
+                        ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "cleanup_merged_story remote.pr_merged"
+Received: [ "noop story.finished" ]
+
+      at <anonymous> (/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/gh294/repro.test.ts:46:20)
+(fail) gh-294: PR merged after the round finished and the claim was released → recorded done [4926.03ms]
+
+ 0 pass
+ 1 fail
+ 4 expect() calls
+Ran 1 test across 1 file. [5.86s]

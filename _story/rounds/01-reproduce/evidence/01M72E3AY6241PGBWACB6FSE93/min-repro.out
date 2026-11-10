@@ -1,0 +1,25 @@
+bun test v1.3.13 (bf2e2cec)
+
+min.test.ts:
+none            ["noop story.finished finished: PR merged; nothing to acquire"]
+expired-ours    ["claim claim.reacquire "]
+expired-theirs  ["noop story.finished finished: PR merged; nothing to acquire"]
+13 | test("probe: which claim states reach cleanup_merged_story", () => {
+14 |   for (const [name, c] of [["none", { state: "none" }], ["expired-ours", { state: "expired", sha: "c1", blob: blob(HB) }], ["expired-theirs", { state: "expired", sha: "c1", blob: blob("01JEEEEEEEEEEEEEEEEEEEEEEE") }]] as const)
+15 |     console.log(name.padEnd(15), JSON.stringify(kinds(story(c))));
+16 | });
+17 | test("gh-294 minimal: round $done, claim none, PR merged → cleanup_merged_story", () => {
+18 |   expect(kinds(story({ state: "none" })).map((k) => k.split(" ")[0])).toContain("cleanup_merged_story");
+                                                                           ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "cleanup_merged_story"
+Received: [ "noop" ]
+
+      at <anonymous> (/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/gh294/min.test.ts:18:71)
+(fail) gh-294 minimal: round $done, claim none, PR merged → cleanup_merged_story [0.46ms]
+
+ 1 pass
+ 1 fail
+ 1 expect() calls
+Ran 2 tests across 1 file. [590.00ms]
