@@ -1,6 +1,6 @@
 /** The `ci` check script of the repo workflows (#125), run through `sh` against a fake gh and sleep on PATH. */
 import { describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSyncCaptured } from "@norn/store";
@@ -24,7 +24,12 @@ case "$1 $2" in
     case "$*" in *"--workflow ci.yml"*"--commit ${SHA}"*"--event pull_request"*) ;; *) echo ""; exit 0 ;; esac
     if [ "$APPEAR" -gt 0 ] && [ $n -ge "$APPEAR" ]; then echo 42; else echo ""; fi ;;
   "run watch") exit "$WATCH_EXIT" ;;
-  "run view") echo "failed log of run $3" ;;
+  "run view")
+    case "$*" in
+      *"--json url"*) echo "https://example.test/run/$3" ;;
+      *"--json jobs"*) echo "- job 7: integration (shard 1/4)" ;;
+      *) echo "unexpected gh $*" >&2; exit 9 ;;
+    esac ;;
   *) echo "unexpected gh $*" >&2; exit 9 ;;
 esac
 `;
@@ -34,6 +39,9 @@ esac
     writeFileSync(join(fake, "sleep"), `#!/bin/sh\necho "$1" >> "$FAKE/sleeps"\n`);
     chmodSync(join(fake, "gh"), 0o755);
     chmodSync(join(fake, "sleep"), 0o755);
+    // the script calls the repo's .agents/scripts/ci-failures.sh relative to the checkout it runs in
+    mkdirSync(join(fake, ".agents", "scripts"), { recursive: true });
+    copyFileSync(join(ROOT, ".agents", "scripts", "ci-failures.sh"), join(fake, ".agents", "scripts", "ci-failures.sh"));
     const proc = spawnSyncCaptured(["sh", "-c", `exec 2>&1\n${ciScript("quick")}`], {
       cwd: fake,
       env: { ...process.env, PATH: `${fake}:${process.env.PATH}`, FAKE: fake, APPEAR: String(appear), WATCH_EXIT: String(watchExit) },
@@ -49,10 +57,13 @@ esac
     expect(r.calls.filter((c) => c.startsWith("run watch"))).toEqual([expect.stringMatching(/^run watch 42 --exit-status/)]);
   });
 
-  test("fails on a red run with its failed log", () => {
+  test("fails on a red run with where its failures are, never its log", () => {
     const r = run(1, 1);
     expect(r.exit).toBe(1);
-    expect(r.out).toContain("failed log of run 42");
+    expect(r.out).toContain("CI run 42 failed: https://example.test/run/42");
+    expect(r.out).toContain("- job 7: integration (shard 1/4)");
+    expect(r.out).toContain('gh api "repos/{owner}/{repo}/check-runs/<job>/annotations"');
+    expect(r.calls.some((c) => c.includes("--log-failed"))).toBe(false);
   });
 
   test("fails when no run appears within 5 minutes", () => {
@@ -83,8 +94,7 @@ case "$*" in
     if [ "$APPEAR" -gt 0 ] && [ $n -ge "$APPEAR" ]; then echo 2; else echo 0; fi ;;
   "pr checks 7 --watch"*) exit "$WATCH_EXIT" ;;
   "pr checks 7") echo "build	fail	1m	https://example.test/run/42"; exit 1 ;;
-  "run list --commit ${SHA} --status failure"*) echo 42 ;;
-  "run view 42 --log-failed") echo "failed log of run 42" ;;
+  "api repos/{owner}/{repo}/commits/${SHA}/check-runs?per_page=100 "*) echo "- build (id 42): https://example.test/run/42" ;;
   *) echo "unexpected gh $*" >&2; exit 9 ;;
 esac
 `;
@@ -110,11 +120,13 @@ esac
     expect(r.calls.filter((c) => c.startsWith("pr checks"))).toEqual(["pr checks 7 --watch --interval 30"]);
   });
 
-  test("fails on a red check with the checks and the failed run's log", () => {
+  test("fails on a red check with the checks and where the failures are, never the log", () => {
     const r = run(1, 1);
     expect(r.exit).toBe(1);
-    expect(r.out).toContain("https://example.test/run/42");
-    expect(r.out).toContain("failed log of run 42");
+    expect(r.out).toContain("build\tfail\t1m\thttps://example.test/run/42");
+    expect(r.out).toContain("- build (id 42): https://example.test/run/42");
+    expect(r.out).toContain('  gh api "repos/{owner}/{repo}/check-runs/<id>/annotations" -q \'.[] | select(.annotation_level=="failure" and .path!=".github") | "\\(.path):\\(.start_line) \\(.message)"\'');
+    expect(r.calls.some((c) => c.startsWith("run "))).toBe(false);
   });
 
   test("passes when no check appears within 5 minutes: the repo has no CI", () => {

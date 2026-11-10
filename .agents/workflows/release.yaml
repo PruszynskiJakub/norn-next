@@ -60,7 +60,7 @@ steps:
       done
       [ -n "$run" ] || { echo "no ci.yml run for $sha after 5m"; exit 1; }
       gh run watch "$run" --exit-status --interval 30 >/dev/null && exit 0
-      gh run view "$run" --log-failed | tail -300
+      sh .agents/scripts/ci-failures.sh "$run"
       exit 1
     timeout: 30m
     outcomes: { pass: ready, fail: $stuck }
