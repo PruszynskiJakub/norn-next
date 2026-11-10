@@ -6,7 +6,7 @@ Unit worktrees are created in the checkout's machine dir (`<machine dir>/worktre
 
 ## Proof
 
-Review #4 (at d3bf5da5): approve, no findings; the only code change since review #3 is the test-only harness `removeTree` (EFAULT retry, then `rm -rf`; any other error still throws, the beside-repo guard still runs). Unit tier 1734 pass, typecheck green, `machine-dir.test.ts` + `worktrees-machine-dir.test.ts` 16/16 locally. QA #4 at 55c959ed (current head, with the harness fix): all 16 criteria `pass` re-observed through the CLI in harness temp repos; golden decisions identical to base after normalising the worktree prefix; the cleanup guard still throws on a planted `repo-worktrees` and still removes the dir; evidence in that run's evidence (`report.md`). e2e: 74 pass, no pinned file rewritten. No hand-built `-worktrees` in sources or docs.
+Review #4 (at d3bf5da5): approve, no findings; the only code change since review #3 is the test-only harness `removeTree` (EFAULT retry, then `rm -rf`; any other error still throws, the beside-repo guard still runs). Unit tier 1734 pass, typecheck green, `machine-dir.test.ts` + `worktrees-machine-dir.test.ts` 16/16 locally. QA #5 at c892491c (after merging origin/main 3666341f): all 16 criteria `pass` re-observed through the CLI in harness temp repos; golden decisions identical to base 3666341f after normalising the worktree prefix; the cleanup guard still throws on a planted `repo-worktrees` and still removes the dir; evidence in that run's evidence (`report.md`). e2e: 74 pass, no pinned file rewritten. No hand-built `-worktrees` in sources or docs.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -37,7 +37,7 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Not proven yet
 
-- The full integration and e2e tiers after the merge of origin/main 3666341f (resolve #1). Locally green: unit 1739, typecheck, e2e base-sync/slice-workflow/merged-pr, integration runtime.test.ts.
+- The full integration and e2e tiers after the merge of origin/main 3666341f (resolve #1). Locally green: unit 1739, typecheck (test#5), e2e base-sync/slice-workflow/merged-pr, integration runtime.test.ts; QA #5 re-observed every criterion on the merged head.
 - The integration tier as a whole on CI at this head. ci#3 failed only on a known flake: `watch-version.test.ts` cleanup threw `EFAULT` from `rmSync` on the harness temp dir after the test body passed. It also failed on other stories' CI (runs 42797767701, 42479653587), so this branch didn't cause it. The harness's `removeTree` now retries and falls back to `rm -rf`; the EFAULT path can't be reproduced locally.
 
 ## Notes
@@ -51,4 +51,4 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Resume
 
-resolve #1 merged origin/main 3666341f (gh-319, gh-294) as 726e3d8f. The conflicts were in base-sync unit test and two transcripts: kept main's `pr_seen` and `findPullRequest` with this branch's `worktrees` fact and machine-dir paths. Semantic fix: main's new merged-pr e2e and runtime "PR merged after the round finished" test hand-built `<repo>-worktrees/`; they now use `h.worktree`. Next: the workflow's checks/CI on the merged head.
+QA #5 passed at c892491c (all 16 criteria re-observed after the merge of origin/main 3666341f; resolve #1 had switched main's new merged-pr e2e and runtime test to `h.worktree`). Next: describe and open-pr refresh the PR body, then CI on the merged head.
