@@ -6,7 +6,7 @@ Unit worktrees are created in the checkout's machine dir (`<machine dir>/worktre
 
 ## Proof
 
-Review #4 (at d3bf5da5): approve, no findings; the only code change since review #3 is the test-only harness `removeTree` (EFAULT retry, then `rm -rf`; any other error still throws, the beside-repo guard still runs). Unit tier 1734 pass, typecheck green, `machine-dir.test.ts` + `worktrees-machine-dir.test.ts` 16/16 locally. QA #3 at 040bcca5 (before the harness fix): all 16 criteria `pass`, re-observed through the CLI in harness temp repos (story/slice worktrees, a home given to the command, a symlinked `NORN_HOME_DIR`, two clones, inbox/--print/Herdr cwd/brief, tidy, gone-check, status reach); golden decisions identical to base after normalising the worktree prefix; slice 02 touched no pinned file; evidence in this run's evidence (`report.md`, scripts `observe*.ts`, `cmp.py`). e2e: 74 pass, no pinned file rewritten. No hand-built `-worktrees` in sources or docs.
+Review #4 (at d3bf5da5): approve, no findings; the only code change since review #3 is the test-only harness `removeTree` (EFAULT retry, then `rm -rf`; any other error still throws, the beside-repo guard still runs). Unit tier 1734 pass, typecheck green, `machine-dir.test.ts` + `worktrees-machine-dir.test.ts` 16/16 locally. QA #3 at 040bcca5 (before the harness fix): all 16 criteria `pass` through the CLI; golden decisions identical to base after normalising the worktree prefix; evidence in that run's evidence (`report.md`). e2e: 74 pass, no pinned file rewritten. No hand-built `-worktrees` in sources or docs.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -27,7 +27,7 @@ Review #4 (at d3bf5da5): approve, no findings; the only code change since review
 | 03.AC10 | rewritten golden corpus: no decision change | test | `packages/core/test/unit/golden.test.ts` |
 | 03.AC11 / story 10 | docs say worktrees live in the machine dir under `worktrees/` | agent | QA (agent); review read `docs/concepts.md` run-state paragraph and glossary |
 
-Review #1's blocking finding (a symlinked home broke orphan detection and marker inference) is fixed: `machineHomeOf` in `packages/store/src/paths.ts` now resolves the home, so the machine dir and `worktreesDir` are spelled as git spells worktree paths. Proven by `worktrees-machine-dir.test.ts` › "a home reached through a symlink…". Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachineDirs` (`machine-dir.ts:30`) compares a resolved own dir with an unresolved listing; harmless.
+Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachineDirs` (`machine-dir.ts:30`) compares a resolved own dir with an unresolved listing; harmless.
 
 ## Easy to miss
 
@@ -37,11 +37,10 @@ Review #1's blocking finding (a symlinked home broke orphan detection and marker
 
 ## Not proven yet
 
-- The integration tier as a whole on CI at this head. ci#3 failed only on a known flake: `watch-version.test.ts` cleanup threw `EFAULT` from `rmSync` on the harness temp dir after the test body passed. The same EFAULT failed this file on gh-319, gh-298 and gh-228's CI (runs 42797767701, 42479653587, 42456678000), so this branch didn't cause it. The harness now retries and falls back to `rm -rf` (`removeTree` in `test/support/harness.ts`); the EFAULT path itself can't be reproduced locally.
+- The integration tier as a whole on CI at this head. ci#3 failed only on a known flake: `watch-version.test.ts` cleanup threw `EFAULT` from `rmSync` on the harness temp dir after the test body passed. It also failed on other stories' CI (runs 42797767701, 42479653587), so this branch didn't cause it. The harness's `removeTree` now retries and falls back to `rm -rf`; the EFAULT path can't be reproduced locally.
 
 ## Notes
 
-- ci fix #3 (test-only): harness `cleanup` removes its dir through `removeTree`, which retries `rmSync` on EFAULT only and then falls back to `rm -rf`; any other error still throws.
 - `machine-dir.test.ts` skips the machine dir's `worktrees/` when collecting machine-local file names (it holds the repo's own files). A test that unbinds the home must not call `h.worktree`/`worktreesOf` afterwards. Run one integration file: `bun test --config=bunfig.integration.toml --timeout=20000 ./<path>`.
 - Upgrade test B16 makes its unit worktree beside the checkout: `toOldLayout` moves the whole machine dir, worktrees included (no product change).
 - Person decided (refine): no compatibility with `<repo>-worktrees/`; repo moves and doctor's adoption advice out of scope; worktrees in the per-checkout machine dir, not a shared `~/.norn/worktrees/`.
