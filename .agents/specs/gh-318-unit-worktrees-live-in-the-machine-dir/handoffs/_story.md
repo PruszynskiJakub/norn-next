@@ -6,7 +6,7 @@ Unit worktrees are created in the checkout's machine dir (`<machine dir>/worktre
 
 ## Proof
 
-Implement #2 (rework of review #1): unit tier 1734 pass, typecheck green; `worktrees-machine-dir.test.ts` 10 pass locally (the new symlinked-home test fails without the fix). Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run's evidence). Golden: 0 of 136 changed. e2e: 74 pass, no pinned file rewritten. `git grep -e '-worktrees'` finds nothing in `packages/*/src` or docs.
+Review #2 (at 4567b83d): approve, no blocking findings; re-ran unit tier 1734 pass, typecheck green, `worktrees-machine-dir.test.ts` 10 pass. Implement #2 (rework of review #1): unit tier 1734 pass, typecheck green; `worktrees-machine-dir.test.ts` 10 pass locally (the new symlinked-home test fails without the fix). Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run's evidence). Golden: 0 of 136 changed. e2e: 74 pass, no pinned file rewritten. `git grep -e '-worktrees'` finds nothing in `packages/*/src` or docs.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -27,7 +27,7 @@ Implement #2 (rework of review #1): unit tier 1734 pass, typecheck green; `workt
 | 03.AC10 | rewritten golden corpus: no decision change | test | `packages/core/test/unit/golden.test.ts` |
 | 03.AC11 / story 10 | docs say worktrees live in the machine dir under `worktrees/` | agent | QA (agent); review read `docs/concepts.md` run-state paragraph and glossary |
 
-Review #1 findings: F1 blocking (symlinked home broke orphan detection and marker inference) is fixed: `machineHomeOf` in `packages/store/src/paths.ts` now resolves the home (realpath of the part that exists, the rest appended; memoized once the home exists), so the machine dir and `worktreesDir` are spelled as git spells worktree paths. Proven by `worktrees-machine-dir.test.ts` › "a home reached through a symlink: the worktree, a tidy orphan and a lost marker are all found under the resolved path". F2 minor (decide fixture still reports `/r-worktrees`) left as a note, as the review asked.
+Review #1's blocking finding (a symlinked home broke orphan detection and marker inference) is fixed: `machineHomeOf` in `packages/store/src/paths.ts` now resolves the home, so the machine dir and `worktreesDir` are spelled as git spells worktree paths. Proven by `worktrees-machine-dir.test.ts` › "a home reached through a symlink: the worktree, a tidy orphan and a lost marker are all found under the resolved path". F2 minor (decide fixture still reports `/r-worktrees`) left as a note, as the review asked. Review #2: the blocking one is fixed; the fixture note is still open (minor). Nit: `orphanedMachineDirs` (`machine-dir.ts:30`) compares a resolved own dir with an unresolved listing; harmless.
 
 ## Easy to miss
 
@@ -52,4 +52,4 @@ Review #1 findings: F1 blocking (symlinked home broke orphan detection and marke
 
 ## Resume
 
-Nothing left for implement: review the rework (the symlinked-home fix in `machineHomeOf`, `packages/store/src/paths.ts`, and its integration test).
+Review approved the rework. The next step: CI re-runs on this head (integration shards 1/4 and 2/4 are still unproven).
