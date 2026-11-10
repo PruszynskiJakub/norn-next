@@ -3,8 +3,7 @@
  * Labels, the trace window and (in manual mode) the runner only ever warn, never fail.
  * Codex runs project hooks only once `.codex/` is trusted (`/hooks` in Codex).
  * `--live` also runs one cheap headless turn per agent in a throwaway repo and checks its hooks reported.
- * `--repo` runs only the repo checks (missing or unlinked skills stay machine checks). An old or
- * mixed layout is the only check reported.
+ * `--repo` runs only the repo checks (missing or unlinked skills stay machine checks).
  * Exit 0 when every check passes, else 1 with the same report.
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -13,7 +12,7 @@ import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, FileError, Ports, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
 import { type ConfigEntry, ExitCode, PROVIDERS, type ResolvedConfig, ulid, type VersionMatch, versionMatch } from "@norn/schema";
-import { baseRunStateStories, baseSpecsRoot, bindNornHome, cachedDefaultBranch, defaultBaseRef, type Layout, layoutProblems, loadWorkflows, gitRemoteUrl, machineDir, machineHolder, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, SKILLS_DIR, skillsDrift, skillsReport, spawnBounded, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
+import { baseRunStateStories, baseSpecsRoot, bindNornHome, cachedDefaultBranch, defaultBaseRef, loadWorkflows, gitRemoteUrl, machineDir, machineHolder, orphanedMachineDirs, readHookFacts, repoConfigPath, SKILLS_DIR, skillsDrift, skillsReport, spawnBounded, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { CliFailure, configError, rendered, withExit } from "../output.ts";
@@ -23,7 +22,6 @@ import { type LabelsReport, labelsWarnings, remoteLabels } from "../runtime/labe
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
 import { effectiveRetain, formatBytes, retainCutoffDay, retainWarning } from "../runtime/trace-retention.ts";
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
-import { layoutRefusal } from "../runtime/layout.ts";
 import { hookBinary, hookCommand } from "./init.ts";
 import { baseRunStateHint, cmd } from "@norn/core";
 import { oneLine } from "@norn/view";
@@ -260,8 +258,6 @@ const driftText = (drifted: string[], running: string) => `${drifted.join(", ")}
 
 interface RepoReport {
   ok: boolean;
-  /** Reaching the other repo checks means the new layout; an old or mixed one is reported alone */
-  layout: { ok: true; layout: "new" };
   version: VersionCheck;
   skills: SkillsDriftCheck;
   workflows: Array<{ name: string; file: string; ok: boolean; issues: WorkflowIssue[] }>;
@@ -301,7 +297,6 @@ async function repoGroup(ctx: Context): Promise<RepoReport> {
   const run_state = runStateCheck(ctx);
   return {
     ok: version.ok && skills.ok && workflows.every((w) => w.ok) && config.ok && run_state.ok,
-    layout: { ok: true, layout: "new" },
     version,
     skills,
     workflows,
@@ -321,20 +316,6 @@ function runStateCheck(ctx: Context): Check & { stories: string[] } {
   const stories = baseRunStateStories(tree ?? ctx.root);
   if (!stories.length) return { ok: true, stories };
   return { ok: false, stories, error: baseRunStateHint.text(base, stories), do_instead: baseRunStateHint.fix() };
-}
-
-/** The layout check of the repo group, failed on an old or mixed layout with what to run. */
-function layoutCheck(l: Layout, root: string) {
-  const refusal = layoutRefusal(l, root).body;
-  return { ok: false, layout: l.layout, parts: layoutProblems(l, root), error: refusal.error, do_instead: refusal.do_instead, code: refusal.code };
-}
-
-function formatLayoutOnly(c: ReturnType<typeof layoutCheck>): string {
-  const l = lines();
-  l.line(false, "layout", c.layout === "both" ? "old and new layout both present" : "old layout");
-  for (const p of c.parts) l.sub(`! ${p}`);
-  l.sub(`→ ${c.do_instead}`);
-  return [l.head(false), "", ...l.out, "", "  · other checks skipped: they read the new layout"].join("\n");
 }
 
 /** One line per check: `ok`, `warn` or `FAIL`, a label, the text; failed labels are collected for the head line. */
@@ -371,7 +352,6 @@ function formatRepo(r: RepoReport, l: ReturnType<typeof lines>, dir: string, o: 
     l.fix(r.skills);
   }
   const valid = r.workflows.filter((w) => w.ok).map((w) => w.name);
-  l.line(true, "layout", `${dir}/ and ${r.config.file}`);
   if (valid.length || !r.workflows.length) l.line(true, "workflows", valid.length ? `${valid.join(", ")} valid (${dir}/)` : `none valid in ${dir}/`);
   for (const w of r.workflows.filter((x) => !x.ok)) {
     l.line(false, `workflow ${w.name}`, w.file);
@@ -481,17 +461,9 @@ export const doctorCommand = defineCommand({
     "--repo": "check only the repo: its norn version, bundled skills, workflows and config; no agent, runner or remote needed (CI, a test check)",
     "--live": "also run one cheap headless test turn per agent",
   },
-  // An old or mixed layout is a failed repo check here, not a refusal
-  layout: false,
   async run(ctx, args) {
     const live = opt.bool(args, "live");
     const repoOnly = opt.bool(args, "repo");
-    const layout = repoLayout(ctx.root);
-    if (layout.layout !== "new") {
-      // nothing else is read: config and workflows at the new places are not the repo's yet
-      const report = { ok: false, repo: { ok: false, layout: layoutCheck(layout, ctx.root) } };
-      return withExit(rendered(report, formatLayoutOnly(report.repo.layout)), ExitCode.error);
-    }
     const repo = await repoGroup(ctx);
     const dir = relative(ctx.root, workflowsDir(ctx.root));
     // --repo looks at no agent, runner or remote

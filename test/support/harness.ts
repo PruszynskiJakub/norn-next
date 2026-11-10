@@ -466,16 +466,6 @@ export function toOldLayout(root: string, parts: LayoutPartName[] = ["config", "
   }
 }
 
-/** The reverse of `toOldLayout`: every part back at its new place, `.agents/norn/` gone. */
-export function toNewLayout(root: string): void {
-  for (const { old, new: now } of Object.values(layoutPlaces(root))) {
-    if (!existsSync(old)) continue;
-    mkdirSync(dirname(now), { recursive: true });
-    renameSync(old, now);
-  }
-  rmSync(oldNornDir(root), { recursive: true, force: true });
-}
-
 /**
  * A unit as an older norn left it: its run state moved from the machine dir back into
  * `<spec folder>/runs/<unit>` in `worktree`, and its handoff from `handoffs/<unit>.md` to
