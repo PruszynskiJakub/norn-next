@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { acquireTickLock, repoConfigPath, workflowsDir } from "@norn/store";
 import type { StoryView } from "@norn/view";
 import type { CliDeps, CliResult } from "../../src/index.ts";
-import { createHarness, FakeInteraction, type Harness } from "../../../../test/support/harness.ts";
+import { createHarness, FakeInteraction, type Harness, worktreesOf } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
 
 setDefaultTimeout(30_000);
@@ -37,7 +37,7 @@ const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> =>
 const creates = () => h.remote.calls.filter((c) => c.startsWith("issue+ "));
 const stories = async () => ((await h.norn("story", "list", "--json")).value as { stories: StoryView[] }).stories;
 /** what the checkout has on disk: spec folders and worktrees */
-const local = () => [join(h.root, ".agents/specs"), `${h.root}-worktrees`].flatMap((d) => (existsSync(d) ? readdirSync(d) : [])).sort();
+const local = () => [join(h.root, ".agents/specs"), worktreesOf(h.root)].flatMap((d) => (existsSync(d) ? readdirSync(d) : [])).sort();
 
 beforeAll(async () => {
   h = await createHarness();

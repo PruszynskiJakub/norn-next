@@ -12,7 +12,7 @@ import { join, relative } from "node:path";
 import { claimRef, recordRef, STORY_UNIT_DIR, ulid } from "@norn/schema";
 import { appendReceipt, handoffPath, machineDir, readState, repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliResult, runningVersion, type TickReport } from "../../src/index.ts";
-import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
+import { createHarness, type Harness, issue, sh, worktreeOf } from "../../../../test/support/harness.ts";
 import { type Clone, cloneOf } from "../../../../test/support/clone.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
@@ -112,7 +112,7 @@ async function handedOverAtReview2(n: number, slug: string, beforeHandoff?: (run
   const key = `gh-${n}`;
   const spec = `.agents/specs/${key}-${slug}`;
   const branch = `${key}-${slug}`;
-  const wt = (root: string) => `${root}-worktrees/${branch}`;
+  const wt = (root: string) => worktreeOf(root, branch);
   const runs = (root: string) => runStateOf(join(wt(root), spec));
   h.remote.issues = [...h.remote.issues, issue(n, slug, ["norn", "norn:wf:rv"])];
   await h.tick("--sync");

@@ -92,6 +92,7 @@ import {
   WORKFLOW_EXT,
   WORKFLOWS_DIR,
   writeState,
+  worktreesDir,
 } from "@norn/store";
 import type { Context } from "../context.ts";
 import { claimHeld, corruptError, failure, refuse, withExit } from "../output.ts";
@@ -443,7 +444,7 @@ async function restoreWorktrees(
   };
   const wtByBranch = w.wtByBranch;
 
-  const storyWt = branch ? (wtByBranch.get(branch) ?? storyWorktreePath(root, key, branch.slice(key.length + 1))) : null;
+  const storyWt = branch ? (wtByBranch.get(branch) ?? storyWorktreePath(worktreesDir(root), key, branch.slice(key.length + 1))) : null;
   if (branch && storyWt && !(await checkoutWorktree(w, { path: storyWt, branch, story: key, slice: null, unit: STORY_UNIT_DIR, spec_dir }, key))) throw o.onStoryFailed(w.problems);
 
   const snapshot = storyWt ? loadStory(storyWt, join(storyWt, spec_dir)) : null;

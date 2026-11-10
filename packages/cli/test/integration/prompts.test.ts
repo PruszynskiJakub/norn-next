@@ -60,7 +60,7 @@ const SCREEN = [
 ].join("\n");
 
 const SPEC = ".agents/specs/gh-9-fix-the-bug";
-const wt = (h: Harness) => `${h.root}-worktrees/gh-9-fix-the-bug`;
+const wt = (h: Harness) => h.worktree("gh-9-fix-the-bug");
 const runs = (h: Harness) => runStateOf(join(wt(h), SPEC));
 const acted = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.rule}${d.ok ? "" : ` FAILED ${d.error}`}`);
 const receipts = (h: Harness): Receipt[] =>

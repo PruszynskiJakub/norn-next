@@ -8,7 +8,7 @@ import { basename, join } from "node:path";
 import type { AgentUnit, UnitRef } from "@norn/core";
 import { cmd, agentWorkRefusal, cursorStep, foreignSessionRefusal, storyMode, storyWorktreePath } from "@norn/core";
 import { type Criterion, type Mode, type Receipt, type ResolvedConfig, STORY_UNIT_DIR } from "@norn/schema";
-import { loadUnit, readPinnedWorkflow, readUnitHooks, readSliceFile, readState, readStoryFile, storyFile, type UnitMarker, runStateDir } from "@norn/store";
+import { loadUnit, readPinnedWorkflow, readUnitHooks, readSliceFile, readState, readStoryFile, storyFile, type UnitMarker, runStateDir, worktreesDir } from "@norn/store";
 import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { corruptError, refuse } from "../output.ts";
 
@@ -107,7 +107,7 @@ export function refuseForeignSession(ctx: Context, s: UnitSession, run_id: strin
 export function unitStoryMode(_ctx: Context, s: UnitSession, config: ResolvedConfig): Mode {
   if (s.unit.slice === null) return storyMode(s.state, s.workflow, config);
   const slug = basename(s.marker.spec_dir).slice(s.unit.story.length + 1);
-  const wt = storyWorktreePath(s.root, s.unit.story, slug);
+  const wt = storyWorktreePath(worktreesDir(s.root), s.unit.story, slug);
   const dir = runStateDir(existsSync(wt) ? wt : s.root, { key: s.unit.story, spec_dir: s.marker.spec_dir }, STORY_UNIT_DIR);
   const st = readState(dir);
   const wf = readPinnedWorkflow(dir);

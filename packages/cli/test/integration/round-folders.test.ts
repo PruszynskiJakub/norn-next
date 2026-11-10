@@ -38,7 +38,7 @@ mode: manual
 let h: Harness;
 const BRANCH = "gh-9-round-thing";
 const spec = `.agents/specs/${BRANCH}`;
-const wt = () => `${h.root}-worktrees/${BRANCH}`;
+const wt = () => h.worktree(BRANCH);
 /** The story unit's run state, in the machine dir */
 const story = () => join(storyRunStateOf(join(wt(), spec)), "_story");
 /** the story's handoff, in the worktree (`handoffs/story.md`) */

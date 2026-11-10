@@ -26,7 +26,7 @@ async function* keys(...ks: string[]) {
 }
 
 let c: Harness;
-const wt = (n: 5 | 6) => `${c.root}-worktrees/${n === 5 ? "gh-5-pay-invoices" : "gh-6-export-report"}`;
+const wt = (n: 5 | 6) => c.worktree(n === 5 ? "gh-5-pay-invoices" : "gh-6-export-report");
 const runs = (n: 5 | 6) => runStateOf(join(wt(n), `.agents/specs/${n === 5 ? "gh-5-pay-invoices" : "gh-6-export-report"}`));
 beforeAll(async () => {
   c = await createHarness();

@@ -21,7 +21,7 @@
         "slot": 1,
         "story": "gh-7",
         "version": 1,
-        "worktree": "<dir>/repo-worktrees/gh-7-add-login-form"
+        "worktree": "<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form"
       }
     ],
     "runner": "fake",
@@ -44,7 +44,8 @@
   "repo": {
     "default_branch": "main",
     "remote": "origin",
-    "root": "<dir>/repo"
+    "root": "<dir>/repo",
+    "worktrees": "<dir>/home/repos/repo-<id>/worktrees"
   },
   "stories": [
     {
@@ -113,7 +114,7 @@
             },
             "last_commit_at": "<wall-ms>",
             "last_file_change_at": null,
-            "path": "<dir>/repo-worktrees/gh-7-add-login-form",
+            "path": "<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form",
             "slot": 1,
             "status": {
               "ahead": 0,
@@ -121,7 +122,7 @@
               "branch": "gh-7-add-login-form",
               "clean": true,
               "head": "<sha:1>",
-              "path": "<dir>/repo-worktrees/gh-7-add-login-form",
+              "path": "<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form",
               "rebase_in_progress": false,
               "staged": [],
               "unstaged": [],
@@ -139,7 +140,7 @@
         },
         "last_commit_at": "<wall-ms>",
         "last_file_change_at": null,
-        "path": "<dir>/repo-worktrees/gh-7-add-login-form",
+        "path": "<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form",
         "slot": 1,
         "status": {
           "ahead": 0,
@@ -147,7 +148,7 @@
           "branch": "gh-7-add-login-form",
           "clean": true,
           "head": "<sha:1>",
-          "path": "<dir>/repo-worktrees/gh-7-add-login-form",
+          "path": "<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form",
           "rebase_in_progress": false,
           "staged": [],
           "unstaged": [],

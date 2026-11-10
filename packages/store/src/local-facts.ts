@@ -40,6 +40,7 @@ import { loadSnapshot, type RepoSnapshot, type StorySnapshot, type UnitSnapshot,
 import { skillSource, worktreeSkillsDrift } from "./skills.ts";
 import { readUnitHooks, unitHooksChangedAt } from "./trace.ts";
 import { readUnitMarker } from "./worktree.ts";
+import { worktreesDir } from "./paths.ts";
 
 export interface LocalFactsOptions {
   /** ms epoch */
@@ -168,7 +169,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   const rejected = readRejectedReceipts(root);
 
   const placed = read.map((s) => {
-    const conventional = storyWorktreePath(root, s.key, s.slug);
+    const conventional = storyWorktreePath(worktreesDir(root), s.key, s.slug);
     const storyWt = opts.storyWorktrees.get(s.key) ?? (existsSync(conventional) && readUnitMarker(conventional).marker ? conventional : null);
     return { s, storyWt, units: s.units.map((u) => ({ u, worktree: u.unit.slice ? (opts.sliceWorktrees.get(u.unit.slice) ?? null) : storyWt })) };
   });

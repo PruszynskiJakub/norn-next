@@ -36,7 +36,7 @@ mode: manual
 setDefaultTimeout(30_000);
 
 let h: Harness;
-const wt = () => `${h.root}-worktrees/gh-1-add-widget`;
+const wt = () => h.worktree("gh-1-add-widget");
 const runs = () => runStateOf(join(wt(), ".agents/specs/gh-1-add-widget"));
 const receipts = () => readdirSync(join(runs(), "receipts")).sort();
 const acted = (r: TickReport) => r.decisions.filter((d) => d.unit === "gh-1" && d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.rule}${d.ok ? "" : ` FAILED ${d.error}`}`);

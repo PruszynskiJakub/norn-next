@@ -28,7 +28,7 @@ steps:
 describe("gh-78: a tick records where it spent its time", () => {
   let h: Harness;
   const branch = "gh-7-time-me";
-  const runs = () => runStateOf(join(`${h.root}-worktrees/${branch}`, `.agents/specs/${branch}`));
+  const runs = () => runStateOf(join(h.worktree(branch), `.agents/specs/${branch}`));
   let report: TickReport;
   let record: TickTrace;
   let end: TickEndTrace;

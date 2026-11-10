@@ -11,9 +11,9 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { Inbox, RunnerPort } from "@norn/core";
-import { machineDir, repoConfigPath, setSpawnObserver, storyRunStateDir, workflowsDir } from "@norn/store";
+import { bindNornHome, machineDir, repoConfigPath, setSpawnObserver, storyRunStateDir, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../../packages/cli/src/index.ts";
-import { createHarness, FakeRunner, type Harness, issue, sh } from "../support/harness.ts";
+import { createHarness, FakeRunner, type Harness, issue, sh, worktreeOf } from "../support/harness.ts";
 import { runChecked } from "../support/harness.ts";
 import { expectTranscript, recordTranscript, type Transcript } from "../support/transcript.ts";
 import { runStateOf } from "../support/run-state.ts";
@@ -37,6 +37,7 @@ mode: auto
 
 interface Clone {
   root: string;
+  worktree(dirName: string): string;
   norn(...argv: string[]): Promise<CliResult>;
   tick(...flags: string[]): Promise<TickReport>;
 }
@@ -48,6 +49,7 @@ function wrap(root: string, deps: CliDeps, name = "A"): Clone {
   const run = <T>(label: string, fn: () => Promise<T>) => (transcript ? transcript.command(`[${name}] ${label}`, fn) : fn());
   return {
     root,
+    worktree: (dirName) => worktreeOf(root, dirName),
     norn: (...argv) => run(`norn ${argv.join(" ")}`, () => runChecked(argv, deps)),
     async tick(...flags) {
       const r = await run(["norn tick", ...flags].join(" "), () => runChecked(["tick", ...flags], deps));
@@ -65,6 +67,8 @@ function cloneOf(h: Harness, name: string, user: string): Clone {
   sh(root, ["config", "user.name", user]);
   const home = join(h.dir, `home-${name}`);
   mkdirSync(home);
+  // the clone's worktrees are named in its machine dir before any of its commands binds the home
+  bindNornHome(root, home);
   const runner = new FakeRunner();
   (runner as { name: string }).name = `fake-${name}`;
   transcript?.watchClone(name, root, { runner });
@@ -96,7 +100,7 @@ describe("a claim lost mid-run", () => {
   let B: Clone;
   const SPEC = ".agents/specs/gh-9-add-search";
   const BRANCH = "gh-9-add-search";
-  const storyRuns = (root: string) => runStateOf(join(`${root}-worktrees/${BRANCH}`, SPEC));
+  const storyRuns = (root: string) => runStateOf(join(worktreeOf(root, BRANCH), SPEC));
   const step = (ms = 10_000) => h.clock.advance(ms);
   const remoteHead = () => h.git(["ls-remote", "origin", `refs/heads/${BRANCH}`]).split("\t")[0];
 
@@ -162,7 +166,7 @@ describe("renewals due together go out in one push", () => {
   let h: Harness;
   let A: Clone;
   const N = 3;
-  const storyRuns = (n: number) => runStateOf(join(`${h.root}-worktrees/gh-${n}-story-${n}`, `.agents/specs/gh-${n}-story-${n}`));
+  const storyRuns = (n: number) => runStateOf(join(h.worktree(`gh-${n}-story-${n}`), `.agents/specs/gh-${n}-story-${n}`));
 
   beforeAll(async () => {
     h = await createHarness();
@@ -224,12 +228,12 @@ describe("intake race and release", () => {
   test("R3.1: both clones intake the issue; the one losing the claim CAS removes its local intake", async () => {
     expect(all(await A.tick())).toEqual(["gh-10 remote.intake"]);
     expect(all(await B.tick())).toEqual(["gh-10 remote.intake"]);
-    expect(existsSync(`${B.root}-worktrees/${BRANCH}`)).toBe(true);
+    expect(existsSync(B.worktree(BRANCH))).toBe(true);
     step();
     expect(all(await A.tick())).toEqual(["gh-10 claim.acquire.intake"]);
     const r = await B.tick();
     expect(all(r)[0]).toMatch(/^gh-10 claim\.acquire\.intake FAILED held by tester@box/);
-    expect(existsSync(`${B.root}-worktrees/${BRANCH}`)).toBe(false);
+    expect(existsSync(B.worktree(BRANCH))).toBe(false);
     expect(sh(B.root, ["branch", "--list", BRANCH])).toBe("");
     expect(readdirSync(join(h.dir, "home-repo-b", "leases"))).toEqual([]);
   });
@@ -244,7 +248,7 @@ describe("intake race and release", () => {
       const branch = "gh-11-add-sorting";
       expect(all(await A2.tick())).toEqual(["gh-11 remote.intake"]);
       expect(all(await B2.tick())).toEqual(["gh-11 remote.intake"]);
-      const wt = `${B2.root}-worktrees/${branch}`;
+      const wt = B2.worktree(branch);
       const subject = sh(wt, ["log", "-1", "--format=%s"]);
       expect(subject).toStartWith("norn: intake gh-11 ");
       sh(wt, ["-c", "user.email=b@example.com", "-c", "user.name=B", "commit", "-q", "--amend", "--allow-empty", "-m", subject]);

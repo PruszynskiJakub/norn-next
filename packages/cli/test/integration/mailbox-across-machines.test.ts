@@ -101,7 +101,7 @@ function setPolicy(policy: "local" | "remote") {
 /** A quad story held by A at review (implement's boundary pushed), review's session started. */
 async function atReview(n: number, slug: string) {
   const spec = `.agents/specs/gh-${n}-${slug}`;
-  const wt = `${h.root}-worktrees/gh-${n}-${slug}`;
+  const wt = h.worktree(`gh-${n}-${slug}`);
   const runs = () => runStateOf(join(wt, spec));
   h.remote.issues = [...h.remote.issues, issue(n, slug)];
   await h.tick("--sync");
@@ -339,7 +339,7 @@ describe("a receipt the holder rejects (B21)", () => {
 
   test("AC4: the story finishing clears it, with no answer or approval accepted since", async () => {
     const spec = ".agents/specs/gh-27-finish-alone";
-    const wt = `${h.root}-worktrees/gh-27-finish-alone`;
+    const wt = h.worktree("gh-27-finish-alone");
     const runs = () => runStateOf(join(wt, spec));
     h.remote.issues = [...h.remote.issues, issue(27, "finish-alone", ["norn", "norn:wf:duo"])];
     await h.tick("--sync");

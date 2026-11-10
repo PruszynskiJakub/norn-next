@@ -8,10 +8,13 @@ import type { RunnerPort } from "@norn/core";
 import { bindNornHome } from "@norn/store";
 import type { CliDeps, CliResult, TickReport } from "../../packages/cli/src/index.ts";
 import { FakeRunner, type Harness, hostEnv, runChecked, sh } from "./harness.ts";
+import { worktreeOf } from "./worktree.ts";
 
 export interface Clone {
   root: string;
   home: string;
+  /** the unit worktree named `dirName`: where norn creates it for this clone */
+  worktree(dirName: string): string;
   runner: FakeRunner;
   norn(...argv: string[]): Promise<CliResult>;
   /** a command run from `cwd` (a worktree of this clone) */
@@ -40,6 +43,7 @@ export function cloneOf(h: Harness, name: string, user: string): Clone {
   return {
     root,
     home,
+    worktree: (dirName) => worktreeOf(root, dirName),
     runner,
     norn: (...argv) => runChecked(argv, deps),
     at: (cwd, ...argv) => runChecked(argv, { ...deps, cwd }),

@@ -91,7 +91,7 @@ afterAll(() => h.cleanup());
 
 describe("the story's handoff is handoffs/story.md, prose only (B39)", () => {
   const SPEC = ".agents/specs/gh-9-prose-only";
-  const wt = () => `${h.root}-worktrees/gh-9-prose-only`;
+  const wt = () => h.worktree("gh-9-prose-only");
   const runs = () => runStateOf(join(wt(), SPEC));
   const handoff = () => handoffPath(join(wt(), SPEC), STORY_UNIT_DIR);
   const HANDOFF = `${SPEC}/${unitHandoffPath(STORY_UNIT_DIR)}`;
@@ -172,7 +172,7 @@ describe("the story's handoff is handoffs/story.md, prose only (B39)", () => {
 
 describe("a slice's handoff is handoffs/<nn>-<slug>.md on the slice branch (B39)", () => {
   const SPEC = ".agents/specs/gh-11-two-handoffs";
-  const wt = () => `${h.root}-worktrees/gh-11-two-handoffs`;
+  const wt = () => h.worktree("gh-11-two-handoffs");
   const story = () => runStateOf(join(wt(), SPEC));
   const part = () => runStateOf(join(wt(), SPEC), "01-part-a");
   const sliceWt = () => `${wt()}--01-part-a`;

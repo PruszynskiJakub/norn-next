@@ -15,7 +15,7 @@ setDefaultTimeout(30_000);
 
 describe("norn status --segment", () => {
   let c: Harness;
-  const wt = () => `${c.root}-worktrees/gh-5-pay-invoices`;
+  const wt = () => c.worktree("gh-5-pay-invoices");
   beforeAll(async () => {
     c = await createHarness();
     expect((await c.norn("init")).exit).toBe(0);
@@ -48,7 +48,7 @@ describe("norn status --segment", () => {
   test("inside Herdr: a token on each orient workspace of this repo, none on another repo's", async () => {
     const ws = (id: string, label: string, cwd: string): herdr.HerdrWorkspace => ({ workspace_id: id, label, pane_ids: [`${id}:p1`], cwds: [cwd] });
     // w3 is another repo's Not ours, never labelled or moved
-    const h = fakeHerdr([], [ws("w1", "repo", c.root), ws("w2", "gh-6 orient", `${c.root}-worktrees/gh-6-export-report`), ws("w3", "gh-5 orient", "/other-repo-worktrees/gh-5-x"), ws("w4", "gh-5 orient", wt())]);
+    const h = fakeHerdr([], [ws("w1", "repo", c.root), ws("w2", "gh-6 orient", c.worktree("gh-6-export-report")), ws("w3", "gh-5 orient", "/other-repo/worktrees/gh-5-x"), ws("w4", "gh-5 orient", wt())]);
     const r = await runChecked(["status", "--segment", "--json", "--ttl", "20s"], { ...c.deps, herdr: h.cockpit });
     expect(r.value).toMatchObject({ tokens: 2, moves: 0 });
     expect(h.calls).toEqual([`report workspace w4 {"norn":"▶ your turn"} 20000`, `report workspace w2 {"norn":"▶ your turn"} 20000`]);

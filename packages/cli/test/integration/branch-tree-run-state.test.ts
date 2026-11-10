@@ -61,7 +61,7 @@ afterAll(() => h.cleanup());
 describe("runs/ in a story branch's tree is never read or moved", () => {
   test("ticks leave the branch tree as it is and the story moves on from its machine-dir state", async () => {
     const spec = ".agents/specs/gh-9-keep-it-local";
-    const wt = `${h.root}-worktrees/gh-9-keep-it-local`;
+    const wt = h.worktree("gh-9-keep-it-local");
     const runs = () => runStateOf(join(wt, spec));
     h.remote.issues = [...h.remote.issues, issue(9, "Keep it local")];
     await h.tick("--sync");

@@ -222,7 +222,8 @@ export async function intake(act: ActEnv, a: Extract<Action, { kind: "intake_sto
   const unit: UnitRef = { story: a.key, slice: null, dir: STORY_UNIT_DIR, key: a.key };
   const specDir = dirname(a.story_file);
   // A story already intaken elsewhere (its branch is on the remote) is continued by take, never re-intaken
-  if (act.obs.remote && !existsSync(a.worktree.path) && !(await act.git.branchExists(act.root, a.worktree.branch)) && (await act.git.branchExists(act.root, a.worktree.branch, "remote", act.obs.remote)))
+  // (a local branch with no worktree too: a wiped machine dir takes the worktree and leaves the branch)
+  if (act.obs.remote && !existsSync(a.worktree.path) && (await act.git.branchExists(act.root, a.worktree.branch, "remote", act.obs.remote)))
     return { ok: true, detail: { skipped: `${a.worktree.branch} already exists on ${act.obs.remote}`, do_instead: cmd.storyCheckout(a.key) } };
   const wt = await ensureWorktree(act, a.worktree, unit, specDir);
   // A folder an older norn intook keeps its story.md (storyFile reads it), so it is never written twice

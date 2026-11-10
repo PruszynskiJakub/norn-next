@@ -9,7 +9,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, writeFi
 import { basename, dirname, join, resolve } from "node:path";
 import { acquireTickLock, leasesDir, listLeases, repoConfigPath, unbindNornHome, userConfigPath, workflowsDir } from "@norn/store";
 import { type CliResult } from "../../src/index.ts";
-import { createHarness, type Harness, issue, runChecked, sh } from "../../../../test/support/harness.ts";
+import { createHarness, type Harness, issue, runChecked, sh, worktreesOf } from "../../../../test/support/harness.ts";
 
 // whole flows over real git, several ticks each
 setDefaultTimeout(30_000);
@@ -48,9 +48,10 @@ async function boot(h: Harness) {
   h.git(["push", "-q", "origin", "main"]);
 }
 
-/** Every path under `dir` (outside `.git/objects`) named like a file the machine dir holds, or a trace day file. */
-function machineFilesUnder(dir: string, machine: string): string[] {
-  const files = readdirSync(machine, { recursive: true, withFileTypes: true }).filter((e) => e.isFile());
+/** Every path under `dir` (outside `.git/objects`) named like a file the machine dir holds outside its `worktrees`, or a trace day file. */
+function machineFilesUnder(dir: string, machine: string, worktrees: string): string[] {
+  // the unit worktrees under the machine dir hold the repo's own files, not machine-local ones
+  const files = readdirSync(machine, { recursive: true, withFileTypes: true }).filter((e) => e.isFile() && !`${e.parentPath}/`.startsWith(`${worktrees}/`));
   const names = new Set(files.map((e) => e.name));
   for (const n of ["tick.lock", "failures.json", "notices.json", "pr.json", "remote.json", "inbox.json", "heartbeat.json", "checkout.json"]) names.add(n);
   return (readdirSync(dir, { recursive: true }) as string[]).filter((p) => !p.startsWith(`.git${"/"}objects`) && (names.has(basename(p)) || p.endsWith(".jsonl")));
@@ -59,7 +60,10 @@ function machineFilesUnder(dir: string, machine: string): string[] {
 describe("machine-local files in the norn home", () => {
   let h: Harness;
   let machine: string;
-  const wt = () => `${h.root}-worktrees/gh-4-four`;
+  let worktrees: string;
+  // fixed while the home is bound: a test below unbinds it, and the path is then computed from another home
+  let gh4: string;
+  const wt = () => gh4;
   beforeAll(async () => {
     h = await createHarness();
     // What the home already holds before norn uses repos/
@@ -72,6 +76,8 @@ describe("machine-local files in the norn home", () => {
       await h.tick();
     }
     machine = machineDirOf(h.home, h.root);
+    worktrees = worktreesOf(h.root);
+    gh4 = h.worktree("gh-4-four");
   });
   afterAll(() => h.cleanup());
 
@@ -81,7 +87,7 @@ describe("machine-local files in the norn home", () => {
     expect(files).toContain("heartbeat.json");
     expect(files).toContain("remote.json");
     expect(JSON.parse(readFileSync(join(machine, "checkout.json"), "utf8"))).toMatchObject({ checkout: h.root });
-    expect(machineFilesUnder(h.root, machine)).toEqual([]);
+    expect(machineFilesUnder(h.root, machine, worktrees)).toEqual([]);
     expect(existsSync(oldTraceDir(h.root))).toBe(false);
     expect(h.git(["status", "--porcelain"])).toBe("");
     const ignore = h.read(join(h.root, ".gitignore")).split("\n");
@@ -115,7 +121,7 @@ describe("machine-local files in the norn home", () => {
     expect(brief.exit).toBe(0);
     expect((await runChecked(["tick", "--json"], { ...h.deps, cwd: wt() })).exit).toBe(0);
     expect(machineDirOf(h.home, wt())).toBe(machine);
-    expect(machineFilesUnder(wt(), machine)).toEqual([]);
+    expect(machineFilesUnder(wt(), machine, worktrees)).toEqual([]);
     expect(existsSync(oldTraceDir(wt()))).toBe(false);
     // the hook was traced into the main checkout's machine dir
     const events = readdirSync(machine)

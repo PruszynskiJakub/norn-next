@@ -28,7 +28,7 @@ steps:
 const DIFFER = "skills differ from norn 0.31.0 (norn): runs use this worktree's copies until the base is merged in, or until this branch's edit to them is reverted";
 
 let h: Harness;
-const wt = (key: string, slug: string) => `${h.root}-worktrees/${key}-${slug}`;
+const wt = (key: string, slug: string) => h.worktree(`${key}-${slug}`);
 const gh7 = () => wt("gh-7", "add-login-form");
 const gh8 = () => wt("gh-8", "add-logout");
 /** two ticks: the first applies what changed (the mode edit), the second launches */

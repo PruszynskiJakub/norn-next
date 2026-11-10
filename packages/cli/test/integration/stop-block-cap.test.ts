@@ -27,7 +27,7 @@ steps:
 
 let h: Harness;
 const spec = ".agents/specs/gh-9-racing-hooks";
-const wt = () => `${h.root}-worktrees/gh-9-racing-hooks`;
+const wt = () => h.worktree("gh-9-racing-hooks");
 const runs = () => runStateOf(join(wt(), spec));
 
 function env() {

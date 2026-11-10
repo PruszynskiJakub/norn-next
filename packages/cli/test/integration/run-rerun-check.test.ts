@@ -34,9 +34,9 @@ counters: { test_loop: { max: 3 } }
 
 let h: Harness;
 const dir = "gh-9-pay-invoices";
-const wt = () => `${h.root}-worktrees/${dir}`;
+const wt = () => h.worktree(dir);
 const checkRetry = async () => ((await h.norn("run", "view", "gh-9", "--json")).value as { check_retry: unknown }).check_retry;
-const runs = () => runStateOf(join(`${h.root}-worktrees`, `${dir}/.agents/specs/${dir}`));
+const runs = () => runStateOf(join(h.worktree(dir), `.agents/specs/${dir}`));
 const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();

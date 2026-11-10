@@ -64,15 +64,15 @@ describe("max_agents holds across ticks when the runner reports no process", () 
       h.clock.advance(10_000);
       await h.tick();
     }
-    const runs1 = runStateOf(join(`${h.root}-worktrees/gh-1-first`, ".agents/specs/gh-1-first"));
-    const runs2 = runStateOf(join(`${h.root}-worktrees/gh-2-second`, ".agents/specs/gh-2-second"));
+    const runs1 = runStateOf(join(h.worktree("gh-1-first"), ".agents/specs/gh-1-first"));
+    const runs2 = runStateOf(join(h.worktree("gh-2-second"), ".agents/specs/gh-2-second"));
     expect(readState(runs1).ok && (readState(runs1) as { value: { status: string } }).value.status).toBe("running");
     expect(h.runner.launches).toHaveLength(1);
 
     // the tick that launched the pane-runner agent has exited: its pid is dead
     const file = join(leasesDir(h.home), "agent-1.json");
     const lease = JSON.parse(readFileSync(file, "utf8"));
-    expect(lease.worktree).toBe(`${h.root}-worktrees/gh-1-first`);
+    expect(lease.worktree).toBe(h.worktree("gh-1-first"));
     h.write(file, JSON.stringify({ ...lease, holder: { pid: 999_999, pid_start: "Thu Jan  1 00:00:00 1970" } }));
 
     for (let i = 0; i < 2; i++) {
@@ -118,10 +118,10 @@ describe("orphans: reported by every tick, cleaned by norn tidy", () => {
     h.git(["add", "-A"], lost);
     h.git(["commit", "-q", "-m", "unique work"], lost);
     h.git(["worktree", "remove", lost]);
-    const orphanWt = `${h.root}-worktrees/gh-97-gone`;
+    const orphanWt = h.worktree("gh-97-gone");
     h.git(["worktree", "add", "-q", "-b", "gh-97-gone", orphanWt, "main"]);
     // a leftover receipt reservation
-    const runs = join(runStateOf(join(`${h.root}-worktrees/gh-3-third`, ".agents/specs/gh-3-third")), "receipts");
+    const runs = join(runStateOf(join(h.worktree("gh-3-third"), ".agents/specs/gh-3-third")), "receipts");
     const reserve = join(runs, ".0042.reserve");
     h.write(reserve, "01KA0000000000000000000002");
     utimesSync(reserve, new Date(Date.now() - 120_000), new Date(Date.now() - 120_000));
@@ -894,7 +894,7 @@ describe("trace retention: norn tidy prunes old hook files, briefings and transc
       h.clock.advance(10_000);
       await h.tick();
     }
-    const st = readState(runStateOf(join(`${h.root}-worktrees/gh-9-ninth`, ".agents/specs/gh-9-ninth")));
+    const st = readState(runStateOf(join(h.worktree("gh-9-ninth"), ".agents/specs/gh-9-ninth")));
     if (!st.ok || st.value.status !== "running" || !st.value.run) throw new Error("gh-9 has no live run");
     liveRun = st.value.run.run_id;
     h.clock.advance(20 * DAY); // the live run started 20 days ago

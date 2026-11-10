@@ -49,7 +49,7 @@ function free(port: number): boolean {
 describe.skipIf(!hasLsof)("an agent step's launch", () => {
   let h: Harness;
   let server: Bun.Subprocess | null = null;
-  const wt = () => `${h.root}-worktrees/gh-9-left-a-server`;
+  const wt = () => h.worktree("gh-9-left-a-server");
 
   beforeAll(async () => {
     h = await createHarness();

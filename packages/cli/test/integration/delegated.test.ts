@@ -38,7 +38,7 @@ steps:
 
 let h: Harness;
 const SLUGS: Record<number, string> = { 1: "gh-1-pay-invoices", 2: "gh-2-send-receipts", 3: "gh-3-archive-invoices" };
-const wt = (n: number) => `${h.root}-worktrees/${SLUGS[n]}`;
+const wt = (n: number) => h.worktree(SLUGS[n]!);
 const spec = (n: number) => join(wt(n), `.agents/specs/${SLUGS[n]}`);
 // A unit's run state is in the checkout's machine dir (the current round for the story)
 const runs = (n: number) => runStateOf(spec(n));

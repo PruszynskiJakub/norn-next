@@ -50,7 +50,7 @@ async function boot(h: Harness, n: number, title: string) {
 
 describe("runtime", () => {
   let h: Harness;
-  const wt = () => `${h.root}-worktrees/gh-9-fix-the-bug`;
+  const wt = () => h.worktree("gh-9-fix-the-bug");
   const runs = () => runStateOf(join(wt(), ".agents/specs/gh-9-fix-the-bug"));
   beforeAll(async () => {
     h = await createHarness();
@@ -169,7 +169,7 @@ describe("runtime", () => {
 
 describe("PR merged after the round finished", () => {
   let h: Harness;
-  const wt = () => `${h.root}-worktrees/gh-9-fix-the-bug`;
+  const wt = () => h.worktree("gh-9-fix-the-bug");
   const runs = () => runStateOf(join(wt(), ".agents/specs/gh-9-fix-the-bug"));
   beforeAll(async () => {
     h = await createHarness();

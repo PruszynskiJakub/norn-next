@@ -52,7 +52,7 @@ async function boot(h: Harness): Promise<void> {
   h.remote.issues = [issue(9, "Fix the bug")];
 }
 
-const wt = (h: Harness) => `${h.root}-worktrees/gh-9-fix-the-bug`;
+const wt = (h: Harness) => h.worktree("gh-9-fix-the-bug");
 const runs = (h: Harness) => runStateOf(join(wt(h), SPEC));
 
 /** Tick until the story unit's agent runs (intake → claim → start → launch). */

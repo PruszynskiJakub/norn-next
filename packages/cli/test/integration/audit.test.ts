@@ -36,7 +36,7 @@ const acted = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && 
 
 describe("audit: runtime", () => {
   let h: Harness;
-  const wt = () => `${h.root}-worktrees/gh-4-audit-me`;
+  const wt = () => h.worktree("gh-4-audit-me");
   const spec = ".agents/specs/gh-4-audit-me";
   const runs = () => runStateOf(join(wt(), spec));
   const step = (ms = 10_000) => h.clock.advance(ms);
@@ -141,7 +141,7 @@ describe("audit: runtime", () => {
 
 describe("owed base records the base keeps refusing", () => {
   let h: Harness;
-  const wt = () => `${h.root}-worktrees/gh-4-audit-me`;
+  const wt = () => h.worktree("gh-4-audit-me");
   const spec = ".agents/specs/gh-4-audit-me";
   const runs = () => runStateOf(join(wt(), spec));
   const step = (ms = 10_000) => h.clock.advance(ms);

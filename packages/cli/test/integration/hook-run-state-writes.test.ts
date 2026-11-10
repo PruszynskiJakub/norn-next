@@ -23,7 +23,7 @@ steps:
 `;
 
 let h: Harness;
-const wt = () => `${h.root}-worktrees/gh-9-manual-thing`;
+const wt = () => h.worktree("gh-9-manual-thing");
 const runs = () => runStateOf(join(wt(), ".agents/specs/gh-9-manual-thing"));
 const REASON = "a hand-edited file fails validation and makes the unit `corrupt`";
 

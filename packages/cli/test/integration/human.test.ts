@@ -10,7 +10,7 @@ import { CLAIMS_PREFIX, type Receipt, STORY_UNIT_DIR } from "@norn/schema";
 import { bindNornHome, heartbeatFilePath, heartbeatId, readTrace, repoConfigPath, workflowsDir, handoffPath } from "@norn/store";
 import { humanTickLines } from "../../src/commands/watch.ts";
 import { type CliResult, type TickReport } from "../../src/index.ts";
-import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
+import { createHarness, type Harness, issue, sh, worktreeOf } from "../../../../test/support/harness.ts";
 import { runChecked } from "../../../../test/support/harness.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
@@ -69,8 +69,8 @@ mode: auto
 let h: Harness;
 const spec5 = ".agents/specs/gh-5-pay-invoices";
 const spec6 = ".agents/specs/gh-6-export-report";
-const wt5 = () => `${h.root}-worktrees/gh-5-pay-invoices`;
-const wt6 = () => `${h.root}-worktrees/gh-6-export-report`;
+const wt5 = () => h.worktree("gh-5-pay-invoices");
+const wt6 = () => h.worktree("gh-6-export-report");
 const runs5 = () => runStateOf(join(wt5(), spec5));
 const runs6 = () => runStateOf(join(wt6(), spec6));
 const step = (ms = 10_000) => h.clock.advance(ms);
@@ -325,12 +325,12 @@ describe("mailbox: a second clone while this one holds the claim", () => {
     const twinHome = join(h.dir, "twin-home");
     mkdirSync(twinHome);
     sh(h.dir, ["clone", "-q", h.remoteDir, twinRoot]);
-    const twinWt = `${twinRoot}-worktrees/gh-5-pay-invoices`;
+    // The twin has a heartbeat of its own (two recorded ids, not one against none) and its worktrees in its own machine dir
+    bindNornHome(twinRoot, twinHome);
+    const twinWt = worktreeOf(twinRoot, "gh-5-pay-invoices");
     sh(twinRoot, ["worktree", "add", "-q", "-b", "gh-5-pay-invoices", twinWt, "origin/gh-5-pay-invoices"]);
     writeFileSync(join(twinWt, ".norn-unit"), `repo=${twinRoot}\nstory=gh-5\nslice=\nunit=_story\nspec_dir=${spec5}\n`);
     sh(twinRoot, ["fetch", "-q", "origin", `+${CLAIMS_PREFIX}*:${CLAIMS_PREFIX}*`]);
-    // The twin has a heartbeat of its own: two recorded ids, not one against none
-    bindNornHome(twinRoot, twinHome);
     expect(heartbeatId(twinRoot, Date.now())).not.toBe(JSON.parse(h.read(heartbeatFilePath(h.root))).heartbeat_id);
     const deps = { ...h.deps, cwd: twinRoot, env: { ...h.deps.env, NORN_HOME_DIR: twinHome, USER: "tester", NORN_MACHINE: "box" } };
     const twin = (...argv: string[]) => runChecked(argv, deps);
@@ -348,7 +348,8 @@ describe("mailbox: a second clone while this one holds the claim", () => {
     const bHome = join(h.dir, "colleague-home");
     mkdirSync(bHome);
     sh(h.dir, ["clone", "-q", h.remoteDir, bRoot]);
-    const bWt = `${bRoot}-worktrees/gh-5-pay-invoices`;
+    bindNornHome(bRoot, bHome);
+    const bWt = worktreeOf(bRoot, "gh-5-pay-invoices");
     sh(bRoot, ["worktree", "add", "-q", "-b", "gh-5-pay-invoices", bWt, "origin/gh-5-pay-invoices"]);
     writeFileSync(join(bWt, ".norn-unit"), `repo=${bRoot}\nstory=gh-5\nslice=\nunit=_story\nspec_dir=${spec5}\n`);
 
@@ -481,7 +482,7 @@ describe("mailbox: a second clone while this one holds the claim", () => {
 
 describe("a slice gate in its own worktree (X1: views read slice runs from the machine dir)", () => {
   const spec8 = ".agents/specs/gh-8-split-work";
-  const wt8 = () => `${h.root}-worktrees/gh-8-split-work`;
+  const wt8 = () => h.worktree("gh-8-split-work");
   const sliceWt = () => `${wt8()}--01-part`;
   const storyRuns = () => runStateOf(join(wt8(), spec8));
   const sliceRuns = () => runStateOf(join(sliceWt(), spec8), "01-part");
@@ -610,7 +611,7 @@ counters: { loop: { max: 2 } }
 `;
   let t: Harness;
   const spec = ".agents/specs/gh-12-triage-me";
-  const wt = () => `${t.root}-worktrees/gh-12-triage-me`;
+  const wt = () => t.worktree("gh-12-triage-me");
   const runs = () => runStateOf(join(wt(), spec));
   const next = () => {
     t.clock.advance(10_000);
@@ -714,7 +715,7 @@ counters: { back: { max: 2 } }
 describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts the next round", () => {
   let t: Harness;
   const spec = ".agents/specs/gh-14-round-me";
-  const wt = () => `${t.root}-worktrees/gh-14-round-me`;
+  const wt = () => t.worktree("gh-14-round-me");
   const record = () => join(storyRunStateOf(join(wt(), spec)), "_story");
   const runs = () => runStateOf(join(wt(), spec));
   const next = () => {
@@ -857,7 +858,7 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
   });
 
   test("B8, B9: the same workflow again as round 2, and --at picks the step it starts at", async () => {
-    const runs15 = () => runStateOf(join(`${t.root}-worktrees/gh-15-triage-twice`, ".agents/specs/gh-15-triage-twice"));
+    const runs15 = () => runStateOf(join(t.worktree("gh-15-triage-twice"), ".agents/specs/gh-15-triage-twice"));
     for (let i = 0; i < 8 && t.state(runs15())?.status !== "running"; i++) await next();
     t.report(runs15(), "done", { outcome: "story", handoff: "a story" });
     await next();
@@ -880,7 +881,7 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
   });
 
   test("B20 (D9): a failed label call warns in the tick's output and the trace; the round starts anyway", async () => {
-    const runs15 = () => runStateOf(join(`${t.root}-worktrees/gh-15-triage-twice`, ".agents/specs/gh-15-triage-twice"));
+    const runs15 = () => runStateOf(join(t.worktree("gh-15-triage-twice"), ".agents/specs/gh-15-triage-twice"));
     t.report(runs15(), "done", { outcome: "done", handoff: "built" });
     await next();
     expect(t.state(runs15())).toMatchObject({ round: 3, step: "$done", status: "done" });
@@ -956,7 +957,7 @@ describe("gh-71 B1, B3–B10, B17, B30, B31: norn story edit --workflow starts t
 
   test("B35 (AC12): a finished round an older norn kept flat is moved into round 1, and --workflow then starts round 2", async () => {
     t.remote.issues = [...t.remote.issues, issue(16, "Old flat")];
-    const wt16 = `${t.root}-worktrees/gh-16-old-flat`;
+    const wt16 = t.worktree("gh-16-old-flat");
     const runs16 = () => runStateOf(join(wt16, ".agents/specs/gh-16-old-flat"));
     t.clock.advance(10_000);
     await t.tick("--sync");
@@ -998,8 +999,8 @@ describe("gh-71 B11–B17, B32: --force ends an unfinished round, --at alone mov
   let t: Harness;
   const spec21 = ".agents/specs/gh-21-force-me";
   const spec22 = ".agents/specs/gh-22-stuck-one";
-  const wt21 = () => `${t.root}-worktrees/gh-21-force-me`;
-  const wt22 = () => `${t.root}-worktrees/gh-22-stuck-one`;
+  const wt21 = () => t.worktree("gh-21-force-me");
+  const wt22 = () => t.worktree("gh-22-stuck-one");
   const record21 = () => join(storyRunStateOf(join(wt21(), spec21)), "_story");
   const runs21 = () => runStateOf(join(wt21(), spec21));
   const runs22 = () => runStateOf(join(wt22(), spec22));

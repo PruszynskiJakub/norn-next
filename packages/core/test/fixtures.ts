@@ -152,7 +152,7 @@ export function facts(stories: StoryFacts[], patch: Partial<Facts> = {}, now = T
   return {
     tick_id: TICK,
     now,
-    repo: { root: "/r", default_branch: "main", remote: "origin" },
+    repo: { root: "/r", default_branch: "main", remote: "origin", worktrees: "/r-worktrees" },
     machine: { holder: "jakub@mac", heartbeat_id: HB, runner: "herdr", leases: [] },
     remote: { issues: undefined },
     stories,

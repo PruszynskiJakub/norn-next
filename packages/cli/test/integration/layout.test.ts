@@ -38,7 +38,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-const pinned = (n: number, slug: string) => h.read(join(runStateOf(join(`${h.root}-worktrees/gh-${n}-${slug}`, `.agents/specs/gh-${n}-${slug}`)), "workflow.yaml"));
+const pinned = (n: number, slug: string) => h.read(join(runStateOf(join(h.worktree(`gh-${n}-${slug}`), `.agents/specs/gh-${n}-${slug}`)), "workflow.yaml"));
 async function ticks(n = 8) {
   for (let i = 0; i < n; i++) {
     h.clock.advance(10_000);

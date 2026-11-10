@@ -26,7 +26,7 @@ type Item = { id: string; story: string; slice: string | null; title: string; co
 
 describe("mode, agent and workflow over ticks (B10, B13, B24, B25, B33)", () => {
   let h: Harness;
-  const wt = (key: string, slug: string) => `${h.root}-worktrees/${key}-${slug}`;
+  const wt = (key: string, slug: string) => h.worktree(`${key}-${slug}`);
   const ticks = async (n: number) => {
     for (let i = 0; i < n; i++) {
       h.clock.advance(10_000);

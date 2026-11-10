@@ -55,8 +55,8 @@ mode: auto
 
 let h: Harness;
 const spec2 = ".agents/specs/gh-2-split-work";
-const wt1 = () => `${h.root}-worktrees/gh-1-pay-invoices`;
-const wt2 = () => `${h.root}-worktrees/gh-2-split-work`;
+const wt1 = () => h.worktree("gh-1-pay-invoices");
+const wt2 = () => h.worktree("gh-2-split-work");
 const sliceWt = () => `${wt2()}--01-part`;
 const storyRuns2 = () => runStateOf(join(wt2(), spec2));
 const sliceRuns = () => runStateOf(join(sliceWt(), spec2), "01-part");

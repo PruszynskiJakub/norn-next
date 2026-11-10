@@ -82,7 +82,7 @@ function noteInHandoff(wt: string, specDir: string, note: string): void {
 
 describe("base sync with real git", () => {
   let h: Harness;
-  const wt = () => `${h.root}-worktrees/gh-7-add-login-form`;
+  const wt = () => h.worktree("gh-7-add-login-form");
   const runs = () => runStateOf(join(wt(), ".agents/specs/gh-7-add-login-form"));
   const step = () => h.clock.advance(10_000);
   const until = async (pred: () => boolean, label: string, max = 20) => {
@@ -230,7 +230,7 @@ describe("base sync with real git", () => {
 
 describe("BS3.3a (dogfood D4): a person's push to the branch of a $done story", () => {
   let h: Harness;
-  const wt = () => `${h.root}-worktrees/gh-13-take-person-pushes`;
+  const wt = () => h.worktree("gh-13-take-person-pushes");
   const runs = () => runStateOf(join(wt(), ".agents/specs/gh-13-take-person-pushes"));
   const until = async (pred: () => boolean, label: string) => {
     const seen: string[] = [];
@@ -291,7 +291,7 @@ describe("base_branch: develop (7b)", () => {
   afterAll(() => h.cleanup());
 
   test("intake from develop, update merges develop, open-pr targets develop", async () => {
-    const wt = `${h.root}-worktrees/gh-8-use-develop`;
+    const wt = h.worktree("gh-8-use-develop");
     const runs = () => runStateOf(join(wt, ".agents/specs/gh-8-use-develop"));
     await h.tick();
     const sibling = siblingMerge(h, "d.txt", "d\n", "develop");
@@ -311,7 +311,7 @@ describe("base_branch: develop (7b)", () => {
 
 describe("PR items between syncs and in the read model, ready approval voided by norn update", () => {
   let h: Harness;
-  const wt = () => `${h.root}-worktrees/gh-9-pay-by-card`;
+  const wt = () => h.worktree("gh-9-pay-by-card");
   const runs = () => runStateOf(join(wt(), ".agents/specs/gh-9-pay-by-card"));
   type View = { groups: Record<string, Array<{ id: string; command: string; detail?: string }>> };
   const view = async () => (await h.norn("status")).value as View;
@@ -429,7 +429,7 @@ describe("PR items between syncs and in the read model, ready approval voided by
 
 describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge; done is verified", () => {
   let h: Harness;
-  const wt = () => `${h.root}-worktrees/gh-11-merge-safely`;
+  const wt = () => h.worktree("gh-11-merge-safely");
   const runs = () => runStateOf(join(wt(), ".agents/specs/gh-11-merge-safely"));
   /** a Claude Code permission dialog in the agent's pane (as in prompts.test.ts) */
   const SCREEN = [" Bash command", "", " │ python3 fix.py", "╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌", " Do you want to proceed?", " ❯ 1. Yes", "   2. No", "", " Esc to cancel · Tab to amend"].join("\n");
@@ -559,7 +559,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
 
 describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run rerun --step resolve", () => {
   let h: Harness;
-  const wt = () => `${h.root}-worktrees/gh-12-conflict-twice`;
+  const wt = () => h.worktree("gh-12-conflict-twice");
   const runs = () => runStateOf(join(wt(), ".agents/specs/gh-12-conflict-twice"));
   const inWt = (...argv: string[]) => runChecked(argv, { ...h.deps, cwd: wt() });
   const lastClassify = () => {
@@ -653,7 +653,7 @@ steps:
 counters: { reject_loop: { max: 3 }, stale_loop: { max: 3 } }
 `;
   let h: Harness;
-  const wt = () => `${h.root}-worktrees/gh-7-add-login-form`;
+  const wt = () => h.worktree("gh-7-add-login-form");
   const runs = () => runStateOf(join(wt(), ".agents/specs/gh-7-add-login-form"));
   const skill = (root: string) => readFileSync(join(root, ".agents/skills/norn/SKILL.md"), "utf8");
   const until = async (pred: () => boolean, label: string, max = 20) => {

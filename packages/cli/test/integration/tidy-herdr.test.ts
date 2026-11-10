@@ -18,7 +18,7 @@ setDefaultTimeout(30_000);
 
 describe("norn tidy closes Herdr panes of runs that reported done", () => {
   let h: Harness;
-  const wt = () => `${h.root}-worktrees/gh-3-third`;
+  const wt = () => h.worktree("gh-3-third");
   const runsDir = () => runStateOf(join(wt(), ".agents/specs/gh-3-third"));
 
   /** A fake Herdr: fixed panes, every close recorded. */

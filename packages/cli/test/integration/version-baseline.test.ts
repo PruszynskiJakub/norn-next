@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { versionBaseline } from "@norn/core";
 import { localConfigPath, REPO_CONFIG_FILE, repoConfigPath, workflowsDir } from "@norn/store";
 import { COMMANDS, NOUNS } from "../../src/commands/index.ts";
-import { createHarness, type Harness, issue, runChecked } from "../../../../test/support/harness.ts";
+import { createHarness, type Harness, issue, runChecked, worktreesOf } from "../../../../test/support/harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -93,7 +93,7 @@ for (const [label, repo, code] of [
         const r = await h.norn(...argv, "--json");
         expect({ argv, exit: r.exit, value: r.value }).toEqual({ argv, exit: 3, value: refusalOf(repo) });
       }
-      expect(existsSync(`${h.root}-worktrees`)).toBe(false);
+      expect(existsSync(worktreesOf(h.root))).toBe(false);
       expect(h.runner.launches).toEqual([]);
       expect(h.git(["ls-remote", h.remoteDir])).toBe(remoteRefs);
       expect(h.git(["status", "--porcelain"])).toBe(`M ${REPO_CONFIG_FILE}`);

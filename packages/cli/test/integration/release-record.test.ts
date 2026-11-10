@@ -117,7 +117,7 @@ function rejectRecord(story: string): () => void {
 /** A mini story with its plan session started (held here, run state in the machine dir). */
 async function storyAt(n: number, slug: string, labels?: string[]) {
   const spec = `.agents/specs/gh-${n}-${slug}`;
-  const wt = `${h.root}-worktrees/gh-${n}-${slug}`;
+  const wt = h.worktree(`gh-${n}-${slug}`);
   const runs = () => runStateOf(join(wt, spec));
   h.remote.issues = [...h.remote.issues, issue(n, slug, labels)];
   await h.tick("--sync");

@@ -91,7 +91,7 @@ An agent that dies is classified `died` and retried; one that goes quiet is nudg
 
 A step boundary commits only the agent's work and the unit's handoff, `handoffs/<unit>.md` in the spec folder (`story.md` for the story, `<nn>-<slug>.md` for a slice), and pushes the unit's branch. A story's PR holds the code, the spec and the handoffs, nothing of norn's own. A handoff is prose only and holds the unit's current state (Goal, Proof, Easy to miss, Not proven yet, Notes, Resume), at most 8 KB: `norn done` refuses a larger one. norn never writes into it; the unit's status is printed by `norn brief` and `norn story checkout` above it, and what happened is in the receipts, which the brief lists as History. Each boundary commit carries trailers naming the story, slice and step; one that ends a step also names its outcome and the step it led to (`Norn-Outcome`, `Norn-Next`), which is what another machine reads as the story's last boundary.
 
-A unit's **run state** (`state.json`, the numbered receipts, the pinned workflow, logs of failed checks and QA evidence) lives on the machine that runs the story, in the checkout's machine dir: `~/.norn/repos/<id>/runs/<story>/<unit>/`. It is in no worktree and on no branch, so removing a worktree or running `git clean -fdx` leaves the story where it was, and it leaves the machine only as the story's record, when norn pushes it to the record ref.
+A unit's **run state** (`state.json`, the numbered receipts, the pinned workflow, logs of failed checks and QA evidence) lives on the machine that runs the story, in the checkout's machine dir: `~/.norn/repos/<id>/runs/<story>/<unit>/`. It is in no worktree and on no branch, so removing a worktree or running `git clean -fdx` leaves the story where it was, and it leaves the machine only as the story's record, when norn pushes it to the record ref. The unit worktrees live beside it, in the same machine dir's `worktrees/` folder: a story's at `~/.norn/repos/<id>/worktrees/<story>-<slug>`, each slice's next to it at `…/worktrees/<story>-<slug>--<nn>-<slug>`. Nothing norn makes sits beside your repository.
 
 When the record has to leave the machine, norn packs the story's whole run state into one commit on the ref `refs/norn/runs/<story>` on the remote, which no branch and no normal clone carries. The team config's **record policy** (`record.policy`) says when:
 
@@ -148,7 +148,7 @@ A repo without the key, or one recording a version below 0.30, is refused the sa
 | brief | What `norn brief` tells the agent of a step: the work and its skill, why this attempt, how to report, what to read, the handoff and the unit's history, and how to work. |
 | inbox | Everything that needs a person, with the command that resolves each item (`norn status`). |
 | tick | One pass of the heartbeat: observe, decide, act. |
-| worktree | The git worktree a unit works in. |
+| worktree | The git worktree a unit works in, in the checkout's machine dir under `worktrees/` (`~/.norn/repos/<id>/worktrees/<story>-<slug>`, a slice's with `--<nn>-<slug>` added). |
 | norn version | The norn version a repo was set up with or last upgraded to (`norn_version` in the team config); a binary of another minor, or an earlier patch, refuses to act on the repo. |
 | slot | A numbered port range a running unit gets, so parallel units do not collide. |
 | trace | The per-tick record of facts and decisions, kept outside the repository. |

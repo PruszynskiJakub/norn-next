@@ -53,7 +53,7 @@ mode: auto
 const SPEC = ".agents/specs/gh-7-add-login-form";
 const BRANCH = "gh-7-add-login-form";
 let h: Harness;
-const storyWt = () => `${h.root}-worktrees/${BRANCH}`;
+const storyWt = () => h.worktree(BRANCH);
 const sliceWt = (nn: string) => `${storyWt()}--${nn}`;
 const storyRuns = () => runStateOf(join(storyWt(), SPEC));
 const sliceRuns = (nn: string) => runStateOf(join(sliceWt(nn), SPEC), nn);
@@ -264,7 +264,7 @@ steps:
   const TBRANCH = "gh-8-triage-me";
   const TSPEC = `.agents/specs/${TBRANCH}`;
   let g: Harness;
-  const wt = () => `${g.root}-worktrees/${TBRANCH}`;
+  const wt = () => g.worktree(TBRANCH);
   // The story's rounds in the checkout's machine dir (named from the main checkout: the worktree goes away)
   const round = (n: string) => join(storyRunStateOf(join(g.root, TSPEC)), "_story/rounds", n);
   const MAILBOX = "refs/norn/inbox/gh-8/01JAAAAAAAAAAAAAAAAAAAAAAA";

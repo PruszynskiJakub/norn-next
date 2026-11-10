@@ -28,7 +28,7 @@ steps:
 `;
 
 let h: Harness;
-const runs = () => runStateOf(join(`${h.root}-worktrees/gh-1-pay-invoices`, ".agents/specs/gh-1-pay-invoices"));
+const runs = () => runStateOf(join(h.worktree("gh-1-pay-invoices"), ".agents/specs/gh-1-pay-invoices"));
 const tick = async () => {
   h.clock.advance(10_000);
   return h.tick();
