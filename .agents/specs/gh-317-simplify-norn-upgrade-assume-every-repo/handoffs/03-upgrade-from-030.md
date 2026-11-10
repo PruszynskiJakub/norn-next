@@ -4,7 +4,7 @@
 
 ### Proof
 
-Commit b45b051f0, plus the review #1 rework commit on top. Unit tier 1736 pass, `bun run typecheck` green, `bun run docs:emit` leaves no diff after the rework.
+Commit b45b051f0, plus the review #1 rework commit fe6af2b2f. Review #2 reran all three on HEAD fe6af2b2f: unit tier 1736 pass, `bun run typecheck` green, `bun run docs:emit` leaves no diff. Review #2 read each row's test and approved; it found all three review #1 findings fixed.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
