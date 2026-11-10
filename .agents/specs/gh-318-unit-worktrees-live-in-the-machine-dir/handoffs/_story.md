@@ -6,7 +6,7 @@ Unit worktrees are created in the checkout's machine dir (`<machine dir>/worktre
 
 ## Proof
 
-Review #6 at b4d0b0ad: approve, no findings; review #5's blocking finding (e2e transcripts) is fixed, the only change since being the three one-line transcript deletions. Implement #6: review #5's blocking finding fixed. The three effect transcripts (`recovery-claim-lost.txt`, `base-sync.txt`, `e2e-slice-workflow.txt`) were rewritten; each diff drops only intake's local `git show-ref --verify --quiet refs/heads/<branch>` line, the intended effect of ci fix #5 (intake skips a story whose branch is on the remote whenever its worktree is gone, `act/lifecycle.ts:230`; observe skips prunable worktrees, `observe/index.ts:170`). Locally: e2e 76/76, unit 1739 pass, typecheck green. QA #5 at c892491c (before ci fix #5): 16/16 `pass`.
+QA #6 at 2ab50a63 (after ci fix #5): 16/16 `pass`, every criterion re-observed through the CLI harness (intake, slice start, story start/--print, inbox, brief, Herdr tab cwd, tidy, status --json, two clones, bound and symlinked homes), the golden comparison and the greps; evidence in this run's QA evidence. Review #6 at b4d0b0ad: approve, no findings; review #5's blocking finding (e2e transcripts) is fixed, the only change since being the three one-line transcript deletions. Implement #6: review #5's blocking finding fixed. The three effect transcripts (`recovery-claim-lost.txt`, `base-sync.txt`, `e2e-slice-workflow.txt`) were rewritten; each diff drops only intake's local `git show-ref --verify --quiet refs/heads/<branch>` line, the intended effect of ci fix #5 (intake skips a story whose branch is on the remote whenever its worktree is gone, `act/lifecycle.ts:230`; observe skips prunable worktrees, `observe/index.ts:170`). Locally: e2e 76/76, unit 1739 pass, typecheck green. QA #5 at c892491c (before ci fix #5): 16/16 `pass`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -51,4 +51,4 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Resume
 
-Review #6 approved at b4d0b0ad (unit 1739 pass, e2e 76/76, typecheck green, re-run by review). Next: the test check, then QA re-observes the 16 criteria on this head (the intake and observe changes of ci fix #5 came after QA #5), then CI.
+QA #6 passed at 2ab50a63 (16/16). Next: describe rewrites pr.md for this head, then open-pr and CI (the full integration and e2e tiers after ci fix #5 are still unproven on CI).
