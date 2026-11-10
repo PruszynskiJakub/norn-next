@@ -41,4 +41,4 @@ Review #1: approve, no blocking findings. Two minor notes (stories already close
 
 ## Resume
 
-Implement is done and committed. Next: the workflow's review/CI steps.
+pr.md in the spec folder holds the PR body for the branch as it is now (summary, test evidence, merge danger). Next: norn opens or updates the PR.
