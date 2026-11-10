@@ -4,32 +4,31 @@
 
 #### Proof
 
-- spec.md holds the Plan (seams S1 CLI via harness, S2 core's pure version rule; D1–D12) and, in its frontmatter `criteria`, every slice criterion (`01.AC1`…`06.AC4`, 32 in all).
-- Six slice files in `slices/`, every user story cited by some acceptance:
-  1. 01 harness keeps the recorded `norn_version` (prefactor; test) — depends on nothing.
-  2. 02 acting commands refuse a missing / pre-0.30 version via one core rule; watch pauses, status shows an Unblock item (test, one agent for release-note commits) — after 01.
-  3. 03 upgrade does only skills, version, staging, labels; refuses the baseline; five-field `--json`; `norn migrate` gone; docs (test, agent for docs and release notes) — after 02.
-  4. 04 doctor's version check and init apply the baseline (test) — after 02.
-  5. 05 no old-layout guard, hook check or doctor layout section; a pre-0.13 repo is stopped by the missing-version refusal (test) — after 02.
-  6. 06 run state read only from the machine dir and archive refs; `move_record` and branch/base-tree readers go (test) — depends on nothing.
-- Critical path: 3 slices (01 → 02 → 03/04/05). Startable at once: 01 and 06.
+- All six slices are integrated (01 harness, 02 baseline guard, 03 slim upgrade + `norn migrate` gone, 04 doctor/init baseline, 05 no old layout, 06 no branch/base-tree run state). The unit tier and typecheck pass (test#1).
+- QA #1 ran every criterion through the dev CLI in throwaway repos. The evidence pack (report.md, criteria.json, findings.json, one file per area) is in this run's evidence. The results:
+  - 30 of 32 criteria `pass`: the guard (tick and story start refuse with nothing changed; a config error still exits 6; watch pauses mid-run; status shows an Unblock item pointing to `norn doctor`), upgrade (skills, relink, version, staging, commit text, labels via a stub gh, no-op, interrupted rerun, the three refusals, five-field JSON, legacy files left alone, `migrate` unknown), doctor and init on the baseline, a pre-0.13 repo, and `runs/` in branch and base trees ignored.
+  - 03.AC11 (docs describe upgrade from 0.30 on, nothing on the removed migrations): **fail**, finding F1.
+  - 06.AC4 (golden corpus: only the record-move cases gone, transcripts unchanged): **person**. The golden part holds (four cases and two rule cases gone, 132 replay green, snapshots unchanged), but `test/e2e/transcripts/recovery-claim-lost.txt` lost one line: the branch-tree `runs` read (`git cat-file -e …/runs`), which is the reader this slice removes.
 
 #### Easy to miss
 
-- 02 makes every test repo without a recorded version refuse: fix the repos (record a version), never weaken the guard.
-- 03 and 05 both touch upgrade's import of the old layout; whichever lands second removes the last import. 03 owns the store's archive-ref move of base-tree run state; 06 owns the rest of branch/base-tree run state.
-- The baseline texts are pinned once in core (S2); cli tests assert the code and that the text is the rule's.
+- F1's two lines are hand-written prose outside the `docs:emit` block and unchanged from main, so `docs:emit` and a diff-only review cannot catch them: `docs/reference.md:24` ("`norn upgrade` rewrites old files") and `docs/concepts.md:101` (base-branch run state "is pointed to `norn upgrade`, which moves it into the refs").
+- Fixes keep the guard as it is: fix docs and fixtures, never weaken the refusal.
 
 #### Not proven yet
 
-- Nothing built. How many e2e repos and fixtures lack `norn_version` shows only when 02 runs the tiers (CI for integration/e2e).
+- F1 is unfixed.
+- A person has not yet ruled on whether the one-line transcript change satisfies 06.AC4.
+- The integration and e2e tiers run in CI only.
 
 #### Notes
 
-- Plan checked against this base (after the main merge 4595edabc): every symbol D10 names exists where the plan says; the plan holds.
-- Earlier decisions (person): init refuses a pre-0.30 version too; config old-key messages lose their "run `norn upgrade`" hint (in 03); codes `version_missing` / `version_too_old`; the status version item is an Unblock item pointing to `norn doctor`. Flat records and older `state.json` readers stay (out of scope).
-- Release notes come from commit messages and the PR body (02 AC7, 03 AC12); CHANGELOG is the release step's.
+- Earlier decisions (person): init refuses a pre-0.30 version too; config old-key messages lose their "run `norn upgrade`" hint; codes `version_missing` / `version_too_old`; the status version item is an Unblock item pointing to `norn doctor`. Flat records and older `state.json` readers stay (out of scope).
+- QA observation for a person: on a team file with no `norn_version`, `norn init` refuses with a do_instead that starts "run `norn init` if norn was never set up here", which is circular coming from init itself (04.AC3 still passes as written).
+- Minor, not a criterion: `packages/core/test/rule-cases.ts` keeps a dangling comment "A held story whose record is still flat moves into round 1 first" above the removed record-move cases. `config-edit.ts:66` says upgrade "moves the skills and files with it".
+- QA repro loop: in a throwaway repo under `$TMPDIR`, run `bun packages/cli/src/main.ts` with the session's `NORN_*`/`HERDR_*` env unset and `NORN_HOME_DIR` set to a temp dir. A "newer norn" is a copy of the worktree with `packages/cli/package.json` at 0.31.0.
+- Release notes come from commit messages 5e8451d29 and b45b051f0 (checked) and the PR body. CHANGELOG is the release step's.
 
 #### Resume
 
-The person approves the slices at the gate; then slices 01 and 06 start.
+Fix F1: drop "; `norn upgrade` rewrites old files" from `docs/reference.md:24` and the last sentence of `docs/concepts.md:101`. Then QA again. A person rules on 06.AC4's transcript line.
