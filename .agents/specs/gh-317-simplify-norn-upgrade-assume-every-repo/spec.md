@@ -8,7 +8,7 @@ title: "Simplify norn upgrade: assume every repo starts at 0.30, drop the old mi
 assignee: PruszynskiJakub
 labels:
   - norn
-  - norn:wf:refinement
+  - norn:wf:story
 workflow: story
 status: active
 intake_at: 2026-11-10T08:21:19.336Z
