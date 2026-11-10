@@ -35,4 +35,4 @@ Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run
 
 ## Resume
 
-QA passed; the next step is the workflow's (PR / gate). If CI's integration tier fails, start from `packages/cli/test/integration/worktrees-machine-dir.test.ts` and the harness guard.
+The PR body is in `pr.md` in the spec folder (describe#1): one evidence entry per user story, linked to the story QA evidence. Next comes the workflow's PR step or gate. If CI's integration tier fails, start from `packages/cli/test/integration/worktrees-machine-dir.test.ts` and the harness guard.
