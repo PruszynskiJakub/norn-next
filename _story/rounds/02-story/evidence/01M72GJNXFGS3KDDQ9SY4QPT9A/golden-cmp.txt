@@ -1,0 +1,6 @@
+cases base/s01/head 136 136 136
+01.AC2 slice01 worktrees facts: ['<dir>/repo-worktrees'] decisions identical to base: True
+03.AC10 head worktrees facts distinct: 130 all machine-dir: True
+03.AC10 head decisions mention repo-worktrees: False
+03.AC10 normalised decisions identical to base: True same tick ids: True
+base 4595edabc360771d1ce919dd4f2ca3adee58d89d

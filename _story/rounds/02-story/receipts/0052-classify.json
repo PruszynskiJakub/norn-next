@@ -1,0 +1,1 @@
+{"kind":"classify","receipt_id":"01M72G4EFB7S2QG1DXWB1JZR7H","run_id":"01M72G3YH195YYK179XEEKNNPE","step":"open-pr","attempt":3,"at":"2026-11-10T10:30:19.883Z","by":"norn","who":"jakubpruszynski@mac","tick_id":"01M72G3YH11MEEXYVBBN31EGVY","outcome":"done","rule":"git.open-pr","detail":"PR #320 body updated https://github.com/PruszynskiJakub/norn-next/pull/320","route":"ci"}
