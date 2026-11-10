@@ -240,12 +240,8 @@ function skillsDriftOf(opts: LocalFactsOptions): (worktree: string) => string[] 
 
 function localUnit(root: string, story: StorySnapshot, u: UnitSnapshot, index: ReceiptIndex, worktree: string | null, hooks: HookFact[], leases: LeaseFile[], failures: Record<string, ActFailure>): LocalUnit {
   const st = u.state;
-  // Receipt paths: absolute in the machine dir; an older norn's record in a tree, relative to the
-  // unit's worktree when it is there, else the story's checkout; one read from a unit worktree's
-  // branch, relative to that worktree
-  const at = u.tree_root ?? (!story.run_state.tree ? undefined : worktree && existsSync(worktree) ? worktree : story.root);
-  const lo = st ? lastOutcomeReceipt(index, st, at) : null;
-  const cursor = st ? cursorRuns(index, st, at) : null;
+  const lo = st ? lastOutcomeReceipt(index, st) : null;
+  const cursor = st ? cursorRuns(index, st) : null;
   const mine = leases.filter((l) => l.repo === root && l.story === u.unit.story && l.slice === u.unit.slice);
   let step_runs: StepRunFacts[] | undefined;
   if (cursor) {
@@ -380,7 +376,7 @@ export function receiptsOfKinds(story: StorySnapshot, u: UnitSnapshot, kinds: re
 }
 
 /** The receipt that produced `state.last_outcome`, scanning newest receipts first. */
-function lastOutcomeReceipt(index: ReceiptIndex, state: UnitState, root: string | undefined): NumberedReceipt | null {
+function lastOutcomeReceipt(index: ReceiptIndex, state: UnitState): NumberedReceipt | null {
   const id = state.last_outcome?.receipt_id;
   if (!id) return null;
   const ns = index.entries
@@ -389,7 +385,7 @@ function lastOutcomeReceipt(index: ReceiptIndex, state: UnitState, root: string 
     .reverse()
     .slice(0, 50);
   for (const n of ns) {
-    const r = index.read(n, root);
+    const r = index.read(n);
     if (r && "receipt" in r && r.receipt.receipt_id === id) return r;
   }
   return null;
@@ -399,13 +395,13 @@ function lastOutcomeReceipt(index: ReceiptIndex, state: UnitState, root: string 
  * The unit's `started` / `classify` receipts at its cursor step/attempt (newest first,
  * stopping at the first of another cursor), and every session id its `started` receipts recorded.
  */
-function cursorRuns(index: ReceiptIndex, st: UnitState, root: string | undefined): CursorRuns {
+function cursorRuns(index: ReceiptIndex, st: UnitState): CursorRuns {
   const runs = new Map<string, { died: boolean }>();
   const sessions = new Set<string>();
   const ns = index.entries.filter((e) => e.kind === "started" || e.kind === "classify").reverse();
   let atCursor = true;
   for (const { n } of ns) {
-    const r = index.read(n, root);
+    const r = index.read(n);
     if (!r || !("receipt" in r)) continue;
     const rc = r.receipt;
     if (rc.kind === "started" && rc.session) sessions.add(rc.session.session_id);

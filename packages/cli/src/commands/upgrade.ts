@@ -155,6 +155,5 @@ export const upgradeCommand = defineCommand({
   summary: "Move this repo's norn_version and bundled skills to this norn, from norn 0.30 on, staged for you to commit",
   usage: "norn upgrade [--json]",
   markdown: true,
-  layout: false,
   run: (ctx) => upgrade(ctx),
 });

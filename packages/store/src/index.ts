@@ -26,7 +26,6 @@ export * from "./run-state.ts";
 export * from "./proc.ts";
 export * from "./spawn.ts";
 export * from "./receipts.ts";
-export * from "./record-move.ts";
 export * from "./record-ref.ts";
 export * from "./refs.ts";
 export * from "./skills.ts";

@@ -42,6 +42,8 @@ describe("mode, agent and workflow over ticks (B10, B13, B24, B25, B33)", () => 
     h.write(join(workflowsDir(h.root), "gem.yaml"), SOLO.replace("name: solo", "name: gem").replace("skill: norn-implement", "skill: norn-implement\n    agent: gemini"));
     // The team's entry workflow; B10, B13: my mode and agent, no agents entry
     h.config("workflow: solo\nmode: auto\nagent: codex\n");
+    // A team file with no version is an older norn's repo to init: this one was set up with this norn
+    h.recordVersion();
     // Init sets up the agents in use, so it runs once the workflows name them
     expect((await h.norn("init")).exit).toBe(0);
     h.git(["add", "-A"]);

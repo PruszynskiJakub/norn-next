@@ -114,6 +114,37 @@ for (const [label, repo, code] of [
       expect(md.stdout).toStartWith(`**Refused (${code}):** ${refusalOf(repo).error}`);
     });
 
+    test(`doctor's version check fails with ${code} and the rule's error and do_instead, as JSON and as markdown`, async () => {
+      const rule = versionBaseline(repo, RUNNING)!;
+      for (const flags of [[], ["--repo"]]) {
+        const json = await h.norn("doctor", ...flags, "--json");
+        expect(json.exit).toBe(1);
+        const v = json.value as { ok: boolean; repo: { ok: boolean; version: Record<string, unknown> } };
+        expect({ flags, ok: v.ok, repo_ok: v.repo.ok }).toEqual({ flags, ok: false, repo_ok: false });
+        expect(v.repo.version).toEqual({ ok: false, running: RUNNING, repo, match: null, code, error: rule.error, do_instead: rule.do_instead });
+        const md = await h.norn("doctor", ...flags);
+        expect(md.exit).toBe(1);
+        expect(md.stdout).toMatch(/^norn doctor: \d+ checks? failed \(.*norn.*\)$/m);
+        expect(md.stdout).toContain(`FAIL norn           ${rule.error}`);
+        expect(md.stdout).toContain(`→ ${rule.do_instead}`);
+        expect(md.stdout).not.toContain("warn norn");
+      }
+    });
+
+    test(`init exits 3 with ${code} and the 0.30 path, and changes no file`, async () => {
+      const rule = versionBaseline(repo, RUNNING)!;
+      const status = h.git(["status", "--porcelain", "--untracked-files=all"]);
+      const team = readFileSync(repoConfigPath(h.root), "utf8");
+      const r = await h.norn("init", "--json");
+      expect({ exit: r.exit, value: r.value }).toEqual({ exit: 3, value: refusalOf(repo) });
+      expect(rule.do_instead).toContain("install norn 0.30.x");
+      const md = await h.norn("init");
+      expect(md.exit).toBe(3);
+      expect(md.stdout).toStartWith(`**Refused (${code}):** ${rule.error}`);
+      expect(h.git(["status", "--porcelain", "--untracked-files=all"])).toBe(status);
+      expect(readFileSync(repoConfigPath(h.root), "utf8")).toBe(team);
+    });
+
     test("norn status shows an Unblock item with the rule's text and norn doctor, not a Check item to norn upgrade", async () => {
       const rule = versionBaseline(repo, RUNNING)!;
       const r = await h.norn("status", "--json");
@@ -124,14 +155,12 @@ for (const [label, repo, code] of [
       expect((await h.norn("status")).stdout).toContain(rule.error);
     });
 
-    test("help, doctor, init and upgrade are not stopped by the guard; upgrade refuses on its own with the rule's text", async () => {
+    test("help and doctor are not stopped by the guard; upgrade and init refuse on their own, upgrade with the rule's text", async () => {
       expect((await h.norn("help")).exit).toBe(0);
       const doctor = await h.norn("doctor", "--json");
       expect(doctor.value).toHaveProperty("repo");
       const upgrade = await h.norn("upgrade", "--json");
       expect({ exit: upgrade.exit, value: upgrade.value }).toEqual({ exit: 3, value: refusalOf(repo) });
-      const init = await h.norn("init", "--json");
-      expect(init.value).not.toEqual(refusalOf(repo));
       for (const c of [...COMMANDS, ...NOUNS.flatMap((n) => n.verbs)].filter((c) => ["help", "doctor", "init", "upgrade"].includes(c.name)))
         expect({ name: c.name, version: c.version }).not.toEqual({ name: c.name, version: "acts" });
     });

@@ -16,11 +16,28 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 import { type FileError, normalizeUnitState } from "@norn/core";
 import { parseRoundDirName, parseSliceDirName, RECORD_REF_PREFIX, ROUNDS_DIR, type RunStory, recordRef, sliceKey, STORY_UNIT_DIR, treeStoryRunStatePath, type UnitState, validate, type Workflow } from "@norn/schema";
 import { fsyncTree, isErrno } from "./fsx.ts";
-import { archiveCacheDir } from "./paths.ts";
+import { archiveCacheDir, statePath } from "./paths.ts";
 import { casRef, git, gitOk, gitSync, readLocalRef } from "./git.ts";
-import { recordErrors } from "./record-move.ts";
+import { listReceipts } from "./receipts.ts";
 import { storyRunStateDir } from "./run-state.ts";
-import { parseWorkflowText } from "./unit.ts";
+import { parseWorkflowText, readPinnedWorkflow, readState } from "./unit.ts";
+
+/** The files of a record folder that fail validation: each state, pinned workflow and receipt of it and of its rounds. */
+export function recordErrors(dir: string, root?: string): FileError[] {
+  const errors: FileError[] = [];
+  const folders = [dir];
+  const rounds = join(dir, ROUNDS_DIR);
+  if (existsSync(rounds)) for (const r of readdirSync(rounds).sort()) folders.push(join(rounds, r));
+  for (const f of folders) {
+    if (!existsSync(statePath(f))) continue;
+    const st = readState(f, root);
+    if (!st.ok && st.reason === "corrupt") errors.push(st.error);
+    const wf = readPinnedWorkflow(f, root);
+    if (!wf.ok && wf.reason === "corrupt") errors.push(wf.error);
+    errors.push(...listReceipts(f, root ? { root } : {}).errors);
+  }
+  return errors;
+}
 
 /**
  * Every regular file of a folder, relative and sorted (git's order is applied when trees are built).

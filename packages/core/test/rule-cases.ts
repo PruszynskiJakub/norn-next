@@ -151,12 +151,6 @@ function cases(): RuleCase[] {
   out.push(c("the pinned workflow changed outside norn", "workflow.drift", facts([story(SOLO_WF, {}, null, {}, { workflow_hash: "edited" })])));
   out.push(c("a rebase waits in the unit's worktree past the step's deadline", "unit.rebase_in_progress", facts([story(SOLO_WF, running("implement", 2 * HOUR), null, {}, { worktree: { ...worktree(STORY_WT), in_progress: { operation: "rebase", unmerged: ["X.txt"] } } })])));
   // A held story whose record is still flat moves into round 1 first
-  // Run state an older norn left on a held unit's branch
-  const onBranch = { branch_record: { path: ".agents/specs/gh-1-login/runs", copy: ["_story"], holds: ["_story"] }, record: "_story" };
-  out.push(c("a held story's flat record still on its branch moves into round 1 of the machine dir", "record.move", facts([story(STORY_WF, { step: "slices" }, null, {}, onBranch)])));
-  out.push(
-    c("a story's branch run state waits out a merge in its worktree", "record.move_waits", facts([story(STORY_WF, { step: "slices" }, null, {}, { ...onBranch, worktree: { ...worktree(STORY_WT), in_progress: { operation: "merge", unmerged: [] } } })])),
-  );
   // Under record.policy remote, a held story whose record changed since the ref it last saw
   out.push(
     c(

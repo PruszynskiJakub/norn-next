@@ -1,8 +1,8 @@
 ---
 id: gh-317/04
 title: doctor's version check and init apply the 0.30 baseline
-depends_on: [gh-317/02]
-status: planned
+depends_on: [ gh-317/02 ]
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

@@ -9,7 +9,7 @@ import { join, relative } from "node:path";
 import { recordRef } from "@norn/schema";
 import { REPO_CONFIG_FILE, repoConfigPath, unpackRecord, workflowsDir } from "@norn/store";
 import type { CliResult, TickReport } from "../../src/index.ts";
-import { createHarness, type Harness, issue, runChecked, sh, toBranchRunState } from "../../../../test/support/harness.ts";
+import { createHarness, type Harness, issue, runChecked, sh } from "../../../../test/support/harness.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
 setDefaultTimeout(90_000);
@@ -332,25 +332,3 @@ describe("the record follows the branch (review F1, F5)", () => {
   });
 });
 
-describe("a moved open story pushes its record under remote (B34)", () => {
-  test("AC7: the first tick moves runs/ off the branch, pushes the branch, then refs/norn/runs/gh-13 with the moved record", async () => {
-    policy("local");
-    const s = await storyAt(13, "old-layout", "review");
-    const before = h.state(s.runs());
-    toBranchRunState(s.wt, s.spec, "_story", { push: "origin" });
-    expect(h.state(s.runs())).toBeNull();
-    policy("remote");
-    expect(remoteRecord("gh-13")).toBeNull();
-
-    const r = await tick();
-    expect(r.decisions.filter((d) => d.unit === "gh-13" && d.kind !== "noop").map((d) => `${d.kind} ${d.ok}`)).toEqual(["move_record true", "push_record true"]);
-    expect(h.state(s.runs())).toEqual(before);
-    const rec = recordOnRemote("gh-13");
-    expect(rec.files).toEqual(filesOf(s.record()));
-    expect(rec.files).toContain("_story/rounds/01-trio/state.json");
-    // the handoff moved to handoffs/ on the branch: it is no part of the record
-    expect(rec.files.filter((f) => f.endsWith("handoff.md") || f.startsWith("handoffs/"))).toEqual([]);
-    expect(sh(s.wt, ["log", "-1", "--format=%s", rec.trailers["Norn-Branch-Commit"] as string])).toBe("norn: move gh-13 run state off the branch");
-    expect(remoteBranch(s.branch)).toBe(rec.trailers["Norn-Branch-Commit"] as string);
-  });
-});

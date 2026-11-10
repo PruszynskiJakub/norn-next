@@ -18,7 +18,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { type AgentAdapter, checkoutNames, currentRun, foreignFact, type HookAnswer, hookAnswer, type HookAnswerInput, type HookResponse, type ToolCall } from "@norn/core";
 import { DEFAULT_CONFIG, type ExitCode, type HookFact, type ResolvedConfig, ulid } from "@norn/schema";
-import { appendHookTrace, bindNornHome, blockedHookCount, claimStopBlock, loadConfig, machineRunsDir, repoLayout, spawnSyncCaptured } from "@norn/store";
+import { appendHookTrace, bindNornHome, blockedHookCount, claimStopBlock, loadConfig, machineRunsDir, spawnSyncCaptured } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { type Context, findUnitMarker, safeRealpath } from "../context.ts";
 import { withExit } from "../output.ts";
@@ -161,7 +161,6 @@ export const hookEventCommand = defineCommand({
       if (!found) return {}; // No-op outside unit worktrees
       const root = safeRealpath(found.marker.repo);
       bindNornHome(root, ctx.home); // repo: false, so no locate() bound this command's home
-      if (repoLayout(root).layout !== "new") return {}; // Old or mixed layout — record nothing, block nothing
       const loaded = loadConfig({ repoRoot: root, home: ctx.home, env: ctx.env });
       const config = loaded.ok ? loaded.config : DEFAULT_CONFIG;
       const at = ctx.clock.iso();
