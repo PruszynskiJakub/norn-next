@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
 import { type ClaimBlob, validate } from "@norn/schema";
-import { acquireLock, acquireTickLock, readLocalClaim, repoConfigPath, workflowsDir } from "@norn/store";
+import { acquireLock, acquireTickLock, readLocalClaim, repoConfigPath, workflowsDir, writeUnitMarker } from "@norn/store";
 import { type CliResult, runningVersion } from "../../src/index.ts";
 import { createHarness, type Harness, issue, layoutPlaces, oldNornDir, runChecked, sh, toOldLayout } from "../../../../test/support/harness.ts";
 
@@ -223,8 +223,11 @@ describe("norn upgrade refuses and moves nothing (B15, B16, B17)", () => {
   });
 
   test("in a unit worktree: exit 3, do_instead names the main checkout's path (B16)", async () => {
-    const wt = h.worktree("gh-4-four");
-    expect(existsSync(wt)).toBe(true);
+    // The unit's own worktree sits in the machine dir, which the old layout moved under `.agents/norn/`:
+    // a linked worktree beside the checkout with the unit's marker is a unit worktree as an old-layout repo has one
+    const wt = join(h.dir, "wt-gh-4");
+    h.git(["worktree", "add", "-q", "--detach", wt]);
+    writeUnitMarker(wt, { repo: h.root, story: "gh-4", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-4-four" });
     const before = [...snapshot(h), ...(readdirSync(wt, { recursive: true }) as string[]).filter((p) => !p.startsWith(".git"))];
     const r = await runChecked(["upgrade", "--json"], { ...h.deps, cwd: wt });
     expectRefused(r, "not_main_checkout");

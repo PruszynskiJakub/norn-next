@@ -27,7 +27,6 @@ Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run
 ## Notes
 
 - ci fix round 1: `upgrade.test.ts` "in a unit worktree: exit 3, do_instead names the main checkout's path (B16)" failed because `h.worktree("gh-4-four")` is now inside the machine dir, and the fixture `toOldLayout` moves the whole machine dir to `.agents/norn/trace`, so the worktree no longer existed there. Fixed in the test: it makes a linked worktree beside the checkout with the unit's marker (as layout-guard's B18 does). I tried keeping `worktrees/` in place in `toOldLayout`, but it makes every old-layout fixture read as `both_layouts`: a non-empty machine dir counts as the new place. Real old-layout repos never have that, so no product change.
-
 - Person decided (refine): no compatibility with `<repo>-worktrees/`; repo moves and doctor's adoption advice out of scope; worktrees in the per-checkout machine dir, not a shared `~/.norn/worktrees/`.
 - Person agreed (plan): seams S1 (cli integration harness) and S2 (decide through Facts), prefactors first, harness check at cleanup (D4), golden corpus rewritten mechanically (D5).
 - Slicing: the plan still holds on this base: the old path is built in exactly the places the plan lists. Slices 01 and 02 run in parallel; critical path is two levels (01 or 02 → 03). Slice 02's helper computes the old folder itself so it need not wait for 01; slice 03 points it at `worktreesDir`.
