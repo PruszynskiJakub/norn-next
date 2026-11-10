@@ -13,7 +13,7 @@ import type { RunnerPort } from "@norn/core";
 import { type ClaimBlob, claimRef, recordRef } from "@norn/schema";
 import { machineDir, repoConfigPath, setSpawnObserver, workflowsDir } from "@norn/store";
 import type { ElsewhereView } from "@norn/view";
-import type { CliDeps, CliResult } from "../../src/index.ts";
+import { type CliDeps, type CliResult, runningVersion } from "../../src/index.ts";
 import { createHarness, FakeRunner, type Harness, hostEnv, issue, runChecked, sh } from "../../../../test/support/harness.ts";
 import { runStateOf } from "../../../../test/support/run-state.ts";
 
@@ -39,7 +39,7 @@ steps:
 counters: { review_loop: { max: 3 } }
 `;
 const CONFIG = "provider: gh\nworkflow: trio\nmode: manual\n";
-const teamConfig = (policy: "local" | "remote") => `provider: gh\nworkflow: trio\nrecord:\n  policy: ${policy}\n`;
+const teamConfig = (policy: "local" | "remote") => `norn_version: ${runningVersion(h.deps)}\nprovider: gh\nworkflow: trio\nrecord:\n  policy: ${policy}\n`;
 /** `2099-01-15 10:00` from an ISO time, as the view prints it */
 const minute = (iso: string) => iso.slice(0, 16).replace("T", " ");
 

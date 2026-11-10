@@ -11,7 +11,7 @@ import { chmodSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync
 import { join, relative } from "node:path";
 import { claimRef, recordRef, STORY_UNIT_DIR, ulid } from "@norn/schema";
 import { appendReceipt, handoffPath, machineDir, readState, repoConfigPath, workflowsDir } from "@norn/store";
-import type { CliResult, TickReport } from "../../src/index.ts";
+import { type CliResult, runningVersion, type TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
 import { type Clone, cloneOf } from "../../../../test/support/clone.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
@@ -314,7 +314,7 @@ describe("a story held only from its record (B33, 10-R3-F2)", () => {
     const s = await handedOverAtReview2(21, "record-only-remote");
     sh(h.root, ["push", "-q", "origin", `:refs/heads/${s.branch}`]);
     const B = cloneOf(h, "b-ro", "bob");
-    h.write(repoConfigPath(B.root), "provider: gh\nworkflow: rv\nrecord:\n  policy: remote\n");
+    h.write(repoConfigPath(B.root), `norn_version: ${runningVersion(h.deps)}\n` + "provider: gh\nworkflow: rv\nrecord:\n  policy: remote\n");
     h.clock.advance(10_000);
     expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
 
@@ -487,7 +487,7 @@ describe("a record lease another checkout broke is one Check item, not a push ev
   test("under remote: B's push is refused as stale once; later ticks do not retry; checkout here re-reads the ref and the next tick pushes on top of it", async () => {
     const s = await handedOverAtReview2(13, "stale-lease");
     const B = cloneOf(h, "b-stale", "bob");
-    h.write(repoConfigPath(B.root), "provider: gh\nworkflow: rv\nrecord:\n  policy: remote\n");
+    h.write(repoConfigPath(B.root), `norn_version: ${runningVersion(h.deps)}\n` + "provider: gh\nworkflow: rv\nrecord:\n  policy: remote\n");
     h.clock.advance(10_000);
     expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
     // another checkout pushes the record ref under B's feet
@@ -524,12 +524,12 @@ describe("a record lease another checkout broke is one Check item, not a push ev
     expect(failures()[s.key]).toBeUndefined();
 
     // back to local: the refusal is forgotten (no item, no hold); remote again: the push is tried once more
-    h.write(repoConfigPath(B.root), "provider: gh\nworkflow: rv\n");
+    h.write(repoConfigPath(B.root), `norn_version: ${runningVersion(h.deps)}\n` + "provider: gh\nworkflow: rv\n");
     h.clock.advance(10_000);
     await B.tick();
     expect(await inbox()).toEqual([]);
     expect(failures()[`record:${s.key}`]).toBeUndefined();
-    h.write(repoConfigPath(B.root), "provider: gh\nworkflow: rv\nrecord:\n  policy: remote\n");
+    h.write(repoConfigPath(B.root), `norn_version: ${runningVersion(h.deps)}\n` + "provider: gh\nworkflow: rv\nrecord:\n  policy: remote\n");
     h.clock.advance(10_000);
     const retried = await B.tick();
     expect(retried.decisions.filter((d) => d.unit === s.key && d.kind === "push_record").map((d) => d.ok)).toEqual([false]);

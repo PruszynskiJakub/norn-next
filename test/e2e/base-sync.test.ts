@@ -98,6 +98,7 @@ describe("base sync with real git", () => {
   beforeAll(async () => {
     h = await createHarness();
     h.config(config());
+    h.recordVersion();
     h.write(join(workflowsDir(h.root), "based.yaml"), BASED);
     installBundledSkills(h.root);
     writeFileSync(join(h.root, "a.txt"), "one\n");
@@ -244,6 +245,7 @@ describe("BS3.3a (dogfood D4): a person's push to the branch of a $done story", 
   beforeAll(async () => {
     h = await createHarness();
     h.config(config());
+    h.recordVersion();
     h.write(join(workflowsDir(h.root), "based.yaml"), BASED);
     installBundledSkills(h.root);
     h.git(["add", "-A"]);
@@ -275,6 +277,7 @@ describe("base_branch: develop (7b)", () => {
   beforeAll(async () => {
     h = await createHarness();
     h.config(config("base_branch: develop\n"));
+    h.recordVersion();
     h.write(join(workflowsDir(h.root), "based.yaml"), BASED);
     installBundledSkills(h.root);
     h.git(["add", "-A"]);
@@ -326,6 +329,7 @@ describe("PR items between syncs and in the read model, ready approval voided by
   beforeAll(async () => {
     h = await createHarness();
     h.config(config());
+    h.recordVersion();
     h.write(join(workflowsDir(h.root), "based.yaml"), BASED);
     installBundledSkills(h.root);
     writeFileSync(join(h.root, "a.txt"), "one\n");
@@ -443,6 +447,7 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
   beforeAll(async () => {
     h = await createHarness();
     h.config(config().replace("runner: { adapter: headless }", "runner: { adapter: herdr }"));
+    h.recordVersion();
     h.write(join(workflowsDir(h.root), "based.yaml"), BASED);
     installBundledSkills(h.root);
     writeFileSync(join(h.root, "a.txt"), "one\n");
@@ -580,6 +585,7 @@ describe("BUG-2: an update conflict that exhausts base_conflict_loop, then run r
   beforeAll(async () => {
     h = await createHarness();
     h.config(config());
+    h.recordVersion();
     h.write(join(workflowsDir(h.root), "based.yaml"), BASED.replace("base_conflict_loop: { max: 2 }", "base_conflict_loop: { max: 1 }"));
     installBundledSkills(h.root);
     writeFileSync(join(h.root, "a.txt"), "one\n");
@@ -668,11 +674,11 @@ counters: { reject_loop: { max: 3 }, stale_loop: { max: 3 } }
 
   beforeAll(async () => {
     h = await createHarness();
-    // norn 0.18.0: the same assets but for its own copy of the norn skill
-    const old = join(h.dir, "assets-0.18.0");
+    // norn 0.30.0: the same assets but for its own copy of the norn skill
+    const old = join(h.dir, "assets-0.30.0");
     cpSync(assetsDir(), old, { recursive: true });
-    writeFileSync(join(old, "skills/norn/SKILL.md"), `${readFileSync(join(old, "skills/norn/SKILL.md"), "utf8")}\nthe 0.18.0 protocol\n`);
-    install("0.18.0", old);
+    writeFileSync(join(old, "skills/norn/SKILL.md"), `${readFileSync(join(old, "skills/norn/SKILL.md"), "utf8")}\nthe 0.30.0 protocol\n`);
+    install("0.30.0", old);
     h.config(config().replace("workflow: based", "workflow: held"));
     h.recordVersion();
     h.write(join(workflowsDir(h.root), "held.yaml"), HELD);
@@ -680,45 +686,45 @@ counters: { reject_loop: { max: 3 }, stale_loop: { max: 3 } }
     installSkills(h.root, join(old, "skills"), names);
     linkSkills(h.root, join(h.root, ".claude", "skills"), names);
     h.git(["add", "-A"]);
-    h.git(["commit", "-q", "-m", "norn init (0.18.0)"]);
+    h.git(["commit", "-q", "-m", "norn init (0.30.0)"]);
     h.git(["push", "-q", "origin", "main"]);
     h.remote.issues = [issue(7, "Add login form")];
   });
   afterAll(() => h.cleanup());
 
   test("its next agent step launches on the worktree's copies (a Check item, nothing under Unblock), on the same pinned workflow", async () => {
-    // the story runs its first agent step on 0.18.0's skills
+    // the story runs its first agent step on 0.30.0's skills
     await until(() => h.state(runs())?.status === "running", "work running");
     expect(h.runner.launches).toHaveLength(1);
-    expect(skill(wt())).toContain("the 0.18.0 protocol");
+    expect(skill(wt())).toContain("the 0.30.0 protocol");
     const pinned = readFileSync(pinnedWorkflowPath(runs()), "utf8");
     h.report(runs(), "done", { outcome: "done", handoff: "built it" });
     await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready");
 
-    // the base moves to 0.19.0 and its skills (`norn upgrade`, committed and merged); the person pulls and installs 0.19.0
+    // the base moves to 0.31.0 and its skills (`norn upgrade`, committed and merged); the person pulls and installs 0.31.0
     const sibling = join(h.dir, "upgrade");
     sh(h.dir, ["clone", "-q", h.remoteDir, sibling]);
     sh(sibling, ["config", "user.email", "s@example.com"]);
     sh(sibling, ["config", "user.name", "Upgrader"]);
-    install("0.19.0");
+    install("0.31.0");
     installSkills(sibling, join(assetsDir(), "skills"), bundledSkills(h.deps.env));
     const team = repoConfigPath(sibling);
-    writeFileSync(team, readFileSync(team, "utf8").replace("norn_version: 0.18.0", "norn_version: 0.19.0"));
+    writeFileSync(team, readFileSync(team, "utf8").replace("norn_version: 0.30.0", "norn_version: 0.31.0"));
     sh(sibling, ["add", "-A"]);
-    sh(sibling, ["commit", "-q", "-m", "norn upgrade (0.19.0)"]);
+    sh(sibling, ["commit", "-q", "-m", "norn upgrade (0.31.0)"]);
     sh(sibling, ["push", "-q", "origin", "main"]);
     h.git(["pull", "-q", "--ff-only"]);
 
-    // the next agent step is not held: it launches in the worktree, still on the 0.18.0 copy
+    // the next agent step is not held: it launches in the worktree, still on the 0.30.0 copy
     expect((await h.norn("story", "reject", "gh-7", "--reason", "one more pass")).exit).toBe(0);
     await until(() => h.state(runs())?.step === "work" && h.state(runs())?.status === "running", "work running again");
     expect(h.runner.launches).toHaveLength(2);
     expect(h.runner.launches[1]?.cwd).toBe(wt());
-    expect(skill(wt())).toContain("the 0.18.0 protocol");
+    expect(skill(wt())).toContain("the 0.30.0 protocol");
     const groups = ((await h.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; title: string; command: string }>> }).groups;
     expect(groups.unblock ?? []).toEqual([]);
     expect(groups.check?.filter((i) => i.story === "gh-7" && i.title.startsWith("skills differ")).map((i) => [i.title, i.command])).toEqual([
-      ["skills differ from norn 0.19.0 (norn): runs use this worktree's copies until the base is merged in, or until this branch's edit to them is reverted", "norn story view gh-7"],
+      ["skills differ from norn 0.31.0 (norn): runs use this worktree's copies until the base is merged in, or until this branch's edit to them is reverted", "norn story view gh-7"],
     ]);
     expect(readFileSync(pinnedWorkflowPath(runs()), "utf8")).toBe(pinned);
   }, 60_000);

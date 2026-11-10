@@ -12,7 +12,7 @@ import { join } from "node:path";
 import type { RunnerPort } from "@norn/core";
 import { mailboxPrefix, type Receipt } from "@norn/schema";
 import { readTrace, rejectedReceiptsPath, repoConfigPath, workflowsDir } from "@norn/store";
-import type { CliDeps, CliResult } from "../../src/index.ts";
+import { type CliDeps, type CliResult, runningVersion } from "../../src/index.ts";
 import { createHarness, FakeRunner, type Harness, hostEnv, issue, runChecked, sh } from "../../../../test/support/harness.ts";
 import { runStateOf } from "../../../../test/support/run-state.ts";
 
@@ -50,7 +50,7 @@ steps:
     outcomes: { done: { to: $done, means: "implemented" } }
 `;
 const CONFIG = "provider: gh\nworkflow: quad\nmode: manual\n";
-const teamConfig = (policy: "local" | "remote") => `provider: gh\nworkflow: quad\nrecord:\n  policy: ${policy}\n`;
+const teamConfig = (policy: "local" | "remote") => `norn_version: ${runningVersion(h.deps)}\nprovider: gh\nworkflow: quad\nrecord:\n  policy: ${policy}\n`;
 
 interface Clone {
   root: string;
