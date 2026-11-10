@@ -28,6 +28,8 @@ When the `ci` check fails, the rework brief shows where the failures are (run/ch
 
 ### Notes
 
+- pr.md (describe #2): no QA ran; evidence is the review's re-run against run 42794918379 plus `ci-check.test.ts`.
+
 - Review #2 (current HEAD): approve, 1 minor note — the green-run tests in `ci-check.test.ts` assert exit 0 but not empty output; optional `expect(r.out).toBe("")`. Code files still match the issue's patch; unit tier 1732 pass, typecheck and ci-check integration 8/8 green.
 - Review #1: approve, no findings. The criteria have no frontmatter verifiers, but the spec prescribes hand verification against a live run and the unit tier cannot run workflow shell, so the rows are proven by the reviewer's re-run rather than marked UNTRACED; a person can overrule that.
 - ci#1 failed on `ci-check.test.ts` (integration shard 4/4): its fake gh still expected the old `--log-failed` calls, and the repo script runs `.agents/scripts/ci-failures.sh` relative to cwd, so the test now copies that script into its fake checkout. The new repo-path output did point straight at the failure (AC1/AC2 shown live).
@@ -36,4 +38,4 @@ When the `ci` check fails, the rework brief shows where the failures are (run/ch
 
 ### Resume
 
-Review #2 approved the current HEAD. Next: norn's describe/open-pr refresh the PR, then `ci` re-runs (PR #324's run 42798730608 was pending at review time); if it fails, read the annotations command it prints.
+describe #2 rewrote pr.md for the current HEAD (adds the ci-check integration test as evidence; shipped path has no live run yet). Next: open-pr refreshes PR #324, then `ci` re-runs; if it fails, read the annotations command it prints.
