@@ -51,4 +51,4 @@ Review #1's blocking finding (a symlinked home broke orphan detection and marker
 
 ## Resume
 
-QA #3 passed at 040bcca5; describe #3 rewrote pr.md from QA #3's evidence (run 01M72FV748N29PT1NVJMXH8818). Next: open-pr and CI on this head; if an integration shard fails, fix it here (one file: `bun test --config=bunfig.integration.toml --timeout=20000 ./<path>`).
+implement #4 made the harness cleanup tolerate the CI-only `rmSync` EFAULT flake. Next: review the test-only diff in `test/support/harness.ts`, then CI. If CI fails, read the failure first: if it is the EFAULT again, the fallback didn't help.

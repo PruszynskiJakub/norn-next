@@ -442,11 +442,28 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
       if (out) harvestGolden(dir, root, out, process.env.NORN_GOLDEN_SOURCE ?? "harness");
       // Every test guards that no command made the old `<repo>-worktrees` folder beside a checkout (this one or a clone)
       const beside = readdirSync(dir).filter((f) => f.endsWith("-worktrees"));
-      rmSync(dir, { recursive: true, force: true });
+      removeTree(dir);
       if (beside.length) throw new Error(`a norn command created a worktrees folder beside the repository: ${beside.join(", ")}`);
     },
   };
   return h;
+}
+
+/**
+ * `rmSync(recursive)` on a CI runner now and then throws EFAULT on a harness dir after `watch` ran in it; the tree is
+ * still removable, so a cleanup that throws there would fail a test whose body passed. Retry, then let `rm -rf` do it.
+ */
+function removeTree(dir: string): void {
+  for (let i = 0; i < 3; i++) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EFAULT") throw e;
+    }
+  }
+  const r = spawnSyncCaptured(["rm", "-rf", dir], { timeoutMs: spawnSyncTimeoutMs() });
+  if (r.exitCode !== 0 || existsSync(dir)) throw new Error(`cleanup could not remove ${dir}: ${r.stderr}`);
 }
 
 /** The three layout parts, each with its old place (spelled out: what a person had) and its new one. */
