@@ -49,4 +49,4 @@ Review #1's blocking finding (a symlinked home broke orphan detection and marker
 
 ## Resume
 
-QA #2 passed on this head. The next step: CI re-runs on this head (integration shards 1/4 and 2/4 are still unproven).
+describe #2 rewrote `pr.md` for head 459926c4 from QA #2's report (16/16 pass, run 01M72F0RJ3JF72NGQF96J2NV7A). Next: norn updates PR #320 and CI runs again; integration shards 1/4 and 2/4 have not passed yet. If CI fails, read the failing shard's log and fix it in this worktree.
