@@ -22,9 +22,11 @@ Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run
 
 ## Not proven yet
 
-- The integration tier as a whole (CI-only per AGENTS.md; no CI run on this branch yet). Its slice-03 flows were observed by hand in QA.
+- The integration tier as a whole: CI run 1 failed one test on shard 3/4 (fixed below) and cancelled shards 1/4 and 2/4, so those two have not reported on this branch yet. Locally only `upgrade.test.ts` (26 pass) and `layout-guard.test.ts` (13 pass) were run.
 
 ## Notes
+
+- ci fix round 1: `upgrade.test.ts` "in a unit worktree: exit 3, do_instead names the main checkout's path (B16)" failed because `h.worktree("gh-4-four")` is now inside the machine dir, and the fixture `toOldLayout` moves the whole machine dir to `.agents/norn/trace`, so the worktree no longer existed there. Fixed in the test: it makes a linked worktree beside the checkout with the unit's marker (as layout-guard's B18 does). I tried keeping `worktrees/` in place in `toOldLayout`, but it makes every old-layout fixture read as `both_layouts`: a non-empty machine dir counts as the new place. Real old-layout repos never have that, so no product change.
 
 - Person decided (refine): no compatibility with `<repo>-worktrees/`; repo moves and doctor's adoption advice out of scope; worktrees in the per-checkout machine dir, not a shared `~/.norn/worktrees/`.
 - Person agreed (plan): seams S1 (cli integration harness) and S2 (decide through Facts), prefactors first, harness check at cleanup (D4), golden corpus rewritten mechanically (D5).
@@ -35,4 +37,4 @@ Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run
 
 ## Resume
 
-The PR body is in `pr.md` in the spec folder (describe#1): one evidence entry per user story, linked to the story QA evidence. Next comes the workflow's PR step or gate. If CI's integration tier fails, start from `packages/cli/test/integration/worktrees-machine-dir.test.ts` and the harness guard.
+Wait for the ci check on the next push; if an integration shard fails, run that file with `bun test --config=bunfig.integration.toml --timeout=20000 <file>`.
