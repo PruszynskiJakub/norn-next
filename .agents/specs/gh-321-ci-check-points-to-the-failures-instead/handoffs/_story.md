@@ -8,7 +8,8 @@ When the `ci` check fails, the rework brief shows where the failures are (run/ch
 - Shipped `packages/cli/assets/workflows/{story,quick}.yaml`: inline listing of failed check runs from `commits/$sha/check-runs`, then the annotations command.
 - The diff of these files matches the issue's drafted patch line for line (review checked it).
 - Review re-ran every command against run 42794918379; output in the review evidence (`ci-failures-run-42794918379.txt`).
-- `bun run test`, `bun run typecheck` green (test#1); `docs:emit` produced no change (re-checked in review).
+- `packages/cli/test/integration/ci-check.test.ts` covers both scripts against a fake gh: repo path prints the run URL, failed job and annotations command with no `--log-failed` call; shipped path prints `gh pr checks`, the failed check-run line and the annotations command, with no `gh run` call. Passes locally under `bunfig.integration.toml` (8/8).
+- `bun run test`, `bun run typecheck` green; `docs:emit` produced no change (re-checked in review).
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -23,13 +24,15 @@ When the `ci` check fails, the rework brief shows where the failures are (run/ch
 
 ### Not proven yet
 
-- The new `ci` check has not run end to end on a red PR; this story's own `ci` step exercises the repo path only if CI fails.
+- The `ci` check after this fix: the integration tier runs in CI only.
 
 ### Notes
 
 - Review: approve, no findings. The criteria have no frontmatter verifiers, but the spec prescribes hand verification against a live run and the unit tier cannot run workflow shell, so the rows are proven by the reviewer's re-run rather than marked UNTRACED; a person can overrule that.
+- ci#1 failed on `ci-check.test.ts` (integration shard 4/4): its fake gh still expected the old `--log-failed` calls, and the repo script runs `.agents/scripts/ci-failures.sh` relative to cwd, so the test now copies that script into its fake checkout. The new repo-path output did point straight at the failure (AC1/AC2 shown live).
+- Run one integration file locally: `bun test --config=bunfig.integration.toml --timeout=20000 ./packages/cli/test/integration/ci-check.test.ts` (a bare `bun test <file>` finds no file).
 - Friction: the worktree had no `node_modules`, so the first `bun run test` failed 75 tests until `bun install`.
 
 ### Resume
 
-describe wrote `pr.md` in the spec folder (summary, by-hand evidence from run 42794918379, two-way door). Next: open-pr, then the `ci` step, both driven by norn.
+implement#2 fixed the ci-check integration test for the new output. Next: norn's open-pr pushes, then `ci` re-runs; if it fails again, read the annotations command it prints.
