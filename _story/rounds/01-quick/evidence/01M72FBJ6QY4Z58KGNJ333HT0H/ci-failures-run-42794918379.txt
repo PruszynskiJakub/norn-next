@@ -1,0 +1,15 @@
+$ sh .agents/scripts/ci-failures.sh 42794918379
+CI run 42794918379 failed: https://github.com/PruszynskiJakub/norn-next/actions/runs/42794918379
+- job 129757664390: integration (shard 3/4)
+Read a job's failures (file, line, message):
+  gh api "repos/{owner}/{repo}/check-runs/<job>/annotations" -q '.[] | select(.annotation_level=="failure" and .path!=".github") | "\(.path):\(.start_line) \(.message)"'
+Only if that is not enough, the job's failed step log: gh run view 42794918379 --log-failed --job <job>
+
+$ annotations for check run 129757664390
+packages/cli/test/integration/upgrade.test.ts:227 Expected: true
+Received: false
+
+      at <anonymous> (/home/runner/work/norn-next/norn-next/packages/cli/test/integration/upgrade.test.ts:227:28)
+
+$ shipped check-runs query for head sha
+- integration (shard 3/4) (id 129757664390): https://github.com/PruszynskiJakub/norn-next/actions/runs/42794918379/job/129757664390
