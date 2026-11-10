@@ -60,8 +60,10 @@ Every user story is covered; none UNTRACED.
 - CI fixes: fixtures record `norn_version` (`runningVersion(h.deps)` / `h.recordVersion()`); guard unchanged. CI tests the PR merged with main, so a new main fixture that skips `norn init` (as `merged-pr.test.ts` did) needs `h.recordVersion()`; check main's new tests after a merge. Reverse case: init records the version and `h.config` keeps it, so a main test committing only `h.recordVersion()` makes an empty commit and fails (fixed in `worktrees-machine-dir.test.ts`).
 - Release notes come from commits 5e8451d29 and b45b051f0 and the PR body. CHANGELOG is the release step's.
 - `bun run golden` (no flag) harvests cases, not a check; replay with `bun test packages/core/test/unit/golden.test.ts`.
+- ci#5 `fail` was not a code failure: its log was empty because every job passed or was cancelled by ci.yml's `cancel-in-progress` when norn pushed its own step commits (`open-pr.done → ci`, `ci.fail → implement`), and `gh run watch --exit-status` exits 1 on a cancelled run. implement#7 changed no code; CI run 42816392208 on e9b623fe passed every job (unit, package, e2e 3/3, integration 4/4).
 - Friction: the agent hook refuses `git worktree add`/`git push` even in a $TMPDIR QA repo.
+- Friction: the ci check watches a run that norn's own next push cancels, so it fails with an empty log; it should wait for the run on the final pushed head or treat `cancelled` as retry.
 
 #### Resume
 
-describe#5 rewrote `pr.md` for HEAD 12a93a6df from QA #6 (evidence links point at qa#6 run `01M72P04QEGAH7M7QADVQJ39WN`; code unchanged since QA). Next: open-pr updates PR #325's body, then CI on the PR merged with main.
+implement#7 found no code to fix (cancelled CI run, see Notes); unit tier 1733 pass and typecheck green; CI green on e9b623fe. Next: review/QA see no change since QA #6, then the ci check again.
