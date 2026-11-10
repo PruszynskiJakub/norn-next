@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_CONFIG } from "@norn/schema";
-import { machineHolder, readEnvNorn, readUnitMarker, scanWorktrees, slotEnv, writeEnvNorn, writeUnitMarker } from "../../src/index.ts";
+import { bindNornHome, machineDir, machineHolder, readEnvNorn, readUnitMarker, scanWorktrees, slotEnv, worktreesDir, writeEnvNorn, writeUnitMarker } from "../../src/index.ts";
 import { tmp } from "../helpers.ts";
 
 describe("worktree files", () => {
@@ -23,7 +23,11 @@ describe("scanWorktrees (A3; refactor 5.2)", () => {
   test("story and slice worktrees by folder shape and marker; anything else is skipped", () => {
     const parent = tmp();
     const root = join(parent, "app");
-    const base = `${root}-worktrees`;
+    mkdirSync(root);
+    bindNornHome(root, join(parent, "home"));
+    // the checkout's machine dir, never a folder beside the repository
+    const base = worktreesDir(root);
+    expect(base).toBe(join(machineDir(root), "worktrees"));
     const mark = (name: string, story: string, slice: string | null) => {
       mkdirSync(join(base, name), { recursive: true });
       writeUnitMarker(join(base, name), { repo: root, story, slice, unit: slice ? "01-form" : "_story", spec_dir: ".agents/specs/gh-7-login" });

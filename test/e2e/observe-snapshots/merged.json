@@ -28,7 +28,7 @@
     "default_branch": "main",
     "remote": "origin",
     "root": "<dir>/repo",
-    "worktrees": "<dir>/repo-worktrees"
+    "worktrees": "<dir>/home/repos/repo-<id>/worktrees"
   },
   "stories": [
     {

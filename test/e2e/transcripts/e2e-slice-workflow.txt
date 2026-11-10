@@ -14,15 +14,15 @@
   spawn repo $ git ls-remote --exit-code --heads origin refs/heads/gh-7-add-login-form
   spawn repo $ git show-ref --verify --quiet refs/heads/gh-7-add-login-form
   spawn repo $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/main
-  spawn repo $ git worktree add -b gh-7-add-login-form <dir>/repo-worktrees/gh-7-add-login-form <sha:1>
+  spawn repo $ git worktree add -b gh-7-add-login-form <dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form <sha:1>
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form $ git add -A
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff
-  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Tick: <ulid:1>"
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached --quiet
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Tick: <ulid:1>"
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse HEAD
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -31,11 +31,11 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/runs/
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:2> "^<sha:1>" --
   spawn repo $ git log "--format=%H%x1f%s%x1f%ct%x1f%(trailers:only,unfold)%x1e" refs/remotes/origin/main..refs/heads/gh-7-add-login-form --
@@ -54,23 +54,23 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/runs/
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form $ git add -A
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff
-  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Step: plan" --trailer "Norn-Tick: <ulid:2>"
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/handoffs/story.md .agents/specs/gh-7-add-login-form/spec.md
-  spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached --quiet
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Step: plan" --trailer "Norn-Tick: <ulid:2>"
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/handoffs/story.md .agents/specs/gh-7-add-login-form/spec.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/state.json
       {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"mini","workflow_hash":"acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd","step":"plan","attempt":1,"visits":{"plan":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:2>","mode":"auto"}
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/workflow.yaml
@@ -82,27 +82,27 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:4> "^<sha:1>" --
   spawn repo $ git rev-list --left-right --count <sha:4>...<sha:1> --
   spawn repo $ git merge-base <sha:4> <sha:1>
-  A.runner.launch title="gh-7 plan" cwd=<dir>/repo-worktrees/gh-7-add-login-form argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Run `norn brief` in this worktree and do the step it gives you."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:3>","NORN_SLOT":"1","NORN_STORY":"gh-7"}
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form $ git add -A -- .agents/specs/gh-7-add-login-form/handoffs/story.md
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/handoffs/story.md
-  spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
+  A.runner.launch title="gh-7 plan" cwd=<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Run `norn brief` in this worktree and do the step it gives you."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:3>","NORN_SLOT":"1","NORN_STORY":"gh-7"}
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A -- .agents/specs/gh-7-add-login-form/handoffs/story.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/handoffs/story.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/receipts/0001-started.json
-      {"kind":"started","receipt_id":"<ulid:4>","run_id":"<ulid:3>","step":"plan","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:5>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-7-add-login-form","machine":"tester@box","heartbeat_id":"<ulid:6>"}
+      {"kind":"started","receipt_id":"<ulid:4>","run_id":"<ulid:3>","step":"plan","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:5>","how":"auto","agent":"claude","worktree":"<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form","machine":"tester@box","heartbeat_id":"<ulid:6>"}
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/receipts/0002-started.json
-      {"kind":"started","receipt_id":"<ulid:7>","run_id":"<ulid:3>","step":"plan","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:5>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-7-add-login-form","machine":"tester@box","heartbeat_id":"<ulid:6>","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"}}
+      {"kind":"started","receipt_id":"<ulid:7>","run_id":"<ulid:3>","step":"plan","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:5>","how":"auto","agent":"claude","worktree":"<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form","machine":"tester@box","heartbeat_id":"<ulid:6>","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"}}
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/state.json
       {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"mini","workflow_hash":"acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd","step":"plan","attempt":1,"visits":{"plan":1},"step_entered_at":"<time>","status":"running","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":2,"run":{"run_id":"<ulid:3>","step":"plan","attempt":1,"started_at":"<time>","how":"auto","agent":"claude","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"},"machine":"tester@box","heartbeat_id":"<ulid:6>"},"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:5>","mode":"auto"}
 > norn tick
@@ -112,11 +112,11 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   A.runner.paneState s-1
@@ -127,24 +127,24 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   A.runner.paneState s-1
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form $ git add -A
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff
-  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --allow-empty --trailer "Norn-Story: gh-7" --trailer "Norn-Step: plan" --trailer "Norn-Outcome: done" --trailer "Norn-Next: slices" --trailer "Norn-Tick: <ulid:8>"
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/slices/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached --quiet
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --allow-empty --trailer "Norn-Story: gh-7" --trailer "Norn-Step: plan" --trailer "Norn-Outcome: done" --trailer "Norn-Next: slices" --trailer "Norn-Tick: <ulid:8>"
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/slices/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/state.json
       {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"mini","workflow_hash":"acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd","step":"slices","attempt":1,"visits":{"plan":1,"slices":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":3,"run":null,"last_outcome":{"step":"plan","outcome":"done","source":"reported","at":"<time>","receipt_id":"<ulid:9>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:8>","mode":"auto"}
 > norn tick
@@ -154,36 +154,36 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:5> "^<sha:1>" --
   spawn repo $ git rev-list --left-right --count <sha:5>...<sha:1> --
   spawn repo $ git merge-base <sha:5> <sha:1>
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form $ git add -A -- .agents/specs/gh-7-add-login-form/slices/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/slices/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-7-add-login-form/slices/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Tick: <ulid:10>" -- .agents/specs/gh-7-add-login-form/slices/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A -- .agents/specs/gh-7-add-login-form/slices/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/slices/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-7-add-login-form/slices/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Tick: <ulid:10>" -- .agents/specs/gh-7-add-login-form/slices/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse HEAD
   spawn repo $ git show-ref --verify --quiet refs/heads/gh-7/01-form
-  spawn repo $ git worktree add -b gh-7/01-form <dir>/repo-worktrees/gh-7-add-login-form--01-form gh-7-add-login-form
+  spawn repo $ git worktree add -b gh-7/01-form <dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form gh-7-add-login-form
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached -U0 --no-color --no-ext-diff
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Tick: <ulid:10>"
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7/01-form -- .agents/specs/gh-7-add-login-form/handoffs/01-form.md .agents/specs/gh-7-add-login-form/slices/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git add -A
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --cached -U0 --no-color --no-ext-diff
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Tick: <ulid:10>"
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7/01-form -- .agents/specs/gh-7-add-login-form/handoffs/01-form.md .agents/specs/gh-7-add-login-form/slices/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
   + home/repos/repo-<id>/runs/gh-7/01-form/state.json
       {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"test_loop":0},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:10>"}
   + home/repos/repo-<id>/runs/gh-7/01-form/workflow.yaml
@@ -195,33 +195,33 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:6> "^<sha:1>" --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:7> "^<sha:1>" --
   spawn repo $ git rev-list --left-right --count <sha:6>...<sha:1> --
   spawn repo $ git merge-base <sha:6> <sha:1>
-  A.runner.launch title="gh-7/01 implement" cwd=<dir>/repo-worktrees/gh-7-add-login-form--01-form argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Run `norn brief` in this worktree and do the step it gives you."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:11>","NORN_SLICE":"gh-7/01","NORN_SLOT":"2","NORN_STORY":"gh-7"}
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A -- .agents/specs/gh-7-add-login-form/handoffs/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/handoffs/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
+  A.runner.launch title="gh-7/01 implement" cwd=<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Run `norn brief` in this worktree and do the step it gives you."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:11>","NORN_SLICE":"gh-7/01","NORN_SLOT":"2","NORN_STORY":"gh-7"}
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git add -A -- .agents/specs/gh-7-add-login-form/handoffs/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/handoffs/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
   + home/repos/repo-<id>/runs/gh-7/01-form/receipts/0001-started.json
-      {"kind":"started","receipt_id":"<ulid:12>","run_id":"<ulid:11>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:13>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-7-add-login-form--01-form","machine":"tester@box","heartbeat_id":"<ulid:6>"}
+      {"kind":"started","receipt_id":"<ulid:12>","run_id":"<ulid:11>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:13>","how":"auto","agent":"claude","worktree":"<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form","machine":"tester@box","heartbeat_id":"<ulid:6>"}
   + home/repos/repo-<id>/runs/gh-7/01-form/receipts/0002-started.json
-      {"kind":"started","receipt_id":"<ulid:14>","run_id":"<ulid:11>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:13>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-7-add-login-form--01-form","machine":"tester@box","heartbeat_id":"<ulid:6>","session":{"runner":"fake","session_id":"s-2","pane_id":"p-2","reach":"fake attach p-2"}}
+      {"kind":"started","receipt_id":"<ulid:14>","run_id":"<ulid:11>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:13>","how":"auto","agent":"claude","worktree":"<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form","machine":"tester@box","heartbeat_id":"<ulid:6>","session":{"runner":"fake","session_id":"s-2","pane_id":"p-2","reach":"fake attach p-2"}}
   ~ home/repos/repo-<id>/runs/gh-7/01-form/state.json
       {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"running","park":null,"counters":{"test_loop":0},"nudges_used":0,"retries_used":0,"applied_through":2,"run":{"run_id":"<ulid:11>","step":"implement","attempt":1,"started_at":"<time>","how":"auto","agent":"claude","session":{"runner":"fake","session_id":"s-2","pane_id":"p-2","reach":"fake attach p-2"},"machine":"tester@box","heartbeat_id":"<ulid:6>"},"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:13>"}
 > norn tick
@@ -231,29 +231,29 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
   A.runner.paneState s-2
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached -U0 --no-color --no-ext-diff
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Outcome: done" --trailer "Norn-Next: test" --trailer "Norn-Tick: <ulid:15>"
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7/01-form -- form.txt
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git add -A
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --cached -U0 --no-color --no-ext-diff
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Outcome: done" --trailer "Norn-Next: test" --trailer "Norn-Tick: <ulid:15>"
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7/01-form -- form.txt
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
   ~ home/repos/repo-<id>/runs/gh-7/01-form/state.json
       {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"test","attempt":1,"visits":{"implement":1,"test":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"test_loop":0},"nudges_used":0,"retries_used":0,"applied_through":3,"run":null,"last_outcome":{"step":"implement","outcome":"done","source":"reported","at":"<time>","receipt_id":"<ulid:16>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:15>"}
 > norn tick
@@ -263,20 +263,20 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:8> "^<sha:1>" --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ norn check-run <ulid:17>
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ norn check-run <ulid:17>
   + home/repos/repo-<id>/runs/gh-7/01-form/logs/<ulid:17>.log
       text 1 lines, normalised sha256 e3b0c44298fc
   + home/repos/repo-<id>/runs/gh-7/01-form/receipts/0004-check.json
@@ -288,24 +288,24 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git add -A
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
   ~ home/repos/repo-<id>/runs/gh-7/01-form/state.json
       {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"implement","attempt":2,"visits":{"implement":2,"test":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"test_loop":1},"nudges_used":0,"retries_used":0,"applied_through":4,"run":null,"last_outcome":{"step":"test","outcome":"fail","source":"classified","at":"<time>","receipt_id":"<ulid:18>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:20>"}
 > norn tick
@@ -315,29 +315,29 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  A.runner.launch title="gh-7/01 implement" cwd=<dir>/repo-worktrees/gh-7-add-login-form--01-form argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Run `norn brief` in this worktree and do the step it gives you."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:21>","NORN_SLICE":"gh-7/01","NORN_SLOT":"2","NORN_STORY":"gh-7"}
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A -- .agents/specs/gh-7-add-login-form/handoffs/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/handoffs/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  A.runner.launch title="gh-7/01 implement" cwd=<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form argv=["<dir>/home/launch/<hash:1>.sh","claude","--permission-mode","auto","--","Run `norn brief` in this worktree and do the step it gives you."] env={"NORN_BIN":"<dir>/home/bin/norn","NORN_HOME":"<dir>/repo","NORN_RUN":"<ulid:21>","NORN_SLICE":"gh-7/01","NORN_SLOT":"2","NORN_STORY":"gh-7"}
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git add -A -- .agents/specs/gh-7-add-login-form/handoffs/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/handoffs/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
   + home/repos/repo-<id>/runs/gh-7/01-form/receipts/0005-started.json
-      {"kind":"started","receipt_id":"<ulid:22>","run_id":"<ulid:21>","step":"implement","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:23>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-7-add-login-form--01-form","machine":"tester@box","heartbeat_id":"<ulid:6>"}
+      {"kind":"started","receipt_id":"<ulid:22>","run_id":"<ulid:21>","step":"implement","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:23>","how":"auto","agent":"claude","worktree":"<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form","machine":"tester@box","heartbeat_id":"<ulid:6>"}
   + home/repos/repo-<id>/runs/gh-7/01-form/receipts/0006-started.json
-      {"kind":"started","receipt_id":"<ulid:24>","run_id":"<ulid:21>","step":"implement","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:23>","how":"auto","agent":"claude","worktree":"<dir>/repo-worktrees/gh-7-add-login-form--01-form","machine":"tester@box","heartbeat_id":"<ulid:6>","session":{"runner":"fake","session_id":"s-3","pane_id":"p-3","reach":"fake attach p-3"}}
+      {"kind":"started","receipt_id":"<ulid:24>","run_id":"<ulid:21>","step":"implement","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:23>","how":"auto","agent":"claude","worktree":"<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form","machine":"tester@box","heartbeat_id":"<ulid:6>","session":{"runner":"fake","session_id":"s-3","pane_id":"p-3","reach":"fake attach p-3"}}
   ~ home/repos/repo-<id>/runs/gh-7/01-form/state.json
       {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"implement","attempt":2,"visits":{"implement":2,"test":1},"step_entered_at":"<time>","status":"running","park":null,"counters":{"test_loop":1},"nudges_used":0,"retries_used":0,"applied_through":6,"run":{"run_id":"<ulid:21>","step":"implement","attempt":2,"started_at":"<time>","how":"auto","agent":"claude","session":{"runner":"fake","session_id":"s-3","pane_id":"p-3","reach":"fake attach p-3"},"machine":"tester@box","heartbeat_id":"<ulid:6>"},"last_outcome":{"step":"test","outcome":"fail","source":"classified","at":"<time>","receipt_id":"<ulid:18>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:23>"}
 > norn tick
@@ -347,29 +347,29 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
   A.runner.paneState s-3
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached -U0 --no-color --no-ext-diff
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Outcome: done" --trailer "Norn-Next: test" --trailer "Norn-Tick: <ulid:25>"
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7/01-form -- pass.flag
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git add -A
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --cached -U0 --no-color --no-ext-diff
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: implement" --trailer "Norn-Outcome: done" --trailer "Norn-Next: test" --trailer "Norn-Tick: <ulid:25>"
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7/01-form -- pass.flag
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
   ~ home/repos/repo-<id>/runs/gh-7/01-form/state.json
       {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"test","attempt":2,"visits":{"implement":2,"test":2},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"test_loop":1},"nudges_used":0,"retries_used":0,"applied_through":7,"run":null,"last_outcome":{"step":"implement","outcome":"done","source":"reported","at":"<time>","receipt_id":"<ulid:26>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:25>"}
 > norn tick
@@ -379,20 +379,20 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:9> "^<sha:1>" --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ norn check-run <ulid:27>
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ norn check-run <ulid:27>
   + home/repos/repo-<id>/runs/gh-7/01-form/receipts/0008-check.json
       {"kind":"check","receipt_id":"<ulid:28>","run_id":"<ulid:27>","step":"test","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:29>","outcome":"pass","command":"test -f pass.flag && echo checked","exit_code":0,"duration_ms":<ms>,"output_tail":"checked"}
 > norn tick
@@ -402,24 +402,24 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git add -A
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
   A.notifier.notify approve:gh-7/01:human-qa#1
   ~ home/repos/repo-<id>/runs/gh-7/01-form/state.json
       {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"human-qa","attempt":1,"visits":{"implement":2,"test":2,"human-qa":1},"step_entered_at":"<time>","status":"parked","park":{"kind":"gate","reason":"Try it","since":"<time>"},"counters":{"test_loop":1},"nudges_used":0,"retries_used":0,"applied_through":8,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:28>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:30>"}
@@ -430,18 +430,18 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -449,24 +449,24 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git add -A
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
   ~ home/repos/repo-<id>/runs/gh-7/01-form/state.json
       {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"integrate","attempt":1,"visits":{"implement":2,"test":2,"human-qa":1,"integrate":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"test_loop":1},"nudges_used":0,"retries_used":0,"applied_through":9,"run":null,"last_outcome":{"step":"human-qa","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:31>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:32>"}
 > norn tick
@@ -476,27 +476,27 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-list --left-right --count HEAD...gh-7-add-login-form --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git merge-base HEAD gh-7-add-login-form
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-list --merges --ancestry-path --reverse <sha:6>..HEAD --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rebase gh-7-add-login-form
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git worktree list --porcelain -z
-  spawn repo-worktrees/gh-7-add-login-form $ git merge --ff-only --no-edit <sha:9>
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-list --left-right --count HEAD...gh-7-add-login-form --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git merge-base HEAD gh-7-add-login-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-list --merges --ancestry-path --reverse <sha:6>..HEAD --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rebase gh-7-add-login-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git worktree list --porcelain -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git merge --ff-only --no-edit <sha:9>
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   + home/repos/repo-<id>/runs/gh-7/01-form/receipts/0010-classify.json
       {"kind":"classify","receipt_id":"<ulid:33>","run_id":"<ulid:34>","step":"integrate","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:35>","outcome":"done","rule":"git.integrate","detail":"gh-7/01-form integrated into gh-7-add-login-form at <short:1>","route":"$done"}
 > norn tick
@@ -506,27 +506,27 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:9> "^<sha:1>" --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git rev-list --left-right --count <sha:9>...<sha:1> --
   spawn repo $ git merge-base <sha:9> <sha:1>
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git add -A
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git add -A
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --cached --quiet
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7/01-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git push --porcelain origin +refs/heads/gh-7/01-form:refs/heads/gh-7/01-form
   ~ home/repos/repo-<id>/runs/gh-7/01-form/state.json
       {"version":1,"story":"gh-7","slice":"gh-7/01","unit_dir":"01-form","workflow":"slice","workflow_hash":"47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a","step":"$done","attempt":1,"visits":{"implement":2,"test":2,"human-qa":1,"integrate":1},"step_entered_at":"<time>","status":"done","park":null,"counters":{"test_loop":1},"nudges_used":0,"retries_used":0,"applied_through":10,"run":null,"last_outcome":{"step":"integrate","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:33>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:36>"}
 > norn tick
@@ -536,44 +536,44 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git merge-base --is-ancestor <sha:9> refs/heads/gh-7-add-login-form
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form $ git add -A
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet
-  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --allow-empty --trailer "Norn-Story: gh-7" --trailer "Norn-Step: slices" --trailer "Norn-Outcome: done" --trailer "Norn-Next: open-pr" --trailer "Norn-Tick: <ulid:37>"
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-list --left-right --count HEAD...gh-7-add-login-form --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git merge-base HEAD gh-7-add-login-form
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-list --merges --ancestry-path --reverse <sha:9>..HEAD --
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rebase gh-7-add-login-form
-  spawn repo-worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git merge --ff-only --no-edit <sha:10>
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form $ git add -A -- .agents/specs/gh-7-add-login-form/slices/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/slices/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-7-add-login-form/slices/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: $done" --trailer "Norn-Tick: <ulid:37>" -- .agents/specs/gh-7-add-login-form/slices/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/slices/01-form.md
-  spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
-  spawn repo $ git worktree remove <dir>/repo-worktrees/gh-7-add-login-form--01-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached --quiet
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --allow-empty --trailer "Norn-Story: gh-7" --trailer "Norn-Step: slices" --trailer "Norn-Outcome: done" --trailer "Norn-Next: open-pr" --trailer "Norn-Tick: <ulid:37>"
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-list --left-right --count HEAD...gh-7-add-login-form --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git merge-base HEAD gh-7-add-login-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-list --merges --ancestry-path --reverse <sha:9>..HEAD --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rebase gh-7-add-login-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form $ git rev-parse HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git merge --ff-only --no-edit <sha:10>
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A -- .agents/specs/gh-7-add-login-form/slices/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached --quiet -- .agents/specs/gh-7-add-login-form/slices/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached -U0 --no-color --no-ext-diff -- .agents/specs/gh-7-add-login-form/slices/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --trailer "Norn-Story: gh-7" --trailer "Norn-Slice: gh-7/01" --trailer "Norn-Step: $done" --trailer "Norn-Tick: <ulid:37>" -- .agents/specs/gh-7-add-login-form/slices/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-7-add-login-form -- .agents/specs/gh-7-add-login-form/slices/01-form.md
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
+  spawn repo $ git worktree remove <dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form--01-form
   spawn repo $ git show-ref --verify --quiet refs/heads/gh-7/01-form
   spawn repo $ git branch -D gh-7/01-form
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/receipts/0004-classify.json
@@ -587,18 +587,18 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:11> "^<sha:1>" --
   spawn repo $ git rev-list --left-right --count <sha:11>...<sha:1> --
   spawn repo $ git merge-base <sha:11> <sha:1>
-  spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   spawn repo $ git rev-parse --verify --quiet refs/norn/runs/gh-7
   spawn repo $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn repo $ git hash-object -w --no-filters --stdin-paths
@@ -618,24 +618,24 @@
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main:.agents/specs
   spawn repo $ git for-each-ref "--format=%(refname) %(objectname)" refs/heads/ refs/remotes/
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
-  spawn repo-worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
-  spawn repo-worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log -1 "--format=%ct" HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git hash-object -w --stdin
   spawn repo $ git push --porcelain --force-with-lease=refs/norn/claims/gh-7:<sha:3> origin <sha:14>:refs/norn/claims/gh-7
   spawn repo $ git update-ref refs/norn/claims/gh-7 <sha:14>
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
-  spawn repo-worktrees/gh-7-add-login-form $ git add -A
-  spawn repo-worktrees/gh-7-add-login-form $ git diff --cached --quiet
-  spawn repo-worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --allow-empty --trailer "Norn-Story: gh-7" --trailer "Norn-Step: open-pr" --trailer "Norn-Outcome: done" --trailer "Norn-Next: $done" --trailer "Norn-Tick: <ulid:42>"
-  spawn repo-worktrees/gh-7-add-login-form $ git rev-parse HEAD
-  spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
-  spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --cached --quiet
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --allow-empty --trailer "Norn-Story: gh-7" --trailer "Norn-Step: open-pr" --trailer "Norn-Outcome: done" --trailer "Norn-Next: $done" --trailer "Norn-Tick: <ulid:42>"
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   A.notifier.notify merge:gh-7:100
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/state.json
       {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"mini","workflow_hash":"acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd","step":"$done","attempt":1,"visits":{"plan":1,"slices":1,"open-pr":1},"step_entered_at":"<time>","status":"done","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":5,"run":null,"last_outcome":{"step":"open-pr","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:39>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:42>","mode":"auto"}

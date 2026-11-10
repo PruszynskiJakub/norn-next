@@ -127,7 +127,7 @@ const machineHomeOf = (root: string) => homes.get(checkoutOf(root).common) ?? no
 export const machineDir = (root: string) => join(machineReposDir(machineHomeOf(root)), checkoutOf(root).id);
 export const machineReposDir = (home: string) => join(home, "repos");
 /** The folder every unit worktree of the checkout at `root` sits in: the one place that names it. */
-export const worktreesDir = (root: string) => `${root.replace(/\/+$/, "")}-worktrees`;
+export const worktreesDir = (root: string) => join(machineDir(root), "worktrees");
 /** Names the checkout a machine dir belongs to, so doctor can tell an orphan after a repo folder moved. */
 export const checkoutFilePath = (dir: string) => join(dir, "checkout.json");
 /** The headless runner's default session log dir, the machine dir's `sessions/` (`runs/` holds run state). */

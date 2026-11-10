@@ -440,7 +440,10 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
       // Phase 0.1: `scripts/golden.ts` sets NORN_GOLDEN_OUT to collect this repo's ticks as golden decide cases
       const out = process.env.NORN_GOLDEN_OUT;
       if (out) harvestGolden(dir, root, out, process.env.NORN_GOLDEN_SOURCE ?? "harness");
+      // Every test guards that no command made the old `<repo>-worktrees` folder beside a checkout (this one or a clone)
+      const beside = readdirSync(dir).filter((f) => f.endsWith("-worktrees"));
       rmSync(dir, { recursive: true, force: true });
+      if (beside.length) throw new Error(`a norn command created a worktrees folder beside the repository: ${beside.join(", ")}`);
     },
   };
   return h;
