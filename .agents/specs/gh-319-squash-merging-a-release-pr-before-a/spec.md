@@ -9,7 +9,7 @@ assignee: PruszynskiJakub
 labels:
   - norn
   - norn:wf:reproduce
-workflow: reproduce
+workflow: quick
 status: active
 intake_at: 2026-11-10T09:46:52.315Z
 body_hash: e89b8838ac98cf459effa91fce6d7028a31d74a63fa59c235f09378257036f2e
