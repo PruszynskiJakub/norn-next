@@ -50,4 +50,4 @@ Review #1's blocking finding (a symlinked home broke orphan detection and marker
 
 ## Resume
 
-QA #3 passed at 040bcca5. Next: describe and CI on this head; if an integration shard fails, fix it here (one file: `bun test --config=bunfig.integration.toml --timeout=20000 ./<path>`).
+QA #3 passed at 040bcca5; describe #3 rewrote pr.md from QA #3's evidence (run 01M72FV748N29PT1NVJMXH8818). Next: open-pr and CI on this head; if an integration shard fails, fix it here (one file: `bun test --config=bunfig.integration.toml --timeout=20000 ./<path>`).
