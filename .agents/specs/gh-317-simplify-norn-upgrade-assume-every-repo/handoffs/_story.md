@@ -62,4 +62,4 @@ Every user story is covered by the criteria above; none is UNTRACED.
 
 #### Resume
 
-QA #2 reported `partial`: everything passes except the golden/transcript criterion (06.AC4). A person rules whether the one removed line in `test/e2e/transcripts/recovery-claim-lost.txt` (`git cat-file -e …/runs`, the read of branch-tree runs/) is intended, and looks at the minor notes.
+pr.md in the spec folder describes the branch at describe#1: summary, one evidence entry per user story (QA #2 evidence), merge danger (one-way for repos without or below 0.30 norn_version; scripts using `norn migrate` or the dropped `upgrade --json` fields break). Next: the PR step opens/updates the PR from pr.md.
