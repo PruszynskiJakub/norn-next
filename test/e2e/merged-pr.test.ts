@@ -42,6 +42,7 @@ const rules = (r: TickReport) => r.decisions.map((d) => `${d.unit} ${d.rule}`);
 async function parkedAtReady(): Promise<{ h: Harness; runs: () => string }> {
   const h = await createHarness();
   h.config("provider: gh\nworkflow: rel\nmode: auto\n");
+  h.recordVersion();
   h.write(join(workflowsDir(h.root), "rel.yaml"), REL);
   installBundledSkills(h.root);
   writeFileSync(join(h.root, "a.txt"), "one\n");

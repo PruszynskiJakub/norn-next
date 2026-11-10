@@ -58,9 +58,10 @@ Every user story is covered; none UNTRACED.
 - Person decisions: init refuses pre-0.30 too; config old-key messages drop the `norn upgrade` hint; codes `version_missing`/`version_too_old`; status version item is Unblock → `norn doctor`. Flat records and old `state.json` readers stay.
 - QA note (03.AC2, seen again at QA #3): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
 - CI fix: fixtures now record `norn_version` (`runningVersion(h.deps)` / `h.recordVersion()`); guard unchanged.
+- CI fix #2 (ci#2 fail): CI tests the PR merged with main, and main's new `test/e2e/merged-pr.test.ts` built a repo with no `norn_version`, so the guard refused its ticks (version_missing). Merged origin/main into the branch (clean) and added `h.recordVersion()` to that test's `parkedAtReady`. Any new e2e fixture from main that skips `norn init` needs the same; check `git diff --name-only HEAD^1 HEAD -- test` after a merge.
 - Release notes come from commits 5e8451d29 and b45b051f0 and the PR body. CHANGELOG is the release step's.
 - Friction: the agent hook refuses `git worktree add` and `git push` even in a throwaway QA repo under $TMPDIR; QA used the worktree norn made and let norn push.
 
 #### Resume
 
-open-pr: norn updates PR #325 with pr.md (describe#2, rewritten at HEAD 6a3c4e7b7 from QA #3's evidence run 01M72J9JB8SE7CYECSGAT5YCGK); then CI must go green. The golden/transcript criterion was ruled acceptable at human-qa#2.
+ci: the branch now includes main (8b6e268c1) and the merged-pr fixture fix; `merged-pr`, `base-sync` and `e2e-slice-workflow` e2e pass locally, unit tier and typecheck green. Wait for CI on PR #325; the golden/transcript criterion was ruled acceptable at human-qa#2.
