@@ -40,4 +40,4 @@ Review #2 traceability (re-checked on the current HEAD; the spec has no numbered
 
 ## Resume
 
-Review #2 approved. Next: the workflow's next step after review (describe / CI on the pushed branch). `pr.md` still holds.
+Describe #2 rewrote `pr.md` for the current HEAD (adds the CI fix: the open-pr PR lookup now runs before the push, and the transcripts were rewritten to match). Next: open-pr updates PR #322's body, then CI runs again.

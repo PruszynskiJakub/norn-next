@@ -16,7 +16,7 @@ A story whose own PR was squash-merged while it waited at a gate no longer reads
 
 ## Evidence
 
-No QA ran; the entries are tests (`bun run test` 1734 pass, typecheck green, `test/e2e/merged-pr.test.ts` passes locally).
+No QA ran; the entries are tests (`bun run test` 1734 pass, typecheck green; `merged-pr`, `slice-workflow`, `base-sync` and `recovery` e2e files pass locally).
 
 - **No stale when the story's own PR merged**
   **Before:** a non-sync tick after the squash classified the gate `gate.stale`, then `git.update`.
@@ -36,4 +36,4 @@ Not covered: the gh adapter's `prsQuery` returns only the newest PR for a branch
 
 **Door:** two-way: decide and act logic only, no persisted format or schema change.
 
-**Blast radius:** stories at stale gates: a story with a PR now waits up to one `sync_interval` before going back through update, and `open-pr` makes one more PR lookup before pushing. Stories without a PR, and host-less setups, behave as before.
+**Blast radius:** stories at stale gates: a story with a PR now waits up to one `sync_interval` before going back through update, and `open-pr` now looks the PR up before pushing rather than after (the pinned `base-sync` and `e2e-slice-workflow` transcripts move that one line, nothing else). Stories without a PR, and host-less setups, behave as before.
