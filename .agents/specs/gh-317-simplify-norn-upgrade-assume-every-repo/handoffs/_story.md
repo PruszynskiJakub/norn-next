@@ -58,9 +58,10 @@ Every user story is covered; none UNTRACED.
 - Person decisions: init refuses pre-0.30 too; config old-key messages drop the `norn upgrade` hint; codes `version_missing`/`version_too_old`; status version item is Unblock → `norn doctor`. Flat records and old `state.json` readers stay.
 - QA note (03.AC2, seen again at QA #4): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
 - CI fixes: fixtures record `norn_version` (`runningVersion(h.deps)` / `h.recordVersion()`); guard unchanged. CI tests the PR merged with main, so a new main fixture that skips `norn init` (as `merged-pr.test.ts` did) needs `h.recordVersion()`; check `git diff --name-only HEAD^1 HEAD -- test` after merging main.
+- CI #3 failed because no ci.yml ran: the PR conflicted with main (gh-318 moved unit worktrees into the machine dir), and GitHub does not start pull_request workflows on a conflicting PR. implement#5 merged main (d6e49dc7f): layout-guard and run-state-move tests stay deleted along with main's re-harvested run-state-move golden cases; upgrade.test.ts keeps this branch's rewrite; takeover-record and version-guard keep the version fixture plus main's `worktreeOf`/`worktreesOf`; this branch's tests use `h.worktree(...)`/`worktreesOf` instead of `<repo>-worktrees`. Unit 1733 pass, typecheck green; integration/e2e not run locally (CI's). If CI says `no ci.yml run`, check `gh pr view --json mergeable` first.
 - Release notes come from commits 5e8451d29 and b45b051f0 and the PR body. CHANGELOG is the release step's.
 - Friction: the agent hook refuses `git worktree add`/`git push` even in a throwaway $TMPDIR QA repo.
 
 #### Resume
 
-open-pr: update PR #325 with pr.md (rewritten at describe#3 from QA #4 evidence, run 01M72KMKJMDFAQSNA4E385AB71; golden/transcript criterion ruled at human-qa#3), then watch CI.
+review: check merge d6e49dc7f (main's machine-dir worktrees taken in; only test files and golden cases changed, guard unchanged), then QA, then CI on PR #325.
