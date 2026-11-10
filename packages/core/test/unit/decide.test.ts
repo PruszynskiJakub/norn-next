@@ -3,6 +3,7 @@ import { type AgentStep, type HookEventKind, type LeaseFile, roundRecordPath, ty
 import { type Action, legacyAction } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { decide, isSideAction, unitDecision } from "../../src/decide/index.ts";
+import { startAgentCommand } from "../../src/commands.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
 import { isCodePath, isIntakeCommit, isStepBoundary, nornTrailers, roundFinished } from "../../src/policy.ts";
 import type { RunFacts, StoryFacts, UnitFacts } from "../../src/facts.ts";
@@ -385,6 +386,27 @@ describe("check, git, gate steps", () => {
       { nn: "02", state: { step: "integrate", visits: { integrate: 1 } } },
     ]);
     expect(kinds(facts([f]))).toEqual(["gh-1 noop slices.wait", "gh-1/01 run_git git.integrate", "gh-1/02 noop git.integrate.queued"]);
+  });
+});
+
+describe("worktree paths come from the worktrees folder observe reports", () => {
+  const WTS = "/home/.norn/repos/r-ab12cd34/worktrees";
+  const elsewhere = { repo: { root: "/r", default_branch: "main", remote: "origin", worktrees: WTS } };
+  test("intake puts the story worktree, and its commit, under the reported folder", () => {
+    const f = facts([], elsewhere);
+    f.remote.issues = [{ provider: "gh", number: 5, url: "u5", title: "Fix", body: "b", state: "open", assignees: ["jakub"], labels: ["norn"], updated_at: at() }];
+    const a = decide(f, WORKFLOWS, CONFIG).find((d) => d.action.kind === "intake_story")?.action;
+    expect(a).toMatchObject({ worktree: { path: `${WTS}/gh-5-fix` }, commit: { cwd: `${WTS}/gh-5-fix` } });
+    expect(JSON.stringify(a)).not.toContain("/r-worktrees");
+  });
+  test("a slice start puts the slice worktree, its commit and its start command under the reported folder", () => {
+    // no story worktree on disk: its path comes from the folder too
+    const a = only(facts([storyAt("slices", { worktree: null }, [{ nn: "01" }])], elsewhere));
+    if (a.kind !== "start_slices") throw new Error(a.kind);
+    const path = `${WTS}/gh-1-login--01-s01`;
+    expect(a.starts[0]).toMatchObject({ worktree: { path }, commit: { cwd: path } });
+    expect(startAgentCommand(a.starts[0]?.worktree?.path ?? null, "claude")).toStartWith(`cd ${path} && `);
+    expect(JSON.stringify(a)).not.toContain("/r-worktrees");
   });
 });
 

@@ -79,7 +79,7 @@ function intake(ctx: Ctx): void {
     if (known.has(key) || issue.state !== "open") continue;
     const slug = slugify(issue.title);
     const branch = storyBranch(key, slug);
-    const path = storyWorktreePath(facts.repo.root, key, slug);
+    const path = storyWorktreePath(facts.repo.worktrees, key, slug);
     const labelled = issue.labels.find((l) => l.startsWith(WF_LABEL))?.slice(WF_LABEL.length);
     const workflow = labelled && ctx.workflows[labelled] ? labelled : config.workflow;
     const frontmatter: StoryFrontmatter = {

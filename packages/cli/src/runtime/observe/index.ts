@@ -56,6 +56,7 @@ import {
   writeIssueFacts,
   writePrFacts,
   writeRemoteCache,
+  worktreesDir,
 } from "@norn/store";
 import type { Context } from "../../context.ts";
 import { leaseLiveness } from "../leases.ts";
@@ -172,7 +173,7 @@ function classifyWorktrees(root: string, wtList: ReadonlyArray<{ path: string; b
     const inferred = marker ? null : inferUnitMarker(root, w.path, w.branch);
     if (inferred) unmarked.push({ path: w.path, marker: (marker = inferred) });
     if (!marker) {
-      if (w.path.startsWith(`${root}-worktrees/`)) orphanWts.push(w.path);
+      if (w.path.startsWith(`${worktreesDir(root)}/`)) orphanWts.push(w.path);
       continue;
     }
     if (marker.slice === null) storyWts.set(marker.story, w.path);
@@ -506,7 +507,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const facts: Facts = {
     tick_id: opts.tick_id,
     now,
-    repo: { root, default_branch: base, remote: remoteName },
+    repo: { root, default_branch: base, remote: remoteName, worktrees: worktreesDir(root) },
     machine: {
       holder,
       heartbeat_id: hb,

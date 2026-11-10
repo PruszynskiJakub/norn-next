@@ -241,7 +241,7 @@ export function slicesStep(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitS
     const loaded = usableWorkflow(ctx, name, "slice");
     if ("problem" in loaded) return park(ctx, story, uf, st, "workflow", `slice ${s.key}: ${loaded.problem}`, "slices.workflow_invalid");
     const sliceRef: UnitRef = { story: story.key, slice: s.key, dir: sliceDirName(s.nn, s.slug), key: s.key };
-    const storyWt = story.worktree?.path ?? storyWorktreePath(ctx.facts.repo.root, story.key, story.slug);
+    const storyWt = story.worktree?.path ?? storyWorktreePath(ctx.facts.repo.worktrees, story.key, story.slug);
     const path = sliceWorktreePath(storyWt, s.nn, s.slug);
     const branch = sliceBranch(story.key, s.nn, s.slug);
     const slot = ctx.slot();

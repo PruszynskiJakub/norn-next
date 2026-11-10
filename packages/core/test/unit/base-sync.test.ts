@@ -73,7 +73,7 @@ class Sim {
       ? { state: "mine", sha: "c", blob: { version: 1, story: "gh-1", holder: "jakub@mac", heartbeat_id: HB, acquired_at: at(this.now), renewed_at: at(this.now), expires_at: at(this.now + 600_000), last_tick_id: null } }
       : { state: "none" };
     const sf = storyFacts("gh-1", [uf], { frontmatter: fm, claim, pr: this.pr, ...(this.base ? { base: this.base } : {}) });
-    return facts([sf], { tick_id: tick, repo: { root: "/r", default_branch: "main", remote: "origin", ...this.repoPatch } }, this.now);
+    return facts([sf], { tick_id: tick, repo: { root: "/r", default_branch: "main", remote: "origin", worktrees: "/r-worktrees", ...this.repoPatch } }, this.now);
   }
   /** one tick: decide (twice: pure), perform the unit's action like act, return it */
   tick(): Decision {
