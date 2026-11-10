@@ -1,5 +1,5 @@
 /**
- * Each unit's handoff is `<spec folder>/handoffs/_story.md` or
+ * Each unit's handoff is `<spec folder>/handoffs/story.md` or
  * `handoffs/<nn>-<slug>.md`, on that unit's branch, holding only what agents and people write; the
  * status it used to carry is printed by `norn brief` and `norn story checkout`.
  */
@@ -89,7 +89,7 @@ beforeAll(async () => {
 });
 afterAll(() => h.cleanup());
 
-describe("the story's handoff is handoffs/_story.md, prose only (B39)", () => {
+describe("the story's handoff is handoffs/story.md, prose only (B39)", () => {
   const SPEC = ".agents/specs/gh-9-prose-only";
   const wt = () => `${h.root}-worktrees/gh-9-prose-only`;
   const runs = () => runStateOf(join(wt(), SPEC));
@@ -97,7 +97,7 @@ describe("the story's handoff is handoffs/_story.md, prose only (B39)", () => {
   const HANDOFF = `${SPEC}/${unitHandoffPath(STORY_UNIT_DIR)}`;
   const PROSE = "## Goal\n\nShip the prose-only handoff.\n\n## Progress\n\n- started\n\n## Resume\n\nRun the review.\n";
 
-  test("AC1, AC2: the first session commits the skeleton at handoffs/_story.md on the story branch; no generated block, no runs/", async () => {
+  test("AC1, AC2: the first session commits the skeleton at handoffs/story.md on the story branch; no generated block, no runs/", async () => {
     h.remote.issues = [...h.remote.issues, issue(9, "Prose only")];
     await h.tick("--sync");
     await tickUntil(() => h.state(runs())?.step === "implement");
