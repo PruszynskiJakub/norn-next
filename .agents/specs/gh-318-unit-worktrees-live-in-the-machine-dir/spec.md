@@ -14,6 +14,23 @@ status: active
 intake_at: 2026-11-10T08:46:51.720Z
 body_hash: e53bb9d21a1bc4f7007aa64f28b0f697fa68cfb9bf25b42f02208412207efce9
 refined_body_hash: e53bb9d21a1bc4f7007aa64f28b0f697fa68cfb9bf25b42f02208412207efce9
+criteria:
+  - { id: 01.AC1, verifier: test }
+  - { id: 01.AC2, verifier: test }
+  - { id: 01.AC3, verifier: agent }
+  - { id: 02.AC1, verifier: test }
+  - { id: 02.AC2, verifier: agent }
+  - { id: 03.AC1, verifier: test }
+  - { id: 03.AC2, verifier: test }
+  - { id: 03.AC3, verifier: test }
+  - { id: 03.AC4, verifier: test }
+  - { id: 03.AC5, verifier: test }
+  - { id: 03.AC6, verifier: test }
+  - { id: 03.AC7, verifier: test }
+  - { id: 03.AC8, verifier: test }
+  - { id: 03.AC9, verifier: test }
+  - { id: 03.AC10, verifier: test }
+  - { id: 03.AC11, verifier: agent }
 ---
 
 # Unit worktrees live in the machine dir next to the run state, not beside the repo
