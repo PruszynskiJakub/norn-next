@@ -37,10 +37,11 @@ Review #1's blocking finding (a symlinked home broke orphan detection and marker
 
 ## Not proven yet
 
-- The integration tier as a whole on CI at this head: shard 1/4 failed only in `machine-dir.test.ts` on the previous head (now passes locally); the other shards are unconfirmed until ci runs again.
+- The integration tier as a whole on CI at this head. ci#3 failed only on a known flake: `watch-version.test.ts` cleanup threw `EFAULT` from `rmSync` on the harness temp dir after the test body passed. The same EFAULT failed this file on gh-319, gh-298 and gh-228's CI (runs 42797767701, 42479653587, 42456678000), so this branch didn't cause it. The harness now retries and falls back to `rm -rf` (`removeTree` in `test/support/harness.ts`); the EFAULT path itself can't be reproduced locally.
 
 ## Notes
 
+- ci fix #3 (test-only): harness `cleanup` removes its dir through `removeTree`, which retries `rmSync` on EFAULT only and then falls back to `rm -rf`; any other error still throws.
 - `machine-dir.test.ts` skips the machine dir's `worktrees/` when collecting machine-local file names (it holds the repo's own files). A test that unbinds the home must not call `h.worktree`/`worktreesOf` afterwards. Run one integration file: `bun test --config=bunfig.integration.toml --timeout=20000 ./<path>`.
 - Upgrade test B16 makes its unit worktree beside the checkout: `toOldLayout` moves the whole machine dir, worktrees included (no product change).
 - Person decided (refine): no compatibility with `<repo>-worktrees/`; repo moves and doctor's adoption advice out of scope; worktrees in the per-checkout machine dir, not a shared `~/.norn/worktrees/`.
