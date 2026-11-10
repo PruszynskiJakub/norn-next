@@ -51,3 +51,44 @@ norn creates unit worktrees inside the checkout's machine dir, in a `worktrees/`
 - Nothing in norn relies on a worktree being a sibling of the repository (no config, hook or `.env.norn` uses a path relative to the repository's parent folder); only the path convention itself and the places that recognise worktrees by the old folder change.
 - Paths get longer and sit under a hidden folder (`~/.norn`): editors and agents' folder-trust prompts see the new path, as they already see a new folder for every new worktree.
 - Pinned observe snapshots, e2e transcripts and golden cases that hold `-worktrees` paths change with this story.
+
+## Plan
+
+### Seams
+- **S1 cli, through the integration harness (`createHarness`: `h.norn(…)` against a temp repo, its `~/.norn` home and the fakes).** Observes where `norn sync`, a slice start, `norn story start` (and `--print`, the Herdr tab's cwd), `norn tidy`, `norn status` and the brief put or find a worktree, and that no `<repo>-worktrees/` folder appears; with a second home or a second clone, that worktrees follow the home and the clone.
+  Prior art: `story-start.test` (gone-check, `--print`, Herdr tab), `housekeeping.test` (orphan worktrees in tidy), `machine-dir.test` and `run-state-machine-dir.test` (files under the bound home), `mailbox-across-machines.test` (two clones of one remote), `story-view.test` (status of a unit's worktree).
+- **S2 core `decide`, through `Facts` → `Decision[]`.** Observes that the story and slice worktree paths decide puts in intake and slice-start actions, and every command built from them (inbox start command, brief paths), come from the worktrees folder observe reports, not from the repo root.
+  Prior art: `decide.test`, `handoff-inbox.test`, `brief.test`, the golden corpus (`golden.test`).
+
+### Coverage
+| User story | Seam | Test kind | Notes |
+|---|---|---|---|
+| 1. `norn sync` / `story start` create the story worktree at `<machine dir>/worktrees/<story>-<slug>` | S1 | integration | path asserted through `machineDir`, never by hand |
+| 2. a slice worktree at `<machine dir>/worktrees/<story>-<slug>--<nn>-<slug>` | S1 | integration | S2 pins the path decide derives from the fact |
+| 3. no `<repo>-worktrees/` folder from any command | S1 | integration | a harness-wide check at cleanup (D4) |
+| 4. worktrees follow a home bound by `--home` / `NORN_HOME_DIR` | S1 | integration | |
+| 5. two clones never share a worktree folder for one story key | S1 | integration | two clones of one remote, as `mailbox-across-machines.test` |
+| 6. `story start --print`, the inbox's start command, the brief, Herdr tabs show the new path | S1 | integration | inbox and brief rendering already pinned at S2 from the unit's worktree path |
+| 7. `norn tidy` reports and removes clean orphan worktrees in the machine dir's `worktrees/` | S1 | integration | |
+| 8. `story start` notices a story worktree deleted from `worktrees/` | S1 | integration | |
+| 9. the view finds unit worktrees in `worktrees/` | S1 | integration | `norn status --json` |
+| 10. the docs say where worktrees live | — | review | concepts.md (run state paragraph and glossary's worktree row) |
+
+### Prefactoring
+1. **One place names the worktrees folder.** Store gains `worktreesDir(root)` beside `machineDir` in its paths; core's `storyWorktreePath` takes that folder instead of the repo root; `Facts.repo` gains `worktrees` (filled by observe and by the view's facts), and decide reads it from there. Every caller that builds or recognises a unit worktree path goes through it: decide's intake and slice start, `loadLocalFacts`, the checkout of a story, `unitStoryMode`, observe's orphan check, `inferUnitMarker`, `scanWorktrees`, `story start`'s gone-check. `worktreesDir` returns `<repo>-worktrees` at first, so nothing changes; the existing golden cases get `repo.worktrees` set to that old folder and decide the same. Makes stories 1–9 a one-line change in where the folder is, and keeps core pure.
+2. **Tests name worktrees through the harness.** The harness gains `h.worktree(<dir name>)` (and the same for a second clone), and the integration and e2e tests and the transcript's watched folders use it instead of spelling `${h.root}-worktrees/…`. Makes the move touch one helper instead of ~80 test files, for stories 1–9.
+
+### Implementation decisions
+- D1 The worktrees folder reaches decide as a fact, `Facts.repo.worktrees` (absolute path) — core cannot read the machine dir, and a fact keeps golden cases replayable as recorded.
+- D2 `worktreesDir(root)` is `<machine dir>/worktrees`; story and slice folder names are unchanged (`storyDirName`, `<story dir>--<sliceDirName>`). git creates the missing parent folders on `worktree add`, so no new mkdir.
+- D3 Recognition moves wholesale: `inferUnitMarker`, observe's orphan check, `scanWorktrees` and `story start`'s gone-check look only under `worktreesDir(root)`; nothing looks at `<repo>-worktrees/` (the person ruled out compatibility).
+- D4 The harness checks at cleanup that no `<repo>-worktrees` folder exists beside its repo, so every integration test guards story 3, not one hand-picked test.
+- D5 The golden corpus: its recorded paths are rewritten mechanically from `<dir>/repo-worktrees/` to the machine dir's `worktrees/`, with `repo.worktrees` to match, then `bun run golden -- --update` must show no decision change — the corpus shows the paths norn makes, and the replay proves decide is path-agnostic. Observe snapshots and e2e transcripts are rewritten by their own update commands; the diff is paths only.
+
+### Testing decisions
+A good test drives `norn` through the harness and checks the folder on disk, the JSON a command prints, or the fake Herdr's tab cwd; paths come from store's `machineDir`/`worktreesDir` and the harness helper, never typed. Decide tests build `Facts` with a worktrees folder and check the actions' paths. Faked: only the system boundaries the harness already fakes (remote, runner, Herdr, notifier, clock); git and the file system are real.
+
+### Risks
+- A caller still building `<repo>-worktrees` by hand that no test reaches (adapters, view, a refusal's `do_instead`): prefactor 1 lands first and a grep for `-worktrees` in `packages/*/src` must come back empty; D4 catches any command that still creates one.
+- macOS temp paths (`/var` vs `/private/var`) and the realpath of the home: the machine dir is under the home now, so a worktree path compared against `git worktree list` output may differ in spelling where the repo root did not; the gone-check and orphan check are the first slice to prove on the real path.
+- Pinned outputs churn (≈130 golden cases, four observe snapshots, three transcripts): rewritten mechanically in one commit, reviewed as paths-only.
