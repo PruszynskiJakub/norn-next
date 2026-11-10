@@ -4,28 +4,35 @@ A `runs/` folder in a base or story branch's tree is ignored: no tick moves it, 
 
 ## Proof
 
-- Ticks leave a story branch's `runs/` alone; the story moves on from its machine-dir state (AC1): `packages/cli/test/integration/branch-tree-run-state.test.ts` › "ticks leave the branch tree as it is and the story moves on from its machine-dir state".
-- `runs/` on the base: no status item or hint (AC2), no doctor run-state check in markdown or `--json` (AC3), nothing moved: `packages/cli/test/integration/archive-ref.test.ts` › "run list is empty for it, no status item or hint names it, and doctor has no run-state check in markdown or --json" (rewritten from the old D16/AC6 case, which asserted the opposite).
-- Golden corpus (AC4): `bun run golden -- --update` reports "0 of 132 golden case(s) decide differently now"; only the four `run-state-move-*.json` cases are deleted, and the two `record.move`/`record.move_waits` rule cases are gone from `packages/core/test/rule-cases.ts`. No observe snapshot or transcript changed (unit tier green, nothing rewritten).
-- `bun run test` (1722 pass) and `bun run typecheck` green.
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | a story branch's tree holds `runs/` and its run state is in the machine dir: ticks never change the branch tree, and the story moves on from its machine-dir state | test | `packages/cli/test/integration/branch-tree-run-state.test.ts` › "ticks leave the branch tree as it is and the story moves on from its machine-dir state" (passed locally in review) |
+| AC2 | the base branch's tree holds `runs/`: no `norn status` item or hint mentions base-tree run state | test | `packages/cli/test/integration/archive-ref.test.ts` › "run list is empty for it, no status item or hint names it, and doctor has no run-state check in markdown or --json" (passed locally in review) |
+| AC3 | the same repo: `norn doctor` (markdown and `--json`) has no run-state section or key | test | same archive-ref test: no `run_state` key in `repo`, no "run state" line in the markdown |
+| AC4 | golden corpus: only the four record-move cases and their rule cases are gone; every other case decides as before; observe snapshots and effect transcripts are unchanged | test | golden: `packages/core/test/unit/golden.test.ts`; `bun run golden -- --update` → "0 of 132 … decide differently"; observe snapshots: `test/e2e/observe-snapshots.test.ts` passes; **effect transcript: `test/e2e/recovery.test.ts` fails** (review F1) |
+| User story 21 | `runs/` in a base or branch tree is never read, moved or warned about | test | AC1–AC3 above |
+
+- `bun run test` (1722 pass) and `bun run typecheck` are green.
 
 ## Easy to miss
 
-- The integration tests above were written but **not run locally**: the brief keeps the integration tier for CI. They are red against the old code by construction (the old snapshot gave any unit whose worktree tree held `runs/` a `branch_record`, so decide emitted `record.move`, and doctor/status reported base `runs/`).
-- `archiveBaseRunState` (store) and `norn upgrade`'s base archive move stay: they belong to slice 03. `upgrade-records.test.ts` lost only its doctor/status assertions (the item and the check no longer exist); its upgrade assertions are 03's to change.
-- `checkout.ts` `lostRecord` no longer returns null when the branch holds `runs/`: a takeover with a lost record now restarts from the branch head, which is the accepted risk (a branch whose record lived only in its tree reads as having no record).
+- Effect transcripts run in the **e2e** tier, not the unit tier. Dropping the branch-tree `runs/` check from `checkout.ts` `lostRecord` removed one spawn (`git cat-file -e <sha>:<spec>/runs`) from `test/e2e/recovery.test.ts`'s transcript, so that test is now red.
+- `archiveBaseRunState` (store) and `norn upgrade`'s base archive move stay: they belong to slice 03. `upgrade-records.test.ts` lost only its doctor/status assertions; changing its upgrade assertions is 03's job.
+- `lostRecord` no longer returns null when the branch holds `runs/`. A takeover with a lost record now restarts from the branch head. This is the accepted risk: a branch whose record lived only in its tree reads as having no record.
 
 ## Not proven yet
 
-- The two integration tests have not run; CI's integration tier is the first run.
+- AC4's effect-transcript part: `test/e2e/recovery.test.ts` › "a claim lost mid-run > effect transcript" is red until the transcript is rewritten and the change is explained (review F1).
 
 ## Notes
 
-- Removed: `branch_record`/`tree_root`/`BranchRecord` and `RunStateAt.tree` from the snapshot, `base_run_state` from snapshot, Facts and view, `baseRunStateStories`, `baseRunStateHint`, the base-run-state inbox item, the `move_record` action with its decide rule and act (`moveRecord`, `movePaths`), the `onBranch` exemption in marking a unit corrupt, observe's `branchRecord`, doctor's `run_state` check, store's `record-move.ts` (`copyTreeRecord`, `removeTreeRunState`, `moveTreeHandoffs`; `recordErrors` moved into `record-ref.ts`), the tree path helpers (`treeRunStateDir`, `treeRunStateFiles`, `treeUnitRunStateDir`, `treeHandoffFile`, schema's `treeRunStatePath`, `treeHandoffPath`), harness `toBranchRunState`, `run-state-move.test.ts`, and record-ref's moved-story case.
-- View's `TraceRecords.source` narrowed to `"machine" | "archive"`: the `worktree`/`checkout` sources only came from branch-tree reads.
-- `docs/recipes.md`: dropped the sentence that status and doctor point to `norn upgrade` until the base removal lands; the rest of that upgrade paragraph is 03's.
-- Old traces holding a `move_record` decision stay readable (trace actions are free-form payloads; D12).
+- Review #1: changes requested. 1 blocking finding:
+  - F1: the recovery effect transcript is red after the `lostRecord` change.
+  - Minor, not rework: F2, a stale comment "Run state an older norn left on the base, pointed to `norn upgrade`" at `packages/cli/src/runtime/observe/index.ts:522` and `packages/view/src/load.ts:474`. F3, `docs/limitations.md:29` still mentions the move off the branch, and `docs/concepts.md:101` still says status and doctor point to `norn upgrade`.
+- Removed: `branch_record`/`tree_root`/`BranchRecord` and `RunStateAt.tree` from the snapshot; `base_run_state` from snapshot, Facts and view; `baseRunStateStories`, `baseRunStateHint` and the base-run-state inbox item; the `move_record` action with its decide rule and act; the `onBranch` exemption in marking a unit corrupt; observe's `branchRecord`; doctor's `run_state` check; store's `record-move.ts` (`recordErrors` moved into `record-ref.ts`); the tree path helpers; harness `toBranchRunState`; `run-state-move.test.ts`.
+- View's `TraceRecords.source` is narrowed to `"machine" | "archive"`.
+- Old traces holding a `move_record` decision stay readable (D12).
 
 ## Resume
 
-Implementation done and committed; next is review of this slice against its four criteria.
+Run `NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e test/e2e/recovery.test.ts` and check that the transcript diff is only the removed `git cat-file -e …/runs` spawn. Record that change under Proof for AC4, then run `bun run test:e2e`, `bun run test` and `bun run typecheck`.
