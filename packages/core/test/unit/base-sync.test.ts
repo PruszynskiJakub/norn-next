@@ -44,6 +44,7 @@ class Sim {
   receipts: NumberedReceipt[] = [];
   base: StoryBase | undefined = base();
   pr: StoryFacts["pr"] = null;
+  prSeen: StoryFacts["pr_seen"] = undefined;
   k = 0;
   /** what the next `git: update` effect yields (act's classify receipt, BS3) */
   git: "merge" | "conflict" | "stuck" = "merge";
@@ -72,7 +73,7 @@ class Sim {
     const claim: StoryFacts["claim"] = this.claimMine
       ? { state: "mine", sha: "c", blob: { version: 1, story: "gh-1", holder: "jakub@mac", heartbeat_id: HB, acquired_at: at(this.now), renewed_at: at(this.now), expires_at: at(this.now + 600_000), last_tick_id: null } }
       : { state: "none" };
-    const sf = storyFacts("gh-1", [uf], { frontmatter: fm, claim, pr: this.pr, ...(this.base ? { base: this.base } : {}) });
+    const sf = storyFacts("gh-1", [uf], { frontmatter: fm, claim, pr: this.pr, ...(this.prSeen ? { pr_seen: this.prSeen } : {}), ...(this.base ? { base: this.base } : {}) });
     return facts([sf], { tick_id: tick, repo: { root: "/r", default_branch: "main", remote: "origin", worktrees: "/r-worktrees", ...this.repoPatch } }, this.now);
   }
   /** one tick: decide (twice: pure), perform the unit's action like act, return it */
@@ -222,6 +223,31 @@ describe("base sync replay", () => {
       s.runUntil(at_("ready", "parked"));
       expect(s.classifies().at(-1)).toMatchObject({ outcome: "done", step: "update" });
     }
+  });
+
+  test("4a: a story PR not fetched this tick holds the stale gate until a sync shows whether the PR merged", () => {
+    const s = new Sim({ ...BASE_WF, base: { stale: "behind" } });
+    s.runUntil(at_("ready", "parked"));
+    const open: NonNullable<StoryFacts["pr"]> = { number: 7, url: "u", state: "open", is_draft: true, head_sha: SHA("h"), base_branch: "main" };
+    // between syncs: the PR is only known from the last sync, and someone fetched the moved base
+    s.pr = undefined;
+    s.prSeen = { pr: open, observed_at: T0 };
+    s.base = base({ behind: 1, sha: SHA("c") });
+    const held = s.tick();
+    expect(held.rule).toBe("gate.stale.awaits_sync");
+    expect(held.action.kind).toBe("noop");
+    expect(s.state).toMatchObject({ step: "ready", status: "parked" });
+    // the sync shows the story's own PR merged: the merge path ends it, never stale → update
+    s.pr = { ...open, state: "merged", is_draft: false, merged_at: at(s.now) };
+    expect(s.tick().rule).not.toBe("gate.stale");
+    expect(s.state.step).not.toBe("update");
+    // the sync shows the PR still open: the base moved under it, so stale → update
+    const t = new Sim({ ...BASE_WF, base: { stale: "behind" } });
+    t.runUntil(at_("ready", "parked"));
+    t.prSeen = { pr: open, observed_at: T0 };
+    t.pr = open;
+    t.base = base({ behind: 1, sha: SHA("c") });
+    expect(t.tick().rule).toBe("gate.stale");
   });
 
   test("4b: an approve waiting at the gate wins over stale (C2: receipts first)", () => {

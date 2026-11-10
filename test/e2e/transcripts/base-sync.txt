@@ -231,6 +231,7 @@
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:8> "^<sha:3>" --
   spawn repo $ git rev-list --left-right --count <sha:8>...<sha:3> --
   spawn repo $ git merge-base <sha:8> <sha:3>
+  A.remote.findPullRequest gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   spawn repo $ git rev-parse --verify --quiet refs/norn/runs/gh-7
@@ -241,7 +242,6 @@
   spawn repo $ git commit-tree <sha:9>
   spawn repo $ git push --porcelain --force-with-lease=refs/norn/runs/gh-7: origin <sha:10>:refs/norn/runs/gh-7
   spawn repo $ git update-ref refs/norn/runs/gh-7 <sha:10>
-  A.remote.findPullRequest gh-7-add-login-form
   A.remote.openDraftPullRequest gh-7-add-login-form → main "Add login form"
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/receipts/0003-classify.json
       {"kind":"classify","receipt_id":"<ulid:11>","run_id":"<ulid:12>","step":"open-pr","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:13>","outcome":"done","rule":"git.open-pr","detail":"draft PR #100 https://github.com/o/r/pull/100","route":"ready"}
@@ -542,6 +542,7 @@
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:18> "^<sha:12>" --
   spawn repo $ git rev-list --left-right --count <sha:18>...<sha:12> --
   spawn repo $ git merge-base <sha:18> <sha:12>
+  A.remote.findPullRequest gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   spawn repo $ git rev-parse --verify --quiet refs/norn/runs/gh-7
@@ -555,7 +556,6 @@
   spawn repo $ git commit-tree <sha:19> -p <sha:10>
   spawn repo $ git push --porcelain --force-with-lease=refs/norn/runs/gh-7:<sha:10> origin <sha:20>:refs/norn/runs/gh-7
   spawn repo $ git update-ref refs/norn/runs/gh-7 <sha:20>
-  A.remote.findPullRequest gh-7-add-login-form
   A.remote.editPullRequestBody 100
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/receipts/0011-classify.json
       {"kind":"classify","receipt_id":"<ulid:36>","run_id":"<ulid:37>","step":"open-pr","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:38>","outcome":"done","rule":"git.open-pr","detail":"PR #100 body updated https://github.com/o/r/pull/100","route":"ready"}
@@ -816,6 +816,7 @@
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:25> "^<sha:12>" --
   spawn repo $ git rev-list --left-right --count <sha:25>...<sha:12> --
   spawn repo $ git merge-base <sha:25> <sha:12>
+  A.remote.findPullRequest gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   spawn repo $ git rev-parse --verify --quiet refs/norn/runs/gh-7
@@ -829,7 +830,6 @@
   spawn repo $ git commit-tree <sha:26> -p <sha:20>
   spawn repo $ git push --porcelain --force-with-lease=refs/norn/runs/gh-7:<sha:20> origin <sha:27>:refs/norn/runs/gh-7
   spawn repo $ git update-ref refs/norn/runs/gh-7 <sha:27>
-  A.remote.findPullRequest gh-7-add-login-form
   A.remote.editPullRequestBody 100
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/receipts/0016-classify.json
       {"kind":"classify","receipt_id":"<ulid:52>","run_id":"<ulid:53>","step":"open-pr","attempt":3,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:54>","outcome":"done","rule":"git.open-pr","detail":"PR #100 body updated https://github.com/o/r/pull/100","route":"ready"}

@@ -128,6 +128,23 @@ describe("claims", () => {
     const theirs = { ...blob, heartbeat_id: "01JEEEEEEEEEEEEEEEEEEEEEEE", holder: "ann@pc" };
     expect(kinds(facts([solo({}, null, { claim: { state: "expired", sha: "c1", blob: theirs }, merged_by_ancestry: true })]))).toEqual(["gh-1 noop story.finished"]);
   });
+  test("a story whose round ran and whose PR merged is taken back for the merge cleanup though nobody holds its claim", () => {
+    const merged = { number: 9, url: "u", state: "merged" as const, is_draft: false, head_sha: "abc" };
+    // the round reached $done (a release story approved at `ready`), the claim was released, then the PR merged
+    const finished = solo({ step: "$done", status: "done" }, null, { claim: { state: "none" }, pr: merged });
+    expect(only(facts([finished]))).toMatchObject({ kind: "claim", rule: "claim.reacquire.merged", op: "acquire", expected: null, blob: { heartbeat_id: HB } });
+    // a round released mid-way and merged is taken back the same way
+    expect(kinds(facts([solo({}, null, { claim: { state: "none" }, pr: merged })]))).toEqual(["gh-1 claim claim.reacquire.merged"]);
+    // held again, the tick records it done through the merge cleanup
+    const held = solo({ step: "$done", status: "done" }, null, { pr: merged });
+    expect(only(facts([held]))).toMatchObject({ kind: "cleanup_merged_story", rule: "remote.pr_merged", story_status: "done" });
+    // once cleaned up (no worktree left), a done record the base still refuses is never taken back again
+    expect(kinds(facts([solo({ step: "$done", status: "done" }, null, { claim: { state: "none" }, pr: merged, worktree: null })]))).toEqual(["gh-1 noop story.finished"]);
+    // a record already done needs nothing
+    const landed = solo({ step: "$done", status: "done" }, null, { claim: { state: "none" }, pr: merged });
+    landed.frontmatter = { ...landed.frontmatter!, status: "done" };
+    expect(kinds(facts([landed]))).toEqual(["gh-1 noop story.finished"]);
+  });
 });
 
 describe("corrupt units", () => {

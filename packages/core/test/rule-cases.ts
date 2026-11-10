@@ -40,7 +40,18 @@ const ROUTED_WF: Workflow = {
     review: { type: "agent", skill: "review", outcomes: { approve: "$done" } },
   },
 };
-const ALL: RepoWorkflows = { ...WORKFLOWS, gitty: loaded(GIT_WF), routed: loaded(ROUTED_WF) };
+/** A gate with a `stale` route, stale when merely behind (as `release` is). */
+const STALE_WF: Workflow = {
+  name: "staled",
+  start: "ready",
+  steps: {
+    update: { type: "git", action: "update", outcomes: { done: "ready", conflict: "$stuck" } },
+    ready: { type: "gate", outcomes: { approve: "$done", reject: "$stuck", stale: { to: "update", counter: "stale_loop" } } },
+  },
+  counters: { stale_loop: { max: 3 } },
+  base: { stale: "behind" },
+};
+const ALL: RepoWorkflows = { ...WORKFLOWS, gitty: loaded(GIT_WF), routed: loaded(ROUTED_WF), staled: loaded(STALE_WF) };
 
 const agentLease = (run_id: string | null = null): LeaseFile => ({ version: 1, kind: "agent", repo: "/x", story: "gh-9", slice: null, run_id, holder: { pid: 1, pid_start: "1" }, created_at: at() });
 const checkLease = (): LeaseFile => ({ version: 1, kind: "check", repo: "/x", story: "gh-9", slice: null, run_id: null, holder: { pid: 1, pid_start: "1" }, created_at: at() });
@@ -101,6 +112,13 @@ function cases(): RuleCase[] {
     }),
   );
   out.push(c("an unreadable claim ref", "claim.corrupt", facts([story(SOLO_WF, {}, null, { claim: { state: "corrupt", sha: "c9", error: { file: "refs/norn/claims/gh-1", errors: [{ path: "", message: "invalid JSON" }] } } })])));
+  out.push(
+    c(
+      "a finished round whose claim was released and whose PR merged afterwards is taken back for the cleanup",
+      "claim.reacquire.merged",
+      facts([story(SOLO_WF, { step: "$done", status: "done" }, null, { claim: { state: "none" }, pr: { number: 9, url: "u", state: "merged", is_draft: false, head_sha: "abc" } })]),
+    ),
+  );
   out.push(c("a story file that failed validation", "story.corrupt", facts([story(SOLO_WF, {}, null, { frontmatter: null, frontmatter_error: { file: ".agents/specs/gh-1-login/story.md", errors: [{ path: "/id", message: "bad" }] } })])));
 
   // ---- remote mirror
@@ -255,6 +273,14 @@ function cases(): RuleCase[] {
   out.push(c("a git step with no worktree", "git.no_worktree", facts([story(STORY_WF, ready("open-pr"), null, { worktree: null, pr: null }, noWorktree)])));
   out.push(c("open-pr with a PR already open runs again: the body is updated (main 0.9.x)", "git.open-pr", facts([story(STORY_WF, ready("open-pr"), null, { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "h" } })])));
   out.push(c("a push step", "git.push", facts([story(GIT_WF, ready("push"))])));
+  {
+    // Parked at a stale-routed gate, the base moved, the story's PR known only from the last sync
+    const base = { ref: "refs/remotes/origin/main", sha: "b".repeat(40), head: "c".repeat(40), merge_base: "d".repeat(40), behind: 1, ahead: 1, conflicts: [] };
+    const parked = { status: "parked", step: "ready", park: { kind: "gate", reason: "waiting for approve / reject", since: at() } } as const;
+    const prSeen = { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "c".repeat(40) } as const, observed_at: T0 };
+    const { pr: _, ...unfetched } = story(STALE_WF, parked, null, { base, pr_seen: prSeen });
+    out.push(c("a stale-routed gate whose base moved, the story PR not fetched this tick", "gate.stale.awaits_sync", facts([unfetched])));
+  }
   out.push(c("an update step with no base observed", "git.update.no_base", facts([story(GIT_WF, ready("update"))])));
   {
     // One integration per story per tick — two slices at integrate, then a slice before a story update

@@ -597,6 +597,7 @@
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:11> "^<sha:1>" --
   spawn repo $ git rev-list --left-right --count <sha:11>...<sha:1> --
   spawn repo $ git merge-base <sha:11> <sha:1>
+  A.remote.findPullRequest gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
   spawn repo $ git rev-parse --verify --quiet refs/norn/runs/gh-7
@@ -607,7 +608,6 @@
   spawn repo $ git commit-tree <sha:12>
   spawn repo $ git push --porcelain --force-with-lease=refs/norn/runs/gh-7: origin <sha:13>:refs/norn/runs/gh-7
   spawn repo $ git update-ref refs/norn/runs/gh-7 <sha:13>
-  A.remote.findPullRequest gh-7-add-login-form
   A.remote.openDraftPullRequest gh-7-add-login-form → main "Add login form"
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/receipts/0005-classify.json
       {"kind":"classify","receipt_id":"<ulid:39>","run_id":"<ulid:40>","step":"open-pr","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:41>","outcome":"done","rule":"git.open-pr","detail":"draft PR #100 https://github.com/o/r/pull/100","route":"$done"}
