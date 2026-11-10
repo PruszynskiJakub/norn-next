@@ -897,7 +897,7 @@ describe("commit trailers", () => {
     expect(isCodePath("packages/core/src/apply.ts")).toBe(true);
     expect(isCodePath("packages/view/src/runs/x.ts")).toBe(true);
     expect(isCodePath(".agents/specs/gh-1-login/spec.md")).toBe(true);
-    expect(isCodePath(".agents/specs/gh-1-login/handoffs/_story.md")).toBe(false);
+    expect(isCodePath(".agents/specs/gh-1-login/handoffs/story.md")).toBe(false);
     expect(isCodePath(".agents/specs/gh-1-login/runs/_story/state.json")).toBe(false);
   });
 });

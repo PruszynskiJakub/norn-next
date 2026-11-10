@@ -17,6 +17,7 @@ import {
   appendTrace,
   readActFailures,
   releaseStoryLeases,
+  moveLegacyHandoff,
   tidyHandoff,
   writeReceiptAt,
   writeState,
@@ -122,7 +123,7 @@ export class ActEnv {
     return releaseStoryLeases(this.ctx.home, this.root, unit.story, (l) => l.slice === unit.slice && kinds.includes(l.kind) && (!runId || l.run_id === runId || l.kind === "slot"));
   }
 
-  /** Tidy the unit's handoff (skeleton when new, an older norn's blocks gone), commit with trailers and push. */
+  /** Tidy the unit's handoff (moved from an older norn's name, skeleton when new, an older norn's blocks gone), commit with trailers and push. */
   async commit(
     c: BoundaryCommit | null,
     unit: UnitRef | null,
@@ -132,8 +133,13 @@ export class ActEnv {
     if (!c) return null;
     if (unit && state) {
       const loc = this.unitLoc(unit);
-      // The status is printed by `brief` and `story checkout` (renderHandoffStatus), never written into the file
-      if (existsSync(loc.runsDir)) tidyHandoff(loc.handoffFile);
+      if (existsSync(loc.runsDir)) {
+        // A commit limited to the handoff leaves the old file's removal to the next full boundary:
+        // staging it by path fails when an older norn never committed it
+        moveLegacyHandoff(loc.handoffFile);
+        // The status is printed by `brief` and `story checkout` (renderHandoffStatus), never written into the file
+        tidyHandoff(loc.handoffFile);
+      }
     }
     let sha: string | null;
     try {

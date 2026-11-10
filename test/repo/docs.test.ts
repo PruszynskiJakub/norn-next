@@ -30,10 +30,10 @@ describe("no rules file", () => {
 
 // ------------------------------------------------------------------------------------------- handoff
 
-/** A unit's handoff, `<spec folder>/handoffs/_story.md` or `handoffs/<nn>-<slug>.md`. */
+/** A unit's handoff, `<spec folder>/handoffs/story.md` (an older norn's `_story.md`) or `handoffs/<nn>-<slug>.md`. */
 /** The slice number part of a slice handoff's name, from the schema's own pattern (`^[0-9]{2,3}$` today). */
 const SLICE_NN = SLICE_NN_PATTERN.replace(/^\^|\$$/g, "");
-const UNIT_HANDOFF = new RegExp(`^\\.agents/specs/[^/]+/handoffs/(?:_story|${SLICE_NN}-[a-z0-9]+(?:-[a-z0-9]+)*)\\.md$`);
+const UNIT_HANDOFF = new RegExp(`^\\.agents/specs/[^/]+/handoffs/(?:_?story|${SLICE_NN}-[a-z0-9]+(?:-[a-z0-9]+)*)\\.md$`);
 /** An older norn's handoff, `runs/<unit>/handoff.md` in a spec folder: moved to `handoffs/` at the unit's next boundary. */
 const OLD_HANDOFF = /^\.agents\/specs\/[^/]+\/(?:.*\/)?runs\//;
 
@@ -48,6 +48,7 @@ describe("no stray handoff (B34)", () => {
   test("matcher", () => {
     expect(strayHandoff("handoff.md")).toBe(true);
     expect(strayHandoff("docs/handoff.md")).toBe(true);
+    expect(strayHandoff(".agents/specs/gh-1-x/handoffs/story.md")).toBe(false);
     expect(strayHandoff(".agents/specs/gh-1-x/handoffs/_story.md")).toBe(false);
     expect(strayHandoff(".agents/specs/gh-1-x/handoffs/01-a.md")).toBe(false);
     expect(strayHandoff(".agents/specs/gh-1-x/handoffs/handoff.md")).toBe(true);
@@ -58,7 +59,7 @@ describe("no stray handoff (B34)", () => {
     expect(strayHandoff(".agents/specs/gh-1-x/handoffs/01--a.md")).toBe(true);
     expect(strayHandoff(".agents/specs/gh-1-x/handoffs/01-a--b.md")).toBe(true);
     expect(strayHandoff(".agents/specs/gh-1-x/handoffs/101-a-b2.md")).toBe(false);
-    expect(strayHandoff("docs/handoffs/_story.md")).toBe(true);
+    expect(strayHandoff("docs/handoffs/story.md")).toBe(true);
     expect(strayHandoff(".agents/specs/gh-1-x/handoff.md")).toBe(true);
     expect(strayHandoff(".agents/specs/gh-1-x/runs/_story/handoff.md")).toBe(false);
     expect(strayHandoff(".agents/specs/gh-1-x/runs/01-a/handoff.md")).toBe(false);

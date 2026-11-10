@@ -1,6 +1,6 @@
 /**
  * The story's record lives in `_story/rounds/01-<workflow>/` of its run state,
- * in the checkout's machine dir, with one story handoff in the worktree (`handoffs/_story.md`, gh-195/07); a story
+ * in the checkout's machine dir, with one story handoff in the worktree (`handoffs/story.md`, gh-195/07); a story
  * whose record is still flat is moved there by its holder's first tick, with nothing committed, and goes on
  * where it was.
  */
@@ -41,7 +41,7 @@ const spec = `.agents/specs/${BRANCH}`;
 const wt = () => `${h.root}-worktrees/${BRANCH}`;
 /** The story unit's run state, in the machine dir */
 const story = () => join(storyRunStateOf(join(wt(), spec)), "_story");
-/** the story's handoff, in the worktree (`handoffs/_story.md`) */
+/** the story's handoff, in the worktree (`handoffs/story.md`) */
 const handoff = () => handoffPath(join(wt(), spec), STORY_UNIT_DIR);
 const round1 = () => join(story(), "rounds", "01-duo");
 const inWt = (...argv: string[]): Promise<CliResult> => {
@@ -97,7 +97,7 @@ describe("a new story's record is round 1 (B30, B31)", () => {
     expect(git("ls-tree", "-r", "--name-only", `origin/${BRANCH}`, "--", spec).split("\n")).toEqual([`${spec}/${unitHandoffPath(STORY_UNIT_DIR)}`, `${spec}/spec.md`]);
   });
 
-  test("AC2: the handoff is handoffs/_story.md, and the step's report leaves it exactly as written", async () => {
+  test("AC2: the handoff is handoffs/story.md, and the step's report leaves it exactly as written", async () => {
     const file = handoff();
     const before = h.read(file);
     const body = before.replace(/## Goal\n[\s\S]*$/, "## Goal\nShip the round thing.\n\n## Progress\n- first milestone\n\n## Resume\nRun the review.\n");

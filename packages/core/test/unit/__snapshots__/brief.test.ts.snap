@@ -358,7 +358,7 @@ Report exactly once, from the worktree root (a report can move or remove the fol
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-login/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
-- Handoff: \`.agents/specs/gh-1-login/handoffs/_story.md\` — write the unit's current state here (shown under Context)
+- Handoff: \`.agents/specs/gh-1-login/handoffs/story.md\` — write the unit's current state here (shown under Context)
 
 ## Context
 
@@ -380,7 +380,7 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 - Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-login/handoffs/_story.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
+- The handoff \`.agents/specs/gh-1-login/handoffs/story.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.
@@ -1317,7 +1317,7 @@ Report exactly once, from the worktree root (a report can move or remove the fol
 ## Inputs
 
 - Story spec: \`.agents/specs/gh-1-projects-and-items/story.md\` — what the story asks (its user stories) and, once planned, how it is built (its Plan)
-- Handoff: \`.agents/specs/gh-1-projects-and-items/handoffs/_story.md\` — write the unit's current state here (shown under Context)
+- Handoff: \`.agents/specs/gh-1-projects-and-items/handoffs/story.md\` — write the unit's current state here (shown under Context)
 
 ## Context
 
@@ -1339,7 +1339,7 @@ What happened so far, oldest first, from the receipts (for a story, its current 
 
 - Read the Inputs before you change anything; after that, read only the code and docs your work touches. This brief is complete: do not read again what it gives you (\`.norn-unit\`, \`.env.norn\`; open the handoff only to rewrite it), and do not survey the repository, \`.agents/\`, \`.claude/\` or the machine to find your bearings — the brief already holds what this step needs, a survey spends context on what it doesn't, and other units' run state and handoffs are not this unit's to act on.
 - Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes — another worktree is another unit's live work, and what this step leaves out has its own step, checks and receipts. Anything that listens on a port uses the range in \`.env.norn\`. Local commits are fine; norn commits what is left when you report. When blocked, report it; never wait silently.
-- The handoff \`.agents/specs/gh-1-projects-and-items/handoffs/_story.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
+- The handoff \`.agents/specs/gh-1-projects-and-items/handoffs/story.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary: norn keeps what happened in the receipts (the brief's History, the current round only), so what a later step or round must know goes under Notes. Its sections:
   - **Goal**: what this unit must achieve, in one or two lines.
   - **Proof**: each thing the goal needs, and what proves it: a named test, a command, an evidence file.
   - **Easy to miss**: the rule or edge case the quick path would break.

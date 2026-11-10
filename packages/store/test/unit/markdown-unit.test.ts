@@ -6,6 +6,7 @@ import {
   ensureEvidenceDir,
   HANDOFF_HEADER_BEGIN,
   HANDOFF_LOG_BEGIN,
+  moveLegacyHandoff,
   parseHandoff,
   patchSliceFile,
   patchStoryFile,
@@ -164,7 +165,7 @@ describe("unit files", () => {
     expect(readdirSync(join(u, "evidence"))).toEqual(["R1"]);
   });
   test("tidyHandoff: a new handoff gets the skeleton, an old one loses its generated blocks once, prose is never touched", () => {
-    const u = join(tmp(), "handoffs", "_story.md");
+    const u = join(tmp(), "handoffs", "story.md");
     expect(tidyHandoff(u)).toBe(true);
     expect(readFileSync(u, "utf8")).toBe("## Goal\n\n## Proof\n\n## Easy to miss\n\n## Not proven yet\n\n## Notes\n\n## Resume\n");
     // an agent's own text: nothing to do, the file is untouched
@@ -178,6 +179,26 @@ describe("unit files", () => {
     expect(tidyHandoff(u)).toBe(true);
     expect(readFileSync(u, "utf8")).toBe(prose);
     expect(tidyHandoff(u)).toBe(false);
+  });
+  test("a story on an older norn's handoffs/_story.md reads from it, and its next move takes it to handoffs/story.md once", () => {
+    const dir = join(tmp(), "handoffs");
+    mkdirSync(dir, { recursive: true });
+    const legacy = join(dir, "_story.md");
+    const u = join(dir, "story.md");
+    writeFileSync(legacy, "## Goal\n\nkeep me\n");
+    expect(readHandoff(u)?.body).toBe("## Goal\n\nkeep me\n");
+    expect(moveLegacyHandoff(u)).toBe(legacy);
+    expect(readFileSync(u, "utf8")).toBe("## Goal\n\nkeep me\n");
+    expect(existsSync(legacy)).toBe(false);
+    expect(moveLegacyHandoff(u)).toBeNull();
+    // both present (a move that stopped after writing): the new one wins and the old one is left alone
+    writeFileSync(legacy, "stale\n");
+    expect(moveLegacyHandoff(u)).toBeNull();
+    expect(readHandoff(u)?.body).toBe("## Goal\n\nkeep me\n");
+    // a slice's handoff never had another name
+    const slice = join(dir, "01-form.md");
+    expect(moveLegacyHandoff(slice)).toBeNull();
+    expect(readHandoff(slice)).toBeNull();
   });
   test("handoff without norn blocks is all body", () => {
     expect(parseHandoff("# mine\n")).toMatchObject({ header: "", heartbeat: [], body: "# mine\n" });

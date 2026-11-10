@@ -265,12 +265,18 @@ export function parseRoundDirName(name: string): { n: number; workflow: string }
 export const HANDOFFS_DIR = "handoffs";
 /**
  * A unit's handoff relative to its spec folder, keyed by the unit, never by its record folder:
- * `handoffs/_story.md` for the story (one file across rounds), `handoffs/<nn>-<slug>.md` for a
- * slice, each on its unit's branch.
+ * `handoffs/story.md` for the story (one file across rounds), `handoffs/<nn>-<slug>.md` for a
+ * slice, each on its unit's branch. A slice's name always starts with digits, so `story` never
+ * collides with one.
  */
 export function unitHandoffPath(unit: string): string {
-  return `${HANDOFFS_DIR}/${unit}.md`;
+  return `${HANDOFFS_DIR}/${unit === STORY_UNIT_DIR ? "story" : unit}.md`;
 }
+/**
+ * Where an older norn kept the story's handoff, named after its run-state folder
+ * (`handoffs/_story.md`); read only until the story's next boundary moves it to `unitHandoffPath`.
+ */
+export const LEGACY_STORY_HANDOFF_PATH = `${HANDOFFS_DIR}/${STORY_UNIT_DIR}.md`;
 /**
  * Where an older norn kept a unit's handoff in its tree, `runs/<unit>/handoff.md` (the story's
  * above its round folders); read only by the move that takes it to `unitHandoffPath`.
