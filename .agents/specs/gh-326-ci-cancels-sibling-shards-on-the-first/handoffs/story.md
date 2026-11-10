@@ -21,10 +21,10 @@ One red CI run reports every failing shard, and the ci check's rework brief neve
 
 ## Notes
 - A skipped job is listed too (e.g. `package` after a red `unit`): it also never ran to the end.
-- Review #1: approved. The one minor note: other non-success conclusions (`timed_out`, `startup_failure`) are still left out of ci-failures.sh. The spec names only cancelled and skipped.
+- Reviews #1 and #2: approved. Review #2 found the repo files unchanged since #1; unit tier and type check green. The one minor note, still open: other non-success conclusions (`timed_out`, `startup_failure`) are left out of ci-failures.sh. The spec names only cancelled and skipped.
 - ci#1 `fail` was not this change: the check looked up a ci.yml run for 615d222df (the PR head when it ran), but norn pushed its state commit 5db02efef straight after, and GitHub made the `pull_request` CI run only for 5db02efef (green). implement#2 changed no code; the repo files are identical across 615d222df, 5db02efef and 317577eeb.
 - Friction: the ci check reads `headRefOid` once, and norn's own state-commit push can race it; a re-read of the head inside the retry loop would avoid this. Left out on purpose (outside this story).
 - `bun install` was needed in this worktree before `bun run test` / typecheck would run.
 
 ## Resume
-Nothing to build. The next ci check should find the CI run for the new head; pr.md still describes the branch as it is.
+Review #2 approved; next is the workflow's step after review (describe/open-pr already ran: PR #333 exists).
