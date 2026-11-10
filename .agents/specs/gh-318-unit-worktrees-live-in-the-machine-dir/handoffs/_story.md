@@ -37,8 +37,8 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Not proven yet
 
-- The full integration and e2e tiers after the merge of origin/main 3666341f (resolve #1). Locally green: unit 1739, typecheck (test#5), e2e base-sync/slice-workflow/merged-pr, integration runtime.test.ts; QA #5 re-observed every criterion on the merged head.
-- The integration tier as a whole on CI at this head. ci#3 failed only on a known flake: `watch-version.test.ts` cleanup threw `EFAULT` from `rmSync` on the harness temp dir after the test body passed. It also failed on other stories' CI (runs 42797767701, 42479653587), so this branch didn't cause it. The harness's `removeTree` now retries and falls back to `rm -rf`; the EFAULT path can't be reproduced locally.
+- The full integration and e2e tiers on CI after ci fix #5 (implement#5). Locally green at implement#5: unit 1739, typecheck, integration takeover-record-lost (12/12), worktrees-machine-dir, machine-dir, housekeeping, run-state-machine-dir, check-run, story-decision.
+- ci#5 failed on a real regression (not a flake): B26 "a wiped machine dir… no ref" in `takeover-record-lost.test.ts`. Fixed in implement#5, see Notes. The EFAULT cleanup flake fix (harness `removeTree` retry, then `rm -rf`) is still unproven on CI.
 
 ## Notes
 
