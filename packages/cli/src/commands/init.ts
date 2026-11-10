@@ -3,8 +3,9 @@
  * absent, the bundled skills into `.agents/skills/` (whole folders, the bundled version) linked
  * from each configured agent's skill folder, agent hooks (norn-owned, updated in place),
  * and machine-local paths in .gitignore. Idempotent: re-running updates norn-owned files only.
- * `norn_version` is recorded only in a repo that has none; on a repo set up
- * for another version, a differing bundled skill is left as it is and `norn upgrade` named instead.
+ * `norn_version` is recorded only in a repo with no team file; a team file with no or a pre-0.30
+ * version is refused (the version guard's refusal) before any write; on a repo set up for another
+ * version from 0.30 on, a differing bundled skill is left as it is and `norn upgrade` named instead.
  * Workflows created now get the repo's test command when its build files name one (`runtime/detect.ts`).
  * Last, the labels norn uses are created on the remote (`runtime/labels.ts`); a remote it
  * cannot reach or write is reported, never a failure.
@@ -17,13 +18,13 @@ import { join, relative } from "node:path";
 import { atomicWrite, gitRemoteUrl, installSkills, LOCAL_CONFIG_FILE, linkSkills, loadWorkflows, readText, REPO_CONFIG_FILE, repoConfigPath, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, WORKTREE_LOCAL_FILES, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
-import { rendered } from "../output.ts";
+import { refuse, rendered } from "../output.ts";
 import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
 import { detectTestCommand, TEMPLATE_TEST_COMMAND, withTestCommand } from "../runtime/detect.ts";
 import { type LabelsReport, labelsLines, remoteLabels } from "../runtime/labels.ts";
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
-import { cmd } from "@norn/core";
+import { cmd, versionBaseline } from "@norn/core";
 import { PROVIDERS, type RemoteProvider } from "@norn/schema";
 
 /** The repo's review guide the `norn-review` skill reads, at the repo root. */
@@ -158,9 +159,15 @@ export const initCommand = defineCommand({
     const root = ctx.root;
     // A config file with a problem refuses before init writes anything, so no half setup
     void ctx.config;
+    const configPath = repoConfigPath(root);
+    // A team file with no or a pre-0.30 version is an older norn's repo, never stamped current:
+    // refused before any write, so it is left exactly as it was
+    if (existsSync(configPath)) {
+      const baseline = versionBaseline(ctx.config.norn_version, ctx.version);
+      if (baseline) throw refuse(baseline.error, baseline.do_instead, baseline.code, { repo: ctx.config.norn_version, running: ctx.version });
+    }
 
     const assets = assetsDir(ctx.env);
-    const configPath = repoConfigPath(root);
     const config = existsSync(configPath) ? "exists" : (atomicWrite(configPath, readFileSync(join(assets, "config.yaml"), "utf8")), "created");
     // The commented user file on a machine's first init, never overwritten
     const userPath = userConfigPath(ctx.home);

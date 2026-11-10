@@ -293,7 +293,6 @@ export const upgradeCommand = defineCommand({
   summary: "Move this repo to this norn: its norn_version, the bundled skills, the layout and config keys, staged for you to commit",
   usage: "norn upgrade [--json]",
   markdown: true,
-  layout: false,
   run: (ctx) => upgrade(ctx),
 });
 
@@ -306,7 +305,6 @@ export const migrateCommand = defineCommand({
   summary: "Deprecated: the old name of norn upgrade, removed in the next minor",
   usage: "norn migrate [--json]",
   markdown: true,
-  layout: false,
   run(ctx) {
     ctx.stderr.push(MIGRATE_RENAMED);
     return upgrade(ctx);

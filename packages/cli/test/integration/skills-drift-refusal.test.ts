@@ -40,7 +40,7 @@ const sessionCommands = () => ({
 });
 
 beforeAll(async () => {
-  h = await createHarness({ version: "0.19.0" });
+  h = await createHarness({ version: "0.31.0" });
   expect((await h.norn("init")).exit).toBe(0);
   h.config("provider: gh\nworkflow: story\nmode: manual\n");
   h.write(join(workflowsDir(h.root), "story.yaml"), STORY);

@@ -147,20 +147,20 @@ describe("norn upgrade with nothing to do changes nothing (B15)", () => {
 });
 
 describe("norn upgrade records a newer patch (B16)", () => {
-  test("AC3: binary 0.19.2, repo at 0.19.0 → norn_version 0.19.2 and the skills refreshed; once committed, 0.19.1 is refused by tick", async () => {
-    const h = await setUpAt("0.19.0", "0.19.2");
+  test("AC3: binary 0.30.2, repo at 0.30.0 → norn_version 0.30.2 and the skills refreshed; once committed, 0.30.1 is refused by tick", async () => {
+    const h = await setUpAt("0.30.0", "0.30.2");
     try {
       const bundled = readFileSync(skill(h, "norn"), "utf8");
-      h.write(skill(h, "norn"), "# 0.19.0's protocol\n");
-      sh(h.root, ["commit", "-q", "-am", "0.19.0's skill"]);
-      const r = await upgradeAs(h, "0.19.2", "--json");
+      h.write(skill(h, "norn"), "# 0.30.0's protocol\n");
+      sh(h.root, ["commit", "-q", "-am", "0.30.0's skill"]);
+      const r = await upgradeAs(h, "0.30.2", "--json");
       expect(r.exit).toBe(0);
-      expect(teamFile(h)).toMatch(/^norn_version: 0\.19\.2$/m);
+      expect(teamFile(h)).toMatch(/^norn_version: 0\.30\.2$/m);
       expect(readFileSync(skill(h, "norn"), "utf8")).toBe(bundled);
-      expect(r.value).toMatchObject({ norn_version: { from: "0.19.0", to: "0.19.2" }, skills: { updated: ["norn"] } });
+      expect(r.value).toMatchObject({ norn_version: { from: "0.30.0", to: "0.30.2" }, skills: { updated: ["norn"] } });
       expectAllStaged(h);
       sh(h.root, ["commit", "-q", "-m", "Upgrade norn"]);
-      const tick = await runChecked(["tick"], { ...h.deps, version: "0.19.1" });
+      const tick = await runChecked(["tick"], { ...h.deps, version: "0.30.1" });
       expect(tick.exit).toBe(3);
       expect(tick.value).toMatchObject({ code: "version_mismatch" });
     } finally {

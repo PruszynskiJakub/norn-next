@@ -301,7 +301,8 @@ export interface Harness {
    * Write config the way a person splits it — the team keys (`provider`, `base_branch`,
    * `workflow`, `slice_workflow`) into `.agents/norn.config.yaml`, your keys (`mode`, `agent`,
    * `agents`) into `.agents/norn.config.local.yaml`, machine keys into the user file. A repo file
-   * left without keys is removed; the user file is only written, never removed.
+   * left without keys is removed; the user file is only written, never removed. The team file keeps
+   * its recorded `norn_version` (first), unless the yaml sets one.
    */
   config(yaml: string): void;
   /** Record the running binary's version as the team file's `norn_version`, keeping its other keys (a repo set up with this norn) */
@@ -405,6 +406,9 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
       const files: Record<string, Record<string, unknown>> = { team: {}, local: {}, user: {} };
       for (const [k, v] of Object.entries(value)) files[["mode", "agent", "agents"].includes(k) ? "local" : ["max_agents", "notify", "trace"].includes(k) ? "user" : "team"]![k] = v;
       const paths = { team: repoConfigPath(root), local: join(root, ".agents", "norn.config.local.yaml"), user: join(home, "config.yaml") };
+      // Dropping the recorded version would leave a repo `norn init` set up looking as if it never was
+      const recorded = existsSync(paths.team) ? ((parseYaml(readFileSync(paths.team, "utf8")) ?? {}) as Record<string, unknown>).norn_version : undefined;
+      if (recorded !== undefined) files.team = { norn_version: files.team!.norn_version ?? recorded, ...files.team };
       for (const [f, keys] of Object.entries(files) as Array<[keyof typeof paths, Record<string, unknown>]>) {
         if (Object.keys(keys).length) h.write(paths[f], stringifyYaml(keys));
         else if (f !== "user") rmSync(paths[f], { force: true });
@@ -460,16 +464,6 @@ export function toOldLayout(root: string, parts: LayoutPartName[] = ["config", "
     mkdirSync(dirname(old), { recursive: true });
     renameSync(now, old);
   }
-}
-
-/** The reverse of `toOldLayout`: every part back at its new place, `.agents/norn/` gone. */
-export function toNewLayout(root: string): void {
-  for (const { old, new: now } of Object.values(layoutPlaces(root))) {
-    if (!existsSync(old)) continue;
-    mkdirSync(dirname(now), { recursive: true });
-    renameSync(old, now);
-  }
-  rmSync(oldNornDir(root), { recursive: true, force: true });
 }
 
 /**

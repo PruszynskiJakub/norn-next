@@ -1,8 +1,8 @@
 ---
 id: gh-317/02
 title: Acting commands refuse a repo with no or a pre-0.30 norn_version
-depends_on: [gh-317/01]
-status: planned
+depends_on: [ gh-317/01 ]
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

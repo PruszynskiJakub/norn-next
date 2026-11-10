@@ -13,7 +13,6 @@ import { DEFAULT_CONFIG, type ResolvedConfig } from "@norn/schema";
 import { bindNornHome, type LoadedConfig, loadConfig, nornHome, readUnitMarker, type UnitMarker } from "@norn/store";
 import { configError, refuse } from "./output.ts";
 import { type Interaction, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
-import { guardLayout } from "./runtime/layout.ts";
 import { abortableSleep } from "./runtime/tick-lock.ts";
 import { NORN_VERSION } from "./version.ts";
 import { buildPorts, defaultRegistry } from "./wiring.ts";
@@ -112,8 +111,6 @@ export class Context {
   readonly deps: CliDeps;
   /** lines for a person on stderr (a one-time notice), returned in `CliResult.stderr`; never data */
   readonly stderr: string[] = [];
-  /** `locate()` refuses a main checkout on the old or a mixed layout; false for a command that reports it itself (doctor, upgrade, migrate) */
-  checksLayout = true;
   private located: Located | null = null;
   private loadedConfig: LoadedConfig | null = null;
   private builtPorts: Ports | null = null;
@@ -142,8 +139,6 @@ export class Context {
       const located = await locateRepo(this.cwd, this.git);
       // The checkout's machine dir lives in this command's norn home, not the process env's
       bindNornHome(located.root, this.home);
-      // The main checkout's layout, never the unit worktree's own files; before config loads
-      if (this.checksLayout) guardLayout(located.root);
       this.located = located;
     }
     return this.located;

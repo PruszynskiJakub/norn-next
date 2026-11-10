@@ -36,6 +36,7 @@ const rules = (r: TickReport) => r.decisions.map((d) => d.rule);
 async function atChecks(run: string, timeout: string, titles: string[]): Promise<{ h: Harness; runsDirs: string[] }> {
   const h = await createHarness();
   h.config(CONFIG);
+  h.recordVersion();
   h.write(join(workflowsDir(h.root), "slow.yaml"), workflow(run, timeout));
   installBundledSkills(h.root);
   h.git(["add", "-A"]);

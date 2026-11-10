@@ -1,7 +1,7 @@
 /**
  * gh-61 B5–B10, B12: a binary that does not match the main checkout's `norn_version` is refused
  * by every command that acts (exit 3, `version_mismatch`, before it writes, launches or pushes anything);
- * reading, setup and reporting commands keep working; a repo without the key works as today; a config
+ * reading, setup and reporting commands keep working; a config
  * error comes first. Driven through `runCli` with the harness, as a binary of any version.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
@@ -64,7 +64,7 @@ async function tickUntil(h: Harness, pred: () => boolean, max = 10): Promise<voi
   expect(pred()).toBe(true);
 }
 
-const NEEDS_019 = { error: "this repo needs norn 0.19.x (you run 0.18.1)", do_instead: "install norn 0.19.x", code: "version_mismatch" };
+const NEEDS_031 = { error: "this repo needs norn 0.31.x (you run 0.30.1)", do_instead: "install norn 0.31.x", code: "version_mismatch" };
 
 describe("commands that act refuse a mismatched binary (D1, D2)", () => {
   let h: Harness;
@@ -74,15 +74,15 @@ describe("commands that act refuse a mismatched binary (D1, D2)", () => {
     h = await createHarness();
     await setUp(h);
     h.remote.issues = [issue(3, "Add totals")];
-    setVersion(team(), "0.19.0");
+    setVersion(team(), "0.31.0");
   });
   afterAll(() => h.cleanup());
 
-  test("AC1: tick as 0.18.1 in a repo at 0.19.0 is refused, exit 3, and nothing is written, launched or pushed", async () => {
+  test("AC1: tick as 0.30.1 in a repo at 0.31.0 is refused, exit 3, and nothing is written, launched or pushed", async () => {
     const remoteRefs = h.git(["ls-remote", h.remoteDir]);
-    const r = await as(h, "0.18.1", ["tick"]);
+    const r = await as(h, "0.30.1", ["tick"]);
     expect(r.exit).toBe(3);
-    expect(r.value).toMatchObject(NEEDS_019);
+    expect(r.value).toMatchObject(NEEDS_031);
     expect(existsSync(`${h.root}-worktrees`)).toBe(false);
     expect(existsSync(runsOf(h, 3, "add-totals"))).toBe(false);
     expect(h.runner.launches).toEqual([]);
@@ -91,7 +91,7 @@ describe("commands that act refuse a mismatched binary (D1, D2)", () => {
 
     // the same tick from a matching binary acts: it takes the issue in
     h.clock.advance(10_000);
-    expect((await as(h, "0.19.3", ["tick"])).exit).toBe(0);
+    expect((await as(h, "0.31.3", ["tick"])).exit).toBe(0);
     expect(await h.listed("gh-3")).toBeDefined();
   });
 
@@ -129,8 +129,8 @@ describe("commands that act refuse a mismatched binary (D1, D2)", () => {
     const remoteRefs = h.git(["ls-remote", h.remoteDir]);
     const launches = h.runner.launches.length;
     for (const [name, a] of Object.entries(argv)) {
-      const r = await as(h, "0.18.1", [...a, "--json"]);
-      expect({ name, exit: r.exit, value: r.value }).toEqual({ name, exit: 3, value: { ...NEEDS_019, details: { repo: "0.19.0", running: "0.18.1" } } });
+      const r = await as(h, "0.30.1", [...a, "--json"]);
+      expect({ name, exit: r.exit, value: r.value }).toEqual({ name, exit: 3, value: { ...NEEDS_031, details: { repo: "0.31.0", running: "0.30.1" } } });
     }
     expect(readFileSync(local, "utf8")).toBe(before);
     expect(h.git(["ls-remote", h.remoteDir])).toBe(remoteRefs);
@@ -138,40 +138,40 @@ describe("commands that act refuse a mismatched binary (D1, D2)", () => {
   });
 
   test("AC2: a person reads the same refusal as markdown", async () => {
-    const r = await as(h, "0.18.1", ["config", "set", "mode", "auto", "--local"]);
+    const r = await as(h, "0.30.1", ["config", "set", "mode", "auto", "--local"]);
     expect(r.exit).toBe(3);
-    expect(r.stdout).toStartWith("**Refused (version_mismatch):** this repo needs norn 0.19.x (you run 0.18.1)");
-    expect(r.stdout).toContain("Do instead: install norn 0.19.x");
+    expect(r.stdout).toStartWith("**Refused (version_mismatch):** this repo needs norn 0.31.x (you run 0.30.1)");
+    expect(r.stdout).toContain("Do instead: install norn 0.31.x");
   });
 
   test("AC2: watch --human prints the refusal as markdown; with --json too, as JSON", async () => {
-    const human = await as(h, "0.18.1", ["watch", "--max-ticks", "1", "--human"]);
+    const human = await as(h, "0.30.1", ["watch", "--max-ticks", "1", "--human"]);
     expect(human.exit).toBe(3);
-    expect(human.stdout).toStartWith("**Refused (version_mismatch):** this repo needs norn 0.19.x (you run 0.18.1)");
-    const json = await as(h, "0.18.1", ["watch", "--max-ticks", "1", "--human", "--json"]);
+    expect(human.stdout).toStartWith("**Refused (version_mismatch):** this repo needs norn 0.31.x (you run 0.30.1)");
+    const json = await as(h, "0.30.1", ["watch", "--max-ticks", "1", "--human", "--json"]);
     expect(json.exit).toBe(3);
-    expect(JSON.parse(json.stdout)).toMatchObject(NEEDS_019);
+    expect(JSON.parse(json.stdout)).toMatchObject(NEEDS_031);
   });
 
   test("AC3: a binary newer than the repo is told to run norn upgrade and commit, or install the repo's norn", async () => {
-    setVersion(team(), "0.18.0");
+    setVersion(team(), "0.30.0");
     try {
-      const r = await as(h, "0.19.0", ["tick"]);
+      const r = await as(h, "0.31.0", ["tick"]);
       expect(r.exit).toBe(3);
       expect(r.value).toMatchObject({
-        error: "this repo needs norn 0.18.x (you run 0.19.0)",
-        do_instead: "run `norn upgrade` to move this repo to norn 0.19.0 and commit the change, or install norn 0.18.x",
+        error: "this repo needs norn 0.30.x (you run 0.31.0)",
+        do_instead: "run `norn upgrade` to move this repo to norn 0.31.0 and commit the change, or install norn 0.30.x",
         code: "version_mismatch",
       });
     } finally {
-      setVersion(team(), "0.19.0");
+      setVersion(team(), "0.31.0");
     }
   });
 
   test("AC4: reading, setup and repair commands run on a mismatch, with the exit code a matching binary gets", async () => {
     while (h.state(runsOf(h, 3, "add-totals"))?.step !== "implement") {
       h.clock.advance(10_000);
-      expect((await as(h, "0.19.0", ["tick"])).exit).toBe(0);
+      expect((await as(h, "0.31.0", ["tick"])).exit).toBe(0);
     }
     const argv = [
       ["help"],
@@ -192,8 +192,8 @@ describe("commands that act refuse a mismatched binary (D1, D2)", () => {
       ["uninstall"],
     ];
     for (const a of argv) {
-      const matching = await as(h, "0.19.0", [...a, "--json"]);
-      const mismatched = await as(h, "0.18.1", [...a, "--json"]);
+      const matching = await as(h, "0.31.0", [...a, "--json"]);
+      const mismatched = await as(h, "0.30.1", [...a, "--json"]);
       // doctor runs, but its own version check fails on a mismatch and exits 1; upgrade (and
       // migrate) is not guarded, but never moves the version back, so an older binary is refused by it
       const expected = a[0] === "doctor" ? 1 : a[0] === "upgrade" || a[0] === "migrate" ? 3 : matching.exit;
@@ -202,7 +202,7 @@ describe("commands that act refuse a mismatched binary (D1, D2)", () => {
       if (a[0] === "upgrade" || a[0] === "migrate") expect(mismatched.value).toMatchObject({ code: "version_backward" });
     }
     // story wait was met, so the exit codes compared above were real runs
-    expect((await as(h, "0.18.1", ["story", "wait", "gh-3", "--until", "step=implement"])).exit).toBe(0);
+    expect((await as(h, "0.30.1", ["story", "wait", "gh-3", "--until", "step=implement"])).exit).toBe(0);
   });
 });
 
@@ -271,26 +271,26 @@ describe("a step in flight can finish (B10)", () => {
   });
 });
 
-describe("the main checkout's team file decides (B12), no key works as today, a config error comes first", () => {
+describe("the main checkout's team file decides (B12), a config error comes first", () => {
   let h: Harness;
   beforeAll(async () => {
-    h = await createHarness({ version: "0.18.1" });
+    h = await createHarness({ version: "0.30.1" });
     await setUp(h);
     h.remote.issues = [issue(5, "Thing")];
   });
   afterAll(() => h.cleanup());
 
-  test("AC7: without the key every command runs as before", async () => {
+  test("AC7: a repo at the running norn's line runs every command", async () => {
     await tickUntil(h, () => h.state(runsOf(h, 5, "thing"))?.status === "ready");
     expect((await h.norn("config", "set", "mode", "manual", "--local")).exit).toBe(0);
-    expect((await as(h, "0.18.1", ["brief"], worktree(h, 5, "thing"))).exit).toBe(0);
+    expect((await as(h, "0.30.1", ["brief"], worktree(h, 5, "thing"))).exit).toBe(0);
   });
 
   test("AC6: a version on the remote's base does not count until the main checkout pulls it", async () => {
     const other = join(h.dir, "other");
     h.git(["clone", "-q", h.remoteDir, other], h.dir);
-    setVersion(repoConfigPath(other), "0.19.0");
-    h.git(["-c", "user.email=o@example.com", "-c", "user.name=Other", "commit", "-qam", "needs 0.19"], other);
+    setVersion(repoConfigPath(other), "0.31.0");
+    h.git(["-c", "user.email=o@example.com", "-c", "user.name=Other", "commit", "-qam", "needs 0.31"], other);
     h.git(["push", "-q", "origin", "main"], other);
 
     h.clock.advance(10_000);
@@ -298,18 +298,18 @@ describe("the main checkout's team file decides (B12), no key works as today, a 
     h.git(["pull", "-q", "--ff-only", "origin", "main"]);
     const r = await h.norn("tick");
     expect(r.exit).toBe(3);
-    expect(r.value).toMatchObject(NEEDS_019);
+    expect(r.value).toMatchObject(NEEDS_031);
   });
 
   test("AC6: a unit worktree's own team file is never what the guard reads", async () => {
     const wtTeam = repoConfigPath(worktree(h, 5, "thing"));
-    // the main checkout needs 0.19, the worktree's own file records nothing: still refused
+    // the main checkout needs 0.31, the worktree's own file records nothing: still refused
     setVersion(wtTeam, null);
-    expect((await as(h, "0.18.1", ["brief", "--json"], worktree(h, 5, "thing"))).value).toMatchObject({ code: "version_mismatch" });
-    // the main checkout has no key, the worktree's file records 0.19: not refused
-    setVersion(repoConfigPath(h.root), null);
-    setVersion(wtTeam, "0.19.0");
-    expect((await as(h, "0.18.1", ["brief"], worktree(h, 5, "thing"))).exit).toBe(0);
+    expect((await as(h, "0.30.1", ["brief", "--json"], worktree(h, 5, "thing"))).value).toMatchObject({ code: "version_mismatch" });
+    // the main checkout fits, the worktree's file records 0.31: not refused
+    setVersion(repoConfigPath(h.root), "0.30.0");
+    setVersion(wtTeam, "0.31.0");
+    expect((await as(h, "0.30.1", ["brief"], worktree(h, 5, "thing"))).exit).toBe(0);
   });
 
   test("AC7: an invalid key, or a mismatch beside another config problem, is the config error (exit 6), not the version refusal", async () => {
@@ -318,7 +318,7 @@ describe("the main checkout's team file decides (B12), no key works as today, a 
     expect(bad.exit).toBe(6);
     expect(bad.value).toMatchObject({ code: "config_invalid" });
 
-    setVersion(repoConfigPath(h.root), "0.19.0");
+    setVersion(repoConfigPath(h.root), "0.31.0");
     writeFileSync(repoConfigPath(h.root), `${readFileSync(repoConfigPath(h.root), "utf8")}bogus: 1\n`);
     const both = await h.norn("tick");
     expect(both.exit).toBe(6);
