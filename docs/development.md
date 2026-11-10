@@ -23,7 +23,7 @@ bun run golden      # add golden cases harvested from the cli integration tests'
 ```
 packages/schema    @norn/schema    JSON Schemas (TypeBox) + types + ajv validators, ids, config merge
 packages/core      @norn/core      pure logic: ports (adapter interfaces), Facts, Action, decide, briefing — no IO
-packages/store     @norn/store     .agents/ files, run state (runs/<story>/<unit>/ JSON in the machine dir, run-state.ts) and its record ref refs/norn/runs/<story> (record-ref.ts: pack, unpack, push), handoffs/<unit>.md, claim + mailbox refs, ~/.norn leases, worktree.ts (.env.norn, .norn-unit, info/exclude), the checkout's machine-local files in its machine dir ~/.norn/repos/<id>/ (local.ts, heartbeat.ts, inbox-history.ts; paths in paths.ts), layout.ts + old-layout.ts (old/new/both, migrate's moves)
+packages/store     @norn/store     .agents/ files, run state (runs/<story>/<unit>/ JSON in the machine dir, run-state.ts) and its record ref refs/norn/runs/<story> (record-ref.ts: pack, unpack, push), handoffs/<unit>.md, claim + mailbox refs, ~/.norn leases, worktree.ts (.env.norn, .norn-unit, info/exclude), the checkout's machine-local files in its machine dir ~/.norn/repos/<id>/ (local.ts, heartbeat.ts, inbox-history.ts; paths in paths.ts), layout.ts (old/new/both)
 packages/adapters  @norn/adapters  src/{git,gh,glab,herdr,headless,claude,codex,opencode,gemini,notify,process} + src/exec.ts (one Exec on spawnBounded, one portError) + src/agent-hooks/ (hook config merge, hook facts, transcripts shared by the agent adapters)
 packages/view      @norn/view      read model loadProjectView()
 packages/cli       @norn/cli       wiring + commands; bin `norn` → src/main.ts

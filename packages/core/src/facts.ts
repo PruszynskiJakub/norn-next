@@ -28,7 +28,7 @@ export interface FileError {
   /** repo-relative path */
   file: string;
   errors: SchemaError[];
-  /** Set when the file failed only because criteria still carry the removed `needs`; `norn upgrade` fixes it */
+  /** Set when the file failed only because criteria still carry the removed `needs`; the person deletes it */
   code?: "needs_removed";
 }
 

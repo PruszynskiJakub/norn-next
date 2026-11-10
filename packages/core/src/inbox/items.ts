@@ -930,15 +930,15 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
         slice: null,
         step: null,
         title: needs ?? `corrupt: ${story.frontmatter_error.file} failed validation`,
-        command: needs ? cmd.upgrade() : cmd.runView(story.key, { why: true }),
+        command: cmd.runView(story.key, { why: true }),
         since: iso(facts.now),
       });
       continue;
     }
-    // A slice file that still has criteria `needs` is not corrupt: `norn upgrade` fixes it
+    // A slice file that still has criteria `needs` is not corrupt: deleting `needs` fixes it
     for (const s of story.slices) {
       const needs = s.error && needsRemoved(s.error);
-      if (needs) add({ id: `needs:${s.key}`, group: "unblock", story: story.key, slice: s.key, step: null, title: needs, command: cmd.upgrade(), since: iso(facts.now) });
+      if (needs) add({ id: `needs:${s.key}`, group: "unblock", story: story.key, slice: s.key, step: null, title: needs, command: cmd.runView(s.key, { why: true }), since: iso(facts.now) });
     }
     add(notStartedItem(story, facts, config));
     add(bodyChangedItem(story));
