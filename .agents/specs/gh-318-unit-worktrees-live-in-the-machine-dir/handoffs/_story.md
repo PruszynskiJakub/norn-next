@@ -51,4 +51,4 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Resume
 
-QA #5 passed at c892491c (all 16 criteria re-observed after the merge of origin/main 3666341f; resolve #1 had switched main's new merged-pr e2e and runtime test to `h.worktree`). Next: describe and open-pr refresh the PR body, then CI on the merged head.
+describe #5 rewrote `pr.md` for head c892491c from story QA #5 (evidence run 01M72HNM90W87PFC8WR4VJPDGK, 16/16 pass). Next: open-pr updates PR #320, then ci; the CI run on this head is the first to check the merged code's integration tier.
