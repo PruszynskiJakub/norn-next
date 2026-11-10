@@ -1,0 +1,300 @@
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0244988Z with:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0245505Z   repository: PruszynskiJakub/norn-next
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0249433Z   token: ***
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0249916Z   ssh-strict: true
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0250387Z   ssh-user: git
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0250907Z   persist-credentials: true
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0251432Z   clean: true
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0251988Z   sparse-checkout-cone-mode: true
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0252544Z   fetch-depth: 1
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0253176Z   fetch-tags: false
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0253699Z   show-progress: true
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0254183Z   lfs: false
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0254672Z   submodules: false
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0255183Z   set-safe-directory: true
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0255728Z   allow-unsafe-pr-checkout: false
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.0256445Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2275543Z Syncing repository: PruszynskiJakub/norn-next
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2277574Z ##[group]Getting Git version info
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2278455Z Working directory is '/home/runner/work/norn-next/norn-next'
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2279854Z [command]/usr/bin/git version
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2281012Z git version 2.56.0
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2283916Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2290327Z Temporarily overriding HOME='/home/runner/work/_temp/c9a9a5d1-53f3-4723-bf29-fb9be9f73d2d' before making global git config changes
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2292637Z Adding repository directory to the temporary git global config as a safe directory
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2294262Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/norn-next/norn-next
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2357847Z Deleting the contents of '/home/runner/work/norn-next/norn-next'
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2377326Z ##[group]Initializing the repository
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2383539Z [command]/usr/bin/git init /home/runner/work/norn-next/norn-next
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2465209Z hint: Using 'master' as the name for the initial branch. This default branch name
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2468126Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2471502Z hint: to use in all of your new repositories, which will suppress this warning,
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2473965Z hint: call:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2475480Z hint:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2476628Z hint: 	git config --global init.defaultBranch <name>
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2477852Z hint:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2478477Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2480546Z hint: 'development'. The just-created branch can be renamed via this command:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2481517Z hint:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2482457Z hint: 	git branch -m <name>
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2483577Z hint:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2484305Z hint: Disable this message with "git config set advice.defaultBranchName false"
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2486276Z Initialized empty Git repository in /home/runner/work/norn-next/norn-next/.git/
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2502005Z [command]/usr/bin/git remote add origin https://github.com/PruszynskiJakub/norn-next
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2536962Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2538583Z ##[group]Disabling automatic garbage collection
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2540470Z [command]/usr/bin/git config --local gc.auto 0
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2574599Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2576045Z ##[group]Setting up auth
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2583880Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2618082Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.2997923Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.3032828Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.3251452Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.3281795Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.3479288Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.3510521Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.3518810Z ##[group]Fetching the repository
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:03.3520783Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +e9e0474bfbac18a7c5023f095b35fb05e8cf1b99:refs/remotes/pull/322/merge
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.0823168Z From https://github.com/PruszynskiJakub/norn-next
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.0825604Z  * [new ref]         e9e0474bfbac18a7c5023f095b35fb05e8cf1b99 -> pull/322/merge
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.0830846Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.0833270Z ##[group]Determining the checkout info
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.0835779Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.0837168Z [command]/usr/bin/git sparse-checkout disable
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.0871555Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.0894227Z ##[group]Checking out the ref
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.0896109Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/322/merge
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1447216Z Note: switching to 'refs/remotes/pull/322/merge'.
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1448309Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1449379Z You are in 'detached HEAD' state. You can look around, make experimental
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1451332Z changes and commit them, and you can discard any commits you make in this
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1453825Z state without impacting any branches by switching back to a branch.
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1455261Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1456286Z If you want to create a new branch to retain commits you create, you may
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1458826Z do so (now or later) by using -c with the switch command. Example:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1460318Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1461116Z   git switch -c <new-branch-name>
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1462566Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1463478Z Or undo this operation with:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1464665Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1465176Z   git switch -
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1465842Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1466837Z Turn off this advice by setting config variable advice.detachedHead to false
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1468393Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1470383Z HEAD is now at e9e0474 Merge 75cc42f10be18f6116ad79e6510e0c83c8adc8f6 into 4595edabc360771d1ce919dd4f2ca3adee58d89d
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1475424Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1487067Z [command]/usr/bin/git log -1 --format=%H
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1503853Z e9e0474bfbac18a7c5023f095b35fb05e8cf1b99
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1839942Z ##[group]Run oven-sh/setup-bun@v2
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1841000Z with:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1841850Z   bun-version: 1.3.13
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1842945Z   no-cache: false
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1851719Z   token: ***
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.1852539Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:04.5426363Z Cache hit for: bun-68bqnNjVR1ckwhD0nFe5oJmGfoU=
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.6361588Z Received 36181060 of 36181060 (100.0%), 40.2 MBs/sec
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.6363013Z Cache Size: ~35 MB (36181060 B)
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.6387748Z [command]/usr/bin/tar -xf /home/runner/work/_temp/00fa4a77-11ea-4872-8dd2-e256cda0b76a/cache.tzst -P -C /home/runner/work/norn-next/norn-next --use-compress-program unzstd
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.7801750Z Cache restored successfully
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.7819112Z [command]/home/runner/.bun/bin/bun --revision
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.7866538Z 1.3.13+bf2e2cecf
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.7867257Z Using a cached version of Bun: 1.3.13+bf2e2cecf
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.7976465Z ##[group]Run bun install --frozen-lockfile
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.7976967Z ^[[36;1mbun install --frozen-lockfile^[[0m
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.8012825Z shell: /usr/bin/bash -e {0}
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.8013329Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.8104643Z bun install v1.3.13 (bf2e2cec)
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9718275Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9719198Z + @types/bun@1.3.13
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9719855Z + typescript@5.9.3
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9720397Z + yaml@2.9.1
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9720719Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9720915Z 26 packages installed [162.00ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9794513Z ##[group]Run git config --global user.name "norn ci"
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9795056Z ^[[36;1mgit config --global user.name "norn ci"^[[0m
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9795495Z ^[[36;1mgit config --global user.email "ci@norn.invalid"^[[0m
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9795920Z ^[[36;1mgit config --global init.defaultBranch main^[[0m
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9796308Z ^[[36;1mbun run test:e2e --shard=1/3^[[0m
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9826038Z shell: /usr/bin/bash -e {0}
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9826574Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9935145Z $ bun test --config=bunfig.e2e.toml --parallel --timeout=20000 "--shard=1/3"
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9953702Z bun test v1.3.13 (bf2e2cec) 4x PARALLEL
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:05.9998286Z --shard=1/3: running 3/8 test files
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.0094043Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.0114379Z test/e2e/slice-workflow.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.0133247Z (pass) norn init > writes config, workflows, skills, hooks and .gitignore, no .gitattributes; idempotent [491.96ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.1384327Z (pass) norn init > prints a summary for a person; --json prints the data [123.99ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.1481219Z (pass) norn init > help prints the commands grouped for a person, Core first; --json prints the list [12.00ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.1483305Z (pass) norn init > unknown commands and bad options are usage errors with do_instead [1.00ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.1484571Z (pass) norn init > a noun with no verb, and help <noun>, list its verbs in order [1.00ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.1485947Z (pass) norn init > help <noun> <verb> and <noun> <verb> --help show that verb's usage and options [1.00ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.1487205Z (pass) norn init > help with an unknown name, or a word after a plain command, is a usage error [1.00ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.1489985Z (pass) norn init > help --all adds the hidden tier
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.1610628Z (pass) norn init > the old trace, why, open, mode, workflow, unstick, take, release and drop are unknown commands, and write nothing [12.00ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.2290052Z (pass) norn init > every command accepts --json [66.99ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.2335074Z (pass) norn init > --version prints the cli package version
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.3126528Z (pass) a story through the slice workflow > setup: repo config and workflows committed on main [83.99ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.5724276Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.5726171Z test/e2e/observe-snapshots.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.5727309Z (pass) observe snapshots and inbox parity (refactor Phase 0.3) > fresh intake: story worktree and story.md, no claim yet [468.96ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.6248089Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.6259841Z test/e2e/slice-workflow.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:07.6264277Z (pass) a story through the slice workflow > tick 1: sync → intake: story branch, worktree, spec.md, slot, marker [306.98ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:08.1615196Z (pass) a story through the slice workflow > tick 2: claim acquired; tick 3: story unit started with pinned workflow [540.97ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:08.5204749Z (pass) a story through the slice workflow > tick 4: auto mode launches the agent via the runner with NORN_* env [358.98ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:08.6178834Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:08.6179880Z test/e2e/auto-recovery.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:08.6180992Z (pass) R4: nudges that can be delivered (acceptance 5) > R4.3: a send that fails is ok:false, an Unblock item and shown in status [1512.91ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:08.7726891Z (pass) R4: nudges that can be delivered (acceptance 5) > R4.2: a runner without `send` resumes the agent session with the nudge text; the failure clears [154.99ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:08.8001910Z (pass) R4: nudges that can be delivered (acceptance 5) > R4.4: status shows the run's last classification, not only liveness [27.00ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:08.8911214Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:08.8911659Z test/e2e/slice-workflow.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:09.1312079Z (pass) a story through the slice workflow > plan done → slices step starts the slice: worktree from the story branch, slot 2, slice active [369.98ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:09.1313336Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:09.1313950Z test/e2e/observe-snapshots.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:09.1314705Z (pass) observe snapshots and inbox parity (refactor Phase 0.3) > running slice: the slice agent runs in its own worktree [1558.92ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:09.3054922Z (pass) observe snapshots and inbox parity (refactor Phase 0.3) > parked ask: the slice agent asked a question [171.99ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:10.1493015Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:10.1494049Z test/e2e/auto-recovery.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:10.1499263Z (pass) R5: a launch norn did not see finish (acceptance 6) > the runner finds the run → adopted, no second agent [906.96ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:10.1565222Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:10.1593940Z test/e2e/slice-workflow.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:10.1595771Z (pass) a story through the slice workflow > slice implement runs; check fails (C5: receipt tail + committed log) and routes back counted [1266.95ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:10.6843862Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:10.6894255Z test/e2e/observe-snapshots.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:10.6948695Z (pass) observe snapshots and inbox parity (refactor Phase 0.3) > gate waiting: the check passed and the slice waits at human-qa [1379.94ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:10.7147099Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:10.7147898Z test/e2e/auto-recovery.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:10.7149372Z (pass) R5: a launch norn did not see finish (acceptance 6) > nothing finds it → waits 2 watch intervals, then died (counted) and a fresh run [563.98ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:11.3366492Z (pass) R5: a launch norn did not see finish (acceptance 6) > R5.3: no new run while another run of the step shows hook activity [622.97ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:11.5366496Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:11.5367402Z test/e2e/slice-workflow.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:11.5368983Z (pass) a story through the slice workflow > rework passes the check; gate parks and notifies once; approve → integrate [1379.94ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:11.7881500Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:11.7888102Z test/e2e/auto-recovery.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:11.7900394Z (pass) R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8) > every tick writes tick.start before act and tick.end after; heartbeat.json records last_tick_at [134.99ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:11.9743381Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:11.9743956Z test/e2e/slice-workflow.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:11.9745400Z (pass) a story through the slice workflow > slice $done → cleanup: final state on the story branch, worktree + branch removed, integrated [436.98ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.1701570Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.1702408Z test/e2e/auto-recovery.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.1704162Z (pass) R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8) > a tick that died during act: why says so and resolves the receipt that cites it [381.98ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.2696757Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.2697660Z test/e2e/observe-snapshots.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.2698623Z (pass) observe snapshots and inbox parity (refactor Phase 0.3) > merged: the story's PR landed on the base branch [1585.93ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3081554Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3090212Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3231491Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3253518Z test/e2e/slice-workflow.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3255128Z (pass) a story through the slice workflow > slices done → open-pr through the RemotePort → story $done; trace replays [343.99ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3403452Z (pass) a story through the slice workflow > AC6: the PR's changed files and every branch tree hold the code, the spec and the handoffs, and no runs/ path [22.00ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3415873Z 276 |   if (process.env.NORN_TRANSCRIPT_UPDATE === "1") {
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3416804Z 277 |     writeFileSync(file, actual);
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3417492Z 278 |     return;
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3417910Z 279 |   }
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3418624Z 280 |   if (!existsSync(file)) throw new Error(`no transcript ${file}: run NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e <this file> and review it`);
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3419540Z 281 |   expect(actual).toBe(readFileSync(file, "utf8"));
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3420014Z                        ^
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3420505Z error: expect(received).toBe(expected)
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3420783Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3432341Z @@ -595,22 +595,22 @@
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3432961Z     spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3433440Z     spawn repo $ git cat-file --batch
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3434162Z     spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:11> "^<sha:1>" --
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3435132Z     spawn repo $ git rev-list --left-right --count <sha:11>...<sha:1> --
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3435648Z     spawn repo $ git merge-base <sha:11> <sha:1>
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3436145Z +   A.remote.findPullRequest gh-7-add-login-form
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3437016Z     spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3438098Z     spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3439016Z     spawn repo $ git rev-parse --verify --quiet refs/norn/runs/gh-7
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3439562Z     spawn repo $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3440092Z     spawn repo $ git hash-object -w --no-filters --stdin-paths
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3440574Z     spawn repo $ git update-index --add --index-info
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3440901Z     spawn repo $ git write-tree
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3441234Z     spawn repo $ git commit-tree <sha:12>
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3441929Z     spawn repo $ git push --porcelain --force-with-lease=refs/norn/runs/gh-7: origin <sha:13>:refs/norn/runs/gh-7
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3442460Z     spawn repo $ git update-ref refs/norn/runs/gh-7 <sha:13>
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3443088Z -   A.remote.findPullRequest gh-7-add-login-form
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3443851Z     A.remote.openDraftPullRequest gh-7-add-login-form → main "Add login form"
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3444596Z     + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/receipts/0005-classify.json
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3445911Z         {"kind":"classify","receipt_id":"<ulid:39>","run_id":"<ulid:40>","step":"open-pr","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:41>","outcome":"done","rule":"git.open-pr","detail":"draft PR #100 https://github.com/o/r/pull/100","route":"$done"}
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3446904Z   > norn tick
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3447331Z     spawn repo $ git rev-parse --path-format=absolute --git-common-dir
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3447624Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3447813Z - Expected  - 1
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3448142Z + Received  + 1
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3448342Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3448629Z       at expectTranscript (/home/runner/work/norn-next/norn-next/test/support/transcript.ts:281:18)
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3449367Z       at <anonymous> (/home/runner/work/norn-next/norn-next/test/e2e/slice-workflow.test.ts:446:5)
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3449719Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3488190Z ##[error]@@ -595,22 +595,22 @@
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git cat-file --batch
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:11> "^<sha:1>" --
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git rev-list --left-right --count <sha:11>...<sha:1> --
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git merge-base <sha:11> <sha:1>
+e2e (shard 1/3)	UNKNOWN STEP	+   A.remote.findPullRequest gh-7-add-login-form
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo-worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo-worktrees/gh-7-add-login-form $ git push --porcelain origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git rev-parse --verify --quiet refs/norn/runs/gh-7
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git hash-object -w --no-filters --stdin-paths
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git update-index --add --index-info
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git write-tree
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git commit-tree <sha:12>
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git push --porcelain --force-with-lease=refs/norn/runs/gh-7: origin <sha:13>:refs/norn/runs/gh-7
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git update-ref refs/norn/runs/gh-7 <sha:13>
+e2e (shard 1/3)	UNKNOWN STEP	-   A.remote.findPullRequest gh-7-add-login-form
+e2e (shard 1/3)	UNKNOWN STEP	 main "Add login form"
+e2e (shard 1/3)	UNKNOWN STEP	    + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-mini/receipts/0005-classify.json
+e2e (shard 1/3)	UNKNOWN STEP	        {"kind":"classify","receipt_id":"<ulid:39>","run_id":"<ulid:40>","step":"open-pr","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:41>","outcome":"done","rule":"git.open-pr","detail":"draft PR #100 https://github.com/o/r/pull/100","route":"$done"}
+e2e (shard 1/3)	UNKNOWN STEP	  > norn tick
+e2e (shard 1/3)	UNKNOWN STEP	    spawn repo $ git rev-parse --path-format=absolute --git-common-dir
+e2e (shard 1/3)	UNKNOWN STEP	
+e2e (shard 1/3)	UNKNOWN STEP	- Expected  - 1
+e2e (shard 1/3)	UNKNOWN STEP	+ Received  + 1
+e2e (shard 1/3)	UNKNOWN STEP	
+e2e (shard 1/3)	UNKNOWN STEP	      at expectTranscript (/home/runner/work/norn-next/norn-next/test/support/transcript.ts:281:18)
+e2e (shard 1/3)	UNKNOWN STEP	      at <anonymous> (/home/runner/work/norn-next/norn-next/test/e2e/slice-workflow.test.ts:446:5)
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.3505072Z (fail) a story through the slice workflow > effect transcript: spawns, port calls and runs/ files of the whole flow (refactor Phase 0.2) [2.00ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.4655410Z (pass) norn init in a repository with a test command and no remote > writes the detected test command into the workflows and puts adding the remote first [86.00ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.4663630Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.4663913Z test/e2e/auto-recovery.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.4664572Z (pass) R5.4 / R5.5: tick records and the heartbeat (acceptance 7, 8) > no heartbeat for 3 watch intervals with auto work held: inbox item, no manual start hint [295.99ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.5023547Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.5024076Z test/e2e/slice-workflow.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.5024377Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:12.5024931Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1680926Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1681605Z test/e2e/auto-recovery.test.ts:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1682559Z (pass) R7: a run from another machine (acceptance 10) > no pid or pane check; after the take, no hooks for the stalled window → died with the foreign rule [542.98ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1853476Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1854405Z ##[endgroup]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1944271Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1944607Z 1 tests failed:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1945552Z (fail) a story through the slice workflow > effect transcript: spawns, port calls and runs/ files of the whole flow (refactor Phase 0.2) [2.00ms]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1946105Z 
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1946312Z  37 pass
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1946826Z  1 fail
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1947253Z  360 expect() calls
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1947530Z Ran 38 tests across 3 files. [7.20s]
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1955583Z error: script "test:e2e" exited with code 1
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.1966259Z ##[error]Process completed with exit code 1.
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.2094080Z Post job cleanup.
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.2806820Z [command]/usr/bin/git version
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.2842285Z git version 2.56.0
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.2871076Z Copying '/home/runner/.gitconfig' to '/home/runner/work/_temp/6c02541b-253e-4618-a041-d3a5b1bcfb88/.gitconfig'
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.2880272Z Temporarily overriding HOME='/home/runner/work/_temp/6c02541b-253e-4618-a041-d3a5b1bcfb88' before making global git config changes
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.2881261Z Adding repository directory to the temporary git global config as a safe directory
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.2885001Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/norn-next/norn-next
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.2917165Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.2944465Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.3145543Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.3162983Z http.https://github.com/.extraheader
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.3171805Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.3199009Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.3412176Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.3443012Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.3749428Z Cleaning up orphan processes
+e2e (shard 1/3)	UNKNOWN STEP	2026-11-10T10:15:13.4005675Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
