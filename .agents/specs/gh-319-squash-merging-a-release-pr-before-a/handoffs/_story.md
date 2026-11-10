@@ -4,6 +4,15 @@ Fix #319: a story whose own PR merged on the remote (squash or merge commit) end
 
 ## Proof
 
+Review #1 traceability (the spec has no numbered criteria; rows are its Wanted lines):
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| Wanted: no stale on own merge | before a gate goes `stale` because the base moved, norn checks whether the story's own PR merged | test | `packages/core/test/unit/base-sync.test.ts` › "4a: a story PR not fetched this tick holds the stale gate until a sync shows whether the PR merged"; rule case `gate.stale.awaits_sync` |
+| Wanted: merged PR ends via merge path | a merged story PR ends the story through cleanup and the done record, never rework | test | `test/e2e/merged-pr.test.ts` › "squash-merged and the base fetched between syncs: the stale gate waits for the sync, which ends the story; no second PR" |
+| Wanted: never a second PR | no update/open-pr reworks a merged story into another PR | test | `test/e2e/merged-pr.test.ts` › "opens no second PR and fails the effect; the next sync ends the story" |
+| Still stale when PR is open | a base that moved under an open PR still routes `stale` → update | test | `packages/core/test/unit/base-sync.test.ts` › "4a: …" (second Sim, `gate.stale`) |
+
 - Stale-routed gate holds between syncs: `test/e2e/merged-pr.test.ts` › "squash-merged and the base fetched between syncs: the stale gate waits for the sync, which ends the story; no second PR" (red before the fix: `gate.stale`, `git.update`, … as in the reproduce).
 - `open-pr` refuses a merged PR: `test/e2e/merged-pr.test.ts` › "opens no second PR and fails the effect; the next sync ends the story" (red before the act guard: a second PR opened).
 - Decide rule: `packages/core/test/unit/base-sync.test.ts` › "4a: a story PR not fetched this tick holds the stale gate until a sync shows whether the PR merged" (red first); rule case `gate.stale.awaits_sync` in `packages/core/test/rule-cases.ts`.
@@ -20,6 +29,8 @@ Fix #319: a story whose own PR merged on the remote (squash or merge commit) end
 
 ## Notes
 
+- Review #1: approve, no blocking findings. Minor: the `pr_seen` doc in `packages/core/src/facts.ts:335` still says "Decide never acts on it"; decide now reads it to wait (noop), never to act.
+
 - Decision: decide waits for fresh PR facts (`gate.stale.awaits_sync` noop, `packages/core/src/decide/story.ts`) rather than computing squash evidence in observe: the PR's merged state is the authority, and a sync comes within `sync_interval`. It reads `pr_seen` only to wait, never to act.
 - Act guard: `packages/cli/src/runtime/act/git-step.ts` open-pr throws when the branch's PR is merged.
 - Docs: one paragraph in `docs/recipes.md` › "The base moved under a story".
@@ -27,4 +38,4 @@ Fix #319: a story whose own PR merged on the remote (squash or merge commit) end
 
 ## Resume
 
-Implement is done; the next step is review of this diff.
+Review #1 approved; the next step is whatever the workflow routes after review (QA or the PR).
