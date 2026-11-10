@@ -17,6 +17,7 @@ Review #1 traceability (the spec has no numbered criteria; rows are its Wanted l
 - `open-pr` refuses a merged PR: `test/e2e/merged-pr.test.ts` › "opens no second PR and fails the effect; the next sync ends the story" (red before the act guard: a second PR opened).
 - Decide rule: `packages/core/test/unit/base-sync.test.ts` › "4a: a story PR not fetched this tick holds the stale gate until a sync shows whether the PR merged" (red first); rule case `gate.stale.awaits_sync` in `packages/core/test/rule-cases.ts`.
 - `bun run test` (1734 pass) and `bun run typecheck` green; the e2e file passes locally (`bun run test:e2e test/e2e/merged-pr.test.ts`).
+- Effect transcripts (ci#1 failure): `test/e2e/transcripts/e2e-slice-workflow.txt` and `base-sync.txt` rewritten with `NORN_TRANSCRIPT_UPDATE=1`; the only change is `A.remote.findPullRequest` moving ahead of the open-pr push. `slice-workflow`, `base-sync` and `recovery` e2e files pass locally (43 pass).
 
 ## Easy to miss
 
@@ -34,8 +35,9 @@ Review #1 traceability (the spec has no numbered criteria; rows are its Wanted l
 - Decision: decide waits for fresh PR facts (`gate.stale.awaits_sync` noop, `packages/core/src/decide/story.ts`) rather than computing squash evidence in observe: the PR's merged state is the authority, and a sync comes within `sync_interval`. It reads `pr_seen` only to wait, never to act.
 - Act guard: `packages/cli/src/runtime/act/git-step.ts` open-pr throws when the branch's PR is merged.
 - Docs: one paragraph in `docs/recipes.md` › "The base moved under a story".
+- ci#1 failed only on the pinned transcripts: the act guard moved the PR lookup ahead of the push, an intended change, so the transcripts were rewritten; no code changed.
 - Friction: norn's mirror commit (32abeef55) committed half of this step's edits mid-step, which made a revert-to-HEAD red check silently keep the fix.
 
 ## Resume
 
-Describe #1 wrote `pr.md` in the spec folder (summary as a decide/act diff, evidence from the tests since no QA ran, merge danger two-way / stale-gate stories). Next: norn opens or updates the PR with it; a later change to the branch means rewriting pr.md from the current diff.
+CI rework done (the transcripts were rewritten). Next: CI reruns on the pushed branch. `pr.md` still holds, because the transcript change does not alter the behaviour it describes.
