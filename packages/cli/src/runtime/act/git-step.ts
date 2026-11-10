@@ -121,11 +121,13 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
       const remote = act.obs.ports.remote;
       if (!remote) throw new Error("no remote provider configured");
       if (!a.pr) throw new Error("open-pr without PR details");
+      let pr = await remote.findPullRequest(a.branch);
+      // The story's work already landed: a second PR for it would deliver it twice; the next sync ends the story through the merge path
+      if (pr?.state === "merged") throw new Error(`PR #${pr.number} of ${a.branch} is already merged; no new PR opened, the next sync ends the story`);
       const pushed = await act.pushBranch(a.cwd, a.branch);
       if (!pushed.ok) throw new Error(`push failed: ${pushed.message}`);
       const linked = await linkRecord(act, a, prText(a.cwd, a.pr), remote);
       const body = prBody(linked.text, a.pr);
-      let pr = await remote.findPullRequest(a.branch);
       if (pr && pr.state === "open") {
         // The open PR describes the branch as it is now
         await remote.editPullRequestBody(pr.number, body);

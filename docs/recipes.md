@@ -68,6 +68,8 @@ No heartbeat runs on this checkout, so the agent's `norn brief` and `norn done` 
 
 norn merges the base into the story branch in an `update` step, never by rebasing. When the merge conflicts, a `resolve` step has an agent resolve it, and the story goes on.
 
+A story waiting at a gate with a `stale` route goes back through update by itself. When the story has a PR, norn first waits for the next sync to fetch it: if the base moved because that PR merged, the story ends through the merge path and no second PR is opened.
+
 **You see:** a Check item such as `gh-3 conflicts with main in a.ts, b.ts (4 behind)` when the story waits at a gate, is stuck or is done with its PR not merged yet.
 
 ```sh

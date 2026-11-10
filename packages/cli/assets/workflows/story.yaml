@@ -110,7 +110,7 @@ steps:
     outcomes: { done: ci }
   # waits for the checks on the PR's head commit (a detached check run, so the tick is not blocked):
   # up to 5m for a first check to appear, none means the repo has no CI and passes; a red check's
-  # failed log becomes last_check for implement, whose rework goes back through open-pr to the new head.
+  # failures' whereabouts become last_check for implement, whose rework goes back through open-pr to the new head.
   # GitHub (gh) only: on GitLab replace the script, or route open-pr's done straight to ready.
   ci:
     type: check
@@ -127,9 +127,11 @@ steps:
       [ "$n" -gt 0 ] || { echo "no checks on PR #$pr after 5m: nothing to wait for"; exit 0; }
       gh pr checks "$pr" --watch --interval 30 >/dev/null && exit 0
       gh pr checks "$pr"
-      for run in $(gh run list --commit "$sha" --status failure --json databaseId -q '.[].databaseId'); do
-        gh run view "$run" --log-failed | tail -200
-      done
+      # where the failures are, never the log: a failed step's log buries the failure in passing output
+      gh api "repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100" -q '.check_runs[] | select(.conclusion=="failure") | "- \(.name) (id \(.id)): \(.details_url)"'
+      echo "Read a failed check run's annotations (file, line, message):"
+      echo "  gh api \"repos/{owner}/{repo}/check-runs/<id>/annotations\" -q '.[] | select(.annotation_level==\"failure\" and .path!=\".github\") | \"\\(.path):\\(.start_line) \\(.message)\"'"
+      echo "Only if that is not enough, the full log is behind its link."
       exit 1
     timeout: 30m
     outcomes: { pass: ready, fail: { to: implement, counter: ci_loop } }

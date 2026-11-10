@@ -76,10 +76,17 @@ export function decideStory(ctx: Ctx, story: StoryFacts): void {
     const ours = claim.state === "expired" && claim.blob.heartbeat_id === ctx.heartbeat;
     const fresh = claim.state === "none" && !su?.state && story.frontmatter?.status === "new";
     // The base record wins over any local spec — a story the base records as done
-    // (or whose PR merged) is never acquired by a stale local intake or a returning checkout. Only this
-    // heartbeat's own expired claim (nobody took it since) is re-acquired for a merged PR whose record
-    // is not yet done, so the merge cleanup and the base record still happen.
+    // (or whose PR merged) is never acquired by a stale local intake or a returning checkout. A merged
+    // PR whose record is not yet done is re-acquired so the merge cleanup records it done: by this
+    // heartbeat's own expired claim (nobody took it since), or, with no claim at all, by the checkout
+    // whose round ran and whose story worktree is still there — the claim is released once a round
+    // reaches $done, and the merge comes after. The cleanup removes that worktree, so a story whose
+    // done record the base still refuses is not taken back again. Another heartbeat's expired claim
+    // is left to its holder.
     const baseDone = baseClosed(story);
+    const takeBack = !baseDone && phase.phase === "merged" && claim.state === "none" && !!su?.state && !!story.worktree?.exists;
+    if (takeBack)
+      return ctx.emit({ kind: "claim", unit: ref, rule: "claim.reacquire.merged", op: "acquire", expected: null, blob: claimBlob(ctx, story.key, null) });
     if (baseDone || (storyMerged(phase) && !ours))
       return ctx.noop(ref, "story.finished", baseDone ? `finished: ${ctx.facts.repo.default_branch} records it ${story.base_status}; nothing to acquire` : "finished: PR merged; nothing to acquire");
     // A finished story (workflow done, merged/recorded or dropped) needs no owner — never "unclaimed"
@@ -490,6 +497,9 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       if (moved) return resolveImplicitAsk(ctx, story, uf, st, wf, moved);
       // A story waiting at a gate with a `stale` route goes back to update when the base moved under it
       if (ref.slice === null && st.park.kind === "gate" && story.base && edgeOf(wf, st.step, "stale") && isStale(wf, story.base)) {
+        // A base that moved because the story's own PR merged must end the story through the merge
+        // path, and only a fetched PR can show that: between syncs a story with a PR waits for one
+        if (story.pr === undefined && story.pr_seen?.pr) return ctx.noop(ref, "gate.stale.awaits_sync", `base moved; waiting for a sync to show whether PR #${story.pr_seen.pr.number} merged`);
         const b = story.base;
         const detail = `${b.behind} behind, conflicts: ${b.conflicts.length ? b.conflicts.join(", ") : "none"}`;
         return classifyNorn(ctx, story, uf, st, wf, "stale", "gate.stale", detail, { receiptRule: "base moved", base: baseOf(b) });
