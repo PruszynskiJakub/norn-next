@@ -6,7 +6,7 @@ Unit worktrees are created in the checkout's machine dir (`<machine dir>/worktre
 
 ## Proof
 
-Review #4 (at d3bf5da5): approve, no findings; the only code change since review #3 is the test-only harness `removeTree` (EFAULT retry, then `rm -rf`; any other error still throws, the beside-repo guard still runs). Unit tier 1734 pass, typecheck green, `machine-dir.test.ts` + `worktrees-machine-dir.test.ts` 16/16 locally. QA #3 at 040bcca5 (before the harness fix): all 16 criteria `pass` through the CLI; golden decisions identical to base after normalising the worktree prefix; evidence in that run's evidence (`report.md`). e2e: 74 pass, no pinned file rewritten. No hand-built `-worktrees` in sources or docs.
+Review #4 (at d3bf5da5): approve, no findings; the only code change since review #3 is the test-only harness `removeTree` (EFAULT retry, then `rm -rf`; any other error still throws, the beside-repo guard still runs). Unit tier 1734 pass, typecheck green, `machine-dir.test.ts` + `worktrees-machine-dir.test.ts` 16/16 locally. QA #4 at 55c959ed (current head, with the harness fix): all 16 criteria `pass` re-observed through the CLI in harness temp repos; golden decisions identical to base after normalising the worktree prefix; the cleanup guard still throws on a planted `repo-worktrees` and still removes the dir; evidence in that run's evidence (`report.md`). e2e: 74 pass, no pinned file rewritten. No hand-built `-worktrees` in sources or docs.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -50,4 +50,4 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Resume
 
-Review #4 approved the test-only harness cleanup fix (`removeTree` in `test/support/harness.ts`). Next: test, QA, describe, then CI. This is the last `ci_loop` round. If CI fails, read the failure first. If it is the EFAULT again, the fallback didn't help.
+QA #4 passed all 16 criteria at 55c959ed. Next: describe (refresh pr.md from QA #4), then CI. This is the last `ci_loop` round. If CI fails, read the failure first. If it is the EFAULT again, the fallback didn't help.
