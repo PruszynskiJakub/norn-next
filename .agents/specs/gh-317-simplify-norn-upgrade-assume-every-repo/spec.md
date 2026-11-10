@@ -14,6 +14,39 @@ status: active
 intake_at: 2026-11-10T08:21:19.336Z
 body_hash: 5bf58336d1c9038bb879d6431fa0d4f75f80ac49128eb44e1683f8c653a648df
 refined_body_hash: 5bf58336d1c9038bb879d6431fa0d4f75f80ac49128eb44e1683f8c653a648df
+criteria:
+  - { id: "01.AC1", verifier: test }
+  - { id: "01.AC2", verifier: test }
+  - { id: "02.AC1", verifier: test }
+  - { id: "02.AC2", verifier: test }
+  - { id: "02.AC3", verifier: test }
+  - { id: "02.AC4", verifier: test }
+  - { id: "02.AC5", verifier: test }
+  - { id: "02.AC6", verifier: test }
+  - { id: "02.AC7", verifier: agent }
+  - { id: "03.AC1", verifier: test }
+  - { id: "03.AC2", verifier: test }
+  - { id: "03.AC3", verifier: test }
+  - { id: "03.AC4", verifier: test }
+  - { id: "03.AC5", verifier: test }
+  - { id: "03.AC6", verifier: test }
+  - { id: "03.AC7", verifier: test }
+  - { id: "03.AC8", verifier: test }
+  - { id: "03.AC9", verifier: test }
+  - { id: "03.AC10", verifier: test }
+  - { id: "03.AC11", verifier: agent }
+  - { id: "03.AC12", verifier: agent }
+  - { id: "04.AC1", verifier: test }
+  - { id: "04.AC2", verifier: test }
+  - { id: "04.AC3", verifier: test }
+  - { id: "04.AC4", verifier: test }
+  - { id: "05.AC1", verifier: test }
+  - { id: "05.AC2", verifier: test }
+  - { id: "05.AC3", verifier: test }
+  - { id: "06.AC1", verifier: test }
+  - { id: "06.AC2", verifier: test }
+  - { id: "06.AC3", verifier: test }
+  - { id: "06.AC4", verifier: test }
 ---
 
 # Simplify norn upgrade: assume every repo starts at 0.30, drop the old migrations
