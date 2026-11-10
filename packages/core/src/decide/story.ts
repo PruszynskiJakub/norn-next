@@ -539,7 +539,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       if (ref.slice === null && st.park.kind === "gate" && story.base && edgeOf(wf, st.step, "stale") && isStale(wf, story.base)) {
         // A base that moved because the story's own PR merged must end the story through the merge
         // path, and only a fetched PR can show that: between syncs a story with a PR waits for one
-        if (story.pr === undefined && story.pr_seen) return ctx.noop(ref, "gate.stale.awaits_sync", `base moved; waiting for a sync to show whether PR #${story.pr_seen.pr.number} merged`);
+        if (story.pr === undefined && story.pr_seen?.pr) return ctx.noop(ref, "gate.stale.awaits_sync", `base moved; waiting for a sync to show whether PR #${story.pr_seen.pr.number} merged`);
         const b = story.base;
         const detail = `${b.behind} behind, conflicts: ${b.conflicts.length ? b.conflicts.join(", ") : "none"}`;
         return classifyNorn(ctx, story, uf, st, wf, "stale", "gate.stale", detail, { receiptRule: "base moved", base: baseOf(b) });

@@ -1,38 +1,30 @@
 ## Goal
 
-Reproduce #319: a story parked at a gate with a `stale` route goes `stale` → `update` → `open-pr` (a second PR) when its own PR merged on the remote, instead of ending through the merge path. Reproduce only, no fix.
+Fix #319: a story whose own PR merged on the remote (squash or merge commit) ends through the merge path, never `stale` → `update` → `open-pr` with a second PR, when the base was fetched between syncs.
 
 ## Proof
 
-- Red loop: `bun test --config=<evidence>/bunfig.toml <evidence>/squash.test.ts`. The test and its bunfig are in this run's evidence (`squash.test.ts`, `bunfig.toml`, with absolute paths to the worktree it ran in; fix them up before rerunning). The output of every variant is in `loop-output.txt`. About 6 s, red 3/3.
-- Posted as the `## Reproduce` comment on #319 (issuecomment-6764477701).
+- Stale-routed gate holds between syncs: `test/e2e/merged-pr.test.ts` › "squash-merged and the base fetched between syncs: the stale gate waits for the sync, which ends the story; no second PR" (red before the fix: `gate.stale`, `git.update`, … as in the reproduce).
+- `open-pr` refuses a merged PR: `test/e2e/merged-pr.test.ts` › "opens no second PR and fails the effect; the next sync ends the story" (red before the act guard: a second PR opened).
+- Decide rule: `packages/core/test/unit/base-sync.test.ts` › "4a: a story PR not fetched this tick holds the stale gate until a sync shows whether the PR merged" (red first); rule case `gate.stale.awaits_sync` in `packages/core/test/rule-cases.ts`.
+- `bun run test` (1734 pass) and `bun run typecheck` green; the e2e file passes locally (`bun run test:e2e test/e2e/merged-pr.test.ts`).
 
 ## Easy to miss
 
-- It needs a **base fetch outside a sync** (another story's `update`, a merged record write at `runtime/record.ts:60`, a person's `git fetch`). With plain non-sync ticks nothing moves, because the base and the PRs are both fetched only on sync ticks. On a sync tick the cleanup wins (`remote.pr_merged`).
-- It is **not squash-specific**: a `--no-ff` merge fails the same way between syncs, because `merged_by_ancestry` is only computed for stories whose PR was fetched this tick.
-- Once a second PR exists, gh's `prsQuery` (`first: 1`, newest) hides the merged one forever, so no later sync ends the story.
+- The hold only applies when the story has a PR seen here (`pr_seen.pr`) and `story.pr` is unfetched this tick; a story with no PR, or a sync tick, classifies `stale` as before (host-less setups keep working).
+- `open-pr` now looks the PR up before pushing; a merged PR makes the effect fail (retried each tick) until the sync's `remote.pr_merged` cleanup ends the story.
 
 ## Not proven yet
 
-- Which fix is right. Options: decide refuses `stale`/`update` without fresh PR facts, or uses `pr_seen` plus a sync before classifying; observe computes merge evidence from `pr_seen` and patch or tree equality for squashes; `open-pr` refuses when the branch's PR is merged; the adapter prefers a merged or open PR over the newest. That is for planning.
+- `prsQuery` (`packages/adapters/src/gh/index.ts:102`, `first: 1` newest) still hides a merged PR once a newer PR exists for the branch; left alone, since the two guards stop a second PR from being opened.
 
 ## Notes
 
-Minimised repro (CLI harness, real git, fake gh, under $TMPDIR):
-1. Workflow `update → open-pr → ready` (gate `stale: { to: update }`), `base: { stale: behind }`, as in `release.yaml`.
-2. Tick until it parks at `ready` with draft PR #100.
-3. Squash-merge the story branch into `main` on the remote and set the fake PR to `merged`.
-4. `git fetch origin main` in the main checkout.
-5. Run non-sync ticks. Output: `gate.stale`, `git.update`, `receipts.apply`, `git.open-pr`, `receipts.apply`, ending at `ready` parked, with PRs `#100 merged, #101 open`.
-
-Confirmed cause:
-1. Primary: between syncs `story.pr` is unobserved (`packages/cli/src/runtime/observe/index.ts:372`), and `merged_by_ancestry` is only set for stories whose PR was fetched this tick (`observe/index.ts:452-455`). So `mergedVia` (`packages/core/src/policy.ts:103`) is null, `storyLifecycle` skips the cleanup, and `gate.stale` (`packages/core/src/decide/story.ts:539`) classifies on the base alone. `pr_seen` is in the facts but unused there.
-2. Contributing: `open-pr` act (`packages/cli/src/runtime/act/git-step.ts:128-135`) sees the PR `merged` and opens a new one.
-3. Aftermath: `prsQuery` (`packages/adapters/src/gh/index.ts:102`) returns only the newest PR per branch.
-
-Seam: the CLI runtime harness, the way `test/e2e/base-sync.test.ts` does it (fake gh `h.remote.prs`, a `land` clone merging into `main`). The minimised test is the regression case: assert no `gate.stale`, no second PR, and that the story ends via `remote.pr_merged`. A core decide case alone is too shallow, since decide needs merge evidence that observe must supply. Add an act guard on `open-pr` for a merged PR.
+- Decision: decide waits for fresh PR facts (`gate.stale.awaits_sync` noop, `packages/core/src/decide/story.ts`) rather than computing squash evidence in observe: the PR's merged state is the authority, and a sync comes within `sync_interval`. It reads `pr_seen` only to wait, never to act.
+- Act guard: `packages/cli/src/runtime/act/git-step.ts` open-pr throws when the branch's PR is merged.
+- Docs: one paragraph in `docs/recipes.md` › "The base moved under a story".
+- Friction: norn's mirror commit (32abeef55) committed half of this step's edits mid-step, which made a revert-to-HEAD red check silently keep the fix.
 
 ## Resume
 
-Reproduce is done. The next step is the person's: plan or fix the story from this cause and seam.
+Implement is done; the next step is review of this diff.
