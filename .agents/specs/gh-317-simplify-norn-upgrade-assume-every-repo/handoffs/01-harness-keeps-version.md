@@ -2,10 +2,14 @@
 The test harness's `h.config(...)` keeps the team file's recorded `norn_version` after `norn init`, so slice 02's refusal of a missing version does not refuse every harness test that rewrites config. Nothing a person sees changes.
 
 ### Proof
-- AC1 (config with only local/user keys, or none for the team file, keeps the team file and its recorded `norn_version`): `packages/cli/test/integration/harness-config.test.ts` › "config with no team keys keeps the team file and its norn_version" and › "empty config keeps the team file and its norn_version" — both red before the harness change.
-- AC2 (team keys written with the recorded `norn_version`, the version first): same file › "team keys are written with the norn_version, the version first" — red before.
-- Slice note (a `norn_version` the test sets wins): same file › "a norn_version the test sets wins over the recorded one".
-- `bun run test` (1732 pass) and `bun run typecheck` green. No golden case, transcript or observe snapshot changed.
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | after `norn init`, config with only local/user keys (or none for the team file) leaves the team file in place with the same `norn_version` | test | `packages/cli/test/integration/harness-config.test.ts` › "config with no team keys keeps the team file and its norn_version", › "empty config keeps the team file and its norn_version" |
+| AC2 | after `norn init`, config with team keys writes those keys plus the recorded `norn_version`, the version first | test | same file › "team keys are written with the norn_version, the version first" |
+| Slice note | a `norn_version` the test sets through `h.config` wins over the recorded one | test | same file › "a norn_version the test sets wins over the recorded one" |
+
+- `bun run test` and `bun run typecheck` green (test#1 check). Review re-ran harness-config, housekeeping and skills-drift-hold in the integration tier: 47 pass. No golden case, transcript or observe snapshot changed.
+- review#1: approve, no findings.
 
 ### Easy to miss
 - The version is kept only when the team file already records one: a harness repo that never ran `norn init` behaves as before (team file removed when no team key is left).
@@ -19,4 +23,4 @@ The test harness's `h.config(...)` keeps the team file's recorded `norn_version`
 - A test that needs a repo with no recorded version must now write the team file itself (as housekeeping's `atVersion(null)` does); slice 02's guard tests will want the same.
 
 ### Resume
-Slice done; the next step reviews it. Nothing pending.
+Reviewed and approved; the next step (QA or the next slice) takes it from here. Nothing pending.
