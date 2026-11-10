@@ -242,7 +242,7 @@ describe("norn init", () => {
 });
 
 describe("a story through the slice workflow", () => {
-  const storyWt = () => `${h.root}-worktrees/gh-7-add-login-form`;
+  const storyWt = () => h.worktree("gh-7-add-login-form");
   const sliceWt = () => `${storyWt()}--01-form`;
   const spec = ".agents/specs/gh-7-add-login-form";
   const storyRuns = () => runStateOf(join(storyWt(), spec));

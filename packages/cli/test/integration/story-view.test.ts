@@ -46,7 +46,7 @@ mode: auto
 
 let h: Harness;
 const spec = ".agents/specs/gh-2-split-work";
-const wt = () => `${h.root}-worktrees/gh-2-split-work`;
+const wt = () => h.worktree("gh-2-split-work");
 const sliceWt = () => `${wt()}--01-first`;
 const storyRuns = () => runStateOf(join(wt(), spec));
 const sliceRuns = (nn: string) => runStateOf(join(`${wt()}--${nn}`, spec), nn);
@@ -157,7 +157,7 @@ describe("norn story chat", () => {
 
     // another repo's gh-2 is not ours; the picker's popup sits in the workspace it covers
     const again = fakeHerdr([], [
-      { workspace_id: "w3", label: "gh-2 orient", pane_ids: ["w3:p1"], cwds: ["/other-worktrees/gh-2-x"] },
+      { workspace_id: "w3", label: "gh-2 orient", pane_ids: ["w3:p1"], cwds: ["/other-repo/worktrees/gh-2-x"] },
       { workspace_id: "w4", label: "gh-2 orient", pane_ids: ["w4:p1", "w4:p2"], cwds: [wt(), "/plugins/herdr"] },
     ]);
     const focused = await norn({ herdr: again.cockpit }, "story", "chat", "gh-2", "--json");

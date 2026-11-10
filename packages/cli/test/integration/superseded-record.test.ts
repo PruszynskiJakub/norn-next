@@ -13,7 +13,7 @@ import { claimRef, recordRef, ulid } from "@norn/schema";
 import type { Inbox } from "@norn/core";
 import { acquireClaim, appendReceipt, heartbeatId, listReceipts, machineDir, newClaimBlob, readState, rejectedReceiptsPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
-import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
+import { createHarness, type Harness, issue, sh, worktreeOf } from "../../../../test/support/harness.ts";
 import { cloneOf } from "../../../../test/support/clone.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
@@ -70,7 +70,7 @@ async function heldThenSilent(n: number, slug: string, rounds: number): Promise<
   const key = `gh-${n}`;
   const spec = `.agents/specs/${key}-${slug}`;
   const branch = `${key}-${slug}`;
-  const wt = (root: string) => `${root}-worktrees/${branch}`;
+  const wt = (root: string) => worktreeOf(root, branch);
   const runs = (root: string) => runStateOf(join(wt(root), spec));
   h.remote.issues = [...h.remote.issues, issue(n, slug, ["norn", "norn:wf:rv"])];
   await h.tick("--sync");
@@ -285,7 +285,7 @@ describe("a --force takeover (AC1: 'or with --force'; review#1 F4)", () => {
     const key = "gh-14";
     const spec = `.agents/specs/${key}-allpushed`;
     const branch = `${key}-allpushed`;
-    const runs = () => runStateOf(join(`${h.root}-worktrees/${branch}`, spec));
+    const runs = () => runStateOf(join(h.worktree(branch), spec));
     h.remote.issues = [...h.remote.issues, issue(14, "allpushed", ["norn", "norn:wf:rv"])];
     await h.tick("--sync");
     await tickUntil(() => state(runs())?.status === "running");
@@ -299,7 +299,7 @@ describe("a --force takeover (AC1: 'or with --force'; review#1 F4)", () => {
     h.clock.advance(10_000);
     const t = await h.tick("--sync");
     expect(t.decisions.filter((d) => d.unit === key).map((d) => `${d.rule} ${d.kind}${d.ok ? "" : " FAILED"}`)).toEqual(["record.released set_aside_record"]);
-    expect(existsSync(storyRunStateOf(join(`${h.root}-worktrees/${branch}`, spec)))).toBe(false);
+    expect(existsSync(storyRunStateOf(join(h.worktree(branch), spec)))).toBe(false);
     expect(supersededOf(key)).toEqual([]);
     expect(await checkItems(key)).toEqual([]);
   });

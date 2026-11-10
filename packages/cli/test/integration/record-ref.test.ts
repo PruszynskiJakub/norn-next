@@ -83,7 +83,7 @@ function recordOnRemote(story: string) {
 /** A trio story at `step` with its session started (`brief`). */
 async function storyAt(n: number, slug: string, step: "implement" | "review") {
   const spec = `.agents/specs/gh-${n}-${slug}`;
-  const wt = `${h.root}-worktrees/gh-${n}-${slug}`;
+  const wt = h.worktree(`gh-${n}-${slug}`);
   const runs = () => runStateOf(join(wt, spec));
   h.remote.issues = [...h.remote.issues, issue(n, slug)];
   await h.tick("--sync");

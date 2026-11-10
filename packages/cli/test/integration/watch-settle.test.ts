@@ -37,7 +37,7 @@ interface Line {
 
 describe("watch settles at once after a tick that changed run state", () => {
   let h: Harness;
-  const runs = () => runStateOf(join(`${h.root}-worktrees/gh-7-settle-me`, ".agents/specs/gh-7-settle-me"));
+  const runs = () => runStateOf(join(h.worktree("gh-7-settle-me"), ".agents/specs/gh-7-settle-me"));
 
   /** `norn watch --interval 1h`: every pause is recorded (and advances the fake clock) instead of waited */
   async function watch(maxTicks: number) {

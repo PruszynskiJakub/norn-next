@@ -64,7 +64,7 @@ mode: auto
 
 describe("observe snapshots and inbox parity (refactor Phase 0.3)", () => {
   let h: Harness;
-  const storyWt = () => `${h.root}-worktrees/gh-7-add-login-form`;
+  const storyWt = () => h.worktree("gh-7-add-login-form");
   const sliceWt = () => `${storyWt()}--01-form`;
   const spec = ".agents/specs/gh-7-add-login-form";
   const storyRuns = () => runStateOf(join(storyWt(), spec));

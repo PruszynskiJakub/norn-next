@@ -32,6 +32,7 @@ import type { CliResult } from "../../packages/cli/src/index.ts";
 import { normaliser } from "./golden-harvest.ts";
 import type { Harness } from "./harness.ts";
 import { REPO_ROOT } from "./repo-root.ts";
+import { worktreesOf } from "./worktree.ts";
 
 /** Where the pinned transcripts live, named from the repo root. */
 export const TRANSCRIPTS_DIR = join(REPO_ROOT, "test", "e2e", "transcripts");
@@ -39,7 +40,7 @@ export const TRANSCRIPTS_DIR = join(REPO_ROOT, "test", "e2e", "transcripts");
 export interface Transcript {
   /** bracket one command: header line, then its effects, then the runs/ files it touched */
   command<T>(label: string, fn: () => Promise<T>): Promise<T>;
-  /** watch another clone: its runs/ files (under `root` and `<root>-worktrees`) and its fake ports, under a name (`B`) */
+  /** watch another clone: its runs/ files (under `root` and its worktrees folder) and its fake ports, under a name (`B`) */
   watchClone(name: string, root: string, ports: { runner?: RunnerPort; remote?: RemotePort; notifiers?: NotifierPort[] }): void;
   /** the normalised transcript so far */
   text(): string;
@@ -220,7 +221,7 @@ export function recordTranscript(h: Harness): Transcript {
   };
   const tops: string[] = [];
   const watchClone: Transcript["watchClone"] = (name, root, ports) => {
-    tops.push(root, `${root}-worktrees`);
+    tops.push(root, worktreesOf(root));
     watchPorts(name, ports);
   };
   watchClone("A", h.root, { runner: h.runner, remote: h.remote, notifiers: [h.notifier] });

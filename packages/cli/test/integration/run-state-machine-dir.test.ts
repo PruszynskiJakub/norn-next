@@ -57,7 +57,7 @@ steps:
 
 let h: Harness;
 const SPEC = ".agents/specs/gh-9-keep-it-local";
-const wt = () => `${h.root}-worktrees/gh-9-keep-it-local`;
+const wt = () => h.worktree("gh-9-keep-it-local");
 const runs = () => runStateOf(join(wt(), SPEC));
 /** every path `git status` shows in the worktree */
 const status = (cwd: string) =>
@@ -151,7 +151,7 @@ describe("gh-9 runs with its run state in the machine dir", () => {
 
 describe("a worktree is disposable", () => {
   const SPEC10 = ".agents/specs/gh-10-ask-me";
-  const wt10 = () => `${h.root}-worktrees/gh-10-ask-me`;
+  const wt10 = () => h.worktree("gh-10-ask-me");
   const runs10 = () => runStateOf(join(h.root, SPEC10));
   const asked = async () => {
     const inbox = (await h.norn("status", "--json")).value as { groups: Record<string, Array<{ story: string; step: string | null; title: string }>> };
@@ -255,7 +255,7 @@ describe("a worktree is disposable", () => {
 
 describe("parallel slices and a crash between a receipt and state (B4: S3)", () => {
   const SPEC11 = ".agents/specs/gh-11-two-parts";
-  const wt11 = () => `${h.root}-worktrees/gh-11-two-parts`;
+  const wt11 = () => h.worktree("gh-11-two-parts");
   const story11 = () => runStateOf(join(h.root, SPEC11));
   const part = (nn: string) => runStateOf(join(h.root, SPEC11), `${nn}-part-${nn === "01" ? "a" : "b"}`);
   const sliceWt = (nn: string) => `${wt11()}--${nn}-part-${nn === "01" ? "a" : "b"}`;

@@ -46,7 +46,7 @@ mode: manual
 
 let h: Harness;
 const spec = ".agents/specs/gh-4-today-view";
-const wt = () => `${h.root}-worktrees/gh-4-today-view`;
+const wt = () => h.worktree("gh-4-today-view");
 const runs = () => runStateOf(join(wt(), spec));
 const env = () => {
   const e: Record<string, string | undefined> = { ...h.deps.env, NORN_AGENT_PID: String(process.pid) };

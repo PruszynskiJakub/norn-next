@@ -41,8 +41,8 @@ mode: auto
 let h: Harness;
 const spec5 = ".agents/specs/gh-5-pay-invoices";
 const spec6 = ".agents/specs/gh-6-export-report";
-const wt5 = () => `${h.root}-worktrees/gh-5-pay-invoices`;
-const wt6 = () => `${h.root}-worktrees/gh-6-export-report`;
+const wt5 = () => h.worktree("gh-5-pay-invoices");
+const wt6 = () => h.worktree("gh-6-export-report");
 const runs5 = () => runStateOf(join(wt5(), spec5));
 const runs6 = () => runStateOf(join(wt6(), spec6));
 const tick = async () => {

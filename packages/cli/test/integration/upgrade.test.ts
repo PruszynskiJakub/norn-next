@@ -223,7 +223,7 @@ describe("norn upgrade refuses and moves nothing (B15, B16, B17)", () => {
   });
 
   test("in a unit worktree: exit 3, do_instead names the main checkout's path (B16)", async () => {
-    const wt = `${h.root}-worktrees/gh-4-four`;
+    const wt = h.worktree("gh-4-four");
     expect(existsSync(wt)).toBe(true);
     const before = [...snapshot(h), ...(readdirSync(wt, { recursive: true }) as string[]).filter((p) => !p.startsWith(".git"))];
     const r = await runChecked(["upgrade", "--json"], { ...h.deps, cwd: wt });

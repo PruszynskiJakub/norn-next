@@ -17,12 +17,15 @@ import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, runningVersion, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
 import { harvestGolden } from "./golden-harvest.ts";
+import { worktreeOf } from "./worktree.ts";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 // Every tick shells out to git (worktrees, status, refs) several times, so the multi-tick
 // integration tests take 2–3.5 s each on an idle laptop — too close to bun's 5 s default on a
 // loaded machine or CI runner. Genuinely slow, not hung: give every harness test 20 s.
 setDefaultTimeout(20_000);
+
+export { worktreeOf, worktreesOf } from "./worktree.ts";
 
 export class FakeClock implements Clock {
   constructor(public t: number) {}
@@ -283,6 +286,8 @@ export interface Harness {
   root: string;
   remoteDir: string;
   home: string;
+  /** the unit worktree named `dirName` (`<story>-<slug>`, a slice's `<story dir>--<nn>-<slug>`): where norn creates it for this repo */
+  worktree(dirName: string): string;
   clock: FakeClock;
   remote: FakeRemote;
   runner: FakeRunner;
@@ -380,6 +385,7 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
     root,
     remoteDir,
     home,
+    worktree: (dirName) => worktreeOf(root, dirName),
     clock,
     remote,
     runner,

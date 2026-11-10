@@ -37,7 +37,7 @@ mode: manual
 
 let h: Harness;
 const spec = ".agents/specs/gh-7-count-items";
-const wt = () => `${h.root}-worktrees/gh-7-count-items`;
+const wt = () => h.worktree("gh-7-count-items");
 const runs = () => runStateOf(join(wt(), spec));
 const tick = async () => {
   h.clock.advance(10_000);

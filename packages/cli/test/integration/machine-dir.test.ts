@@ -59,7 +59,7 @@ function machineFilesUnder(dir: string, machine: string): string[] {
 describe("machine-local files in the norn home", () => {
   let h: Harness;
   let machine: string;
-  const wt = () => `${h.root}-worktrees/gh-4-four`;
+  const wt = () => h.worktree("gh-4-four");
   beforeAll(async () => {
     h = await createHarness();
     // What the home already holds before norn uses repos/

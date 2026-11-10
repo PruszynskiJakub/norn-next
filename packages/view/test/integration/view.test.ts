@@ -25,6 +25,7 @@ import {
 } from "@norn/store";
 import { formatInbox, formatStatus, formatStoryView, formatTimeline, loadProjectView, loadTimelines, orientReport, prCommand } from "../../src/index.ts";
 import { runStateOf } from "../../../../test/support/run-state.ts";
+import { worktreeOf } from "../../../../test/support/worktree.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -312,7 +313,7 @@ describe("loadProjectView", () => {
     const parent = tmp();
     const repo = join(parent, "app");
     mkdirSync(repo);
-    const wt = join(parent, "app-worktrees", "gh-7-thing");
+    const wt = worktreeOf(repo, "gh-7-thing");
     writeStoryFile(
       storyFile(storyDir(wt, "gh-7", "thing")),
       { id: "gh-7", slug: "thing", provider: "gh", number: 7, url: "u", title: "Thing", assignee: null, workflow: "story", status: "new", intake_at: ago(5) },
@@ -328,7 +329,7 @@ describe("loadProjectView", () => {
     const repo = join(parent, "app");
     mkdirSync(repo);
     const fm = (n: number, slug: string) => ({ id: `gh-${n}`, slug, provider: "gh", number: n, url: "u", title: `T${n}`, assignee: null, workflow: "story", status: "active", intake_at: ago(5) }) as const;
-    const wt = join(parent, "app-worktrees", "gh-7-thing");
+    const wt = worktreeOf(repo, "gh-7-thing");
     const spec = storyDir(wt, "gh-7", "thing");
     writeStoryFile(storyFile(spec), fm(7, "thing"), "");
     writeSliceFile(join(spec, "slices/01-login-form.md"), { id: "gh-7/01", title: "Form", depends_on: [], status: "active" }, "");
@@ -341,7 +342,7 @@ describe("loadProjectView", () => {
     writeState(u1, state({ story: "gh-7", slice: "gh-7/01", unit_dir: "01-login-form", status: "parked", park: { kind: "ask", reason: "blocked", since: ago(3), receipt_id: ASK } }));
     writeUnitMarker(sliceWt, { repo, story: "gh-7", slice: "gh-7/01", unit: "01-login-form", spec_dir: ".agents/specs/gh-7-thing" });
     // a story-shaped folder whose marker names another story is not that story's worktree
-    const wrong = join(parent, "app-worktrees", "gh-8-other");
+    const wrong = worktreeOf(repo, "gh-8-other");
     writeStoryFile(storyFile(storyDir(wrong, "gh-9", "else")), fm(9, "else"), "");
     writeUnitMarker(wrong, { repo, story: "gh-9", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-9-else" });
 

@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { claimRef, recordRef, ulid } from "@norn/schema";
 import { appendReceipt, readState, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
-import { createHarness, type Harness, issue, sh } from "../../../../test/support/harness.ts";
+import { createHarness, type Harness, issue, sh, worktreeOf } from "../../../../test/support/harness.ts";
 import { type Clone, cloneOf } from "../../../../test/support/clone.ts";
 import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
@@ -74,7 +74,7 @@ async function heldThenSilent(n: number, slug: string, rounds: number): Promise<
   const key = `gh-${n}`;
   const spec = `.agents/specs/${key}-${slug}`;
   const branch = `${key}-${slug}`;
-  const wt = (root: string) => `${root}-worktrees/${branch}`;
+  const wt = (root: string) => worktreeOf(root, branch);
   const runs = (root: string) => runStateOf(join(wt(root), spec));
   h.remote.issues = [...h.remote.issues, issue(n, slug, ["norn", "norn:wf:rv"])];
   await h.tick("--sync");
@@ -341,9 +341,9 @@ describe("a lost-record checkout that cannot start the round takes nothing (revi
     for (let i = 0; i < 4 && !remoteRef(claimRef(key)); i++) await tick();
     expect(remoteRef(claimRef(key))).toBeTruthy();
     // its intake branch reached the remote (a person pushed it)
-    sh(`${h.root}-worktrees/${key}-not-started`, ["push", "-q", "origin", `${key}-not-started`]);
+    sh(h.worktree(`${key}-not-started`), ["push", "-q", "origin", `${key}-not-started`]);
     expect(sh(h.dir, ["--git-dir", h.remoteDir, "show", `${key}-not-started:${spec}/spec.md`])).toContain("status: new");
-    expect(state(runStateOf(join(`${h.root}-worktrees/${key}-not-started`, spec)))).toBeNull();
+    expect(state(runStateOf(join(h.worktree(`${key}-not-started`), spec)))).toBeNull();
     expire(key);
     const B = cloneOf(h, "b-new", "bob");
     const r = await B.norn("story", "checkout", key);
@@ -353,6 +353,6 @@ describe("a lost-record checkout that cannot start the round takes nothing (revi
     h.clock.advance(10_000);
     const t = await B.tick();
     expect(t.decisions.filter((d) => d.unit === key).map((d) => d.rule)).toContain("story.start");
-    expect(state(runStateOf(join(`${B.root}-worktrees/${key}-not-started`, spec)))).toMatchObject({ step: "implement", attempt: 1 });
+    expect(state(runStateOf(join(B.worktree(`${key}-not-started`), spec)))).toMatchObject({ step: "implement", attempt: 1 });
   });
 });

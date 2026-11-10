@@ -58,7 +58,7 @@ mode: auto
 
 let h: Harness;
 const SLUGS: Record<number, string> = { 1: "gh-1-pay-invoices", 2: "gh-2-send-receipts", 3: "gh-3-pick-an-api", 4: "gh-4-split-work" };
-const wt = (n: number) => `${h.root}-worktrees/${SLUGS[n]}`;
+const wt = (n: number) => h.worktree(SLUGS[n]!);
 const runs = (n: number) => runStateOf(join(wt(n), `.agents/specs/${SLUGS[n]}`));
 const sliceWt = () => `${wt(4)}--01-part`;
 const sliceRuns = () => runStateOf(join(sliceWt(), `.agents/specs/${SLUGS[4]}`), "01-part");

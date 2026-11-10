@@ -44,7 +44,7 @@ const CONFIG = "provider: gh\nworkflow: ship\nmode: manual\n";
 
 let h: Harness;
 const spec = ".agents/specs/gh-7-count-items";
-const wt = () => `${h.root}-worktrees/gh-7-count-items`;
+const wt = () => h.worktree("gh-7-count-items");
 const runs = () => runStateOf(join(wt(), spec));
 const tick = () => {
   h.clock.advance(10_000);

@@ -25,7 +25,7 @@ steps:
 
 let h: Harness;
 const spec = ".agents/specs/gh-9-two-sessions";
-const wt = () => `${h.root}-worktrees/gh-9-two-sessions`;
+const wt = () => h.worktree("gh-9-two-sessions");
 const runs = () => runStateOf(join(wt(), spec));
 const receipts = () => (existsSync(join(runs(), "receipts")) ? readdirSync(join(runs(), "receipts")).sort() : []);
 

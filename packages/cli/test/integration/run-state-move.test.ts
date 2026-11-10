@@ -78,7 +78,7 @@ const handoffAt = (cwd: string, ref: string, spec: string, unit: string = STORY_
 /** A duo story taken to implement attempt 2 (a review sent it back once: review_loop 1). */
 async function storyAtRework(n: number, slug: string, title: string) {
   const spec = `.agents/specs/gh-${n}-${slug}`;
-  const wt = `${h.root}-worktrees/gh-${n}-${slug}`;
+  const wt = h.worktree(`gh-${n}-${slug}`);
   const runs = () => runStateOf(join(wt, spec));
   h.remote.issues = [...h.remote.issues, issue(n, title)];
   await h.tick("--sync");
@@ -282,7 +282,7 @@ describe("an open story's run state moves off its branch at the holder's first t
 
 describe("a story with slices: each unit's record moves off its own branch (B34)", () => {
   const SPEC = ".agents/specs/gh-11-two-parts";
-  const wt = () => `${h.root}-worktrees/gh-11-two-parts`;
+  const wt = () => h.worktree("gh-11-two-parts");
   const story = () => runStateOf(join(wt(), SPEC));
   const SLICES = [
     ["01", "part-a"],
@@ -335,7 +335,7 @@ describe("a story with slices: each unit's record moves off its own branch (B34)
 
   test("S2: the story's move waits while a slice with a folder on the story branch fails validation on its own branch; nothing is removed", async () => {
     const SPEC19 = ".agents/specs/gh-19-guarded-parts";
-    const wt19 = `${h.root}-worktrees/gh-19-guarded-parts`;
+    const wt19 = h.worktree("gh-19-guarded-parts");
     const story19 = () => runStateOf(join(wt19, SPEC19));
     const slice19 = `${wt19}--01-part-a`;
     h.remote.issues = [...h.remote.issues, issue(19, "Guarded parts", ["norn", "norn:wf:split"])];

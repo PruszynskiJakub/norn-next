@@ -35,7 +35,7 @@ const SPEC = ".agents/specs/gh-9-fix-the-bug";
 type Why = { tick_id: string; rule: string; replay: { matches: boolean; all_match: boolean } };
 
 let h: Harness;
-const wt = () => `${h.root}-worktrees/gh-9-fix-the-bug`;
+const wt = () => h.worktree("gh-9-fix-the-bug");
 const runs = () => runStateOf(join(wt(), SPEC));
 const ticks = () => readTrace(h.root, { types: ["tick"] }).events as TickTrace[];
 const dir = () => machineDir(h.root);
