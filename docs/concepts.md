@@ -120,7 +120,7 @@ The version is read from the main checkout's team config, so it changes for you 
 - the commands that only read run and show the mismatch: `help`, `--version`, `doctor`, `status` (a top Unblock item, and the tab bar line), `story list|view|wait`, `run list|view`, `config list|get`.
 - `init`, `upgrade`, `uninstall`, and the reports an agent already in a step makes (`done`, `ask`, `stuck`, `hook`, and the check runs a tick started), are never refused for it, so a session already started can always report.
 
-A repo without the key, or one recording a version below 0.30, is refused the same way by every command that acts, with code `version_missing` or `version_too_old`, and `status` shows it as a top Unblock item pointing to `norn doctor`. Run `norn init` if norn was never set up there; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with this norn. How to move a team to a new norn is in [Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team).
+A repo without the key, or one recording a version below 0.30, is refused the same way by every command that acts and by `init`, with code `version_missing` or `version_too_old`; `doctor` fails its version check with the same words, and `status` shows it as a top Unblock item pointing to `norn doctor`. Run `norn init` if norn was never set up there; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with this norn. How to move a team to a new norn is in [Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team).
 
 ## Glossary
 

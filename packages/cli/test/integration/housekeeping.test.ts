@@ -457,6 +457,7 @@ steps:
       expect(repo.stdout).toMatch(/FAIL config +\.agents\/norn\.config\.yaml/);
     } finally {
       h.config(CONFIG);
+      h.recordVersion();
     }
   });
 
@@ -571,49 +572,49 @@ describe("norn doctor: the repo's norn version and drifted skills (B23–B25, D1
   afterAll(() => h.cleanup());
 
   test("B23: a matching binary passes the version line; an older one fails it with what to install, exit 1", async () => {
-    atVersion("0.19.0");
-    const ok = await runChecked(["doctor"], as("0.19.2"));
-    expect(ok.value).toMatchObject({ repo: { version: { ok: true, running: "0.19.2", repo: "0.19.0", match: "match" } } });
-    expect(ok.stdout).toMatch(/ok {3}norn +0\.19\.2 matches this repo's norn version 0\.19\.0\n/);
+    atVersion("0.31.0");
+    const ok = await runChecked(["doctor"], as("0.31.2"));
+    expect(ok.value).toMatchObject({ repo: { version: { ok: true, running: "0.31.2", repo: "0.31.0", match: "match" } } });
+    expect(ok.stdout).toMatch(/ok {3}norn +0\.31\.2 matches this repo's norn version 0\.31\.0\n/);
     expect(ok.exit).toBe(0);
 
-    const old = await runChecked(["doctor"], as("0.18.1"));
+    const old = await runChecked(["doctor"], as("0.30.1"));
     expect(old.exit).toBe(1);
-    expect(old.value).toMatchObject({ ok: false, repo: { ok: false, version: { ok: false, running: "0.18.1", repo: "0.19.0", match: "older", do_instead: "install norn 0.19.x" } } });
+    expect(old.value).toMatchObject({ ok: false, repo: { ok: false, version: { ok: false, running: "0.30.1", repo: "0.31.0", match: "older", do_instead: "install norn 0.31.x" } } });
     expect(old.stdout).toMatch(/^norn doctor: 1 check failed \(norn\)/);
-    expect(old.stdout).toMatch(/FAIL norn +0\.18\.1 does not match this repo's norn version 0\.19\.0\n +→ install norn 0\.19\.x\n/);
+    expect(old.stdout).toMatch(/FAIL norn +0\.30\.1 does not match this repo's norn version 0\.31\.0\n +→ install norn 0\.31\.x\n/);
   });
 
   test("B7, B23: a newer binary fails the version line and names `norn upgrade`", async () => {
-    atVersion("0.18.0");
-    const r = await runChecked(["doctor"], as("0.19.0"));
+    atVersion("0.30.0");
+    const r = await runChecked(["doctor"], as("0.31.0"));
     expect(r.exit).toBe(1);
     expect(r.value).toMatchObject({ repo: { version: { ok: false, match: "newer" } } });
-    expect(r.stdout).toMatch(/FAIL norn +0\.19\.0 does not match this repo's norn version 0\.18\.0/);
-    expect(r.stdout).toContain("→ run `norn upgrade` to move this repo to norn 0.19.0 and commit the change, or install norn 0.18.x");
+    expect(r.stdout).toMatch(/FAIL norn +0\.31\.0 does not match this repo's norn version 0\.30\.0/);
+    expect(r.stdout).toContain("→ run `norn upgrade` to move this repo to norn 0.31.0 and commit the change, or install norn 0.30.x");
   });
 
-  test("B5: no version recorded is a warning naming `norn upgrade`, not a failure", async () => {
+  test("no version recorded fails the version line with the version guard's code and words", async () => {
     atVersion(null);
-    const r = await runChecked(["doctor"], as("0.19.0"));
-    expect(r.value).toMatchObject({ ok: true, repo: { ok: true, version: { ok: true, running: "0.19.0", repo: null, match: null, warning: "no norn version recorded: run `norn upgrade`" } } });
-    expect(r.stdout).toMatch(/warn norn +no norn version recorded: run `norn upgrade`\n/);
-    expect(r.exit).toBe(0);
+    const r = await runChecked(["doctor"], as("0.31.0"));
+    expect(r.exit).toBe(1);
+    expect(r.value).toMatchObject({ ok: false, repo: { ok: false, version: { ok: false, running: "0.31.0", repo: null, match: null, code: "version_missing", error: "this repo records no norn_version" } } });
+    expect(r.stdout).toMatch(/FAIL norn +this repo records no norn_version\n/);
   });
 
   test("B24, B21: a drifted bundled skill fails the skills check with `norn upgrade`; a repo-local skill is never named", async () => {
-    atVersion("0.19.0");
+    atVersion("0.31.0");
     h.write(join(h.root, ".agents/skills/release/SKILL.md"), "---\nname: release\n---\nthe repo's own\n");
     try {
-      const clean = await runChecked(["doctor"], as("0.19.0"));
+      const clean = await runChecked(["doctor"], as("0.31.0"));
       expect(clean.exit).toBe(0);
       expect(clean.stdout).toMatch(/ok {3}skills +installed and linked\n/);
       await editing("norn-review", async () => {
-        const r = await runChecked(["doctor"], as("0.19.0"));
+        const r = await runChecked(["doctor"], as("0.31.0"));
         expect(r.exit).toBe(1);
         expect(r.value).toMatchObject({ ok: false, skills: { ok: false, drifted: ["norn-review"] }, repo: { ok: false, skills: { ok: false, drifted: ["norn-review"] } } });
         expect(r.stdout).toMatch(/^norn doctor: 1 check failed \(skills\)/);
-        expect(r.stdout).toMatch(/FAIL skills +norn-review differs from norn 0\.19\.0's copy\n/);
+        expect(r.stdout).toMatch(/FAIL skills +norn-review differs from norn 0\.31\.0's copy\n/);
         expect(r.stdout).toContain("→ run `norn upgrade` and commit (git diff .agents/skills/ shows the change)");
         expect(r.stdout).not.toContain("release");
         expect(r.stdout).not.toContain("skills differ from this norn's bundled version");
@@ -624,33 +625,33 @@ describe("norn doctor: the repo's norn version and drifted skills (B23–B25, D1
   });
 
   test("B25: --repo with no agent, runner or remote fails on drift or an older repo version, passes a clean repo; missing skills stay out", async () => {
-    atVersion("0.19.0");
-    const clean = await runChecked(["doctor", "--repo"], bare("0.19.0"));
+    atVersion("0.31.0");
+    const clean = await runChecked(["doctor", "--repo"], bare("0.31.0"));
     expect(clean.exit).toBe(0);
     expect(clean.stdout).toStartWith("norn doctor: every check passes\n");
-    expect(clean.stdout).toMatch(/ok {3}norn +0\.19\.0 matches this repo's norn version 0\.19\.0\n/);
+    expect(clean.stdout).toMatch(/ok {3}norn +0\.31\.0 matches this repo's norn version 0\.31\.0\n/);
     expect(Object.keys(clean.value as object).sort()).toEqual(["ok", "repo"]);
 
     await editing("norn", async () => {
-      const r = await runChecked(["doctor", "--repo"], bare("0.19.0"));
+      const r = await runChecked(["doctor", "--repo"], bare("0.31.0"));
       expect(r.exit).toBe(1);
       expect(r.stdout).toMatch(/^norn doctor: 1 check failed \(skills\)/);
-      expect(r.stdout).toMatch(/FAIL skills +norn differs from norn 0\.19\.0's copy\n/);
+      expect(r.stdout).toMatch(/FAIL skills +norn differs from norn 0\.31\.0's copy\n/);
     });
 
-    atVersion("0.18.0");
-    const stale = await runChecked(["doctor", "--repo"], bare("0.19.0"));
+    atVersion("0.30.0");
+    const stale = await runChecked(["doctor", "--repo"], bare("0.31.0"));
     expect(stale.exit).toBe(1);
     expect(stale.stdout).toMatch(/^norn doctor: 1 check failed \(norn\)/);
 
     // a missing skill or an unlinked one is a machine check of the full doctor, not --repo's
-    atVersion("0.19.0");
+    atVersion("0.31.0");
     // a skill no workflow names, so the workflows stay valid
     const skill = join(h.root, ".agents/skills/norn-codebase-design");
     const saved = join(h.dir, "norn-codebase-design");
     renameSync(skill, saved);
     try {
-      const missing = await runChecked(["doctor", "--repo"], bare("0.19.0"));
+      const missing = await runChecked(["doctor", "--repo"], bare("0.31.0"));
       expect(missing.exit).toBe(0);
       expect(missing.stdout).not.toContain("missing");
     } finally {

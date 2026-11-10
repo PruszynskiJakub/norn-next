@@ -23,7 +23,7 @@ import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
 import { effectiveRetain, formatBytes, retainCutoffDay, retainWarning } from "../runtime/trace-retention.ts";
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { hookBinary, hookCommand } from "./init.ts";
-import { baseRunStateHint, cmd } from "@norn/core";
+import { baseRunStateHint, cmd, versionBaseline } from "@norn/core";
 import { oneLine } from "@norn/view";
 
 interface RunOut {
@@ -226,16 +226,18 @@ function loadFail(ctx: Context): ConfigFail | null {
   return { ok: false, error: body.error, do_instead: body.do_instead };
 }
 
-/** The repo's `norn_version` against this binary; no key is a warning, never a failure. */
+/** The repo's `norn_version` against this binary; a missing or pre-0.30 one fails with the version guard's own refusal. */
 interface VersionCheck extends Check {
   running: string;
   repo: string | null;
   match: VersionMatch | null;
-  warning?: string;
+  code?: "version_missing" | "version_too_old";
 }
 
 function versionCheck(running: string, repo: string | null): VersionCheck {
-  if (repo === null) return { ok: true, running, repo, match: null, warning: `no norn version recorded: run \`${cmd.upgrade()}\`` };
+  const baseline = versionBaseline(repo, running);
+  if (baseline) return { ok: false, running, repo, match: null, code: baseline.code, error: baseline.error, do_instead: baseline.do_instead };
+  if (repo === null) throw new Error("unreachable: the baseline rule refuses a missing norn_version");
   const match = versionMatch(repo, running);
   if (match === "match") return { ok: true, running, repo, match };
   const line = `${repo.split(".").slice(0, 2).join(".")}.x`;
@@ -336,7 +338,11 @@ function lines() {
 }
 
 function formatVersion(v: VersionCheck, l: ReturnType<typeof lines>): void {
-  if (v.repo === null) return l.line(false, "norn", v.warning ?? "", true);
+  if (v.code) {
+    l.line(false, "norn", v.error ?? "");
+    l.sub(`→ ${v.do_instead}`);
+    return;
+  }
   l.line(v.ok, "norn", `${v.running} ${v.ok ? "matches" : "does not match"} this repo's norn version ${v.repo}`);
   if (v.do_instead) l.sub(`→ ${v.do_instead}`);
 }
