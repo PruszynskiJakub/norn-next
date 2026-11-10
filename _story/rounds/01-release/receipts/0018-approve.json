@@ -1,0 +1,1 @@
+{"kind":"approve","receipt_id":"01M72YRQ5SY04ZEVWT35RYP3QN","run_id":null,"step":"ready","attempt":2,"at":"2026-11-10T14:46:04.217Z","by":"human","who":"jakubpruszynski@mac","slice":null,"round":1,"comment":"person: approve 0.31.0 as proposed; issue and PR renamed to Release 0.31.0 so the process check passes","head_sha":"8ff1b6edbd9ede8aa217790b5d18eab3219c6fd2"}
