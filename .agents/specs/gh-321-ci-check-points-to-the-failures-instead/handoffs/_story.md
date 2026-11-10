@@ -13,9 +13,9 @@ When the `ci` check fails, the rework brief shows where the failures are (run/ch
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
-| AC1 | on a failed CI run the "Failing check" block holds the run/check-run links, failed ids and the annotations command in about 10 lines, no test log | agent (hand check; no test seam for workflow shell) | QA (agent): review ran `sh .agents/scripts/ci-failures.sh 42794918379` → 5 lines (run URL, `- job 129757664390: integration (shard 3/4)`, annotations command, `--log-failed --job` fallback); shipped check-runs query → `- integration (shard 3/4) (id 129757664390): <job link>`; shipped echo lines render correctly under sh |
+| AC1 | on a failed CI run the "Failing check" block holds the run/check-run links, failed ids and the annotations command in about 10 lines, no test log | agent (hand check; no test seam for workflow shell) | QA (agent): review ran `sh .agents/scripts/ci-failures.sh 42794918379` → 5 lines (run URL, `- job 129757664390: integration (shard 3/4)`, annotations command, `--log-failed --job` fallback); shipped check-runs query → `- integration (shard 3/4) (id 129757664390): <job link>`; shipped echo lines render correctly under sh; also `packages/cli/test/integration/ci-check.test.ts` › "fails on a red run with where its failures are, never its log" and "fails on a red check with the checks and where the failures are, never the log" (fake gh) |
 | AC2 | the printed annotations command for a failed integration job shows the failing assertion with file and line, and no `.github` noise | agent (hand check) | QA (agent): annotations for check run 129757664390 → `packages/cli/test/integration/upgrade.test.ts:227 Expected: true / Received: false`, no `.github` entries |
-| AC3 | a green CI run still exits 0 with no output | agent (hand check) | QA (agent): by reading — `gh run watch … && exit 0` / `gh pr checks --watch … && exit 0` still precede the new lines, unchanged by the diff |
+| AC3 | a green CI run still exits 0 with no output | agent (hand check) | QA (agent): by reading — `gh run watch … && exit 0` / `gh pr checks --watch … && exit 0` still precede the new lines, unchanged by the diff; `ci-check.test.ts` green-path tests assert exit 0 (not empty output — review #2 minor note) |
 
 ### Easy to miss
 
@@ -28,11 +28,12 @@ When the `ci` check fails, the rework brief shows where the failures are (run/ch
 
 ### Notes
 
-- Review: approve, no findings. The criteria have no frontmatter verifiers, but the spec prescribes hand verification against a live run and the unit tier cannot run workflow shell, so the rows are proven by the reviewer's re-run rather than marked UNTRACED; a person can overrule that.
+- Review #2 (current HEAD): approve, 1 minor note — the green-run tests in `ci-check.test.ts` assert exit 0 but not empty output; optional `expect(r.out).toBe("")`. Code files still match the issue's patch; unit tier 1732 pass, typecheck and ci-check integration 8/8 green.
+- Review #1: approve, no findings. The criteria have no frontmatter verifiers, but the spec prescribes hand verification against a live run and the unit tier cannot run workflow shell, so the rows are proven by the reviewer's re-run rather than marked UNTRACED; a person can overrule that.
 - ci#1 failed on `ci-check.test.ts` (integration shard 4/4): its fake gh still expected the old `--log-failed` calls, and the repo script runs `.agents/scripts/ci-failures.sh` relative to cwd, so the test now copies that script into its fake checkout. The new repo-path output did point straight at the failure (AC1/AC2 shown live).
 - Run one integration file locally: `bun test --config=bunfig.integration.toml --timeout=20000 ./packages/cli/test/integration/ci-check.test.ts` (a bare `bun test <file>` finds no file).
 - Friction: the worktree had no `node_modules`, so the first `bun run test` failed 75 tests until `bun install`.
 
 ### Resume
 
-implement#2 fixed the ci-check integration test for the new output. Next: norn's open-pr pushes, then `ci` re-runs; if it fails again, read the annotations command it prints.
+Review #2 approved the current HEAD. Next: norn's describe/open-pr refresh the PR, then `ci` re-runs (PR #324's run 42798730608 was pending at review time); if it fails, read the annotations command it prints.
