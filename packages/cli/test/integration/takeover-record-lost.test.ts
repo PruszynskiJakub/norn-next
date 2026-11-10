@@ -232,9 +232,11 @@ describe("a wiped machine dir on the holder recovers as any takeover (B26)", () 
     wipe(h.home);
     h.clock.advance(10_000);
     const t = await h.tick();
+    // The wipe took the story worktree with it (it lives in the machine dir): A sees the issue as a
+    // fresh clone would, and its intake leaves the story to `story checkout` (the branch is on the remote)
     const mine = t.decisions.filter((d) => d.unit.startsWith(s.key) && d.kind !== "noop");
-    expect(mine).toEqual([]);
-    expect(t.decisions.find((d) => d.unit === s.key)?.rule).toBe("claim.other");
+    expect(mine).toEqual([expect.objectContaining({ kind: "intake_story", rule: "remote.intake", ok: true })]);
+    expect(existsSync(s.wt(h.root))).toBe(false);
     expect(state(s.runs(h.root))).toBeNull();
 
     h.clock.advance(10_000);
