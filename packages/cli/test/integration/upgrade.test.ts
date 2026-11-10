@@ -1,86 +1,51 @@
 /**
- * gh-110 B11–B17, gh-61 B29, B30: `norn upgrade` (once `norn migrate`) moves a main checkout from the old layout to the new one. The
- * config and workflows move as staged git renames, the machine-local files into the machine dir,
- * norn's old `.gitignore` line goes; nothing is committed. It refuses outside the main checkout, with
- * a part in both places, or while the tick lock is held; it does nothing on a migrated repo, and a
- * rerun finishes an interrupted one. The old paths are spelled out in the harness: what a person had.
+ * `norn upgrade` moves a repo from norn 0.30 on: before any write it refuses a run outside the main
+ * checkout, a repo below the 0.30 baseline or recording no version (the baseline rule's text), and a
+ * running tick; its `--json` holds only what it still does; it never touches old config keys,
+ * criteria `needs` or `.gitattributes`. `norn migrate` is gone.
  */
-import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { join, relative } from "node:path";
-import { type ClaimBlob, validate } from "@norn/schema";
-import { acquireLock, acquireTickLock, readLocalClaim, repoConfigPath, workflowsDir } from "@norn/store";
-import { type CliResult, runningVersion } from "../../src/index.ts";
-import { createHarness, type Harness, issue, layoutPlaces, oldNornDir, runChecked, sh, toOldLayout } from "../../../../test/support/harness.ts";
+import { describe, expect, setDefaultTimeout, test } from "bun:test";
+import { lstatSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { versionBaseline } from "@norn/core";
+import { validate } from "@norn/schema";
+import { acquireTickLock, OLD_CONFIG_FILE, REPO_CONFIG_FILE, repoConfigPath } from "@norn/store";
+import type { CliResult } from "../../src/index.ts";
+import { createHarness, type Harness, runChecked, sh } from "../../../../test/support/harness.ts";
 
-// whole flows over real git, several ticks each
 setDefaultTimeout(60_000);
 
-const CONFIG = `provider: gh
-workflow: solo
-mode: manual
-`;
+const RUNNING = "0.31.0";
+const skill = (h: Harness, name: string) => join(h.root, ".agents", "skills", name, "SKILL.md");
+const link = (h: Harness, name: string) => join(h.root, ".claude", "skills", name);
+const teamFile = (h: Harness) => readFileSync(repoConfigPath(h.root), "utf8");
+const porcelain = (h: Harness) => sh(h.root, ["status", "--porcelain", "--untracked-files=all"]).trimEnd();
 
-const SOLO = `name: solo
-start: implement
-steps:
-  implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: $done }
-`;
-
-/** The `.gitignore` of a repo an older norn set up: the person's lines around norn's. */
-const OLD_GITIGNORE = `node_modules/
-dist
-# norn (machine-local)
-.agents/norn/trace/
-.env.norn
-.norn-unit
-*.log
-`;
-
-const OLD_CONFIG = ".agents/norn/config.yaml";
-const OLD_WORKFLOWS = ".agents/norn/workflows";
-const NEW_CONFIG = ".agents/norn.config.yaml";
-const NEW_WORKFLOWS = ".agents/workflows";
-
-interface Migrated {
-  moves: Array<{ part: string; from: string; to: string; how: string }>;
-  staged: string[];
-  commit: string | null;
+/** A repo set up by norn 0.30.0 and committed, with a drifted skill and a missing link upgrade would otherwise fix; the binary under test is 0.31.0. */
+async function repoAt030(): Promise<Harness> {
+  const h = await createHarness({ version: RUNNING });
+  expect((await runChecked(["init"], { ...h.deps, version: "0.30.0" })).exit).toBe(0);
+  h.write(skill(h, "norn-plan"), "# 0.30.0's protocol\n");
+  rmSync(link(h, "norn-plan"));
+  sh(h.root, ["add", "-A"]);
+  sh(h.root, ["commit", "-q", "-m", "Set up norn 0.30.0"]);
+  return h;
 }
 
-/** A repo set up and ticked on the new layout, then moved back to the old one and committed, as an older norn left it. */
-async function oldRepo(): Promise<{ h: Harness; workflows: string[] }> {
-  const h = await createHarness();
-  expect((await h.norn("init")).exit).toBe(0);
-  h.config(CONFIG);
-  h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
-  h.write(join(workflowsDir(h.root), "quick.yaml"), SOLO.replace("name: solo", "name: quick"));
-  h.git(["add", "-A"]);
-  h.git(["commit", "-q", "-m", "norn init"]);
-  h.git(["push", "-q", "origin", "main"]);
-  h.remote.issues = [issue(4, "Four")];
-  for (let i = 0; i < 3; i++) {
-    h.clock.advance(10_000);
-    await h.tick();
-  }
-  const workflows = readdirSync(workflowsDir(h.root)).sort();
-  toOldLayout(h.root);
-  h.write(join(h.root, ".gitignore"), OLD_GITIGNORE);
-  h.git(["add", "-A"]);
-  h.git(["commit", "-q", "-m", "on the old layout"]);
-  h.git(["push", "-q", "origin", "main"]);
-  return { h, workflows };
+/** Set (or, with null, remove) the team file's `norn_version`, committed. */
+function recordVersion(h: Harness, v: string | null): void {
+  const kept = teamFile(h).replace(/^norn_version:.*\n?/m, "");
+  h.write(repoConfigPath(h.root), v === null ? kept : `${kept}norn_version: ${v}\n`);
+  sh(h.root, ["commit", "-q", "-am", `norn_version ${v ?? "(none)"}`]);
 }
 
-const porcelain = (h: Harness) => sh(h.root, ["status", "--porcelain"]).trimEnd();
-const head = (h: Harness) => sh(h.root, ["rev-parse", "HEAD"]).trim();
-
-/** Every file under the checkout (outside `.git`) and under the norn home, and the git status: what "moves nothing" compares. */
+/** Every file under the checkout (outside `.git`) and the norn home, with its bytes, and the git status. */
 function snapshot(h: Harness): string[] {
-  const list = (dir: string) => (readdirSync(dir, { recursive: true }) as string[]).filter((p) => !p.startsWith(".git/") && p !== ".git").map((p) => join(dir, p));
+  const list = (dir: string) =>
+    (readdirSync(dir, { recursive: true }) as string[])
+      .filter((p) => !p.startsWith(".git/") && p !== ".git")
+      .map((p) => join(dir, p))
+      .map((p) => (lstatSync(p).isFile() ? `${p}:${readFileSync(p, "utf8")}` : p));
   return [...list(h.root), ...list(h.home), porcelain(h)].sort();
 }
 
@@ -90,390 +55,56 @@ function expectRefused(r: CliResult, code: string) {
   expect(validate("cli-error", r.value).ok).toBe(true);
 }
 
-describe("norn upgrade on the old layout (B11, B12, B13)", () => {
-  let h: Harness;
-  let workflows: string[];
-  let heartbeat: string;
-  let claimBefore: ClaimBlob;
-  let headBefore: string;
-  let out: CliResult;
-  beforeAll(async () => {
-    ({ h, workflows } = await oldRepo());
-    heartbeat = JSON.parse(h.read(join(layoutPlaces(h.root)["machine files"].old, "heartbeat.json"))).heartbeat_id;
-    const c = await readLocalClaim(h.root, "gh-4");
-    if (c.state !== "present") throw new Error(`no claim on gh-4: ${c.state}`);
-    claimBefore = c.blob;
-    headBefore = head(h);
-    out = await h.norn("upgrade");
-  });
-  afterAll(() => h.cleanup());
-
-  test("the config and workflows are staged git renames, nothing committed; the output lists each move and ends with the commit (B11)", () => {
-    expect(out.exit).toBe(0);
-    expect(head(h)).toBe(headBefore);
-    const lines = porcelain(h).split("\n").sort();
-    expect(lines).toEqual(
-      [`R  ${OLD_CONFIG} -> ${NEW_CONFIG}`, ...workflows.map((w) => `R  ${OLD_WORKFLOWS}/${w} -> ${NEW_WORKFLOWS}/${w}`), "M  .gitignore"].sort(),
-    );
-    expect(out.stdout).toContain(`${OLD_CONFIG} → ${NEW_CONFIG}`);
-    for (const w of workflows) expect(out.stdout).toContain(`${OLD_WORKFLOWS}/${w} → ${NEW_WORKFLOWS}/${w}`);
-    expect(out.stdout.trimEnd().split("\n").at(-1)).toContain("git commit");
-  });
-
-  test("the machine-local files are in the machine dir with the same heartbeat; .agents/norn/ is gone (B12)", () => {
-    const machine = layoutPlaces(h.root)["machine files"].new;
-    expect(JSON.parse(readFileSync(join(machine, "heartbeat.json"), "utf8")).heartbeat_id).toBe(heartbeat);
-    expect(existsSync(oldNornDir(h.root))).toBe(false);
-    expect(out.stdout).toContain(machine);
-  });
-
-  test("norn's old .gitignore line is gone and staged; the person's lines are untouched (B13)", () => {
-    expect(h.read(join(h.root, ".gitignore"))).toBe(OLD_GITIGNORE.replace(".agents/norn/trace/\n", ""));
-    expect(porcelain(h)).toContain("M  .gitignore");
-  });
-
-  test("the next tick recognises its own claim", async () => {
-    h.git(["commit", "-q", "-m", "norn: move to the new layout"]);
-    // past the renewal (3m), inside the lease (10m): only a tick that knows the claim is its own renews it
-    h.clock.advance(4 * 60_000);
-    await h.tick();
-    const c = await readLocalClaim(h.root, "gh-4");
-    if (c.state !== "present") throw new Error(`no claim on gh-4: ${c.state}`);
-    expect(c.blob.heartbeat_id).toBe(heartbeat);
-    expect(c.blob.acquired_at).toBe(claimBefore.acquired_at);
-    expect(Date.parse(c.blob.renewed_at)).toBeGreaterThan(Date.parse(claimBefore.renewed_at));
-  });
-
-  test("a second run says nothing to move, exits 0 and changes nothing (B14)", async () => {
-    const before = snapshot(h);
-    const md = await h.norn("upgrade");
-    expect(md.exit).toBe(0);
-    expect(md.stdout).toContain("nothing to upgrade");
-    const json = await h.norn("upgrade", "--json");
-    expect(json.exit).toBe(0);
-    const version = runningVersion(h.deps);
-    expect(json.value).toEqual({ moves: [], config: { changed: [], renamed: [], removed: [] }, norn_version: { from: version, to: version, changed: false }, skills: { updated: [], linked: [] }, run_state: [], staged: [], commit: null, labels: expect.objectContaining({ checked: true, created: [] }) });
-    expect(snapshot(h)).toEqual(before);
-  });
-});
-
-describe("norn migrate is a deprecated alias of norn upgrade", () => {
-  test("it stages the same moves upgrade stages, with the same JSON value, and says on stderr that it is now norn upgrade", async () => {
-    const a = await oldRepo();
-    const b = await oldRepo();
+describe("norn upgrade refuses before any write", () => {
+  test("a repo recording 0.29.4: version_too_old with the baseline rule's 0.30.x path, nothing staged or rewritten", async () => {
+    const h = await repoAt030();
     try {
-      const up = await a.h.norn("upgrade", "--json");
-      const mig = await b.h.norn("migrate", "--json");
-      expect(up.exit).toBe(0);
-      expect(mig.exit).toBe(0);
-      const rel = (h: Harness, v: unknown) => JSON.parse(JSON.stringify(v).replaceAll(layoutPlaces(h.root)["machine files"].new, "<machine>"));
-      expect(rel(b.h, mig.value)).toEqual(rel(a.h, up.value));
-      expect(porcelain(b.h)).toBe(porcelain(a.h));
-      expect(mig.stderr).toBe("`norn migrate` is now `norn upgrade`; the old name goes in the next minor\n");
-      expect(up.stderr).toBeUndefined();
-    } finally {
-      a.h.cleanup();
-      b.h.cleanup();
-    }
-  });
-});
-
-describe("norn upgrade --json (B11)", () => {
-  let h: Harness;
-  let workflows: string[];
-  beforeAll(async () => ({ h, workflows } = await oldRepo()));
-  afterAll(() => h.cleanup());
-
-  test("gives {moves, staged, commit}", async () => {
-    const r = await h.norn("upgrade", "--json");
-    expect(r.exit).toBe(0);
-    const v = r.value as Migrated;
-    expect(Object.keys(v).sort()).toEqual(["commit", "config", "labels", "moves", "norn_version", "run_state", "skills", "staged"]);
-    const machine = layoutPlaces(h.root)["machine files"];
-    expect(v.moves).toEqual([
-      { part: "config", from: OLD_CONFIG, to: NEW_CONFIG, how: "git mv" },
-      ...workflows.map((w) => ({ part: "workflows", from: `${OLD_WORKFLOWS}/${w}`, to: `${NEW_WORKFLOWS}/${w}`, how: "git mv" })),
-      { part: "machine files", from: relative(h.root, machine.old), to: machine.new, how: "moved" },
-    ]);
-    expect(v.staged.sort()).toEqual([NEW_CONFIG, ...workflows.map((w) => `${NEW_WORKFLOWS}/${w}`), ".gitignore"].sort());
-    expect(v.commit).toStartWith("git commit -m ");
-  });
-});
-
-describe("norn upgrade refuses and moves nothing (B15, B16, B17)", () => {
-  let h: Harness;
-  beforeAll(async () => ({ h } = await oldRepo()));
-  afterAll(() => h.cleanup());
-
-  test("with the tick lock held the way watch holds it: exit 3, do_instead to stop watch and run it again (B15)", async () => {
-    const lock = await acquireLock(join(layoutPlaces(h.root)["machine files"].old, "tick.lock"), { note: "norn watch" });
-    if (!lock.ok) throw new Error("could not take the tick lock");
-    try {
+      recordVersion(h, "0.29.4");
       const before = snapshot(h);
       const r = await h.norn("upgrade", "--json");
-      expectRefused(r, "tick_locked");
-      expect((r.value as { do_instead: string }).do_instead).toBe("stop `norn watch` and run it again");
+      expectRefused(r, "version_too_old");
+      const rule = versionBaseline("0.29.4", RUNNING);
+      expect(r.value).toMatchObject({ error: rule?.error, do_instead: rule?.do_instead });
+      expect((r.value as { do_instead: string }).do_instead).toBe("install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0");
       expect(snapshot(h)).toEqual(before);
-      // A rerun under the same lock is refused the same way and still changes nothing
-      expect((await h.norn("upgrade", "--json")).value).toEqual(r.value);
-      expect(snapshot(h)).toEqual(before);
-    } finally {
-      lock.release();
-    }
-  });
-
-  test("in a unit worktree: exit 3, do_instead names the main checkout's path (B16)", async () => {
-    const wt = `${h.root}-worktrees/gh-4-four`;
-    expect(existsSync(wt)).toBe(true);
-    const before = [...snapshot(h), ...(readdirSync(wt, { recursive: true }) as string[]).filter((p) => !p.startsWith(".git"))];
-    const r = await runChecked(["upgrade", "--json"], { ...h.deps, cwd: wt });
-    expectRefused(r, "not_main_checkout");
-    expect((r.value as { do_instead: string }).do_instead).toContain(h.root);
-    expect((r.value as { do_instead: string }).do_instead).toContain("norn upgrade");
-    expect([...snapshot(h), ...(readdirSync(wt, { recursive: true }) as string[]).filter((p) => !p.startsWith(".git"))]).toEqual(before);
-  });
-
-  test("with one part in both places: exit 3 naming both paths (B17)", async () => {
-    const { old, new: now } = layoutPlaces(h.root).config;
-    cpSync(old, now);
-    try {
-      const before = snapshot(h);
-      const r = await h.norn("upgrade", "--json");
-      expectRefused(r, "both_layouts");
-      const error = (r.value as { error: string }).error;
-      expect(error).toContain(relative(h.root, old));
-      expect(error).toContain(relative(h.root, now));
-      expect(snapshot(h)).toEqual(before);
-    } finally {
-      rmSync(now);
-    }
-  });
-});
-
-describe("a rerun finishes an interrupted migration (B11, B12)", () => {
-  let h: Harness;
-  beforeAll(async () => ({ h } = await oldRepo()));
-  afterAll(() => h.cleanup());
-
-  test("config and workflows moved, the trace not: migrate moves the trace", async () => {
-    const places = layoutPlaces(h.root);
-    // what a run cut short after the staged renames left
-    h.git(["mv", OLD_CONFIG, NEW_CONFIG]);
-    h.git(["mv", OLD_WORKFLOWS, NEW_WORKFLOWS]);
-    const heartbeat = JSON.parse(h.read(join(places["machine files"].old, "heartbeat.json"))).heartbeat_id;
-    const r = await h.norn("upgrade", "--json");
-    expect(r.exit).toBe(0);
-    expect((r.value as Migrated).moves.map((m) => m.part)).toEqual(["machine files"]);
-    expect(JSON.parse(h.read(join(places["machine files"].new, "heartbeat.json"))).heartbeat_id).toBe(heartbeat);
-    expect(existsSync(oldNornDir(h.root))).toBe(false);
-    expect(porcelain(h)).toContain(`R  ${OLD_CONFIG} -> ${NEW_CONFIG}`);
-    expect((await h.norn("status", "--json")).exit).toBe(0);
-  });
-});
-
-describe("a rerun finishes a trace move cut short (B12, D6)", () => {
-  let h: Harness;
-  beforeAll(async () => ({ h } = await oldRepo()));
-  afterAll(() => h.cleanup());
-
-  test("part of the trace in the machine dir, the rest at its old place: migrate moves the rest", async () => {
-    const { old, new: machine } = layoutPlaces(h.root)["machine files"];
-    const heartbeat = h.read(join(old, "heartbeat.json"));
-    cpSync(join(old, "heartbeat.json"), join(machine, "heartbeat.json"));
-    rmSync(join(old, "heartbeat.json"));
-    const rest = readdirSync(old).sort();
-    expect(rest.length).toBeGreaterThan(0);
-    const r = await h.norn("upgrade", "--json");
-    expect(r.exit).toBe(0);
-    for (const n of rest) expect(existsSync(join(machine, n))).toBe(true);
-    expect(h.read(join(machine, "heartbeat.json"))).toBe(heartbeat);
-    expect(existsSync(oldNornDir(h.root))).toBe(false);
-  });
-
-  test("a file in both places is refused naming both paths", async () => {
-    const h2 = await oldRepo();
-    try {
-      const { old, new: machine } = layoutPlaces(h2.h.root)["machine files"];
-      cpSync(join(old, "heartbeat.json"), join(machine, "heartbeat.json"));
-      const before = snapshot(h2.h);
-      const r = await h2.h.norn("upgrade", "--json");
-      expectRefused(r, "both_layouts");
-      const error = (r.value as { error: string }).error;
-      expect(error).toContain(relative(h2.h.root, join(old, "heartbeat.json")));
-      expect(error).toContain(join(machine, "heartbeat.json"));
-      expect(snapshot(h2.h)).toEqual(before);
-    } finally {
-      h2.h.cleanup();
-    }
-  });
-});
-
-describe("an untracked old workflow file (B11)", () => {
-  let h: Harness;
-  beforeAll(async () => ({ h } = await oldRepo()));
-  afterAll(() => h.cleanup());
-
-  test("is moved plainly and listed as untracked", async () => {
-    h.write(join(h.root, OLD_WORKFLOWS, "draft.yaml"), SOLO.replace("name: solo", "name: draft"));
-    const r = await h.norn("upgrade", "--json");
-    expect(r.exit).toBe(0);
-    const v = r.value as Migrated;
-    expect(v.moves).toContainEqual({ part: "workflows", from: `${OLD_WORKFLOWS}/draft.yaml`, to: `${NEW_WORKFLOWS}/draft.yaml`, how: "untracked" });
-    expect(v.staged).not.toContain(`${NEW_WORKFLOWS}/draft.yaml`);
-    expect(existsSync(join(h.root, NEW_WORKFLOWS, "draft.yaml"))).toBe(true);
-    expect(porcelain(h)).toContain(`?? ${NEW_WORKFLOWS}/draft.yaml`);
-    const md = await h.norn("upgrade");
-    expect(md.stdout).toContain("nothing to upgrade");
-  });
-});
-
-describe("norn upgrade moves old config keys (gh-64 B40–B45, D13)", () => {
-  let h: Harness;
-  let out: CliResult;
-  const USER_OLD = `# mine
-default_mode: auto        # the tick starts my agents
-notifiers:
-  - adapter: os
-  - adapter: ntfy
-    options: { url: https://ntfy.sh/x }
-`;
-  const TEAM_OLD = `# the team
-remote: { provider: gh, label: norn }
-default_agent: codex
-max_agents: 1
-default_mode: auto
-limits: { deadline: 45m, attended_wait: 5m }
-notifiers: [{ adapter: ntfy, options: { url: https://ntfy.sh/team } }]
-`;
-  const SLICE = `---
-id: gh-12/02
-title: Two
-depends_on: []
-status: planned
-criteria:
-  - { id: c1, verifier: agent, needs: [browser] }
-  - { id: c2, verifier: test }
----
-
-Body
-`;
-  const slicePath = () => join(h.root, ".agents/specs/gh-12-x/slices/02-two.md");
-  /** a person's own file beside the story folders */
-  const SPECS_README = "# Specs\n\nOne folder per story.\n";
-  beforeAll(async () => {
-    h = await createHarness();
-    expect((await h.norn("init")).exit).toBe(0);
-    h.write(join(workflowsDir(h.root), "release.yaml"), `mode: manual\ndefaults: { deadline: 20m }\n${SOLO.replace("name: solo", "name: release")}`);
-    h.write(repoConfigPath(h.root), TEAM_OLD);
-    h.write(join(workflowsDir(h.root), "plain.json"), `${JSON.stringify({ ...(Bun.YAML.parse(SOLO) as object), name: "plain" }, null, 2)}\n`);
-    h.write(slicePath(), SLICE);
-    h.write(join(h.root, ".agents/specs/README.md"), SPECS_README);
-    h.git(["add", "-A"]);
-    h.git(["commit", "-q", "-m", "an older norn's config"]);
-    h.write(join(h.home, "config.yaml"), USER_OLD);
-    out = await h.norn("upgrade");
-  });
-  afterAll(() => h.cleanup());
-
-  test("B40: the user file is rewritten in place, comments kept; the team file's remote.provider becomes provider, staged", () => {
-    expect(out.exit).toBe(0);
-    // the comment stays with its key (the YAML writer pads it with one space)
-    expect(h.read(join(h.home, "config.yaml"))).toBe("# mine\n\nmode: auto # the tick starts my agents\nnotify:\n  ntfy: https://ntfy.sh/x\n");
-    const team = h.read(repoConfigPath(h.root));
-    expect(team).toStartWith("# the team\n");
-    expect(team).toContain("provider: gh");
-    expect(team).not.toMatch(/remote|limits|default_|max_agents/);
-    expect(porcelain(h).split("\n")).toContain("M  .agents/norn.config.yaml");
-  });
-
-  test("B41, B42: team limits fill each workflow's defaults: and default_mode each workflow's mode, keeping a workflow's own", () => {
-    const quick = h.read(join(workflowsDir(h.root), "quick.yaml")).trimEnd();
-    // Only the added lines differ; the rest of the file keeps its text (no reflow)
-    const before = sh(h.root, ["show", "HEAD:.agents/workflows/quick.yaml"]).trimEnd();
-    const added = quick.split("\n").filter((l) => !before.split("\n").includes(l));
-    expect(added).toEqual(["mode: auto", "defaults:", "  deadline: 45m"]);
-    expect(quick.split("\n").filter((l) => !added.includes(l)).join("\n")).toBe(before);
-    const release = h.read(join(workflowsDir(h.root), "release.yaml"));
-    expect(release).toContain("mode: manual");
-    expect(release).toContain("deadline: 20m");
-    expect(release).not.toContain("attended_wait");
-    const status = porcelain(h).split("\n");
-    expect(status).toContain("M  .agents/workflows/quick.yaml");
-    // release already sets its mode and deadline: untouched
-    expect(status.some((l) => l.includes("release.yaml"))).toBe(false);
-  });
-
-  test("B43: personal and machine keys leave the team file, each listed with its value", () => {
-    expect(out.stdout).toContain("removed `max_agents: 1` from the team file: set it in ~/.norn/config.yaml if you want it");
-    expect(out.stdout).toContain("removed `agent: codex` from the team file: set it in ~/.norn/config.yaml if you want it");
-  });
-
-  test("B43: a team notifiers list is offered in the user file's new shape, not the old key", () => {
-    expect(out.stdout).toContain('set it in ~/.norn/config.yaml if you want it: `notify: {"ntfy":"https://ntfy.sh/team","os":false}`');
-    expect(out.stdout).not.toContain("if you want it: `notifiers");
-  });
-
-  test("B43: a team limit no workflow takes is listed with its value", () => {
-    expect(out.stdout).toContain("removed `limits.attended_wait: 5m` from the team file: fixed at 2m");
-  });
-
-  test("B41: a workflow stored as JSON gains the defaults and mode too, still JSON", () => {
-    const plain = JSON.parse(h.read(join(workflowsDir(h.root), "plain.json")));
-    expect(plain).toMatchObject({ name: "plain", mode: "auto", defaults: { deadline: "45m" } });
-  });
-
-  test("B44: criteria needs are stripped from every slice, staged", () => {
-    expect(h.read(slicePath())).toBe(SLICE.replace("  - { id: c1, verifier: agent, needs: [browser] }\n", "  - { id: c1, verifier: agent }\n"));
-    expect(porcelain(h).split("\n")).toContain("M  .agents/specs/gh-12-x/slices/02-two.md");
-  });
-
-  test("B44: a file beside the story folders is skipped, untouched", () => {
-    expect(h.read(join(h.root, ".agents/specs/README.md"))).toBe(SPECS_README);
-    expect(porcelain(h)).not.toContain("README.md");
-  });
-
-  test("B45, B55: the config loads again; a second run changes nothing; nothing is committed", async () => {
-    expect((await h.norn("config", "list", "--json")).exit).toBe(0);
-    const before = snapshot(h);
-    const again = await h.norn("upgrade", "--json");
-    expect(again.exit).toBe(0);
-    expect(again.value).toMatchObject({ moves: [], config: { changed: [], renamed: [], removed: [] } });
-    expect(snapshot(h)).toEqual(before);
-    expect(sh(h.root, ["log", "-1", "--format=%s"]).trim()).toBe("an older norn's config");
-  });
-});
-
-describe("norn upgrade leaves a new-style config alone", () => {
-  test("B45: a user and team file with no old key, in odd formatting, are neither rewritten nor staged", async () => {
-    const h = await createHarness();
-    try {
-      expect((await h.norn("init")).exit).toBe(0);
-      const team = "# the team\nprovider:    gh   # ours\nworkflow: quick\n";
-      const user = "mode:    auto   # mine\n";
-      h.write(repoConfigPath(h.root), team);
-      h.git(["add", "-A"]);
-      h.git(["commit", "-q", "-m", "new-style config"]);
-      h.write(join(h.home, "config.yaml"), user);
-      const out = await h.norn("upgrade", "--json");
-      expect(out.exit).toBe(0);
-      expect(out.value).toMatchObject({ config: { changed: [], renamed: [], removed: [] } });
-      expect(h.read(join(h.home, "config.yaml"))).toBe(user);
-      // The only change is the norn_version a repo without one gets
-      expect(h.read(repoConfigPath(h.root))).toBe(`${team}norn_version: ${runningVersion(h.deps)}\n`);
-      expect(porcelain(h)).toBe(`M  ${NEW_CONFIG}`);
     } finally {
       h.cleanup();
     }
   });
-});
 
-describe("norn upgrade on the new layout while watch holds the tick lock", () => {
-  test("exit 3, do_instead to stop watch and run it again; a rerun is refused the same way and nothing changes", async () => {
-    const h = await createHarness();
+  test("a repo recording no norn_version: version_missing, its do_instead naming norn init, nothing staged or rewritten", async () => {
+    const h = await repoAt030();
     try {
-      expect((await h.norn("init")).exit).toBe(0);
-      h.git(["add", "-A"]);
-      h.git(["commit", "-q", "-m", "norn init"]);
+      recordVersion(h, null);
+      const before = snapshot(h);
+      const r = await h.norn("upgrade", "--json");
+      expectRefused(r, "version_missing");
+      const rule = versionBaseline(null, RUNNING);
+      expect(r.value).toMatchObject({ error: rule?.error, do_instead: rule?.do_instead });
+      expect((r.value as { do_instead: string }).do_instead).toContain("`norn init`");
+      expect(snapshot(h)).toEqual(before);
+    } finally {
+      h.cleanup();
+    }
+  });
+
+  test("a repo with only the pre-0.13 config file is a repo with no version: version_missing, the old file untouched", async () => {
+    const h = await repoAt030();
+    try {
+      mkdirSync(dirname(join(h.root, OLD_CONFIG_FILE)));
+      sh(h.root, ["mv", REPO_CONFIG_FILE, OLD_CONFIG_FILE]);
+      sh(h.root, ["commit", "-q", "-m", "an old layout"]);
+      const before = snapshot(h);
+      expectRefused(await h.norn("upgrade", "--json"), "version_missing");
+      expect(snapshot(h)).toEqual(before);
+    } finally {
+      h.cleanup();
+    }
+  });
+
+  test("while watch holds the tick lock: tick_locked, do_instead to stop watch and run it again; a rerun is refused the same way", async () => {
+    const h = await repoAt030();
+    try {
       const lock = await acquireTickLock(h.root, { note: "norn watch" });
       if (!lock.ok) throw new Error("could not take the tick lock");
       try {
@@ -490,26 +121,133 @@ describe("norn upgrade on the new layout while watch holds the tick lock", () =>
       h.cleanup();
     }
   });
+
+  test("in a linked worktree: not_main_checkout, do_instead naming the main checkout's path, nothing changed", async () => {
+    const h = await repoAt030();
+    try {
+      const wt = `${h.root}-wt`;
+      sh(h.root, ["worktree", "add", "-q", "-b", "elsewhere", wt]);
+      const before = snapshot(h);
+      const r = await runChecked(["upgrade", "--json"], { ...h.deps, cwd: wt });
+      expectRefused(r, "not_main_checkout");
+      expect((r.value as { do_instead: string }).do_instead).toBe(`cd ${h.root} && norn upgrade`);
+      expect(snapshot(h)).toEqual(before);
+      expect(sh(wt, ["status", "--porcelain"]).trim()).toBe("");
+    } finally {
+      rmSync(`${h.root}-wt`, { recursive: true, force: true });
+      h.cleanup();
+    }
+  });
 });
 
-describe("norn upgrade on old team values of the wrong shape", () => {
-  test("B43: a scalar remote, limits or default_mode is removed and listed once with its value", async () => {
-    const h = await createHarness();
+describe("norn upgrade --json", () => {
+  test("holds exactly norn_version {from, to, changed}, skills {updated, linked}, staged, commit and labels", async () => {
+    const h = await repoAt030();
     try {
-      expect((await h.norn("init")).exit).toBe(0);
-      h.write(repoConfigPath(h.root), "remote: origin\nlimits: 5m\ndefault_mode: sometimes\n");
-      h.git(["add", "-A"]);
-      h.git(["commit", "-q", "-m", "odd old config"]);
-      const out = await h.norn("upgrade", "--json");
-      expect(out.exit).toBe(0);
-      const removed = (out.value as { config: { removed: Array<{ key: string; value: unknown }> } }).config.removed;
-      expect(removed.map(({ key, value }) => ({ key, value }))).toEqual([
-        { key: "remote", value: "origin" },
-        { key: "limits", value: "5m" },
-        { key: "default_mode", value: "sometimes" },
-      ]);
-      expect(h.read(repoConfigPath(h.root))).not.toMatch(/remote|limits|default_mode/);
-      expect((await h.norn("config", "list", "--json")).exit).toBe(0);
+      const r = await h.norn("upgrade", "--json");
+      expect(r.exit).toBe(0);
+      const v = r.value as Record<string, unknown>;
+      expect(Object.keys(v).sort()).toEqual(["commit", "labels", "norn_version", "skills", "staged"]);
+      for (const gone of ["moves", "config", "run_state", "gitattributes"]) expect(v).not.toHaveProperty(gone);
+      expect(Object.keys(v.norn_version as object).sort()).toEqual(["changed", "from", "to"]);
+      expect(Object.keys(v.skills as object).sort()).toEqual(["linked", "updated"]);
+      expect(v).toMatchObject({
+        norn_version: { from: "0.30.0", to: "0.31.0", changed: true },
+        skills: { updated: ["norn-plan"], linked: ["norn-plan"] },
+        commit: 'git commit -m "Upgrade norn to 0.31.0 (norn upgrade)"',
+      });
+    } finally {
+      h.cleanup();
+    }
+  });
+});
+
+describe("norn upgrade leaves old config keys, criteria needs and .gitattributes alone", () => {
+  const SLICE = `---
+id: gh-12/02
+title: Two
+depends_on: []
+status: planned
+criteria:
+  - { id: c1, verifier: agent, needs: [browser] }
+---
+
+Body
+`;
+  const SPEC = `---
+id: gh-12
+title: X
+criteria:
+  - { id: "02.c1", verifier: agent, needs: [browser] }
+---
+
+# X
+`;
+  const ATTRIBUTES = "# norn (machine state, collapsed in diffs)\n.agents/specs/*/runs/** linguist-generated=true gitlab-generated=true\n";
+  const USER_OLD = "default_mode: auto\n";
+
+  test("none of those files change or is staged; config validation still flags the old key, without pointing to norn upgrade", async () => {
+    const h = await repoAt030();
+    try {
+      const slice = join(h.root, ".agents/specs/gh-12-x/slices/02-two.md");
+      const spec = join(h.root, ".agents/specs/gh-12-x/spec.md");
+      h.write(slice, SLICE);
+      h.write(spec, SPEC);
+      h.write(join(h.root, ".gitattributes"), ATTRIBUTES);
+      sh(h.root, ["add", "-A"]);
+      sh(h.root, ["commit", "-q", "-m", "an older norn's files"]);
+      h.write(join(h.home, "config.yaml"), USER_OLD);
+
+      const r = await h.norn("upgrade", "--json");
+      expect(h.read(slice)).toBe(SLICE);
+      expect(h.read(spec)).toBe(SPEC);
+      expect(h.read(join(h.root, ".gitattributes"))).toBe(ATTRIBUTES);
+      expect(h.read(join(h.home, "config.yaml"))).toBe(USER_OLD);
+      expect(porcelain(h)).toBe("");
+      // the old key is the config's own error (exit 6), never rewritten
+      expect(r.exit).toBe(6);
+      const message = JSON.stringify(r.value);
+      expect(message).toContain("`default_mode` is now `mode`");
+      expect(message).not.toContain("norn upgrade");
+      const list = await h.norn("config", "list", "--json");
+      expect(JSON.stringify(list.value)).toContain("`default_mode` is now `mode`");
+      expect(JSON.stringify(list.value)).not.toContain("norn upgrade");
+    } finally {
+      h.cleanup();
+    }
+  });
+
+  test("with a valid config the upgrade succeeds and the slice, spec and .gitattributes stay unchanged and unstaged", async () => {
+    const h = await repoAt030();
+    try {
+      const slice = join(h.root, ".agents/specs/gh-12-x/slices/02-two.md");
+      h.write(slice, SLICE);
+      h.write(join(h.root, ".agents/specs/gh-12-x/spec.md"), SPEC);
+      h.write(join(h.root, ".gitattributes"), ATTRIBUTES);
+      sh(h.root, ["add", "-A"]);
+      sh(h.root, ["commit", "-q", "-m", "an older norn's files"]);
+      const r = await h.norn("upgrade", "--json");
+      expect(r.exit).toBe(0);
+      expect(h.read(slice)).toBe(SLICE);
+      expect(h.read(join(h.root, ".gitattributes"))).toBe(ATTRIBUTES);
+      expect((r.value as { staged: string[] }).staged.filter((p) => p.startsWith(".agents/specs") || p === ".gitattributes")).toEqual([]);
+      expect(porcelain(h)).not.toMatch(/specs|gitattributes/);
+    } finally {
+      h.cleanup();
+    }
+  });
+});
+
+describe("norn migrate is gone", () => {
+  test("it fails as an unknown command like any other, and norn help lists no migrate", async () => {
+    const h = await repoAt030();
+    try {
+      const mig = await h.norn("migrate", "--json");
+      const other = await h.norn("frobnicate", "--json");
+      expect(mig.exit).toBe(other.exit);
+      expect(mig.exit).not.toBe(0);
+      expect((mig.value as { code?: string }).code).toBe((other.value as { code?: string }).code);
+      for (const args of [["help"], ["help", "--all"], ["help", "--all", "--json"]]) expect((await h.norn(...args)).stdout).not.toMatch(/\bmigrate\b/);
     } finally {
       h.cleanup();
     }

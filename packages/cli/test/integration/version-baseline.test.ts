@@ -124,14 +124,14 @@ for (const [label, repo, code] of [
       expect((await h.norn("status")).stdout).toContain(rule.error);
     });
 
-    test("help, doctor, init and upgrade are not stopped by the guard", async () => {
+    test("help, doctor, init and upgrade are not stopped by the guard; upgrade refuses on its own with the rule's text", async () => {
       expect((await h.norn("help")).exit).toBe(0);
       const doctor = await h.norn("doctor", "--json");
       expect(doctor.value).toHaveProperty("repo");
-      for (const argv of [["init"], ["upgrade"]]) {
-        const r = await h.norn(...argv, "--json");
-        expect({ argv, value: r.value }).not.toEqual({ argv, value: refusalOf(repo) });
-      }
+      const upgrade = await h.norn("upgrade", "--json");
+      expect({ exit: upgrade.exit, value: upgrade.value }).toEqual({ exit: 3, value: refusalOf(repo) });
+      const init = await h.norn("init", "--json");
+      expect(init.value).not.toEqual(refusalOf(repo));
       for (const c of [...COMMANDS, ...NOUNS.flatMap((n) => n.verbs)].filter((c) => ["help", "doctor", "init", "upgrade"].includes(c.name)))
         expect({ name: c.name, version: c.version }).not.toEqual({ name: c.name, version: "acts" });
     });

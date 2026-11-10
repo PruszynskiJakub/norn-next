@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CONFIG_FILES, type ConfigEntry, ExitCode } from "@norn/schema";
-import { repoConfigPath } from "@norn/store";
+import { REPO_CONFIG_FILE, repoConfigPath } from "@norn/store";
 import { type CliDeps, type CliResult } from "../../src/index.ts";
 import { version } from "../../package.json";
 import { createHarness, FakeInteraction, type Harness, runChecked, sh } from "../../../../test/support/harness.ts";
@@ -139,19 +139,19 @@ describe("three files and where keys belong", () => {
     expect(by(await entries(h), "mode")).toMatchObject({ value: "manual", source: "built-in" });
   });
 
-  test("B39: an old key is config_moved naming its replacement and norn upgrade", async () => {
+  test("B39: an old key is config_moved naming its replacement, do_instead to fix that file", async () => {
     const cases: Array<[string, string, string]> = [
-      [userFile(h), "default_agent: codex\n", "`~/.norn/config.yaml`: `default_agent` is now `agent`; run `norn upgrade`"],
-      [repoConfigPath(h.root), "remote: { label: x }\n", "`.agents/norn.config.yaml`: `remote.label` is gone: the label is always `norn`; run `norn upgrade`"],
-      [userFile(h), "runner: { adapter: herdr }\n", "`~/.norn/config.yaml`: `runner` is gone: norn detects it; run `norn upgrade`"],
-      [userFile(h), "agents: { claude: { capabilities: [browser] } }\n", "`~/.norn/config.yaml`: `agents.claude.capabilities` is gone, with criteria `needs`; run `norn upgrade`"],
-      [repoConfigPath(h.root), "limits: { deadline: 45m }\n", "`.agents/norn.config.yaml`: `limits` moved to each workflow's `defaults:`; run `norn upgrade`"],
+      [userFile(h), "default_agent: codex\n", "`~/.norn/config.yaml`: `default_agent` is now `agent`"],
+      [repoConfigPath(h.root), "remote: { label: x }\n", "`.agents/norn.config.yaml`: `remote.label` is gone: the label is always `norn`"],
+      [userFile(h), "runner: { adapter: herdr }\n", "`~/.norn/config.yaml`: `runner` is gone: norn detects it"],
+      [userFile(h), "agents: { claude: { capabilities: [browser] } }\n", "`~/.norn/config.yaml`: `agents.claude.capabilities` is gone, with criteria `needs`"],
+      [repoConfigPath(h.root), "limits: { deadline: 45m }\n", "`.agents/norn.config.yaml`: `limits` moved to each workflow's `defaults:`"],
     ];
     for (const [file, text, error] of cases) {
       h.write(file, text);
       const r = await h.norn("config", "list", "--json");
       expect(r.exit).toBe(ExitCode.config);
-      expect(r.value).toMatchObject({ code: "config_moved", error, do_instead: "norn upgrade" });
+      expect(r.value).toMatchObject({ code: "config_moved", error, do_instead: `fix ${file === userFile(h) ? "~/.norn/config.yaml" : REPO_CONFIG_FILE}` });
       rmSync(file);
     }
   });

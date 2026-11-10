@@ -8,7 +8,7 @@ Commands a person or an agent reads (`brief`, `done`, `ask`, `stuck`, `help`, `i
 
 A refusal prints `{error, do_instead}` (as markdown without `--json`): what was refused and what to do instead. The exit code says why: `refused` (3) when a rule says no, `usage` (2) for bad arguments, `corrupt` (4) when a state file fails validation, `busy` (5) when another process holds the lock or the claim, `config` (6) when a config file is wrong. The full list is under [Exit codes](#exit-codes).
 
-A command a person runs that needs the tick lock (`norn story edit --workflow`, `norn story edit --at`, `norn story checkout`, `norn story handoff`, `norn story close`, `norn story reset`, `norn story reopen`, `norn tidy`, and the claim release when `norn watch` stops) waits for a running tick to finish, up to 60 seconds, with one line on stderr naming the tick it waits for, then runs as usual. Only a tick still running after 60 seconds gets it refused, `busy` with code `tick_locked`; Ctrl-C while it waits stops it with nothing changed. `norn tick` and `norn migrate` refuse a running tick at once, and `norn story edit --auto|--manual` never waits.
+A command a person runs that needs the tick lock (`norn story edit --workflow`, `norn story edit --at`, `norn story checkout`, `norn story handoff`, `norn story close`, `norn story reset`, `norn story reopen`, `norn tidy`, and the claim release when `norn watch` stops) waits for a running tick to finish, up to 60 seconds, with one line on stderr naming the tick it waits for, then runs as usual. Only a tick still running after 60 seconds gets it refused, `busy` with code `tick_locked`; Ctrl-C while it waits stops it with nothing changed. `norn tick` and `norn upgrade` refuse a running tick at once, and `norn story edit --auto|--manual` never waits.
 
 ## Config
 
@@ -309,7 +309,7 @@ norn init [--json] [--hook-command <cmd>]
 
 ##### `norn upgrade`
 
-Move this repo to this norn: its norn_version, the bundled skills, the layout and config keys, staged for you to commit
+Move this repo's norn_version and bundled skills to this norn, from norn 0.30 on, staged for you to commit
 
 ```sh
 norn upgrade [--json]
@@ -376,14 +376,6 @@ Remove norn-owned hooks and skills; keep config, workflows and specs
 
 ```sh
 norn uninstall
-```
-
-##### `norn migrate`
-
-Deprecated: the old name of norn upgrade, removed in the next minor
-
-```sh
-norn migrate [--json]
 ```
 
 #### Background

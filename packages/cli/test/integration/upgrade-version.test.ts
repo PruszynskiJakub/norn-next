@@ -1,8 +1,8 @@
 /**
- * gh-61 B13, B15, B16, B17 at the CLI seam: `norn upgrade` moves the repo's `norn_version`
- * to the running binary's, rewrites and relinks the bundled skills and runs the config moves, all
- * staged and nothing committed; with nothing to do it changes nothing; it never moves the version
- * back, and refuses before any write (`norn migrate` too).
+ * `norn upgrade` on a repo from norn 0.30 on: it rewrites and relinks the bundled skills and moves
+ * the repo's `norn_version` to the running binary's, last, all staged and nothing committed, printing
+ * the commit to make; a rerun finishes an interrupted run; with nothing to do it changes nothing;
+ * it never moves the version back.
  */
 import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { appendFileSync, lstatSync, readdirSync, readFileSync, rmSync } from "node:fs";
@@ -49,40 +49,39 @@ function expectAllStaged(h: Harness) {
   }
 }
 
-describe("norn upgrade moves the version, the skills and the config in one staged diff (B13)", () => {
-  test("AC1: 0.17.0 with a drifted skill, a missing link and a moved key → all moved to 0.19.0, staged, not committed", async () => {
-    const h = await setUpAt("0.17.0", "0.19.0");
+describe("norn upgrade moves the skills and the version in one staged diff", () => {
+  test("0.30.0 with a drifted skill and a missing link → both fixed, norn_version 0.31.0, staged, not committed, the commit printed", async () => {
+    const h = await setUpAt("0.30.0", "0.31.0");
     try {
       const bundled = readFileSync(skill(h, "norn-plan"), "utf8");
-      h.write(skill(h, "norn-plan"), "# 0.17.0's protocol\n");
+      h.write(skill(h, "norn-plan"), "# 0.30.0's protocol\n");
       expect(lstatSync(link(h, "norn-plan")).isSymbolicLink()).toBe(true);
       rmSync(link(h, "norn-plan"));
-      h.write(repoConfigPath(h.root), `${teamFile(h).replace("norn_version: 0.17.0", "norn_version: 0.17.0 # the team's norn")}remote: { provider: gh }\n`);
+      h.write(repoConfigPath(h.root), teamFile(h).replace("norn_version: 0.30.0", "norn_version: 0.30.0 # the team's norn"));
       sh(h.root, ["add", "-A"]);
-      sh(h.root, ["commit", "-q", "-m", "an older norn's repo"]);
+      sh(h.root, ["commit", "-q", "-m", "a 0.30 repo"]);
       const before = head(h);
 
-      const r = await upgradeAs(h, "0.19.0");
+      const r = await upgradeAs(h, "0.31.0");
       expect(r.exit).toBe(0);
       const team = teamFile(h);
-      expect(team).toContain("norn_version: 0.19.0 # the team's norn");
+      expect(team).toContain("norn_version: 0.31.0 # the team's norn");
       expect(team).toContain("# norn team config");
-      expect(team).toMatch(/^provider: gh$/m);
-      expect(team).not.toMatch(/^remote:/m);
       expect(readFileSync(skill(h, "norn-plan"), "utf8")).toBe(bundled);
       expect(lstatSync(link(h, "norn-plan")).isSymbolicLink()).toBe(true);
       expectAllStaged(h);
       expect(porcelain(h)).toContain(`M  ${REPO_CONFIG_FILE}`);
       expect(porcelain(h)).toContain("M  .agents/skills/norn-plan/SKILL.md");
       expect(head(h)).toBe(before);
-      expect(r.stdout).toContain("norn version 0.17.0 → 0.19.0; skills updated: norn-plan; skills relinked: norn-plan; config: `remote.provider` → `provider`");
+      expect(r.stdout).toContain("norn version 0.30.0 → 0.31.0; skills updated: norn-plan; skills relinked: norn-plan");
+      expect(r.stdout.trimEnd().split("\n").at(-1)).toContain('`git commit -m "Upgrade norn to 0.31.0 (norn upgrade)"`');
     } finally {
       h.cleanup();
     }
   });
 
-  test("AC1: an agent folder the repo ignores → the link is recreated and not staged, the rest staged", async () => {
-    const h = await setUpAt("0.17.0", "0.19.0");
+  test("an agent folder the repo ignores → the link is recreated and not staged, the rest staged", async () => {
+    const h = await setUpAt("0.30.0", "0.31.0");
     try {
       appendFileSync(join(h.root, ".gitignore"), ".claude/\n");
       sh(h.root, ["rm", "-r", "-q", "--cached", ".claude"]);
@@ -90,14 +89,14 @@ describe("norn upgrade moves the version, the skills and the config in one stage
       sh(h.root, ["commit", "-q", "-m", "ignore the agent folder"]);
       const bundled = readFileSync(skill(h, "norn-plan"), "utf8");
       rmSync(link(h, "norn-plan"));
-      h.write(skill(h, "norn-plan"), "# 0.17.0's protocol\n");
+      h.write(skill(h, "norn-plan"), "# 0.30.0's protocol\n");
       sh(h.root, ["commit", "-q", "-am", "drift"]);
 
-      const r = await upgradeAs(h, "0.19.0", "--json");
+      const r = await upgradeAs(h, "0.31.0", "--json");
       expect(r.exit).toBe(0);
       expect(lstatSync(link(h, "norn-plan")).isSymbolicLink()).toBe(true);
       expect(readFileSync(skill(h, "norn-plan"), "utf8")).toBe(bundled);
-      expect(teamFile(h)).toMatch(/^norn_version: 0\.19\.0$/m);
+      expect(teamFile(h)).toMatch(/^norn_version: 0\.31\.0$/m);
       expectAllStaged(h);
       expect(porcelain(h)).toContain("M  .agents/skills/norn-plan/SKILL.md");
       expect(porcelain(h)).toContain(`M  ${REPO_CONFIG_FILE}`);
@@ -109,45 +108,63 @@ describe("norn upgrade moves the version, the skills and the config in one stage
     }
   });
 
-  test("AC1: a repo without the key gets it written and staged", async () => {
-    const h = await setUpAt("0.19.0", "0.19.0");
+  test("interrupted after the skills, before the version → a rerun records the new version", async () => {
+    const h = await setUpAt("0.30.0", "0.31.0");
     try {
-      h.write(repoConfigPath(h.root), teamFile(h).replace(/^norn_version: .*\n/m, ""));
-      sh(h.root, ["commit", "-q", "-am", "no version yet"]);
-      const r = await upgradeAs(h, "0.19.0");
+      const bundled = readFileSync(skill(h, "norn-plan"), "utf8");
+      h.write(skill(h, "norn-plan"), "# 0.30.0's protocol\n");
+      sh(h.root, ["commit", "-q", "-am", "0.30.0's skill"]);
+      // what a run cut short before `norn_version` leaves: the skill rewritten, the version still 0.30.0
+      h.write(skill(h, "norn-plan"), bundled);
+      expect(teamFile(h)).toMatch(/^norn_version: 0\.30\.0$/m);
+
+      const r = await upgradeAs(h, "0.31.0", "--json");
       expect(r.exit).toBe(0);
-      expect(r.stdout).toContain("norn version (none) → 0.19.0");
-      expect(teamFile(h)).toMatch(/^norn_version: 0\.19\.0$/m);
-      expect(porcelain(h)).toBe(`M  ${REPO_CONFIG_FILE}`);
-      sh(h.root, ["reset", "-q", "--hard"]);
-      const json = await upgradeAs(h, "0.19.0", "--json");
-      expect(json.value).toMatchObject({ norn_version: { from: null, to: "0.19.0", changed: true }, skills: { updated: [] }, staged: [REPO_CONFIG_FILE] });
+      expect(teamFile(h)).toMatch(/^norn_version: 0\.31\.0$/m);
+      expect(r.value).toMatchObject({ norn_version: { from: "0.30.0", to: "0.31.0", changed: true }, commit: 'git commit -m "Upgrade norn to 0.31.0 (norn upgrade)"' });
+      expect(porcelain(h)).toContain(`M  ${REPO_CONFIG_FILE}`);
     } finally {
       h.cleanup();
     }
   });
 });
 
-describe("norn upgrade with nothing to do changes nothing (B15)", () => {
-  test("AC2: binary 0.19.0, repo at 0.19.0, skills matching → already on norn 0.19.0, git status clean", async () => {
-    const h = await setUpAt("0.19.0", "0.19.0");
+describe("norn upgrade with nothing to do changes nothing", () => {
+  test("binary 0.31.0, repo at 0.31.0, skills and links matching → already on norn 0.31.0, nothing staged, commit null", async () => {
+    const h = await setUpAt("0.31.0", "0.31.0");
     try {
       const before = snapshot(h, true);
-      const r = await upgradeAs(h, "0.19.0");
+      const r = await upgradeAs(h, "0.31.0");
       expect(r.exit).toBe(0);
-      expect(r.stdout).toContain("already on norn 0.19.0: nothing to upgrade");
+      expect(r.stdout).toContain("already on norn 0.31.0: nothing to upgrade");
       expect(porcelain(h)).toBe("");
       expect(snapshot(h, true)).toEqual(before);
-      const json = await upgradeAs(h, "0.19.0", "--json");
-      expect(json.value).toEqual({ moves: [], config: { changed: [], renamed: [], removed: [] }, norn_version: { from: "0.19.0", to: "0.19.0", changed: false }, skills: { updated: [], linked: [] }, run_state: [], staged: [], commit: null, labels: expect.objectContaining({ checked: true, created: [] }) });
+      const json = await upgradeAs(h, "0.31.0", "--json");
+      expect(json.value).toEqual({ norn_version: { from: "0.31.0", to: "0.31.0", changed: false }, skills: { updated: [], linked: [] }, staged: [], commit: null, labels: expect.objectContaining({ checked: true, created: [] }) });
+      expect(porcelain(h)).toBe("");
+    } finally {
+      h.cleanup();
+    }
+  });
+
+  test("only a skill differs → the skill is rewritten and staged, the commit is Refresh norn's skills", async () => {
+    const h = await setUpAt("0.31.0", "0.31.0");
+    try {
+      h.write(skill(h, "norn-plan"), "# edited\n");
+      sh(h.root, ["commit", "-q", "-am", "drift"]);
+      const r = await upgradeAs(h, "0.31.0", "--json");
+      expect(r.exit).toBe(0);
+      expect(r.value).toMatchObject({ norn_version: { from: "0.31.0", to: "0.31.0", changed: false }, skills: { updated: ["norn-plan"] }, staged: [".agents/skills/norn-plan"], commit: `git commit -m "Refresh norn's skills (norn upgrade)"` });
+      expect(teamFile(h)).toMatch(/^norn_version: 0\.31\.0$/m);
+      expectAllStaged(h);
     } finally {
       h.cleanup();
     }
   });
 });
 
-describe("norn upgrade records a newer patch (B16)", () => {
-  test("AC3: binary 0.30.2, repo at 0.30.0 → norn_version 0.30.2 and the skills refreshed; once committed, 0.30.1 is refused by tick", async () => {
+describe("norn upgrade records a newer patch", () => {
+  test("binary 0.30.2, repo at 0.30.0 → norn_version 0.30.2 and the skills refreshed; once committed, 0.30.1 is refused by tick", async () => {
     const h = await setUpAt("0.30.0", "0.30.2");
     try {
       const bundled = readFileSync(skill(h, "norn"), "utf8");
@@ -169,24 +186,21 @@ describe("norn upgrade records a newer patch (B16)", () => {
   });
 });
 
-describe("norn upgrade never moves the version back (B17)", () => {
-  for (const command of ["upgrade", "migrate"]) {
-    test(`AC4: binary 0.18.1, repo at 0.19.0 → norn ${command} refused, exit 3, no file changed`, async () => {
-      const h = await setUpAt("0.19.0", "0.18.1");
-      try {
-        // something upgrade would otherwise rewrite: a drifted skill and an old key
-        h.write(skill(h, "norn-plan"), "# edited\n");
-        h.write(repoConfigPath(h.root), `${teamFile(h)}remote: { provider: gh }\n`);
-        sh(h.root, ["commit", "-q", "-am", "drift"]);
-        const before = snapshot(h);
-        const r = await runChecked([command, "--json"], { ...h.deps, version: "0.18.1" });
-        expect(r.exit).toBe(3);
-        expect(validate("cli-error", r.value).ok).toBe(true);
-        expect(r.value).toMatchObject({ error: "this repo is set up for norn 0.19.0; upgrade will not move it back", do_instead: "install norn 0.19.x", code: "version_backward" });
-        expect(snapshot(h)).toEqual(before);
-      } finally {
-        h.cleanup();
-      }
-    });
-  }
+describe("norn upgrade never moves the version back", () => {
+  test("binary 0.30.5, repo at 0.31.0 → refused, exit 3, version_backward, no file changed", async () => {
+    const h = await setUpAt("0.31.0", "0.30.5");
+    try {
+      // something upgrade would otherwise rewrite: a drifted skill
+      h.write(skill(h, "norn-plan"), "# edited\n");
+      sh(h.root, ["commit", "-q", "-am", "drift"]);
+      const before = snapshot(h);
+      const r = await upgradeAs(h, "0.30.5", "--json");
+      expect(r.exit).toBe(3);
+      expect(validate("cli-error", r.value).ok).toBe(true);
+      expect(r.value).toMatchObject({ error: "this repo is set up for norn 0.31.0; upgrade will not move it back", do_instead: "install norn 0.31.x", code: "version_backward" });
+      expect(snapshot(h)).toEqual(before);
+    } finally {
+      h.cleanup();
+    }
+  });
 });

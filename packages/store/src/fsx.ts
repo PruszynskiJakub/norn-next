@@ -228,3 +228,15 @@ export function readJsonFile<N extends SchemaName>(name: N, path: string, root?:
   }
   return validated(name, parsed, path, raw, root);
 }
+
+/** Move a file or folder into a folder made as needed: a rename, or copy then delete when `to` is on another filesystem. */
+export function moveFile(from: string, to: string): void {
+  mkdirSync(dirname(to), { recursive: true });
+  try {
+    renameSync(from, to);
+  } catch (e) {
+    if (!isErrno(e, "EXDEV")) throw e;
+    cpSync(from, to, { recursive: true, preserveTimestamps: true });
+    rmSync(from, { recursive: true, force: true });
+  }
+}

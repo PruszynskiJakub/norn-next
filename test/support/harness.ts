@@ -540,17 +540,6 @@ export function archiveTreeRunState(root: string, rev: string, specDir: string, 
   return packed.sha;
 }
 
-/**
- * Finished stories as an older norn merged them into the base: the gh-1 fixture's
- * spec, slices and `runs/` copied into each of `specDirs` in `root`, committed and pushed to `main`.
- */
-export function toBaseRunState(root: string, specDirs: readonly string[], remote = "origin"): void {
-  for (const d of specDirs) cpSync(join(import.meta.dir, "../../packages/view/test/integration/fixtures/gh-1/spec"), join(root, d), { recursive: true });
-  sh(root, ["add", "-A"]);
-  sh(root, ["commit", "-q", "-m", "merge finished stories (older norn)"]);
-  sh(root, ["push", "-q", remote, "main"]);
-}
-
 /** The generated header and heartbeat blocks an older norn kept at the top of a unit's handoff (S9, O6; gone since gh-195/07). */
 export function olderNornHandoffBlocks(story: string, unit: string): string {
   return [HANDOFF_HEADER_BEGIN, `- Story: ${story} · Unit: ${unit}`, "- Step: implement (attempt 1)", HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, "- story.start: story at implement", HANDOFF_LOG_END].join("\n");

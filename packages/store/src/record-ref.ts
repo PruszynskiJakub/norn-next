@@ -14,10 +14,10 @@ import { type Dirent, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileS
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { type FileError, normalizeUnitState } from "@norn/core";
-import { parseRoundDirName, parseSliceDirName, parseSpecDirName, RECORD_REF_PREFIX, ROUNDS_DIR, type RunStory, recordRef, sliceKey, SPECS_DIR, STORY_UNIT_DIR, treeStoryRunStatePath, type UnitState, validate, type Workflow } from "@norn/schema";
+import { parseRoundDirName, parseSliceDirName, RECORD_REF_PREFIX, ROUNDS_DIR, type RunStory, recordRef, sliceKey, STORY_UNIT_DIR, treeStoryRunStatePath, type UnitState, validate, type Workflow } from "@norn/schema";
 import { fsyncTree, isErrno } from "./fsx.ts";
 import { archiveCacheDir } from "./paths.ts";
-import { casRef, casRefs, git, gitOk, gitSync, readLocalRef } from "./git.ts";
+import { casRef, git, gitOk, gitSync, readLocalRef } from "./git.ts";
 import { recordErrors } from "./record-move.ts";
 import { storyRunStateDir } from "./run-state.ts";
 import { parseWorkflowText } from "./unit.ts";
@@ -435,97 +435,6 @@ export function treeRecordCommit(root: string, rev: string, story: RunStory, o: 
     rmSync(check, { recursive: true, force: true });
   }
   return { ok: true, sha, tree };
-}
-
-export type BaseRecordOutcome =
-  | { story: string; path: string; done: "pushed" | "already archived"; ref: string; sha: string }
-  | { story: string; path: string; done: "failed"; ref: string; reason: string };
-
-/** One outcome of `archiveBaseRunState`; a reason is kept to one line (git's stderr spans several). */
-function outcome(s: RunStory, r: { done: "pushed" | "already archived"; sha: string } | { done: "failed"; reason: string }): BaseRecordOutcome {
-  const at = { story: s.key, path: treeStoryRunStatePath(s), ref: recordRef(s.key) };
-  return r.done === "failed" ? { ...at, done: "failed", reason: r.reason.trim().split(/\s*\n\s*/).join("; ") } : { ...at, ...r };
-}
-
-function packFailure(f: TreeRecordFailure): string {
-  if (f.kind !== "invalid") return f.message;
-  return `its record fails validation: ${f.errors.map((e) => `${e.file}: ${e.errors.map((x) => x.message).join("; ")}`).join(", ")}`;
-}
-
-/** The finished stories whose `<spec folder>/runs` is in `HEAD` and still in the index (a staged removal is done), ascending. */
-function baseRunStateInIndex(root: string): RunStory[] {
-  const ls = gitSync(root, ["ls-tree", "-d", "-z", "--name-only", "HEAD", `${SPECS_DIR}/`]);
-  if (ls.code !== 0) return [];
-  const out: RunStory[] = [];
-  for (const dir of ls.stdout.toString("utf8").split("\0").filter(Boolean)) {
-    const m = parseSpecDirName(basename(dir));
-    if (!m) continue;
-    const story = { key: m.story, spec_dir: dir };
-    const path = treeStoryRunStatePath(story);
-    if (gitSync(root, ["rev-parse", "--verify", "-q", `HEAD:${path}`]).code !== 0) continue;
-    const indexed = gitSync(root, ["ls-files", "-z", "--", path]);
-    if (indexed.code === 0 && indexed.stdout.length) out.push(story);
-  }
-  return out.sort((a, b) => a.key.localeCompare(b.key, undefined, { numeric: true }));
-}
-
-/**
- * Push each packed record to its ref on `remote`: one batch with a lease of "absent" each (`casRefs`),
- * then each ref the batch rejected again alone, since a remote hook (`pre-receive`) refuses a whole
- * push for one ref.
- */
-async function pushNewRecords(root: string, remote: string, packed: ReadonlyArray<{ story: RunStory; sha: string }>): Promise<BaseRecordOutcome[]> {
-  const results = await casRefs(root, remote, packed.map((p) => ({ ref: recordRef(p.story.key), sha: p.sha, expected: null })));
-  if (packed.length > 1)
-    for (const [i, p] of packed.entries()) if (results[i] && !results[i].ok && results[i].reason === "rejected") results[i] = await casRef(root, remote, recordRef(p.story.key), p.sha, null);
-  return packed.map((p, i) => {
-    const r = results[i];
-    return r?.ok ? outcome(p.story, { done: "pushed", sha: p.sha }) : outcome(p.story, { done: "failed", reason: `the push of ${recordRef(p.story.key)} failed (${r?.reason ?? "other"}): ${r && !r.ok ? r.message : ""}` });
-  });
-}
-
-/**
- * Move every finished story's run state an older norn left in
- * the main checkout's tree into its archive ref on `remote`. Each story (`baseRunStateInIndex`) is
- * packed from `HEAD` (`treeRecordCommit`); a ref the remote already has with the same tree is a rerun
- * after an interruption, and nothing is pushed for it; the rest go out by `pushNewRecords`. Only then
- * is the removal of each archived story's `runs/` staged (`git rm`, refused for files changed since
- * `HEAD`). A story whose record fails validation, whose push is rejected, or whose ref holds another
- * record keeps its run state in the tree, unstaged, with the reason; with no remote, or one that
- * cannot be read, every story does (the record must be on a remote before its removal), and no ref is
- * written. Ascending by story.
- */
-export async function archiveBaseRunState(root: string, remote: string | null, o: { holder: string; at: string }): Promise<BaseRecordOutcome[]> {
-  const stories = baseRunStateInIndex(root);
-  if (!stories.length) return [];
-  const all = (reason: string) => stories.map((s) => outcome(s, { done: "failed", reason }));
-  if (remote === null) return all("no git remote to push its archive ref to: the run state stays in the tree until one is configured");
-  let fetched: Set<string>;
-  try {
-    fetched = new Set(await fetchRecords(root, remote, stories.map((s) => s.key)));
-  } catch (e) {
-    return all(`the remote's archive refs could not be read: ${(e as Error).message}`);
-  }
-  const local = localRecordRefs(root);
-  const out = new Map<string, BaseRecordOutcome>();
-  const fresh: Array<{ story: RunStory; sha: string }> = [];
-  for (const s of stories) {
-    const packed = treeRecordCommit(root, "HEAD", s, o);
-    const have = fetched.has(recordRef(s.key)) ? local.get(s.key) : undefined;
-    if (!packed.ok) out.set(s.key, outcome(s, { done: "failed", reason: packFailure(packed) }));
-    else if (have === undefined) fresh.push({ story: s, sha: packed.sha });
-    else if ((await readLocalRef(root, `${have}^{tree}`)) === packed.tree) out.set(s.key, outcome(s, { done: "already archived", sha: have }));
-    else out.set(s.key, outcome(s, { done: "failed", reason: `${recordRef(s.key)} already holds another record (${have.slice(0, 12)})` }));
-  }
-  for (const r of await pushNewRecords(root, remote, fresh)) out.set(r.story, r);
-  // Every ref is on the remote before any removal is staged
-  for (const s of stories) {
-    const r = out.get(s.key) as BaseRecordOutcome;
-    if (r.done === "failed") continue;
-    const rm = await git(root, ["rm", "-r", "-q", "--", r.path]);
-    if (rm.code !== 0) out.set(s.key, outcome(s, { done: "failed", reason: `its archive ref is on the remote, but git rm refused: ${rm.stderr}` }));
-  }
-  return stories.map((s) => out.get(s.key) as BaseRecordOutcome);
 }
 
 /** A unit of a record read from git objects: its key and its validated state and pinned workflow. */

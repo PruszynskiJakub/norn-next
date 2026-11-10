@@ -3,7 +3,7 @@
  * instead of refusing at once. One line on the progress log (stderr) says so, once, only when the
  * first try finds the lock busy; a dead holder is reclaimed at once by store (no wait). After 60s
  * on the context clock, or on the abort signal (Ctrl-C), it refuses `tick_locked` without taking
- * the lock. `tick`, `migrate` and watch's per-tick lock take the store lock directly and refuse at once.
+ * the lock. `tick`, `upgrade` and watch's per-tick lock take the store lock directly and refuse at once.
  */
 import { acquireTickLock, type LockContent, type LockResult } from "@norn/store";
 import type { Context } from "../context.ts";

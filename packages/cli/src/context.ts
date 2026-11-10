@@ -112,7 +112,7 @@ export class Context {
   readonly deps: CliDeps;
   /** lines for a person on stderr (a one-time notice), returned in `CliResult.stderr`; never data */
   readonly stderr: string[] = [];
-  /** `locate()` refuses a main checkout on the old or a mixed layout; false for a command that reports it itself (doctor, upgrade, migrate) */
+  /** `locate()` refuses a main checkout on the old or a mixed layout; false for a command that reports it itself (doctor, upgrade) */
   checksLayout = true;
   private located: Located | null = null;
   private loadedConfig: LoadedConfig | null = null;
