@@ -41,7 +41,7 @@ All six slices are integrated. Review #2: **approve** (both review #1 blockers f
 | 06.AC3 | doctor: no run-state section or key | test | `archive-ref.test.ts` › same test |
 | 06.AC4 | only record-move golden/rule cases gone; snapshots, transcripts unchanged | test | golden corpus (`golden.test.ts`); one transcript line removed, a person rules |
 
-Every user story is covered by the criteria above; none is UNTRACED.
+Every user story is covered; none UNTRACED.
 
 #### Easy to miss
 
@@ -58,7 +58,7 @@ Every user story is covered by the criteria above; none is UNTRACED.
 - Minor notes from review #1, still open, for the person and not for rework: init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before loading config, so a broken config with no version gets exit 3, not 6 (D4, `upgrade.ts:52`); `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move` are left for tests only; the 05.AC2 hook test also passes on old code; a few stale comments (`observe/index.ts:522`, `view/src/load.ts:474`, `store/src/fsx.ts:16`, `docs/limitations.md:29`); commit 1ac2a0d2f's accepted risk (a branch-only record reads as none) belongs in the PR body.
 - Person decisions: init refuses pre-0.30 too; config old-key messages drop the `norn upgrade` hint; codes `version_missing`/`version_too_old`; status version item is Unblock → `norn doctor`. Flat records and old `state.json` readers stay.
 - QA #2 note (03.AC2): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
-- CI fix round 1 (ci.fail): the guard refused e2e/integration fixtures that had no `norn_version` (raw team-config writes in `layout`, `non-holder-views`, `takeover-record`, `mailbox-across-machines`; `base-sync` cases that never ran init) or played norns below 0.30 (`base-sync` gh-252 case 0.18→0.19, now 0.30→0.31; `observe-snapshots` fixed at 0.19.0, now 0.30.0 — only the snapshots' repo/running version fields moved). Fixtures only; guard unchanged, no transcript moved. Raw team-config writes in tests must carry `norn_version: ${runningVersion(h.deps)}` or follow `h.config` with `h.recordVersion()`.
+- CI fix round 1 (ci.fail): the guard refused e2e/integration fixtures that had no `norn_version` (raw team-config writes in `layout`, `non-holder-views`, `takeover-record`, `mailbox-across-machines`; `base-sync` cases that never ran init) or played norns below 0.30 (`base-sync` gh-252 now 0.30→0.31; `observe-snapshots` now 0.30.0, only its version fields moved). Fixtures only; guard unchanged, no transcript moved. Test team-config writes need `norn_version` (`runningVersion(h.deps)` or `h.recordVersion()`).
 - Release notes come from commits 5e8451d29 and b45b051f0 and the PR body. CHANGELOG is the release step's.
 
 #### Resume
