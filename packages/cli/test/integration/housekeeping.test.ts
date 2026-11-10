@@ -545,7 +545,11 @@ describe("norn doctor: the repo's norn version and drifted skills (B23–B25, D1
   const as = (version: string) => ({ ...h.deps, env: env(), version });
   // --repo: no agent on PATH
   const bare = (version: string) => ({ ...h.deps, env: { ...h.deps.env, PATH: "/usr/bin:/bin" }, version });
-  const atVersion = (v: string | null) => h.config(v === null ? CONFIG : `${CONFIG}norn_version: ${v}\n`);
+  const atVersion = (v: string | null) => {
+    h.config(v === null ? CONFIG : `${CONFIG}norn_version: ${v}\n`);
+    // h.config keeps a recorded version; a repo with none needs a team file written without it
+    if (v === null) h.write(repoConfigPath(h.root), "provider: gh\nworkflow: solo\n");
+  };
   /** Edit a bundled skill for the length of `fn`, then put it back. */
   const editing = async (skill: string, fn: () => Promise<void>) => {
     const file = join(h.root, ".agents/skills", skill, "SKILL.md");

@@ -92,7 +92,7 @@ describe("drifted skills hold nothing", () => {
 
   test("AC2 (D14): gh-7's own team file records a newer norn_version → not drift", async () => {
     const team = repoConfigPath(gh7());
-    writeFileSync(team, `${readFileSync(team, "utf8")}norn_version: 0.20.0\n`);
+    writeFileSync(team, readFileSync(team, "utf8").replace(/^norn_version: .*$/m, "norn_version: 0.20.0"));
     const obs = await observeNow(h);
     expect(obs.facts.stories.find((s) => s.key === "gh-7")?.units[0]?.skills_drift).toEqual([]);
   });
