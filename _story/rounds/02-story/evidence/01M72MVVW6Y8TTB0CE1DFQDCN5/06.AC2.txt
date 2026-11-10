@@ -1,0 +1,51 @@
+== 06.AC2 (valid spec gh-9, status: active, no machine-dir run state for gh-9; base tree holds its runs/ copied from a real round)
+.agents/specs/gh-9-done/runs/_story/rounds/01-triage/receipts/0001-started.json
+.agents/specs/gh-9-done/runs/_story/rounds/01-triage/receipts/0002-done.json
+.agents/specs/gh-9-done/runs/_story/rounds/01-triage/state.json
+.agents/specs/gh-9-done/runs/_story/rounds/01-triage/workflow.yaml
+.agents/specs/gh-9-done/spec.md
+---
+id: gh-9
+slug: done
+provider: gh
+number: 9
+url: https://github.com/qa-example/qa-repo/issues/9
+title: Done story
+assignee: qa
+labels:
+  - norn
+workflow: triage
+status: active
+intake_at: 2026-11-10T11:58:20.499Z
+body_hash: 1e64fe732f5336d2552fa8287db2740b4efc8d26528f7bb1fe04d3423e44f1df
+$ norn status  (binary 0.31.0)
+Inbox empty — nothing needs you.
+exit=0  repo+machine-dir changed: no
+
+$ norn status --json  (binary 0.31.0)
+{"at":"2026-11-10T11:59:35.761Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[],"check":[],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":0,"delegated_counts":{},"heartbeat":{"holder":"tester@box","last_tick_at":null,"age":null,"down":false,"up":false}}
+exit=0  repo+machine-dir changed: no
+
+$ norn story list  (binary 0.31.0)
+gh-9 Done story
+  triage · manual · unclaimed · not started
+
+0 items need you — norn status
+exit=0  repo+machine-dir changed: no
+
+status/story list mention runs/|run state|run_state|archive|base tree: 0
+== doctor in this repo
+top keys: ok,live,hook_command,machine,git,agents,remote,labels,runner,skills,repo,warnings,hints | repo keys: ok,version,skills,workflows,config
+doctor json/markdown matching run_state|run state|runs/|archive: 0 / 0
+$ norn run list gh-9  (binary 0.31.0)
+gh-9 · Done story · not_started
+intake 2026-11-10 11:58:20Z · not done · wall-clock 1m25s so far
+time in steps: - · human wait 0s
+
+No steps yet.
+exit=0  repo+machine-dir changed: no
+
+$ norn run list gh-9 --json  (binary 0.31.0)
+{"unit":"gh-9","story":"gh-9","slice":null,"title":"Done story","status":"not_started","step":null,"intake_at":"2026-11-10T11:58:20.499Z","done_at":null,"merged_at":null,"totals":{"wall_clock_ms":85378,"merge_wait_ms":null,"by_type":{},"by_step":{},"human_wait_ms":0},"steps":[],"units":[{"unit":"gh-9","story":"gh-9","slice":null,"title":"Done story","status":"not_started","step":null,"intake_at":"2026-11-10T11:58:20.499Z","done_at":null,"merged_at":null,"totals":{"wall_clock_ms":85378,"merge_wait_ms":null,"by_type":{},"by_step":{},"human_wait_ms":0}}],"hidden_events":0,"rounds":[],"records":{"
+exit=0  repo+machine-dir changed: no
+

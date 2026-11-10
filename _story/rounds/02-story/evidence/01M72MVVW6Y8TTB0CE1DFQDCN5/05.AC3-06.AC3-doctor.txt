@@ -1,0 +1,75 @@
+== 05.AC3 + 06.AC3 doctor in br
+doctor --json exit 1
+top keys: ok,live,hook_command,machine,git,agents,remote,labels,runner,skills,repo,warnings,hints
+repo keys: ok,version,skills,workflows,config
+json matching layout|migrate|run_state|run-state|archive: 0
+markdown lines matching layout|migrate|run state|runs/|archive: 0
+--- doctor markdown:
+norn doctor: 2 checks failed (agent claude, remote)
+
+  ok   git            git version 2.54.0 (Apple Git-157)
+  FAIL agent claude   claude not on PATH · hooks fire
+  FAIL remote         gh as []
+                      ! this repository has no git remote named origin
+                      → git remote add origin <url>
+  ok   runner         headless available · sessions run this norn
+  ok   skills         installed and linked
+       machine        tester@box
+  ok   norn           0.31.0 matches this repo's norn version 0.31.0
+  ok   workflows      quick, refinement, reproduce, slice, story, triage valid (.agents/workflows/)
+  ok   config         .agents/norn.config.yaml
+
+Warnings
+  ! NORN_MACHINE=box overrides this machine's name (a test aid): runs are judged by pid only on the machine they were started on, so two hosts must never share a name — unset it outside tests
+  ! labels not checked: no git remote
+== 05.AC3 + 06.AC3 doctor in r3
+doctor --json exit 1
+top keys: ok,live,hook_command,machine,git,agents,remote,labels,runner,skills,repo,warnings,hints
+repo keys: ok,version,skills,workflows,config
+json matching layout|migrate|run_state|run-state|archive: 0
+markdown lines matching layout|migrate|run state|runs/|archive: 0
+--- doctor markdown:
+norn doctor: 4 checks failed (agent claude, remote, skills, norn)
+
+  ok   git            git version 2.54.0 (Apple Git-157)
+  FAIL agent claude   claude not on PATH · hooks missing
+                      · run norn init to install hooks
+  FAIL remote         gh as []
+                      ! this repository has no git remote named origin
+                      → git remote add origin <url>
+  ok   runner         headless available · sessions run this norn
+  FAIL skills         missing norn, norn-clarify, norn-codebase-design, norn-diagnose, norn-fsd, norn-fsd-round, norn-implement, norn-interview, norn-merge, norn-plan, norn-pr, norn-prototype, norn-qa, norn-qa-person, no
+                      → norn init
+       machine        tester@box
+  FAIL norn           this repo records no norn_version
+                      → run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0
+  ok   workflows      none valid in .agents/workflows/
+  ok   config         .agents/norn.config.yaml (none: built-in defaults)
+
+Warnings
+  ! NORN_MACHINE=box overrides this machine's name (a test aid): runs are judged by pid only on the machine they were started on, so two hosts must never share a name — unset it outside tests
+  ! labels not checked: no git remote
+== 05.AC3 + 06.AC3 doctor in base
+doctor --json exit 1
+top keys: ok,live,hook_command,machine,git,agents,remote,labels,runner,skills,repo,warnings,hints
+repo keys: ok,version,skills,workflows,config
+json matching layout|migrate|run_state|run-state|archive: 0
+markdown lines matching layout|migrate|run state|runs/|archive: 0
+--- doctor markdown:
+norn doctor: 2 checks failed (agent claude, remote)
+
+  ok   git            git version 2.54.0 (Apple Git-157)
+  FAIL agent claude   claude not on PATH · hooks fire
+  FAIL remote         gh as []
+                      ! this repository has no git remote named origin
+                      → git remote add origin <url>
+  ok   runner         headless available · sessions run this norn
+  ok   skills         installed and linked
+       machine        tester@box
+  ok   norn           0.31.0 matches this repo's norn version 0.31.0
+  ok   workflows      quick, refinement, reproduce, slice, story, triage valid (.agents/workflows/)
+  ok   config         .agents/norn.config.yaml
+
+Warnings
+  ! NORN_MACHINE=box overrides this machine's name (a test aid): runs are judged by pid only on the machine they were started on, so two hosts must never share a name — unset it outside tests
+  ! labels not checked: no git remote

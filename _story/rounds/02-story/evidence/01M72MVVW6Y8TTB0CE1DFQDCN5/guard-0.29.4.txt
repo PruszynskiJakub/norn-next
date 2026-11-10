@@ -1,0 +1,69 @@
+== repo norn_version=0.29.4, binary 0.31.0, HEAD under test adb5b5a74
+$ norn tick --json  (binary 0.31.0)
+{"error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.31.0"}}
+exit=3  repo+machine-dir changed: no
+
+$ norn story start gh-1 --json  (binary 0.31.0)
+{"error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.31.0"}}
+exit=3  repo+machine-dir changed: no
+
+$ norn tick  (binary 0.31.0)
+{"error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.31.0"}}
+exit=3  repo+machine-dir changed: no
+
+$ norn sync --json  (binary 0.31.0)
+{"error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.31.0"}}
+exit=3  repo+machine-dir changed: no
+
+$ norn upgrade --json  (binary 0.31.0)
+{"error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.31.0"}}
+exit=3  repo+machine-dir changed: no
+
+$ norn upgrade  (binary 0.31.0)
+**Refused (version_too_old):** this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on
+
+Do instead: install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0
+exit=3  repo+machine-dir changed: no
+
+$ norn init --json  (binary 0.31.0)
+{"error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.31.0"}}
+exit=3  repo+machine-dir changed: no
+
+$ norn init  (binary 0.31.0)
+**Refused (version_too_old):** this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on
+
+Do instead: install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0
+exit=3  repo+machine-dir changed: no
+
+$ norn status --json  (binary 0.31.0)
+{"at":"2026-11-10T11:54:04.603Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[{"story":"*","slice":null,"step":null,"command":"norn doctor","since":"2026-11-10T11:54:04.603Z","id":"norn-version:0.29.4:0.31.0","group":"unblock","title":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on: install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","age":"0s"}],"check":[],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":1,"delegated_counts":{},"heartbeat":{"holder":"tester@box","last_tick_at":null,"age":null,"down":false,"up":false}}
+exit=0  repo+machine-dir changed: no
+
+$ norn status  (binary 0.31.0)
+`norn status` now shows what needs you; the story listing moved to `norn story list`.
+! this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on: install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0
+      $ norn doctor
+exit=0  repo+machine-dir changed: YES
+
+$ norn help  (binary 0.31.0)
+norn — deliver software stories with coding agents; code decides the next step, agents do it.
+
+Agent doing a norn step? Run only `norn brief`, then report once with `norn done`, `norn ask` or `norn stuck`
+(the `norn` skill says how). Every other command is the person's: run one only when the person asks you to directly.
+
+Core
+  norn status            What needs you, grouped by action, with the command to resolve each item; --history for when items came and went
+  norn story             The stories of this repository (create, take, list, view, wait, answer, approve, reject, update-branch, start
+exit=0  repo+machine-dir changed: no
+
+$ norn doctor --json (version check)
+{"ok":false,"live":false,"hook_command":"\"${NORN_BIN:-norn}\" hook","machine":{"holder":"tester@box","override":"box"},"git":{"ok":true,"version":"git version 2.54.0 (Apple Git-157)"},"agents":[{"name":"claude","adapter":"claude","tier":"blocking","ok":true,"binary":{"command":"claude","path":"/Users/jakubpruszynski/.local/bin/claude","version":"2.1.322 (Claude Code)"},"hooks_installed":true,"hook_fires":{"ok":true,"command":"\"${NORN_BIN:-norn}\" hook session-start --agent claude","exit":0,"recorded":1},"notes":[]}],"remote":{"ok":false,"provider":"gh","user":"[]","git_remote":{"name":"origin","url":null},"error":"this repository has no git remote named origin","do_instead":"git remote add origin <url>"},"labels":{"checked":false,"reason":"no git remote","fix":null,"do_instead":null},"runner":{"ok":true,"configured":true,"required":false,"name":"herdr","available":true,"norn_on_path":{"ok":true,"expected":"$QA/w/home/bin/norn","resolved":"$QA/w/home/bin/norn"},"cockpit_plugin":{"linked":true,"enabled":true,"root":"/Users/jakubpruszynski/.config/herdr/plugins/github-installations/norn-2d93e9449bde/95167-0/checkout/plugins/herdr"}},"skills":{"ok":true,"dir":"$QA/w/g-0.29.4/.agents/skills","missing":[],"drifted":[],"unlinked":{}},"repo":{"ok":false,"version":{"ok":false,"running":"0.31.0","repo":"0.29.4","match":null,"code":"version_too_old","error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0"},"skills":{"ok":true,"drifted":[]},"workflows":[{"name":"quick","file":".agents/workflows/quick.yaml","ok":true,"issues":[]},{"name":"refinement","file":".agents/workflows/refinement.yaml","ok":true,"issues":[]},{"name":"reproduce","file":".agents/workflows/reproduce.yaml","ok":true,"issues":[]},{"name":"slice","file":".agents/workflows/slice.yaml","ok":true,"issues":[]},{"name":"story","file":".agents/workflows/story.yaml","ok":true,"issues":[]},{"name":"triage","file":".agents/workflows/triage.yaml","ok":true,"issues":[]}],"config":{"ok":true,"file":".agents/norn.config.yaml","present":true,"errors":[]}},"warnings":["NORN_MACHINE=box overrides this machine's name (a test aid): runs are judged by pid only on the machine they were started on, so two hosts must never share a name — unset it outside tests","labels not checked: no git remote"],"hints":[]}
+doctor exit=1
+$ norn doctor (version lines)
+  ok   git            git version 2.54.0 (Apple Git-157)
+  ok   agent claude   /Users/jakubpruszynski/.local/bin/claude (2.1.322 (Claude Code)) · hooks fire
+  FAIL remote         gh as []
+--
+  FAIL norn           this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on
+                      → install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0
+  ok   workflows      quick, refinement, reproduce, slice, story, triage valid (.agents/workflows/)

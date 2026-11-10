@@ -1,0 +1,73 @@
+== 06.AC1 story gh-1 (triage, manual) started; runs/ committed in its branch tree at ff09614 (.agents/specs/gh-1-demo-story/runs)
+branch-tree runs/ (local): 0 files; (remote): 0 files; tip ff09614
+
+$ norn tick --json  (binary 0.31.0)
+{"tick_id":"01M72N501WZ3R431AE1XB0N640","at":"2026-11-10T11:58:00.764Z","duration_ms":392,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"agent.ready.manual","kind":"noop","ok":true}],"notified":["your_turn:gh-1:explore#1"],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"after","ms":135}}
+exit=0  repo+machine-dir changed: YES
+
+branch-tree runs/ (local): 0 files; (remote): 0 files; tip ff09614
+$ norn tick --json  (binary 0.31.0)
+{"tick_id":"01M72N50SKX7XW4BMV9GR1Y2AE","at":"2026-11-10T11:58:01.523Z","duration_ms":271,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"agent.ready.manual","kind":"noop","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"observe.local","ms":121}}
+exit=0  repo+machine-dir changed: no
+
+branch-tree runs/ (local): 0 files; (remote): 0 files; tip ff09614
+### brief + done from the unit worktree (dev build)
+$ norn brief | head -3
+# norn brief — gh-1 · explore #1
+
+You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+$ norn done done --handoff QA demo  (binary 0.31.0)
+Reported `done done` (gh-1, step explore #1).
+Receipt: `../../runs/gh-1/_story/rounds/01-triage/receipts/0002-done.json`
+
+**End your turn now.** Do not report again; norn routes the work from here.
+exit=0  repo+machine-dir changed: YES
+
+branch-tree runs/ (local): 0 files; (remote): 0 files; tip ff09614
+$ norn tick --json  (binary 0.31.0)
+{"tick_id":"01M72N527BYXWRYJ9SBQNZNCA5","at":"2026-11-10T11:58:02.987Z","duration_ms":623,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"receipts.apply","kind":"apply_receipts","ok":true}],"notified":["round_done:gh-1:_story/rounds/01-triage"],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"act apply_receipts gh-1","ms":195},"follow_up":true}
+exit=0  repo+machine-dir changed: no
+
+branch-tree runs/ (local): 1 files; (remote): 1 files; tip ec8f3ac
+$ norn tick --json  (binary 0.31.0)
+{"tick_id":"01M72N536D1H5K101BT64T4T6T","at":"2026-11-10T11:58:03.981Z","duration_ms":333,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"story.round_done","kind":"noop","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"observe.local","ms":162}}
+exit=0  repo+machine-dir changed: no
+
+branch-tree runs/ (local): 1 files; (remote): 1 files; tip ec8f3ac
+$ norn tick --json  (binary 0.31.0)
+{"tick_id":"01M72N53WAC7RAP1FSZ34D213E","at":"2026-11-10T11:58:04.682Z","duration_ms":315,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"story.round_done","kind":"noop","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"observe.local","ms":166}}
+exit=0  repo+machine-dir changed: no
+
+branch-tree runs/ (local): 1 files; (remote): 1 files; tip ec8f3ac
+### branch log
+ec8f3ac norn: gh-1 explore.done → $done
+ff09614 norn: start gh-1 (triage)
+2849452 norn: intake gh-1 Demo story
+44a2d45 setup
+285d8cf Set up norn
+c21b410 init
+--- commits touching runs/ (local):
+ec8f3ac norn: gh-1 explore.done → $done
+--- remote commits touching runs/:
+ec8f3ac norn: gh-1 explore.done → $done
+--- runs/ tree at QA commit vs tip (local, remote):
+fatal: path '.agents/specs/gh-1-demo-story/runs' does not exist in 'ff09614'
+ff09614:.agents/specs/gh-1-demo-story/runs
+b73039b549ee560893b0772b67add614db3aa8a3
+--- machine-dir run state:
+$QA/w/home/repos/r6-be6f5be8/runs/gh-1/_story/rounds/01-triage/workflow.yaml
+$QA/w/home/repos/r6-be6f5be8/runs/gh-1/_story/rounds/01-triage/state.json
+$QA/w/home/repos/r6-be6f5be8/runs/gh-1/_story/rounds/01-triage/receipts/0002-done.json
+$QA/w/home/repos/r6-be6f5be8/runs/gh-1/_story/rounds/01-triage/receipts/0001-started.json
+$ norn story list  (binary 0.31.0)
+gh-1 Demo story
+  triage · manual · mine · done 2s
+  base main: up to date
+
+Recently done
+  gh-1       Demo story (2s ago)
+
+heartbeat: last tick 0s ago on tester@box (took 315ms)
+1 item needs you — norn status
+exit=0  repo+machine-dir changed: no
+

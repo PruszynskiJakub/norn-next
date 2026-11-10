@@ -1,0 +1,29 @@
+== 05.AC2 agent hooks fire in that repo (cwd = the pre-0.13 repo)
+$ norn hook session-start --agent claude
+{}
+exit=0
+$ norn hook pre-tool-use --agent claude
+{}
+exit=0
+$ norn hook stop --agent claude
+{}
+exit=0
+any output mentioning layout/migrate: 0
+
+== 05.AC2 (b): hook in a unit dir (.norn-unit → the pre-0.13 repo r3)
+repo=$QA/w/r3
+story=gh-3
+slice=
+unit=_story
+spec_dir=.agents/specs/gh-3-x
+$ norn hook pre-tool-use --agent claude
+{}
+exit=0
+$ norn hook stop --agent claude
+{}
+exit=0
+any output mentioning layout/migrate: 0
+--- old files after the hooks (git status changes: 0)
+5f36b2ea290645ee34d943220a14b54ee5ea5be5  .agents/norn/trace/x.jsonl
+7b28b8ede903f1bec28f20efc7b1adace5516807  .agents/norn/workflows/duo.yaml
+b4b981fc1986ef65b69ce2d892919d4d7f03c0bf  .agents/norn/config.yaml

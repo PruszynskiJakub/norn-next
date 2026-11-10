@@ -1,0 +1,16 @@
+#!/bin/zsh
+echo "gh $*" >> $QA/gh6.log
+ISSUE='{"number":1,"url":"https://github.com/qa-example/qa-repo/issues/1","title":"Demo story","body":"Demo body","state":"OPEN","assignees":[{"login":"qa"}],"labels":[{"name":"norn"}],"updatedAt":"2026-11-10T09:00:00Z"}'
+case "$1 $2" in
+  "api user") echo qa;;
+  "auth status") echo ok;;
+  "issue list") echo "[$ISSUE]";;
+  "issue view") echo "$ISSUE";;
+  "issue edit"|"issue comment"|"label create") ;;
+  "label list") echo '[]';;
+  "pr list") echo '[]';;
+  "repo view") echo '{"url":"https://github.com/qa-example/qa-repo"}';;
+  "api graphql") echo '{"data":{"repository":{}}}';;
+  *) echo '[]';;
+esac
+exit 0

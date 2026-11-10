@@ -1,0 +1,6 @@
+== 04.AC2 repo with no team file, binary 0.31.0
+$ norn init --json  (binary 0.31.0)
+{"root":"$QA/w/i1","config":"created","review":"created","user_config":"exists","schemas":["$QA/w/i1/.agents/norn.config.schema.json","$QA/w/i1/.agents/norn.config.local.schema.json"],"workflows":{"crea
+exit=0  repo+machine-dir changed: YES
+
+team file: norn_version: 0.31.0
