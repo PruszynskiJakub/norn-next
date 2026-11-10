@@ -50,4 +50,4 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Resume
 
-QA #4 passed all 16 criteria at 55c959ed. Next: describe (refresh pr.md from QA #4), then CI. This is the last `ci_loop` round. If CI fails, read the failure first. If it is the EFAULT again, the fallback didn't help.
+pr.md rewritten for head 55c959ed from story QA #4 (16/16 pass, evidence run 01M72GJNXFGS3KDDQ9SY4QPT9A). Next: open-pr updates PR #320, then CI. This is the last `ci_loop` round. If CI fails, read the failure first. If it is the EFAULT again, the fallback didn't help.
