@@ -1,0 +1,300 @@
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:05.9019148Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:05.9043174Z ##[endgroup]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:07.6713478Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:07.6742228Z packages/cli/test/integration/tick-lock-wait.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:07.6784893Z (pass) waiting for a running tick (tidy) > B7: still running after 60s → tick_locked (busy), naming the holder and the wait [6532.06ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:07.9863010Z (pass) waiting for a running tick (tidy) > B8: a lock left by a dead tick is taken over at once [320.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.0504526Z (pass) waiting for a running tick (tidy) > B9: Ctrl-C while waiting → refuses, the lock never taken, nothing written [64.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.4261447Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.4288689Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.4290588Z (pass) orphans: reported by every tick, cleaned by norn tidy > tick reports orphan branches and worktrees; tidy --dry-run lists, tidy removes only what is safe [3080.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.6014080Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.6024876Z packages/cli/test/integration/record-ref.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.6027878Z (pass) record.policy > AC1: absent = local; config set writes the team file, config get names it, doctor fails an unknown value [1674.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.6536638Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.6537559Z packages/cli/test/integration/tick-lock-wait.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.6539260Z (pass) waiting for a running tick (tidy) > B10, D6: a holder that changes is waited on within one budget and one line; both commands complete [604.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.7235273Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.7236259Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.7238076Z (pass) GR6 record on the base branch > deferred while the spec file is not on the base branch [44.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.8809148Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.8874136Z packages/cli/test/integration/branch-tree-run-state.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.8925875Z (pass) runs/ in a story branch's tree is never read or moved > ticks leave the branch tree as it is and the story moves on from its machine-dir state [3649.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.9339519Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.9340236Z packages/cli/test/integration/tick-lock-wait.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.9341474Z (pass) judged after the wait > B6: a refusal comes right after the wait [280.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.9531018Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.9543813Z packages/cli/test/integration/branch-tree-run-state.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.9573628Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:08.9577548Z ##[endgroup]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.0972596Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.0975027Z packages/cli/test/integration/round-folders.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.0976959Z (pass) a new story's record is round 1 (B30, B31) > AC1: state, pinned workflow, receipts from 0001 and evidence sit in rounds/01-duo/ of the machine dir; the worktree and the branch hold no runs/, only the story's handoff [2766.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.2972059Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.3052299Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.3090200Z (pass) GR6 record on the base branch > after the merge: committed in a throwaway worktree and pushed to the base branch; main checkout untouched (story.md an older norn wrote) [572.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.5764115Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.5769881Z packages/cli/test/integration/tick-lock-wait.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.5773458Z (pass) no wait (B11, B13–B15) > B15: story edit --manual while a tick runs → at once, no wait line [642.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.6013586Z (pass) no wait (B11, B13–B15) > B14: norn tick refuses at once [25.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.6603900Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.6681903Z packages/cli/test/integration/round-folders.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.6798309Z (pass) a new story's record is round 1 (B30, B31) > AC2: the handoff is handoffs/story.md, and the step's report leaves it exactly as written [559.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.6818613Z (pass) a flat record moves into round 1 (B34), in the machine dir > setup: the story's record laid out flat, as an older norn wrote it, with a slice folder beside it [7.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.7560472Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.7581740Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.7645348Z (pass) GR6 record on the base branch > GR2: a story intaken as spec.md is marked done in spec.md [460.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.8969448Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.9012349Z packages/cli/test/integration/round-folders.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:09.9029938Z (pass) a flat record moves into round 1 (B34), in the machine dir > AC3: the first tick moves everything into rounds/01-duo/, committing nothing; the story goes on at its step [233.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:10.3402808Z (pass) a flat record moves into round 1 (B34), in the machine dir > the story goes on: the next tick decides at implement, round 1, counters unchanged [433.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:10.3432459Z (pass) a move into round 1 that stopped partway is finished by the next round.migrate (B34) > setup: flat again, then a move stopped after evidence/ and receipts/, and a file written to the flat evidence/ after [4.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:10.8129212Z (pass) a move into round 1 that stopped partway is finished by the next round.migrate (B34) > the story still reads as flat at its step, and the next tick moves what is left, state last, committing nothing [479.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.0906972Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.0908971Z packages/cli/test/integration/story-reopen.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.0915879Z (pass) story reopen refusals (B42) > a story that is not closed is refused not_closed; nothing changes [184.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.1375758Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.1479349Z packages/cli/test/integration/tick-lock-wait.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.1481243Z (pass) no wait (B11, B13–B15) > B11, B12: watch skips a busy tick, then its exit release waits for the tick and releases [1536.02ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.4841294Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.4917995Z packages/cli/test/integration/round-folders.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.4931548Z (pass) an old flat record merged into the base stays flat and reads as round 1 (B36) > setup: a story an older norn finished, its flat record merged into main [671.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.5831316Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.5836301Z packages/cli/test/integration/tick-lock-wait.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.5837289Z (pass) each person command waits, then runs (a missed call site fails here) > story edit --at [443.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.8407214Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.8505720Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.8562377Z (pass) norn doctor > reports agents, hooks (installed and firing through the hook command), remote auth and runner [1258.02ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.8948842Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.8982415Z packages/cli/test/integration/tick-lock-wait.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:11.9004094Z (pass) each person command waits, then runs (a missed call site fails here) > story edit --workflow [311.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.0479089Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.0480487Z packages/cli/test/integration/record-ref.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.0481950Z (pass) record.policy > AC1 (review F8): a story run without the key behaves as local: no ref leaves the machine [3443.04ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.2093881Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.2142046Z packages/cli/test/integration/story-reopen.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.2252048Z (pass) story reopen refusals (B42) > a closed issue is refused: reopen the issue first; nothing changes [1121.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.4273089Z (pass) story reopen refusals (B42) > a unit branch missing from the remote is refused naming the branch; nothing changes [219.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.5314453Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.5352101Z packages/cli/test/integration/tick-lock-wait.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.5353171Z (pass) each person command waits, then runs (a missed call site fails here) > story checkout [634.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.6114377Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.6134925Z packages/cli/test/integration/round-folders.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.6136596Z (pass) an old flat record merged into the base stays flat and reads as round 1 (B36) > AC5: run list and run view read it as its one round; nothing is written to the base or the record [1129.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.6184499Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.6229426Z packages/cli/test/integration/story-reopen.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.6265539Z (pass) story reopen refusals (B42) > the story branch missing from the remote is refused naming the branch; nothing changes [190.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.7301353Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.7302250Z packages/cli/test/integration/round-folders.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.7331104Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.7359520Z ##[endgroup]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.8235364Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.8242084Z packages/cli/test/integration/story-reopen.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.8258770Z (pass) story reopen (B40, B41, B55) > without a target a terminal is offered closed stories only; a script is refused with them [207.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.8605894Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.8606805Z packages/cli/test/integration/tick-lock-wait.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:12.8608016Z (pass) each person command waits, then runs (a missed call site fails here) > story reset [336.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:13.4359092Z (pass) each person command waits, then runs (a missed call site fails here) > story handoff [575.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:13.9851350Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:13.9869403Z packages/cli/test/integration/story-reopen.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:13.9932323Z (pass) story reopen (B40, B41, B55) > restores worktrees and the claim, marks spec.md active in one commit; a running unit comes back stuck (reopened) [1160.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.0743909Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.0782119Z packages/cli/test/integration/upgrade-version.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.0827462Z (pass) norn upgrade moves the skills and the version in one staged diff > 0.30.0 with a drifted skill and a missing link → both fixed, norn_version 0.31.0, staged, not committed, the commit printed [1181.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.2112146Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.2113144Z packages/cli/test/integration/tick-lock-wait.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.2115046Z (pass) B5: judged against the state the tick left > a tick applies the agent's done while story edit --at waits → refused at the new cursor [775.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.3829002Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.3921897Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.3951968Z (pass) norn doctor > prints the report for a person, with the same exit code as --json [2540.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.8253784Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.8291878Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.8314122Z (pass) mode, agent and workflow over ticks (B10, B13, B24, B25, B33) > B24: an issue without a norn:wf: label is taken in on the team's workflow; a labelled one on its own [504.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.8346138Z (pass) mode, agent and workflow over ticks (B10, B13, B24, B25, B33) > B10, B13: my mode auto starts gh-1 with the agent I named; the workflow's mode manual holds gh-2 [1.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.8442281Z (pass) mode, agent and workflow over ticks (B10, B13, B24, B25, B33) > B13: a step naming gemini, with no agents entry, launches Gemini
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.8821398Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.8883795Z packages/cli/test/integration/upgrade-version.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:14.8973927Z (pass) norn upgrade moves the skills and the version in one staged diff > an agent folder the repo ignores → the link is recreated and not staged, the rest staged [803.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.0641006Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.0641704Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.0647295Z (pass) norn doctor > missing hooks and an unusable hook command fail the check with what to do [685.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.0648298Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.0648829Z packages/cli/test/integration/tick-lock-wait.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.0649627Z (pass) closing and reopening wait too > story close [853.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.3021446Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.3065680Z packages/cli/test/integration/record-ref.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.3071637Z (pass) under remote, every boundary pushes the record after the branch (B10) > AC2: implement ends: branch, then refs/norn/runs/gh-9 holding the run-state folder, with trailers and a parent [3259.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.5124274Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.5188687Z packages/cli/test/integration/upgrade-version.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.5196699Z (pass) norn upgrade moves the skills and the version in one staged diff > interrupted after the skills, before the version → a rerun records the new version [635.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.6181966Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.6273256Z packages/cli/test/integration/record-ref.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.6322281Z (pass) under remote, every boundary pushes the record after the branch (B10) > AC6: a boundary whose record did not change pushes nothing [316.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.7076477Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.7090539Z packages/cli/test/integration/tick-lock-wait.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.7091995Z (pass) closing and reopening wait too > story reopen [643.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.8405039Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.8506877Z ##[endgroup]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.8564648Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.8571819Z packages/cli/test/integration/record-ref.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.8629453Z (pass) under remote, every boundary pushes the record after the branch (B10) > D3: another clone unpacks the record into a folder, every JSON validated [237.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.9441327Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.9520993Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.9522175Z (pass) mode, agent and workflow over ticks (B10, B13, B24, B25, B33) > B10: the story's own mode beats the workflow's [1118.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:15.9583062Z (pass) mode, agent and workflow over ticks (B10, B13, B24, B25, B33) > B33: .env.norn holds only NORN_SLOT and PORT_BASE, slot n from port 4000 + 10·n [1.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.0836742Z (pass) mode, agent and workflow over ticks (B10, B13, B24, B25, B33) > B38: a slice that still has criteria needs shows under Unblock with the file to fix, not as corrupt [140.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.4554209Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.4558530Z packages/cli/test/integration/upgrade-version.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.4563085Z (pass) norn upgrade with nothing to do changes nothing > binary 0.31.0, repo at 0.31.0, skills and links matching → already on norn 0.31.0, nothing staged, commit null [942.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.6881318Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.6883606Z packages/cli/test/integration/init-version.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.6886393Z (pass) norn init records the version once and never moves it (B28) > AC1 B1: a repo with no norn_version gets the binary's, uncommitted, and init says so [696.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.6897650Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.6902359Z packages/cli/test/integration/story-reopen.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.6903786Z (pass) story reopen (B40, B41, B55) > the next tick resumes the units at their steps; the reopened unit is stuck under Unblock and not started [2707.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.8392995Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.8426939Z packages/cli/test/integration/init-version.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.8442499Z (pass) norn init records the version once and never moves it (B28) > a team file with no norn_version is refused before any write, and stays as it was [151.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.8869921Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.8872986Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.8874462Z (pass) norn doctor: a fresh repository > no git remote fails the remote check with the command that adds one [1208.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.9520111Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.9599458Z packages/cli/test/integration/record-ref.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:16.9621923Z (pass) under remote, every boundary pushes the record after the branch (B10) > AC6: a push with a lease on a sha the remote no longer holds is refused and the ref is kept [1092.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:17.0877706Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:17.0898855Z packages/cli/test/integration/upgrade-version.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:17.0900923Z (pass) norn upgrade with nothing to do changes nothing > only a skill differs → the skill is rewritten and staged, the commit is Refresh norn's skills [628.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:17.7230968Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:17.7271548Z packages/cli/test/integration/init-version.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:17.7299075Z (pass) norn init records the version once and never moves it (B28) > AC2 B28: a newer binary sets up the machine, copies a missing skill, keeps the version and an edited skill [884.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:17.8179461Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:17.8215254Z packages/cli/test/integration/upgrade-version.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:17.8264612Z (pass) norn upgrade records a newer patch > binary 0.30.2, repo at 0.30.0 → norn_version 0.30.2 and the skills refreshed; once committed, 0.30.1 is refused by tick [732.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.4050857Z (pass) norn upgrade never moves the version back > binary 0.30.5, repo at 0.31.0 → refused, exit 3, version_backward, no file changed [590.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.4055575Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.4056444Z ##[endgroup]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.4442381Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.4457253Z packages/cli/test/integration/init-version.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.4458956Z (pass) norn init records the version once and never moves it (B28) > AC3 B28: with the binary on the repo's version, init repairs a drifted skill as before [720.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.5074028Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.5075334Z ##[endgroup]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.5249614Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.5251122Z packages/cli/test/integration/story-reopen.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.5252647Z (pass) story reopen (B40, B41, B55) > closing again and reopening from a slice worktree that still exists acts on the story (B55) [1835.02ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.6975502Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.6977503Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.6991404Z (pass) norn doctor: a fresh repository > in manual mode an unavailable runner is a warning, not a failed check [1812.02ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:18.7196705Z (pass) norn doctor: the cockpit plugin hint > links this checkout's plugins/herdr when norn runs from source, else installs it from GitHub
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:19.8463194Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:19.8472182Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:19.8478760Z (pass) the agent command a launch runs (B14, B15) > B14: setting a model keeps the built-in --permission-mode auto, and the model is passed
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:19.8538608Z (pass) the agent command a launch runs (B14, B15) > B15: args: [] launches claude with no permission mode [1.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:19.9919148Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:19.9920327Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:19.9922785Z (pass) norn doctor: the repo group (B7–B10, D7) > a clean checkout: workflows and config valid, exit 0, nothing changed [894.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:20.0143692Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:20.0148377Z packages/cli/test/integration/record-ref.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:20.0149844Z (pass) under local, a normal step pushes no ref (B11) > AC3: implement, review and qa leave no refs/norn/runs/gh-10 on the remote [3068.03ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:20.7818746Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:20.7819650Z packages/cli/test/integration/story-reopen.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:20.7831522Z (pass) reopen after the base moved (B40) > restores the claim and worktrees only; the next ticks go on without error [2257.02ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:20.9128533Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:20.9144576Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:20.9173086Z (pass) norn doctor: the repo group (B7–B10, D7) > a workflow with an uncounted cycle is named with the cycle and its path; non-zero [919.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:21.0211361Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:21.0240559Z packages/cli/test/integration/config-runtime.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:21.0281658Z (pass) a notification that fails to send (B47) > B47: the tick goes on and the trace keeps the send error [2.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:21.3488707Z (pass) the tick interval and claim timing (B34, B35) > B34: no recorded interval → 30s built in; claim lease 10m renewed every 3m20s (B35) [21.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:21.5365673Z (pass) the tick interval and claim timing (B34, B35) > B34: norn tick --interval records it; a plain tick keeps it; the claim follows (B35) [187.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:21.6521597Z (pass) the tick interval and claim timing (B34, B35) > B34: ticks every 2 minutes with --interval 2m keep the heartbeat up: no norn watch item [116.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:21.6572525Z (pass) the tick interval and claim timing (B34, B35) > a bad --interval is a usage error [4.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:21.9502666Z (pass) norn init sets up the agents in use only (B13) > B1: a plain init installs hooks and skills for Claude only [275.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:22.2113535Z (pass) norn init sets up the agents in use only (B13) > B13: an agent in use — the default agent or one a workflow step names — is set up too [262.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:22.3743428Z (pass) norn init sets up the agents in use only (B13) > B1, B7: an old key in the user file refuses init before it writes anything [162.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:22.3816012Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:22.3852776Z ##[endgroup]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:22.8773596Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:22.8801965Z packages/cli/test/integration/record-ref.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:22.8819911Z (pass) a policy change applies from the next boundary (B12) > AC4: local → remote while gh-11 is in review: the next boundary pushes the ref, and every one after [2859.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:22.9410416Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:22.9411487Z packages/cli/test/integration/story-reopen.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:22.9412907Z (pass) gh-71 B22, B23 (GR6b): a closed issue with no PR ends a finished story; reopen brings it back > AC2: sync with the issue closed pushes the record, then removes worktree, branch, claim and mailbox refs; spec closed; gone from the inbox [468.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:23.0905149Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:23.0905932Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:23.0907942Z (pass) norn doctor: the repo group (B7–B10, D7) > B13: doctor checks the agents in use only — a built-in agent named on a workflow step joins them [2179.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:23.6939688Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:23.6940505Z packages/cli/test/integration/story-reopen.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:23.6942517Z (pass) gh-71 B22, B23 (GR6b): a closed issue with no PR ends a finished story; reopen brings it back > AC3: reopening the issue and `story reopen` brings it back at its finished round; `--workflow story` starts round 2 [753.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:23.7796241Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:23.7799065Z ##[endgroup]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:24.4293537Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:24.4294116Z packages/cli/test/integration/record-ref.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:24.4294960Z (pass) a failed ref push is retried at the next tick (B14) > AC5: the remote rejects the ref once; the branch is pushed, the step goes on, the next tick pushes the ref [1556.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:24.8372616Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:24.8373274Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:24.8375175Z (pass) norn doctor: the repo group (B7–B10, D7) > a workflow naming a skill its agent lacks: doctor names it, and a tick refuses it for the same reason [1747.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:25.5016211Z (pass) norn doctor: the repo group (B7–B10, D7) > a config value of the wrong type names the file, the key and why; non-zero [665.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:25.9632675Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:25.9633479Z packages/cli/test/integration/record-ref.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:25.9635678Z (pass) the record follows the branch (review F1, F5) > F1: under core.autocrlf=input a CRLF file in the record is packed as it is; the next tick pushes nothing [1533.02ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:26.1647753Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:26.1648384Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:26.1650289Z (pass) norn doctor: the repo group (B7–B10, D7) > gh-64 B48: a notifier that fails to build is one FAIL config line naming its file; the other checks still run [663.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:26.8346585Z (pass) norn doctor: the repo group (B7–B10, D7) > gh-64 B48: a bad notify.webhook is a FAIL config line naming its file, counted; the machine checks still run [670.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:26.8873431Z (pass) norn doctor: the repo group (B7–B10, D7) > --repo checks only the repo: no agent on PATH, no remote auth, no runner (B10) [52.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:26.8887858Z (pass) norn doctor: the repo group (B7–B10, D7) > norn help doctor lists --repo (B10) [2.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:28.0444806Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:28.0445287Z packages/cli/test/integration/record-ref.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:28.0446109Z (pass) the record follows the branch (review F1, F5) > F5: while this tick's branch push fails the record waits; it follows the branch once that is pushed [2082.03ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:28.1522496Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:28.1523847Z ##[endgroup]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:28.4156925Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:28.4157690Z packages/cli/test/integration/housekeeping.test.ts:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:28.4159897Z (pass) norn doctor: the repo's norn version and drifted skills (B23–B25, D12) > B23: a matching binary passes the version line; an older one fails it with what to install, exit 1 [1272.02ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:28.9913560Z (pass) norn doctor: the repo's norn version and drifted skills (B23–B25, D12) > B7, B23: a newer binary fails the version line and names `norn upgrade` [575.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:29.5533210Z (pass) norn doctor: the repo's norn version and drifted skills (B23–B25, D12) > no version recorded fails the version line with the version guard's code and words [562.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:30.6713361Z (pass) norn doctor: the repo's norn version and drifted skills (B23–B25, D12) > B24, B21: a drifted bundled skill fails the skills check with `norn upgrade`; a repo-local skill is never named [1118.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:30.7186262Z (pass) norn doctor: the repo's norn version and drifted skills (B23–B25, D12) > B25: --repo with no agent, runner or remote fails on drift or an older repo version, passes a clean repo; missing skills stay out [48.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:30.9421033Z (pass) trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34) > no trace.retain: tidy deletes the 26 oldest of 41 day pairs and keeps the last 14 days and trace/workflows (B23, B27) [34.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:30.9666465Z (pass) trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34) > trace.retain: 30d prunes only what is older than 30 days (B23) [25.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:30.9919376Z (pass) trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34) > --retain overrides trace.retain for that run (B24) [25.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:31.5416002Z (pass) trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34) > a window under 14d, from the flag or the config, is refused and nothing is deleted; doctor warns, config still loads (B25) [550.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:31.5496430Z (pass) trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34) > a value that is not a duration is refused naming the expected form, nothing deleted (B26) [8.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:31.5766497Z (pass) trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34) > --dry-run lists each day pair with its bytes and the total, and deletes nothing (B31) [27.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:31.6281224Z (pass) trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34) > a second tidy prunes nothing from the trace (B32) [51.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:33.8866145Z (pass) trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34) > doctor hints, without failing a check, how many days and bytes lie beyond the window; none within it (B33) [2259.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:34.0568165Z (pass) trace retention: norn tidy prunes day pairs older than trace.retain (B23–B27, B31–B34) > ticks over 30 fake-clock days never delete a day file; only tidy prunes (B34) [170.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:34.7338990Z (pass) trace retention: norn tidy prunes old hook files, briefings and transcripts, never a live run's (B28–B32) > the hook files of units with no live run and no change within the window are deleted; a live unit's are kept (B28) [47.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:34.7932370Z (pass) trace retention: norn tidy prunes old hook files, briefings and transcripts, never a live run's (B28–B32) > the briefings and transcripts of a run that ended 20 days ago are deleted, yesterday's kept (B29) [59.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:34.8566363Z (pass) trace retention: norn tidy prunes old hook files, briefings and transcripts, never a live run's (B28–B32) > a live run 20 days old keeps its hook file, briefings and transcripts; workflows, backfill.json, caches and locks are untouched (B30) [64.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.0282914Z (pass) trace retention: norn tidy prunes old hook files, briefings and transcripts, never a live run's (B28–B32) > --dry-run lists the hook files and runs with their bytes and deletes nothing; a second tidy prunes nothing (B31, B32) [171.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1257508Z (pass) trace retention: norn tidy prunes old hook files, briefings and transcripts, never a live run's (B28–B32) > gh-195 B2: session logs an older norn left in the machine dir's runs/ go with their run once past the window; newer and live ones stay [98.00ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1458482Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1460015Z ##[endgroup]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1757606Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1758120Z 1 tests failed:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1758732Z (fail) worktrees follow the clone and its home > (unnamed) [645.01ms]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1759205Z 
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1759607Z  255 pass
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1759865Z  1 fail
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1760107Z  1555 expect() calls
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1760405Z Ran 256 tests across 25 files. [52.78s]
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1789324Z error: script "test:integration" exited with code 1
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1805531Z ##[error]Process completed with exit code 1.
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.1953478Z Post job cleanup.
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.2860620Z [command]/usr/bin/git version
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.2908584Z git version 2.56.0
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.2945628Z Copying '/home/runner/.gitconfig' to '/home/runner/work/_temp/fa4b787c-529f-4702-b536-06064c833be0/.gitconfig'
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.2957132Z Temporarily overriding HOME='/home/runner/work/_temp/fa4b787c-529f-4702-b536-06064c833be0' before making global git config changes
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.2958478Z Adding repository directory to the temporary git global config as a safe directory
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.2961580Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/norn-next/norn-next
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.3003552Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.3043134Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.3367115Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.3416212Z http.https://github.com/.extraheader
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.3451759Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.3495573Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.3814723Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.3856034Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.4310002Z Cleaning up orphan processes
+integration (shard 2/4)	UNKNOWN STEP	2026-11-10T12:05:35.4806765Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

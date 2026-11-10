@@ -1,0 +1,9 @@
+#!/bin/sh
+echo "gh $*" >> /var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T//qa6-gh317/gh.log
+case "$1 $2" in
+ "label list") echo '[{"name":"norn","color":"5319e7","description":"x"}]';;
+ "label create") exit 0;;
+ "auth status") exit 0;;
+ "api user"*) echo '{"login":"qa"}';;
+ *) exit 0;;
+esac

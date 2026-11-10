@@ -1,0 +1,2 @@
+import { versionBaseline, versionMismatch } from "/Users/jakubpruszynski/Projects/norn-worktrees/gh-317-simplify-norn-upgrade-assume-every-repo/packages/core/src/commands.ts";
+for (const r of ["0.29.4", null, "0.30.0", "0.30.7", "0.31.2"]) console.log(JSON.stringify(r), "→ baseline", JSON.stringify(versionBaseline(r, "0.31.0")), "| mismatch", JSON.stringify(r === null ? "n/a" : versionMismatch(r, "0.31.0")));
