@@ -1,0 +1,82 @@
+[
+ {
+  "id": "01.AC1",
+  "verdict": "pass",
+  "evidence": "01.AC1.md"
+ },
+ {
+  "id": "01.AC2",
+  "verdict": "pass",
+  "evidence": "01.AC2.md"
+ },
+ {
+  "id": "01.AC3",
+  "verdict": "pass",
+  "evidence": "01.AC3.md"
+ },
+ {
+  "id": "02.AC1",
+  "verdict": "pass",
+  "evidence": "02.AC1.md"
+ },
+ {
+  "id": "02.AC2",
+  "verdict": "pass",
+  "evidence": "02.AC2.md"
+ },
+ {
+  "id": "03.AC1",
+  "verdict": "pass",
+  "evidence": "03.AC1.md"
+ },
+ {
+  "id": "03.AC2",
+  "verdict": "pass",
+  "evidence": "03.AC2.md"
+ },
+ {
+  "id": "03.AC3",
+  "verdict": "pass",
+  "evidence": "03.AC3.md"
+ },
+ {
+  "id": "03.AC4",
+  "verdict": "pass",
+  "evidence": "03.AC4.md"
+ },
+ {
+  "id": "03.AC5",
+  "verdict": "pass",
+  "evidence": "03.AC5.md"
+ },
+ {
+  "id": "03.AC6",
+  "verdict": "pass",
+  "evidence": "03.AC6.md"
+ },
+ {
+  "id": "03.AC7",
+  "verdict": "pass",
+  "evidence": "03.AC7.md"
+ },
+ {
+  "id": "03.AC8",
+  "verdict": "pass",
+  "evidence": "03.AC8.md"
+ },
+ {
+  "id": "03.AC9",
+  "verdict": "pass",
+  "evidence": "03.AC9.md"
+ },
+ {
+  "id": "03.AC10",
+  "verdict": "pass",
+  "evidence": "03.AC10.md"
+ },
+ {
+  "id": "03.AC11",
+  "verdict": "pass",
+  "evidence": "03.AC11.md"
+ }
+]
