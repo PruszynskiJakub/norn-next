@@ -1,0 +1,29 @@
+=== MERGE=squash TICK=fetch LATER_SYNC=1
+[ticks after squash]
+gh-7 gate.stale
+gh-7 git.update
+gh-7 receipts.apply
+gh-7 git.open-pr
+gh-7 receipts.apply
+--sync--
+[state] {"step":"ready","status":"parked"} [prs] #100 merged, #101 open
+Expected to not contain: "gh-7 gate.stale"
+ 0 pass
+ 1 fail
+=== MERGE=merge TICK=fetch
+[ticks after squash]
+gh-7 gate.stale
+gh-7 git.update
+gh-7 receipts.apply
+gh-7 git.open-pr
+gh-7 receipts.apply
+[state] {"step":"ready","status":"parked"} [prs] #100 merged, #101 open
+Expected to not contain: "gh-7 gate.stale"
+ 0 pass
+ 1 fail
+=== MERGE=squash TICK=sync
+[ticks after squash]
+gh-7 remote.pr_merged
+[state] {"step":"$done","status":"done"} [prs] #100 merged
+ 1 pass
+ 0 fail
