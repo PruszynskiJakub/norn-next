@@ -50,4 +50,4 @@ Review #1's blocking finding (a symlinked home broke orphan detection and marker
 
 ## Resume
 
-describe #2 rewrote `pr.md` for head 459926c4 from QA #2's report (16/16 pass, run 01M72F0RJ3JF72NGQF96J2NV7A). Next: norn updates PR #320 and CI runs again; integration shards 1/4 and 2/4 have not passed yet. If CI fails, read the failing shard's log and fix it in this worktree.
+Review #3 approved head 5d87bf9a (test-only ci fix since review #2). Next: the test step and CI run again on this head; if an integration shard fails, read its log and fix it in this worktree (one file: `bun test --config=bunfig.integration.toml --timeout=20000 ./<path>`).
