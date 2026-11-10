@@ -6,7 +6,7 @@ Unit worktrees are created in the checkout's machine dir (`<machine dir>/worktre
 
 ## Proof
 
-Review #2 (at 4567b83d): approve, no blocking findings; re-ran unit tier 1734 pass, typecheck green, `worktrees-machine-dir.test.ts` 10 pass. Implement #2 (rework of review #1): unit tier 1734 pass, typecheck green; `worktrees-machine-dir.test.ts` 10 pass locally (the new symlinked-home test fails without the fix). Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run's evidence). Golden: 0 of 136 changed. e2e: 74 pass, no pinned file rewritten. `git grep -e '-worktrees'` finds nothing in `packages/*/src` or docs.
+Review #2 (at 4567b83d): approve, no blocking findings; re-ran unit tier 1734 pass, typecheck green, `worktrees-machine-dir.test.ts` 10 pass. Implement #2 (rework of review #1): unit tier 1734 pass, typecheck green; `worktrees-machine-dir.test.ts` 10 pass locally (the new symlinked-home test fails without the fix). QA #2 at 459926c4 (current head, after the rework): all 16 criteria `pass`, observed afresh through the CLI in harness temp repos, including a symlinked `NORN_HOME_DIR` (worktree, tidy orphan under the resolved path); golden decisions identical to base after normalising the worktree prefix; evidence pack in this run's evidence (`report.md`, one file per criterion). Golden: 0 of 136 changed. e2e: 74 pass, no pinned file rewritten. `git grep -e '-worktrees'` finds nothing in `packages/*/src` or docs.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -52,4 +52,4 @@ Review #1's blocking finding (a symlinked home broke orphan detection and marker
 
 ## Resume
 
-Review approved the rework. The next step: CI re-runs on this head (integration shards 1/4 and 2/4 are still unproven).
+QA #2 passed on this head. The next step: CI re-runs on this head (integration shards 1/4 and 2/4 are still unproven).
