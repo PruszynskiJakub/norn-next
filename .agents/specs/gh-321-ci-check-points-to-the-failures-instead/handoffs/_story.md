@@ -6,11 +6,15 @@ When the `ci` check fails, the rework brief shows where the failures are (run/ch
 
 - New `.agents/scripts/ci-failures.sh <run-id>`; repo workflows `story.yaml`, `quick.yaml`, `release.yaml` call it instead of `--log-failed | tail -300`.
 - Shipped `packages/cli/assets/workflows/{story,quick}.yaml`: inline listing of failed check runs from `commits/$sha/check-runs`, then the annotations command.
-- Failing check block in about 10 lines, no log: `sh .agents/scripts/ci-failures.sh 42794918379` prints 5 lines (run URL, `- job 129757664390: integration (shard 3/4)`, the annotations command, the `--log-failed --job` fallback).
-- The annotations command shows the assertion: for check run 129757664390 it prints `packages/cli/test/integration/upgrade.test.ts:227 Expected: true / Received: false` and no `.github` entries.
-- Shipped inline command: its check-runs query for that run's head sha prints `- integration (shard 3/4) (id 129757664390): <job link>`; its echo lines render the annotations command correctly under sh.
-- Green run exits 0 with no output: unchanged, since `gh run watch … && exit 0` / `gh pr checks --watch … && exit 0` still come before the new lines.
-- `bun run test` (1732 pass), `bun run typecheck` green; `docs:emit` produced no change.
+- The diff of these files matches the issue's drafted patch line for line (review checked it).
+- Review re-ran every command against run 42794918379; output in the review evidence (`ci-failures-run-42794918379.txt`).
+- `bun run test`, `bun run typecheck` green (test#1); `docs:emit` produced no change (re-checked in review).
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | on a failed CI run the "Failing check" block holds the run/check-run links, failed ids and the annotations command in about 10 lines, no test log | agent (hand check; no test seam for workflow shell) | QA (agent): review ran `sh .agents/scripts/ci-failures.sh 42794918379` → 5 lines (run URL, `- job 129757664390: integration (shard 3/4)`, annotations command, `--log-failed --job` fallback); shipped check-runs query → `- integration (shard 3/4) (id 129757664390): <job link>`; shipped echo lines render correctly under sh |
+| AC2 | the printed annotations command for a failed integration job shows the failing assertion with file and line, and no `.github` noise | agent (hand check) | QA (agent): annotations for check run 129757664390 → `packages/cli/test/integration/upgrade.test.ts:227 Expected: true / Received: false`, no `.github` entries |
+| AC3 | a green CI run still exits 0 with no output | agent (hand check) | QA (agent): by reading — `gh run watch … && exit 0` / `gh pr checks --watch … && exit 0` still precede the new lines, unchanged by the diff |
 
 ### Easy to miss
 
@@ -19,13 +23,13 @@ When the `ci` check fails, the rework brief shows where the failures are (run/ch
 
 ### Not proven yet
 
-- The new `ci` check has not run end to end on a red PR yet; this story's own `ci` step exercises the repo path only if CI fails.
+- The new `ci` check has not run end to end on a red PR; this story's own `ci` step exercises the repo path only if CI fails.
 
 ### Notes
 
-- Applied the patch drafted in the issue as is; no test was added because the change is to workflow shell scripts, which the unit tier does not run. Verified by hand against run 42794918379 instead.
+- Review: approve, no findings. The criteria have no frontmatter verifiers, but the spec prescribes hand verification against a live run and the unit tier cannot run workflow shell, so the rows are proven by the reviewer's re-run rather than marked UNTRACED; a person can overrule that.
 - Friction: the worktree had no `node_modules`, so the first `bun run test` failed 75 tests until `bun install`.
 
 ### Resume
 
-Nothing left for implement; the next step opens the PR.
+Review approved; next is open-pr then the `ci` step, driven by norn.
