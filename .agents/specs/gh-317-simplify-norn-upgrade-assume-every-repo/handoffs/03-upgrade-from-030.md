@@ -39,6 +39,8 @@ Review #1, finding 3 (the `needs_removed` advice): `agent-protocol.test.ts` › 
 - The layout guard (`packages/cli/src/runtime/layout.ts`) still points to `norn upgrade`; slice 05 removes it.
 - `needs_removed`: `needsRemovedMessage(kind, key, file)` now ends "delete it from the criteria in <file>"; brief/done refuse with `do_instead: fix <file>`; the inbox items (spec and slice) use `norn run view <key> --why`, like a corrupt file, since an inbox command must be a shell command.
 
+- Review #2 minor (a note, not rework): the `ReadResult` comment at `packages/store/src/fsx.ts:16` still says "`norn upgrade` fixes it" for `needs_removed`. It is stale; deleting `needs` from the file is the fix now.
+
 ### Resume
 
-Review the rework commit (README.md:77, docs/development.md:26, the `needs_removed` message and do_instead).
+Review #2 approved on HEAD fe6af2b2f. Next is QA of AC11 (README, docs, reference and help describe upgrade from 0.30 on, nothing old) and AC12 (the commit's release note names the removed `norn migrate` and the dropped `--json` fields). Both are agent-verified.
