@@ -4,7 +4,7 @@
 
 #### Proof
 
-All six slices are integrated. Review #4 at 07daf021b: approve, no findings . **QA #4 at 87f235f64: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (evidence: `report.md` in this run's QA evidence). The golden/transcript criterion (06.AC4) is `person`.
+All six slices are integrated. Review #4 at 07daf021b: approve, no findings . **QA #4 at 87f235f64: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos**. The golden/transcript criterion (06.AC4) is `person`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
