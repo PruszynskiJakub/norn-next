@@ -2,7 +2,7 @@
 id: gh-317/03
 title: norn upgrade moves only a 0.30+ repo, and norn migrate goes
 depends_on: [ gh-317/02 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
