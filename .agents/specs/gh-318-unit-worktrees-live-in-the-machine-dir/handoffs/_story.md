@@ -6,13 +6,28 @@ Unit worktrees are created in the checkout's machine dir (`<machine dir>/worktre
 
 ## Proof
 
-Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run's evidence: one `<id>.md` per criterion, `observe*.ts` scripts and their outputs, `report.md`).
-- Story worktree at `<machine dir>/worktrees/<story>-<slug>`, slice worktree beside it (`--<nn>-<slug>`): seen in `git worktree list` from real ticks over the cli harness (real git, fake gh).
-- Bound home (NORN_HOME_DIR and the command's home override) and two clones each land in their own machine dir; nothing named `*-worktrees` beside any repo; the harness cleanup guard throws if one appears (`test/support/harness.ts`).
-- Inbox start command, `story start`, `--print`, Herdr tab cwd, `norn brief`, `status --json` reach and `story list` root all show the machine-dir path; `tidy` reports a clean and a dirty orphan there and removes only the clean one; `story start` recreates a deleted worktree.
-- Golden: `bun run golden -- --update` → 0 of 136 changed; at slice 01's commit decisions were byte-identical to base with only `facts.repo.worktrees` added; at HEAD decisions equal base modulo the worktree folder prefix.
-- `git grep -e '-worktrees'` at HEAD: nothing in `packages/*/src` or docs; tests keep only the harness guard. `docs/concepts.md` run-state paragraph and glossary name `<machine dir>/worktrees/`.
-- `bun run test:e2e` at HEAD: 74 pass, no pinned file rewritten. Unit tier + typecheck: test#1 check pass.
+Review #1 at becfb596: unit tier 1734 pass, typecheck green. Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run's evidence). Golden: 0 of 136 changed. e2e: 74 pass, no pinned file rewritten. `git grep -e '-worktrees'` finds nothing in `packages/*/src` or docs.
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| 01.AC1 | decide puts the story and slice worktree paths and their start command under the reported worktrees folder | test | `packages/core/test/unit/decide.test.ts` › "worktree paths come from the worktrees folder observe reports" (both tests) |
+| 01.AC2 | golden replay with the old folder as the fact: no decision change | test | `packages/core/test/unit/golden.test.ts` (replay of the corpus at slice 01; corpus rewritten since, see 03.AC10) |
+| 01.AC3 | one store function names the folder; observe and view fill the fact from it | agent | QA (agent); review read `paths.ts:130`, `observe/index.ts:510`, `view/src/load.ts:463` |
+| 02.AC1 | the harness names a unit worktree (and a clone's) by folder name | test | `test/support/worktree.ts` through `h.worktree`/`Clone.worktree`, used by every integration and e2e test; `worktrees-machine-dir.test.ts` › "the tick creates the story worktree…" asserts `h.worktree(DIR)` equals the machine-dir path |
+| 02.AC2 | no hand-spelled `-worktrees` left in tests outside the helper | agent | QA (agent) |
+| 03.AC1 / story 1 | `sync`/`story start` create the story worktree at `<machine dir>/worktrees/<story>-<slug>` | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "the tick creates the story worktree at <machine dir>/worktrees/…" |
+| 03.AC2 / story 2 | a slice worktree at `…/worktrees/<story>-<slug>--<nn>-<slug>` beside the story's | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "the slice starts at <machine dir>/worktrees/…--<nn>-<slug>…" |
+| 03.AC3 / story 3 | no `<repo>-worktrees` beside the repo after any integration test | test | `test/support/harness.ts` cleanup guard (throws), plus `besideRepo` checks in `packages/cli/test/integration/worktrees-machine-dir.test.ts` |
+| 03.AC4 / story 4 | worktrees follow a home bound by `--home` or `NORN_HOME_DIR` | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "the tick creates the story worktree…" (NORN_HOME_DIR) and "a home given to the command…" |
+| 03.AC5 / story 5 | two clones keep separate worktree folders for one story key | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "two clones of one remote take in the same story…" |
+| 03.AC6 / story 6 | `--print`, the inbox start command, the brief and the Herdr tab show the machine-dir path | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "the inbox's start command, story start, --print and the Herdr tab's cwd…" and "the brief run from the worktree in the machine dir…" |
+| 03.AC7 / story 7 | `tidy` reports a clean and a dirty orphan and removes only the clean one | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "a clean and a dirty orphan are both reported…" (canonical home only, see F1) |
+| 03.AC8 / story 8 | `story start` notices a deleted story worktree and recreates it | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "a story worktree deleted from the machine dir's worktrees/…" |
+| 03.AC9 / story 9 | `status --json` shows each unit's worktree in the machine dir | test | `packages/cli/test/integration/worktrees-machine-dir.test.ts` › "norn status shows the running story's worktree…" and the slice test (reach plus `story list` root); `packages/view/test/integration/view.test.ts` › "reads specs from story worktrees in the checkout's machine dir" |
+| 03.AC10 | rewritten golden corpus: no decision change | test | `packages/core/test/unit/golden.test.ts` |
+| 03.AC11 / story 10 | docs say worktrees live in the machine dir under `worktrees/` | agent | QA (agent); review read `docs/concepts.md` run-state paragraph and glossary |
+
+Review findings (`findings.json` in this run): F1 blocking. `worktreesDir` uses an unresolved home but is prefix-matched against resolved `git worktree list` paths (`observe/index.ts:176`, `worktree.ts:91`). F2 minor: the decide fixture still reports `/r-worktrees`.
 
 ## Easy to miss
 
@@ -22,7 +37,8 @@ Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run
 
 ## Not proven yet
 
-- The integration tier as a whole: CI run 1 failed one test on shard 3/4 (fixed below) and cancelled shards 1/4 and 2/4, so those two have not reported on this branch yet. Locally only `upgrade.test.ts` (26 pass) and `layout-guard.test.ts` (13 pass) were run.
+- A norn home reached through a symlink (F1): orphan detection and marker inference compare `${worktreesDir(root)}/` with resolved git paths. Not reproduced live; the shell hook refuses `git worktree add`. A harness test can reproduce it.
+- The integration tier as a whole: CI shards 1/4 and 2/4 have not reported on this branch yet.
 
 ## Notes
 
@@ -36,4 +52,4 @@ Built and QA'd at 2a61bb35: all 16 criteria `pass` (QA evidence pack in this run
 
 ## Resume
 
-Wait for the ci check on the next push; if an integration shard fails, run that file with `bun test --config=bunfig.integration.toml --timeout=20000 <file>`.
+Rework F1: resolve the norn home through realpath where it is bound or defaulted (`bindNornHome` and `machineHomeOf` in `packages/store/src/paths.ts`, e.g. with `realOr`), or inside `worktreesDir`. Add a test in `packages/cli/test/integration/worktrees-machine-dir.test.ts` with the command's home given as a symlink: a tidy orphan must still be reported, and a story worktree with its `.norn-unit` deleted must still be inferred. Then `bun run test` and `bun run typecheck`.
