@@ -43,4 +43,4 @@ Review #2: approve, no blocking findings, on the head with the integration test 
 
 ## Resume
 
-Review #2 approved; the next step is describe (refresh pr.md for the added integration test).
+Describe #2 rewrote pr.md for the current head (the integration test is now the main evidence for the merged-story fix). Next: norn updates the PR and CI runs; then the ready gate.
