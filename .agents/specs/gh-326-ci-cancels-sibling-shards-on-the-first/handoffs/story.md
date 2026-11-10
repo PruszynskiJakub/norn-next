@@ -25,4 +25,4 @@ One red CI run reports every failing shard, and the ci check's rework brief neve
 - `bun install` was needed in this worktree before `bun run test` / typecheck would run.
 
 ## Resume
-QA / ci: on a red ci run, read the failing integration shard's annotations for ci-check.test.ts (needs `jq` on the runner).
+pr.md (in the spec folder) describes the branch as it is now; next is norn's PR step. Nothing left to build.
