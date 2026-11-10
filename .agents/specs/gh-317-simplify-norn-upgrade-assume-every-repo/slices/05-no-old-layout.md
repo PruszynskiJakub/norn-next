@@ -1,8 +1,8 @@
 ---
 id: gh-317/05
 title: norn stops looking for the old layout
-depends_on: [gh-317/02]
-status: planned
+depends_on: [ gh-317/02 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
