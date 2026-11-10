@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { repoConfigPath, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, FakeInteraction, type Harness, issue, runChecked, sh } from "../../../../test/support/harness.ts";
+import { runStateOf, storyRunStateOf } from "../../../../test/support/run-state.ts";
 
 // whole flows over real git, several ticks each
 setDefaultTimeout(30_000);
@@ -74,7 +75,15 @@ describe("norn story reset (GR7a)", () => {
     expect(remoteHeads()).toBe(before);
   });
 
-  test("a story with no work of its own: worktree, branches, record, mailbox and claim gone; the issue stays; the next sync takes it in again from the current base", async () => {
+  test("a story with no work of its own: worktree, branches, run state, record, mailbox and claim gone; the issue stays; the next sync takes it in again from the current base and claims it", async () => {
+    // its step ran: an ask applied by a tick, so the story's run state holds more than intake wrote
+    const spec = join(h.root, ".agents/specs/gh-8-add-logout");
+    h.report(runStateOf(join(wt("gh-8-add-logout"), ".agents/specs/gh-8-add-logout")), "ask", { question: "Which logout route?" });
+    h.clock.advance(10_000);
+    await h.norn("tick");
+    expect(h.state(runStateOf(spec))?.step).toBe("plan");
+    const runState = storyRunStateOf(spec);
+    expect(existsSync(runState)).toBe(true);
     // the base moves on after intake, as it did for the stories cut too early (#126)
     h.write(join(h.root, "later.txt"), "on main after intake\n");
     h.git(["add", "later.txt"]);
@@ -88,8 +97,9 @@ describe("norn story reset (GR7a)", () => {
     const calls = h.remote.calls.length;
     const r = await h.norn("story", "reset", "gh-8", "--yes");
     expect(r.exit).toBe(0);
-    expect(r.value).toMatchObject({ story: "gh-8", reset: true, branches_deleted: ["gh-8-add-logout"], remote_branches_deleted: ["gh-8-add-logout"], mailbox_deleted: [left], claim_deleted: true });
+    expect(r.value).toMatchObject({ story: "gh-8", reset: true, branches_deleted: ["gh-8-add-logout"], remote_branches_deleted: ["gh-8-add-logout"], mailbox_deleted: [left], claim_deleted: true, run_state_removed: runState });
     expect(existsSync(wt("gh-8-add-logout"))).toBe(false);
+    expect(existsSync(runState)).toBe(false);
     expect(remoteHeads()).not.toContain("gh-8-add-logout");
     expect(h.git(["branch", "--list", "gh-8*"])).toBe("");
     expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-8"])).toBe("");
@@ -98,7 +108,10 @@ describe("norn story reset (GR7a)", () => {
     expect(h.remote.calls.slice(calls).filter((c) => c.startsWith("pr+") || c.startsWith("pr~"))).toEqual([]);
 
     h.clock.advance(10 * 60_000);
-    expect(kinds((await h.norn("tick")).value as TickReport)).toContain("gh-8 intake_story");
+    for (const want of ["gh-8 intake_story", "gh-8 claim", "gh-8 start_unit"]) {
+      h.clock.advance(10_000);
+      expect(kinds((await h.norn("tick")).value as TickReport)).toContain(want);
+    }
     expect(sh(wt("gh-8-add-logout"), ["show", "HEAD:later.txt"])).toBe("on main after intake");
   });
 
