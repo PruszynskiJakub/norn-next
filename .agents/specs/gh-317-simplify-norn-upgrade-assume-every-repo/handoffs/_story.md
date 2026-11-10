@@ -4,7 +4,7 @@
 
 #### Proof
 
-All six slices are integrated. Review #2: **approve**. Both blocking findings from review #1 are fixed: the old-layout code is gone (the verify grep finds nothing) and `norn config` now says `norn init` records a missing norn_version, with the 0.30 path. Unit tier and typecheck are green (test#2). **QA #2 at a9321da29: 31/32 pass, observed with the dev CLI in throwaway repos** (evidence: `report.md` in this run's QA evidence). That includes the docs criterion (03.AC11, docs:emit clean). The golden/transcript criterion (06.AC4) is `person`.
+All six slices are integrated. Review #2: **approve** (both review #1 blockers fixed). Unit tier and typecheck green. **QA #2 at a9321da29: 31/32 pass, observed with the dev CLI in throwaway repos** (evidence: `report.md` in this run's QA evidence). That includes the docs criterion (03.AC11, docs:emit clean). The golden/transcript criterion (06.AC4) is `person`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -34,7 +34,7 @@ All six slices are integrated. Review #2: **approve**. Both blocking findings fr
 | 04.AC3 | init on no/pre-0.30 version → exit 3, no file changed | test | `version-baseline.test.ts` › "init exits 3 with {code} …" |
 | 04.AC4 | init on 0.30+ behaves as today | test | `init-version.test.ts` › "AC2 B28 …" |
 | 05.AC1 | pre-0.13 repo: acting command → version_missing, old files untouched | test | `pre-013-repo.test.ts` › "an acting command exits 3 with version_missing …" |
-| 05.AC2 | agent hook does not refuse on the layout | test | `pre-013-repo.test.ts` › "an agent hook … does not refuse on the layout" (weak: also passes on old code) |
+| 05.AC2 | agent hook does not refuse on the layout | test | `pre-013-repo.test.ts` › "an agent hook … does not refuse on the layout" |
 | 05.AC3 | doctor: no layout section/key, no old-layout or migrate text | test | `pre-013-repo.test.ts` › "a pre-0.13 repo: no layout key …" |
 | 06.AC1 | runs/ in a branch tree never changed; story moves on | test | `branch-tree-run-state.test.ts` › "ticks leave the branch tree as it is …" |
 | 06.AC2 | base-tree runs/: no status item or hint | test | `archive-ref.test.ts` › "run list is empty for it, no status item or hint …" |
@@ -51,15 +51,16 @@ Every user story is covered by the criteria above; none is UNTRACED.
 #### Not proven yet
 
 - A person has not ruled on the golden/transcript criterion (06.AC4): one transcript line is gone (`recovery-claim-lost.txt`, the read of the branch-tree runs).
-- The full integration and e2e tiers run only in CI.
+- CI on the fixture fix (55673447f) has not run yet; locally the full integration (904 tests) and e2e (74) tiers, the unit tier and typecheck are green.
 
 #### Notes
 
-- Minor notes from review #1, still open, for the person and not for rework: init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before loading config, so a broken config with no version gets exit 3, not 6 (D4, `upgrade.ts:52`); `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move` are left for tests only; the 05.AC2 hook test also passes on old code; stale comments (`observe/index.ts:522`, `view/src/load.ts:474`, `store/src/fsx.ts:16` still says `norn upgrade` fixes needs_removed, `docs/limitations.md:29`); commit 1ac2a0d2f's accepted risk (a branch-only record reads as none) belongs in the PR body.
-- Earlier decisions (person): init refuses a pre-0.30 version too; config old-key messages lose their "run `norn upgrade`" hint; codes `version_missing` / `version_too_old`; the status version item is an Unblock item pointing to `norn doctor`. Flat records and older `state.json` readers stay (out of scope).
-- QA #2 note (03.AC2, passes as written): after an upgrade interrupted between the skills and the version, the rerun records the version but stages only the config; the skill rewritten before the interruption stays unstaged, so the printed commit misses it unless the person stages it.
+- Minor notes from review #1, still open, for the person and not for rework: init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before loading config, so a broken config with no version gets exit 3, not 6 (D4, `upgrade.ts:52`); `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move` are left for tests only; the 05.AC2 hook test also passes on old code; a few stale comments (`observe/index.ts:522`, `view/src/load.ts:474`, `store/src/fsx.ts:16`, `docs/limitations.md:29`); commit 1ac2a0d2f's accepted risk (a branch-only record reads as none) belongs in the PR body.
+- Person decisions: init refuses pre-0.30 too; config old-key messages drop the `norn upgrade` hint; codes `version_missing`/`version_too_old`; status version item is Unblock → `norn doctor`. Flat records and old `state.json` readers stay.
+- QA #2 note (03.AC2): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
+- CI fix round 1 (ci.fail): the guard refused e2e/integration fixtures that had no `norn_version` (raw team-config writes in `layout`, `non-holder-views`, `takeover-record`, `mailbox-across-machines`; `base-sync` cases that never ran init) or played norns below 0.30 (`base-sync` gh-252 case 0.18→0.19, now 0.30→0.31; `observe-snapshots` fixed at 0.19.0, now 0.30.0 — only the snapshots' repo/running version fields moved). Fixtures only; guard unchanged, no transcript moved. Raw team-config writes in tests must carry `norn_version: ${runningVersion(h.deps)}` or follow `h.config` with `h.recordVersion()`.
 - Release notes come from commits 5e8451d29 and b45b051f0 and the PR body. CHANGELOG is the release step's.
 
 #### Resume
 
-pr.md in the spec folder describes the branch at describe#1: summary, one evidence entry per user story (QA #2 evidence), merge danger (one-way for repos without or below 0.30 norn_version; scripts using `norn migrate` or the dropped `upgrade --json` fields break). Next: the PR step opens/updates the PR from pr.md.
+The ci step re-runs CI on the head with 55673447f (fixtures record norn_version). pr.md (describe#1) still describes the branch; the fix touches tests only, so its evidence and merge danger stand.
