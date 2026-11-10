@@ -51,4 +51,4 @@ Review #1's blocking finding (a symlinked home broke orphan detection and marker
 
 ## Resume
 
-implement #4 made the harness cleanup tolerate the CI-only `rmSync` EFAULT flake. Next: review the test-only diff in `test/support/harness.ts`, then CI. If CI fails, read the failure first: if it is the EFAULT again, the fallback didn't help.
+Review #4 approved the test-only harness cleanup fix (`removeTree` in `test/support/harness.ts`). Next: test, QA, describe, then CI. This is the last `ci_loop` round. If CI fails, read the failure first. If it is the EFAULT again, the fallback didn't help.
