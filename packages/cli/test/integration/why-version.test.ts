@@ -133,10 +133,10 @@ describe("the running version is a dependency (Prefactor 1)", () => {
     expect(r.value).toEqual({ version });
   });
 
-  test("a harness built as norn 0.18.1 prints 0.18.1 for --version and records it on its tick traces", async () => {
-    const other = await createHarness({ version: "0.18.1" });
+  test("a harness built as norn 0.30.1 prints 0.30.1 for --version and records it on its tick traces", async () => {
+    const other = await createHarness({ version: "0.30.1" });
     try {
-      expect((await other.norn("--version")).value).toEqual({ version: "0.18.1" });
+      expect((await other.norn("--version")).value).toEqual({ version: "0.30.1" });
       expect((await other.norn("init")).exit).toBe(0);
       other.config(CONFIG);
       other.write(join(workflowsDir(other.root), "ship.yaml"), WORKFLOW);
@@ -153,7 +153,7 @@ describe("the running version is a dependency (Prefactor 1)", () => {
         .map((l) => JSON.parse(l) as TickTrace)
         .filter((e) => e.type === "tick");
       expect(recorded.length).toBeGreaterThan(0);
-      for (const t of recorded) expect(t.norn_version).toBe("0.18.1");
+      for (const t of recorded) expect(t.norn_version).toBe("0.30.1");
     } finally {
       other.cleanup();
     }

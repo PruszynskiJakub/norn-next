@@ -54,6 +54,7 @@ describe.skipIf(!hasLsof)("an agent step's launch", () => {
   beforeAll(async () => {
     h = await createHarness();
     h.config("provider: gh\nworkflow: solo\nmode: auto\n");
+    h.recordVersion();
     h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
     installBundledSkills(h.root);
     h.git(["add", "-A"]);

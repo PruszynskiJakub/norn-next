@@ -8,7 +8,7 @@
  * Recently done.
  */
 import { ATTENDED_WAIT, isClosedStatus, parseDuration, receiptNumber, recordRef, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
-import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, unstickCommand, versionMismatch } from "../commands.ts";
+import { baseRunStateHint, cmd, nextCommand, skillsDriftHint, startAgentCommand, unstickCommand, versionBaseline, versionMismatch } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
@@ -125,15 +125,18 @@ const VERSION_ITEM = "norn-version:";
 export const isVersionMismatchItem = (it: Pick<InboxItem, "id" | "group">): boolean => it.group === "unblock" && it.id.startsWith(VERSION_ITEM);
 
 /**
- * The running binary against the repo's norn version. A mismatch is a repo-level
- * Unblock item (first in its group); no recorded version is a Check item, so it never notifies.
+ * The running binary against the repo's norn version. A repo below the 0.30 baseline (or recording
+ * none) and a mismatch are each a repo-level Unblock item (first in its group).
  * Null when they match or the version was not observed.
  */
 function versionItem(facts: Facts): InboxItem | null {
   const v = facts.norn;
   if (!v) return null;
   const base = { story: "*", slice: null, step: null, command: cmd.upgrade(), since: iso(facts.now) };
-  if (v.repo === null) return { ...base, id: `${VERSION_ITEM}none`, group: "check", title: NO_VERSION_HINT };
+  // its way out is outside this norn (init, or the 0.30.x binary); `doctor` runs on it and shows it
+  const baseline = versionBaseline(v.repo, v.running);
+  if (baseline) return { ...base, id: `${VERSION_ITEM}${v.repo ?? "none"}:${v.running}`, group: "unblock", title: `${baseline.error}: ${baseline.do_instead}`, command: cmd.doctor() };
+  if (v.repo === null) return null;
   const mismatch = versionMismatch(v.repo, v.running);
   if (!mismatch) return null;
   // an older binary's way out is outside norn (install the repo's line); `doctor` runs on a mismatch and shows it

@@ -25,7 +25,7 @@ steps:
     skill: norn-implement
     outcomes: { done: $done }
 `;
-const DIFFER = "skills differ from norn 0.19.0 (norn): runs use this worktree's copies until the base is merged in, or until this branch's edit to them is reverted";
+const DIFFER = "skills differ from norn 0.31.0 (norn): runs use this worktree's copies until the base is merged in, or until this branch's edit to them is reverted";
 
 let h: Harness;
 const wt = (key: string, slug: string) => `${h.root}-worktrees/${key}-${slug}`;
@@ -42,7 +42,7 @@ const launchedIn = () => h.runner.launches.map((l) => l.cwd);
 type Groups = Record<string, Array<{ story: string; title: string; command: string }>>;
 
 beforeAll(async () => {
-  h = await createHarness({ version: "0.19.0" });
+  h = await createHarness({ version: "0.31.0" });
   expect((await h.norn("init")).exit).toBe(0);
   // manual first: the story worktrees are made and their agent steps wait for a person
   h.config("provider: gh\nworkflow: solo\nmode: manual\n");
@@ -92,7 +92,7 @@ describe("drifted skills hold nothing", () => {
 
   test("AC2 (D14): gh-7's own team file records a newer norn_version → not drift", async () => {
     const team = repoConfigPath(gh7());
-    writeFileSync(team, readFileSync(team, "utf8").replace(/^norn_version: .*$/m, "norn_version: 0.20.0"));
+    writeFileSync(team, readFileSync(team, "utf8").replace(/^norn_version: .*$/m, "norn_version: 0.32.0"));
     const obs = await observeNow(h);
     expect(obs.facts.stories.find((s) => s.key === "gh-7")?.units[0]?.skills_drift).toEqual([]);
   });

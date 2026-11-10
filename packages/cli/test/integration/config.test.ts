@@ -260,6 +260,8 @@ describe("norn config set and unset (B62–B68, D4)", () => {
   });
   beforeEach(() => {
     for (const f of [userFile(h), localFile(h), repoConfigPath(h.root)]) rmSync(f, { force: true });
+    // config set acts, so the repo records a version or every set is refused
+    h.recordVersion();
   });
   afterAll(() => h.cleanup());
 
@@ -270,16 +272,18 @@ describe("norn config set and unset (B62–B68, D4)", () => {
     expect((await h.norn("config", "set", "mode", "manual", "--local")).exit).toBe(0);
     expect(read(localFile(h))).toBe("# yaml-language-server: $schema=norn.config.local.schema.json\nmode: manual\n");
     expect(await get("mode")).toMatchObject([{ value: "manual", source: "local" }]);
+    const team = read(repoConfigPath(h.root));
     expect((await h.norn("config", "set", "workflow", "story", "--repo")).exit).toBe(0);
-    expect(read(repoConfigPath(h.root))).toBe("# yaml-language-server: $schema=norn.config.schema.json\nworkflow: story\n");
+    expect(read(repoConfigPath(h.root))).toBe(`${team}workflow: story\n`);
   });
 
   test("D4: a key the file does not take is refused with config_wrong_file or config_moved; nothing written", async () => {
+    const team = read(repoConfigPath(h.root));
     const wrong = await h.norn("config", "set", "max_agents", "4", "--repo", "--json");
     expect(wrong).toMatchObject({ exit: 3, value: { code: "config_wrong_file", error: "`.agents/norn.config.yaml`: `max_agents` belongs in `~/.norn/config.yaml` (machine key)", do_instead: "norn config set max_agents 4 --user" } });
     const moved = await h.norn("config", "set", "default_mode", "auto", "--user", "--json");
     expect(moved).toMatchObject({ exit: 3, value: { code: "config_moved" } });
-    expect(read(repoConfigPath(h.root))).toBeNull();
+    expect(read(repoConfigPath(h.root))).toBe(team);
     expect(read(userFile(h))).toBeNull();
   });
 
