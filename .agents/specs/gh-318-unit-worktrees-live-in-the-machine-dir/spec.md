@@ -10,7 +10,7 @@ labels:
   - norn
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-11-10T08:46:51.720Z
 body_hash: e53bb9d21a1bc4f7007aa64f28b0f697fa68cfb9bf25b42f02208412207efce9
 refined_body_hash: e53bb9d21a1bc4f7007aa64f28b0f697fa68cfb9bf25b42f02208412207efce9
@@ -31,6 +31,13 @@ criteria:
   - { id: 03.AC9, verifier: test }
   - { id: 03.AC10, verifier: test }
   - { id: 03.AC11, verifier: agent }
+merge:
+  pr: 320
+  url: https://github.com/PruszynskiJakub/norn-next/pull/320
+  head_sha: 37de0885c399b685833aa0e9fdcd73c84280572e
+  merge_commit_sha: 5678a3fedb7d80028ee0fe112ce7f7c249ed903d
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-10T11:40:31.000Z
 ---
 
 # Unit worktrees live in the machine dir next to the run state, not beside the repo
