@@ -4,7 +4,7 @@ Fix #319: a story whose own PR merged on the remote (squash or merge commit) end
 
 ## Proof
 
-Review #1 traceability (the spec has no numbered criteria; rows are its Wanted lines):
+Review #2 traceability (re-checked on the current HEAD; the spec has no numbered criteria, so the rows are its Wanted lines):
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -30,7 +30,7 @@ Review #1 traceability (the spec has no numbered criteria; rows are its Wanted l
 
 ## Notes
 
-- Review #1: approve, no blocking findings. Minor: the `pr_seen` doc in `packages/core/src/facts.ts:335` still says "Decide never acts on it"; decide now reads it to wait (noop), never to act.
+- Review #2: approve, no blocking findings. Since review #1 only the effect transcripts changed (the intended `findPullRequest` reorder). Review #1's minor finding is still not fixed and stays a note for the person: the `pr_seen` doc at `packages/core/src/facts.ts:335` still says "Decide never acts on it", but decide now reads it to wait (noop), never to act.
 
 - Decision: decide waits for fresh PR facts (`gate.stale.awaits_sync` noop, `packages/core/src/decide/story.ts`) rather than computing squash evidence in observe: the PR's merged state is the authority, and a sync comes within `sync_interval`. It reads `pr_seen` only to wait, never to act.
 - Act guard: `packages/cli/src/runtime/act/git-step.ts` open-pr throws when the branch's PR is merged.
@@ -40,4 +40,4 @@ Review #1 traceability (the spec has no numbered criteria; rows are its Wanted l
 
 ## Resume
 
-CI rework done (the transcripts were rewritten). Next: CI reruns on the pushed branch. `pr.md` still holds, because the transcript change does not alter the behaviour it describes.
+Review #2 approved. Next: the workflow's next step after review (describe / CI on the pushed branch). `pr.md` still holds.
