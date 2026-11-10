@@ -27,6 +27,7 @@ A `runs/` folder in a base or story branch's tree is ignored: no tick moves it, 
 
 ## Notes
 
+- Merged the story branch in (integrate conflict, merge e3c8b9502): doctor.ts kept the story branch's removal of the layout check and its `versionBaseline`, and this slice's removal of `run_state`; inbox/items.ts takes `versionBaseline` and drops `baseRunStateHint`. `bun run test` and `bun run typecheck` green after the merge.
 - Review #2 approved. Review #1's blocking finding (the recovery effect transcript was red after the `lostRecord` change) is fixed: the only transcript diff is the removed `git cat-file -e …/runs` spawn.
 - Minor, for the person: `packages/core/test/rule-cases.ts:153` keeps the comment "A held story whose record is still flat moves into round 1 first", which introduced the removed `record.move` case and now sits orphaned above the `record.push` case.
 - Review #1 minor notes, left as notes: F2, a stale comment "Run state an older norn left on the base, pointed to `norn upgrade`" at `packages/cli/src/runtime/observe/index.ts:522` and `packages/view/src/load.ts:474`. F3, `docs/limitations.md:29` still mentions the move off the branch, and `docs/concepts.md:101` still says status and doctor point to `norn upgrade`.
@@ -36,4 +37,4 @@ A `runs/` folder in a base or story branch's tree is ignored: no tick moves it, 
 
 ## Resume
 
-Next is whatever the workflow sends after review approve; nothing is owed for this slice.
+Next is integrate again: the story branch is merged in, nothing is owed for this slice.
