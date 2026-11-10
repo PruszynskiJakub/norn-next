@@ -27,7 +27,7 @@ Review #1, finding 3 (the `needs_removed` advice): `agent-protocol.test.ts` › 
 
 - Upgrade's order (D5): main checkout, baseline (read from the team file, so a config that fails to load still gets the 0.30 path), backward, config load (exit 6), tick lock. A config with an old key makes upgrade exit 6 with nothing written.
 - `configError` (`packages/cli/src/output.ts`) gives `fix <file>` for `config_moved`, no longer `norn upgrade`.
-- `Command.layout`/`layout: false` stays on upgrade; slice 05 removes the layout guard and the field.
+- Slice 05 (merged in) removed `Command.layout`/`checksLayout`; upgrade no longer sets `layout: false`.
 
 ### Not proven yet
 
@@ -36,11 +36,11 @@ Review #1, finding 3 (the `needs_removed` advice): `agent-protocol.test.ts` › 
 ### Notes
 
 - Removed: `config-migrate.ts`, `old-layout.ts` (`moveFile` now in `fsx.ts`), `archiveBaseRunState`/`BaseRecordOutcome` (`treeRecordCommit` stays for the harness), `oldTickLockPath`, the harness's `toBaseRunState`, `upgrade-records.test.ts`. The `OLD_*` paths and `repoLayout` stay for slice 05.
-- The layout guard (`packages/cli/src/runtime/layout.ts`) still points to `norn upgrade`; slice 05 removes it.
+- Merge #1 (5f4fd09f5) took in slices 04, 05 and 06 from the story branch: kept this slice's removal of `norn migrate`, the record moves and their test, and its recipes.md upgrade text; took slice 05's removal of the layout field and slice 06's `recordErrors` in `record-ref.ts`. In `version-baseline.test.ts` upgrade refuses with the rule's text (this slice) and init's refusal is slice 04's own test. After the merge: unit tier 1726 pass, typecheck green, `docs:emit` no diff, and the version/upgrade/labels/config-runtime integration files 79 pass.
 - `needs_removed`: `needsRemovedMessage(kind, key, file)` now ends "delete it from the criteria in <file>"; brief/done refuse with `do_instead: fix <file>`; the inbox items (spec and slice) use `norn run view <key> --why`, like a corrupt file, since an inbox command must be a shell command.
 
 - Review #2 minor (a note, not rework): the `ReadResult` comment at `packages/store/src/fsx.ts:16` still says "`norn upgrade` fixes it" for `needs_removed`. It is stale; deleting `needs` from the file is the fix now.
 
 ### Resume
 
-Review #2 approved on HEAD fe6af2b2f. Next is QA of AC11 (README, docs, reference and help describe upgrade from 0.30 on, nothing old) and AC12 (the commit's release note names the removed `norn migrate` and the dropped `--json` fields). Both are agent-verified.
+Merged the story branch in (5f4fd09f5); integrate takes the slice in next. Then QA of AC11 (README, docs, reference and help describe upgrade from 0.30 on, nothing old) and AC12 (the commit's release note names the removed `norn migrate` and the dropped `--json` fields), both agent-verified.
