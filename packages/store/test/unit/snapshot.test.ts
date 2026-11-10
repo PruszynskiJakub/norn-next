@@ -119,14 +119,14 @@ describe("run state lives in the checkout's machine dir, the handoff in the work
     writeState(r2, state());
     expect(runStateDir(root, story, "_story")).toBe(r2);
     // One file per unit under handoffs/, never under a record folder
-    expect(handoffPath(spec, "_story")).toBe(join(spec, "handoffs/_story.md"));
+    expect(handoffPath(spec, "_story")).toBe(join(spec, "handoffs/story.md"));
     expect(handoffPath(spec, "01-add-form")).toBe(join(spec, "handoffs/01-add-form.md"));
     mkdirSync(join(spec, "handoffs"), { recursive: true });
     writeFileSync(handoffPath(spec, "_story"), "## Goal\n\nstory goal\n");
     const u = loadUnit(root, story, { story: "gh-12", slice: null, dir: "_story", key: "gh-12" });
     expect(u.path).toBe(r2);
     expect(u.record).toBe("_story/rounds/02-story");
-    expect(u.handoffFile).toBe(join(spec, "handoffs/_story.md"));
+    expect(u.handoffFile).toBe(join(spec, "handoffs/story.md"));
     expect(u.handoff?.body).toBe("## Goal\n\nstory goal\n");
     expect(existsSync(join(spec, "runs/_story/rounds"))).toBe(false);
   });
