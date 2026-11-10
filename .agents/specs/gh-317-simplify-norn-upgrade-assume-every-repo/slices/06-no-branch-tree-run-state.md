@@ -2,7 +2,7 @@
 id: gh-317/06
 title: Run state is read only from the machine dir and archive refs
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
