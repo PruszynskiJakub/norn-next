@@ -32,4 +32,4 @@ When the `ci` check fails, the rework brief shows where the failures are (run/ch
 
 ### Resume
 
-Review approved; next is open-pr then the `ci` step, driven by norn.
+describe wrote `pr.md` in the spec folder (summary, by-hand evidence from run 42794918379, two-way door). Next: open-pr, then the `ci` step, both driven by norn.
