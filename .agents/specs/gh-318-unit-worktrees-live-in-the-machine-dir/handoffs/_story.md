@@ -41,11 +41,11 @@ Review #1's blocking finding (a symlinked home broke orphan detection and marker
 
 ## Notes
 
-- ci fix #2 (`packages/cli/test/integration/machine-dir.test.ts`, test-only): its "no machine-local files in the tree" check collected file names from the whole machine dir, which now holds `worktrees/` with the repo's own files (SKILL.md…), so it skips that folder; and the AC2 test's `h.worktree(...)` was computed after `unbindNornHome`, i.e. from another home, so the path is now fixed in `beforeAll` while the home is bound. A test that unbinds the home must not call `h.worktree`/`worktreesOf` afterwards. Run one integration file: `bun test --config=bunfig.integration.toml --timeout=20000 ./<path>`.
-- ci fix: the upgrade test B16 now makes its unit worktree beside the checkout with the unit's marker, because `toOldLayout` moves the whole machine dir (worktrees included). Keeping `worktrees/` in place made every old-layout fixture read as `both_layouts`; real old-layout repos never have that, so no product change.
+- `machine-dir.test.ts` skips the machine dir's `worktrees/` when collecting machine-local file names (it holds the repo's own files). A test that unbinds the home must not call `h.worktree`/`worktreesOf` afterwards. Run one integration file: `bun test --config=bunfig.integration.toml --timeout=20000 ./<path>`.
+- Upgrade test B16 makes its unit worktree beside the checkout: `toOldLayout` moves the whole machine dir, worktrees included (no product change).
 - Person decided (refine): no compatibility with `<repo>-worktrees/`; repo moves and doctor's adoption advice out of scope; worktrees in the per-checkout machine dir, not a shared `~/.norn/worktrees/`.
 - Person agreed (plan): seams S1 (cli integration harness) and S2 (decide through Facts), prefactors first, harness check at cleanup (D4), golden corpus rewritten mechanically (D5).
-- Rework of review #1: resolving in `machineHomeOf` (not only `worktreesDir`) keeps every machine-dir path in one spelling; the resolution is memoized only once the home exists, since a missing folder may still be created as a link.
+- `machineHomeOf` resolves the home (one spelling for every machine-dir path), memoized only once the home exists.
 - QA: `story start --print` on an agent step running in auto is refused (`nothing_to_open`); the person-facing paths were checked on an attended step in manual mode. There is no `--home` CLI flag: the spec's `--home` means the home given to the command (deps.home). Never run `bun run golden` without `--update` to check: it harvests by running the integration tests.
 
 ## Resume
