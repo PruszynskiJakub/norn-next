@@ -1,0 +1,4 @@
+#!/bin/zsh
+for v in NORN_HOME NORN_STORY NORN_SLICE NORN_RUN NORN_BIN NORN_ORIENT HERDR_ENV HERDR_SOCKET_PATH NORN_SLOT HERDR_SESSION HERDR_TAB_ID HERDR_BIN_PATH HERDR_WORKSPACE_ID HERDR_PANE_ID NORN_UNIT; do unset $v; done
+export NORN_HOME_DIR=/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/ba09e8a0-3f99-4d29-92a6-06a0f7562734/scratchpad/qa4/w/home USER=tester NORN_MACHINE=box QA=/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/ba09e8a0-3f99-4d29-92a6-06a0f7562734/scratchpad/qa4
+exec bun /private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/ba09e8a0-3f99-4d29-92a6-06a0f7562734/scratchpad/qa4/norn.ts "$@"

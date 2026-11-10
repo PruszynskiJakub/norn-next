@@ -1,0 +1,4 @@
+# mk <name> <version|none>
+rm -rf /private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/ba09e8a0-3f99-4d29-92a6-06a0f7562734/scratchpad/qa4/w/$1; cp -R /private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/ba09e8a0-3f99-4d29-92a6-06a0f7562734/scratchpad/qa4/w/base /private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/ba09e8a0-3f99-4d29-92a6-06a0f7562734/scratchpad/qa4/w/$1; cd /private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/ba09e8a0-3f99-4d29-92a6-06a0f7562734/scratchpad/qa4/w/$1
+if [ "$2" = none ]; then sed -i '' '/^norn_version:/d' .agents/norn.config.yaml; else sed -i '' "s/^norn_version: .*/norn_version: $2/" .agents/norn.config.yaml; fi
+git commit -qam "version $2"

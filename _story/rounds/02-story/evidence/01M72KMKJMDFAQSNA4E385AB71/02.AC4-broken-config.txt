@@ -1,0 +1,9 @@
+== 02.AC4 no norn_version + team config with invalid YAML
+$ norn tick --json  (binary 0.31.0)
+{"error":"`.agents/norn.config.yaml`: not valid YAML: Flow sequence in block collection must be sufficiently indented and end with a ] at line 23, column 1:","do_instead":"fix .agents/norn.config.yaml","code":"config_invalid","details":[{"code":"config_invalid","file":"repo","key":"","message":"not valid YAML: Flow sequence in block collection must be sufficiently indented and end with a ] at line 23, column 1:","path":"$QA/w/badcfg/.agents/norn.config.yaml"}]}
+exit=6  repo+machine-dir changed: no
+
+$ norn story start gh-1 --json  (binary 0.31.0)
+{"error":"`.agents/norn.config.yaml`: not valid YAML: Flow sequence in block collection must be sufficiently indented and end with a ] at line 23, column 1:","do_instead":"fix .agents/norn.config.yaml","code":"config_invalid","details":[{"code":"config_invalid","file":"repo","key":"","message":"not valid YAML: Flow sequence in block collection must be sufficiently indented and end with a ] at line 23, column 1:","path":"$QA/w/badcfg/.agents/norn.config.yaml"}]}
+exit=6  repo+machine-dir changed: no
+

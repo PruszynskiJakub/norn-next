@@ -1,0 +1,11 @@
+== 04.AC2 repo with no team file, binary 0.31.0
+ls: .agents: No such file or directory
+$ norn init --json  (binary 0.31.0)
+{"root":"$QA/w/i1","config":"created","review":"created","user_config":"exists","schemas":["$QA/w/i1/.agents/norn.config.schema.json","/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/ba09e8a0-3f99-4
+exit=0  repo+machine-dir changed: YES
+
+--- team file:
+
+
+
+norn_version: 0.31.0

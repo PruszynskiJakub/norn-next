@@ -1,0 +1,22 @@
+== lines in README/docs mentioning upgrade
+README.md:77:Config is optional: a solo developer on GitHub with Claude Code writes none. It lives in three files: `~/.norn/config.yaml` (your machine and your defaults), `.agents/norn.config.local.yaml` (yours in this repository, gitignored) and `.agents/norn
+docs/recipes.md:103:4. Run `norn upgrade` once: it creates the `norn:wf:docs` label on the remote. Then use it: label an issue `norn:wf:docs`, or start the next round of a story with `norn story edit gh-12 --workflow docs`.
+docs/recipes.md:149:The repo's norn version (`norn_version` in `.agents/norn.config.yaml`, see [Concepts](concepts.md#the-repos-norn-version)) says which norn every machine runs. Moving it is one commit by one person; everyone else pulls and installs. `norn up
+docs/recipes.md:154:2. Stop `norn watch` (and any cron tick) on this checkout: `norn upgrade` refuses while a tick runs.
+docs/recipes.md:155:3. Run `norn upgrade`. It rewrites the bundled `norn*` skills in `.agents/skills/` to its copies and relinks them into each configured agent's skill folder, then moves `norn_version` to the running binary's version, last, so a run cut short
+docs/recipes.md:158:`norn upgrade` never moves the version backward: a binary older than the repo's version is refused with the norn to install. To really go back, edit the key in the team file by hand, where review sees it.
+docs/recipes.md:162:**`norn init` is for a new repo or a new machine**, never for moving the version. On a repo with no team file it records the running norn's version; a team file with no `norn_version`, or one below 0.30, is an older norn's repo and init ref
+docs/reference.md:11:A command a person runs that needs the tick lock (`norn story edit --workflow`, `norn story edit --at`, `norn story checkout`, `norn story handoff`, `norn story close`, `norn story reset`, `norn story reopen`, `norn tidy`, and the claim re
+docs/reference.md:26:`norn_version` is the repo's norn version: `norn init` records it on a repo with no team file (and refuses a team file with no or a pre-0.30 one), and only `norn upgrade` moves it (`norn config set|unset` refuse it). A binary of another mi
+docs/reference.md:310:##### `norn upgrade`
+docs/reference.md:315:norn upgrade [--json]
+docs/concepts.md:41:norn reads and writes a few labels on your issues. `norn init` and `norn upgrade` create each one that is missing on the remote, in norn's colour (`#5319E7`) with a description; they never change or delete a label that is there. `norn docto
+docs/concepts.md:111:A bundled skill (a `norn`-prefixed folder in `.agents/skills/`) that differs from the running norn's copy is **drift**. A unit keeps running on the skills its worktree holds, as it keeps its pinned workflow: its agent steps start, and `nor
+docs/concepts.md:115:The team config records **the repo's norn version** (`norn_version: X.Y.Z` in `.agents/norn.config.yaml`): the norn the repo was set up with or last upgraded to. A binary matches it when it is the same minor (before 1.0; the same major fro
+docs/concepts.md:119:- every command that acts is refused with exit code 3 (`refused`) and the norn to install, or `norn upgrade` when your binary is newer: `tick`, `watch` (each tick), `sync`, `brief`, `tidy`, `config set|unset`, every `story` verb that chang
+docs/concepts.md:121:- `init`, `upgrade`, `uninstall`, and the reports an agent already in a step makes (`done`, `ask`, `stuck`, `hook`, and the check runs a tick started), are never refused for it, so a session already started can always report.
+docs/concepts.md:123:A repo without the key, or one recording a version below 0.30, is refused the same way by every command that acts and by `init`, with code `version_missing` or `version_too_old`; `doctor` fails its version check with the same words, and `s
+docs/development.md:133:- **The CI process check** passes a PR only from a story branch `gh-N-<slug>` that closes #N, a valid bypass, or Dependabot, and refuses one that edits the installed skill copies `.agents/skills/norn*` unless it is a release PR (titled 
+
+== forbidden mentions (migrate, needs strip, .gitattributes, archive ref move, old config keys) anywhere in README/docs
+(end)

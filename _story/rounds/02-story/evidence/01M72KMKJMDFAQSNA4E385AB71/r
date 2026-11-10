@@ -1,0 +1,7 @@
+#!/bin/zsh
+# r <args>: run dev norn, print cmd/output/exit/whether repo or machine dir changed
+snap() { git status --porcelain --ignored; git rev-parse HEAD; find .agents .claude -type f -exec md5 -q {} + 2>/dev/null | md5; find /private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/ba09e8a0-3f99-4d29-92a6-06a0f7562734/scratchpad/qa4/w/home -type f 2>/dev/null | sort | md5 }
+b=$(snap); echo "\$ norn $*  (binary ${QA_VERSION:-dev})"
+out=$(/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/ba09e8a0-3f99-4d29-92a6-06a0f7562734/scratchpad/qa4/n "$@" 2>&1); c=$?
+print -r -- "${out[1,${MAXC:-2500}]}"
+a=$(snap); echo "exit=$c  repo+machine-dir changed: $([ "$b" = "$a" ] && echo no || echo YES)"; echo

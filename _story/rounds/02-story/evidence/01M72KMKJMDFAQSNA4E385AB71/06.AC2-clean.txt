@@ -1,0 +1,24 @@
+== 06.AC2 (valid spec, status: active, no machine-dir run state for gh-9; base tree holds its runs/)
+.agents/specs/gh-9-done/runs/_story/rounds/01-story/receipts/0001-started.json
+.agents/specs/gh-9-done/runs/_story/rounds/01-story/state.json
+.agents/specs/gh-9-done/spec.md
+$ norn status  (binary 0.31.0)
+`norn status` now shows what needs you; the story listing moved to `norn story list`.
+Inbox empty — nothing needs you.
+exit=0  repo+machine-dir changed: YES
+
+$ norn status --json  (binary 0.31.0)
+{"at":"2026-11-10T11:38:24.631Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[],"check":[],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":0,"delegated_counts":{},"heartbeat":{"holder":"tester@box","last_tick_at":null,"age":null,"down":false,"up":false}}
+exit=0  repo+machine-dir changed: no
+
+$ norn story list  (binary 0.31.0)
+gh-9 Done story
+  story · manual · unclaimed · not started
+
+0 items need you — norn status
+exit=0  repo+machine-dir changed: no
+
+status mentions runs/|run state|run_state|archive|base tree: 0
+== doctor in this repo
+top keys: ok,live,hook_command,machine,git,agents,remote,labels,runner,skills,repo,warnings,hints | repo keys: ok,version,skills,workflows,config
+doctor json/markdown matching run_state|run state|runs/|archive: 0 / 0

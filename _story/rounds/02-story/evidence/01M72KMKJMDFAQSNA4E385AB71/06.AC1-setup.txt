@@ -1,0 +1,36 @@
+== r6: repo 0.31.0, workflow triage, mode manual (default), stub gh serving issue #1, stub claude, no herdr on PATH, bare local remote
+$ norn sync --json  (binary 0.31.0)
+{"tick_id":"01M72KVH3XW9J8JCSG779YVH1J","at":"2026-11-10T11:35:21.981Z","duration_ms":710,"sync":{"ran":true,"ok":true},"decisions":[{"unit":"gh-1","rule":"remote.intake","kind":"intake_story","ok":true,"story":"gh-1"}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"act intake_story gh-1","ms":233},"follow_up":true,"intake":[{"rule":"remote.intake","ok":true}]}
+exit=0  repo+machine-dir changed: YES
+
+$ norn tick --json  (binary 0.31.0)
+{"tick_id":"01M72KVJ46SY5XNHKMJB5SWFPM","at":"2026-11-10T11:35:23.014Z","duration_ms":380,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"claim.acquire.intake","kind":"claim","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"act claim gh-1","ms":122},"follow_up":true}
+exit=0  repo+machine-dir changed: YES
+
+$ norn tick --json  (binary 0.31.0)
+{"tick_id":"01M72KVJSY55J5EFFWKKNT2PB3","at":"2026-11-10T11:35:23.710Z","duration_ms":433,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"story.start","kind":"start_unit","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"act start_unit gh-1","ms":209},"follow_up":true}
+exit=0  repo+machine-dir changed: YES
+
+$ norn story start gh-1 --json  (binary 0.31.0)
+{"unit":"gh-1","step":"explore","worktree":"$QA/w/r6-worktrees/gh-1-demo-story","command":"cd $QA/w/r6-worktrees/gh-1-demo-story && claude --permission-mode auto -- 'Run `norn brief` in this worktree and do the step it gives you.'","opened":false}
+exit=0  repo+machine-dir changed: no
+
++ gh-1-demo-story
+* main
+  remotes/origin/gh-1-demo-story
+  remotes/origin/main
+badcfg
+base
+d.json
+g-0.29.4
+g-none
+home
+i1
+lock.out
+r6
+r6-worktrees
+remote6.git
+u.json
+up1
+watch.out
+wmid

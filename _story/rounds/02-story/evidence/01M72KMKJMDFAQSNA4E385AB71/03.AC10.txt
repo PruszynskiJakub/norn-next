@@ -1,0 +1,23 @@
+== 03.AC10
+$ norn migrate  (binary 0.31.0)
+{"error":"Unknown command: migrate","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, check-run, status, tidy, doctor, upgrade, help, story, run, config","code":"unknown_command"}
+exit=2  repo+machine-dir changed: no
+
+$ norn migrate --json  (binary 0.31.0)
+{"error":"Unknown command: migrate","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, check-run, status, tidy, doctor, upgrade, help, story, run, config","code":"unknown_command"}
+exit=2  repo+machine-dir changed: no
+
+$ norn frobnicate --json  (binary 0.31.0)
+{"error":"Unknown command: frobnicate","do_instead":"norn help — commands: init, uninstall, sync, tick, watch, brief, done, ask, stuck, hook, check-run, status, tidy, doctor, upgrade, help, story, run, config","code":"unknown_command"}
+exit=2  repo+machine-dir changed: no
+
+$ norn help | grep -c migrate: 0
+$ norn help --json | grep -c migrate: 0
+$ norn help upgrade  (binary 0.31.0)
+norn upgrade — Move this repo's norn_version and bundled skills to this norn, from norn 0.30 on, staged for you to commit
+
+    norn upgrade [--json]
+
+For the person; an agent runs it only when the person asks it to.
+exit=0  repo+machine-dir changed: no
+

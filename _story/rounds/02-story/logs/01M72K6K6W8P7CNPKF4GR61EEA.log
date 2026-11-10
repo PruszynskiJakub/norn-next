@@ -1,0 +1,232 @@
+e2e (shard 3/3)	UNKNOWN STEP	﻿2026-11-10T11:24:33.7396609Z Current runner version: '2.338.2'
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7417901Z ##[group]Runner Image Provisioner
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7418671Z Hosted Compute Agent
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7419206Z Version: 20261028.624
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7419717Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7420357Z Build Date: 2026-10-28T21:51:42Z
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7420910Z Worker ID: {3c4ca795-d336-4fb8-8625-98c1db1daf11}
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7421469Z Region: westus3
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7422044Z Cloud: Azure
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7422484Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7423867Z ##[group]Operating System
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7424391Z Ubuntu
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7424817Z 26.04.1
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7425332Z LTS
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7425769Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7426247Z ##[group]Runner Image
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7426744Z Image: ubuntu-26.04
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7427404Z Version: 20261101.186.1
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7428513Z Included Software: https://github.com/actions/runner-images/blob/ubuntu26/20261101.186/images/ubuntu/Ubuntu2604-Readme.md
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7429798Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu26%2F20261101.186
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7430617Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7431591Z ##[group]GITHUB_TOKEN Permissions
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7433164Z Contents: read
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7433638Z Metadata: read
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7434189Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7435882Z Secret source: Actions
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7436727Z Cache mode: write
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7437514Z Prepare workflow directory
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7708654Z Prepare all required actions
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:33.7750546Z Getting action download info
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.0490253Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.1837321Z Download action repository 'oven-sh/setup-bun@v2' (SHA:0c5077e51419868618aeaa5fe8019c62421857d6)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.8290544Z Complete job name: e2e (shard 3/3)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9091198Z ##[group]Run actions/checkout@v4
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9091966Z with:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9092396Z   repository: PruszynskiJakub/norn-next
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9095887Z   token: ***
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9096280Z   ssh-strict: true
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9096673Z   ssh-user: git
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9097352Z   persist-credentials: true
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9097825Z   clean: true
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9098219Z   sparse-checkout-cone-mode: true
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9098682Z   fetch-depth: 1
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9099059Z   fetch-tags: false
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9099449Z   show-progress: true
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9099837Z   lfs: false
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9100214Z   submodules: false
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9100620Z   set-safe-directory: true
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9101063Z   allow-unsafe-pr-checkout: false
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:34.9101728Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.1319901Z Syncing repository: PruszynskiJakub/norn-next
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.1322485Z ##[group]Getting Git version info
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.1323467Z Working directory is '/home/runner/work/norn-next/norn-next'
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.1324887Z [command]/usr/bin/git version
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.1329308Z git version 2.56.0
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.1346299Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.1360406Z Temporarily overriding HOME='/home/runner/work/_temp/652c7052-17b1-41da-856a-05c24524b76c' before making global git config changes
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.1362477Z Adding repository directory to the temporary git global config as a safe directory
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.1364866Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/norn-next/norn-next
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.1768234Z Deleting the contents of '/home/runner/work/norn-next/norn-next'
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.1772364Z ##[group]Initializing the repository
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.1785247Z [command]/usr/bin/git init /home/runner/work/norn-next/norn-next
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3401258Z hint: Using 'master' as the name for the initial branch. This default branch name
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3402765Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3404811Z hint: to use in all of your new repositories, which will suppress this warning,
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3406088Z hint: call:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3406795Z hint:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3407900Z hint: 	git config --global init.defaultBranch <name>
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3408839Z hint:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3409745Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3411484Z hint: 'development'. The just-created branch can be renamed via this command:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3413259Z hint:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3414476Z hint: 	git branch -m <name>
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3415576Z hint:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3416947Z hint: Disable this message with "git config set advice.defaultBranchName false"
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3419712Z Initialized empty Git repository in /home/runner/work/norn-next/norn-next/.git/
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3441891Z [command]/usr/bin/git remote add origin https://github.com/PruszynskiJakub/norn-next
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3494712Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3496273Z ##[group]Disabling automatic garbage collection
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3498229Z [command]/usr/bin/git config --local gc.auto 0
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3529987Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3531748Z ##[group]Setting up auth
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3538630Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.3570423Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.5594506Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.5625778Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.5858984Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.5887264Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.6118405Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.6152570Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.6153911Z ##[group]Fetching the repository
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:35.6161037Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +c21e1573200ba8b296f9a8455d1737c58272f728:refs/remotes/pull/325/merge
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.6722279Z From https://github.com/PruszynskiJakub/norn-next
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.6724467Z  * [new ref]         c21e1573200ba8b296f9a8455d1737c58272f728 -> pull/325/merge
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.6730163Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.6731756Z ##[group]Determining the checkout info
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.6733505Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.6736292Z [command]/usr/bin/git sparse-checkout disable
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.6777758Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.6802968Z ##[group]Checking out the ref
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.6804813Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/325/merge
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7478695Z Note: switching to 'refs/remotes/pull/325/merge'.
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7480025Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7481082Z You are in 'detached HEAD' state. You can look around, make experimental
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7483587Z changes and commit them, and you can discard any commits you make in this
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7485987Z state without impacting any branches by switching back to a branch.
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7487182Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7488000Z If you want to create a new branch to retain commits you create, you may
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7489864Z do so (now or later) by using -c with the switch command. Example:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7490785Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7491359Z   git switch -c <new-branch-name>
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7492463Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7492992Z Or undo this operation with:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7493624Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7494074Z   git switch -
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7494535Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7495366Z Turn off this advice by setting config variable advice.detachedHead to false
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7496497Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7497948Z HEAD is now at c21e157 Merge a2afa2ed50d359d4706db7c3835e580c0588301f into 8b6e268c1ed80acedd571f4072f8d44fdc1493da
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7501822Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7531892Z [command]/usr/bin/git log -1 --format=%H
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7553483Z c21e1573200ba8b296f9a8455d1737c58272f728
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7902439Z ##[group]Run oven-sh/setup-bun@v2
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7903369Z with:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7904049Z   bun-version: 1.3.13
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7904827Z   no-cache: false
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7912589Z   token: ***
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:36.7913302Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:37.6320341Z Cache hit for: bun-68bqnNjVR1ckwhD0nFe5oJmGfoU=
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:38.8287916Z Received 36181060 of 36181060 (100.0%), 35.9 MBs/sec
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:38.8288435Z Cache Size: ~35 MB (36181060 B)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:38.8311551Z [command]/usr/bin/tar -xf /home/runner/work/_temp/c11de38d-0772-49ff-a17d-a48da4e99d20/cache.tzst -P -C /home/runner/work/norn-next/norn-next --use-compress-program unzstd
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:38.9750493Z Cache restored successfully
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:38.9771289Z [command]/home/runner/.bun/bin/bun --revision
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:38.9838737Z 1.3.13+bf2e2cecf
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:38.9841970Z Using a cached version of Bun: 1.3.13+bf2e2cecf
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.0018912Z ##[group]Run bun install --frozen-lockfile
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.0019309Z ^[[36;1mbun install --frozen-lockfile^[[0m
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.0070513Z shell: /usr/bin/bash -e {0}
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.0070768Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.0173362Z bun install v1.3.13 (bf2e2cec)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1729134Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1729945Z + @types/bun@1.3.13
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1730322Z + typescript@5.9.3
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1730636Z + yaml@2.9.1
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1730742Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1730866Z 26 packages installed [156.00ms]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1809920Z ##[group]Run git config --global user.name "norn ci"
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1810284Z ^[[36;1mgit config --global user.name "norn ci"^[[0m
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1810612Z ^[[36;1mgit config --global user.email "ci@norn.invalid"^[[0m
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1810925Z ^[[36;1mgit config --global init.defaultBranch main^[[0m
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1811184Z ^[[36;1mbun run test:e2e --shard=3/3^[[0m
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1858806Z shell: /usr/bin/bash -e {0}
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.1859065Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.2013569Z $ bun test --config=bunfig.e2e.toml --parallel --timeout=20000 "--shard=3/3"
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.2040118Z bun test v1.3.13 (bf2e2cec) 4x PARALLEL
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.2090019Z --shard=3/3: running 2/8 test files
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8391351Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8391904Z test/e2e/merged-pr.test.ts:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8392532Z 391 |       const view = (await this.norn("story", "list", "--json")).value as ProjectView;
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8393432Z 392 |       return view.stories.flatMap((s): Listed[] => [s, ...s.slices]).find((u) => u.key === key);
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8394066Z 393 |     },
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8394335Z 394 |     async tick(...flags) {
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8394868Z 395 |       const r = printsNoRemovedCommand(["tick", ...flags], await runCli(["tick", ...flags], deps));
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8395513Z 396 |       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8395918Z                                         ^
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8397403Z error: tick failed: {"error":"this repo records no norn_version","do_instead":"run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.30.0","code":"version_missing","details":{"repo":null,"running":"0.30.0"}}
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8398651Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8398916Z       at tick (/home/runner/work/norn-next/norn-next/test/support/harness.ts:396:35)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8399913Z       at async parkedAtReady (/home/runner/work/norn-next/norn-next/test/e2e/merged-pr.test.ts:56:43)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8400692Z       at async <anonymous> (/home/runner/work/norn-next/norn-next/test/e2e/merged-pr.test.ts:82:21)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8401153Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8424624Z ##[error]
+e2e (shard 3/3)	UNKNOWN STEP	      at tick (/home/runner/work/norn-next/norn-next/test/support/harness.ts:396:35)
+e2e (shard 3/3)	UNKNOWN STEP	      at async parkedAtReady (/home/runner/work/norn-next/norn-next/test/e2e/merged-pr.test.ts:56:43)
+e2e (shard 3/3)	UNKNOWN STEP	      at async <anonymous> (/home/runner/work/norn-next/norn-next/test/e2e/merged-pr.test.ts:82:21)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:39.8433864Z (fail) a story PR merged on the remote > squash-merged and the base fetched between syncs: the stale gate waits for the sync, which ends the story; no second PR [390.00ms]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:40.9870557Z 391 |       const view = (await this.norn("story", "list", "--json")).value as ProjectView;
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:40.9874206Z 392 |       return view.stories.flatMap((s): Listed[] => [s, ...s.slices]).find((u) => u.key === key);
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:40.9875477Z 393 |     },
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:40.9897588Z 394 |     async tick(...flags) {
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:40.9928083Z 395 |       const r = printsNoRemovedCommand(["tick", ...flags], await runCli(["tick", ...flags], deps));
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:40.9957864Z 396 |       if (r.exit !== 0) throw new Error(`tick failed: ${r.stdout}`);
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:40.9967579Z                                         ^
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:40.9988742Z error: tick failed: {"error":"this repo records no norn_version","do_instead":"run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.30.0","code":"version_missing","details":{"repo":null,"running":"0.30.0"}}
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:41.0011723Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:41.0028126Z       at tick (/home/runner/work/norn-next/norn-next/test/support/harness.ts:396:35)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:41.0053699Z       at async parkedAtReady (/home/runner/work/norn-next/norn-next/test/e2e/merged-pr.test.ts:56:43)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:41.0054791Z       at async <anonymous> (/home/runner/work/norn-next/norn-next/test/e2e/merged-pr.test.ts:107:21)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:41.0055467Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:41.0063233Z ##[error]
+e2e (shard 3/3)	UNKNOWN STEP	      at tick (/home/runner/work/norn-next/norn-next/test/support/harness.ts:396:35)
+e2e (shard 3/3)	UNKNOWN STEP	      at async parkedAtReady (/home/runner/work/norn-next/norn-next/test/e2e/merged-pr.test.ts:56:43)
+e2e (shard 3/3)	UNKNOWN STEP	      at async <anonymous> (/home/runner/work/norn-next/norn-next/test/e2e/merged-pr.test.ts:107:21)
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:41.0072542Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:41.0098001Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:41.0117724Z (fail) open-pr finding the branch's PR merged > opens no second PR and fails the effect; the next sync ends the story [1146.00ms]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:41.8888884Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:41.8889446Z test/e2e/recovery.test.ts:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:41.8890669Z (pass) a claim lost mid-run > R1.2: the renewal loses its CAS → the waiting done receipt is skipped, nothing is written or pushed [269.00ms]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:42.0607632Z (pass) a claim lost mid-run > R2.3, T7a (B27): the non-holder sets its record aside as superseded, pushes nothing and shows one Check item [171.00ms]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:42.0610353Z (pass) a claim lost mid-run > effect transcript: spawns, port calls and runs/ files of both clones (refactor Phase 0.2) [1.00ms]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:44.1015952Z (pass) renewals due together go out in one push > one renewal lost among several: one claim push, only that story fails and its actions are skipped [514.00ms]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:44.8375458Z (pass) intake race and release > R3.1: both clones intake the issue; the one losing the claim CAS removes its local intake [418.00ms]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.4010644Z (pass) intake race and release > R3.1: an intake commit is read off its trailers — a person's commit that only looks like one keeps the intake [564.00ms]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.6150285Z (pass) intake race and release > R3.3: release refuses a push that is not a fast-forward; the claim and the remote branch stay [214.00ms]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.6477868Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.6478717Z ##[endgroup]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.6649567Z 
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.6650074Z  7 pass
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.6650414Z  2 fail
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.6650795Z  39 expect() calls
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.6651220Z Ran 9 tests across 2 files. [6.46s]
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.6673650Z error: script "test:e2e" exited with code 1
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.6687483Z ##[error]Process completed with exit code 1.
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.6799808Z Post job cleanup.
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.7500472Z [command]/usr/bin/git version
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.7541065Z git version 2.56.0
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.7565814Z Copying '/home/runner/.gitconfig' to '/home/runner/work/_temp/6492901c-e5b0-4b6a-80ec-b204c31d9533/.gitconfig'
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.7573728Z Temporarily overriding HOME='/home/runner/work/_temp/6492901c-e5b0-4b6a-80ec-b204c31d9533' before making global git config changes
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.7574999Z Adding repository directory to the temporary git global config as a safe directory
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.7578661Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/norn-next/norn-next
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.7615009Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.7644992Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.7906294Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.7929896Z http.https://github.com/.extraheader
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.7941289Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.7988424Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.8249954Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.8280915Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.8669506Z Cleaning up orphan processes
+e2e (shard 3/3)	UNKNOWN STEP	2026-11-10T11:24:45.9006814Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

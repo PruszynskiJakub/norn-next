@@ -1,0 +1,5 @@
+{"repo":"0.29.4","running":"0.31.0","rule":{"code":"version_too_old","needs":"0.30.x","error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0"}}
+{"repo":null,"running":"0.31.0","rule":{"code":"version_missing","needs":"0.30.x","error":"this repo records no norn_version","do_instead":"run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0"}}
+{"repo":"0.30.0","running":"0.31.0","rule":null}
+{"repo":"0.31.2","running":"0.31.0","rule":null}
+{"repo":"0.30.0","running":"0.30.0","rule":null}

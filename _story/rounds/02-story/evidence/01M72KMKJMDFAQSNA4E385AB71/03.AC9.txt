@@ -1,0 +1,36 @@
+== 03.AC9 (a) spec+slice with criteria needs, .gitattributes runs/** line, valid config; 0.34.0 → 0.35.0
+$ norn upgrade --json  (binary 0.35.0)
+{"norn_version":{"from":"0.34.0","to":"0.35.0","changed":true},"skills":{"updated":[],"linked":[]},"staged":[".agents/norn.config.yaml"],"commit":"git commit -m \"Upgrade norn to 0.35.0 (norn upgrade)\"","labels":{"checked":false,"reason":"no git remote","fix":null,"do_instead":null}}
+exit=0  repo+machine-dir changed: YES
+
+staged:
+.agents/norn.config.yaml
+needs/.gitattributes files unchanged: yes
+.agents/specs/gh-9-x/spec.md:1
+.agents/specs/gh-9-x/slices/01-s.md:1
+runs/** merge=union
+
+== 03.AC9 (b) team config holds old key default_workflow: story; binary 0.36.0
+$ norn upgrade --json  (binary 0.36.0)
+{"error":"`.agents/norn.config.yaml`: `default_workflow` is now `workflow`","do_instead":"fix .agents/norn.config.yaml","code":"config_moved","details":[{"code":"config_moved","file":"repo","key":"default_workflow","message":"`default_workflow` is now `workflow`","path":"$QA/w/ac9/.agents/norn.config.yaml"}]}
+exit=6  repo+machine-dir changed: no
+
+config unchanged: yes; staged: 
+$ norn config  (binary 0.36.0)
+norn config — Show the resolved config; set or unset one value in the user, local or team file
+
+  norn config list   Show the resolved config and which file set each value
+  norn config get    Show one setting, or every setting under a key, and which file set it
+  norn config set    Set one value in the user, local or repo config file
+  norn config unset  Remove one value from the user, local or repo config file
+
+`norn help config <verb>` shows one verb's usage and options.
+exit=0  repo+machine-dir changed: no
+
+$ norn tick --json  (binary 0.36.0)
+{"error":"`.agents/norn.config.yaml`: `default_workflow` is now `workflow`","do_instead":"fix .agents/norn.config.yaml","code":"config_moved","details":[{"code":"config_moved","file":"repo","key":"default_workflow","message":"`default_workflow` is now `workflow`","path":"$QA/w/ac9/.agents/norn.config.yaml"}]}
+exit=6  repo+machine-dir changed: no
+
+any 'norn upgrade' in config/tick/doctor output about the key: 0
+                      ! default_workflow: `default_workflow` is now `workflow`
+

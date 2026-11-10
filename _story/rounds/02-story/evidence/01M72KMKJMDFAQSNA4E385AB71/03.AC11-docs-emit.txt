@@ -1,0 +1,5 @@
+$ bun run docs:emit
+$ bun packages/cli/scripts/docs-emit.ts
+{"emitted":"docs/reference.md"}
+$ git status --porcelain
+(end; empty = no diff)
