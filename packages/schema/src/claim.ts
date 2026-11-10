@@ -1,5 +1,5 @@
 import { type Static, Type } from "@sinclair/typebox";
-import { IsoTime, NonEmpty, NonNegInt, PosInt, ProcessIdentity, SliceKey, StoryKey, Ulid } from "./common.ts";
+import { IsoTime, NonEmpty, NonNegInt, OutcomeName, PosInt, ProcessIdentity, SliceKey, StoryKey, Ulid } from "./common.ts";
 
 /** Blob behind `refs/norn/claims/<story>`. */
 export const ClaimBlob = Type.Object(
@@ -68,6 +68,8 @@ export const CheckOrder = Type.Object(
     cwd: NonEmpty,
     env: Type.Record(Type.String(), Type.String()),
     timeout_ms: PosInt,
+    /** The step's `exits`: exit code → the outcome the receipt records */
+    exits: Type.Optional(Type.Record(Type.String({ pattern: "^[1-9][0-9]*$" }), OutcomeName)),
     /** The slot's port range, when the unit has one */
     ports: Type.Union([Type.Object({ from: PosInt, to: PosInt }, { additionalProperties: false }), Type.Null()]),
   },

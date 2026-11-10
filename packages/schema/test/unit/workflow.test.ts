@@ -98,7 +98,10 @@ describe("workflow schema", () => {
     ["unknown reserved target", (w: any) => (w.steps.merge.outcomes.done = "$later")],
     ["check without timeout", (w: any) => delete w.steps.test.timeout],
     ["malformed duration", (w: any) => (w.steps.test.timeout = "10 minutes")],
-    ["check outcome other than pass/fail", (w: any) => (w.steps.test.outcomes.flaky = "review")],
+    ["check exit code 0", (w: any) => (w.steps.test.exits = { 0: "flaky" })],
+    ["check exit code above 255", (w: any) => (w.steps.test.exits = { 256: "flaky" })],
+    ["check exit code not a number", (w: any) => (w.steps.test.exits = { x: "flaky" })],
+    ["check exit naming a malformed outcome", (w: any) => (w.steps.test.exits = { 3: "Flaky!" })],
     ["gate outcome other than approve/reject", (w: any) => (w.steps["human-qa"].outcomes.answer = "qa")],
     ["git outcome other than done/conflict", (w: any) => (w.steps.integrate.outcomes.ok = "$done")],
     ["unknown git action", (w: any) => (w.steps.integrate.action = "merge")],
@@ -117,6 +120,13 @@ describe("workflow schema", () => {
     const wf = example();
     mutate(wf);
     expect(errorsOf(wf).length).toBeGreaterThan(0);
+  });
+
+  test("a check may declare outcomes by exit code beside pass and fail", () => {
+    const wf = example();
+    wf.steps.test.exits = { 3: "stale" };
+    wf.steps.test.outcomes.stale = "implement";
+    expect(errorsOf(wf)).toEqual([]);
   });
 
   test("errors carry a JSON pointer to the offending field", () => {

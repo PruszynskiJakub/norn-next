@@ -1,5 +1,6 @@
 /** Workflow load-time validation and per-unit level checks. */
 import {
+  type CheckStep,
   type OutcomeEdge,
   outcomeEdge,
   RESERVED_STEP_NAMES,
@@ -18,6 +19,7 @@ export type WorkflowIssueCode =
   | "unknown_counter"
   | "unknown_reset"
   | "unknown_skill"
+  | "unknown_outcome"
   | "cannot_reach_done"
   | "uncounted_cycle"
   | "verdict"
@@ -46,6 +48,19 @@ export interface ValidateOptions {
 
 /** Outcomes an agent step may declare to override a classified route. `exhausted` always goes to `$stuck`. */
 export const OVERRIDABLE_ROUTES = ["silent", "died", "timeout", "stalled", "ask", "stuck"] as const;
+
+/** What a check ends in without `exits`: exit 0 passes, anything else fails. */
+const CHECK_OUTCOMES = ["pass", "fail"] as const;
+
+/**
+ * The outcome of a check run: `pass` on exit 0, the outcome `exits` names for its exit code, else
+ * `fail`. A timeout has no exit code, so it always fails.
+ */
+export function checkOutcome(exits: CheckStep["exits"], res: { exit_code: number | null; timed_out: boolean }): string {
+  if (res.timed_out || res.exit_code === null) return "fail";
+  if (res.exit_code === 0) return "pass";
+  return exits?.[String(res.exit_code)] ?? "fail";
+}
 
 const isReservedStep = (name: string) => name.startsWith("$") || (RESERVED_STEP_NAMES as readonly string[]).includes(name);
 
@@ -127,6 +142,24 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
           message: "'exhausted' always routes to $stuck and cannot be declared",
         });
     }
+  }
+  for (const [name, step] of Object.entries(wf.steps)) {
+    if (step.type !== "check") continue;
+    const named = new Set(Object.values(step.exits ?? {}));
+    for (const [code, outcome] of Object.entries(step.exits ?? {})) {
+      const path = `/steps/${name}/exits/${code}`;
+      if ((CHECK_OUTCOMES as readonly string[]).includes(outcome) || outcome === "exhausted")
+        issues.push({ code: "reserved_outcome", path, message: `exit ${code} names '${outcome}', which a check reaches without exits` });
+      else if (!Object.hasOwn(step.outcomes, outcome))
+        issues.push({ code: "unknown_outcome", path, message: `exit ${code} names outcome '${outcome}', but ${name} declares no route for it in outcomes` });
+    }
+    for (const outcome of Object.keys(step.outcomes))
+      if (!(CHECK_OUTCOMES as readonly string[]).includes(outcome) && !named.has(outcome))
+        issues.push({
+          code: "unknown_outcome",
+          path: `/steps/${name}/outcomes/${outcome}`,
+          message: `check outcome '${outcome}' is neither pass, fail nor named by an exit code in exits`,
+        });
   }
   // `reset_on` names a declared edge `<step>.<outcome>`
   for (const [name, c] of Object.entries(counters)) {

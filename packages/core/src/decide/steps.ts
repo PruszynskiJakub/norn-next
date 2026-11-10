@@ -68,7 +68,7 @@ export function recordOf(uf: UnitFacts): string {
 /** The story unit's record is flat, `_story/state.json` directly in its folder (an older norn's). */
 export const hasFlatRecord = (uf: UnitFacts): boolean => uf.unit.slice === null && uf.record !== undefined && normalRecord(uf.record) === unitRecordPath(STORY_UNIT_DIR);
 
-export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, command: string, timeout_ms: number): void {
+export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, command: string, timeout_ms: number, exits?: Record<string, string>): void {
   const ref = uf.unit;
   if (uf.lease?.kind === "check") return ctx.noop(ref, "check.running", `check run ${uf.lease.run_id ?? "?"} in progress`);
   const cwd = unitWorktree(story, uf);
@@ -89,6 +89,7 @@ export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitSta
     timeout_ms,
     env,
     log_path: `${recordRunStatePath(story, recordOf(uf))}/logs/${run_id}.log`,
+    ...(exits ? { exits } : {}),
   });
 }
 

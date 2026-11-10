@@ -29,7 +29,7 @@ A **step** is one node of a workflow. There are five kinds:
 | Step | What happens |
 |---|---|
 | agent | an agent does the step with a skill (`norn-implement`, `norn-review`, …) and reports an outcome |
-| check | norn runs a command, such as your tests; the exit code is the outcome (`pass` or `fail`) |
+| check | norn runs a command, such as your tests; the exit code is the outcome (`pass` on 0, else `fail`, unless `exits` names another outcome for that code) |
 | git | norn does a git action: merge the base into the story (`update`), integrate a slice, open the draft PR, wait for CI |
 | gate | a person decides: `approve` or `reject` |
 | slices | the story waits while its slices run, each with its own workflow |

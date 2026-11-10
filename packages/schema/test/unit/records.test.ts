@@ -89,7 +89,7 @@ describe("receipt schema", () => {
     ["bad timestamp", { ...receipts.stuck, at: "yesterday" }],
     ["field of another kind", { ...receipts.stuck, outcome: "done" }],
     ["done without outcome", (({ outcome: _, ...r }) => r)(receipts.done as Extract<Receipt, { kind: "done" }>)],
-    ["check with bad outcome", { ...receipts.check, outcome: "timeout" }],
+    ["check with malformed outcome", { ...receipts.check, outcome: "Timed Out" }],
     ["mode with bad value", { ...receipts.mode, mode: "semi" }],
     ["finding with bad severity", { ...receipts.done, findings: [{ severity: "huge", title: "x" }] }],
     ["unknown actor", { ...receipts.stuck, by: "robot" }],

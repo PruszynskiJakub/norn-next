@@ -193,6 +193,40 @@ describe("a check-run that fails on its own side", () => {
   });
 });
 
+describe("a check-run whose step declares outcomes by exit code", () => {
+  test("records the outcome its exit code names, with the log; other exits stay fail", async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "norn-check-run-")));
+    try {
+      const runsDir = join(dir, "runs");
+      mkdirSync(runsDir);
+      const t = Date.parse("2026-01-01T00:00:00Z");
+      const order = (n: number, command: string): CheckOrder => ({
+        version: 1,
+        home: join(dir, "home"),
+        lease_file: `check-${n}.json`,
+        runs_dir: runsDir,
+        run_id: ulid(t + 10 * n),
+        step: "ci",
+        attempt: 1,
+        tick_id: ulid(t + 10 * n + 1),
+        who: "tester@box",
+        command,
+        cwd: dir,
+        env: { NORN_HOME: dir },
+        timeout_ms: 10_000,
+        exits: { "3": "stale" },
+        ports: null,
+      });
+      const stale = await runCheckOrder(order(1, "echo conflicting; exit 3"), () => t);
+      expect(stale).toMatchObject({ outcome: "stale", exit_code: 3 });
+      expect(stale.log).toBeDefined();
+      expect(await runCheckOrder(order(2, "exit 1"), () => t)).toMatchObject({ outcome: "fail", exit_code: 1 });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("a check-run the tick could not identify", () => {
   test("takes its run's lease over itself while it runs, and releases it after", async () => {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), "norn-check-run-")));

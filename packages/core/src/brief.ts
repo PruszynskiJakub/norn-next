@@ -117,7 +117,7 @@ export interface BriefCheck {
   step: string;
   attempt: number;
   command: string;
-  outcome: "pass" | "fail";
+  outcome: string;
   exit_code: number | null;
   duration_ms: number;
   reason: string | null;
@@ -522,7 +522,7 @@ export function receiptLine(r: Receipt): string | null {
     case "mode":
       return `mode ${r.previous} → ${r.mode}`;
     case "check":
-      return `${at} check \`${r.outcome}\`${r.outcome === "fail" ? ` (exit ${r.exit_code ?? "none"}${r.reason ? `, ${r.reason}` : ""})` : ""} in ${duration(r.duration_ms)}`;
+      return `${at} check \`${r.outcome}\`${r.outcome !== "pass" ? ` (exit ${r.exit_code ?? "none"}${r.reason ? `, ${r.reason}` : ""})` : ""} in ${duration(r.duration_ms)}`;
     case "started":
       return r.retry ? `${at} fresh session started` : null;
     case "classify":
@@ -885,7 +885,7 @@ function markdown(b: BriefJson): string {
   if (b.checks) {
     out.push("## Checks since the last report", "", `These checks ran on the code since ${b.checks.since} reported; nothing else has run on it yet.`, "");
     for (const c of b.checks.items) {
-      const exit = c.outcome === "fail" ? ` (exit ${c.exit_code ?? "none"}${c.reason ? `, ${c.reason}` : ""})` : "";
+      const exit = c.outcome !== "pass" ? ` (exit ${c.exit_code ?? "none"}${c.reason ? `, ${c.reason}` : ""})` : "";
       out.push(`- ${c.step}#${c.attempt} \`${c.outcome}\`${exit} in ${duration(c.duration_ms)} — \`${c.command}\` — output: \`${c.log}\``);
     }
     out.push("");

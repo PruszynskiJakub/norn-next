@@ -99,6 +99,8 @@ Set `status: done` in the story's `spec.md` on the base yourself and commit it, 
     outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
 ```
 
+   A check ends in `pass` (exit 0) or `fail` (any other exit). One that can end another way names the outcome per exit code in `exits` and routes it like any other: the shipped `ci` check exits 3 on a PR that conflicts with its base, and `exits: { 3: stale }` with `stale: { to: update, counter: stale_loop }` sends the story to take the base instead of to `implement`.
+
 3. Commit it. norn validates a workflow before a unit uses it and refuses one that does not hold together, naming what is wrong.
 4. Run `norn upgrade` once: it creates the `norn:wf:docs` label on the remote. Then use it: label an issue `norn:wf:docs`, or start the next round of a story with `norn story edit gh-12 --workflow docs`.
 

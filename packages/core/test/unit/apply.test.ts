@@ -19,8 +19,8 @@ function run(st: UnitState, wf: Workflow, ...make: Array<(s: UnitState) => Recei
 }
 const started = (s: UnitState) => ({ ...receipt(s, "started", { how: "manual", worktree: "/w" }), run_id: RUN });
 const done = (outcome: string, extra: Record<string, unknown> = {}) => (s: UnitState) => receipt(s, "done", { outcome, handoff: "h", ...extra });
-const check = (outcome: "pass" | "fail") => (s: UnitState) =>
-  receipt(s, "check", { outcome, command: "bun test", exit_code: outcome === "pass" ? 0 : 1, duration_ms: 5, output_tail: "" }, "norn");
+const check = (outcome: string, exit_code = outcome === "pass" ? 0 : 1) => (s: UnitState) =>
+  receipt(s, "check", { outcome, command: "bun test", exit_code, duration_ms: 5, output_tail: "" }, "norn");
 const classify = (outcome: string) => (s: UnitState) => receipt(s, "classify", { outcome, rule: "t", route: "park" }, "norn");
 
 describe("initialState", () => {
@@ -62,6 +62,24 @@ describe("transitions", () => {
     expect(r.state).toMatchObject({ step: "$done", status: "done", run: null });
     const s = run(stateFor(storyUnit(), STORY_WF, { step: "slices", status: "ready", park: null }), STORY_WF, classify("stuck"));
     expect(s.state).toMatchObject({ status: "stuck", park: { kind: "stuck", reason: "slices.stuck → $stuck" } });
+  });
+});
+
+describe("check outcomes declared by exit code", () => {
+  test("a check receipt with an exit-code outcome takes that outcome's edge, counted on its own counter", () => {
+    const wf: Workflow = {
+      name: "w",
+      start: "ci",
+      steps: {
+        ci: { type: "check", run: "x", timeout: "1m", exits: { "3": "stale" }, outcomes: { pass: "$done", fail: { to: "fix", counter: "ci_loop" }, stale: { to: "fix", counter: "stale_loop" } } },
+        fix: { type: "agent", skill: "s", outcomes: { done: "ci" } },
+      },
+      counters: { ci_loop: { max: 1 }, stale_loop: { max: 3 } },
+    };
+    const r = run(stateFor(storyUnit(), wf), wf, check("stale", 3));
+    expect(r.advance).toMatchObject({ from: "ci", outcome: "stale", to: "fix", counter: { name: "stale_loop", value: 1 } });
+    expect(r.state.counters).toEqual({ ci_loop: 0, stale_loop: 1 });
+    expect(r.state.last_outcome).toMatchObject({ step: "ci", outcome: "stale" });
   });
 });
 

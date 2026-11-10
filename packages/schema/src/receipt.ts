@@ -149,7 +149,8 @@ export const UnstickReceipt = mailboxReceipt("unstick", {
 });
 export const ModeReceipt = receipt("mode", { mode: Mode, previous: Mode });
 export const CheckReceipt = receipt("check", {
-  outcome: Type.Union([Type.Literal("pass"), Type.Literal("fail")]),
+  /** `pass` (exit 0), the outcome the step's `exits` names for the exit code, else `fail` */
+  outcome: OutcomeName,
   command: NonEmpty,
   /** null when killed by timeout */
   exit_code: Type.Union([Type.Integer(), Type.Null()]),
@@ -157,7 +158,7 @@ export const CheckReceipt = receipt("check", {
   reason: Type.Optional(Type.Literal("timeout")),
   /** last ~200 lines */
   output_tail: Type.String(),
-  /** `logs/<run_id>.log`, present on fail */
+  /** `logs/<run_id>.log`, present unless it passed */
   log: Type.Optional(NonEmpty),
 });
 export const SessionInfo = Type.Object(

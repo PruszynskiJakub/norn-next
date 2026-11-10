@@ -27,6 +27,7 @@ import {
   T0,
   TICK,
   unitFacts,
+  loaded,
   WORKFLOWS,
   worktree as worktreeOf,
 } from "../fixtures.ts";
@@ -374,6 +375,15 @@ describe("check, git, gate steps", () => {
     const leased = storyAt("test");
     leased.units[0]!.lease = { version: 1, kind: "check", repo: "/r", story: "gh-1", slice: null, run_id: RUN, holder: { pid: 1, pid_start: "1" }, created_at: at() };
     expect(kinds(facts([leased]))).toEqual(["gh-1 noop check.running"]);
+  });
+  test("a check carries the exit codes its step declares, so check-run records the outcome each names", () => {
+    expect(only(facts([storyAt("test")]))).not.toHaveProperty("exits");
+    const test = STORY_WF.steps.test as Extract<Workflow["steps"][string], { type: "check" }>;
+    const wf: Workflow = { ...STORY_WF, steps: { ...STORY_WF.steps, test: { ...test, exits: { "3": "stale" }, outcomes: { ...test.outcomes, stale: "fix" } } } };
+    const unit = storyUnit();
+    const story = storyFacts("gh-1", [unitFacts(unit, wf, stateFor(unit, wf, { step: "test", visits: { test: 1 }, status: "ready", park: null }))]);
+    const d = decide(facts([story]), { ...WORKFLOWS, story: loaded(wf) }, CONFIG).find((x) => x.unit === "gh-1");
+    expect(d?.action).toMatchObject({ kind: "run_check", exits: { "3": "stale" } });
   });
   test("a check whose job holds the lease shows as running since the lease, not queued", () => {
     const title = (s: StoryFacts) => buildInbox(facts([s]), CONFIG).groups.running.map((i) => `${i.title} ${i.since}`);
