@@ -6,13 +6,13 @@
  * Reuse: `const h = await createHarness(); await h.norn("init"); …; h.cleanup()`.
  */
 import { setDefaultTimeout } from "bun:test";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type PullRequestCi, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
-import { parseSpecDirName, type Receipt, recordRef, ROUNDS_DIR, STORY_UNIT_DIR, type UnitState, ulid } from "@norn/schema";
+import { parseSpecDirName, type Receipt, recordRef, type UnitState, ulid } from "@norn/schema";
 import { spawnSyncTimeoutMs } from "./spawn-sync-bound.ts";
-import { appendReceipt, bindNornHome, HANDOFF_HEADER_BEGIN, HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, HANDOFF_LOG_END, installSkills, linkSkills, machineDir, readState, repoConfigPath, handoffPath, runStateDir, spawnSyncCaptured, storyRunStateDir, treeHandoffFile, treeRecordCommit, treeRunStateDir, treeUnitRunStateDir, workflowsDir } from "@norn/store";
+import { appendReceipt, bindNornHome, HANDOFF_HEADER_BEGIN, HANDOFF_HEADER_END, HANDOFF_LOG_BEGIN, HANDOFF_LOG_END, installSkills, linkSkills, machineDir, readState, repoConfigPath, spawnSyncCaptured, treeRecordCommit, workflowsDir } from "@norn/store";
 import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, runningVersion, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
@@ -306,7 +306,8 @@ export interface Harness {
    * Write config the way a person splits it — the team keys (`provider`, `base_branch`,
    * `workflow`, `slice_workflow`) into `.agents/norn.config.yaml`, your keys (`mode`, `agent`,
    * `agents`) into `.agents/norn.config.local.yaml`, machine keys into the user file. A repo file
-   * left without keys is removed; the user file is only written, never removed.
+   * left without keys is removed; the user file is only written, never removed. The team file keeps
+   * its recorded `norn_version` (first), unless the yaml sets one.
    */
   config(yaml: string): void;
   /** Record the running binary's version as the team file's `norn_version`, keeping its other keys (a repo set up with this norn) */
@@ -411,6 +412,9 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
       const files: Record<string, Record<string, unknown>> = { team: {}, local: {}, user: {} };
       for (const [k, v] of Object.entries(value)) files[["mode", "agent", "agents"].includes(k) ? "local" : ["max_agents", "notify", "trace"].includes(k) ? "user" : "team"]![k] = v;
       const paths = { team: repoConfigPath(root), local: join(root, ".agents", "norn.config.local.yaml"), user: join(home, "config.yaml") };
+      // Dropping the recorded version would leave a repo `norn init` set up looking as if it never was
+      const recorded = existsSync(paths.team) ? ((parseYaml(readFileSync(paths.team, "utf8")) ?? {}) as Record<string, unknown>).norn_version : undefined;
+      if (recorded !== undefined) files.team = { norn_version: files.team!.norn_version ?? recorded, ...files.team };
       for (const [f, keys] of Object.entries(files) as Array<[keyof typeof paths, Record<string, unknown>]>) {
         if (Object.keys(keys).length) h.write(paths[f], stringifyYaml(keys));
         else if (f !== "user") rmSync(paths[f], { force: true });
@@ -468,83 +472,15 @@ function removeTree(dir: string): void {
 
 /** The three layout parts, each with its old place (spelled out: what a person had) and its new one. */
 export type LayoutPartName = "config" | "workflows" | "machine files";
-export const oldNornDir = (root: string) => join(root, ".agents/norn");
+/** Where a pre-0.13 norn kept its files, relative to the main checkout. */
+export const PRE_013_NORN_DIR = ".agents/norn";
+export const oldNornDir = (root: string) => join(root, PRE_013_NORN_DIR);
 export function layoutPlaces(root: string): Record<LayoutPartName, { old: string; new: string }> {
   return {
     config: { old: join(oldNornDir(root), "config.yaml"), new: repoConfigPath(root) },
     workflows: { old: join(oldNornDir(root), "workflows"), new: workflowsDir(root) },
     "machine files": { old: join(oldNornDir(root), "trace"), new: machineDir(root) },
   };
-}
-
-/** A repo on the old layout, built by moving `init`'s files (and the machine dir) back to their old places. */
-export function toOldLayout(root: string, parts: LayoutPartName[] = ["config", "workflows", "machine files"]): void {
-  const places = layoutPlaces(root);
-  for (const p of parts) {
-    const { old, new: now } = places[p];
-    if (!existsSync(now)) continue;
-    mkdirSync(dirname(old), { recursive: true });
-    renameSync(now, old);
-  }
-}
-
-/** The reverse of `toOldLayout`: every part back at its new place, `.agents/norn/` gone. */
-export function toNewLayout(root: string): void {
-  for (const { old, new: now } of Object.values(layoutPlaces(root))) {
-    if (!existsSync(old)) continue;
-    mkdirSync(dirname(now), { recursive: true });
-    renameSync(old, now);
-  }
-  rmSync(oldNornDir(root), { recursive: true, force: true });
-}
-
-/**
- * A unit as an older norn left it: its run state moved from the machine dir back into
- * `<spec folder>/runs/<unit>` in `worktree`, and its handoff from `handoffs/<unit>.md` to
- * `runs/<unit>/handoff.md` under an older norn's generated header and heartbeat blocks,
- * committed on the worktree's branch with norn's trailers, then pushed to `push` (a remote name) when given.
- * - `flat`: the story's one round folded back into `_story/` itself, the record of a norn before rounds.
- * - `broken`: a receipt that fails validation committed with it.
- * - `interrupted`: a move that stopped partway, its copy already in the machine dir: `"after copy"`
- *   with runs/ still in the worktree, `"after removal"` with runs/ deleted from the worktree and the
- * handoff back at `handoffs/<unit>.md` but neither committed.
- */
-export function toBranchRunState(
-  worktree: string,
-  specDir: string,
-  unit: string,
-  opts: { flat?: boolean; push?: string; broken?: boolean; interrupted?: "after copy" | "after removal" } = {},
-): void {
-  const key = parseSpecDirName(basename(specDir))?.story;
-  if (!key) throw new Error(`not a spec folder: ${specDir}`);
-  const story = { key, spec_dir: specDir };
-  const machine = unit === STORY_UNIT_DIR ? join(storyRunStateDir(worktree, story), STORY_UNIT_DIR) : runStateDir(worktree, story, unit);
-  const tree = treeUnitRunStateDir(worktree, story, unit);
-  mkdirSync(tree, { recursive: true });
-  const rounds = unit === STORY_UNIT_DIR ? readdirSync(join(machine, ROUNDS_DIR)) : [];
-  if (opts.flat) {
-    if (rounds.length !== 1) throw new Error(`flat: ${unit} has ${rounds.length} rounds`);
-    cpSync(join(machine, ROUNDS_DIR, rounds[0] as string), tree, { recursive: true });
-  } else cpSync(machine, tree, { recursive: true });
-  const handoff = handoffPath(join(worktree, specDir), unit);
-  const prose = existsSync(handoff) ? readFileSync(handoff, "utf8") : null;
-  if (prose !== null) {
-    writeFileSync(treeHandoffFile(join(worktree, specDir), unit), `${olderNornHandoffBlocks(key, unit)}\n\n${prose}`);
-    rmSync(handoff);
-  }
-  if (opts.broken) {
-    const record = opts.flat || unit !== STORY_UNIT_DIR ? tree : join(tree, ROUNDS_DIR, rounds.at(-1) as string);
-    mkdirSync(join(record, "receipts"), { recursive: true });
-    writeFileSync(join(record, "receipts", "0099-done.json"), "{}\n");
-  }
-  if (!opts.interrupted) rmSync(machine, { recursive: true, force: true });
-  sh(worktree, ["add", "-A"]);
-  sh(worktree, ["commit", "-q", "-m", `norn: ${key} run state (older norn)`, "--trailer", `Norn-Story: ${key}`, "--trailer", "Norn-Tick: 01OLDERNORN0000000000000000"]);
-  if (opts.push) sh(worktree, ["push", "-q", "--force", opts.push, "HEAD"]);
-  if (opts.interrupted === "after removal") {
-    rmSync(treeRunStateDir(worktree, story), { recursive: true, force: true });
-    if (prose !== null) writeFileSync(handoff, prose);
-  }
 }
 
 /**
@@ -560,17 +496,6 @@ export function archiveTreeRunState(root: string, rev: string, specDir: string, 
   if (!packed.ok) throw new Error(`${specDir}: ${JSON.stringify(packed)}`);
   sh(root, ["push", "-q", remote, `${packed.sha}:${recordRef(key)}`]);
   return packed.sha;
-}
-
-/**
- * Finished stories as an older norn merged them into the base: the gh-1 fixture's
- * spec, slices and `runs/` copied into each of `specDirs` in `root`, committed and pushed to `main`.
- */
-export function toBaseRunState(root: string, specDirs: readonly string[], remote = "origin"): void {
-  for (const d of specDirs) cpSync(join(import.meta.dir, "../../packages/view/test/integration/fixtures/gh-1/spec"), join(root, d), { recursive: true });
-  sh(root, ["add", "-A"]);
-  sh(root, ["commit", "-q", "-m", "merge finished stories (older norn)"]);
-  sh(root, ["push", "-q", remote, "main"]);
 }
 
 /** The generated header and heartbeat blocks an older norn kept at the top of a unit's handoff (S9, O6; gone since gh-195/07). */

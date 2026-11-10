@@ -8,8 +8,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { REMOVED_COMMANDS } from "@norn/core";
-import { OLD_NORN_DIR } from "@norn/store";
-import { createHarness, type Harness } from "../../../../test/support/harness.ts";
+import { createHarness, type Harness, PRE_013_NORN_DIR } from "../../../../test/support/harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -39,7 +38,7 @@ function sections(stdout: string): Array<{ title: string; rows: string[] }> {
 }
 
 const CORE = ["status", "story", "run"];
-const SETUP = ["init", "upgrade", "doctor", "config", "uninstall", "migrate"];
+const SETUP = ["init", "upgrade", "doctor", "config", "uninstall"];
 const BACKGROUND = ["watch", "sync", "tidy"];
 const PROTOCOL = ["brief", "done", "ask", "stuck"];
 
@@ -101,20 +100,11 @@ describe("norn upgrade in help", () => {
   test("help lists upgrade with one line on what it does, and no help text names the old layout's folder", async () => {
     const v = (await h.norn("help")).value as Help;
     const upgrade = v.commands.find((c) => c.command === "upgrade");
-    expect(upgrade?.summary).toMatch(/^Move .*layout.*stage/);
+    expect(upgrade?.summary).toMatch(/^Move .*norn_version.*bundled skills.*0\.30.*stage/);
     expect(upgrade?.summary).not.toContain("\n");
     for (const args of [["help"], ["help", "--all"], ["help", "--json"], ["help", "--all", "--json"]]) {
-      expect((await h.norn(...args)).stdout).not.toContain(`${OLD_NORN_DIR}/`);
+      expect((await h.norn(...args)).stdout).not.toContain(`${PRE_013_NORN_DIR}/`);
     }
-  });
-});
-
-describe("norn migrate in help", () => {
-  test("help marks migrate deprecated, naming norn upgrade", async () => {
-    const r = await h.norn("help");
-    const migrate = (r.value as Help).commands.find((c) => c.command === "migrate");
-    expect(migrate?.summary).toMatch(/^Deprecated: .*norn upgrade/);
-    expect(r.stdout).toMatch(/norn migrate +Deprecated: .*norn upgrade/);
   });
 });
 

@@ -122,7 +122,6 @@
   spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/gh-9-add-search
   spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/gh-9-add-search
   spawn repo-b $ git show <sha:4>:.agents/specs/gh-9-add-search/spec.md
-  spawn repo-b $ git cat-file -e <sha:4>:.agents/specs/gh-9-add-search/runs
   spawn repo-b $ git show <sha:4>:.agents/workflows/solo.yaml
   spawn repo-b $ git log "--format=%x1e%(trailers:only,unfold)" "--grep=^Norn-Outcome: " refs/remotes/origin/gh-9-add-search
   spawn repo-b $ git ls-remote origin refs/norn/claims/gh-9

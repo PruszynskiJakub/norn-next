@@ -128,16 +128,6 @@ export const skillsDriftHint = {
   repo: (running: string) => `skills differ from norn ${running}: run \`${cmd.upgrade()}\` and commit`,
 };
 
-/**
- * What `norn status` and `norn doctor` say while the base's tree still holds
- * run state an older norn left there (never read: only archive refs are), with the stories it is for.
- */
-export const baseRunStateHint = {
-  text: (base: string, stories: readonly string[]) =>
-    `run state is still on ${base} for ${stories.length === 1 ? stories[0] : `${stories.length} stories`}: norn no longer reads it there — run \`${cmd.upgrade()}\` to move it into archive refs and commit the removal`,
-  fix: () => `run \`${cmd.upgrade()}\` and commit the removal it stages`,
-};
-
 /** Removed top-level commands; no printed command may name one. */
 export const REMOVED_COMMANDS = ["drop", "inbox", "cockpit", "orient", "open", "answer", "approve", "unstick", "update", "mode", "workflow", "take", "release", "trace", "why"] as const;
 
@@ -170,6 +160,25 @@ export function versionMismatch(repo: string, running: string): { match: "older"
   return { match, needs: fits, error: `this repo needs norn ${fits} (you run ${running})`, do_instead };
 }
 
+/** The oldest `norn_version` this norn moves a repo from; an older repo goes through the 0.30.x binary first. */
+export const BASELINE_VERSION = "0.30.0";
+
+/**
+ * The refusal for a repo whose recorded `norn_version` is missing or below the 0.30 baseline, or
+ * null when it is from 0.30 on (the mismatch rule then applies). It runs before `versionMismatch`:
+ * pointing such a repo at `norn upgrade` would only refuse again, so it names the 0.30.x path directly.
+ */
+export function versionBaseline(
+  repo: string | null,
+  running: string,
+): { code: "version_missing" | "version_too_old"; needs: string; error: string; do_instead: string } | null {
+  if (repo !== null && versionMatch(BASELINE_VERSION, repo) !== "older") return null;
+  const path = `install norn 0.30.x, run \`${cmd.upgrade()}\`, commit, then run \`${cmd.upgrade()}\` again with norn ${running}`;
+  if (repo === null)
+    return { code: "version_missing", needs: "0.30.x", error: "this repo records no norn_version", do_instead: `run \`${cmd.init()}\` if norn was never set up here; for a repo from an older norn, ${path}` };
+  return { code: "version_too_old", needs: "0.30.x", error: `this repo records norn_version ${repo}; this norn moves a repo from norn 0.30 on`, do_instead: path };
+}
+
 /** `norn upgrade` run by a binary older than the repo's version; no flag overrides it. */
 export function upgradeBackward(repo: string, running: string): { error: string; do_instead: string } {
   return { error: `this repo is set up for norn ${repo}; upgrade will not move it back`, do_instead: versionMismatch(repo, running)?.do_instead ?? `install norn ${repo}` };
@@ -177,6 +186,3 @@ export function upgradeBackward(repo: string, running: string): { error: string;
 
 /** The one notification `norn watch` sends when it pauses ticks on a mismatch. */
 export const ticksPausedTitle = (needs: string): string => `this repo needs norn ${needs}; ticks paused`;
-
-/** The hint when the team file records no `norn_version` (`doctor`, `status`). */
-export const NO_VERSION_HINT = `no norn version recorded: run \`${cmd.upgrade()}\``;

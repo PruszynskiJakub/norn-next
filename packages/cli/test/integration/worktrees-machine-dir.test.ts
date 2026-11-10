@@ -224,10 +224,6 @@ describe("worktrees follow the clone and its home", () => {
   beforeAll(async () => {
     h = await createHarness();
     await initRepo(h, "provider: gh\nworkflow: build\nmode: auto\n", { build: BUILD });
-    h.recordVersion();
-    h.git(["add", "-A"]);
-    h.git(["commit", "-q", "-m", "norn version"]);
-    h.git(["push", "-q", "origin", "main"]);
     h.remote.issues = [issue(10, "Two places")];
     B = cloneOf(h, "repo-b", "bob");
   });

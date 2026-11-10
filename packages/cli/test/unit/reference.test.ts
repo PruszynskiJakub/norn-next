@@ -49,10 +49,10 @@ describe("Reference render (B13)", () => {
     expect(fresh).not.toContain("$schema");
   });
 
-  test("the repo's norn version key and norn upgrade are listed, norn migrate as deprecated", () => {
+  test("the repo's norn version key and norn upgrade are listed, with upgrade's 0.30 starting point; no norn migrate", () => {
     expect(fresh).toContain("| `norn_version` | team | string | `null` |");
-    expect(fresh).toContain("##### `norn upgrade`\n");
-    expect(fresh).toMatch(/##### `norn migrate`\n\nDeprecated: the old name of norn upgrade/);
+    expect(fresh).toContain("##### `norn upgrade`\n\nMove this repo's norn_version and bundled skills to this norn, from norn 0.30 on");
+    expect(fresh).not.toContain("migrate");
   });
 
   test("no key gh-64 removed is listed (B52)", () => {

@@ -11,7 +11,7 @@ import type { Facts, StoryFacts, UnitFacts } from "../../src/facts.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
 import { at, CONFIG, facts, loaded, numbered, receipt, SLICE_WF, sliceFile, sliceUnit, STORY_WF, stateFor, storyFacts, storyUnit, unitFacts, WORKFLOWS } from "../fixtures.ts";
 
-const NORN = { running: "0.19.0", repo: "0.19.0" };
+const NORN = { running: "0.30.0", repo: "0.30.0" };
 const DRIFT = ["norn", "norn-implement"];
 
 /** gh-1 at its slices step with two slice units ready at implement; `drifted` slices carry skills_drift. */
@@ -111,7 +111,7 @@ describe("drifted skills in the inbox", () => {
     expect(items[0]).toMatchObject({
       story: "gh-1",
       step: "implement",
-      title: "skills differ from norn 0.19.0 (norn, norn-implement): runs use this worktree's copies until the base is merged in, or until this branch's edit to them is reverted",
+      title: "skills differ from norn 0.30.0 (norn, norn-implement): runs use this worktree's copies until the base is merged in, or until this branch's edit to them is reverted",
       command: "norn story view gh-1",
     });
     expect(inbox.groups.unblock).toEqual([]);
@@ -129,7 +129,7 @@ describe("drifted skills in the inbox", () => {
     const inbox = buildInbox({ ...f, norn: { ...NORN, skills_drift: ["norn"] } }, CONFIG);
     const repo = inbox.groups.unblock.filter((i) => i.story === "*");
     expect(repo).toHaveLength(1);
-    expect(repo[0]).toMatchObject({ slice: null, step: null, title: "skills differ from norn 0.19.0: run `norn upgrade` and commit", command: "norn upgrade" });
+    expect(repo[0]).toMatchObject({ slice: null, step: null, title: "skills differ from norn 0.30.0: run `norn upgrade` and commit", command: "norn upgrade" });
   });
 
   test("B21: no drift observed (repo-local skills are never compared) → no item", () => {

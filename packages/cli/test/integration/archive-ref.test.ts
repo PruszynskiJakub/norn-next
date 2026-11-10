@@ -2,7 +2,7 @@
  * A finished story's record is archived on its ref
  * `refs/norn/runs/<story>`, never on the base. GR6 and GR6b push it before any cleanup; `run list`,
  * `run view` and `story reopen` read it on a fresh clone, fetching that one ref; `tidy` never touches
- * the refs; run state an older norn left on the base is never read, only pointed to `norn upgrade`.
+ * the refs; run state an older norn left on the base is never read.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { chmodSync, cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -243,10 +243,10 @@ describe("GR6b: a story closed without a PR is archived, and reopened from its r
   });
 });
 
-describe("D16: run state an older norn left on the base is never read; status and doctor point to norn upgrade (B29, B35)", () => {
+describe("run state an older norn left on the base is never read, moved or warned about", () => {
   const OLD = ".agents/specs/gh-1-projects-and-items";
 
-  test("AC6: run list is empty for it, status shows one item and doctor one failed check; once removed from the base, neither", async () => {
+  test("run list is empty for it, no status item or hint names it, and doctor has no run-state check in markdown or --json", async () => {
     h.git(["fetch", "-q", "origin"]);
     h.git(["merge", "-q", "--ff-only", "origin/main"]);
     cpSync(join(import.meta.dir, "../../../view/test/integration/fixtures/gh-1/spec"), join(h.root, OLD), { recursive: true });
@@ -254,28 +254,20 @@ describe("D16: run state an older norn left on the base is never read; status an
     h.git(["commit", "-q", "-m", "merge gh-1 (older norn)"]);
     h.git(["push", "-q", "origin", "main"]);
     await h.norn("sync");
+    const head = h.git(["rev-parse", "HEAD"]);
 
     const list = await h.norn("run", "list", "gh-1", "--json");
     expect(list.exit).toBe(0);
     expect((list.value as { steps: unknown[] }).steps).toEqual([]);
-    const items = () => h.norn("status", "--json").then((r) => Object.values((r.value as { groups: Record<string, Array<{ id: string; title: string; command: string }>> }).groups).flat().filter((x) => x.id.startsWith("base_run_state:")));
-    const shown = await items();
-    expect(shown).toHaveLength(1);
-    expect(shown[0]?.title).toContain("run state is still on main for gh-1");
-    expect(shown[0]?.title).toContain("norn upgrade");
+    const status = await h.norn("status", "--json");
+    expect(JSON.stringify(status.value)).not.toMatch(/base_run_state|run state is still on/);
+    expect((await h.norn("status")).stdout).not.toContain("run state is still on");
     const doctor = await h.norn("doctor", "--repo", "--json");
-    expect(doctor.exit).not.toBe(0);
-    expect(doctor.value).toMatchObject({ repo: { run_state: { ok: false, stories: ["gh-1"] } } });
-    expect(JSON.stringify((doctor.value as { repo: { run_state: unknown } }).repo.run_state)).toContain("norn upgrade");
+    expect(Object.keys((doctor.value as { repo: Record<string, unknown> }).repo)).not.toContain("run_state");
     const text = (await h.norn("doctor", "--repo")).stdout;
-    expect(text.split("\n").filter((l) => l.includes("FAIL"))).toEqual([expect.stringContaining("run state")]);
-
-    h.git(["rm", "-rq", `${OLD}/runs`]);
-    h.git(["commit", "-q", "-m", "remove run state from the base"]);
-    h.git(["push", "-q", "origin", "main"]);
-    await h.norn("sync");
-    expect(await items()).toEqual([]);
-    const after = await h.norn("doctor", "--repo", "--json");
-    expect(after.value).toMatchObject({ repo: { run_state: { ok: true, stories: [] } } });
+    expect(text).not.toMatch(/run state/i);
+    // nothing moved it off the base
+    expect(h.git(["rev-parse", "HEAD"])).toBe(head);
+    expect(existsSync(join(h.root, OLD, "runs"))).toBe(true);
   });
 });

@@ -49,6 +49,7 @@ const refused = (r: CliResult, code: string) => {
 beforeAll(async () => {
   h = await createHarness();
   h.config("provider: gh\nworkflow: flow\nmode: auto\n");
+  h.recordVersion();
   h.write(join(workflowsDir(h.root), "flow.yaml"), FLOW);
   installBundledSkills(h.root);
   h.git(["add", "-A"]);

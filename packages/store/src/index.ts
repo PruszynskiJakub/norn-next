@@ -6,14 +6,12 @@
 export * from "./base.ts";
 export * from "./cockpit.ts";
 export * from "./config.ts";
-export * from "./config-migrate.ts";
 export * from "./frontmatter.ts";
 export * from "./fsx.ts";
 // raw git (`git`, `gitSync`, blob and ref plumbing) stays inside store: everyone else goes through GitPort
 export { type CasResult, fetchNornRefs, gitRemoteUrl, gitTimeoutMs, NETWORK_TIMEOUT_MS, onlyNornCommitsSince } from "./git.ts";
 export * from "./heartbeat.ts";
 export * from "./inbox-history.ts";
-export * from "./layout.ts";
 export * from "./leases.ts";
 export * from "./local.ts";
 export * from "./local-facts.ts";
@@ -22,13 +20,11 @@ export * from "./local-json.ts";
 export * from "./lock.ts";
 export * from "./machine.ts";
 export * from "./machine-dir.ts";
-export * from "./old-layout.ts";
 export * from "./paths.ts";
 export * from "./run-state.ts";
 export * from "./proc.ts";
 export * from "./spawn.ts";
 export * from "./receipts.ts";
-export * from "./record-move.ts";
 export * from "./record-ref.ts";
 export * from "./refs.ts";
 export * from "./skills.ts";

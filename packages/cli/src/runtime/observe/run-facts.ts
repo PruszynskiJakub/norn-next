@@ -1,6 +1,6 @@
 /** observe: a unit's run facts — its run windows, hook facts refined per agent, the live or unknown run. */
 import type { AgentAdapter, Ports, RunFacts, UnitFacts, WorktreeFacts } from "@norn/core";
-import { type HookFact, treeStoryRunStatePath } from "@norn/schema";
+import type { HookFact } from "@norn/schema";
 import { baseUnitFacts, handoffPath, type LocalUnit, liveRun, receiptsOfKinds, runHooks, type StorySnapshot, type UnitSnapshot } from "@norn/store";
 import type { DatedCommit } from "./git-facts.ts";
 import { runnerFor } from "../../wiring.ts";
@@ -129,23 +129,5 @@ export async function unitFacts(ports: Ports, story: StorySnapshot, lu: LocalUni
     worktree,
     run,
     uncommitted,
-    ...branchRecord(story, u, worktree),
   };
-}
-
-/**
- * The run state an older norn left on the unit's own branch, as store read it from
- * the worktree; or, when the worktree holds none of it any more, a removal of it git status still shows
- * uncommitted (a move that stopped after deleting the files, or whose commit failed or was deferred):
- * the move is not done until its commit lands, so the next move only finishes it.
- */
-function branchRecord(story: StorySnapshot, u: UnitSnapshot, worktree: WorktreeFacts | null): Pick<UnitFacts, "branch_record"> {
-  if (u.branch_record) return { branch_record: structuredClone(u.branch_record) };
-  const st = worktree?.status;
-  if (!st) return {};
-  const path = treeStoryRunStatePath(story);
-  const left = [...st.staged, ...st.unstaged].filter((p) => p.startsWith(`${path}/`));
-  if (!left.length) return {};
-  const holds = [...new Set(left.map((p) => p.slice(path.length + 1).split("/")[0] as string))].sort();
-  return { branch_record: { path, copy: [], holds } };
 }
