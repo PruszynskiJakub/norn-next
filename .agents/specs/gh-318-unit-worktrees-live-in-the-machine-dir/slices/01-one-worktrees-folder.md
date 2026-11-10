@@ -2,7 +2,7 @@
 id: gh-318/01
 title: One place names the worktrees folder
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
