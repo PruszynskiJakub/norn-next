@@ -1,0 +1,1 @@
+{"kind":"stuck","receipt_id":"01M72PXGGYATARTG87YZ78G0X3","run_id":"01M72PWPZ30EMKJXNXSAHQETW0","step":"prepare","attempt":1,"at":"2026-11-10T12:28:52.639Z","by":"agent","who":"claude","reason":"waiting for #325 to merge (Must include: Simplify norn upgrade: assume every repo starts at 0.30, drop the old migrations); gh pr view 325 reports OPEN"}
