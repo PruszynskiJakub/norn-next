@@ -186,7 +186,7 @@ describe("old layout in a unit worktree's session (B18, D5)", () => {
 });
 
 describe("a unit worktree's own old files are ignored (B21)", () => {
-  const wtOf = (n: number, slug: string) => `${h.root}-worktrees/gh-${n}-${slug}`;
+  const wtOf = (n: number, slug: string) => h.worktree(`gh-${n}-${slug}`);
   const env = () => {
     const e: Record<string, string | undefined> = { ...h.deps.env, NORN_AGENT_PID: String(process.pid) };
     for (const k of ["NORN_AGENT", "NORN_RUN", "NORN_STORY", "NORN_SLICE", "NORN_AGENT_SESSION_ID"]) delete e[k];

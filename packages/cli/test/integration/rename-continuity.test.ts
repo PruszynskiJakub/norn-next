@@ -36,7 +36,7 @@ mode: auto
 `;
 
 let h: Harness;
-const wt = () => `${h.root}-worktrees/gh-5-pay-invoices`;
+const wt = () => h.worktree("gh-5-pay-invoices");
 const runs = () => runStateOf(join(wt(), ".agents/specs/gh-5-pay-invoices"));
 const machineDir = () => machineDirOf(h.root);
 const tick = async () => {

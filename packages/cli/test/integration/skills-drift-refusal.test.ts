@@ -24,7 +24,7 @@ steps:
 `;
 
 let h: Harness;
-const wt = () => `${h.root}-worktrees/gh-7-add-login-form`;
+const wt = () => h.worktree("gh-7-add-login-form");
 const skill = (name: string) => join(wt(), ".agents/skills", name, "SKILL.md");
 const norn = (deps: Partial<CliDeps>, ...argv: string[]): Promise<CliResult> => runChecked(argv, { ...h.deps, ...deps });
 function agentEnv() {

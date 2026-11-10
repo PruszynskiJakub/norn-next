@@ -238,7 +238,7 @@ describe("a tick never creates a label", () => {
     try {
       sh(h.root, ["push", "-q", "origin", "main"]);
       h.remote.issues = [issue(7, "Seven")];
-      const runs = () => runStateOf(join(`${h.root}-worktrees/gh-7-seven`, ".agents/specs/gh-7-seven"));
+      const runs = () => runStateOf(join(h.worktree("gh-7-seven"), ".agents/specs/gh-7-seven"));
       for (let i = 0; i < 6 && !h.state(runs()); i++) await h.tick();
       expect(h.state(runs())).toMatchObject({ workflow: "triage" });
       h.remote.labels = h.remote.labels.filter((l) => l.name !== "norn:wf:reproduce");

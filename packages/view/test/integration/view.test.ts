@@ -25,6 +25,7 @@ import {
 } from "@norn/store";
 import { formatInbox, formatStatus, formatStoryView, formatTimeline, loadProjectView, loadTimelines, orientReport, prCommand } from "../../src/index.ts";
 import { runStateOf } from "../../../../test/support/run-state.ts";
+import { worktreeOf } from "../../../../test/support/worktree.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -308,27 +309,32 @@ describe("loadProjectView", () => {
     expect(v.inbox.groups.unblock.map((i) => i.slice)).toEqual(["gh-12/02"]);
   });
 
-  test("reads specs from story worktrees beside the repo", async () => {
+  test("reads specs from story worktrees in the checkout's machine dir", async () => {
     const parent = tmp();
     const repo = join(parent, "app");
     mkdirSync(repo);
-    const wt = join(parent, "app-worktrees", "gh-7-thing");
+    const home = tmp();
+    bindNornHome(repo, home);
+    const wt = worktreeOf(repo, "gh-7-thing");
     writeStoryFile(
       storyFile(storyDir(wt, "gh-7", "thing")),
       { id: "gh-7", slug: "thing", provider: "gh", number: 7, url: "u", title: "Thing", assignee: null, workflow: "story", status: "new", intake_at: ago(5) },
       "",
     );
     writeUnitMarker(wt, { repo, story: "gh-7", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-7-thing" });
-    const v = await loadProjectView({ repoRoot: repo, home: tmp(), now: NOW, holder: "me@box", env: {} });
+    const v = await loadProjectView({ repoRoot: repo, home, now: NOW, holder: "me@box", env: {} });
     expect(v.stories.map((s) => [s.key, s.status, s.root])).toEqual([["gh-7", "not_started", wt]]);
+    expect(wt.startsWith(join(machineDir(repo), "worktrees"))).toBe(true);
   });
 
   test("worktrees are found by folder shape and marker (refactor 5.2): a slice's own, a mislabelled story folder skipped", async () => {
     const parent = tmp();
     const repo = join(parent, "app");
     mkdirSync(repo);
+    const home = tmp();
+    bindNornHome(repo, home);
     const fm = (n: number, slug: string) => ({ id: `gh-${n}`, slug, provider: "gh", number: n, url: "u", title: `T${n}`, assignee: null, workflow: "story", status: "active", intake_at: ago(5) }) as const;
-    const wt = join(parent, "app-worktrees", "gh-7-thing");
+    const wt = worktreeOf(repo, "gh-7-thing");
     const spec = storyDir(wt, "gh-7", "thing");
     writeStoryFile(storyFile(spec), fm(7, "thing"), "");
     writeSliceFile(join(spec, "slices/01-login-form.md"), { id: "gh-7/01", title: "Form", depends_on: [], status: "active" }, "");
@@ -341,11 +347,11 @@ describe("loadProjectView", () => {
     writeState(u1, state({ story: "gh-7", slice: "gh-7/01", unit_dir: "01-login-form", status: "parked", park: { kind: "ask", reason: "blocked", since: ago(3), receipt_id: ASK } }));
     writeUnitMarker(sliceWt, { repo, story: "gh-7", slice: "gh-7/01", unit: "01-login-form", spec_dir: ".agents/specs/gh-7-thing" });
     // a story-shaped folder whose marker names another story is not that story's worktree
-    const wrong = join(parent, "app-worktrees", "gh-8-other");
+    const wrong = worktreeOf(repo, "gh-8-other");
     writeStoryFile(storyFile(storyDir(wrong, "gh-9", "else")), fm(9, "else"), "");
     writeUnitMarker(wrong, { repo, story: "gh-9", slice: null, unit: "_story", spec_dir: ".agents/specs/gh-9-else" });
 
-    const v = await loadProjectView({ repoRoot: repo, home: tmp(), now: NOW, holder: "me@box", env: {} });
+    const v = await loadProjectView({ repoRoot: repo, home, now: NOW, holder: "me@box", env: {} });
     expect(v.stories.map((s) => s.key)).toEqual(["gh-7"]);
     expect(v.stories[0]?.slices.map((s) => [s.key, s.status, s.park?.reason])).toEqual([["gh-7/01", "parked", "blocked"]]);
   });

@@ -441,8 +441,9 @@ export interface Facts {
   /**
    * `default_branch` is the **base branch**: config `base_branch` when set, else the remote's
    * default branch as discovered. Stories are cut from it, updated from it and PR'd into it.
+   * `worktrees` is the absolute folder unit worktrees sit in (store's `worktreesDir`): core cannot derive it.
    */
-  repo: { root: string; default_branch: string; remote: string };
+  repo: { root: string; default_branch: string; remote: string; worktrees: string };
   machine: MachineFacts;
   remote: {
     /** issues from the last sync; undefined = not fetched this tick */

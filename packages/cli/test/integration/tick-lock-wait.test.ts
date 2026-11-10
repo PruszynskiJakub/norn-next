@@ -42,7 +42,7 @@ const WAIT_LINE = /^waiting for a running tick \(pid \d+, norn tick, since \d\d:
 
 let h: Harness;
 const spec6 = ".agents/specs/gh-6-export-report";
-const wt6 = () => `${h.root}-worktrees/gh-6-export-report`;
+const wt6 = () => h.worktree("gh-6-export-report");
 const runs6 = () => runStateOf(join(wt6(), spec6));
 const tick = async () => {
   h.clock.advance(10_000);

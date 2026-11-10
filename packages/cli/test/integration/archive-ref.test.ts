@@ -87,7 +87,7 @@ function cloneOf(name: string, user: string): Clone {
 async function finished(n: number, slug: string) {
   const branch = `gh-${n}-${slug}`;
   const spec = `.agents/specs/${branch}`;
-  const wt = `${h.root}-worktrees/${branch}`;
+  const wt = h.worktree(branch);
   const runs = () => runStateOf(join(wt, spec));
   h.remote.issues = [...h.remote.issues, issue(n, slug)];
   await h.tick("--sync");

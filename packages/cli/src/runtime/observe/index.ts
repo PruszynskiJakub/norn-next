@@ -56,6 +56,7 @@ import {
   writeIssueFacts,
   writePrFacts,
   writeRemoteCache,
+  worktreesDir,
 } from "@norn/store";
 import type { Context } from "../../context.ts";
 import { leaseLiveness } from "../leases.ts";
@@ -158,13 +159,15 @@ function writeIfChanged<T>(root: string, next: T, prev: T, write: (root: string,
 }
 
 /** The unit worktrees `git worktree` lists, by their `.norn-unit` markers: story and slice worktrees, orphans, and the ones a marker is inferred for. */
-function classifyWorktrees(root: string, wtList: ReadonlyArray<{ path: string; branch: string | null }>) {
+function classifyWorktrees(root: string, wtList: ReadonlyArray<{ path: string; branch: string | null; prunable?: boolean }>) {
   const storyWts = new Map<string, string>();
   const sliceWts = new Map<string, string>();
   const orphanWts: string[] = [];
   const unmarked: UnmarkedWorktree[] = [];
   for (const w of wtList) {
-    if (w.path === root) continue;
+    // A worktree whose folder is gone (a wiped machine dir takes its worktrees with it) is no unit
+    // here: inferring a marker for it would have act write one into a fresh non-repo folder
+    if (w.path === root || w.prunable || !existsSync(w.path)) continue;
     let marker = readUnitMarker(w.path).marker;
     // A unit worktree whose marker `git clean -fdx` took is read by the marker its folder
     // and branch name (its run state is in the machine dir); observe writes nothing, act
@@ -172,7 +175,7 @@ function classifyWorktrees(root: string, wtList: ReadonlyArray<{ path: string; b
     const inferred = marker ? null : inferUnitMarker(root, w.path, w.branch);
     if (inferred) unmarked.push({ path: w.path, marker: (marker = inferred) });
     if (!marker) {
-      if (w.path.startsWith(`${root}-worktrees/`)) orphanWts.push(w.path);
+      if (w.path.startsWith(`${worktreesDir(root)}/`)) orphanWts.push(w.path);
       continue;
     }
     if (marker.slice === null) storyWts.set(marker.story, w.path);
@@ -506,7 +509,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   const facts: Facts = {
     tick_id: opts.tick_id,
     now,
-    repo: { root, default_branch: base, remote: remoteName },
+    repo: { root, default_branch: base, remote: remoteName, worktrees: worktreesDir(root) },
     machine: {
       holder,
       heartbeat_id: hb,

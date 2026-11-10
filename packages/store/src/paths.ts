@@ -120,12 +120,38 @@ export function unbindNornHome(root: string): void {
   checkouts.delete(root);
 }
 
-/** The norn home `root`'s machine dir lives in. */
-const machineHomeOf = (root: string) => homes.get(checkoutOf(root).common) ?? nornHome();
+/**
+ * `p` with its symlinks resolved, as far as it exists; the missing rest is appended. Git reports a
+ * worktree by its resolved path and observe matches those against the worktrees folder by prefix, so
+ * a home reached through a symlink (`/tmp` on macOS, a dotfiles link) must be spelled as git spells it.
+ */
+function resolveExisting(p: string): string {
+  const abs = resolve(p);
+  try {
+    return realpathSync(abs);
+  } catch {
+    const parent = dirname(abs);
+    return parent === abs ? abs : join(resolveExisting(parent), basename(abs));
+  }
+}
+/** Resolved homes, kept only once the home exists: a folder not made yet may still become a link. */
+const resolvedHomes = new Map<string, string>();
+function resolvedHome(home: string): string {
+  const hit = resolvedHomes.get(home);
+  if (hit) return hit;
+  const out = resolveExisting(home);
+  if (existsSync(home)) resolvedHomes.set(home, out);
+  return out;
+}
+
+/** The norn home `root`'s machine dir lives in, resolved (see `resolveExisting`). */
+const machineHomeOf = (root: string) => resolvedHome(homes.get(checkoutOf(root).common) ?? nornHome());
 
 /** The checkout's machine-local files (trace, locks, heartbeat, caches), `<norn home>/repos/<id>/`. */
 export const machineDir = (root: string) => join(machineReposDir(machineHomeOf(root)), checkoutOf(root).id);
 export const machineReposDir = (home: string) => join(home, "repos");
+/** The folder every unit worktree of the checkout at `root` sits in: the one place that names it. */
+export const worktreesDir = (root: string) => join(machineDir(root), "worktrees");
 /** Names the checkout a machine dir belongs to, so doctor can tell an orphan after a repo folder moved. */
 export const checkoutFilePath = (dir: string) => join(dir, "checkout.json");
 /** The headless runner's default session log dir, the machine dir's `sessions/` (`runs/` holds run state). */

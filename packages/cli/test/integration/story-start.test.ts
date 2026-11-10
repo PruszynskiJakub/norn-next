@@ -70,7 +70,7 @@ beforeAll(async () => {
 afterAll(() => h.cleanup());
 
 describe("norn story start (B28)", () => {
-  const wt = () => `${h.root}-worktrees/gh-7-add-login-form`;
+  const wt = () => h.worktree("gh-7-add-login-form");
   const norn = (deps: Partial<CliDeps>, ...argv: string[]) => runChecked(argv, { ...h.deps, ...deps });
 
   test("taken in, not started: refused with the command that starts it; the inbox says so", async () => {

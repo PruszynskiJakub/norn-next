@@ -55,6 +55,7 @@ import {
   type ElsewhereStory,
   heldElsewhereKeys,
   loadElsewhereStory,
+  worktreesDir,
 } from "@norn/store";
 import type { BaseSyncView, ClaimView, CounterView, DelegatedDecision, DelegatedKind, ElsewhereView, PrView, ProjectView, RecentDone, RunView, SliceView, StoryView, UnitView } from "./types.ts";
 
@@ -459,7 +460,7 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const facts: Facts = {
     tick_id: "view",
     now,
-    repo: { root: opts.repoRoot, default_branch: defaultBranch, remote: config.git_remote },
+    repo: { root: opts.repoRoot, default_branch: defaultBranch, remote: config.git_remote, worktrees: worktreesDir(opts.repoRoot) },
     machine: {
       holder,
       heartbeat_id: me.heartbeat_id,

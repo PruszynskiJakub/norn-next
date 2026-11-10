@@ -50,7 +50,7 @@ async function atChecks(run: string, timeout: string, titles: string[]): Promise
   if (started < titles.length) throw new Error("stories did not start");
   const runsDirs = titles.map((t, i) => {
     const dir = `gh-${9 + i}-${t.toLowerCase().replaceAll(" ", "-")}`;
-    return runStateOf(join(`${h.root}-worktrees`, `${dir}/.agents/specs/${dir}`));
+    return runStateOf(join(h.worktree(dir), `.agents/specs/${dir}`));
   });
   return { h, runsDirs };
 }

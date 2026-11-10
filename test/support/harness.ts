@@ -17,12 +17,15 @@ import type { ProjectView } from "@norn/view";
 import { bundledSkills, type CliDeps, type CliResult, type Interaction, type InteractionChoice, runCli, runningVersion, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
 import { harvestGolden } from "./golden-harvest.ts";
+import { worktreeOf } from "./worktree.ts";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 // Every tick shells out to git (worktrees, status, refs) several times, so the multi-tick
 // integration tests take 2–3.5 s each on an idle laptop — too close to bun's 5 s default on a
 // loaded machine or CI runner. Genuinely slow, not hung: give every harness test 20 s.
 setDefaultTimeout(20_000);
+
+export { worktreeOf, worktreesOf } from "./worktree.ts";
 
 export class FakeClock implements Clock {
   constructor(public t: number) {}
@@ -283,6 +286,8 @@ export interface Harness {
   root: string;
   remoteDir: string;
   home: string;
+  /** the unit worktree named `dirName` (`<story>-<slug>`, a slice's `<story dir>--<nn>-<slug>`): where norn creates it for this repo */
+  worktree(dirName: string): string;
   clock: FakeClock;
   remote: FakeRemote;
   runner: FakeRunner;
@@ -380,6 +385,7 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
     root,
     remoteDir,
     home,
+    worktree: (dirName) => worktreeOf(root, dirName),
     clock,
     remote,
     runner,
@@ -434,10 +440,30 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
       // Phase 0.1: `scripts/golden.ts` sets NORN_GOLDEN_OUT to collect this repo's ticks as golden decide cases
       const out = process.env.NORN_GOLDEN_OUT;
       if (out) harvestGolden(dir, root, out, process.env.NORN_GOLDEN_SOURCE ?? "harness");
-      rmSync(dir, { recursive: true, force: true });
+      // Every test guards that no command made the old `<repo>-worktrees` folder beside a checkout (this one or a clone)
+      const beside = readdirSync(dir).filter((f) => f.endsWith("-worktrees"));
+      removeTree(dir);
+      if (beside.length) throw new Error(`a norn command created a worktrees folder beside the repository: ${beside.join(", ")}`);
     },
   };
   return h;
+}
+
+/**
+ * `rmSync(recursive)` on a CI runner now and then throws EFAULT on a harness dir after `watch` ran in it; the tree is
+ * still removable, so a cleanup that throws there would fail a test whose body passed. Retry, then let `rm -rf` do it.
+ */
+function removeTree(dir: string): void {
+  for (let i = 0; i < 3; i++) {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+      return;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "EFAULT") throw e;
+    }
+  }
+  const r = spawnSyncCaptured(["rm", "-rf", dir], { timeoutMs: spawnSyncTimeoutMs() });
+  if (r.exitCode !== 0 || existsSync(dir)) throw new Error(`cleanup could not remove ${dir}: ${r.stderr}`);
 }
 
 /** The three layout parts, each with its old place (spelled out: what a person had) and its new one. */

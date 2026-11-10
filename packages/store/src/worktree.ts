@@ -8,7 +8,7 @@ import { SLOTS } from "@norn/schema";
 import { isSliceKey, isStoryKey, parseSliceDirName, parseSliceFileName, parseSpecDirName, sliceDirName, sliceKey, specDir, STORY_UNIT_DIR, storyDirName } from "@norn/schema";
 import { atomicWrite, readText } from "./fsx.ts";
 import { git } from "./git.ts";
-import { envNornPath, unitMarkerPath, WORKTREE_LOCAL_FILES } from "./paths.ts";
+import { envNornPath, unitMarkerPath, WORKTREE_LOCAL_FILES, worktreesDir } from "./paths.ts";
 
 /**
  * `.env.norn` and `.norn-unit` are machine-local: add them to the repo's shared `info/exclude`
@@ -84,11 +84,11 @@ export function writeUnitMarker(worktree: string, m: UnitMarker): void {
 /**
  * The marker of a unit worktree of `repo` that lost it (`git clean -fdx` removes the
  * ignored `.norn-unit`), from its folder name and checked-out branch, as norn made both: the story
- * worktree `<repo>-worktrees/<id>-<slug>` on branch `<id>-<slug>`, a slice's `<story worktree>--<nn>-<slug>`
+ * worktree `<worktrees folder>/<id>-<slug>` on branch `<id>-<slug>`, a slice's `<story worktree>--<nn>-<slug>`
  * on `<id>/<nn>-<slug>`. null when the folder is no unit worktree norn names so.
  */
 export function inferUnitMarker(repo: string, path: string, branch: string | null): UnitMarker | null {
-  if (!branch || !path.startsWith(`${repo}-worktrees/`)) return null;
+  if (!branch || !path.startsWith(`${worktreesDir(repo)}/`)) return null;
   const name = basename(path);
   const story = parseSpecDirName(branch);
   if (story && name === branch) return { repo, story: story.story, slice: null, unit: STORY_UNIT_DIR, spec_dir: specDir(story.story, story.slug) };
@@ -124,15 +124,15 @@ export interface ScannedWorktrees {
 }
 
 /**
- * The unit worktrees beside the repo, found without git — what a read-only view
- * uses where observe lists `git worktree`. A story worktree is `<repo>-worktrees/<story>-<slug>`
+ * The unit worktrees in the worktrees folder (`worktreesDir`), found without git — what a read-only view
+ * uses where observe lists `git worktree`. A story worktree is `<worktrees folder>/<story>-<slug>`
  * (`storyDirName`), a slice worktree `<that>--<nn>-<slug>` (`sliceDirName`); a folder counts only
  * when its name has that shape (schema key patterns) and its `.norn-unit` marker names the same
  * story, and for a slice the slice its name's number gives. First folder (by name) per unit wins.
  */
 export function scanWorktrees(repoRoot: string): ScannedWorktrees {
   const out: ScannedWorktrees = { stories: new Map(), slices: new Map() };
-  const base = `${repoRoot.replace(/\/+$/, "")}-worktrees`;
+  const base = worktreesDir(repoRoot);
   let names: string[];
   try {
     names = readdirSync(base).sort();

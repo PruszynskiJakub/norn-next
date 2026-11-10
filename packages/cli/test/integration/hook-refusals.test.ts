@@ -25,7 +25,7 @@ steps:
 
 let h: Harness;
 const spec = ".agents/specs/gh-9-refused-calls";
-const wt = () => `${h.root}-worktrees/gh-9-refused-calls`;
+const wt = () => h.worktree("gh-9-refused-calls");
 const runs = () => runStateOf(join(wt(), spec));
 
 function env(extra: Record<string, string> = {}) {

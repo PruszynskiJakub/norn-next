@@ -49,7 +49,7 @@ async function parkedAtReady(): Promise<{ h: Harness; runs: () => string }> {
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);
   h.remote.issues = [issue(7, "Cut release")];
-  const runs = () => runStateOf(join(`${h.root}-worktrees/gh-7-cut-release`, ".agents/specs/gh-7-cut-release"));
+  const runs = () => runStateOf(join(h.worktree("gh-7-cut-release"), ".agents/specs/gh-7-cut-release"));
   const parked = () => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked";
   for (let i = 0; i < 20 && !parked(); i++) {
     h.clock.advance(10_000);

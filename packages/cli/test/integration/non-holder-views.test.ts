@@ -85,7 +85,7 @@ async function tickOn(c: Clone) {
 /** A trio story held by A at implement with its session started; `boundary` reports done and ticks until review's session started. */
 async function storyOnA(n: number, slug: string, boundary: boolean) {
   const spec = `.agents/specs/gh-${n}-${slug}`;
-  const wt = `${h.root}-worktrees/gh-${n}-${slug}`;
+  const wt = h.worktree(`gh-${n}-${slug}`);
   const runs = () => runStateOf(join(wt, spec));
   h.remote.issues = [...h.remote.issues, issue(n, slug)];
   await h.tick("--sync");

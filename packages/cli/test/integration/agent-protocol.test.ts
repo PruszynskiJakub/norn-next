@@ -56,9 +56,9 @@ mode: manual
 
 let h: Harness;
 const spec = ".agents/specs/gh-9-manual-thing";
-const wt = () => `${h.root}-worktrees/gh-9-manual-thing`;
+const wt = () => h.worktree("gh-9-manual-thing");
 const runs = () => runStateOf(join(wt(), spec));
-const pairWt = () => `${h.root}-worktrees/gh-10-pair-on-it`;
+const pairWt = () => h.worktree("gh-10-pair-on-it");
 const pairRuns = () => runStateOf(join(pairWt(), ".agents/specs/gh-10-pair-on-it"));
 
 function env() {
@@ -541,7 +541,7 @@ describe("parseFindings", () => {
 
 describe("hook backfill on upgrade (B11, B12, D5)", () => {
   let g: Harness;
-  const gWt = () => `${g.root}-worktrees/gh-9-manual-thing`;
+  const gWt = () => g.worktree("gh-9-manual-thing");
   const gRuns = () => runStateOf(join(gWt(), spec));
   const backfillFile = () => join(machineDir(g.root), "hooks", "backfill.json");
   const gHookFile = () => join(machineDir(g.root), "hooks", "gh-9", "_story.jsonl");

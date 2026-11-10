@@ -89,7 +89,7 @@ function mergeOnRemote(h: Harness, branch: string): string {
 describe("records: ready head, foreign commits, merged by ancestry, durable status", () => {
   let h: Harness;
   const branch = "gh-5-record-me";
-  const wt = () => `${h.root}-worktrees/${branch}`;
+  const wt = () => h.worktree(branch);
   const spec = `.agents/specs/${branch}`;
   const runs = () => runStateOf(join(wt(), spec));
   const step = (ms = 10_000) => h.clock.advance(ms);
@@ -173,7 +173,7 @@ describe("records: ready head, foreign commits, merged by ancestry, durable stat
 describe("records: PR merge facts from the remote", () => {
   let h: Harness;
   const branch = "gh-6-merge-facts";
-  const wt = () => `${h.root}-worktrees/${branch}`;
+  const wt = () => h.worktree(branch);
   const spec = `.agents/specs/${branch}`;
   const runs = () => runStateOf(join(wt(), spec));
 
@@ -208,7 +208,7 @@ describe("records: PR merge facts from the remote", () => {
 describe("C4: an agent's commit while its unit is parked on an ask is not foreign", () => {
   let h: Harness;
   const branch = "gh-6-ask-and-commit";
-  const wt = () => `${h.root}-worktrees/${branch}`;
+  const wt = () => h.worktree(branch);
   const runs = () => runStateOf(join(wt(), `.agents/specs/${branch}`));
   /** commit in the story worktree with the given committer/author date (git's own clock otherwise) */
   const commitAt = (file: string, message: string, date: string, name = "Agent") => {
@@ -287,7 +287,7 @@ steps:
   type Rounds = { rounds: Array<{ n: number; workflow: string; ended: { by: string; at: string } | null }>; steps: Array<{ step: string; round?: number }> };
   let h: Harness;
   const spec = ".agents/specs/gh-16-rounds-shown";
-  const wt = () => `${h.root}-worktrees/gh-16-rounds-shown`;
+  const wt = () => h.worktree("gh-16-rounds-shown");
   const runs = () => runStateOf(join(wt(), spec));
   // The status block `story checkout` prints above the handoff, rendered from state.json
   const header = () => {

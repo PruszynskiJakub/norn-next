@@ -10,9 +10,9 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Inbox, RunnerPort } from "@norn/core";
 import { STORY_UNIT_DIR, ulid, unitHandoffPath } from "@norn/schema";
-import { acquireTickLock, appendReceipt, handoffPath, readState, repoConfigPath, workflowsDir } from "@norn/store";
+import { acquireTickLock, appendReceipt, bindNornHome, handoffPath, readState, repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../../packages/cli/src/index.ts";
-import { createHarness, FakeInteraction, FakeRunner, type Harness, hostEnv, issue, sh } from "../support/harness.ts";
+import { createHarness, FakeInteraction, FakeRunner, type Harness, hostEnv, issue, sh, worktreeOf } from "../support/harness.ts";
 import { runChecked } from "../support/harness.ts";
 import { runStateOf } from "../support/run-state.ts";
 
@@ -80,6 +80,8 @@ function cloneOf(h: Harness, name: string, user: string): Clone {
   sh(root, ["config", "user.name", user]);
   const home = join(h.dir, `home-${name}`);
   mkdirSync(home);
+  // the clone's worktrees are named in its machine dir before any of its commands binds the home
+  bindNornHome(root, home);
   const runner = new FakeRunner();
   (runner as { name: string }).name = `fake-${name}`;
   const deps: CliDeps = {
@@ -110,7 +112,7 @@ function wrap(root: string, deps: CliDeps, runner: FakeRunner): Clone {
 
 const kinds = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.kind}${d.ok ? "" : ` FAILED ${d.error}`}`);
 const SPEC = ".agents/specs/gh-7-add-login-form";
-const storyWt = (root: string) => `${root}-worktrees/gh-7-add-login-form`;
+const storyWt = (root: string) => worktreeOf(root, "gh-7-add-login-form");
 const sliceWt = (root: string) => `${storyWt(root)}--01-form`;
 const storyRuns = (root: string) => runStateOf(join(storyWt(root), SPEC));
 const sliceRuns = (root: string) => runStateOf(join(sliceWt(root), SPEC), "01-form");
@@ -402,7 +404,7 @@ describe("story close asks at the terminal (B36)", () => {
       h2.clock.advance(10_000);
       expect(kinds((await h2.norn("tick")).value as TickReport)).toEqual([want]);
     }
-    const wt = `${h2.root}-worktrees/gh-8-add-logout`;
+    const wt = h2.worktree("gh-8-add-logout");
     expect(existsSync(wt)).toBe(true);
 
     // the question is asked without the tick lock: a tick may run while it is open

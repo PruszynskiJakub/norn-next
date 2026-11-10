@@ -12,7 +12,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import { cmd, situationOf, startable, startCommandFor } from "@norn/core";
 import { parseSpecDirName } from "@norn/schema";
-import { heartbeatId, readLocalClaim } from "@norn/store";
+import { heartbeatId, readLocalClaim, worktreesDir } from "@norn/store";
 import type { Context } from "../context.ts";
 import { checkoutStory } from "../runtime/checkout.ts";
 import { waitForTickLock } from "../runtime/tick-lock.ts";
@@ -35,7 +35,7 @@ async function worktreeGone(ctx: Context, story: string): Promise<boolean> {
   // a claim norn cannot read is said, never taken for "no claim"
   const claim = await readLocalClaim(ctx.root, story);
   if (claim.state !== "present" || claim.blob.heartbeat_id !== heartbeatId(ctx.root, ctx.clock.now())) return false;
-  const parent = `${ctx.root}-worktrees`;
+  const parent = worktreesDir(ctx.root);
   const names = existsSync(parent) ? readdirSync(parent) : [];
   return !names.some((n) => parseSpecDirName(n)?.story === story);
 }

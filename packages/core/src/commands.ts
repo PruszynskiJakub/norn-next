@@ -10,9 +10,9 @@ export const NUDGE_TEXT =
 
 const q = (s: string) => (/^[\w./@:-]+$/.test(s) ? s : `'${s.replaceAll("'", "'\\''")}'`);
 
-/** Worktree path conventions: story worktrees sit beside the repo; slice worktrees beside their story's. */
-export const storyWorktreePath = (repoRoot: string, story: string, slug: string) =>
-  `${repoRoot.replace(/\/+$/, "")}-worktrees/${storyDirName(story, slug)}`;
+/** Worktree path conventions: story worktrees sit in the worktrees folder observe reports; slice worktrees beside their story's. */
+export const storyWorktreePath = (worktreesDir: string, story: string, slug: string) =>
+  `${worktreesDir.replace(/\/+$/, "")}/${storyDirName(story, slug)}`;
 export const sliceWorktreePath = (storyWorktree: string, nn: string, slug: string) =>
   `${storyWorktree.replace(/\/+$/, "")}--${sliceDirName(nn, slug)}`;
 

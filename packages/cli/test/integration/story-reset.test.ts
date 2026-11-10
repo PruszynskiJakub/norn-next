@@ -31,7 +31,7 @@ mode: auto
 const kinds = (r: TickReport) => r.decisions.filter((d) => d.kind !== "noop" && d.rule !== "claim.renew").map((d) => `${d.unit} ${d.kind}${d.ok ? "" : ` FAILED ${d.error}`}`);
 
 let h: Harness;
-const wt = (slug: string) => `${h.root}-worktrees/${slug}`;
+const wt = (slug: string) => h.worktree(slug);
 const remoteHeads = () => h.git(["ls-remote", "--heads", "origin"]);
 
 async function intake(n: number, title: string, slug: string) {
