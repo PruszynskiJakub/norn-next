@@ -41,6 +41,7 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Notes
 
+- e2e flake seen once under the parallel full tier: base-sync.test.ts › "base_branch: develop (7b)" failed, then passed alone and in a full rerun (76/76).
 - Wiped machine dir (ci fix #5): a wiped home now takes the unit worktrees with it, leaving git a prunable registration and the local branch. Two product fixes: observe's `classifyWorktrees` skips a worktree whose folder is gone (else `restore_markers` recreates the path as a non-repo folder and intake's `git add` fails); intake skips a story whose branch is on the remote even when a local branch is left (it continues by `story checkout`, which prunes the stale registration). The B26 no-ref test now expects A's tick to emit only that skipped intake (no `claim.other`: unknown locally, as on a fresh clone) and no worktree; `checkout --force` still restarts implement with record_lost.
 - `machine-dir.test.ts` skips the machine dir's `worktrees/` when collecting machine-local file names (it holds the repo's own files). A test that unbinds the home must not call `h.worktree`/`worktreesOf` afterwards. Run one integration file: `bun test --config=bunfig.integration.toml --timeout=20000 ./<path>`.
 - Person decided (refine): no compatibility with `<repo>-worktrees/`; repo moves and doctor's adoption advice out of scope; worktrees in the per-checkout machine dir, not a shared `~/.norn/worktrees/`.
