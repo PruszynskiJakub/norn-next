@@ -57,10 +57,10 @@ Every user story is covered; none UNTRACED.
 - Review #1 minor notes, for the person, not rework: init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before loading config, so a broken config with no version gets exit 3, not 6 (D4, `upgrade.ts:52`); test-only leftovers `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move`; stale comments (`observe/index.ts:522`, `view/src/load.ts:474`, `store/src/fsx.ts:16`, `docs/limitations.md:29`); commit 1ac2a0d2f's accepted risk (a branch-only record reads as none) belongs in the PR body.
 - Person decisions: init refuses pre-0.30 too; config old-key messages drop the `norn upgrade` hint; codes `version_missing`/`version_too_old`; status version item is Unblock → `norn doctor`. Flat records and old `state.json` readers stay.
 - QA note (03.AC2, seen again at QA #4): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
-- CI fixes: fixtures record `norn_version` (`runningVersion(h.deps)` / `h.recordVersion()`); guard unchanged. CI tests the PR merged with main, so a new main fixture that skips `norn init` (as `merged-pr.test.ts` did) needs `h.recordVersion()`; check `git diff --name-only HEAD^1 HEAD -- test` after merging main.
+- CI fixes: fixtures record `norn_version` (`runningVersion(h.deps)` / `h.recordVersion()`); guard unchanged. CI tests the PR merged with main, so a new main fixture that skips `norn init` (as `merged-pr.test.ts` did) needs `h.recordVersion()`; check main's new tests after merging it.
 - CI #3 failed because no ci.yml ran: the PR conflicted with main (gh-318 moved unit worktrees into the machine dir),; GitHub runs no pull_request workflow then. Merged main at d6e49dc7f (resolution in its message); our new tests use `h.worktree`/`worktreesOf`. If CI says `no ci.yml run`, check `gh pr view --json mergeable` first.
 - Release notes come from commits 5e8451d29 and b45b051f0 and the PR body. CHANGELOG is the release step's.
-- Friction: the agent hook refuses `git worktree add`/`git push` even in a throwaway $TMPDIR QA repo.
+- Friction: the agent hook refuses `git worktree add`/`git push` even in a $TMPDIR QA repo.
 
 #### Resume
 
