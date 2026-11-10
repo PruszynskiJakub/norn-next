@@ -2,7 +2,7 @@
 id: gh-317/01
 title: The test harness keeps the recorded norn_version
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
