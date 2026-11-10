@@ -6,7 +6,7 @@ Unit worktrees are created in the checkout's machine dir (`<machine dir>/worktre
 
 ## Proof
 
-Review #4 (at d3bf5da5): approve, no findings; the only code change since review #3 is the test-only harness `removeTree` (EFAULT retry, then `rm -rf`; any other error still throws, the beside-repo guard still runs). Unit tier 1734 pass, typecheck green, `machine-dir.test.ts` + `worktrees-machine-dir.test.ts` 16/16 locally. QA #5 at c892491c (after merging origin/main 3666341f): all 16 criteria `pass` re-observed through the CLI in harness temp repos; golden decisions identical to base 3666341f after normalising the worktree prefix; the cleanup guard still throws on a planted `repo-worktrees` and still removes the dir; evidence in that run's evidence (`report.md`). e2e: 74 pass, no pinned file rewritten. No hand-built `-worktrees` in sources or docs.
+Review #5 (at b12cc1a2): changes requested, 1 blocking finding. ci fix #5's product change holds: observe skips worktrees that are prunable or whose folder is gone (`observe/index.ts:170`), and intake skips a story whose branch is on the remote whenever its worktree is gone (`act/lifecycle.ts:230`). Unit tier 1739 pass, typecheck green. These integration files pass locally: takeover-record-lost, worktrees-machine-dir, machine-dir, takeover-record, records, status, run-rerun-cancel and human. **The e2e tier is red at HEAD (73 pass, 3 fail)**: dropping intake's local `git show-ref` changed three effect transcripts that nobody rewrote. QA #5 at c892491c (before ci fix #5): all 16 criteria `pass`; evidence in that run's `report.md`. No hand-built `-worktrees` in sources or docs.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -37,8 +37,8 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Not proven yet
 
-- The full integration and e2e tiers on CI after ci fix #5 (implement#5). Locally green at implement#5: unit 1739, typecheck, 7 related integration files.
-- ci#5 failed on a real regression (not a flake): B26 "a wiped machine dir… no ref" in `takeover-record-lost.test.ts`. Fixed in implement#5, see Notes. The EFAULT cleanup flake fix (harness `removeTree` retry, then `rm -rf`) is still unproven on CI.
+- Review #5 blocking finding (e2e tier red): intake's local `git show-ref --verify --quiet refs/heads/<branch>` is gone, so the effect transcripts of `test/e2e/recovery.test.ts` ("a claim lost mid-run"), `test/e2e/base-sync.test.ts` ("base sync with real git") and `test/e2e/slice-workflow.test.ts` ("a story through the slice workflow") each lose that one line and fail.
+- The full integration and e2e tiers on CI after ci fix #5. The EFAULT cleanup flake fix (harness `removeTree`) is still unproven on CI.
 
 ## Notes
 
@@ -52,4 +52,4 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Resume
 
-implement #5 fixed ci#5's failure (wiped machine dir, B26) with two small product changes in `observe/index.ts` (`classifyWorktrees`) and `act/lifecycle.ts` (`intake`) plus the B26 test. Next: review the diff since c892491c, then test, qa, describe, open-pr, ci.
+Review #5 requested changes (findings file passed with the report). Next, in implement: run `NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e test/e2e/recovery.test.ts test/e2e/base-sync.test.ts test/e2e/slice-workflow.test.ts`, check that each diff only drops the `show-ref` line, then run `bun run test:e2e` (expect 76 pass), `bun run test` and `bun run typecheck`.
