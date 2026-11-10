@@ -10,7 +10,7 @@ labels:
   - norn
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-11-10T08:21:19.336Z
 body_hash: 5bf58336d1c9038bb879d6431fa0d4f75f80ac49128eb44e1683f8c653a648df
 refined_body_hash: 5bf58336d1c9038bb879d6431fa0d4f75f80ac49128eb44e1683f8c653a648df
@@ -47,6 +47,13 @@ criteria:
   - { id: "06.AC2", verifier: test }
   - { id: "06.AC3", verifier: test }
   - { id: "06.AC4", verifier: test }
+merge:
+  pr: 325
+  url: https://github.com/PruszynskiJakub/norn-next/pull/325
+  head_sha: d9330c8b28824803166e66e56d3175aed58e95b8
+  merge_commit_sha: c8c2c8df93dd70002675fa184fd9de92c847e523
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-10T12:34:28.000Z
 ---
 
 # Simplify norn upgrade: assume every repo starts at 0.30, drop the old migrations
