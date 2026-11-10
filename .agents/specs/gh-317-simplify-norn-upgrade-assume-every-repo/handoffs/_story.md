@@ -4,7 +4,7 @@
 
 #### Proof
 
-All six slices are integrated. Review #2: **approve**. Both blocking findings from review #1 are fixed: the old-layout code is gone (the verify grep finds nothing) and `norn config` now says `norn init` records a missing norn_version, with the 0.30 path. Unit tier (1726 pass) and typecheck are green at HEAD 0a9713103. The integration tests for config, upgrade and help-tree also pass locally (65/65). QA #1: 30/32 pass; the docs criterion was fixed after QA; the golden/transcript criterion awaits a person.
+All six slices are integrated. Review #2: **approve**. Both blocking findings from review #1 are fixed: the old-layout code is gone (the verify grep finds nothing) and `norn config` now says `norn init` records a missing norn_version, with the 0.30 path. Unit tier and typecheck are green (test#2). **QA #2 at a9321da29: 31/32 pass, observed with the dev CLI in throwaway repos** (evidence: `report.md` in this run's QA evidence). That includes the docs criterion (03.AC11, docs:emit clean). The golden/transcript criterion (06.AC4) is `person`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -50,16 +50,16 @@ Every user story is covered by the criteria above; none is UNTRACED.
 
 #### Not proven yet
 
-- QA has not re-checked the docs criterion (03.AC11: the docs describe upgrade from 0.30 on, nothing old) since the docs fix.
 - A person has not ruled on the golden/transcript criterion (06.AC4): one transcript line is gone (`recovery-claim-lost.txt`, the read of the branch-tree runs).
 - The full integration and e2e tiers run only in CI.
 
 #### Notes
 
-- Minor notes from review #1, still open, for the person and not for rework: init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before loading config, so a broken config with no version gets exit 3, not 6 (D4, `upgrade.ts:52`); `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move` are left for tests only; the 05.AC2 hook test also passes on old code; stale comments (`observe/index.ts:522`, `view/src/load.ts:474`, `store/src/fsx.ts:16` still says `norn upgrade` fixes needs_removed, `docs/limitations.md:29`); coverage narrower than some criteria read (watch, the unwritable remote, other skill folders); commit 1ac2a0d2f's accepted risk (a branch-only record reads as none) belongs in the PR body.
+- Minor notes from review #1, still open, for the person and not for rework: init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before loading config, so a broken config with no version gets exit 3, not 6 (D4, `upgrade.ts:52`); `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move` are left for tests only; the 05.AC2 hook test also passes on old code; stale comments (`observe/index.ts:522`, `view/src/load.ts:474`, `store/src/fsx.ts:16` still says `norn upgrade` fixes needs_removed, `docs/limitations.md:29`); commit 1ac2a0d2f's accepted risk (a branch-only record reads as none) belongs in the PR body.
 - Earlier decisions (person): init refuses a pre-0.30 version too; config old-key messages lose their "run `norn upgrade`" hint; codes `version_missing` / `version_too_old`; the status version item is an Unblock item pointing to `norn doctor`. Flat records and older `state.json` readers stay (out of scope).
+- QA #2 note (03.AC2, passes as written): after an upgrade interrupted between the skills and the version, the rerun records the version but stages only the config; the skill rewritten before the interruption stays unstaged, so the printed commit misses it unless the person stages it.
 - Release notes come from commits 5e8451d29 and b45b051f0 and the PR body. CHANGELOG is the release step's.
 
 #### Resume
 
-Review #2 approved. Next: QA re-checks the docs criterion (03.AC11), and a person rules on the one-line transcript change (06.AC4) and on the minor notes.
+QA #2 reported `partial`: everything passes except the golden/transcript criterion (06.AC4). A person rules whether the one removed line in `test/e2e/transcripts/recovery-claim-lost.txt` (`git cat-file -e …/runs`, the read of branch-tree runs/) is intended, and looks at the minor notes.
