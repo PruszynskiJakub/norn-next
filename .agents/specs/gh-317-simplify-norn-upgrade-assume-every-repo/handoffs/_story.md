@@ -4,7 +4,7 @@
 
 #### Proof
 
-All six slices are integrated. **Review #6 at b679d458b: approve, no findings** — since review #5 (81146c3ee) the only code change is implement#6's removal of the empty version-only commit in `worktrees-machine-dir.test.ts` (10/10 locally); src unchanged, merge base with main unchanged; unit tier (1733 pass) and typecheck green. **QA #5 at adb5b5a74: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (qa#5 evidence: `report.md`, scripts `n`/`r`/`mk.sh`/`norn.ts`). The golden/transcript criterion (06.AC4) is `person`.
+All six slices are integrated. **Review #6 at b679d458b: approve, no findings** (only a test fix since review #5; unit tier and typecheck green). **QA #5 at adb5b5a74: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (qa#5 evidence `report.md`). The golden/transcript criterion (06.AC4) is `person`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
