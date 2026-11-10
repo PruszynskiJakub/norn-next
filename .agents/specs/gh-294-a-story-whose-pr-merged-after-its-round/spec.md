@@ -8,7 +8,7 @@ title: A story whose PR merged after its round finished is never recorded done, 
 assignee: PruszynskiJakub
 labels:
   - norn
-  - norn:wf:reproduce
+  - norn:wf:quick
 workflow: quick
 status: active
 intake_at: 2026-11-10T09:46:52.315Z
