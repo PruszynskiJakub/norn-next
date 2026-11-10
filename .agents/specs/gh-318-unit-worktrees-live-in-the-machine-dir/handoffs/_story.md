@@ -6,7 +6,7 @@ Unit worktrees are created in the checkout's machine dir (`<machine dir>/worktre
 
 ## Proof
 
-Review #2 (at 4567b83d): approve, no blocking findings; unit tier 1734 pass, typecheck green. QA #2 at 459926c4 (current head): all 16 criteria `pass`, observed through the CLI in harness temp repos, including a symlinked `NORN_HOME_DIR`; golden decisions identical to base after normalising the worktree prefix; evidence in this run's evidence (`report.md`). e2e: 74 pass, no pinned file rewritten. No hand-built `-worktrees` in sources or docs.
+Review #3 (at 5d87bf9a): approve, no findings; the only change since review #2 is the test-only ci fix in `machine-dir.test.ts`. Unit tier 1734 pass, typecheck green, `machine-dir.test.ts` + `worktrees-machine-dir.test.ts` 16/16 locally. QA #2 at 459926c4 (product code unchanged since): all 16 criteria `pass`, observed through the CLI in harness temp repos, including a symlinked `NORN_HOME_DIR`; golden decisions identical to base after normalising the worktree prefix; evidence in this run's evidence (`report.md`). e2e: 74 pass, no pinned file rewritten. No hand-built `-worktrees` in sources or docs.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -37,7 +37,7 @@ Review #1's blocking finding (a symlinked home broke orphan detection and marker
 
 ## Not proven yet
 
-- The integration tier as a whole on CI: shard 1/4 failed only in `machine-dir.test.ts` (now 6/6 locally); the other shards' results on this head are unconfirmed.
+- The integration tier as a whole on CI at this head: shard 1/4 failed only in `machine-dir.test.ts` on the previous head (now passes locally); the other shards are unconfirmed until ci runs again.
 
 ## Notes
 
