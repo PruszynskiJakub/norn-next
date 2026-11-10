@@ -1,0 +1,7 @@
+norn watch: a tick every 2s, one line per action; Ctrl-C finishes the tick and releases claims
+11:39:45  tick skipped: this repo records no norn_version
+11:39:47  tick skipped: this repo records no norn_version
+11:39:49  tick skipped: this repo records no norn_version
+Stopped after 6 ticks (0 failed actions, 3 skipped on a norn version mismatch).
+No claims to release.
+[exit 0]

@@ -1,0 +1,21 @@
+## init on a repo at 0.37.0 with a drifted skill; binary 0.38.0
+norn init in $QA/w/r1
+
+norn version: 0.37.0
+
+  config          .agents/norn.config.yaml kept (exists)
+  workflows       kept quick.yaml, refinement.yaml, reproduce.yaml, slice.yaml, story.yaml, triage.yaml
+  skills          .agents/skills: up to date; kept norn-tdd (norn 0.37.0's to change) (20 skills)
+                  claude → .claude/skills: all linked
+
+this repo is on norn 0.37.0, you run 0.38.0: `norn upgrade` moves it, with the bundled skills that differ: norn-tdd
+
+Nothing changed: norn is set up here.
+
+Next steps
+  1. Add the remote norn syncs issues from and pushes branches to: `git remote add origin <url>`.
+  2. Check this machine: `norn doctor`.
+  3. Make a first story: an issue labelled `norn` and assigned to you, e.g. `gh issue create --label norn --assignee @me --title "…"`.
+  4. Pick it up: `norn sync`, keep `norn watch` running (it moves every step on, in manual mode too), and `norn status` shows what needs you and the command for each item.
+[exit 0]
+version after: norn_version: 0.37.0; drift kept: 1

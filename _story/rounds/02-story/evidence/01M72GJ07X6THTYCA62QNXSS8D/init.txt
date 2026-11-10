@@ -1,0 +1,7 @@
+## fresh repo, no team file; binary 0.30.0
+ls: .agents: No such file or directory
+$ norn init --json | jq .norn_version?
+[{"key":"norn_version","value":{"repo":"0.30.0","running":"0.30.0","recorded":true,"skills_kept":[]}}]
+[exit 0]
+$ grep norn_version .agents/norn.config.yaml
+norn_version: 0.30.0

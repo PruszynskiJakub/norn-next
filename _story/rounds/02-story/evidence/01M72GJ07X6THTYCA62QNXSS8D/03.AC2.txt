@@ -1,0 +1,11 @@
+## interrupt: skill norn-review drifted, .agents/ made read-only so the norn_version write fails after the skills; binary 0.37.0
+{"error":"EACCES: permission denied, open '$QA/w/r1/.agents/.norn.config.yaml.67416.1794307317418.4.tmp'","do_instead":null,"code":"error"}
+[exit 1]
+after interrupt: norn_version: 0.35.0; skill drift line present: 0
+ M .agents/skills/norn-review/SKILL.md
+## rerun
+{"norn_version":{"from":"0.35.0","to":"0.37.0","changed":true},"skills":{"updated":[],"linked":[]},"staged":[".agents/norn.config.yaml"],"commit":"git commit -m \"Upgrade norn to 0.37.0 (norn upgrade)\"","labels":{"checked":false,"reason":"no git remote","fix":null,"do_instead":null}}
+[exit 0]
+norn_version: 0.37.0
+M  .agents/norn.config.yaml
+ M .agents/skills/norn-review/SKILL.md

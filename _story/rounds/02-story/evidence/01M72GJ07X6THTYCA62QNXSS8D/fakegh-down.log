@@ -1,0 +1,1 @@
+gh label list --limit 1000 --json name,color,description

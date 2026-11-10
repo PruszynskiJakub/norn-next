@@ -1,0 +1,52 @@
+# 02.AC7 / 03.AC12 release-note commits
+
+## 5e8451d29
+feat: refuse a repo with no or a pre-0.30 norn_version
+
+Every command that acts now refuses (exit 3) a repo whose main checkout
+records no `norn_version` (code `version_missing`) or one below 0.30
+(code `version_too_old`), before it writes, launches or pushes anything,
+instead of running on default config. The refusal names the path
+forward: install norn 0.30.x, run `norn upgrade`, commit, then run
+`norn upgrade` again with this norn; for a missing version, `norn init`
+if norn was never set up there. `norn watch` pauses its ticks on it, and
+`norn status` shows it as an Unblock item pointing to `norn doctor`
+(it was a Check item pointing to `norn upgrade`). `help`, `doctor`,
+`init` and `upgrade` are not stopped by the guard.
+
+Release note: a repo with no or a pre-0.30 `norn_version` is now refused
+by every acting command, with the codes `version_missing` and
+`version_too_old`.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+
+## b45b051f0
+feat!: norn upgrade moves only a 0.30+ repo; remove norn migrate
+
+`norn upgrade` now only moves a repo from norn 0.30 on: it rewrites and
+relinks the bundled skills, writes `norn_version` last, stages
+everything, prints the commit to make and creates missing labels. Every
+check runs before any write: main checkout, the 0.30 baseline
+(`version_missing` / `version_too_old`, with the 0.30.x path), a binary
+older than the repo (`version_backward`), a config that loads, the tick
+lock.
+
+It no longer moves the old layout, renames old config keys, strips
+criteria `needs` from slices and specs, moves base-tree run state into
+archive refs, or edits `.gitattributes`. Config validation still flags
+an old key, but no longer tells you to run `norn upgrade`; its
+do_instead names the file to fix.
+
+Release note:
+- `norn migrate` is removed; it is now an unknown command. Use
+  `norn upgrade`.
+- `norn upgrade --json` drops the fields `moves`, `config`, `run_state`
+  and `gitattributes`; it holds `norn_version`, `skills`, `staged`,
+  `commit` and `labels`.
+- A repo with no or a pre-0.30 `norn_version` must go through norn
+  0.30.x first: install it, run `norn upgrade`, commit, then upgrade
+  again.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+

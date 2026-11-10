@@ -1,0 +1,6 @@
+$ norn hook stop --json (in a unit worktree of the pre-0.13 repo)
+{}
+[exit 0]
+$ norn hook pre-tool-use --json (in a unit worktree of the pre-0.13 repo)
+{}
+[exit 0]

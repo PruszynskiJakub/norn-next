@@ -1,0 +1,7 @@
+{ "findings": [
+  { "id": "F1", "severity": "blocking", "criterion": "03.AC11",
+    "title": "Two docs passages still describe upgrade behaviour that was removed",
+    "file": "docs/reference.md", "line": 24,
+    "repro": "grep -n 'norn upgrade` rewrites old files' docs/reference.md; grep -n 'which moves it into the refs' docs/concepts.md. Expected: no doc says upgrade rewrites old config keys or moves base-branch run state into refs. Seen: reference.md:24 says '`norn upgrade` rewrites old files'; concepts.md:101 says a base branch holding old run state 'is pointed to `norn upgrade`, which moves it into the refs'.",
+    "detail": "Observed now: upgrade refuses a config with an old key (config_moved, do_instead 'fix .agents/norn.config.yaml') and never touches base-tree runs/; status gives no pointer for it (06.AC2). Both lines are hand-written, outside the docs:emit block, and unchanged from origin/main, which is why docs:emit and the earlier sweep missed them. Fix: drop the clause in reference.md:24 (the sentence before already says the file and key to use) and the last sentence of concepts.md:101. Evidence: 03-AC11-docs.md." }
+] }

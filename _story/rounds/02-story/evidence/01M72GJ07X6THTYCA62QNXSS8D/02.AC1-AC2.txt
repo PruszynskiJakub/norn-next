@@ -1,0 +1,13 @@
+## versionBaseline (library entry point, @norn/core)
+{"repo":"0.29.4","running":"0.31.0","rule":{"code":"version_too_old","needs":"0.30.x","error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0"}}
+{"repo":null,"running":"0.31.0","rule":{"code":"version_missing","needs":"0.30.x","error":"this repo records no norn_version","do_instead":"run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0"}}
+{"repo":"0.30.0","running":"0.31.0","rule":null}
+{"repo":"0.31.2","running":"0.31.0","rule":null}
+{"repo":"0.30.0","running":"0.30.0","rule":null}
+
+## CLI: repo at 0.37.0, binary 0.30.0 → the usual mismatch rule, not the baseline
+{"error":"this repo needs norn 0.37.x (you run 0.30.0)","do_instead":"install norn 0.37.x","code":"version_mismatch","details":{"repo":"0.37.0","running":"0.30.0"}}
+[exit 3]
+## CLI: repo at 0.37.0, binary 0.37.0 → no refusal
+{"tick_id":"01M72H06PMCVX5MVXANTYGD4SH","at":"2026-11-10T10:45:29.428Z","duration_ms":497,"sync":{"ran":true,"ok":false,"error":"gh issue list failed (exit 1): no git remotes found"},"decisions":[{"un
+[exit 0]

@@ -1,0 +1,89 @@
+## repo at 0.29.4
+$ norn tick --json
+{"error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.30.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.30.0"}}
+[exit 3]
+$ norn story start gh-1 --json
+{"error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.30.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.30.0"}}
+[exit 3]
+$ norn tick
+{"error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.30.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.30.0"}}
+[exit 3]
+HEAD unchanged: yes
+$ norn upgrade --json
+{"error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.30.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.30.0"}}
+[exit 3]
+staged:        0
+$ norn init --json
+{"error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.30.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.30.0"}}
+[exit 3]
+$ norn doctor --json
+{"ok":false,"live":false,"hook_command":"\"${NORN_BIN:-norn}\" hook","machine":{"holder":"jakubpruszynski@mac","override":null},"git":{"ok":true,"version":"git version 2.54.0 (Apple Git-157)"},"agents":[{"name":"claude","adapter":"claude","tier":"blocking","ok":true,"binary":{"command":"claude","path":"/Users/jakubpruszynski/.local/bin/claude","version":"2.1.322 (Claude Code)"},"hooks_installed":true,"hook_fires":{"ok":true,"command":"\"${NORN_BIN:-norn}\" hook session-start --agent claude","exit":0,"recorded":1},"notes":[]}],"remote":{"ok":false,"provider":"gh","user":"PruszynskiJakub","git_remote":{"name":"origin","url":null},"error":"this repository has no git remote named origin","do_instead":"git remote add origin <url>"},"labels":{"checked":false,"reason":"no git remote","fix":null,"do_instead":null},"runner":{"ok":true,"configured":true,"required":false,"name":"herdr","available":true,"norn_on_path":{"ok":true,"expected":"$QA/w/home/bin/norn","resolved":"$QA/w/home/bin/norn"},"cockpit_plugin":{"linked":true,"enabled":true,"root":"/Users/jakubpruszynski/.config/herdr/plugins/github-installations/norn-2d93e9449bde/95167-0/checkout/plugins/herdr"}},"skills":{"ok":true,"dir":"$QA/w/r1/.agents/skills","missing":[],"drifted":[],"unlinked":{}},"repo":{"ok":false,"version":{"ok":false,"running":"0.30.0","repo":"0.29.4","match":null,"code":"version_too_old","error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.30.0"},"skills":{"ok":true,"drifted":[]},"workflows":[{"name":"quick","file":".agents/workflows/quick.yaml","ok":true,"issues":[]},{"name":"refinement","file":".agents/workflows/refinement.yaml","ok":true,"issues":[]},{"name":"reproduce","file":".agents/workflows/reproduce.yaml","ok":true,"issues":[]},{"name":"slice","file":".agents/workflows/slice.yaml","ok":true,"issues":[]},{"name":"story","file":".agents/workflows/story.yaml","ok":true,"issues":[]},{"name":"triage","file":".agents/workflows/triage.yaml","ok":true,"issues":[]}],"config":{"ok":true,"file":".agents/norn.config.yaml","present":true,"errors":[]}},"warnings":["labels not checked: no git remote"],"hints":[]}
+[exit 1]
+$ norn doctor
+norn doctor: 2 checks failed (remote, norn)
+
+  ok   git            git version 2.54.0 (Apple Git-157)
+  ok   agent claude   /Users/jakubpruszynski/.local/bin/claude (2.1.322 (Claude Code)) · hooks fire
+  FAIL remote         gh as PruszynskiJakub
+                      ! this repository has no git remote named origin
+                      → git remote add origin <url>
+  ok   runner         herdr available · sessions run this norn
+                      · cockpit plugin linked
+  ok   skills         installed and linked
+       machine        jakubpruszynski@mac
+  FAIL norn           this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on
+                      → install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.30.0
+  ok   workflows      quick, refinement, reproduce, slice, story, triage valid (.agents/workflows/)
+  ok   config         .agents/norn.config.yaml
+
+Warnings
+  ! labels not checked: no git remote
+[exit 1]
+$ norn status
+`norn status` now shows what needs you; the story listing moved to `norn story list`.
+! this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on: install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.30.0
+      $ norn doctor
+[exit 0]
+$ norn status --json
+{"at":"2026-11-10T10:38:50.565Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[{"story":"*","slice":null,"step":null,"command":"norn doctor","since":"2026-11-10T10:38:50.565Z","id":"norn-version:0.29.4:0.30.0","group":"unblock","title":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on: install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.30.0","age":"0s"}],"check":[],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":1,"delegated_counts":{},"heartbeat":{"holder":"jakubpruszynski@mac","last_tick_at":null,"age":null,"down":false,"up":false}}
+[exit 0]
+$ norn help
+norn — deliver software stories with coding agents; code decides the next step, agents do it.
+
+Agent doing a norn step? Run only `norn brief`, then report once with `norn done`, `norn ask` or `norn stuck`
+(the `norn` skill says how). Every other command is the person's: run one only when the person asks you to directly.
+
+Core
+  norn status            What needs you, grouped by action, with the command to resolve each item; --history for when items came and went
+  norn story             The stories of this repository (create, take, list, view, wait, answer, approve, reject, update-branch, start, chat, edit, checkout, handoff, close, reopen, reset)
+  norn run               The runs of a unit: its step timeline, one run, why a tick decided what it did, its agent pane; rerun or cancel it (list, view, attach, rerun, cancel)
+
+Setup
+  norn init              Set up norn in this repository: config, workflows, skills, hooks
+  norn upgrade           Move this repo's norn_version and bundled skills to this norn, from norn 0.30 on, staged for you to commit
+  norn doctor            Check agents, hooks, skills, remote auth and runner on this machine, and the repo workflows and config
+  norn config            Show the resolved config; set or unset one value in the user, local or team file (list, get, set, unset)
+  norn uninstall         Remove norn-owned hooks and skills; keep config, workflows and specs
+
+Background
+  norn watch             Run ticks in a loop; a clean exit releases held claims
+  norn sync              Sync the remote now and take in new stories
+  norn tidy              Report or clean orphan worktrees, branches, stale leases, receipt reservations, Herdr panes of runs that reported done, stopped base-branch records whose story is gone, and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain
+
+Agent protocol: the only commands an agent runs
+  norn brief             Brief the agent on the current step of this worktree's unit; starts the run in manual mode
+  norn done              Report that the current step finished with a declared outcome; then end your turn
+  norn ask               Report that the step needs a person's answer to continue; then end your turn
+  norn stuck             Report that the step cannot continue; then end your turn
+
+Skills (in .agents/skills/; only an agent loads one, the one its brief names)
+  the protocol, loaded first in every step: norn
+  step skills, the agent works alone: norn-implement, norn-review, norn-qa, norn-merge, norn-slice, norn-pr, norn-diagnose
+  step skills, a person works with the agent: norn-refine, norn-clarify, norn-plan, norn-interview, norn-qa-person, norn-prototype
+  references other skills read, never a step: norn-tdd, norn-codebase-design
+  supervisors a person starts in the main checkout, never a step: norn-fsd-round, norn-fsd
+  other skills: norn-retro, norn-triage
+
+New here? `norn init` in your repository, then follow the steps it prints.
+`norn help <command>` shows one command's usage; add `--json` to any command for data.
+[exit 0]

@@ -1,0 +1,32 @@
+## base branch tree holds .agents/specs/gh-9-done/runs/ (committed)
+.agents/specs/gh-9-done/runs/_story/rounds/01-story/receipts/0001-x.json
+.agents/specs/gh-9-done/runs/_story/state.json
+$ norn status
+Unblock (3) · stuck or broken, needs you to unstick it
+  gh-12      story `gh-12`: `needs` was removed; delete it from the criteria in .agents/specs/gh-12-x/spec.md · 0s
+      $ norn run view gh-12 --why
+  gh-9       corrupt: .agents/specs/gh-9-done/spec.md failed validation · 0s
+      $ norn run view gh-9 --why
+  *          skills differ from norn 0.37.0: run `norn upgrade` and commit · 0s
+      norn-tdd
+      $ norn upgrade
+[exit 0]
+$ norn status --json
+{"at":"2026-11-10T10:43:30.330Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[{"id":"corrupt:gh-12:spec.md","group":"unblock","story":"gh-12","slice":null,"step":null,"title":"story `gh-12`: `needs` was removed; delete it from the criteria in .agents/specs/gh-12-x/spec.md","command":"norn run view gh-12 --why","since":"2026-11-10T10:43:30.330Z","age":"0s"},{"id":"corrupt:gh-9:spec.md","group":"unblock","story":"gh-9","slice":null,"step":null,"title":"corrupt: .agents/specs/gh-9-done/spec.md failed validation","command":"norn run view gh-9 --why","since":"2026-11-10T10:43:30.330Z","age":"0s"},{"id":"skills_drift:*:0.37.0:norn-tdd","group":"unblock","story":"*","slice":null,"step":null,"title":"skills differ from norn 0.37.0: run `norn upgrade` and commit","detail":"norn-tdd"
+status json mentions runs/run state/archive: 0
+$ norn run list gh-9 --json
+{"unit":"gh-9","story":"gh-9","slice":null,"title":"gh-9","status":"not_started","step":null,"intake_at":null,"done_at":null,"merged_at":null,"totals":{"wall_clock_ms":null,"merge_wait_ms":null,"by_type":{},"by_step":{},"human_wait_ms":0},"steps":[],"units":[{"unit":"gh-9","story":"gh-9","slice":nul
+doctor json mentions run state: 0  markdown: 0
+doctor --json repo keys: ["config","ok","skills","version","workflows"]
+## with a valid gh-9 spec, base tree still holds its runs/
+$ norn status
+Unblock (2) · stuck or broken, needs you to unstick it
+  gh-9       corrupt: .agents/specs/gh-9-done/spec.md failed validation · 0s
+      $ norn run view gh-9 --why
+  *          skills differ from norn 0.37.0: run `norn upgrade` and commit · 0s
+      norn-tdd
+      $ norn upgrade
+[exit 0]
+status --json mentions runs/run state/archive: 0
+$ norn run list gh-9 --json | jq .steps
+{"status":"not_started","steps":[]}

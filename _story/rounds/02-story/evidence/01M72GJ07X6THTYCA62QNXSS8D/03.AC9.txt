@@ -1,0 +1,30 @@
+## valid config: slice/spec with needs, .gitattributes runs line; binary 0.35.0
+63fce10edc3d66fa0ad356ae516b0f0b0dc0bc75  .agents/specs/gh-12-x/slices/02-two.md
+148df489bcd0dc314ac02a3cbed0944b8ac41a2c  .agents/specs/gh-12-x/spec.md
+9c0397250c7be5d9f38a424e63fb0b6873ab640f  .gitattributes
+c0fffbdb9efcec9ce15ad084ec95099ae04c12bf  $QA/w/home/config.yaml
+{"norn_version":{"from":"0.34.0","to":"0.35.0","changed":true},"skills":{"updated":[],"linked":[]},"staged":[".agents/norn.config.yaml"],"commit":"git commit -m \"Upgrade norn to 0.35.0 (norn upgrade)\"","labels":{"checked":false,"reason":"gh label list failed (exit 1): GraphQL: Could not resolve to a Repository with the name 'qa-owner/qa-repo'. (repository)","fix":null,"do_instead":"run norn upgrade again"}}
+[exit 0]
+63fce10edc3d66fa0ad356ae516b0f0b0dc0bc75  .agents/specs/gh-12-x/slices/02-two.md
+148df489bcd0dc314ac02a3cbed0944b8ac41a2c  .agents/specs/gh-12-x/spec.md
+9c0397250c7be5d9f38a424e63fb0b6873ab640f  .gitattributes
+c0fffbdb9efcec9ce15ad084ec95099ae04c12bf  $QA/w/home/config.yaml
+staged:
+.agents/norn.config.yaml
+## user config with old key default_mode: auto; binary 0.36.0
+63fce10edc3d66fa0ad356ae516b0f0b0dc0bc75  .agents/specs/gh-12-x/slices/02-two.md
+148df489bcd0dc314ac02a3cbed0944b8ac41a2c  .agents/specs/gh-12-x/spec.md
+9c0397250c7be5d9f38a424e63fb0b6873ab640f  .gitattributes
+29d68b8fcd1b02f0e10da789f22b03bb439f7aa2  $QA/w/home/config.yaml
+{"error":"`~/.norn/config.yaml`: `default_mode` is now `mode`","do_instead":"fix ~/.norn/config.yaml","code":"config_moved","details":[{"code":"config_moved","file":"user","key":"default_mode","message":"`default_mode` is now `mode`","path":"$QA/w/home/config.yaml"}]}
+[exit 6]
+63fce10edc3d66fa0ad356ae516b0f0b0dc0bc75  .agents/specs/gh-12-x/slices/02-two.md
+148df489bcd0dc314ac02a3cbed0944b8ac41a2c  .agents/specs/gh-12-x/spec.md
+9c0397250c7be5d9f38a424e63fb0b6873ab640f  .gitattributes
+29d68b8fcd1b02f0e10da789f22b03bb439f7aa2  $QA/w/home/config.yaml
+status:        0
+$ norn config list --json | grep default_mode
+`~/.norn/config.yaml`: `default_mode` is now `mode`
+default_mode
+`default_mode` is now `mode`
+mentions norn upgrade: 0

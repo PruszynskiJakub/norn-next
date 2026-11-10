@@ -1,0 +1,14 @@
+## r2
+$ norn doctor  --json → repo keys: ["config","ok","skills","version","workflows"]  top keys: ["agents","git","hints","hook_command","labels","live","machine","ok","remote","repo","runner","skills","warnings"]
+  json mentions layout|migrate|run_state|run state: 0
+  markdown mentions: 0
+$ norn doctor --repo --json → repo keys: ["config","ok","skills","version","workflows"]  top keys: ["ok","repo"]
+  json mentions layout|migrate|run_state|run state: 0
+  markdown mentions: 0
+## r1
+$ norn doctor  --json → repo keys: ["config","ok","skills","version","workflows"]  top keys: ["agents","git","hints","hook_command","labels","live","machine","ok","remote","repo","runner","skills","warnings"]
+  json mentions layout|migrate|run_state|run state: 0
+  markdown mentions: 0
+$ norn doctor --repo --json → repo keys: ["config","ok","skills","version","workflows"]  top keys: ["ok","repo"]
+  json mentions layout|migrate|run_state|run state: 0
+  markdown mentions: 0

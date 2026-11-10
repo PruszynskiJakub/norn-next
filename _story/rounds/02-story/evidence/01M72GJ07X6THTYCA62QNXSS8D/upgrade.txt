@@ -1,0 +1,46 @@
+## repo at 0.30.0 (committed); binary QA_VERSION=0.31.0; drift skill norn-qa, remove link .claude/skills/norn-tdd
+$ env QA_VERSION=0.31.0 $QA/n.sh upgrade
+# norn upgrade
+
+norn version 0.30.0 → 0.31.0; skills updated: norn-qa; skills relinked: norn-tdd
+
+Skills rewritten from norn 0.31.0's copies (`git diff --staged .agents/skills/` shows how): norn-qa
+
+.agents/norn.config.yaml: `norn_version: 0.31.0` (staged)
+
+labels: not checked — no git remote
+
+Review the staged changes with `git diff --staged`, then commit them: `git commit -m "Upgrade norn to 0.31.0 (norn upgrade)"`
+[exit 0]
+M  .agents/norn.config.yaml
+M  .agents/skills/norn-qa/SKILL.md
+A  .claude/skills/norn-tdd
+--- staged:
+.agents/norn.config.yaml
+.agents/skills/norn-qa/SKILL.md
+.claude/skills/norn-tdd
+HEAD msg: drift
+norn_version: 0.31.0
+lrwxr-xr-x@ 1 jakubpruszynski  wheel  29 Nov 10 11:40 .claude/skills/norn-tdd -> ../../.agents/skills/norn-tdd
+Done when every criterion has exactly one verdict; every `pass` has evidence (a screenshot when seen in a browser); every `fail` has a repro and a finding; every `person` and `unverified` says how to check it; secrets are redacted; and `report.md` has one line per criterion.
+## rerun: already current
+$ env QA_VERSION=0.31.0 $QA/n.sh upgrade --json
+{"norn_version":{"from":"0.31.0","to":"0.31.0","changed":false},"skills":{"updated":[],"linked":[]},"staged":[],"commit":null,"labels":{"checked":false,"reason":"no git remote","fix":null,"do_instead":null}}
+[exit 0]
+$ env QA_VERSION=0.31.0 $QA/n.sh upgrade
+# norn upgrade
+
+already on norn 0.31.0: nothing to upgrade
+
+labels: not checked — no git remote
+[exit 0]
+staged:        0
+## only a skill differs
+$ env QA_VERSION=0.31.0 $QA/n.sh upgrade --json
+{"norn_version":{"from":"0.31.0","to":"0.31.0","changed":false},"skills":{"updated":["norn-pr"],"linked":[]},"staged":[".agents/skills/norn-pr"],"commit":"git commit -m \"Refresh norn's skills (norn upgrade)\"","labels":{"checked":false,"reason":"no git remote","fix":null,"do_instead":null}}
+[exit 0]
+## binary older than repo
+$ env QA_VERSION=0.30.5 $QA/n.sh upgrade --json
+{"error":"this repo is set up for norn 0.31.0; upgrade will not move it back","do_instead":"install norn 0.31.x","code":"version_backward","details":{"repo":"0.31.0","running":"0.30.5"}}
+[exit 3]
+changed files:        0

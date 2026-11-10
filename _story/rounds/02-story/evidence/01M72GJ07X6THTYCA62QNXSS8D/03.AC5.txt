@@ -1,0 +1,9 @@
+## tick lock held by another process (qa holder); binary 0.35.0
+{"ok":true}
+{"error":"a tick is running (pid 64118, qa holder); norn upgrade never rewrites the repo under a running tick","do_instead":"stop `norn watch` and run it again","code":"tick_locked"}
+[exit 3]
+changed:        0
+## linked worktree; binary 0.35.0
+{"error":"$QA/w/r1-wt is not the main checkout; norn upgrade moves the main checkout only, so the move never lands in a story's branch","do_instead":"cd $QA/w/r1 && norn upgrade","code":"not_main_checkout","details":{"main_checkout":"$QA/w/r1"}}
+[exit 3]
+changed main:        0 changed wt:        0
