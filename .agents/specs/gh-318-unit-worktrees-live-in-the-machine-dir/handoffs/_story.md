@@ -6,7 +6,7 @@ Unit worktrees are created in the checkout's machine dir (`<machine dir>/worktre
 
 ## Proof
 
-Review #3 (at 5d87bf9a): approve, no findings; the only change since review #2 is the test-only ci fix in `machine-dir.test.ts`. Unit tier 1734 pass, typecheck green, `machine-dir.test.ts` + `worktrees-machine-dir.test.ts` 16/16 locally. QA #2 at 459926c4 (product code unchanged since): all 16 criteria `pass`, observed through the CLI in harness temp repos, including a symlinked `NORN_HOME_DIR`; golden decisions identical to base after normalising the worktree prefix; evidence in this run's evidence (`report.md`). e2e: 74 pass, no pinned file rewritten. No hand-built `-worktrees` in sources or docs.
+Review #3 (at 5d87bf9a): approve, no findings; the only change since review #2 is the test-only ci fix in `machine-dir.test.ts`. Unit tier 1734 pass, typecheck green, `machine-dir.test.ts` + `worktrees-machine-dir.test.ts` 16/16 locally. QA #3 at 040bcca5 (current head): all 16 criteria `pass`, re-observed through the CLI in harness temp repos (story/slice worktrees, a home given to the command, a symlinked `NORN_HOME_DIR`, two clones, inbox/--print/Herdr cwd/brief, tidy, gone-check, status reach); golden decisions identical to base after normalising the worktree prefix; slice 02 touched no pinned file; evidence in this run's evidence (`report.md`, scripts `observe*.ts`, `cmp.py`). e2e: 74 pass, no pinned file rewritten. No hand-built `-worktrees` in sources or docs.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -50,4 +50,4 @@ Review #1's blocking finding (a symlinked home broke orphan detection and marker
 
 ## Resume
 
-Review #3 approved head 5d87bf9a (test-only ci fix since review #2). Next: the test step and CI run again on this head; if an integration shard fails, read its log and fix it in this worktree (one file: `bun test --config=bunfig.integration.toml --timeout=20000 ./<path>`).
+QA #3 passed at 040bcca5. Next: describe and CI on this head; if an integration shard fails, fix it here (one file: `bun test --config=bunfig.integration.toml --timeout=20000 ./<path>`).
