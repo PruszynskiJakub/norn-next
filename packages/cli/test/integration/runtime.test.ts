@@ -1,7 +1,8 @@
 /**
  * Runtime paths beyond the happy flow: repo discovery from a worktree, throttled sync,
  * silent → nudge into the same session, died → fresh session, watch releasing
- * claims on a clean exit, PR merged cleanup, uninstall, and check timeouts.
+ * claims on a clean exit, PR merged cleanup (also after the round finished and the claim was
+ * released), uninstall, and check timeouts.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
@@ -163,6 +164,52 @@ describe("runtime", () => {
     expect(existsSync(join(h.root, ".agents/skills"))).toBe(false);
     expect(h.read(join(h.root, ".claude/settings.json"))).not.toContain("norn-owned");
     expect(existsSync(repoConfigPath(h.root))).toBe(true);
+  });
+});
+
+describe("PR merged after the round finished", () => {
+  let h: Harness;
+  const wt = () => `${h.root}-worktrees/gh-9-fix-the-bug`;
+  const runs = () => runStateOf(join(wt(), ".agents/specs/gh-9-fix-the-bug"));
+  beforeAll(async () => {
+    h = await createHarness();
+    await boot(h, 9, "Fix the bug");
+  });
+  afterAll(() => h.cleanup());
+
+  test("round at $done, claim released by watch's clean exit, then the PR merges → sync cleans up and records done", async () => {
+    for (let i = 0; i < 3; i++) {
+      await h.tick();
+      h.clock.advance(1000);
+    }
+    h.report(runs(), "done", { outcome: "done", handoff: "fixed" });
+    h.clock.advance(10_000);
+    await h.tick();
+    expect(h.state(runs())).toMatchObject({ step: "$done", status: "done" });
+    const runsDir = runs();
+
+    const w = await runChecked(["watch", "--interval", "1ms", "--max-ticks", "1"], { ...h.deps, log: () => {} });
+    expect(w.value).toMatchObject({ released: [{ story: "gh-9", ok: true }] });
+    expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-9"])).toBe("");
+
+    // the PR merges for real: the story branch watch pushed lands on main on the remote (not pulled here)
+    const merger = join(h.dir, "merger");
+    const id = ["-c", "user.email=m@x", "-c", "user.name=m"];
+    h.git(["clone", "-q", h.remoteDir, merger], h.dir);
+    h.git([...id, "merge", "-q", "--no-ff", "-m", "merge PR #1", "origin/gh-9-fix-the-bug"], merger);
+    h.git(["push", "-q", "origin", "main"], merger);
+    h.remote.prs = [{ number: 1, url: "u", state: "merged", is_draft: false, head_sha: "", head: "gh-9-fix-the-bug", base_branch: "main", merged_at: h.clock.iso() }];
+    h.remote.issues = h.remote.issues.map((i) => ({ ...i, state: "closed" as const }));
+    h.clock.advance(60_000);
+    const gh9 = (r: TickReport) => r.decisions.filter((d) => d.unit === "gh-9" && d.kind !== "noop").map((d) => `${d.kind} ${d.rule}${d.ok ? "" : ` FAILED ${d.error}`}`);
+    // the sync takes the released claim back; holding it, the next sync (the PR fact comes with a sync) runs the merge cleanup
+    expect(gh9((await h.norn("sync")).value as TickReport)).toEqual(["claim claim.reacquire.merged"]);
+    h.clock.advance(60_000);
+    expect(gh9((await h.norn("sync")).value as TickReport)).toEqual(["cleanup_merged_story remote.pr_merged"]);
+    expect(existsSync(wt())).toBe(false);
+    expect(h.state(runsDir)).toMatchObject({ status: "done" });
+    h.git(["fetch", "-q", "origin"]);
+    expect(h.git(["show", "origin/main:.agents/specs/gh-9-fix-the-bug/spec.md"])).toMatch(/^status: done$/m);
   });
 });
 
