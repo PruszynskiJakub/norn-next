@@ -4,7 +4,7 @@
 
 #### Proof
 
-All six slices are integrated. Review #5 at 81146c3ee (after the main merge d6e49dc7f): approve, no findings; test#5 (unit tier + typecheck) green. **QA #5 at adb5b5a74: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (qa#5 evidence: `report.md`, scripts `n`/`r`/`mk.sh`/`norn.ts`). The golden/transcript criterion (06.AC4) is `person`.
+All six slices are integrated. **Review #6 at b679d458b: approve, no findings** — since review #5 (81146c3ee) the only code change is implement#6's removal of the empty version-only commit in `worktrees-machine-dir.test.ts` (10/10 locally); src unchanged, merge base with main unchanged; unit tier (1733 pass) and typecheck green. **QA #5 at adb5b5a74: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (qa#5 evidence: `report.md`, scripts `n`/`r`/`mk.sh`/`norn.ts`). The golden/transcript criterion (06.AC4) is `person`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -63,4 +63,4 @@ Every user story is covered; none UNTRACED.
 
 #### Resume
 
-implement#6 fixed CI's one failure (empty version-only commit in `worktrees-machine-dir.test.ts`; 10/10 locally, unit tier and typecheck green). Integration shards 3 and 4 were cancelled in that CI run, not yet run on this head. Next: review, test, QA, then CI.
+Review #6 approved b679d458b with no findings. Integration shards 3 and 4 were cancelled in the last CI run and have not run on this head. Next: test, QA, then CI.
