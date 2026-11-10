@@ -2,7 +2,7 @@
 id: gh-318/02
 title: Tests name worktrees through the harness
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: agent }
