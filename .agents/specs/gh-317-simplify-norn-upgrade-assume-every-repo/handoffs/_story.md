@@ -54,15 +54,13 @@ Every user story is covered; none UNTRACED.
 
 #### Notes
 
-- Review #1 minor notes (for the person, not rework): init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before config, so a broken config with no version gets exit 3, not 6 (`upgrade.ts:52`); test-only leftovers `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move`; a few stale comments. The accepted risk (a branch-only record reads as none) is in the PR body.
+- Review #1 minor notes (person, not rework): init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before config, so a broken config with no version exits 3, not 6 (`upgrade.ts:52`); test-only leftovers `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move`. Accepted risk (a branch-only record reads as none) is in the PR body.
 - Person decisions: init refuses pre-0.30 too; config old-key messages drop the `norn upgrade` hint; codes `version_missing`/`version_too_old`; status version item is Unblock → `norn doctor`. Flat records and old `state.json` readers stay.
-- QA note (03.AC2, seen again at QA #6): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
-- CI fixes: fixtures record `norn_version` (`runningVersion(h.deps)` / `h.recordVersion()`); guard unchanged. CI tests the PR merged with main, so a new main fixture that skips `norn init` (as `merged-pr.test.ts` did) needs `h.recordVersion()`; check main's new tests after a merge. Reverse case: init records the version and `h.config` keeps it, so a main test committing only `h.recordVersion()` makes an empty commit and fails (fixed in `worktrees-machine-dir.test.ts`).
-- Release notes come from commits 5e8451d29 and b45b051f0 and the PR body. CHANGELOG is the release step's.
-- `bun run golden` (no flag) harvests cases, not a check; replay with `bun test packages/core/test/unit/golden.test.ts`.
-- ci#5 `fail` was not a code failure: its log was empty because every job passed or was cancelled by ci.yml's `cancel-in-progress` when norn pushed its own step commits (`open-pr.done → ci`, `ci.fail → implement`), and `gh run watch --exit-status` exits 1 on a cancelled run. implement#7 changed no code; CI run 42816392208 on e9b623fe passed every job (unit, package, e2e 3/3, integration 4/4).
-- Friction: the agent hook refuses `git worktree add`/`git push` even in a $TMPDIR QA repo.
-- Friction: the ci check watches a run that norn's own next push cancels, so it fails with an empty log; it should wait for the run on the final pushed head or treat `cancelled` as retry.
+- QA note (03.AC2): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
+- CI fixtures record `norn_version` (`runningVersion(h.deps)` / `h.recordVersion()`). CI tests the PR merged with main: a new main test that skips `norn init` needs `h.recordVersion()`; one that runs init must not also commit `h.recordVersion()` (empty commit).
+- ci#5 `fail` was no code failure: jobs passed or were cancelled by ci.yml `cancel-in-progress` when norn pushed its own step commits; `gh run watch --exit-status` exits 1 on cancelled, empty log. implement#7 changed no code; run 42816392208 on e9b623fe passed every job.
+- Release notes: commits 5e8451d29, b45b051f0 and the PR body. Golden replay: `bun test packages/core/test/unit/golden.test.ts`.
+- Friction: the agent hook refuses `git worktree add`/`git push` in a $TMPDIR QA repo. The ci check watches a run norn's own next push cancels.
 
 #### Resume
 
