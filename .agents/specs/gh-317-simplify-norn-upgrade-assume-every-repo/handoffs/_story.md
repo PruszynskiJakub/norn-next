@@ -63,4 +63,4 @@ Every user story is covered; none UNTRACED.
 
 #### Resume
 
-human-qa: a person confirms the golden/transcript criterion on 87f235f64 (same two pinned-output changes as ruled at human-qa#1/#2), then describe and open-pr.
+open-pr: update PR #325 with pr.md (rewritten at describe#3 from QA #4 evidence, run 01M72KMKJMDFAQSNA4E385AB71; golden/transcript criterion ruled at human-qa#3), then watch CI.
