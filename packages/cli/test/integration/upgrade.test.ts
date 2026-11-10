@@ -358,6 +358,8 @@ criteria:
 Body
 `;
   const slicePath = () => join(h.root, ".agents/specs/gh-12-x/slices/02-two.md");
+  /** a person's own file beside the story folders */
+  const SPECS_README = "# Specs\n\nOne folder per story.\n";
   beforeAll(async () => {
     h = await createHarness();
     expect((await h.norn("init")).exit).toBe(0);
@@ -365,6 +367,7 @@ Body
     h.write(repoConfigPath(h.root), TEAM_OLD);
     h.write(join(workflowsDir(h.root), "plain.json"), `${JSON.stringify({ ...(Bun.YAML.parse(SOLO) as object), name: "plain" }, null, 2)}\n`);
     h.write(slicePath(), SLICE);
+    h.write(join(h.root, ".agents/specs/README.md"), SPECS_README);
     h.git(["add", "-A"]);
     h.git(["commit", "-q", "-m", "an older norn's config"]);
     h.write(join(h.home, "config.yaml"), USER_OLD);
@@ -422,6 +425,11 @@ Body
   test("B44: criteria needs are stripped from every slice, staged", () => {
     expect(h.read(slicePath())).toBe(SLICE.replace("  - { id: c1, verifier: agent, needs: [browser] }\n", "  - { id: c1, verifier: agent }\n"));
     expect(porcelain(h).split("\n")).toContain("M  .agents/specs/gh-12-x/slices/02-two.md");
+  });
+
+  test("B44: a file beside the story folders is skipped, untouched", () => {
+    expect(h.read(join(h.root, ".agents/specs/README.md"))).toBe(SPECS_README);
+    expect(porcelain(h)).not.toContain("README.md");
   });
 
   test("B45, B55: the config loads again; a second run changes nothing; nothing is committed", async () => {

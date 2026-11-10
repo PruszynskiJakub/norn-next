@@ -285,7 +285,8 @@ function stripNeeds(root: string, out: ConfigMigration): void {
     try {
       for (const f of readdirSync(slicesDir(dir)).sort()) if (f.endsWith(".md")) files.push(join(slicesDir(dir), f));
     } catch (e) {
-      if (!isErrno(e, "ENOENT")) throw e;
+      // a person's own file beside the story folders (a README) has no slices
+      if (!isErrno(e, "ENOENT") && !isErrno(e, "ENOTDIR")) throw e;
     }
   }
   for (const path of files) {

@@ -91,6 +91,7 @@ export const watchCommand = defineCommand({
   summary: "Run ticks in a loop; a clean exit releases held claims",
   usage: "norn watch [--interval 30s] [--max-ticks N] [--keep-claims] [--human]",
   options: { interval: { type: "string" }, "max-ticks": { type: "string" }, "keep-claims": { type: "boolean" }, human: { type: "boolean" } },
+  textFlag: "human",
   async run(ctx, args) {
     const raw = opt.str(args, "interval") ?? DEFAULT_INTERVAL;
     let interval: number;

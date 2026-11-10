@@ -144,6 +144,15 @@ describe("commands that act refuse a mismatched binary (D1, D2)", () => {
     expect(r.stdout).toContain("Do instead: install norn 0.19.x");
   });
 
+  test("AC2: watch --human prints the refusal as markdown; with --json too, as JSON", async () => {
+    const human = await as(h, "0.18.1", ["watch", "--max-ticks", "1", "--human"]);
+    expect(human.exit).toBe(3);
+    expect(human.stdout).toStartWith("**Refused (version_mismatch):** this repo needs norn 0.19.x (you run 0.18.1)");
+    const json = await as(h, "0.18.1", ["watch", "--max-ticks", "1", "--human", "--json"]);
+    expect(json.exit).toBe(3);
+    expect(JSON.parse(json.stdout)).toMatchObject(NEEDS_019);
+  });
+
   test("AC3: a binary newer than the repo is told to run norn upgrade and commit, or install the repo's norn", async () => {
     setVersion(team(), "0.18.0");
     try {
