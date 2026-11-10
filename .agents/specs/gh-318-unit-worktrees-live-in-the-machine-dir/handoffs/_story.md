@@ -37,13 +37,14 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Not proven yet
 
-- The full integration and e2e tiers on CI after ci fix #5 (implement#5). Locally green at implement#5: unit 1739, typecheck, integration takeover-record-lost (12/12), worktrees-machine-dir, machine-dir, housekeeping, run-state-machine-dir, check-run, story-decision.
+- The full integration and e2e tiers on CI after ci fix #5 (implement#5). Locally green at implement#5: unit 1739, typecheck, 7 related integration files.
 - ci#5 failed on a real regression (not a flake): B26 "a wiped machine dir… no ref" in `takeover-record-lost.test.ts`. Fixed in implement#5, see Notes. The EFAULT cleanup flake fix (harness `removeTree` retry, then `rm -rf`) is still unproven on CI.
 
 ## Notes
 
+- Wiped machine dir (ci fix #5): a wiped home now takes the unit worktrees with it, leaving git a prunable registration and the local branch. Two product fixes: observe's `classifyWorktrees` skips a worktree whose folder is gone (else `restore_markers` recreates the path as a non-repo folder and intake's `git add` fails); intake skips a story whose branch is on the remote even when a local branch is left (it continues by `story checkout`, which prunes the stale registration). The B26 no-ref test now expects A's tick to emit only that skipped intake (no `claim.other`: unknown locally, as on a fresh clone) and no worktree; `checkout --force` still restarts implement with record_lost.
 - `machine-dir.test.ts` skips the machine dir's `worktrees/` when collecting machine-local file names (it holds the repo's own files). A test that unbinds the home must not call `h.worktree`/`worktreesOf` afterwards. Run one integration file: `bun test --config=bunfig.integration.toml --timeout=20000 ./<path>`.
-- Upgrade test B16 makes its unit worktree beside the checkout: `toOldLayout` moves the whole machine dir, worktrees included (no product change).
+- Upgrade test B16: `toOldLayout` moves the whole machine dir, worktrees included.
 - Person decided (refine): no compatibility with `<repo>-worktrees/`; repo moves and doctor's adoption advice out of scope; worktrees in the per-checkout machine dir, not a shared `~/.norn/worktrees/`.
 - Person agreed (plan): seams S1 (cli integration harness) and S2 (decide through Facts), prefactors first, harness check at cleanup (D4), golden corpus rewritten mechanically (D5).
 - `machineHomeOf` resolves the home (one spelling for every machine-dir path), memoized only once the home exists.
@@ -51,4 +52,4 @@ Open minor: the decide fixture still reports `/r-worktrees`. Nit: `orphanedMachi
 
 ## Resume
 
-describe #5 rewrote `pr.md` for head c892491c from story QA #5 (evidence run 01M72HNM90W87PFC8WR4VJPDGK, 16/16 pass). Next: open-pr updates PR #320, then ci; the CI run on this head is the first to check the merged code's integration tier.
+implement #5 fixed ci#5's failure (wiped machine dir, B26) with two small product changes in `observe/index.ts` (`classifyWorktrees`) and `act/lifecycle.ts` (`intake`) plus the B26 test. Next: review the diff since c892491c, then test, qa, describe, open-pr, ci.
