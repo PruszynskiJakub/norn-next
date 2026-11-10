@@ -20,12 +20,6 @@ export const LOCAL_CONFIG_SCHEMA_FILE = ".agents/norn.config.local.schema.json";
 export const USER_CONFIG_SCHEMA_FILE = "config.schema.json";
 export const WORKFLOWS_DIR = ".agents/workflows";
 
-/** The old layout's places, relative to the main checkout; only refused and moved from, never read. */
-export const OLD_NORN_DIR = ".agents/norn";
-export const OLD_CONFIG_FILE = ".agents/norn/config.yaml";
-export const OLD_WORKFLOWS_DIR = ".agents/norn/workflows";
-export const OLD_TRACE_DIR = ".agents/norn/trace";
-
 export const repoConfigPath = (root: string) => join(root, REPO_CONFIG_FILE);
 export const workflowsDir = (root: string) => join(root, WORKFLOWS_DIR);
 /** Whether norn is set up in this checkout (the cockpit falls back to the last repo otherwise). */

@@ -9,13 +9,15 @@ import { lstatSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs
 import { dirname, join } from "node:path";
 import { versionBaseline } from "@norn/core";
 import { validate } from "@norn/schema";
-import { acquireTickLock, OLD_CONFIG_FILE, REPO_CONFIG_FILE, repoConfigPath } from "@norn/store";
+import { acquireTickLock, REPO_CONFIG_FILE, repoConfigPath } from "@norn/store";
 import type { CliResult } from "../../src/index.ts";
-import { createHarness, type Harness, runChecked, sh } from "../../../../test/support/harness.ts";
+import { createHarness, type Harness, PRE_013_NORN_DIR, runChecked, sh } from "../../../../test/support/harness.ts";
 
 setDefaultTimeout(60_000);
 
 const RUNNING = "0.31.0";
+/** where a pre-0.13 norn kept the team config */
+const OLD_CONFIG = `${PRE_013_NORN_DIR}/config.yaml`;
 const skill = (h: Harness, name: string) => join(h.root, ".agents", "skills", name, "SKILL.md");
 const link = (h: Harness, name: string) => join(h.root, ".claude", "skills", name);
 const teamFile = (h: Harness) => readFileSync(repoConfigPath(h.root), "utf8");
@@ -91,8 +93,8 @@ describe("norn upgrade refuses before any write", () => {
   test("a repo with only the pre-0.13 config file is a repo with no version: version_missing, the old file untouched", async () => {
     const h = await repoAt030();
     try {
-      mkdirSync(dirname(join(h.root, OLD_CONFIG_FILE)));
-      sh(h.root, ["mv", REPO_CONFIG_FILE, OLD_CONFIG_FILE]);
+      mkdirSync(dirname(join(h.root, OLD_CONFIG)));
+      sh(h.root, ["mv", REPO_CONFIG_FILE, OLD_CONFIG]);
       sh(h.root, ["commit", "-q", "-m", "an old layout"]);
       const before = snapshot(h);
       expectRefused(await h.norn("upgrade", "--json"), "version_missing");

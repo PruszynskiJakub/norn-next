@@ -8,8 +8,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { REMOVED_COMMANDS } from "@norn/core";
-import { OLD_NORN_DIR } from "@norn/store";
-import { createHarness, type Harness } from "../../../../test/support/harness.ts";
+import { createHarness, type Harness, PRE_013_NORN_DIR } from "../../../../test/support/harness.ts";
 
 setDefaultTimeout(30_000);
 
@@ -104,7 +103,7 @@ describe("norn upgrade in help", () => {
     expect(upgrade?.summary).toMatch(/^Move .*norn_version.*bundled skills.*0\.30.*stage/);
     expect(upgrade?.summary).not.toContain("\n");
     for (const args of [["help"], ["help", "--all"], ["help", "--json"], ["help", "--all", "--json"]]) {
-      expect((await h.norn(...args)).stdout).not.toContain(`${OLD_NORN_DIR}/`);
+      expect((await h.norn(...args)).stdout).not.toContain(`${PRE_013_NORN_DIR}/`);
     }
   });
 });

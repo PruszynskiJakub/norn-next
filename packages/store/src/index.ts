@@ -12,7 +12,6 @@ export * from "./fsx.ts";
 export { type CasResult, fetchNornRefs, gitRemoteUrl, gitTimeoutMs, NETWORK_TIMEOUT_MS, onlyNornCommitsSince } from "./git.ts";
 export * from "./heartbeat.ts";
 export * from "./inbox-history.ts";
-export * from "./layout.ts";
 export * from "./leases.ts";
 export * from "./local.ts";
 export * from "./local-facts.ts";

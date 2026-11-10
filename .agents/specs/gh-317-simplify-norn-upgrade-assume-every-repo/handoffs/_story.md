@@ -50,8 +50,7 @@ Every user story is covered by the criteria above; none is UNTRACED.
 
 #### Not proven yet
 
-- **Blocking F1** (old-layout code the plan's D10 removes is still there, dead): `packages/store/src/layout.ts` + its export in `store/src/index.ts:15`, `OLD_*` in `store/src/paths.ts:24-27`, `packages/cli/src/runtime/layout.ts` (no callers), `toOldLayout` in `test/support/harness.ts:459`, `docs/development.md:26` "layout.ts (old/new/both)".
-- **Blocking F2**: `packages/cli/src/commands/config.ts:112` tells a person that `norn upgrade` records a missing norn_version, but upgrade now refuses that repo with version_missing. Reword it to point at `norn init` or the 0.30 path, and update `config.test.ts` › "B4: without the key, get shows no value and that norn upgrade records it".
+- Review #1's blocking findings are fixed in implement #2 and await re-review: (F1) old-layout code removed: store `layout.ts` and its export, the `OLD_*` paths, cli `runtime/layout.ts`, harness `toOldLayout`, the development.md mentions; the tests spell `.agents/norn` through the harness's `PRE_013_NORN_DIR`; the verify grep finds nothing; the paths.ts allowance in `repo.test.ts` is down to 2. (F2) `norn config`'s note for a missing norn_version now says `norn init` records it on a new repo and a repo from an older norn needs norn 0.30.x and `norn upgrade` first; pinned by `config.test.ts` › "B4: without the key, get shows no value, that norn init records it and the 0.30 path".
 - QA has not re-checked 03.AC11 (docs) since the docs fix; a person has not ruled on 06.AC4's one-line transcript change.
 - The integration and e2e tiers run in CI only.
 
@@ -63,4 +62,4 @@ Every user story is covered by the criteria above; none is UNTRACED.
 
 #### Resume
 
-Implement: fix F1 (delete the dead old-layout code and its doc mention) and F2 (the config null-meaning text and its test), then run `bun run test` and `bun run typecheck`.
+Review the fixes for review #1's two blocking findings (implement #2); unit tier and typecheck are green.

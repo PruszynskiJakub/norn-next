@@ -421,12 +421,12 @@ describe("the team's norn version (D4)", () => {
     expect(md.stdout).toContain("| `norn_version` | `0.19.0` | repo |");
   });
 
-  test("B4: without the key, get shows no value and that norn upgrade records it", async () => {
+  test("B4: without the key, get shows no value, that norn init records it and the 0.30 path", async () => {
     const got = await h.norn("config", "get", "norn_version", "--json");
     expect((got.value as Listed).entries).toMatchObject([{ key: "norn_version", value: null, source: "built-in" }]);
     const md = await h.norn("config", "get", "norn_version");
     expect(md.exit).toBe(0);
-    expect(md.stdout).toContain("| `norn_version` | not recorded: `norn upgrade` records it |");
+    expect(md.stdout).toContain("| `norn_version` | not recorded: `norn init` records it on a new repo; a repo from an older norn needs norn 0.30.x and `norn upgrade` first |");
   });
 
   test("D4, K8: config set and unset of norn_version are refused, exit 3, naming norn upgrade; the file is unchanged", async () => {

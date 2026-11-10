@@ -918,7 +918,7 @@ const SPAWN_ALLOW: Counts = {};
  */
 const NORN_PATH = /\.agents\/norn\b|["'`]\.agents["'`]\s*,\s*["'`]norn["'`]/;
 const NORN_PATH_ALLOW: Record<string, [number, string]> = {
-  "packages/store/src/paths.ts": [6, "the path module, and the old layout's places"],
+  "packages/store/src/paths.ts": [2, "the path module"],
   "packages/schema/src/config.ts": [2, "the config files as messages name them (gh-64 B5: an error names the right file)"],
   "test/support/harness.ts": [1, "the old layout's places as a person had them, spelled independently of store"],
   "packages/cli/test/integration/config.test.ts": [9, "messages: the config errors and `norn config` name the files as a person sees them (gh-64 B5–B7, B39, B54)"],

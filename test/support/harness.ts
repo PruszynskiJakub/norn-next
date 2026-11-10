@@ -6,7 +6,7 @@
  * Reuse: `const h = await createHarness(); await h.norn("init"); …; h.cleanup()`.
  */
 import { setDefaultTimeout } from "bun:test";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { type Clock, type InboxItem, type LaunchSpec, type NotifierPort, type PaneState, type PromptKey, type PullRequestCi, type RemoteIssue, type RemoteLabel, type RemotePort, type RemotePullRequest, type RunnerCapabilities, type RunnerPort, type RunnerSessionInfo, nameRemoved, type SessionRef } from "@norn/core";
@@ -446,24 +446,15 @@ export async function createHarness(opts: HarnessOptions = {}): Promise<Harness>
 
 /** The three layout parts, each with its old place (spelled out: what a person had) and its new one. */
 export type LayoutPartName = "config" | "workflows" | "machine files";
-export const oldNornDir = (root: string) => join(root, ".agents/norn");
+/** Where a pre-0.13 norn kept its files, relative to the main checkout. */
+export const PRE_013_NORN_DIR = ".agents/norn";
+export const oldNornDir = (root: string) => join(root, PRE_013_NORN_DIR);
 export function layoutPlaces(root: string): Record<LayoutPartName, { old: string; new: string }> {
   return {
     config: { old: join(oldNornDir(root), "config.yaml"), new: repoConfigPath(root) },
     workflows: { old: join(oldNornDir(root), "workflows"), new: workflowsDir(root) },
     "machine files": { old: join(oldNornDir(root), "trace"), new: machineDir(root) },
   };
-}
-
-/** A repo on the old layout, built by moving `init`'s files (and the machine dir) back to their old places. */
-export function toOldLayout(root: string, parts: LayoutPartName[] = ["config", "workflows", "machine files"]): void {
-  const places = layoutPlaces(root);
-  for (const p of parts) {
-    const { old, new: now } = places[p];
-    if (!existsSync(now)) continue;
-    mkdirSync(dirname(old), { recursive: true });
-    renameSync(now, old);
-  }
 }
 
 /**
