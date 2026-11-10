@@ -1,0 +1,13 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { createHarness } from "/Users/jakubpruszynski/Projects/norn-worktrees/gh-317-simplify-norn-upgrade-assume-every-repo/test/support/harness.ts";
+const h = await createHarness();
+const team = join(h.root, ".agents", "norn.config.yaml");
+const show = (label: string) => console.log(`=== ${label}\nteam file exists: ${existsSync(team)}\n${existsSync(team) ? readFileSync(team, "utf8").split("\n").filter((l) => l && !l.startsWith("#")).join("\n") : ""}`);
+const r = await h.norn("init", "--json"); console.log("norn init exit:", r.exit);
+show("after norn init");
+h.config("mode: auto\nagent: claude"); show("01.AC1 h.config with only local keys (mode, agent)");
+h.config(""); show("01.AC1 h.config with no keys");
+h.config("max_agents: 2"); show("01.AC1 h.config with only a user key (max_agents)");
+h.config("provider: gh\nbase_branch: main\nworkflow: story"); show("01.AC2 h.config with team keys (provider, base_branch, workflow)");
+h.cleanup();

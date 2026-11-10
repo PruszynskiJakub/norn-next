@@ -1,0 +1,45 @@
+== team file has no norn_version
+$ norn tick --json
+{"error":"this repo records no norn_version","do_instead":"run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_missing","details":{"repo":null,"running":"0.31.0"}}
+exit 3
+
+files changed:        0
+
+$ norn story start gh-1 --json
+{"error":"this repo records no norn_version","do_instead":"run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_missing","details":{"repo":null,"running":"0.31.0"}}
+exit 3
+
+files changed:        0
+
+$ norn init --json
+{"error":"this repo records no norn_version","do_instead":"run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_missing","details":{"repo":null,"running":"0.31.0"}}
+exit 3
+
+files changed:        0
+
+$ norn upgrade --json
+{"error":"this repo records no norn_version","do_instead":"run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_missing","details":{"repo":null,"running":"0.31.0"}}
+exit 3
+
+files changed:        0
+
+$ norn help
+norn — deliver software stories with coding agents; code decides the next step, agents do it.
+
+  FAIL norn           this repo records no norn_version
+                      → run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0
+doctor --json repo.version: {"ok":false,"running":"0.31.0","repo":null,"match":null,"code":"version_missing","error":"this repo records no norn_version","do_instead":"run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0"}
+$ norn status
+! this repo records no norn_version: run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0
+      $ norn doctor
+exit 0
+
+== broken config (invalid YAML), no version
+$ norn tick --json
+{"error":"`.agents/norn.config.yaml`: not valid YAML: Flow sequence in block collection must be sufficiently indented and end with a ] at line 23, column 1:","do_instead":"fix .agents/norn.config.yaml","code":"config_invalid","details":[{"code":"config_invalid","file":"repo","key":"","message":"not valid YAML: Flow sequence in block collection must be sufficiently indented and end with a ] at line 23, column 1:","path":"/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/93efabae-12a8-4e07-930b-8de0e28eb447/scratchpad/qa3/w/r1/.agents/norn.config.yaml"}]}
+exit 6
+
+$ norn story start gh-1 --json
+{"error":"`.agents/norn.config.yaml`: not valid YAML: Flow sequence in block collection must be sufficiently indented and end with a ] at line 23, column 1:","do_instead":"fix .agents/norn.config.yaml","code":"config_invalid","details":[{"code":"config_invalid","file":"repo","key":"","message":"not valid YAML: Flow sequence in block collection must be sufficiently indented and end with a ] at line 23, column 1:","path":"/private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/93efabae-12a8-4e07-930b-8de0e28eb447/scratchpad/qa3/w/r1/.agents/norn.config.yaml"}]}
+exit 6
+

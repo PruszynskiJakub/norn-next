@@ -1,0 +1,34 @@
+== 06.AC2 (valid spec, status: active, no machine-dir run state; base tree holds its runs/)
+.agents/specs/gh-9-done/runs/_story/rounds/01-story/receipts/0001-x.json
+.agents/specs/gh-9-done/runs/_story/state.json
+.agents/specs/gh-9-done/spec.md
+---
+id: gh-9
+slug: done
+provider: gh
+number: 9
+url: https://github.com/qa-example/qa-repo/issues/9
+title: "Done story"
+assignee: qa
+labels:
+  - norn
+workflow: story
+status: active
+intake_at: 2026-11-01T08:00:00.000Z
+body_hash: aaaa5bf58336d1c9038bb879d6431fa0d4f75f80ac49128eb44e1683f8c653a6
+---
+# Done
+$ norn status
+Inbox empty — nothing needs you.
+exit 0
+$ norn status --json
+{"at":"2026-11-10T11:13:57.142Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[],"check":[],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":0,"delegated_counts":{},"heartbeat":{"holder":"jakubpruszynski@mac","last_tick_at":null,"age":null,"down":false,"up":false}}
+
+lines mentioning runs/|run state|run_state|archive|base tree: 0
+$ norn story list
+gh-9 Done story
+  story · manual · unclaimed · not started
+
+0 items need you — norn status
+$ norn run list gh-9 --json
+{"unit":"gh-9","story":"gh-9","slice":null,"title":"Done story","status":"not_started","step":null,"intake_at":"2026-11-01T08:00:00.000Z","done_at":null,"merged_at":null,"totals":{"wall_clock_ms":789238150,"merge_wait_ms":null,"by_type":{},"by_step":{},"human_wait_ms":0},"steps":[],"units":[{"unit":"gh-9","story":"gh-9","slice":null,"title":"Done story","status":"not_started","step":null,"intake_at":"2026-11-01T08:00:00.000Z","done_at":null,"merged_at":null,"totals":{"wall_clock_ms":789238150,"merge_wait_ms":null,"by_type":{},"by_step":{},"human_wait_ms":0}}],"hidden_events":0,"rounds":[],"rec

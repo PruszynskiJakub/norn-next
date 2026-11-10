@@ -1,0 +1,30 @@
+== 04.AC4 repo records 0.35.0, binary 0.36.0; skill norn-plan differs, skill norn-pr missing
+norn_version: 0.35.0
+$ norn init
+norn init in $QA/w/r2
+
+norn version: 0.35.0
+
+  config          .agents/norn.config.yaml kept (exists)
+  user config     ~/.norn/config.yaml kept (exists)
+  review          REVIEW.md kept (exists)
+  workflows       kept quick.yaml, refinement.yaml, reproduce.yaml, slice.yaml, story.yaml, triage.yaml
+  skills          .agents/skills: updated norn-pr; kept norn-plan (norn 0.35.0's to change) (20 skills)
+                  claude → .claude/skills: all linked
+  hooks           claude: up to date
+  hook command    "${NORN_BIN:-norn}" hook
+  .gitignore      up to date
+  remote          no git remote named origin
+  labels          not checked — no git remote
+
+this repo is on norn 0.35.0, you run 0.36.0: `norn upgrade` moves it, with the bundled skills that differ: norn-plan
+
+Next steps
+  1. Add the remote norn syncs issues from and pushes branches to: `git remote add origin <url>`.
+  2. Commit and push the setup: `git add .agents .claude && git commit -m "Set up norn" && git push`.
+  3. Check this machine: `norn doctor`.
+  4. Make a first story: an issue labelled `norn` and assigned to you, e.g. `gh issue create --label norn --assignee @me --title "…"`.
+  5. Pick it up: `norn sync`, keep `norn watch` running (it moves every step on, in manual mode too), and `norn status` shows what needs you and the command for each item.
+exit 0
+after: norn_version: 0.35.0; norn-plan drift line kept: 1; norn-pr present: yes
+?? .agents/skills/norn-pr/

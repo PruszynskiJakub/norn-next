@@ -1,0 +1,3 @@
+#!/bin/zsh
+echo "claude $* (cwd $PWD)" >> $QA/claude6.log
+exit 0

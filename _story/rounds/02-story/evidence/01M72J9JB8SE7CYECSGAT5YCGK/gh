@@ -1,0 +1,7 @@
+#!/bin/zsh
+echo "gh $*" >> $QA/fakegh.log
+case "$FAKEGH" in down) echo "error connecting to api.github.com" >&2; exit 1;; esac
+if [[ "$1 $2" == "label list" ]]; then echo '[{"name":"norn","color":"5319E7","description":"norn"}]'; exit 0; fi
+if [[ "$1 $2" == "label create" ]]; then exit 0; fi
+if [[ "$1 $2" == "auth status" ]]; then echo "Logged in"; exit 0; fi
+echo "[]"; exit 0

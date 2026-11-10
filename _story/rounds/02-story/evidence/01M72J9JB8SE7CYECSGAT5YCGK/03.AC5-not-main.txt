@@ -1,0 +1,8 @@
+== 03.AC5 not_main_checkout: a linked worktree norn made (r6-worktrees/gh-1-demo-story; git-dir ≠ common-dir)
+git-dir: $QA/w/r6/.git/worktrees/gh-1-demo-story
+common-dir: $QA/w/r6/.git
+$ norn upgrade --json  (binary 0.32.0, repo 0.31.0)
+{"error":"$QA/w/r6-worktrees/gh-1-demo-story is not the main checkout; norn upgrade moves the main checkout only, so the move never lands in a story's branch","do_instead":"cd $QA/w/r6 && norn upgrade","code":"not_main_checkout","details":{"main_checkout":"$QA/w/r6"}}
+exit 0
+files changed (worktree + main checkout .agents):        0
+norn exit code (unpiped): 3

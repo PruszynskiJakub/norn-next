@@ -1,0 +1,66 @@
+== 06.AC2 base branch tree holds .agents/specs/gh-9-done/runs/ (committed); repo 0.35.0
+.agents/specs/gh-9-done/runs/_story/rounds/01-story/receipts/0001-x.json
+.agents/specs/gh-9-done/runs/_story/state.json
+$ norn status
+`norn status` now shows what needs you; the story listing moved to `norn story list`.
+Unblock (2) · stuck or broken, needs you to unstick it
+  gh-12      story `gh-12`: `needs` was removed; delete it from the criteria in .agents/specs/gh-12-x/spec.md · 0s
+      $ norn run view gh-12 --why
+  gh-9       corrupt: .agents/specs/gh-9-done/spec.md failed validation · 0s
+      $ norn run view gh-9 --why
+exit 0
+$ norn status --json
+{"at":"2026-11-10T11:12:54.751Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[{"id":"corrupt:gh-12:spec.md","group":"unblock","story":"gh-12","slice":null,"step":null,"title":"story `gh-12`: `needs` was removed; delete it from the criteria in .agents/specs/gh-12-x/spec.md","command":"norn run view gh-12 --why","since":"2026-11-10T11:12:54.751Z","age":"0s"},{"id":"corrupt:gh-9:spec.md","group":"unblock","story":"gh-9","slice":null,"step":null,"title":"corrupt: .agents/specs/gh-9-done/spec.md failed validation","command":"norn run view gh-9 --why","since":"2026-11-10T11:12:54.751Z","age":"0s"}],"check":[],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":2,"delegated_counts":{},"heartbeat":{"holder":"jakubpruszynski@mac","last_tick_at":null,"age":null,"down":false,"up":false}}
+
+1
+
+== 05.AC3 + 06.AC3 doctor
+### r2 (0.35.0, base-tree runs/)
+top keys: ok,live,hook_command,machine,git,agents,remote,labels,runner,skills,repo,warnings,hints
+repo keys: ok,version,skills,workflows,config
+markdown lines matching layout|migrate|run state|runs/: 0
+json matches layout|migrate|run_state|runs/: 0
+--- markdown
+norn doctor: 1 check failed (remote)
+
+  ok   git            git version 2.54.0 (Apple Git-157)
+  ok   agent claude   /Users/jakubpruszynski/.local/bin/claude (2.1.322 (Claude Code)) · hooks fire
+  FAIL remote         gh as PruszynskiJakub
+                      ! this repository has no git remote named origin
+                      → git remote add origin <url>
+  ok   runner         herdr available · sessions run this norn
+                      · cockpit plugin linked
+  ok   skills         installed and linked
+       machine        jakubpruszynski@mac
+  ok   norn           0.35.0 matches this repo's norn version 0.35.0
+  ok   workflows      quick, refinement, reproduce, slice, story, triage valid (.agents/workflows/)
+  ok   config         .agents/norn.config.yaml
+
+Warnings
+  ! labels not checked: no git remote
+### r3 (pre-0.13 only)
+top keys: ok,live,hook_command,machine,git,agents,remote,labels,runner,skills,repo,warnings,hints
+repo keys: ok,version,skills,workflows,config
+markdown lines matching layout|migrate|run state|runs/: 0
+json matches layout|migrate|run_state|runs/: 0
+--- markdown
+norn doctor: 4 checks failed (agent claude, remote, skills, norn)
+
+  ok   git            git version 2.54.0 (Apple Git-157)
+  FAIL agent claude   /Users/jakubpruszynski/.local/bin/claude (2.1.322 (Claude Code)) · hooks missing
+                      · run norn init to install hooks
+  FAIL remote         gh as PruszynskiJakub
+                      ! this repository has no git remote named origin
+                      → git remote add origin <url>
+  ok   runner         herdr available · sessions run this norn
+                      · cockpit plugin linked
+  FAIL skills         missing norn, norn-clarify, norn-codebase-design, norn-diagnose, norn-fsd, norn-fsd-round, norn-implement, norn-interview, norn-merge, norn-plan, norn-pr, norn-prototype, norn-qa, norn-qa-person, norn-refine, norn-retro, norn-review, norn-slice, norn-tdd, norn-triage; not linked for claude: norn, norn-clarify, norn-codebase-design, norn-diagnose, norn-fsd, norn-fsd-round, norn-implement, norn-interview, norn-merge, norn-plan, norn-pr, norn-prototype, norn-qa, norn-qa-person, norn-refine, norn-retro, norn-review, norn-slice, norn-tdd, norn-triage
+                      → norn init
+       machine        jakubpruszynski@mac
+  FAIL norn           this repo records no norn_version
+                      → run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0
+  ok   workflows      none valid in .agents/workflows/
+  ok   config         .agents/norn.config.yaml (none: built-in defaults)
+
+Warnings
+  ! labels not checked: no git remote

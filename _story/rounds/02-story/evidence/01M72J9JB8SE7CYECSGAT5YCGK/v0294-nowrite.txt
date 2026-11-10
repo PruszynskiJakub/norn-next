@@ -1,0 +1,11 @@
+== per-command file snapshot (worktree incl. ignored + machine dir), repo 0.29.4
+exit 3 norn init --json
+diff:
+exit 3 norn upgrade --json
+diff:
+exit 3 norn tick --json
+diff:
+
+$ norn doctor --json | version check
+{}
+keys: ok,live,hook_command,machine,git,agents,remote,labels,runner,skills,repo,warnings,hints

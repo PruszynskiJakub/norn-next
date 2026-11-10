@@ -1,0 +1,8 @@
+$ norn watch --interval 2s --max-ticks 6 --json  (repo 0.31.0; team file set to 0.29.4 ~5s in)
+{"tick_id":"01M72JD7HCPZ2ERZZR5GW55XSW","at":"2026-11-10T11:10:04.844Z","duration_ms":290,"decisions":[],"failed":0}
+{"tick_id":"01M72JD9FZAY7PQ7P610NE5F3Z","at":"2026-11-10T11:10:06.847Z","duration_ms":59,"decisions":[],"failed":0}
+{"tick_id":"01M72JDBEG2Y8N6M2NAY4REV1A","at":"2026-11-10T11:10:08.848Z","duration_ms":55,"decisions":[],"failed":0}
+{"at":"2026-11-10T11:10:10.848Z","error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.31.0"}}
+{"at":"2026-11-10T11:10:12.849Z","error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.31.0"}}
+{"at":"2026-11-10T11:10:14.851Z","error":"this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on","do_instead":"install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_too_old","details":{"repo":"0.29.4","running":"0.31.0"}}
+{"ticks":6,"failed_actions":0,"skipped_busy":0,"skipped_version":3,"interval":"2s","released":[]}

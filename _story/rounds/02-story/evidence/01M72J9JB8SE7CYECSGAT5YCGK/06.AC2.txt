@@ -1,0 +1,49 @@
+== 06.AC2 (clean fixture): base tree holds .agents/specs/gh-9-done/{spec.md,runs/…} committed, gh-9 has no machine-dir run state
+.agents/specs/gh-9-done/runs/_story/rounds/01-story/receipts/0001-x.json
+.agents/specs/gh-9-done/runs/_story/state.json
+.agents/specs/gh-9-done/spec.md
+$ norn status
+Unblock (1) · stuck or broken, needs you to unstick it
+  gh-9       corrupt: .agents/specs/gh-9-done/spec.md failed validation · 0s
+      $ norn run view gh-9 --why
+exit 0
+$ norn status --json
+{"at":"2026-11-10T11:13:22.483Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[{"id":"corrupt:gh-9:spec.md","group":"unblock","story":"gh-9","slice":null,"step":null,"title":"corrupt: .agents/specs/gh-9-done/spec.md failed validation","command":"norn run view gh-9 --why","since":"2026-11-10T11:13:22.483Z","age":"0s"}],"check":[],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":1,"delegated_counts":{},"heartbeat":{"holder":"jakubpruszynski@mac","last_tick_at":null,"age":null,"down":false,"up":false}}
+
+lines mentioning runs/|run state|run_state|archive|base tree: 0
+$ norn story list
+gh-9 gh-9
+  triage · manual · unclaimed · not started
+  ! .agents/specs/gh-9-done/spec.md: must have required property 'status'
+
+1 item needs you — norn status
+== 06.AC2 (valid spec, status: closed)
+---
+id: gh-9
+slug: done
+provider: gh
+number: 9
+url: https://github.com/qa-example/qa-repo/issues/9
+title: "Done story"
+assignee: qa
+labels:
+  - norn
+workflow: story
+status: closed
+---
+# Done
+$ norn status
+Unblock (1) · stuck or broken, needs you to unstick it
+  gh-9       corrupt: .agents/specs/gh-9-done/spec.md failed validation · 0s
+      $ norn run view gh-9 --why
+exit 0
+$ norn status --json
+{"at":"2026-11-10T11:13:30.697Z","groups":{"your_turn":[],"answer":[],"approve":[],"unblock":[{"id":"corrupt:gh-9:spec.md","group":"unblock","story":"gh-9","slice":null,"step":null,"title":"corrupt: .agents/specs/gh-9-done/spec.md failed validation","command":"norn run view gh-9 --why","since":"2026-11-10T11:13:30.697Z","age":"0s"}],"check":[],"unclaimed":[],"running":[],"notes":[],"recently_done":[]},"pending":1,"delegated_counts":{},"heartbeat":{"holder":"jakubpruszynski@mac","last_tick_at":null,"age":null,"down":false,"up":false}}
+
+lines mentioning runs/|run state|run_state|archive|base tree: 0
+$ norn story list
+gh-9 gh-9
+  triage · manual · unclaimed · not started
+  ! .agents/specs/gh-9-done/spec.md: must have required property 'intake_at'
+
+1 item needs you — norn status

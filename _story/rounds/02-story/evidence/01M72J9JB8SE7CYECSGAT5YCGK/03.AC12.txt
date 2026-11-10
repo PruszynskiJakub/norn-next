@@ -1,0 +1,29 @@
+b45b051f05353aef18bf8baa5baca5143f015495
+feat!: norn upgrade moves only a 0.30+ repo; remove norn migrate
+
+`norn upgrade` now only moves a repo from norn 0.30 on: it rewrites and
+relinks the bundled skills, writes `norn_version` last, stages
+everything, prints the commit to make and creates missing labels. Every
+check runs before any write: main checkout, the 0.30 baseline
+(`version_missing` / `version_too_old`, with the 0.30.x path), a binary
+older than the repo (`version_backward`), a config that loads, the tick
+lock.
+
+It no longer moves the old layout, renames old config keys, strips
+criteria `needs` from slices and specs, moves base-tree run state into
+archive refs, or edits `.gitattributes`. Config validation still flags
+an old key, but no longer tells you to run `norn upgrade`; its
+do_instead names the file to fix.
+
+Release note:
+- `norn migrate` is removed; it is now an unknown command. Use
+  `norn upgrade`.
+- `norn upgrade --json` drops the fields `moves`, `config`, `run_state`
+  and `gitattributes`; it holds `norn_version`, `skills`, `staged`,
+  `commit` and `labels`.
+- A repo with no or a pre-0.30 `norn_version` must go through norn
+  0.30.x first: install it, run `norn upgrade`, commit, then upgrade
+  again.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+

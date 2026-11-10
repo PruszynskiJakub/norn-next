@@ -1,0 +1,22 @@
+== 03.AC4 markdown, repo at 0.33.0
+$ norn upgrade
+# norn upgrade
+
+already on norn 0.33.0: nothing to upgrade
+
+labels: not checked — no git remote
+exit 0
+
+== 03.AC5 version_backward: binary 0.30.5, repo 0.33.0
+$ norn upgrade --json
+{"error":"this repo is set up for norn 0.33.0; upgrade will not move it back","do_instead":"install norn 0.33.x","code":"version_backward","details":{"repo":"0.33.0","running":"0.30.5"}}
+exit 3
+
+files changed:        0
+== 03.AC5 tick_locked: another process holds the tick lock
+{"ok":true}
+$ norn upgrade --json
+{"error":"a tick is running (pid 43741, qa holder); norn upgrade never rewrites the repo under a running tick","do_instead":"stop `norn watch` and run it again","code":"tick_locked"}
+exit 3
+
+files changed:        0

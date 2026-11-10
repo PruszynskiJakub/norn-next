@@ -1,0 +1,76 @@
+== 03.AC1 + 03.AC3: repo 0.30.0, binary 0.31.0; skill norn-review drifted, link .claude/skills/norn-tdd removed; fake gh with only label 'norn'
+$ norn upgrade
+# norn upgrade
+
+norn version 0.30.0 → 0.31.0; skills updated: norn-review; skills relinked: norn-tdd
+
+Skills rewritten from norn 0.31.0's copies (`git diff --staged .agents/skills/` shows how): norn-review
+
+.agents/norn.config.yaml: `norn_version: 0.31.0` (staged)
+
+labels: created norn:wf:quick, norn:wf:refinement, norn:wf:reproduce, norn:wf:slice, norn:wf:story, norn:wf:triage, norn:kind:bug, norn:kind:feature, norn:kind:security, norn:kind:chore, norn:kind:docs, norn:risk:low, norn:risk:medium, norn:risk:high, norn:priority:low, norn:priority:medium, norn:priority:high, norn:priority:extreme; 1 already there
+
+Review the staged changes with `git diff --staged`, then commit them: `git commit -m "Upgrade norn to 0.31.0 (norn upgrade)"`
+exit 0
+
+HEAD unchanged (nothing committed): yes
+--- git status
+M  .agents/norn.config.yaml
+M  .agents/skills/norn-review/SKILL.md
+A  .claude/skills/norn-tdd
+norn_version: 0.31.0
+norn-review matches bundled: yes
+lrwxr-xr-x@ 1 jakubpruszynski  wheel  29 Nov 10 12:10 .claude/skills/norn-tdd -> ../../.agents/skills/norn-tdd
+--- gh calls
+gh label list --limit 1000 --json name,color,description
+gh label create norn:wf:quick --color 5319E7 --description Make a small change (refactor, 
+gh label create norn:wf:refinement --color 5319E7 --description Agree a story's spec and p
+gh label create norn:wf:reproduce --color 5319E7 --description Reproduce a bug through the
+gh label create norn:wf:slice --color 5319E7 --description Build one slice test-first, che
+gh label create norn:wf:story --color 5319E7 --description Slice a planned story against t
+gh label create norn:wf:triage --color 5319E7 --description Check an issue still holds, ad
+gh label create norn:kind:bug --color 5319E7 --description Kind: something does not work a
+gh label create norn:kind:feature --color 5319E7 --description Kind: new or changed behavi
+gh label create norn:kind:security --color 5319E7 --description Kind: a vulnerability or s
+gh label create norn:kind:chore --color 5319E7 --description Kind: maintenance (dependenci
+gh label create norn:kind:docs --color 5319E7 --description Kind: documentation only
+gh label create norn:risk:low --color 5319E7 --description Risk: a two-way door with a sma
+gh label create norn:risk:medium --color 5319E7 --description Risk: a two-way door that to
+gh label create norn:risk:high --color 5319E7 --description Risk: a one-way door or a wide
+gh label create norn:priority:low --color 5319E7 --description Priority: can wait until th
+gh label create norn:priority:medium --color 5319E7 --description Priority: do it soon, in
+gh label create norn:priority:high --color 5319E7 --description Priority: do it next; it b
+gh label create norn:priority:extreme --color 5319E7 --description Priority: drop other wo
+
+== 03.AC4 current repo
+$ norn upgrade --json
+{"norn_version":{"from":"0.31.0","to":"0.31.0","changed":false},"skills":{"updated":[],"linked":[]},"staged":[],"commit":null,"labels":{"checked":true,"created":["norn:wf:quick","norn:wf:refinement","norn:wf:reproduce","norn:wf:slice","norn:wf:story","norn:wf:triage","norn:kind:bug","norn:kind:feature","norn:kind:security","norn:kind:chore","norn:kind:docs","norn:risk:low","norn:risk:medium","norn:risk:high","norn:priority:low","norn:priority:medium","norn:priority:high","norn:priority:extreme"],"existing":["norn"],"missing":[],"not_created":[],"unused":[]}}
+exit 0
+
+       0
+== 03.AC4 skills-only drift
+$ norn upgrade --json
+{"norn_version":{"from":"0.31.0","to":"0.31.0","changed":false},"skills":{"updated":["norn-tdd"],"linked":[]},"staged":[".agents/skills/norn-tdd"],"commit":"git commit -m \"Refresh norn's skills (norn upgrade)\"","labels":{"checked":true,"created":["norn:wf:quick","norn:wf:refinement","norn:wf:reproduce","norn:wf:slice","norn:wf:story","norn:wf:triage","norn:kind:bug","norn:kind:feature","norn:kind:security","norn:kind:chore","norn:kind:docs","norn:risk:low","norn:risk:medium","norn:risk:high","norn:priority:low","norn:priority:medium","norn:priority:high","norn:priority:extreme"],"existing":["norn"],"missing":[],"not_created":[],"unused":[]}}
+exit 0
+
+On branch main
+nothing to commit, working tree clean
+== 03.AC8 key set of a successful upgrade --json (0.31.0 → 0.32.0)
+["norn_version","skills","staged","commit","labels"] {"norn_version":["from","to","changed"],"skills":["updated","linked"],"staged":"object","commit":"string","labels":["checked","created","existing","missing","not_created","unused"]}
+
+== 03.AC3 remote unreachable (fake gh exits 1), 0.32.0 → 0.33.0
+$ norn upgrade
+# norn upgrade
+
+norn version 0.32.0 → 0.33.0
+
+.agents/norn.config.yaml: `norn_version: 0.33.0` (staged)
+
+labels: not checked — gh label list failed (exit 1): error connecting to api.github.com: run norn upgrade again
+
+Review the staged changes with `git diff --staged`, then commit them: `git commit -m "Upgrade norn to 0.33.0 (norn upgrade)"`
+exit 0
+
+norn_version: 0.33.0
+.agents/norn.config.yaml
+gh label list --limit 1000 --json name,color,description

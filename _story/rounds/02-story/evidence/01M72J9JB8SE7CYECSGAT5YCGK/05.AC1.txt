@@ -1,0 +1,19 @@
+== 05.AC1 repo holding only pre-0.13 files .agents/norn/{config.yaml,workflows/duo.yaml,trace/…}
+4345b7afc614ce0be50cd01105f89253ad0f5b56  .agents/norn/config.yaml
+6e1e829da09d8f4df97d441654aa04199110098b  .agents/norn/trace/2026-01-01.jsonl
+7b28b8ede903f1bec28f20efc7b1adace5516807  .agents/norn/workflows/duo.yaml
+$ norn tick --json
+{"error":"this repo records no norn_version","do_instead":"run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_missing","details":{"repo":null,"running":"0.31.0"}}
+exit 3
+
+$ norn story start gh-3 --json
+{"error":"this repo records no norn_version","do_instead":"run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_missing","details":{"repo":null,"running":"0.31.0"}}
+exit 3
+
+$ norn sync --json
+{"error":"this repo records no norn_version","do_instead":"run `norn init` if norn was never set up here; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.0","code":"version_missing","details":{"repo":null,"running":"0.31.0"}}
+exit 3
+
+4345b7afc614ce0be50cd01105f89253ad0f5b56  .agents/norn/config.yaml
+6e1e829da09d8f4df97d441654aa04199110098b  .agents/norn/trace/2026-01-01.jsonl
+7b28b8ede903f1bec28f20efc7b1adace5516807  .agents/norn/workflows/duo.yaml

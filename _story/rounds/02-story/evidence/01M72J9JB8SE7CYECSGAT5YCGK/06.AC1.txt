@@ -1,0 +1,109 @@
+== 06.AC1 story gh-1 (triage, manual) started; runs/ committed in its branch tree at ce18bd0 (local)
+branch-tree runs/ (local): 2 files; (remote): 0 files; tip ce18bd0
+
+$ norn tick --json
+{"tick_id":"01M72JQ0BNKV6ZWMNFK58Z8HQD","at":"2026-11-10T11:15:25.173Z","duration_ms":417,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"agent.ready.manual","kind":"noop","ok":true}],"notified":["your_turn:gh-1:explore#1"],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"after","ms":127}}
+exit 0
+branch-tree runs/ (local): 2 files; (remote): 0 files; tip ce18bd0
+
+$ norn tick --json
+{"tick_id":"01M72JQ10JH3Y1HVH9HMFT1BXE","at":"2026-11-10T11:15:25.842Z","duration_ms":268,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"agent.ready.manual","kind":"noop","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"observe.local","ms":124}}
+exit 0
+branch-tree runs/ (local): 2 files; (remote): 0 files; tip ce18bd0
+
+### report the step from the unit worktree (dev build)
+$ norn done done --handoff 'QA demo'
+**Refused (no_run):** no run of explore#1 has started in this worktree
+
+Do instead: norn brief (it starts the run), do the step, then report
+branch-tree runs/ (local): 2 files; (remote): 0 files; tip ce18bd0
+
+$ norn tick --json
+{"tick_id":"01M72JQ1T0XB3QBKCNAT75W94D","at":"2026-11-10T11:15:26.656Z","duration_ms":266,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"agent.ready.manual","kind":"noop","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"observe.local","ms":126}}
+exit 0
+branch-tree runs/ (local): 2 files; (remote): 0 files; tip ce18bd0
+
+$ norn tick --json
+{"tick_id":"01M72JQ29YKGCT28ERMQMJZ013","at":"2026-11-10T11:15:27.166Z","duration_ms":277,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"agent.ready.manual","kind":"noop","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"observe.local","ms":125}}
+exit 0
+branch-tree runs/ (local): 2 files; (remote): 0 files; tip ce18bd0
+
+$ norn tick --json
+{"tick_id":"01M72JQ2TQ7CBKXE7CF3W7PQHG","at":"2026-11-10T11:15:27.703Z","duration_ms":275,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"agent.ready.manual","kind":"noop","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"observe.local","ms":127}}
+exit 0
+branch-tree runs/ (local): 2 files; (remote): 0 files; tip ce18bd0
+
+### branch log
+ce18bd0 QA: runs/ in the story branch tree
+c78eb2b norn: start gh-1 (triage)
+516495a norn: intake gh-1 Demo story
+8324ab2 setup
+421cf04 init
+--- commits touching runs/:
+ce18bd0 QA: runs/ in the story branch tree
+--- remote:
+--- machine-dir run state:
+$QA/w/home/repos/r6-6d53688a/runs/gh-1/_story/rounds/01-triage/state.json
+$ norn story list
+gh-1 Demo story
+  triage · manual · mine · ready explore#1 28s
+  → cd $QA/w/r6-worktrees/gh-1-demo-story && claude --permission-mode auto -- 'Run `norn brief` in this worktree and do the step it gives you.'
+  base main: up to date
+
+### brief + done from the unit worktree (dev build)
+$ norn brief | head -3
+# norn brief — gh-1 · explore #1
+
+You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+$ norn done done --handoff 'QA demo'
+Reported `done done` (gh-1, step explore #1).
+Receipt: `../../home/repos/r6-6d53688a/runs/gh-1/_story/rounds/01-triage/receipts/0002-done.json`
+
+**End your turn now.** Do not report again; norn routes the work from here.
+branch-tree runs/ (local): 2 files; (remote): 0 files; tip ce18bd0
+
+$ norn tick --json
+{"tick_id":"01M72JQDEN1V0G4MPJ5M3D2A4W","at":"2026-11-10T11:15:38.581Z","duration_ms":638,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"receipts.apply","kind":"apply_receipts","ok":true}],"notified":["round_done:gh-1:_story/rounds/01-triage"],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"act apply_receipts gh-1","ms":193},"follow_up":true}
+exit 0
+branch-tree runs/ (local): 2 files; (remote): 2 files; tip ae5aa80
+
+$ norn tick --json
+{"tick_id":"01M72JQEABNNXFWAFQQDCBHEF9","at":"2026-11-10T11:15:39.467Z","duration_ms":334,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"story.round_done","kind":"noop","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"observe.local","ms":166}}
+exit 0
+branch-tree runs/ (local): 2 files; (remote): 2 files; tip ae5aa80
+
+$ norn tick --json
+{"tick_id":"01M72JQEWJ3P8JSSGJDMBWVKQF","at":"2026-11-10T11:15:40.050Z","duration_ms":321,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"story.round_done","kind":"noop","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"observe.local","ms":176}}
+exit 0
+branch-tree runs/ (local): 2 files; (remote): 2 files; tip ae5aa80
+
+### branch log
+ae5aa80 norn: gh-1 explore.done → $done
+ce18bd0 QA: runs/ in the story branch tree
+c78eb2b norn: start gh-1 (triage)
+516495a norn: intake gh-1 Demo story
+8324ab2 setup
+421cf04 init
+--- commits touching runs/ (local):
+ce18bd0 QA: runs/ in the story branch tree
+--- remote branch log:
+ae5aa80 norn: gh-1 explore.done → $done
+ce18bd0 QA: runs/ in the story branch tree
+c78eb2b norn: start gh-1 (triage)
+516495a norn: intake gh-1 Demo story
+8324ab2 setup
+--- remote commits touching runs/:
+ce18bd0 QA: runs/ in the story branch tree
+--- machine-dir run state:
+$QA/w/home/repos/r6-6d53688a/runs/gh-1/_story/rounds/01-triage/state.json
+$QA/w/home/repos/r6-6d53688a/runs/gh-1/_story/rounds/01-triage/receipts/0002-done.json
+$QA/w/home/repos/r6-6d53688a/runs/gh-1/_story/rounds/01-triage/receipts/0001-started.json
+$ norn story list
+gh-1 Demo story
+  triage · manual · mine · done 2s
+  base main: up to date
+
+Recently done
+--- runs/ tree identical between QA commit and the tip:
+3ed29dacdd861127fc079f623609671f071353b7
+3ed29dacdd861127fc079f623609671f071353b7

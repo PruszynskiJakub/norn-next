@@ -1,0 +1,22 @@
+5e8451d2912d28ba9503c8ac39284596f1b566f0
+feat: refuse a repo with no or a pre-0.30 norn_version
+
+Every command that acts now refuses (exit 3) a repo whose main checkout
+records no `norn_version` (code `version_missing`) or one below 0.30
+(code `version_too_old`), before it writes, launches or pushes anything,
+instead of running on default config. The refusal names the path
+forward: install norn 0.30.x, run `norn upgrade`, commit, then run
+`norn upgrade` again with this norn; for a missing version, `norn init`
+if norn was never set up there. `norn watch` pauses its ticks on it, and
+`norn status` shows it as an Unblock item pointing to `norn doctor`
+(it was a Check item pointing to `norn upgrade`). `help`, `doctor`,
+`init` and `upgrade` are not stopped by the guard.
+
+Release note: a repo with no or a pre-0.30 `norn_version` is now refused
+by every acting command, with the codes `version_missing` and
+`version_too_old`.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+5e8451d29 on HEAD
+b45b051f0 on HEAD

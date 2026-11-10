@@ -1,0 +1,28 @@
+$ norn sync --json
+{"tick_id":"01M72JP68S6BC88Y0Q23HJ8GT7","at":"2026-11-10T11:14:58.457Z","duration_ms":525,"sync":{"ran":true,"ok":true},"decisions":[{"unit":"gh-1","rule":"remote.intake","kind":"intake_story","ok":true,"story":"gh-1"}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"act intake_story gh-1","ms":229},"follow_up":true,"intake":[{"rule":"remote.intake","ok":true}]}
+exit 0
+
+$ norn tick --json
+{"tick_id":"01M72JP6ZBEC5E0KJA8BY89ESA","at":"2026-11-10T11:14:59.179Z","duration_ms":378,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"claim.acquire.intake","kind":"claim","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"act claim gh-1","ms":123},"follow_up":true}
+exit 0
+
+$ norn tick --json
+{"tick_id":"01M72JP7HENSHWXZX3W2MX9JCV","at":"2026-11-10T11:14:59.758Z","duration_ms":453,"sync":{"ran":false,"ok":true},"decisions":[{"unit":"gh-1","rule":"story.start","kind":"start_unit","ok":true}],"notified":[],"trace":"2026-11-10.jsonl","failed":0,"slowest":{"phase":"act start_unit gh-1","ms":227},"follow_up":true}
+exit 0
+
+$ norn story start gh-1 --json
+{"unit":"gh-1","step":"explore","worktree":"$QA/w/r6-worktrees/gh-1-demo-story","command":"cd /private/tmp/claude-501/-Users-jakubpruszynski-Projects-norn-worktrees-gh-317-simplify-norn-upgrade-assume-every-repo/93efabae-12a8-4e07-930
+exit 0
+
++ gh-1-demo-story
+* main
+  remotes/origin/gh-1-demo-story
+  remotes/origin/main
+home
+r1
+r2
+r3
+r3-unit
+r6
+r6-worktrees
+remote6.git

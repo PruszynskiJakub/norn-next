@@ -1,0 +1,49 @@
+== 03.AC9 (a) spec+slice with criteria needs, .gitattributes runs line, valid config; 0.34.0 → 0.35.0
+71f807e9fcf87c6d9ef8f7fbf78ed6e64be694ae  .agents/specs/gh-12-x/spec.md
+0b1416e34765fcc3ae67818ad9d2c88ffde7037a  .agents/specs/gh-12-x/slices/02-two.md
+db405712ec48c2d0d0dfdd2a17ce09581df6efb4  .gitattributes
+cb94f0bc223c6399ef8c6d2fcb8df8bd2be18fbc  .agents/norn.config.yaml
+$ norn upgrade --json
+{"norn_version":{"from":"0.34.0","to":"0.35.0","changed":true},"skills":{"updated":[],"linked":[]},"staged":[".agents/norn.config.yaml"],"commit":"git commit -m \"Upgrade norn to 0.35.0 (norn upgrade)\"","labels":{"checked":false,"reason":"no git remote","fix":null,"do_instead":null}}
+exit 0
+
+71f807e9fcf87c6d9ef8f7fbf78ed6e64be694ae  .agents/specs/gh-12-x/spec.md
+0b1416e34765fcc3ae67818ad9d2c88ffde7037a  .agents/specs/gh-12-x/slices/02-two.md
+db405712ec48c2d0d0dfdd2a17ce09581df6efb4  .gitattributes
+d1924ff7883f6316438d66ccc088df54a9e23ef9  .agents/norn.config.yaml
+staged:
+.agents/norn.config.yaml
+
+== 03.AC9 (b) team config holds old key default_workflow: story; binary 0.36.0
+71f807e9fcf87c6d9ef8f7fbf78ed6e64be694ae  .agents/specs/gh-12-x/spec.md
+0b1416e34765fcc3ae67818ad9d2c88ffde7037a  .agents/specs/gh-12-x/slices/02-two.md
+db405712ec48c2d0d0dfdd2a17ce09581df6efb4  .gitattributes
+5172ecc02f1b45c127a82be4e98d0dbcc6b08bff  .agents/norn.config.yaml
+$ norn upgrade --json
+{"error":"`.agents/norn.config.yaml`: `default_workflow` is now `workflow`","do_instead":"fix .agents/norn.config.yaml","code":"config_moved","details":[{"code":"config_moved","file":"repo","key":"default_workflow","message":"`default_workflow` is now `workflow`","path":"$QA/w/r2/.agents/norn.config.yaml"}]}
+exit 6
+
+71f807e9fcf87c6d9ef8f7fbf78ed6e64be694ae  .agents/specs/gh-12-x/spec.md
+0b1416e34765fcc3ae67818ad9d2c88ffde7037a  .agents/specs/gh-12-x/slices/02-two.md
+db405712ec48c2d0d0dfdd2a17ce09581df6efb4  .gitattributes
+5172ecc02f1b45c127a82be4e98d0dbcc6b08bff  .agents/norn.config.yaml
+staged:
+$ norn config
+norn config — Show the resolved config; set or unset one value in the user, local or team file
+
+  norn config list   Show the resolved config and which file set each value
+  norn config get    Show one setting, or every setting under a key, and which file set it
+  norn config set    Set one value in the user, local or repo config file
+  norn config unset  Remove one value from the user, local or repo config file
+
+`norn help config <verb>` shows one verb's usage and options.
+exit 0
+
+norn doctor: 2 checks failed (remote, config)
+
+  ok   git            git version 2.54.0 (Apple Git-157)
+--
+  FAIL config         .agents/norn.config.yaml
+                      ! default_workflow: `default_workflow` is now `workflow`
+
+mentions 'norn upgrade' in the config error: 0

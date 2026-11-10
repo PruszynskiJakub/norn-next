@@ -1,0 +1,16 @@
+== 05.AC2: hook in a unit dir (.norn-unit → the pre-0.13 repo r3)
+repo=$QA/w/r3
+story=gh-3
+slice=
+unit=_story
+spec_dir=.agents/specs/gh-3-x
+$ norn hook pre-tool-use --agent claude  (Bash: ls)
+{}
+exit 0
+$ norn hook stop --agent claude
+{}
+exit 0
+--- old files after the hooks:
+4345b7afc614ce0be50cd01105f89253ad0f5b56  .agents/norn/config.yaml
+6e1e829da09d8f4df97d441654aa04199110098b  .agents/norn/trace/2026-01-01.jsonl
+7b28b8ede903f1bec28f20efc7b1adace5516807  .agents/norn/workflows/duo.yaml

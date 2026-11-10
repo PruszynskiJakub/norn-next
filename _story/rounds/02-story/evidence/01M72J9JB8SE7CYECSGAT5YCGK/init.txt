@@ -1,0 +1,55 @@
+$ norn init
+                  claude → .claude/skills: linked norn, norn-clarify, norn-codebase-design, norn-diagnose, norn-fsd, norn-fsd-round, norn-implement, norn-interview, norn-merge, norn-plan, norn-pr, norn-prototype, norn-qa, norn-qa-person, norn-refine, norn-retro, norn-review, norn-slice, norn-tdd, norn-triage
+  hooks           claude: installed in .claude/settings.json
+  hook command    "${NORN_BIN:-norn}" hook
+  .gitignore      added .env.norn, .norn-unit, .agents/norn.config.local.yaml
+  test command    bun test (not detected: the template's default)
+  remote          no git remote named origin
+  labels          not checked — no git remote
+
+Next steps
+  1. Add the remote norn syncs issues from and pushes branches to: `git remote add origin <url>`.
+  2. Set your test command: the `test` steps in .agents/workflows/ run `bun test` — change `run:` there.
+  3. Commit and push the setup: `git add .agents .claude REVIEW.md .gitignore && git commit -m "Set up norn" && git push`.
+  4. Check this machine: `norn doctor`.
+  5. Make a first story: an issue labelled `norn` and assigned to you, e.g. `gh issue create --label norn --assignee @me --title "…"`.
+  6. Pick it up: `norn sync`, keep `norn watch` running (it moves every step on, in manual mode too), and `norn status` shows what needs you and the command for each item.
+exit 0
+norn.config.local.schema.json
+norn.config.schema.json
+norn.config.yaml
+skills
+workflows
+.agents/norn.config.local.schema.json
+.agents/norn.config.schema.json
+.agents/norn.config.yaml
+
+.agents/skills:
+norn
+norn-clarify
+norn-codebase-design
+norn-diagnose
+norn-fsd
+norn-fsd-round
+norn-implement
+norn-interview
+norn-merge
+norn-plan
+norn-pr
+norn-prototype
+norn-qa
+norn-qa-person
+norn-refine
+norn-retro
+norn-review
+norn-slice
+norn-tdd
+norn-triage
+
+.agents/workflows:
+quick.yaml
+refinement.yaml
+reproduce.yaml
+slice.yaml
+story.yaml
+triage.yaml
