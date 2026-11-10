@@ -325,12 +325,12 @@ describe("mailbox: a second clone while this one holds the claim", () => {
     const twinHome = join(h.dir, "twin-home");
     mkdirSync(twinHome);
     sh(h.dir, ["clone", "-q", h.remoteDir, twinRoot]);
+    // The twin has a heartbeat of its own (two recorded ids, not one against none) and its worktrees in its own machine dir
+    bindNornHome(twinRoot, twinHome);
     const twinWt = worktreeOf(twinRoot, "gh-5-pay-invoices");
     sh(twinRoot, ["worktree", "add", "-q", "-b", "gh-5-pay-invoices", twinWt, "origin/gh-5-pay-invoices"]);
     writeFileSync(join(twinWt, ".norn-unit"), `repo=${twinRoot}\nstory=gh-5\nslice=\nunit=_story\nspec_dir=${spec5}\n`);
     sh(twinRoot, ["fetch", "-q", "origin", `+${CLAIMS_PREFIX}*:${CLAIMS_PREFIX}*`]);
-    // The twin has a heartbeat of its own: two recorded ids, not one against none
-    bindNornHome(twinRoot, twinHome);
     expect(heartbeatId(twinRoot, Date.now())).not.toBe(JSON.parse(h.read(heartbeatFilePath(h.root))).heartbeat_id);
     const deps = { ...h.deps, cwd: twinRoot, env: { ...h.deps.env, NORN_HOME_DIR: twinHome, USER: "tester", NORN_MACHINE: "box" } };
     const twin = (...argv: string[]) => runChecked(argv, deps);
@@ -348,6 +348,7 @@ describe("mailbox: a second clone while this one holds the claim", () => {
     const bHome = join(h.dir, "colleague-home");
     mkdirSync(bHome);
     sh(h.dir, ["clone", "-q", h.remoteDir, bRoot]);
+    bindNornHome(bRoot, bHome);
     const bWt = worktreeOf(bRoot, "gh-5-pay-invoices");
     sh(bRoot, ["worktree", "add", "-q", "-b", "gh-5-pay-invoices", bWt, "origin/gh-5-pay-invoices"]);
     writeFileSync(join(bWt, ".norn-unit"), `repo=${bRoot}\nstory=gh-5\nslice=\nunit=_story\nspec_dir=${spec5}\n`);

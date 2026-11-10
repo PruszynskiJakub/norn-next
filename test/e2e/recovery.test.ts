@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { Inbox, RunnerPort } from "@norn/core";
-import { machineDir, repoConfigPath, setSpawnObserver, storyRunStateDir, workflowsDir } from "@norn/store";
+import { bindNornHome, machineDir, repoConfigPath, setSpawnObserver, storyRunStateDir, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, FakeRunner, type Harness, issue, sh, worktreeOf } from "../support/harness.ts";
 import { runChecked } from "../support/harness.ts";
@@ -67,6 +67,8 @@ function cloneOf(h: Harness, name: string, user: string): Clone {
   sh(root, ["config", "user.name", user]);
   const home = join(h.dir, `home-${name}`);
   mkdirSync(home);
+  // the clone's worktrees are named in its machine dir before any of its commands binds the home
+  bindNornHome(root, home);
   const runner = new FakeRunner();
   (runner as { name: string }).name = `fake-${name}`;
   transcript?.watchClone(name, root, { runner });

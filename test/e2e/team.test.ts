@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Inbox, RunnerPort } from "@norn/core";
 import { STORY_UNIT_DIR, ulid, unitHandoffPath } from "@norn/schema";
-import { acquireTickLock, appendReceipt, handoffPath, readState, repoConfigPath, workflowsDir } from "@norn/store";
+import { acquireTickLock, appendReceipt, bindNornHome, handoffPath, readState, repoConfigPath, workflowsDir } from "@norn/store";
 import { type CliDeps, type CliResult, type TickReport } from "../../packages/cli/src/index.ts";
 import { createHarness, FakeInteraction, FakeRunner, type Harness, hostEnv, issue, sh, worktreeOf } from "../support/harness.ts";
 import { runChecked } from "../support/harness.ts";
@@ -80,6 +80,8 @@ function cloneOf(h: Harness, name: string, user: string): Clone {
   sh(root, ["config", "user.name", user]);
   const home = join(h.dir, `home-${name}`);
   mkdirSync(home);
+  // the clone's worktrees are named in its machine dir before any of its commands binds the home
+  bindNornHome(root, home);
   const runner = new FakeRunner();
   (runner as { name: string }).name = `fake-${name}`;
   const deps: CliDeps = {
