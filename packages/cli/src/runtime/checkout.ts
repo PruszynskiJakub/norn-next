@@ -52,7 +52,7 @@ import {
   sliceWorktreePath,
   storyWorktreePath,
 } from "@norn/core";
-import { ExitCode, type ReceiptOf, recordRef, type RunStory, sliceBranch, sliceDirName, SPEC_FILE, specDir, STORY_UNIT_DIR, treeStoryRunStatePath, ulid, type UnitState, type Workflow } from "@norn/schema";
+import { ExitCode, type ReceiptOf, recordRef, type RunStory, sliceBranch, sliceDirName, SPEC_FILE, specDir, STORY_UNIT_DIR, ulid, type UnitState, type Workflow } from "@norn/schema";
 import {
   acquireClaim,
   appendReceipt,
@@ -231,8 +231,7 @@ interface LostRecord {
 /**
  * With no record to take over, the round a takeover starts from the branch `head`
  * (`headRef`, its ref) — or null when there is nothing to restart: the story not started on the branch
- * (its frontmatter not `active`: the tick starts it as any new story) or an older norn's run state still
- * on the branch (the tick moves it off). The frontmatter's workflow pinned fresh from the branch; a
+ * (its frontmatter not `active`: the tick starts it as any new story). The frontmatter's workflow pinned fresh from the branch; a
  * missing or invalid one refuses before anything is taken. The step: `restartStepOf` the story unit's
  * last boundary on the branch (its `Norn-Next`).
  */
@@ -250,7 +249,6 @@ async function lostRecord(git: GitPort, root: string, story: RunStory, branch: s
       fm.reason === "corrupt" ? [fm.error] : undefined,
     );
   if (fm.value.frontmatter.status !== "active") return null;
-  if (await git.hasPath(root, head, treeStoryRunStatePath(story))) return null;
   const name = fm.value.frontmatter.workflow;
   const again = cmd.storyCheckout(key);
   let found: { path: string; source: string } | null = null;

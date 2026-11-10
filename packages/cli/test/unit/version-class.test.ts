@@ -44,7 +44,6 @@ const D1: Record<string, VersionClass> = {
   "config get": "reads",
   init: "exempt",
   upgrade: "exempt",
-  migrate: "exempt",
   uninstall: "exempt",
   done: "exempt",
   ask: "exempt",

@@ -50,7 +50,7 @@ export function humanSummary(s: { ticks: number; failed_actions: number; skipped
 
 /**
  * The version guard again before a tick, with the config reloaded so a pull mid-watch
- * is seen. A mismatch skips the tick and notifies once per repo version it pauses on; a match clears
+ * is seen. A refusal skips the tick and notifies once per repo version it pauses on; a match clears
  * that memory, so the same mismatch coming back notifies again. The memory lives in this watch
  * process only, and watch never exits for a mismatch (a cron tick just exits 3).
  */
@@ -61,10 +61,11 @@ async function pausedOnVersion(ctx: Context, state: { notified: string | null })
     state.notified = null;
     return null;
   }
-  if (state.notified !== refusal.repo) {
-    state.notified = refusal.repo;
+  const repo = refusal.repo ?? "none";
+  if (state.notified !== repo) {
+    state.notified = repo;
     const item: InboxItem = {
-      id: `watch-paused:${refusal.repo}:${ctx.version}`,
+      id: `watch-paused:${repo}:${ctx.version}`,
       group: "unblock",
       story: "*",
       slice: null,

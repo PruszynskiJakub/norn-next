@@ -2,7 +2,7 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { cmd, type Action, type ActionResult, nornTrailers, recordOnBase, recordRetryDue, recordStopsAt, type UnitRef, type WorktreeSpec } from "@norn/core";
-import { type ClaimBlob, HANDOFFS_DIR, parseDuration, recordRef, ROUNDS_DIR, RUNS_DIR, STORY_UNIT_DIR } from "@norn/schema";
+import { type ClaimBlob, parseDuration, recordRef, ROUNDS_DIR, STORY_UNIT_DIR } from "@norn/schema";
 import {
   acquireClaim,
   addRejectedReceipt,
@@ -24,11 +24,7 @@ import {
   readPendingRecords,
   writePendingRecords,
   moveFile,
-  copyTreeRecord,
-  moveTreeHandoffs,
   handoffPath,
-  treeHandoffFile,
-  removeTreeRunState,
   runStateFile,
   runStateRecord,
   runStateStartDir,
@@ -408,32 +404,6 @@ export async function roundMigrate(act: ActEnv, a: Extract<Action, { kind: "roun
 }
 
 /**
- * Copy each record off the unit's branch into the machine dir — validated and put
- * in place atomically, one the machine dir already holds skipped (a move that stopped after the copy)
- * — then remove the branch's run state but the handoffs from the worktree and commit that removal
- * alone, pushed. A copy that fails removes nothing; state was never in git, so nothing is
- * written past the copies. The move is done only once its commit lands: a commit that fails, or that a
- * merge or rebase defers, fails the action, and the next tick finishes the removal (observe sees
- * it uncommitted).
- */
-export async function moveRecord(act: ActEnv, a: Extract<Action, { kind: "move_record" }>): Promise<ActionResult> {
-  const wt = a.commit.cwd;
-  const story = act.storyLoc(a.unit.story);
-  // A merge or rebase begun since observe: nothing is removed under it
-  const busy = await act.git.inProgress(wt);
-  if (busy.operation || busy.unmerged.length) return { ok: false, error: `${busy.operation ?? "a merge"} in progress in ${wt}: the move waits until it is concluded` };
-  const copied = a.copy.filter((c) => copyTreeRecord(join(wt, c.from), runStateFile(act.root, c.to), treeHandoffFile(join(wt, story.spec_dir), c.unit))).map((c) => c.to);
-  // The old handoffs move to handoffs/, prose only, in the same commit
-  const handoffs = moveTreeHandoffs(wt, story).map((f) => relative(wt, f));
-  const removed = removeTreeRunState(wt, story);
-  const committed = await act.commit(a.commit, null, null, await movePaths(act, wt, story.spec_dir));
-  const detail = { copied, handoffs, removed: removed.length, ...committed };
-  const notDone = committed?.deferred ?? committed?.refused;
-  if (notDone) return { ok: false, error: `the removal of ${a.path} is not committed: ${notDone}`, detail };
-  return { ok: true, detail };
-}
-
-/**
  * This checkout's own record of a story another heartbeat holds leaves
  * `runs/<story>/` in one rename: set aside whole under `superseded/<name>/` with its
  * `superseded.json`, or, already on the ref after a clean release, removed quietly. Nothing is pushed.
@@ -447,19 +417,6 @@ export async function setAsideRecordAct(act: ActEnv, a: Extract<Action, { kind: 
   }
   const dir = setAsideRecord(act.root, run, a.superseded.name, { story: story.key, holder: a.superseded.holder, last_receipt: a.superseded.last_receipt, superseded_at: new Date(act.obs.facts.now).toISOString() });
   return { ok: true, detail: { superseded: dir } };
-}
-
-/**
- * The pathspec of a move commit: the spec folder's `runs/` and `handoffs/` (moved now, or by a move that
- * stopped before its commit), every other entry of it excluded, so an agent's work stays out. The spec
- * folder, not `runs/` itself, is what it names: a move whose commit failed after staging left no `runs/`
- * for git to match.
- */
-async function movePaths(act: ActEnv, wt: string, specDir: string): Promise<string[]> {
-  const here = existsSync(join(wt, specDir)) ? readdirSync(join(wt, specDir)) : [];
-  const committed = (await act.git.lsTree(wt, "HEAD", specDir)) ?? [];
-  const others = [...new Set([...here, ...committed])].filter((n) => n !== RUNS_DIR && n !== HANDOFFS_DIR).sort();
-  return [specDir, ...others.map((n) => `:(exclude)${specDir}/${n}`)];
 }
 
 /** Move one record entry to the round; into a folder already there (an earlier move that stopped partway), child by child. */

@@ -24,13 +24,11 @@ export function criteriaSummary(events: readonly TraceEvent[], units: ReadonlySe
 
 /**
  * Where the unit's records are read from: the checkout's machine dir; a finished
- * story's archive ref, unpacked into the machine dir's cache (the ref named, never the base
- * tree); or an older norn's run state still on a unit worktree's branch, before the tick moves it.
+ * story's archive ref, unpacked into the machine dir's cache (the ref named, never a tree).
  */
-function recordsOf(repoRoot: string, story: StorySnapshot): { records: TraceRecords; runsDir: (u: UnitSnapshot) => string } {
+function recordsOf(story: StorySnapshot): { records: TraceRecords; runsDir: (u: UnitSnapshot) => string } {
   if (story.run_state.archive) return { records: { source: "archive", root: story.run_state.base, ref: recordRef(story.key), commit: story.run_state.archive }, runsDir: (u) => u.path };
-  if (!story.run_state.tree) return { records: { source: "machine", root: story.run_state.base }, runsDir: (u) => u.path };
-  return { records: { source: story.root === repoRoot ? "checkout" : "worktree", root: story.root }, runsDir: (u) => u.path };
+  return { records: { source: "machine", root: story.run_state.base }, runsDir: (u) => u.path };
 }
 
 export interface LoadTraceViewOptions {
@@ -121,7 +119,7 @@ export function loadTraceView(opts: LoadTraceViewOptions): TraceView | null {
   const story = withSliceWorktrees(read, (slice) => wts.slices.get(slice), { includeApplied: true });
   const { events } = readTrace(opts.repoRoot, { unit: storyKey, types: TIMELINE_TYPES });
   const tdir = machineDir(opts.repoRoot);
-  const { records, runsDir } = recordsOf(opts.repoRoot, story);
+  const { records, runsDir } = recordsOf(story);
 
   const build = (u: UnitSnapshot, evs: TraceEvent[] = events): TraceView => {
     const file = u.unit.slice ? story.slices.find((s) => s.key === u.unit.slice) : null;

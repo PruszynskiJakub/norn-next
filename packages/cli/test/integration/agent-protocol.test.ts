@@ -209,6 +209,19 @@ describe("manual mode: tick → brief → done → tick", () => {
     expect(receipts(runs()).filter((f) => f.endsWith("-started.json"))).toHaveLength(1);
   });
 
+  test("a spec whose criteria still carry needs: brief refuses with the file to fix, not norn upgrade", async () => {
+    const file = join(wt(), spec, "spec.md");
+    const before = readFileSync(file, "utf8");
+    writeFileSync(file, before.replace(/^---\n/, "---\ncriteria:\n  - { id: c1, verifier: agent, needs: [browser] }\n"));
+    try {
+      const r = await inWt(wt(), "brief", "--json");
+      expect(r.exit).toBe(3);
+      expect(r.value).toEqual({ code: "needs_removed", error: `story \`gh-9\`: \`needs\` was removed; delete it from the criteria in ${spec}/spec.md`, do_instead: `fix ${spec}/spec.md` });
+    } finally {
+      writeFileSync(file, before);
+    }
+  });
+
   test("Stop in an unattended step whose run has not reported → blocked with the report instruction", async () => {
     const r = await stop(wt());
     expect(r.exit).toBe(0);

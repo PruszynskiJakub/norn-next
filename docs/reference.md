@@ -8,7 +8,7 @@ Commands a person or an agent reads (`brief`, `done`, `ask`, `stuck`, `help`, `i
 
 A refusal prints `{error, do_instead}` (as markdown without `--json`): what was refused and what to do instead. The exit code says why: `refused` (3) when a rule says no, `usage` (2) for bad arguments, `corrupt` (4) when a state file fails validation, `busy` (5) when another process holds the lock or the claim, `config` (6) when a config file is wrong. The full list is under [Exit codes](#exit-codes).
 
-A command a person runs that needs the tick lock (`norn story edit --workflow`, `norn story edit --at`, `norn story checkout`, `norn story handoff`, `norn story close`, `norn story reset`, `norn story reopen`, `norn tidy`, and the claim release when `norn watch` stops) waits for a running tick to finish, up to 60 seconds, with one line on stderr naming the tick it waits for, then runs as usual. Only a tick still running after 60 seconds gets it refused, `busy` with code `tick_locked`; Ctrl-C while it waits stops it with nothing changed. `norn tick` and `norn migrate` refuse a running tick at once, and `norn story edit --auto|--manual` never waits.
+A command a person runs that needs the tick lock (`norn story edit --workflow`, `norn story edit --at`, `norn story checkout`, `norn story handoff`, `norn story close`, `norn story reset`, `norn story reopen`, `norn tidy`, and the claim release when `norn watch` stops) waits for a running tick to finish, up to 60 seconds, with one line on stderr naming the tick it waits for, then runs as usual. Only a tick still running after 60 seconds gets it refused, `busy` with code `tick_locked`; Ctrl-C while it waits stops it with nothing changed. `norn tick` and `norn upgrade` refuse a running tick at once, and `norn story edit --auto|--manual` never waits.
 
 ## Config
 
@@ -21,9 +21,9 @@ A command a person runs that needs the tick lock (`norn story edit --workflow`, 
 | `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow`, `record.policy`, `norn_version` |
 | a workflow file | the workflow | top-level `mode`; `defaults:` with `deadline`, `nudges`, `retries`, `stalled` |
 
-For your keys the nearer file wins: local over user over built-in. Maps merge key by key; lists and scalars replace, so `agents: {claude: {model: …}}` keeps Claude's built-in `--permission-mode auto`, while setting `agents.claude.args` replaces that list, and `notify: {ntfy: <url>}` keeps OS notifications. A story's mode is, nearest first: the story's own (`norn story edit --auto|--manual`), its workflow's `mode`, the local file, the user file, then `manual`. A key in the wrong file, or one an older norn used, is refused with the file and key to use instead; `norn upgrade` rewrites old files. `norn config` lists every setting in effect and the file it came from; `norn config set <key> <value>` changes one in the file you name with `--user`, `--local` or `--repo`.
+For your keys the nearer file wins: local over user over built-in. Maps merge key by key; lists and scalars replace, so `agents: {claude: {model: …}}` keeps Claude's built-in `--permission-mode auto`, while setting `agents.claude.args` replaces that list, and `notify: {ntfy: <url>}` keeps OS notifications. A story's mode is, nearest first: the story's own (`norn story edit --auto|--manual`), its workflow's `mode`, the local file, the user file, then `manual`. A key in the wrong file, or one an older norn used, is refused with the file and key to use instead. `norn config` lists every setting in effect and the file it came from; `norn config set <key> <value>` changes one in the file you name with `--user`, `--local` or `--repo`.
 
-`norn_version` is the repo's norn version: `norn init` records it on a repo without one, and only `norn upgrade` moves it (`norn config set|unset` refuse it). A binary of another minor, or an earlier patch, is refused by every command that acts; see [Concepts: the repo's norn version](concepts.md#the-repos-norn-version) and [Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team).
+`norn_version` is the repo's norn version: `norn init` records it on a repo with no team file (and refuses a team file with no or a pre-0.30 one), and only `norn upgrade` moves it (`norn config set|unset` refuse it). A binary of another minor, or an earlier patch, is refused by every command that acts, and so is a repo that records no `norn_version` (`version_missing`) or one below 0.30 (`version_too_old`); see [Concepts: the repo's norn version](concepts.md#the-repos-norn-version) and [Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team).
 
 Everything else has no key. The runner is detected: Herdr when norn runs inside Herdr or `herdr` is installed, otherwise headless. GitHub or GitLab is read from the remote URL (`provider` is only for a self-hosted host). The git remote is the one the base branch tracks, else `origin`. Claims are timed from the tick interval (`norn watch --interval`, `norn tick --interval`). The label `norn`, the sync about every 5 minutes, slots 1–9 with ten ports each from 4010, and the 2-minute attended wait are fixed.
 
@@ -309,7 +309,7 @@ norn init [--json] [--hook-command <cmd>]
 
 ##### `norn upgrade`
 
-Move this repo to this norn: its norn_version, the bundled skills, the layout and config keys, staged for you to commit
+Move this repo's norn_version and bundled skills to this norn, from norn 0.30 on, staged for you to commit
 
 ```sh
 norn upgrade [--json]
@@ -376,14 +376,6 @@ Remove norn-owned hooks and skills; keep config, workflows and specs
 
 ```sh
 norn uninstall
-```
-
-##### `norn migrate`
-
-Deprecated: the old name of norn upgrade, removed in the next minor
-
-```sh
-norn migrate [--json]
 ```
 
 #### Background

@@ -109,7 +109,7 @@ const MEANING: Record<string, string> = {
 };
 
 /** What `null` means for the keys that allow it. */
-const NULL_MEANS: Record<string, string> = { base_branch: "the remote's default branch", norn_version: `not recorded: \`${cmd.upgrade()}\` records it` };
+const NULL_MEANS: Record<string, string> = { base_branch: "the remote's default branch", norn_version: `not recorded: \`${cmd.init()}\` records it on a new repo; a repo from an older norn needs norn 0.30.x and \`${cmd.upgrade()}\` first` };
 
 const meaning = (key: string) => MEANING[key] ?? MEANING[key.split(".")[0] as string] ?? "";
 

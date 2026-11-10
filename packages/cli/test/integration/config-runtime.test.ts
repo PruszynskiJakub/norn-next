@@ -42,6 +42,8 @@ describe("mode, agent and workflow over ticks (B10, B13, B24, B25, B33)", () => 
     h.write(join(workflowsDir(h.root), "gem.yaml"), SOLO.replace("name: solo", "name: gem").replace("skill: norn-implement", "skill: norn-implement\n    agent: gemini"));
     // The team's entry workflow; B10, B13: my mode and agent, no agents entry
     h.config("workflow: solo\nmode: auto\nagent: codex\n");
+    // A team file with no version is an older norn's repo to init: this one was set up with this norn
+    h.recordVersion();
     // Init sets up the agents in use, so it runs once the workflows name them
     expect((await h.norn("init")).exit).toBe(0);
     h.git(["add", "-A"]);
@@ -83,13 +85,13 @@ describe("mode, agent and workflow over ticks (B10, B13, B24, B25, B33)", () => 
     expect(env).toMatch(new RegExp(`PORT_BASE="?${4000 + 10 * slot}`));
   });
 
-  test("B38: a slice that still has criteria needs shows under Unblock with norn upgrade, not as corrupt", async () => {
+  test("B38: a slice that still has criteria needs shows under Unblock with the file to fix, not as corrupt", async () => {
     h.write(
       join(wt("gh-1", "one"), ".agents/specs/gh-1-one/slices/02-two.md"),
       "---\nid: gh-1/02\ntitle: Two\ndepends_on: []\nstatus: planned\ncriteria:\n  - { id: c1, verifier: agent, needs: [browser] }\n---\n",
     );
     const items = ((await h.norn("status", "--json")).value as { groups: { unblock: Item[] } }).groups.unblock;
-    expect(items).toContainEqual(expect.objectContaining({ slice: "gh-1/02", title: "slice `gh-1/02`: `needs` was removed; run `norn upgrade`", command: "norn upgrade" }));
+    expect(items).toContainEqual(expect.objectContaining({ slice: "gh-1/02", title: "slice `gh-1/02`: `needs` was removed; delete it from the criteria in .agents/specs/gh-1-one/slices/02-two.md", command: "norn run view gh-1/02 --why" }));
     expect(items.some((i) => i.title.startsWith("corrupt"))).toBe(false);
   });
 });

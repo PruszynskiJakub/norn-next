@@ -473,7 +473,6 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     heartbeat: { last_tick_at: lastTick },
     ...(local.norn ? { norn: local.norn } : {}),
     // Run state an older norn left on the base, pointed to `norn upgrade`
-    ...(local.snapshot.base_run_state.length ? { base_run_state: local.snapshot.base_run_state } : {}),
     // Records set aside as superseded (loadLocalFacts, as observe)
     ...(local.superseded.length ? { superseded: local.superseded } : {}),
     ...(local.owed_records.length ? { owed_records: local.owed_records } : {}),

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cmd, nameRemoved, upgradeBackward, versionMismatch } from "@norn/core";
+import { cmd, nameRemoved, upgradeBackward, versionBaseline, versionMismatch } from "@norn/core";
 
 // Every command norn prints is built by one `cmd` builder. This table pins each builder's
 // string for a sample unit, so renaming a command is one reviewed diff of this table and the module.
@@ -108,5 +108,32 @@ describe("the version refusal (D3)", () => {
 
   test("norn upgrade run by an older binary is told it will not move the repo back, and which norn to install (B17)", () => {
     expect(upgradeBackward("0.19.0", "0.18.1")).toEqual({ error: "this repo is set up for norn 0.19.0; upgrade will not move it back", do_instead: "install norn 0.19.x" });
+  });
+});
+
+describe("the 0.30 baseline", () => {
+  const PATH = "install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with norn 0.31.2";
+
+  test("a repo recording a version below 0.30 is refused with the 0.30 path", () => {
+    expect(versionBaseline("0.29.4", "0.31.2")).toEqual({
+      code: "version_too_old",
+      error: "this repo records norn_version 0.29.4; this norn moves a repo from norn 0.30 on",
+      needs: "0.30.x",
+      do_instead: PATH,
+    });
+  });
+
+  test("a repo recording no version is refused, naming norn init and the 0.30 path", () => {
+    expect(versionBaseline(null, "0.31.2")).toEqual({
+      code: "version_missing",
+      error: "this repo records no norn_version",
+      needs: "0.30.x",
+      do_instead: `run \`norn init\` if norn was never set up here; for a repo from an older norn, ${PATH}`,
+    });
+  });
+
+  test("a repo recording 0.30.0 or later gets nothing from it and goes on to the mismatch rule", () => {
+    for (const repo of ["0.30.0", "0.30.5", "0.31.0", "1.0.0"]) expect(versionBaseline(repo, "0.31.2")).toBeNull();
+    expect(versionMismatch("0.30.0", "0.31.2")?.match).toBe("newer");
   });
 });

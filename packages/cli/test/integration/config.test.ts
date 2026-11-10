@@ -7,7 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { CONFIG_FILES, type ConfigEntry, ExitCode } from "@norn/schema";
-import { repoConfigPath } from "@norn/store";
+import { REPO_CONFIG_FILE, repoConfigPath } from "@norn/store";
 import { type CliDeps, type CliResult } from "../../src/index.ts";
 import { version } from "../../package.json";
 import { createHarness, FakeInteraction, type Harness, runChecked, sh } from "../../../../test/support/harness.ts";
@@ -139,19 +139,19 @@ describe("three files and where keys belong", () => {
     expect(by(await entries(h), "mode")).toMatchObject({ value: "manual", source: "built-in" });
   });
 
-  test("B39: an old key is config_moved naming its replacement and norn upgrade", async () => {
+  test("B39: an old key is config_moved naming its replacement, do_instead to fix that file", async () => {
     const cases: Array<[string, string, string]> = [
-      [userFile(h), "default_agent: codex\n", "`~/.norn/config.yaml`: `default_agent` is now `agent`; run `norn upgrade`"],
-      [repoConfigPath(h.root), "remote: { label: x }\n", "`.agents/norn.config.yaml`: `remote.label` is gone: the label is always `norn`; run `norn upgrade`"],
-      [userFile(h), "runner: { adapter: herdr }\n", "`~/.norn/config.yaml`: `runner` is gone: norn detects it; run `norn upgrade`"],
-      [userFile(h), "agents: { claude: { capabilities: [browser] } }\n", "`~/.norn/config.yaml`: `agents.claude.capabilities` is gone, with criteria `needs`; run `norn upgrade`"],
-      [repoConfigPath(h.root), "limits: { deadline: 45m }\n", "`.agents/norn.config.yaml`: `limits` moved to each workflow's `defaults:`; run `norn upgrade`"],
+      [userFile(h), "default_agent: codex\n", "`~/.norn/config.yaml`: `default_agent` is now `agent`"],
+      [repoConfigPath(h.root), "remote: { label: x }\n", "`.agents/norn.config.yaml`: `remote.label` is gone: the label is always `norn`"],
+      [userFile(h), "runner: { adapter: herdr }\n", "`~/.norn/config.yaml`: `runner` is gone: norn detects it"],
+      [userFile(h), "agents: { claude: { capabilities: [browser] } }\n", "`~/.norn/config.yaml`: `agents.claude.capabilities` is gone, with criteria `needs`"],
+      [repoConfigPath(h.root), "limits: { deadline: 45m }\n", "`.agents/norn.config.yaml`: `limits` moved to each workflow's `defaults:`"],
     ];
     for (const [file, text, error] of cases) {
       h.write(file, text);
       const r = await h.norn("config", "list", "--json");
       expect(r.exit).toBe(ExitCode.config);
-      expect(r.value).toMatchObject({ code: "config_moved", error, do_instead: "norn upgrade" });
+      expect(r.value).toMatchObject({ code: "config_moved", error, do_instead: `fix ${file === userFile(h) ? "~/.norn/config.yaml" : REPO_CONFIG_FILE}` });
       rmSync(file);
     }
   });
@@ -260,6 +260,8 @@ describe("norn config set and unset (B62–B68, D4)", () => {
   });
   beforeEach(() => {
     for (const f of [userFile(h), localFile(h), repoConfigPath(h.root)]) rmSync(f, { force: true });
+    // config set acts, so the repo records a version or every set is refused
+    h.recordVersion();
   });
   afterAll(() => h.cleanup());
 
@@ -270,16 +272,18 @@ describe("norn config set and unset (B62–B68, D4)", () => {
     expect((await h.norn("config", "set", "mode", "manual", "--local")).exit).toBe(0);
     expect(read(localFile(h))).toBe("# yaml-language-server: $schema=norn.config.local.schema.json\nmode: manual\n");
     expect(await get("mode")).toMatchObject([{ value: "manual", source: "local" }]);
+    const team = read(repoConfigPath(h.root));
     expect((await h.norn("config", "set", "workflow", "story", "--repo")).exit).toBe(0);
-    expect(read(repoConfigPath(h.root))).toBe("# yaml-language-server: $schema=norn.config.schema.json\nworkflow: story\n");
+    expect(read(repoConfigPath(h.root))).toBe(`${team}workflow: story\n`);
   });
 
   test("D4: a key the file does not take is refused with config_wrong_file or config_moved; nothing written", async () => {
+    const team = read(repoConfigPath(h.root));
     const wrong = await h.norn("config", "set", "max_agents", "4", "--repo", "--json");
     expect(wrong).toMatchObject({ exit: 3, value: { code: "config_wrong_file", error: "`.agents/norn.config.yaml`: `max_agents` belongs in `~/.norn/config.yaml` (machine key)", do_instead: "norn config set max_agents 4 --user" } });
     const moved = await h.norn("config", "set", "default_mode", "auto", "--user", "--json");
     expect(moved).toMatchObject({ exit: 3, value: { code: "config_moved" } });
-    expect(read(repoConfigPath(h.root))).toBeNull();
+    expect(read(repoConfigPath(h.root))).toBe(team);
     expect(read(userFile(h))).toBeNull();
   });
 
@@ -417,12 +421,12 @@ describe("the team's norn version (D4)", () => {
     expect(md.stdout).toContain("| `norn_version` | `0.19.0` | repo |");
   });
 
-  test("B4: without the key, get shows no value and that norn upgrade records it", async () => {
+  test("B4: without the key, get shows no value, that norn init records it and the 0.30 path", async () => {
     const got = await h.norn("config", "get", "norn_version", "--json");
     expect((got.value as Listed).entries).toMatchObject([{ key: "norn_version", value: null, source: "built-in" }]);
     const md = await h.norn("config", "get", "norn_version");
     expect(md.exit).toBe(0);
-    expect(md.stdout).toContain("| `norn_version` | not recorded: `norn upgrade` records it |");
+    expect(md.stdout).toContain("| `norn_version` | not recorded: `norn init` records it on a new repo; a repo from an older norn needs norn 0.30.x and `norn upgrade` first |");
   });
 
   test("D4, K8: config set and unset of norn_version are refused, exit 3, naming norn upgrade; the file is unchanged", async () => {

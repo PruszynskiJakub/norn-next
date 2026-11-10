@@ -40,9 +40,8 @@ export function configError(problems: readonly ConfigProblem[], paths?: Record<s
   const first = problems[0];
   const code = first?.code ?? "config_invalid";
   const error = problems.map(problemText).join("; ");
-  const moved = problems.some((p) => p.code === "config_moved");
   const details = problems.map((p) => ({ ...p, path: paths?.[p.file] ?? CONFIG_FILES[p.file] }));
-  return new CliFailure(body(error || "config is invalid", moved ? cmd.upgrade() : `fix ${CONFIG_FILES[first?.file ?? "repo"]}`, code, details), ExitCode.config);
+  return new CliFailure(body(error || "config is invalid", `fix ${CONFIG_FILES[first?.file ?? "repo"]}`, code, details), ExitCode.config);
 }
 /** Another process holds the lock or claim (exit 5). */
 export const busyError = (error: string, do_instead: string | null, code = "busy", details?: unknown) =>

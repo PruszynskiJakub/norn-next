@@ -457,22 +457,6 @@ export interface IntakeStoryAction extends RepoBase {
 }
 
 /**
- * Move the run state an older norn left on the unit's branch into the machine dir:
- * copy each record in `copy` (`from` relative to the worktree, `to` to the machine dir; a flat record
- * goes to the story's round 1), validated and put in place atomically, skipping one the
- * machine dir already holds; then remove `path` but the handoffs from the worktree and commit that
- * removal alone in `commit`, pushed.
- */
-export interface MoveRecordAction extends UnitBase {
-  kind: "move_record";
-  /** `<spec folder>/runs`, relative to the worktree (`commit.cwd`) */
-  path: string;
-  /** each unit's folder (`_story`, `<nn>-<slug>`), where it is on the branch and where it goes */
-  copy: Array<{ unit: string; from: string; to: string }>;
-  commit: BoundaryCommit;
-}
-
-/**
  * Pack the story's record and push it to `refs/norn/runs/<story>` with a
  * lease on `expected` (the sha observe saw; null = none yet). A side action of the story unit that act
  * performs after every other action of the tick, so after the branch push; a tree unchanged from
@@ -535,7 +519,6 @@ export type UnitAction =
   | CloseStoryAction
   | RoundMigrateAction
   | RoundStartAction
-  | MoveRecordAction
   | SetAsideRecordAction
   | PushRecordAction
   | NoopAction;

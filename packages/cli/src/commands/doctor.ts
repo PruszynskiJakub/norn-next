@@ -3,8 +3,7 @@
  * Labels, the trace window and (in manual mode) the runner only ever warn, never fail.
  * Codex runs project hooks only once `.codex/` is trusted (`/hooks` in Codex).
  * `--live` also runs one cheap headless turn per agent in a throwaway repo and checks its hooks reported.
- * `--repo` runs only the repo checks (missing or unlinked skills stay machine checks). An old or
- * mixed layout is the only check reported.
+ * `--repo` runs only the repo checks (missing or unlinked skills stay machine checks).
  * Exit 0 when every check passes, else 1 with the same report.
  */
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -13,7 +12,7 @@ import { basename, extname, join, relative, resolve } from "node:path";
 import { git as gitAdapter, herdr, proc } from "@norn/adapters";
 import type { AgentAdapter, FileError, Ports, RunnerPort, SessionRef, WorkflowIssue } from "@norn/core";
 import { type ConfigEntry, ExitCode, PROVIDERS, type ResolvedConfig, ulid, type VersionMatch, versionMatch } from "@norn/schema";
-import { baseRunStateStories, baseSpecsRoot, bindNornHome, cachedDefaultBranch, defaultBaseRef, type Layout, layoutProblems, loadWorkflows, gitRemoteUrl, machineDir, machineHolder, orphanedMachineDirs, readHookFacts, repoConfigPath, repoLayout, SKILLS_DIR, skillsDrift, skillsReport, spawnBounded, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
+import { bindNornHome, loadWorkflows, gitRemoteUrl, machineDir, machineHolder, orphanedMachineDirs, readHookFacts, repoConfigPath, SKILLS_DIR, skillsDrift, skillsReport, spawnBounded, traceDaysBefore, unbindNornHome, workflowsDir, writeUnitMarker } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { CliFailure, configError, rendered, withExit } from "../output.ts";
@@ -23,9 +22,8 @@ import { type LabelsReport, labelsWarnings, remoteLabels } from "../runtime/labe
 import { ensureShim, withNornOnPath } from "../runtime/shim.ts";
 import { effectiveRetain, formatBytes, retainCutoffDay, retainWarning } from "../runtime/trace-retention.ts";
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
-import { layoutRefusal } from "../runtime/layout.ts";
 import { hookBinary, hookCommand } from "./init.ts";
-import { baseRunStateHint, cmd } from "@norn/core";
+import { cmd, versionBaseline } from "@norn/core";
 import { oneLine } from "@norn/view";
 
 interface RunOut {
@@ -228,16 +226,18 @@ function loadFail(ctx: Context): ConfigFail | null {
   return { ok: false, error: body.error, do_instead: body.do_instead };
 }
 
-/** The repo's `norn_version` against this binary; no key is a warning, never a failure. */
+/** The repo's `norn_version` against this binary; a missing or pre-0.30 one fails with the version guard's own refusal. */
 interface VersionCheck extends Check {
   running: string;
   repo: string | null;
   match: VersionMatch | null;
-  warning?: string;
+  code?: "version_missing" | "version_too_old";
 }
 
 function versionCheck(running: string, repo: string | null): VersionCheck {
-  if (repo === null) return { ok: true, running, repo, match: null, warning: `no norn version recorded: run \`${cmd.upgrade()}\`` };
+  const baseline = versionBaseline(repo, running);
+  if (baseline) return { ok: false, running, repo, match: null, code: baseline.code, error: baseline.error, do_instead: baseline.do_instead };
+  if (repo === null) throw new Error("unreachable: the baseline rule refuses a missing norn_version");
   const match = versionMatch(repo, running);
   if (match === "match") return { ok: true, running, repo, match };
   const line = `${repo.split(".").slice(0, 2).join(".")}.x`;
@@ -260,14 +260,10 @@ const driftText = (drifted: string[], running: string) => `${drifted.join(", ")}
 
 interface RepoReport {
   ok: boolean;
-  /** Reaching the other repo checks means the new layout; an old or mixed one is reported alone */
-  layout: { ok: true; layout: "new" };
   version: VersionCheck;
   skills: SkillsDriftCheck;
   workflows: Array<{ name: string; file: string; ok: boolean; issues: WorkflowIssue[] }>;
   config: { ok: boolean; file: string; present: boolean; errors: FileError["errors"] };
-  /** Run state an older norn left in the base's tree, never read: fixed by `norn upgrade` */
-  run_state: Check & { stories: string[] };
 }
 
 /**
@@ -298,43 +294,13 @@ async function repoGroup(ctx: Context): Promise<RepoReport> {
   const config = { ok: configErrors.length === 0, file: configFile, present: existsSync(repoConfigPath(root)), errors: configErrors };
   const version = versionCheck(ctx.version, usableConfig(ctx).config.norn_version);
   const skills = driftCheck(skillsDrift(join(root, SKILLS_DIR), join(assetsDir(ctx.env), "skills"), bundledSkills(ctx.env)));
-  const run_state = runStateCheck(ctx);
   return {
-    ok: version.ok && skills.ok && workflows.every((w) => w.ok) && config.ok && run_state.ok,
-    layout: { ok: true, layout: "new" },
+    ok: version.ok && skills.ok && workflows.every((w) => w.ok) && config.ok,
     version,
     skills,
     workflows,
     config,
-    run_state,
   };
-}
-
-/**
- * The stories whose run state is still in the base's tree (the fetched base
- * branch, the main checkout without one); a failed check until the removal `norn upgrade` stages is committed.
- */
-function runStateCheck(ctx: Context): Check & { stories: string[] } {
-  const base = usableConfig(ctx).config.base_branch ?? cachedDefaultBranch(ctx.root) ?? "main";
-  const ref = defaultBaseRef(ctx.root, usableConfig(ctx).config.git_remote, base);
-  const tree = ref ? baseSpecsRoot(ctx.root, ref) : null;
-  const stories = baseRunStateStories(tree ?? ctx.root);
-  if (!stories.length) return { ok: true, stories };
-  return { ok: false, stories, error: baseRunStateHint.text(base, stories), do_instead: baseRunStateHint.fix() };
-}
-
-/** The layout check of the repo group, failed on an old or mixed layout with what to run. */
-function layoutCheck(l: Layout, root: string) {
-  const refusal = layoutRefusal(l, root).body;
-  return { ok: false, layout: l.layout, parts: layoutProblems(l, root), error: refusal.error, do_instead: refusal.do_instead, code: refusal.code };
-}
-
-function formatLayoutOnly(c: ReturnType<typeof layoutCheck>): string {
-  const l = lines();
-  l.line(false, "layout", c.layout === "both" ? "old and new layout both present" : "old layout");
-  for (const p of c.parts) l.sub(`! ${p}`);
-  l.sub(`→ ${c.do_instead}`);
-  return [l.head(false), "", ...l.out, "", "  · other checks skipped: they read the new layout"].join("\n");
 }
 
 /** One line per check: `ok`, `warn` or `FAIL`, a label, the text; failed labels are collected for the head line. */
@@ -355,7 +321,11 @@ function lines() {
 }
 
 function formatVersion(v: VersionCheck, l: ReturnType<typeof lines>): void {
-  if (v.repo === null) return l.line(false, "norn", v.warning ?? "", true);
+  if (v.code) {
+    l.line(false, "norn", v.error ?? "");
+    l.sub(`→ ${v.do_instead}`);
+    return;
+  }
   l.line(v.ok, "norn", `${v.running} ${v.ok ? "matches" : "does not match"} this repo's norn version ${v.repo}`);
   if (v.do_instead) l.sub(`→ ${v.do_instead}`);
 }
@@ -371,15 +341,10 @@ function formatRepo(r: RepoReport, l: ReturnType<typeof lines>, dir: string, o: 
     l.fix(r.skills);
   }
   const valid = r.workflows.filter((w) => w.ok).map((w) => w.name);
-  l.line(true, "layout", `${dir}/ and ${r.config.file}`);
   if (valid.length || !r.workflows.length) l.line(true, "workflows", valid.length ? `${valid.join(", ")} valid (${dir}/)` : `none valid in ${dir}/`);
   for (const w of r.workflows.filter((x) => !x.ok)) {
     l.line(false, `workflow ${w.name}`, w.file);
     for (const i of w.issues) l.sub(`! ${i.path || "/"}: ${i.message}`);
-  }
-  if (!r.run_state.ok) {
-    l.line(false, "run state", r.run_state.stories.join(", "));
-    l.fix(r.run_state);
   }
   l.line(r.config.ok, "config", r.config.present ? r.config.file : `${r.config.file} (none: built-in defaults)`);
   for (const e of r.config.errors) l.sub(`! ${e.path || "/"}: ${e.message}`);
@@ -481,17 +446,9 @@ export const doctorCommand = defineCommand({
     "--repo": "check only the repo: its norn version, bundled skills, workflows and config; no agent, runner or remote needed (CI, a test check)",
     "--live": "also run one cheap headless test turn per agent",
   },
-  // An old or mixed layout is a failed repo check here, not a refusal
-  layout: false,
   async run(ctx, args) {
     const live = opt.bool(args, "live");
     const repoOnly = opt.bool(args, "repo");
-    const layout = repoLayout(ctx.root);
-    if (layout.layout !== "new") {
-      // nothing else is read: config and workflows at the new places are not the repo's yet
-      const report = { ok: false, repo: { ok: false, layout: layoutCheck(layout, ctx.root) } };
-      return withExit(rendered(report, formatLayoutOnly(report.repo.layout)), ExitCode.error);
-    }
     const repo = await repoGroup(ctx);
     const dir = relative(ctx.root, workflowsDir(ctx.root));
     // --repo looks at no agent, runner or remote

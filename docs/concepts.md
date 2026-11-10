@@ -98,7 +98,7 @@ When the record has to leave the machine, norn packs the story's whole run state
 - `local` (the default): when the claim is released (`norn story handoff`, a clean `norn watch` exit, `norn story close`), each time the `open-pr` step opens or updates the PR (so the PR body can link QA evidence at that record commit), and once at the end, when the PR merges or the story closes without one.
 - `remote`: as well, whenever the record changed since its last push (so at least at every step boundary, right after the branch); a push that fails is tried again at a later tick (one refused because another checkout pushed the ref waits until the ref this checkout sees changes). Another machine then sees the current step and attempt, and can take the story over with its record as last pushed even if the holder dies.
 
-A finished story's record stays on its ref, so `norn run list` and `norn run view` read it on any machine; the base branch never receives run state. Per-tick detail (the trace, locks and caches) stays in the machine dir too; `norn run view --why` reads it. A repository whose base branch still holds run state from an older norn is pointed to `norn upgrade`, which moves it into the refs ([Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team)).
+A finished story's record stays on its ref, so `norn run list` and `norn run view` read it on any machine; the base branch never receives run state. Per-tick detail (the trace, locks and caches) stays in the machine dir too; `norn run view --why` reads it.
 
 On a machine that does not hold the story, `norn status` and `norn story view` show what that machine can know: under `remote`, the step, attempt and counters read from the ref; under `local`, the claim, the branch, the PR and its CI and the last boundary step, with a line saying whose machine holds the record. A ref no longer kept current is shown with its age ("record as of …"). An answer or approval sent from such a machine goes through the mailbox and is checked on the holder; one the holder turns away (the story moved on) shows there as a Check item.
 
@@ -120,7 +120,7 @@ The version is read from the main checkout's team config, so it changes for you 
 - the commands that only read run and show the mismatch: `help`, `--version`, `doctor`, `status` (a top Unblock item, and the tab bar line), `story list|view|wait`, `run list|view`, `config list|get`.
 - `init`, `upgrade`, `uninstall`, and the reports an agent already in a step makes (`done`, `ask`, `stuck`, `hook`, and the check runs a tick started), are never refused for it, so a session already started can always report.
 
-A repo without the key works as before; `doctor` and `status` hint to run `norn upgrade`. How to move a team to a new norn is in [Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team).
+A repo without the key, or one recording a version below 0.30, is refused the same way by every command that acts and by `init`, with code `version_missing` or `version_too_old`; `doctor` fails its version check with the same words, and `status` shows it as a top Unblock item pointing to `norn doctor`. Run `norn init` if norn was never set up there; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with this norn. How to move a team to a new norn is in [Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team).
 
 ## Glossary
 

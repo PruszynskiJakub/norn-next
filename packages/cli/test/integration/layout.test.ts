@@ -90,6 +90,7 @@ describe("messages name the new paths (D11)", () => {
     const r = await h.norn("tick");
     expect(r.value).toMatchObject({ code: "config_wrong_file", error: expect.stringContaining(CONFIG_FILE) });
     h.config(CONFIG);
+    h.recordVersion();
   });
 });
 

@@ -23,7 +23,7 @@ export const Criterion = Type.Object(
 export type Criterion = Static<typeof Criterion>;
 
 /** The message a slice or story still carrying criteria `needs` is refused with. */
-export const needsRemovedMessage = (kind: "slice" | "story", key: string) => `${kind} \`${key}\`: \`needs\` was removed; run \`norn upgrade\``;
+export const needsRemovedMessage = (kind: "slice" | "story", key: string, file: string) => `${kind} \`${key}\`: \`needs\` was removed; delete it from the criteria in ${file}`;
 
 /**
  * Verdicts, worst first: `fail` > `unverified` > `person` > `pass`.

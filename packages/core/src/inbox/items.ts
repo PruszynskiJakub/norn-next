@@ -8,7 +8,7 @@
  * Recently done.
  */
 import { ATTENDED_WAIT, isClosedStatus, parseDuration, receiptNumber, recordRef, type ResolvedConfig, type UnitState, type Workflow } from "@norn/schema";
-import { baseRunStateHint, cmd, NO_VERSION_HINT, nextCommand, skillsDriftHint, startAgentCommand, unstickCommand, versionMismatch } from "../commands.ts";
+import { cmd, nextCommand, skillsDriftHint, startAgentCommand, unstickCommand, versionBaseline, versionMismatch } from "../commands.ts";
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
@@ -125,15 +125,18 @@ const VERSION_ITEM = "norn-version:";
 export const isVersionMismatchItem = (it: Pick<InboxItem, "id" | "group">): boolean => it.group === "unblock" && it.id.startsWith(VERSION_ITEM);
 
 /**
- * The running binary against the repo's norn version. A mismatch is a repo-level
- * Unblock item (first in its group); no recorded version is a Check item, so it never notifies.
+ * The running binary against the repo's norn version. A repo below the 0.30 baseline (or recording
+ * none) and a mismatch are each a repo-level Unblock item (first in its group).
  * Null when they match or the version was not observed.
  */
 function versionItem(facts: Facts): InboxItem | null {
   const v = facts.norn;
   if (!v) return null;
   const base = { story: "*", slice: null, step: null, command: cmd.upgrade(), since: iso(facts.now) };
-  if (v.repo === null) return { ...base, id: `${VERSION_ITEM}none`, group: "check", title: NO_VERSION_HINT };
+  // its way out is outside this norn (init, or the 0.30.x binary); `doctor` runs on it and shows it
+  const baseline = versionBaseline(v.repo, v.running);
+  if (baseline) return { ...base, id: `${VERSION_ITEM}${v.repo ?? "none"}:${v.running}`, group: "unblock", title: `${baseline.error}: ${baseline.do_instead}`, command: cmd.doctor() };
+  if (v.repo === null) return null;
   const mismatch = versionMismatch(v.repo, v.running);
   if (!mismatch) return null;
   // an older binary's way out is outside norn (install the repo's line); `doctor` runs on a mismatch and shows it
@@ -153,23 +156,6 @@ function repoSkillsDriftItem(facts: Facts): InboxItem | null {
     step: null,
     title: skillsDriftHint.repo(v.running),
     detail: v.skills_drift.join(", "),
-    command: cmd.upgrade(),
-    since: iso(facts.now),
-  };
-}
-
-/** Run state still in the base's tree — one repo-level Check item pointing to `norn upgrade`. */
-function baseRunStateItem(facts: Facts): InboxItem | null {
-  const stories = facts.base_run_state;
-  if (!stories?.length) return null;
-  return {
-    id: `base_run_state:*:${stories.join(",")}`,
-    group: "check",
-    story: "*",
-    slice: null,
-    step: null,
-    title: baseRunStateHint.text(facts.repo.default_branch, stories),
-    detail: stories.join(", "),
     command: cmd.upgrade(),
     since: iso(facts.now),
   };
@@ -927,15 +913,15 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
         slice: null,
         step: null,
         title: needs ?? `corrupt: ${story.frontmatter_error.file} failed validation`,
-        command: needs ? cmd.upgrade() : cmd.runView(story.key, { why: true }),
+        command: cmd.runView(story.key, { why: true }),
         since: iso(facts.now),
       });
       continue;
     }
-    // A slice file that still has criteria `needs` is not corrupt: `norn upgrade` fixes it
+    // A slice file that still has criteria `needs` is not corrupt: deleting `needs` fixes it
     for (const s of story.slices) {
       const needs = s.error && needsRemoved(s.error);
-      if (needs) add({ id: `needs:${s.key}`, group: "unblock", story: story.key, slice: s.key, step: null, title: needs, command: cmd.upgrade(), since: iso(facts.now) });
+      if (needs) add({ id: `needs:${s.key}`, group: "unblock", story: story.key, slice: s.key, step: null, title: needs, command: cmd.runView(s.key, { why: true }), since: iso(facts.now) });
     }
     add(notStartedItem(story, facts, config));
     add(bodyChangedItem(story));
@@ -956,7 +942,6 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   add(heartbeatItem(facts, config));
   add(versionItem(facts));
   add(repoSkillsDriftItem(facts));
-  add(baseRunStateItem(facts));
   for (const it of supersededItems(facts)) add(it);
   for (const it of owedRecordItems(facts)) add(it);
   // The version item comes first, whatever its age
