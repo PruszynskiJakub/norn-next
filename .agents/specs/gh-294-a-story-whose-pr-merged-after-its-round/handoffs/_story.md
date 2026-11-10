@@ -28,7 +28,9 @@ A story whose PR is seen merged into the base is recorded done, even when its ro
 - decide unit: `packages/core/test/unit/decide.test.ts`, next to R3.2.
 - integration: `packages/cli/test/integration/runtime.test.ts`, following the "PR merged →" flow plus a `watch --max-ticks 1` release before the merge (the full repro in `repro.test.ts`).
 
-The `## Reproduce` comment with the same content is posted on the issue.
+The `## Reproduce` comment is NOT posted: the norn PreToolUse hook refused `gh issue comment` although the reproduce brief allows exactly that one comment. Its text is in evidence as `reproduce-comment.md`, for a person to post.
+
+Friction: the reproduce brief allows one `## Reproduce` issue comment, but norn's Bash hook refuses every `gh` remote write, that comment included.
 
 ## Resume
 
