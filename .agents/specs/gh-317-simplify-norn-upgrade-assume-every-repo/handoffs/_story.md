@@ -4,7 +4,7 @@
 
 #### Proof
 
-All six slices are integrated. Review #4 at 07daf021b: approve, no findings (since review #3: main merged cleanly, merged-pr fixture records norn_version; unit 1731 pass, e2e 76 pass, typecheck green). **QA #3 at 751452c86: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (evidence: `report.md` in this run's QA evidence). The golden/transcript criterion (06.AC4) is `person`.
+All six slices are integrated. Review #4 at 07daf021b: approve, no findings (since review #3: main merged cleanly, merged-pr fixture records norn_version; unit 1731 pass, e2e 76 pass, typecheck green). **QA #4 at 87f235f64: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (evidence: `report.md` in this run's QA evidence). The golden/transcript criterion (06.AC4) is `person`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -50,17 +50,17 @@ Every user story is covered; none UNTRACED.
 
 #### Not proven yet
 
-- Golden/transcript criterion (06.AC4: only the record-move golden cases gone, pinned outputs otherwise unchanged), `person`: ruled acceptable at human-qa#1 and #2 (removed branch-tree runs/ probe line in `recovery-claim-lost.txt`; observe snapshots' version fields 0.19.0 → 0.30.0). Nothing else moved.
+- Golden/transcript criterion (06.AC4: only the record-move golden cases gone, pinned outputs otherwise unchanged), `person`: ruled acceptable at human-qa#1 and #2; QA #4 sees the identical diff on 87f235f64 (removed branch-tree runs/ probe line in `recovery-claim-lost.txt`; observe snapshots' version fields 0.19.0 → 0.30.0). Nothing else moved.
 
 #### Notes
 
 - Review #1 minor notes, for the person, not rework: init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before loading config, so a broken config with no version gets exit 3, not 6 (D4, `upgrade.ts:52`); test-only leftovers `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move`; stale comments (`observe/index.ts:522`, `view/src/load.ts:474`, `store/src/fsx.ts:16`, `docs/limitations.md:29`); commit 1ac2a0d2f's accepted risk (a branch-only record reads as none) belongs in the PR body.
 - Person decisions: init refuses pre-0.30 too; config old-key messages drop the `norn upgrade` hint; codes `version_missing`/`version_too_old`; status version item is Unblock → `norn doctor`. Flat records and old `state.json` readers stay.
-- QA note (03.AC2, seen again at QA #3): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
+- QA note (03.AC2, seen again at QA #4): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
 - CI fixes: fixtures record `norn_version` (`runningVersion(h.deps)` / `h.recordVersion()`); guard unchanged. CI tests the PR merged with main, so a new main fixture that skips `norn init` (as `merged-pr.test.ts` did) needs `h.recordVersion()`; check `git diff --name-only HEAD^1 HEAD -- test` after merging main.
 - Release notes come from commits 5e8451d29 and b45b051f0 and the PR body. CHANGELOG is the release step's.
 - Friction: the agent hook refuses `git worktree add`/`git push` even in a throwaway $TMPDIR QA repo.
 
 #### Resume
 
-test, then the rest of the round: review #4 approved HEAD 07daf021b (main merged, merged-pr fixture fix). The golden/transcript criterion was ruled acceptable at human-qa#2.
+human-qa: a person confirms the golden/transcript criterion on 87f235f64 (same two pinned-output changes as ruled at human-qa#1/#2), then describe and open-pr.
