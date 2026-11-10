@@ -8,7 +8,7 @@ title: Unit worktrees live in the machine dir next to the run state, not beside 
 assignee: PruszynskiJakub
 labels:
   - norn
-  - norn:wf:refinement
+  - norn:wf:story
 workflow: story
 status: active
 intake_at: 2026-11-10T08:46:51.720Z
