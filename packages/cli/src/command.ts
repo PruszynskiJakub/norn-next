@@ -50,6 +50,8 @@ export interface Command {
   positionals?: { min?: number; max?: number };
   /** prints markdown unless `--json` (refusals too): its reader is an agent or a person, not a program */
   markdown?: boolean;
+  /** a JSON command's flag that asks for text (`watch --human`): with it, refusals print markdown too */
+  textFlag?: string;
   /** needs a git repository (default true): `ctx.locate()` runs before `run` */
   repo?: boolean;
   /** false: reports the repo layout itself instead of refusing an old or mixed one at `locate()` (doctor, upgrade, migrate) */

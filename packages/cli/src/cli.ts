@@ -84,7 +84,7 @@ async function dispatch(command: Command, rest: string[], deps: CliDeps): Promis
   const end = rest.indexOf("--");
   const flags = end < 0 ? rest : rest.slice(0, end);
   const json = flags.includes("--json");
-  const markdown = command.markdown === true && !json;
+  const markdown = !json && (command.markdown === true || (command.textFlag !== undefined && flags.includes(`--${command.textFlag}`)));
   const argvOwn = [...flags.filter((a) => a !== "--json" && (command.markdown !== true || a !== "--text")), ...(end < 0 ? [] : rest.slice(end))];
   const ctx = new Context(deps);
   ctx.checksLayout = command.layout !== false;
