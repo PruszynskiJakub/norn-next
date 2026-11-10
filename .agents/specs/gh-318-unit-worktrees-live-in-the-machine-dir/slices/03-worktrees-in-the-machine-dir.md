@@ -2,7 +2,7 @@
 id: gh-318/03
 title: Worktrees move into the machine dir
 depends_on: [ gh-318/01, gh-318/02 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
