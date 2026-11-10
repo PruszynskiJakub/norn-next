@@ -4,7 +4,7 @@
 
 #### Proof
 
-All six slices are integrated. Review #5 at 81146c3ee (after the main merge d6e49dc7f): approve, no findings; the merge resolved only test files, src unchanged against main; unit tier 1733 pass, typecheck green. **QA #4 at 87f235f64: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos**. The golden/transcript criterion (06.AC4) is `person`.
+All six slices are integrated. Review #5 at 81146c3ee (after the main merge d6e49dc7f): approve, no findings; test#5 (unit tier + typecheck) green. **QA #5 at adb5b5a74: 31/32 pass, every criterion re-observed with the dev CLI in throwaway repos** (qa#5 evidence: `report.md`, scripts `n`/`r`/`mk.sh`/`norn.ts`). The golden/transcript criterion (06.AC4) is `person`.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -27,7 +27,7 @@ All six slices are integrated. Review #5 at 81146c3ee (after the main merge d6e4
 | 03.AC8 | `--json` has exactly the five keys | test | `upgrade.test.ts` › "holds exactly norn_version …, skills …, staged, commit and labels" |
 | 03.AC9 | old key, needs, .gitattributes left alone; validation flags the key without norn upgrade | test | `upgrade.test.ts` › "none of those files change …" + "with a valid config …" |
 | 03.AC10 | norn migrate unknown and absent from help | test | `upgrade.test.ts` › "it fails as an unknown command …"; `help-tree.test.ts` |
-| 03.AC11 | docs describe upgrade from 0.30 on, nothing old | agent | QA (agent): re-check after the docs fix |
+| 03.AC11 | docs describe upgrade from 0.30 on, nothing old | agent | QA (agent) |
 | 03.AC12 | commits call out removed migrate and dropped --json fields | agent | QA (agent) (commit b45b051f0) |
 | 04.AC1 | doctor's version check fails with the guard's code/error/do_instead | test | `version-baseline.test.ts` › "doctor's version check fails …" |
 | 04.AC2 | init with no team file records the running norn | test | `init-version.test.ts` › "AC1 B1: a repo with no norn_version gets the binary's …" |
@@ -50,18 +50,18 @@ Every user story is covered; none UNTRACED.
 
 #### Not proven yet
 
-- Golden/transcript criterion (06.AC4: only the record-move golden cases gone, pinned outputs otherwise unchanged), `person`: ruled acceptable at human-qa#1 and #2; QA #4 sees the identical diff on 87f235f64 (removed branch-tree runs/ probe line in `recovery-claim-lost.txt`; observe snapshots' version fields 0.19.0 → 0.30.0). Nothing else moved.
+- Golden/transcript criterion (06.AC4: only the record-move golden cases gone, pinned outputs otherwise unchanged), `person`: ruled acceptable at human-qa#1, #2 and #3; QA #5 sees the same diff on adb5b5a74 against merge base 5e1fee846 (four run-state-move golden cases deleted; removed branch-tree runs/ probe line in `recovery-claim-lost.txt`; observe snapshots' version fields 0.19.0 → 0.30.0, no other line). Nothing else moved.
 
 #### Notes
 
-- Review #1 minor notes, for the person, not rework: init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before loading config, so a broken config with no version gets exit 3, not 6 (D4, `upgrade.ts:52`); test-only leftovers `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move`; stale comments (`observe/index.ts:522`, `view/src/load.ts:474`, `store/src/fsx.ts:16`, `docs/limitations.md:29`); commit 1ac2a0d2f's accepted risk (a branch-only record reads as none) belongs in the PR body.
+- Review #1 minor notes (for the person, not rework): init's version_missing hint loops back to init (`core/src/commands.ts:178`); upgrade checks the baseline before config, so a broken config with no version gets exit 3, not 6 (`upgrade.ts:52`); test-only leftovers `treeRecordCommit`/`treeStoryRunStatePath`/`GitPort.move`; a few stale comments; commit 1ac2a0d2f's accepted risk (a branch-only record reads as none) belongs in the PR body.
 - Person decisions: init refuses pre-0.30 too; config old-key messages drop the `norn upgrade` hint; codes `version_missing`/`version_too_old`; status version item is Unblock → `norn doctor`. Flat records and old `state.json` readers stay.
-- QA note (03.AC2, seen again at QA #4): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
+- QA note (03.AC2, seen again at QA #5): an interrupted upgrade's rerun stages only the config; a skill rewritten before the interruption stays unstaged.
 - CI fixes: fixtures record `norn_version` (`runningVersion(h.deps)` / `h.recordVersion()`); guard unchanged. CI tests the PR merged with main, so a new main fixture that skips `norn init` (as `merged-pr.test.ts` did) needs `h.recordVersion()`; check main's new tests after a merge.
-- CI #3: no ci.yml ran because the PR conflicted with main; merged main at d6e49dc7f (resolution in its message), new tests use `h.worktree`/`worktreesOf`.
+- After the main merge d6e49dc7f, tests use `h.worktree`/`worktreesOf` (worktrees live in the machine dir).
 - Release notes come from commits 5e8451d29 and b45b051f0 and the PR body. CHANGELOG is the release step's.
-- Friction: the agent hook refuses `git worktree add`/`git push` even in a $TMPDIR QA repo.
+- Friction: the agent hook refuses `git worktree add`/`git push` even in a $TMPDIR QA repo (QA seeds a bare remote with `git clone --bare`; a lock-holder helper needs the dev CLI's `NORN_HOME_DIR`).
 
 #### Resume
 
-test, then QA re-observes the 32 criteria at the merged HEAD (worktrees now live in the machine dir), then CI on PR #325; on `no ci.yml run`, check `gh pr view 325 --json mergeable`.
+human-qa: the person confirms the pinned-output criterion (06.AC4) on adb5b5a74 from qa#5's `06.AC4.txt`; then describe, open-pr, CI on PR #325 (on `no ci.yml run`, check `gh pr view 325 --json mergeable`).
