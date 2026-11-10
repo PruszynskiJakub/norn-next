@@ -64,4 +64,4 @@ Every user story is covered; none UNTRACED.
 
 #### Resume
 
-human-qa: the person confirms the pinned-output criterion (06.AC4) on adb5b5a74 from qa#5's `06.AC4.txt`; then describe, open-pr, CI on PR #325 (on `no ci.yml run`, check `gh pr view 325 --json mergeable`).
+describe#4 rewrote `pr.md` for HEAD e922cac16 from QA #5's evidence (run 01M72MVVW6Y8TTB0CE1DFQDCN5; every link checked). Next: open-pr updates PR #325, then CI (on `no ci.yml run`, check `gh pr view 325 --json mergeable`; after a main merge, check main's new tests record a norn_version).
