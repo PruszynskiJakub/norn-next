@@ -1,7 +1,7 @@
 ---
 id: gh-337/11
 title: Waiting stories are re-verified when the base moves
-depends_on: [gh-337/04]
+depends_on: [gh-337/04, gh-337/03, gh-337/05, gh-337/06, gh-337/08, gh-337/09, gh-337/10]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
@@ -34,4 +34,4 @@ User stories: workflow key `base.verify`; shipped story and quick set it to thei
 - `bun run schema:emit` and `bun run docs:emit`
 
 ## Notes
-D11. Depends on the merge step slice (it verifies at the merge step, and the spec puts re-verify after it). Verify reuses the `stale` edge; there is no new outcome. The cache is the check receipt's `verify: {head, base}`.
+D11. Depends on the merge step slice (it verifies at the merge step, and the spec puts re-verify after it), and on the last slices of changes 1–5 (03, 05, 06, 08, 09, 10), the order the person asked for. Verify reuses the `stale` edge; there is no new outcome. The cache is the check receipt's `verify: {head, base}`.

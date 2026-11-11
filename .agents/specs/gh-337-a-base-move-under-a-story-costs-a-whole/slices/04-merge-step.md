@@ -1,7 +1,7 @@
 ---
 id: gh-337/04
 title: A merge step keeps an approved story in its workflow
-depends_on: []
+depends_on: [gh-337/01]
 status: planned
 criteria:
   - { id: AC1, verifier: test }

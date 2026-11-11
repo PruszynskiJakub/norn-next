@@ -1,7 +1,7 @@
 ---
 id: gh-337/14
 title: The resolver can ask with the merge kept in progress
-depends_on: []
+depends_on: [gh-337/03, gh-337/05, gh-337/06, gh-337/08, gh-337/09, gh-337/10]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
@@ -31,4 +31,4 @@ User stories: the resolver can ask with the merge in progress; the answer resume
 - `bun run typecheck`
 
 ## Notes
-D14. Edit the skill in its bundled copy only. Claim release code is also touched by slices 01 and 03; a conflict is resolved at merge.
+D14. Starts after the last slices of changes 1–5 (03, 05, 06, 08, 09, 10), the order the person asked for. Edit the skill in its bundled copy only. Claim release code is also touched by slices 01 and 03; a conflict is resolved at merge.

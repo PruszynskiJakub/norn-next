@@ -1,7 +1,7 @@
 ---
 id: gh-337/13
 title: Generated files regenerate instead of resolving
-depends_on: [gh-337/07]
+depends_on: [gh-337/07, gh-337/03, gh-337/05, gh-337/06, gh-337/08, gh-337/09, gh-337/10]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
@@ -36,4 +36,4 @@ User stories: the regenerate key in the team config; all conflicts mapped → re
 - `bun run schema:emit` and `bun run docs:emit`
 
 ## Notes
-D13. Depends on slice 07 for the clean classification (AC6). Closes #126 (AC5): the PR body says so. Regenerate runs inside act's update and holds the tick up to its timeout.
+D13. Depends on slice 07 for the clean classification (AC6), and on the last slices of changes 1–5 (03, 05, 06, 08, 09, 10), the order the person asked for. Closes #126 (AC5): the PR body says so. Regenerate runs inside act's update and holds the tick up to its timeout.

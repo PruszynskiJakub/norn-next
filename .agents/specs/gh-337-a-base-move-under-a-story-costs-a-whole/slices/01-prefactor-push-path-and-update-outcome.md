@@ -25,4 +25,4 @@ User stories: a person's push merges with norn's local boundaries, never rebased
 - `bun run typecheck`
 
 ## Notes
-Plan › Prefactoring 1 and 2. The person asked for both prefactorings in one slice of their own, first. Only slices that build on these functions depend on this one (the heads ref and push rule, the light path); the others start in parallel.
+Plan › Prefactoring 1 and 2. The person asked for both prefactorings in one slice of their own, first. Every slice starts behind this one, as the person asked: prefactorings first, then the push rule, merge step, story edit refusal, light path and re-approval and the base side; re-verify, overlap, regenerate and ask-instead-of-abort wait for all of those.

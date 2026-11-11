@@ -1,7 +1,7 @@
 ---
 id: gh-337/12
 title: norn status shows overlap between open stories
-depends_on: []
+depends_on: [gh-337/03, gh-337/05, gh-337/06, gh-337/08, gh-337/09, gh-337/10]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
@@ -30,4 +30,4 @@ User stories: a Check item naming both stories and the paths; only stories with 
 - `bun run schema:emit` (the overlap cache schema)
 
 ## Notes
-D12. The cache is `overlap.json` in the machine dir beside `base.json`; the item id is `overlap:<a>:<b>`.
+D12. Starts after the last slices of changes 1–5 (03, 05, 06, 08, 09, 10), the order the person asked for. The cache is `overlap.json` in the machine dir beside `base.json`; the item id is `overlap:<a>:<b>`.

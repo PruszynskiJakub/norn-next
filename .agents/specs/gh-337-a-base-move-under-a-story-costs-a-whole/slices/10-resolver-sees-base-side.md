@@ -1,7 +1,7 @@
 ---
 id: gh-337/10
 title: The resolver sees the base side of each conflict
-depends_on: []
+depends_on: [gh-337/01]
 status: planned
 criteria:
   - { id: AC1, verifier: test }

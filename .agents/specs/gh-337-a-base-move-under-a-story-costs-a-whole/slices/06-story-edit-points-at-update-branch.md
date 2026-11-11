@@ -1,7 +1,7 @@
 ---
 id: gh-337/06
 title: story edit points at update-branch for a conflicting PR
-depends_on: []
+depends_on: [gh-337/01]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
