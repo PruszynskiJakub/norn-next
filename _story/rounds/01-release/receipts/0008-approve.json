@@ -1,0 +1,1 @@
+{"kind":"approve","receipt_id":"01M75CFAAY5QR9AA87CHK30C9P","run_id":null,"step":"ready","attempt":1,"at":"2026-11-11T13:24:05.086Z","by":"human","who":"jakubpruszynski@mac","slice":null,"round":1,"comment":"person: 0.33.0 approved; CI green on 09f15d2, process green after title fix","head_sha":"1b8d28fdce1b0bae908d3139de3c2c7b431763a9"}

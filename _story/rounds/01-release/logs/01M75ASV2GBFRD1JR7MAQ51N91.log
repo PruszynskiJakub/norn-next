@@ -1,0 +1,8 @@
+CI run 43024446893 failed: https://github.com/PruszynskiJakub/norn-next/actions/runs/43024446893
+- job 130535468195: unit (cancelled: unknown, not run to the end)
+- job 130535529878: e2e (shard ${{ matrix.shard }}/3) (cancelled: unknown, not run to the end)
+- job 130535530464: integration (shard ${{ matrix.shard }}/4) (cancelled: unknown, not run to the end)
+- job 130535531001: package (cancelled: unknown, not run to the end)
+Read a job's failures (file, line, message):
+  gh api "repos/{owner}/{repo}/check-runs/<job>/annotations" -q '.[] | select(.annotation_level=="failure" and .path!=".github") | "\(.path):\(.start_line) \(.message)"'
+Only if that is not enough, the job's failed step log: gh run view 43024446893 --log-failed --job <job>
