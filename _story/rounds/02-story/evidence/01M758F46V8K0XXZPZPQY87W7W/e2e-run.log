@@ -1,0 +1,7 @@
+$ e2e base-sync light-path slice-workflow
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+ 41 pass
+ 0 fail
+ 439 expect() calls
+Ran 41 tests across 3 files. [60.16s]

@@ -1,0 +1,7 @@
+0009-approve.json approve-slices approve  8cb7821939f400f05ed5a56322d5aed1ae674d25
+0028-done.json review done approve 
+0036-classify.json open-pr classify done 
+0043-done.json review done approve 327602bc00000000000000000000000000000000
+steps: sync,sync-resolve,slice,approve-slices,slices,update,resolve,test,qa,human-qa,implement,review,describe,open-pr,ci,ready
+lightAnchor(real round) = null
+same round + open-pr done after it = 327602bc00000000000000000000000000000000

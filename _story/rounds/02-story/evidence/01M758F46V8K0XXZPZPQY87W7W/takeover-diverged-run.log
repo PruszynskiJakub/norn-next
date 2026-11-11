@@ -1,0 +1,14 @@
+bun test v1.3.13 (bf2e2cec)
+
+../../../../../../../private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/qa3-gh337/scratch/takeover-diverged.test.ts:
+QA[local] checkout exit 0 {"story":"gh-3","branch":"gh-3-div-local","claim":{"holder":"bob@b-local","heartbeat_id":"03PGFNPFHG46HPMKPDQR89WD71","acquired_at":"2099-01-15T10:11:10.000Z","expires_at":"2099-01-15T10:21:10.000Z"},"taken_from":{"holder":"tester@box","since":"2099-01-15T10:00:10.000Z","expires_at":"2099-01-15T10:10:10.000Z","expired":true},"forced":false,"journal":null,"receipt":{"file":"0001-take.json"},"record
+QA[local] B HEAD 19142befc335e2987f0257889326d3eac3c4f7a6; contains boundary 1601953a0aea8a635b6d7658712215f7062cd423: false; contains person's 19142befc335e2987f0257889326d3eac3c4f7a6: true; parents: ddbbb948338d6a5545bf9aff18cb43add9ca3ebc
+QA[local] story step after takeover: implement
+QA[remote] checkout exit 0 {"story":"gh-4","branch":"gh-4-div-remote","claim":{"holder":"bob@b-remote","heartbeat_id":"03PGFPAXV0SKKB5YBHCCASD240","acquired_at":"2099-01-15T10:22:20.000Z","expires_at":"2099-01-15T10:32:20.000Z"},"taken_from":{"holder":"tester@box","since":"2099-01-15T10:11:20.000Z","expires_at":"2099-01-15T10:21:20.000Z","expired":true},"forced":false,"journal":null,"receipt":{"file":"0006-take.json"},"reco
+QA[remote] B HEAD d9d4aacd89f9a4bdd6f68d86c4246107d772bc69; contains boundary 616a28519f27077af3cb4cfd2aca7e811f240a0d: false; contains person's d9d4aacd89f9a4bdd6f68d86c4246107d772bc69: true; parents: db9ecc807dac82c3b4ed3a443413efc613907f89
+QA[remote] story step after takeover: review
+
+ 2 pass
+ 0 fail
+ 6 expect() calls
+Ran 2 tests across 1 file. [8.58s]

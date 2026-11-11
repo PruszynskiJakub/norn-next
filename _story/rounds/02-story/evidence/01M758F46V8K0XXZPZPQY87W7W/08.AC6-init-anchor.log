@@ -1,0 +1,10 @@
+$ (throwaway repo with package.json scripts.test + bun.lock) bun packages/cli/src/main.ts init --json
+grep -n 'test-run' .agents/workflows/{story,quick}.yaml:
+.agents/workflows/quick.yaml:9:# Change `test.run` to your repo's test command; the light path's test steps reuse it (`*test-run`).
+.agents/workflows/quick.yaml:62:    run: &test-run "bun install --frozen-lockfile && bun run test"
+.agents/workflows/quick.yaml:69:    run: *test-run
+.agents/workflows/quick.yaml:74:    run: *test-run
+.agents/workflows/story.yaml:13:# Change `test.run` to your repo's test command; the light path's test steps reuse it (`*test-run`).
+.agents/workflows/story.yaml:74:    run: &test-run "bun install --frozen-lockfile && bun run test"
+.agents/workflows/story.yaml:81:    run: *test-run
+.agents/workflows/story.yaml:86:    run: *test-run

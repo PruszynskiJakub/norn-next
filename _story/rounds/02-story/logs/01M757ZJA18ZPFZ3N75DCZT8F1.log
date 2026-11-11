@@ -1,0 +1,6 @@
+CI run 43017356178 failed: https://github.com/PruszynskiJakub/norn-next/actions/runs/43017356178
+- job 130511822841: e2e (shard 2/3)
+- job 130511822950: integration (shard 4/4)
+Read a job's failures (file, line, message):
+  gh api "repos/{owner}/{repo}/check-runs/<job>/annotations" -q '.[] | select(.annotation_level=="failure" and .path!=".github") | "\(.path):\(.start_line) \(.message)"'
+Only if that is not enough, the job's failed step log: gh run view 43017356178 --log-failed --job <job>
