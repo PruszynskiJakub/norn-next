@@ -20,6 +20,7 @@ import { cmd, sliceWorktreePath, storyWorktreePath } from "../commands.ts";
 import type { SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { sha256 } from "../hash.ts";
 import { unitWorktree } from "../policy.ts";
+import { CARRIED_CLEAN, remergeCommands } from "../ready-carry.ts";
 import { checkWorkflowLevel, stepOf, type UnitLevel } from "../workflow.ts";
 import { commitFor, type Ctx, emitApplied, endedWith, nextReceiptNumber, nornReceipt, park, rebasing, synth, trailersFor, unitBranch } from "./receipts.ts";
 
@@ -129,10 +130,17 @@ export function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState
     onto: step.action === "integrate" ? story.branch : null,
     pr:
       step.action === "open-pr"
-        ? { base: ctx.facts.repo.default_branch, title: fm.title, body: `Closes ${fm.url}\n\nDelivered by norn (story ${story.key}).`, body_file: `${story.spec_dir}/${PR_BODY_FILE}` }
+        ? { base: ctx.facts.repo.default_branch, title: fm.title, body: `Closes ${fm.url}\n\nDelivered by norn (story ${story.key}).${resolvedEvidence(story)}`, body_file: `${story.spec_dir}/${PR_BODY_FILE}` }
         : null,
     ...(update ? { update } : {}),
   });
+}
+
+/** A base merge since the ready approval needed a resolution: the PR names what the resolver changed, for the person who approves again. */
+function resolvedEvidence(story: StoryFacts): string {
+  const since = story.ready_since;
+  if (!since?.resolved || !since.merges.length) return "";
+  return `\n\nResolved base merges since the ready approval; what the resolver changed:\n\n${remergeCommands(since.merges).map((c) => `- \`${c}\``).join("\n")}`;
 }
 
 /** The base a classify receipt records. */
@@ -165,6 +173,17 @@ export function classifyNorn(
     state: res.state,
     commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} ${outcome} → ${receipt.route}`, st.step, { ended: endedWith(res) }),
   });
+}
+
+/**
+ * Norn approves the ready gate on its own (`carriedApproval`) at the story head the base facts
+ * measured, the receipt marked carried, so History tells it from a person's approval and the next
+ * base update measures from that head.
+ */
+export function carryApproval(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): void {
+  const approve = nornReceipt(ctx, st, "approve", { carried: CARRIED_CLEAN, ...(story.base ? { head_sha: story.base.head } : {}) });
+  const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), approve);
+  emitApplied(ctx, story, uf, "gate.carried", res, [nr], { message: `norn: ${uf.unit.key} ${st.step} approval carried: ${CARRIED_CLEAN}`, step: st.step, ended: endedWith(res) });
 }
 
 /**

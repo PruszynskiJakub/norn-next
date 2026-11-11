@@ -22,6 +22,7 @@ import type {
   Workflow,
 } from "@norn/schema";
 import type { GitInProgress, PaneState, PullRequestCi, RemoteIssue, RemotePullRequest, RunnerCapabilities, SessionRef, WorktreeStatus } from "./ports.ts";
+import type { ReadySince } from "./ready-carry.ts";
 
 /** A file that failed to read or validate. */
 export interface FileError {
@@ -345,6 +346,11 @@ export interface StoryFacts {
   foreign_commits?: ForeignCommit[];
   /** story branch head when the person gave `approve` at the `ready` gate (the approve receipt's `head_sha`) */
   ready_head_sha?: string;
+  /**
+   * What happened since that approval (`readySince` over the story unit's receipts): whether it
+   * carries over, and the merges brought in. Absent = no ready approval in the round, or not observed.
+   */
+  ready_since?: ReadySince;
   /** When that approval was given (the approve receipt's `at`); PRs seen before it are not compared */
   ready_approved_at?: string;
   /**

@@ -280,6 +280,9 @@ function cases(): RuleCase[] {
     const prSeen = { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "c".repeat(40) } as const, observed_at: T0 };
     const { pr: _, ...unfetched } = story(STALE_WF, parked, null, { base, pr_seen: prSeen });
     out.push(c("a stale-routed gate whose base moved, the story PR not fetched this tick", "gate.stale.awaits_sync", facts([unfetched])));
+    // Since the ready approve only a clean base merge and green checks: the approval carries over
+    const merged = { ...base, behind: 0 };
+    out.push(c("a ready gate whose approval carries over a clean base merge", "gate.carried", facts([story(STALE_WF, parked, null, { base: merged, ready_since: { carry: true, resolved: false, merges: ["e".repeat(40)] } })])));
   }
   out.push(c("an update step with no base observed", "git.update.no_base", facts([story(GIT_WF, ready("update"))])));
   {

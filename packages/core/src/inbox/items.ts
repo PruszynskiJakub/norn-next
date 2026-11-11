@@ -15,6 +15,7 @@ import type { InboxGroup, InboxItem } from "../ports.ts";
 import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, skillsDiffer, issueProblem, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyLanded, storyPhase, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { hookActivity } from "../session.ts";
+import { CARRIED_CLEAN, carriedApproval, isReadyGate, readyApprovalReceipt, remergeCommands } from "../ready-carry.ts";
 import { isParked } from "../verbs.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -354,6 +355,18 @@ function judgedDetail(story: StoryFacts, uf: UnitFacts): { detail: string; full:
   return { detail: `step ${r.step}#${r.attempt} reported ${"outcome" in r ? r.outcome : r.kind} (receipt ${receiptNumber(nr.n)})`, full: lines.join("\n") };
 }
 
+/**
+ * At the ready gate after a base merge that needed a resolution: what the resolver changed, one
+ * remerge-diff command per merge since the last ready approval, so the person reads only that.
+ */
+function resolvedMerges(story: StoryFacts, uf: UnitFacts): { detail: string; full: string } | null {
+  const since = story.ready_since;
+  const st = uf.state;
+  if (uf.unit.slice !== null || !since?.resolved || !since.merges.length || !st || !uf.workflow || !isReadyGate(uf.workflow, st.step)) return null;
+  const cmds = remergeCommands(since.merges);
+  return { detail: `resolved base merge since your approval: review ${cmds.join("; ")}`, full: ["What the resolver changed since your last approval:", ...cmds.map((c) => `- ${c}`)].join("\n") };
+}
+
 const oneLine = (t: string) => t.replace(/\s*\n\s*/g, " ").trim();
 
 /**
@@ -630,11 +643,14 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
         case "ask":
           return answerItem(uf, st, park, item);
         case "gate": {
+          // The person's earlier approval carries over this tick: nothing for them to approve
+          if (uf.workflow && carriedApproval(story, uf, st, uf.workflow)) return item("running", `${st.step}: approval carried: ${CARRIED_CLEAN}`, cmd.runList(key), park.since);
           const judged = judgedDetail(story, uf);
           const reject = `or reject: ${cmd.storyReject(key)}`;
           const { detail, full } = gateChecks(story, uf);
-          const fullText = [judged?.full, full].filter(Boolean).join("\n\n");
-          return item("approve", park.reason, cmd.storyApprove(key), park.since, { detail: [judged?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
+          const resolved = resolvedMerges(story, uf);
+          const fullText = [judged?.full, full, resolved?.full].filter(Boolean).join("\n\n");
+          return item("approve", park.reason, cmd.storyApprove(key), park.since, { detail: [judged?.detail, resolved?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
         }
         case "merge":
           // The person's last action is merging the PR: today's merge item, never a gate item
@@ -732,15 +748,12 @@ export function bodyChangedItem(story: StoryFacts): InboxItem | null {
   };
 }
 
-/** Receipts that send a finished story unit back into its workflow — the head will change, the ready gate is passed again. */
-export const RE_ENTRY_KINDS = ["update", "workflow"] as const;
-
 /**
  * The story branch head when the person gave `approve` at the `ready` gate — the `head_sha` of
- * the newest `approve` receipt at that gate (the `ready` step, or any gate whose `approve` goes to
- * `$done` or to a merge step). Only an approval newer than the unit's last re-entry (`norn story update-branch`, `norn story edit
- * --at`) counts; a re-entry voids it until a new approve at the gate. `receipts` are the story
- * unit's, at least of the kinds `approve` and RE_ENTRY_KINDS; order does not matter.
+ * the newest `approve` receipt at that gate (`isReadyGate`). Only an approval newer than the unit's
+ * last re-entry (`norn story update-branch`, `norn story edit --at`) counts; a re-entry voids it until
+ * a new approve at the gate. `receipts` are the story unit's, at least of the kinds `approve` and
+ * RE_ENTRY_KINDS; order does not matter.
  */
 function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[]): string | undefined {
   return readyApproval(wf, receipts)?.sha;
@@ -748,14 +761,8 @@ function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[]): strin
 
 /** The head the ready approval let through and when it was given (`readyHeadSha`). */
 export function readyApproval(wf: Workflow, receipts: readonly NumberedReceipt[]): { sha: string; at: string } | undefined {
-  const approvesTo = (step: string) => edgeOf(wf, step, "approve")?.to ?? "";
-  const isReady = (step: string) => step === "ready" || (stepOf(wf, step)?.type === "gate" && (approvesTo(step) === "$done" || stepOf(wf, approvesTo(step))?.type === "merge"));
-  const sorted = [...receipts].sort((a, b) => b.n - a.n);
-  for (const { receipt: r } of sorted) {
-    if ((RE_ENTRY_KINDS as readonly string[]).includes(r.kind)) return undefined;
-    if (r.kind === "approve" && isReady(r.step)) return r.head_sha ? { sha: r.head_sha, at: r.at } : undefined;
-  }
-  return undefined;
+  const r = readyApprovalReceipt(wf, receipts)?.receipt;
+  return r?.kind === "approve" && r.head_sha ? { sha: r.head_sha, at: r.at } : undefined;
 }
 
 /** The PR head moved after the `ready.approve` — what would merge is not what was reviewed. */

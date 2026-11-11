@@ -19,6 +19,9 @@ import {
   type OwedRecord,
   RE_ENTRY_KINDS,
   readyApproval,
+  readyApprovalReceipt,
+  type ReadySince,
+  readySince,
   recordPushSlot,
   type StepRunFacts,
   type StoryFacts,
@@ -109,6 +112,8 @@ export interface LocalStory {
   notes?: StoryFacts["notes"];
   /** The story unit's ready approval (`readyApproval`) */
   ready?: { sha: string; at: string };
+  /** What happened since it (`readySince`) */
+  ready_since?: ReadySince;
   /** The story's refused record push, from its own slot of failures.json (`StoryFacts.record_refused`) */
   record_refused?: ActFailure;
   /** The local record ref's commit while the story unit has no run state (`StoryFacts.record_unplaced`) */
@@ -197,7 +202,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
       const skills_drift = worktree && u.state?.status !== "done" ? drift(worktree) : undefined;
       return skills_drift ? { ...lu, skills_drift } : lu;
     });
-    const ready = readyOf(s, s.units[0], indexOf);
+    const { ready, since } = readyOf(s, s.units[0], indexOf);
     const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"], indexOf(u)) })));
     const refused = failures[recordPushSlot(s.key)];
     // A record ref here while the story unit has no run state — the record is not in place
@@ -209,6 +214,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
       units,
       ...(notes.length ? { notes } : {}),
       ...(ready ? { ready } : {}),
+      ...(since ? { ready_since: since } : {}),
       ...(refused ? { record_refused: refused } : {}),
       ...(unplaced ? { record_unplaced: unplaced } : {}),
       ...(open.length ? { rejected: open } : {}),
@@ -297,7 +303,7 @@ export function baseStoryFacts(
   ls: LocalStory,
   workflows: Readonly<Record<string, { workflow: Workflow | null } | undefined>>,
   config: Pick<ResolvedConfig, "mode" | "workflow">,
-): Pick<StoryFacts, "key" | "slug" | "spec_dir" | "branch" | "frontmatter" | "frontmatter_error" | "mode" | "notes" | "rejected_mailbox" | "record_refused" | "record_unplaced" | "record_only"> {
+): Pick<StoryFacts, "key" | "slug" | "spec_dir" | "branch" | "frontmatter" | "frontmatter_error" | "mode" | "notes" | "ready_since" | "rejected_mailbox" | "record_refused" | "record_unplaced" | "record_only"> {
   const s = ls.snapshot;
   const story = s.units[0];
   return {
@@ -309,6 +315,7 @@ export function baseStoryFacts(
     frontmatter_error: s.frontmatter_error,
     mode: storyMode(story?.state, story?.workflow?.workflow ?? workflows[s.frontmatter?.workflow ?? config.workflow]?.workflow, config),
     ...(ls.notes ? { notes: ls.notes } : {}),
+    ...(ls.ready_since ? { ready_since: ls.ready_since } : {}),
     ...(ls.rejected ? { rejected_mailbox: ls.rejected } : {}),
     ...(ls.record_refused ? { record_refused: ls.record_refused } : {}),
     ...(ls.record_unplaced ? { record_unplaced: ls.record_unplaced } : {}),
@@ -316,12 +323,28 @@ export function baseStoryFacts(
   };
 }
 
-/** The story unit's approve and re-entry receipts give its ready approval (with its time). */
-function readyOf(story: StorySnapshot, u: UnitSnapshot | undefined, indexOf: (u: UnitSnapshot) => ReceiptIndex): { sha: string; at: string } | undefined {
+/**
+ * The story unit's approve and re-entry receipts give its ready approval (with its time); the
+ * receipts after that approval give what happened since (`readySince`). Only those few are read; one
+ * that does not read as a receipt leaves `since` out, so nothing is carried on a guess.
+ */
+function readyOf(story: StorySnapshot, u: UnitSnapshot | undefined, indexOf: (u: UnitSnapshot) => ReceiptIndex): { ready?: { sha: string; at: string }; since?: ReadySince } {
   const wf = u?.workflow?.workflow;
-  if (!u || !wf) return undefined;
-  const ready = readyApproval(wf, receiptsOfKinds(story, u, ["approve", ...RE_ENTRY_KINDS], indexOf(u)));
-  return ready ? { sha: ready.sha, at: ready.at } : undefined;
+  if (!u || !wf) return {};
+  const index = indexOf(u);
+  const gate = receiptsOfKinds(story, u, ["approve", ...RE_ENTRY_KINDS], index);
+  const ready = readyApproval(wf, gate);
+  const out = ready ? { ready: { sha: ready.sha, at: ready.at } } : {};
+  const approval = readyApprovalReceipt(wf, gate);
+  if (!approval) return out;
+  const later: NumberedReceipt[] = [];
+  for (const { n } of index.entries.filter((e) => e.n > approval.n)) {
+    const r = index.read(n, story.root);
+    if (!r || !("receipt" in r)) return out;
+    later.push(r);
+  }
+  const since = readySince(wf, [approval, ...later]);
+  return since ? { ...out, since } : out;
 }
 
 /**

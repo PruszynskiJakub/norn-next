@@ -26,6 +26,7 @@ import { cmd } from "./commands.ts";
 import { HANDOFF_MAX_BYTES, HANDOFF_SECTIONS, handoffBytes, handoffCounters, handoffLastOutcome } from "./handoff.ts";
 import { branchRewrittenLine, recordLostLine } from "./apply.ts";
 import { ruleWithReason } from "./hard-rules.ts";
+import { readySince, remergeCommands } from "./ready-carry.ts";
 
 type Runner = ResolvedConfig["runner"]["adapter"];
 
@@ -208,6 +209,11 @@ export interface BriefJson {
   checks: { since: string; items: BriefCheck[] } | null;
   /** Gate rulings of the story, oldest first (the one shown under Rework excepted) */
   rulings: Ruling[];
+  /**
+   * A base merge since the story's ready approval needed a resolution: one remerge-diff command per
+   * merge since that approval, what the resolver changed. null when none did.
+   */
+  resolved_merges: string[] | null;
   context: {
     handoff: string | null;
     /** the handoff's size; `norn done` refuses it past `max`, and the brief cuts it past twice that */
@@ -266,6 +272,7 @@ export function renderBrief(input: BriefInput): Briefing {
     rework: rw,
     checks: checksSince(input, step),
     rulings: rulingsFor(input),
+    resolved_merges: resolvedMerges(input),
     context: { handoff: handoff.text, handoff_bytes: handoff.bytes, handoff_warning: handoff.warning, resume_dropped: handoff.resume_dropped, answers: answers(input), notes: rw ? null : notes(input) },
     log: receiptLog(input),
     handoff_file: `${input.paths.spec_dir}/${unitHandoffPath(input.unit.dir)}`,
@@ -274,6 +281,12 @@ export function renderBrief(input: BriefInput): Briefing {
     limits: limits(input, step),
   };
   return { markdown: markdown(json), json };
+}
+
+function resolvedMerges(input: BriefInput): string[] | null {
+  if (input.unit.slice !== null) return null;
+  const since = readySince(input.workflow, input.receipts);
+  return since?.resolved && since.merges.length ? remergeCommands(since.merges) : null;
 }
 
 function where(input: BriefInput, step: AgentStep): BriefJson["where"] {
@@ -553,6 +566,7 @@ export function receiptLine(r: Receipt): string | null {
     case "stuck":
       return `${at} stuck: ${oneLine(r.reason)}`;
     case "approve":
+      if (r.carried) return `${at} approval carried: ${r.carried}`;
       return `${at} approve${by}${r.comment?.trim() ? `: ${oneLine(r.comment)}` : ""}`;
     case "reject":
       return `${at} reject${by}: ${r.comment?.trim() ? oneLine(r.comment) : "(no comment given)"}`;
@@ -911,6 +925,12 @@ function markdown(b: BriefJson): string {
   // last_check / last_findings point at Rework or Earlier findings, both above: no line of their own
   for (const i of b.inputs.filter((x) => x.kind !== "last_check" && x.kind !== "last_findings")) out.push(`- ${i.label}: \`${i.ref}\`${i.purpose ? ` — ${i.purpose}` : ""}`);
   out.push("");
+
+  if (b.resolved_merges) {
+    out.push("## Resolved base merges", "", "A base merge since the ready approval needed a resolution. What the resolver changed, per merge:", "");
+    for (const c of b.resolved_merges) out.push(`- \`${c}\``);
+    out.push("");
+  }
 
   out.push("## Context", "");
   if (b.context.answers.length) {

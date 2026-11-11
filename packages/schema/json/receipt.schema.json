@@ -894,6 +894,10 @@
             "description": "note:<receipt_id>:<n>",
             "type": "string"
           }
+        },
+        "carried": {
+          "minLength": 1,
+          "type": "string"
         }
       }
     },

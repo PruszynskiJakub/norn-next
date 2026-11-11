@@ -138,6 +138,8 @@ export const ApproveReceipt = mailboxReceipt("approve", {
   head_sha: Type.Optional(GitSha),
   /** Open notes of the story listed at this story-level gate at `approve`; they leave the inbox */
   acknowledged_notes: Type.Optional(Type.Array(NoteId, { uniqueItems: true })),
+  /** Set when norn gave this `approve` on its own, carrying the person's earlier ready approval over: why (e.g. "clean base merge") */
+  carried: Type.Optional(NonEmpty),
 });
 export const RejectReceipt = mailboxReceipt("reject", {
   comment: Type.Optional(Type.String()),
