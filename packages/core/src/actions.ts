@@ -369,7 +369,7 @@ export interface RetitlePrAction extends UnitBase {
   title: string;
 }
 
-/** PR merged → story done; remove worktrees, branches, claim and mailbox refs. */
+/** PR merged → story done; remove worktrees, branches, the claim, heads and mailbox refs. */
 export interface CleanupMergedStoryAction extends UnitBase {
   kind: "cleanup_merged_story";
   worktrees: string[];

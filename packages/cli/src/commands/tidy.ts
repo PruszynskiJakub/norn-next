@@ -21,13 +21,15 @@
  *   - rejected mailbox receipts (`rejected.json`) cleared and rejected before the window
  *   - owed base-branch records norn stopped retrying whose story is gone from the base, and
  *     their Unblock item with them
+ *   - the heads ref (`refs/norn/heads/<story>`, here and on the remote) of a story that merged,
+ *     landed or was dropped
  * Nothing with unique work is removed; such items are listed under `kept` with the reason.
  */
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
-import { ulid } from "@norn/schema";
-import { deleteTraceDays, dropRecords, pruneRejectedReceipts, pruneSuperseded, rejectedReceiptsPath, deleteTracePaths, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore } from "@norn/store";
+import { HEADS_REF_PREFIX, parseSpecDirName, SPEC_FILE, SPECS_DIR, ulid } from "@norn/schema";
+import { deleteTraceDays, dropRecords, listRemoteRefs, parseStoryFile, pruneRejectedReceipts, pruneSuperseded, rejectedReceiptsPath, deleteTracePaths, reclaimLeases, receiptsDir, safeUnlink, traceDaysBefore } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, usageError } from "../output.ts";
@@ -36,7 +38,21 @@ import { leaseLiveness } from "../runtime/leases.ts";
 import { type Observed, observe } from "../runtime/observe/index.ts";
 import { doneHerdrRuns, planHerdrTidy } from "../runtime/tidy-herdr.ts";
 import { checkRetain, MIN_TRACE_RETAIN, retainCutoffDay, unitTracesBefore } from "../runtime/trace-retention.ts";
-import { cmd, recordPrunable, storyFinished, storyPhase } from "@norn/core";
+import { cmd, type GitPort, recordPrunable, type StoryPhase, storyFinished, storyLanded, storyPhase } from "@norn/core";
+import { deleteHeadsRef } from "../runtime/close.ts";
+
+const storyEnded = (p: StoryPhase): boolean => storyLanded(p) || p.phase === "dropped";
+
+/** The story's spec at `sha` says it is done or dropped; false when the commit or the spec is not here. */
+async function endedAt(git: GitPort, root: string, sha: string, key: string): Promise<boolean> {
+  const dirs = await git.lsTree(root, sha, SPECS_DIR).catch(() => null);
+  const dir = dirs?.find((d) => parseSpecDirName(d)?.story === key);
+  if (!dir) return false;
+  const file = `${SPECS_DIR}/${dir}/${SPEC_FILE}`;
+  const raw = await git.show(root, sha, file).catch(() => null);
+  const fm = raw === null ? null : parseStoryFile(raw, file);
+  return fm?.ok === true && (fm.value.frontmatter.status === "done" || fm.value.frontmatter.status === "dropped");
+}
 
 /** A reservation lives only while a receipt is being written; older ones are crash leftovers. */
 const RESERVE_STALE_MS = 60_000;
@@ -140,6 +156,29 @@ export const tidyCommand = defineCommand({
         branches.push(b);
       }
 
+      // Heads refs of stories that ended (merged, landed or dropped) that their cleanup or close left
+      // behind: as this checkout sees the story, else as the spec at the ref's own commit says (a
+      // closed story is gone from here). An open story's stays: its real last boundary may be on no branch
+      const heads: string[] = [];
+      const there = new Map((await git.listRefs(root, HEADS_REF_PREFIX)).map((r) => [r.ref, r.sha] as const));
+      const listed = obs.remote ? await listRemoteRefs(root, obs.remote, `${HEADS_REF_PREFIX}*`).catch((e: unknown) => e as Error) : [];
+      if (listed instanceof Error) kept.push({ item: `${HEADS_REF_PREFIX}*`, reason: `cannot list ${obs.remote}: ${listed.message}` });
+      else for (const r of listed) there.set(r.ref, r.sha);
+      for (const [ref, sha] of there) {
+        const key = ref.slice(HEADS_REF_PREFIX.length);
+        const known = obs.facts.stories.find((s) => s.key === key);
+        const ended = known ? storyEnded(storyPhase(known, base)) : await endedAt(git, root, sha, key);
+        if (!ended) continue;
+        if (!dry) {
+          const r = await deleteHeadsRef(git, root, obs.remote, key);
+          if (!r.ok) {
+            kept.push({ item: ref, reason: r.message });
+            continue;
+          }
+        }
+        heads.push(ref);
+      }
+
       const leaseFiles = obs.facts.machine.dead_lease_files ?? [];
       const leases = dry ? [...leaseFiles] : await reclaimLeases(ctx.home, leaseFiles, leaseLiveness((p) => obs.ports.process.isAlive(p)));
 
@@ -192,7 +231,7 @@ export const tidyCommand = defineCommand({
       const verb = dry ? "would_remove" : "removed";
       return {
         dry_run: dry,
-        [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves, rejected_receipts: rejected, superseded, ...(owed.length ? { owed_records: owed } : {}), ...(herdrClosed ? { herdr: herdrClosed } : {}) },
+        [verb]: { worktrees, stale_worktree_records: prunable, branches, leases, reserve_files: reserves, rejected_receipts: rejected, superseded, ...(owed.length ? { owed_records: owed } : {}), ...(heads.length ? { heads_refs: heads } : {}), ...(herdrClosed ? { herdr: herdrClosed } : {}) },
         trace,
         kept,
       };

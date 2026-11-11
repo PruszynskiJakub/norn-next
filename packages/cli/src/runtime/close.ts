@@ -11,8 +11,8 @@
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { StoryFacts } from "@norn/core";
-import { recordRef } from "@norn/schema";
+import type { GitPort, StoryFacts } from "@norn/core";
+import { headsRef, recordRef } from "@norn/schema";
 import { patchStoryFile, pushRecord, readRecordRef, type RecordPushResult, releaseClaim, releaseStoryLeases, storyFile } from "@norn/store";
 import { refuse } from "../output.ts";
 import type { Observed } from "./observe/index.ts";
@@ -31,6 +31,8 @@ export interface StoryClosed {
   leases_released: string[];
   claim_deleted: boolean;
   claim_error?: string;
+  /** why the story's heads ref could not be deleted on the remote; absent = deleted */
+  heads_error?: string;
   /** where the record lives now: `<remote>/<branch>`, the local branch without a remote */
   record: string | null;
 }
@@ -124,6 +126,8 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
     await git.deleteBranch(obs.root, b, { force: true });
     deleted.push(b);
   }
+  // The story ended: its heads ref goes with it (the record and the pushed branch keep its last boundary)
+  const heads = await deleteHeadsRef(git, obs.root, obs.remote, key);
   const leases = await releaseStoryLeases(opts.home, obs.root, key);
   const rel = await releaseClaim(obs.root, obs.remote, key, opts.claimSha);
 
@@ -137,6 +141,7 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
     branches_deleted: deleted,
     branches_kept: kept,
     leases_released: leases,
+    ...(heads.ok ? {} : { heads_error: heads.message }),
     claim_deleted: rel.ok,
     ...(rel.ok ? {} : { claim_error: rel.message }),
     record: obs.remote && loc ? `${obs.remote}/${loc.branch}` : (loc?.branch ?? null),
@@ -145,8 +150,8 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
 
 /**
  * Push the story's record to `refs/norn/runs/<story>` with a lease
- * on the sha this checkout last saw, its `Norn-Branch-Commit` the story branch as the remote has
- * it (the local one without a remote; none without a branch). The one push every claim release
+ * on the sha this checkout last saw, its `Norn-Branch-Commit` the story's heads ref as last pushed
+ * (the local branch without a remote; none without a branch). The one push every claim release
  * (`story handoff`, a clean `watch` exit: runtime/release.ts) and every cleanup
  * (`cleanup_merged_story`; closing, `closeStory`: the tick action and `story close`) makes after the branches and
  * before the claim or anything else goes; an unchanged or empty record pushes nothing. Once pushed,
@@ -155,12 +160,25 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
 export async function pushHeldRecord(obs: Observed, key: string, branch: string | null): Promise<RecordPushResult & { branch_commit: string | null }> {
   const git = obs.ports.git;
   const loc = obs.stories[key];
-  const remoteHead = branch && obs.remote ? await git.revParse(obs.root, `refs/remotes/${obs.remote}/${branch}`) : null;
+  // the heads ref as last pushed while the story branch is here, else (a story no boundary of this
+  // norn pushed, or whose branch is gone) the remote branch
+  const tracking = branch && obs.remote ? await git.revParse(obs.root, `refs/remotes/${obs.remote}/${branch}`) : null;
+  const pushedHeads = branch && obs.remote && (await git.revParse(obs.root, `refs/heads/${branch}`)) ? await git.revParse(obs.root, headsRef(key)) : null;
+  const remoteHead = pushedHeads ?? tracking;
   const head = remoteHead ?? (branch ? await git.revParse(obs.root, `refs/heads/${branch}`) : null);
   const expected = (await readRecordRef(obs.root, key))?.sha ?? null;
   const spec_dir = loc?.spec_dir ?? obs.facts.stories.find((s) => s.key === key)?.spec_dir ?? "";
   const r = await pushRecord(obs.root, obs.remote, { key, spec_dir }, { expected, holder: obs.facts.machine.holder, branch_commit: head, at: new Date(obs.facts.now).toISOString() });
   return { ...r, branch_commit: head };
+}
+
+/** Delete a story's heads ref on the remote and its local copy; a ref already gone is fine. */
+export async function deleteHeadsRef(git: GitPort, root: string, remote: string | null, key: string): Promise<{ ok: true } | { ok: false; message: string }> {
+  const ref = headsRef(key);
+  await git.updateRef(root, { ref, sha: null });
+  if (!remote) return { ok: true };
+  const r = await git.pushRef(root, remote, { ref, sha: null });
+  return r.ok ? { ok: true } : { ok: false, message: `delete ${ref} on ${remote} failed (${r.reason}): ${r.message}` };
 }
 
 /** Why a record push failed, the same words for every release and cleanup. */

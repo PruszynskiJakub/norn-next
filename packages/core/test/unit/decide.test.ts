@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type AgentStep, type HookEventKind, type LeaseFile, roundRecordPath, type UnitState, type UnitStateRecord, type Workflow } from "@norn/schema";
+import { type AgentStep, claimRef, headsRef, type HookEventKind, type LeaseFile, roundRecordPath, type UnitState, type UnitStateRecord, type Workflow } from "@norn/schema";
 import { type Action, legacyAction } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { decide, isSideAction, unitDecision } from "../../src/decide/index.ts";
@@ -495,9 +495,9 @@ describe("slices step", () => {
 });
 
 describe("story lifecycle", () => {
-  test("PR merged → cleanup", () => {
+  test("PR merged → cleanup, the story's heads ref removed with its claim", () => {
     const f = storyAt("ready", { pr: { number: 7, url: "u", state: "merged", is_draft: false, head_sha: "", head: "gh-1-login", base_branch: "main", merged_at: at() } }, [{ nn: "01", status: "integrated" }]);
-    expect(only(facts([f]))).toMatchObject({ kind: "cleanup_merged_story", local_branches: ["gh-1/01-s01", "gh-1-login"], remote_branches: ["gh-1/01-s01"], refs: ["refs/norn/claims/gh-1"], story_status: "done" });
+    expect(only(facts([f]))).toMatchObject({ kind: "cleanup_merged_story", local_branches: ["gh-1/01-s01", "gh-1-login"], remote_branches: ["gh-1/01-s01"], refs: [claimRef("gh-1"), headsRef("gh-1")], story_status: "done" });
   });
   test("gh-88 GR6: a PR merged while parked at a gate → the cleanup records every unfinished unit done at $done; the inbox then has nothing for it", () => {
     const pr = { number: 7, url: "u", state: "merged" as const, is_draft: false, head_sha: "", head: "gh-1-login", base_branch: "main", merged_at: at() };

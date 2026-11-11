@@ -246,8 +246,8 @@ export interface GitPort {
    * `base..head` — or null when there is none (`base` not merged, or reached without a merge).
    */
   baseMergeCommit(cwd: string, base: string, head: string): Promise<string | null>;
-  /** Push a branch (`refspec` like `HEAD:refs/heads/x`), optional force-with-lease. */
-  push(cwd: string, remote: string, refspec: string, opts?: { forceWithLease?: string; setUpstream?: boolean }): Promise<PushResult>;
+  /** Push a branch (`refspec` like `HEAD:refs/heads/x`; several go in one push), optional force-with-lease. */
+  push(cwd: string, remote: string, refspec: string | readonly string[], opts?: { forceWithLease?: string; setUpstream?: boolean }): Promise<PushResult>;
   /** Fetch `refspecs` (none: the remote's configured ones), no tags; `quiet` drops progress output. */
   fetch(cwd: string, remote: string, refspecs: string[], opts?: { quiet?: boolean }): Promise<void>;
   /** `git pull --ff-only` equivalent for the current branch. */

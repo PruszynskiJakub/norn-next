@@ -461,7 +461,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
       const args = ["push", "--porcelain"];
       if (o?.forceWithLease !== undefined) args.push(o.forceWithLease ? `--force-with-lease=${o.forceWithLease}` : "--force-with-lease");
       if (o?.setUpstream) args.push("--set-upstream");
-      return classifyPush(await run(cwd, [...args, remote, refspec]));
+      return classifyPush(await run(cwd, [...args, remote, ...(typeof refspec === "string" ? [refspec] : refspec)]));
     },
     async fetch(cwd, remote, refspecs, o) {
       // LC_ALL=C: callers tell a missing remote branch apart by git's English message

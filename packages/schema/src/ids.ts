@@ -337,6 +337,16 @@ export function recordRef(story: string): string {
   return `${RECORD_REF_PREFIX}${story}`;
 }
 
+/**
+ * The ref holding a story's latest boundary on the remote: pushed with the story branch at every
+ * boundary, so a crashed holder's last boundary is on the remote. Neither branch nor tag, so a push of
+ * it starts no CI run.
+ */
+export const HEADS_REF_PREFIX = "refs/norn/heads/";
+export function headsRef(story: string): string {
+  return `${HEADS_REF_PREFIX}${story}`;
+}
+
 /** A receipt's number as its file name spells it: 7 → `0007`. */
 export const receiptNumber = (n: number): string => String(n).padStart(4, "0");
 /** Receipt file name `NNNN-<kind>.json`. */

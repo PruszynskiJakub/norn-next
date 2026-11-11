@@ -4,6 +4,7 @@
  * person's push to the story branch is taken in the same way wherever norn pushes.
  */
 import type { GitPort } from "@norn/core";
+import { headsRef, parseSpecDirName } from "@norn/schema";
 import { syncRemoteBranch } from "./integrate.ts";
 
 export interface PushBranchOptions {
@@ -29,14 +30,26 @@ export async function pushBranch(git: GitPort, opts: PushBranchOptions): Promise
   const held = await markersHeld(git, cwd, remote, branch);
   if (held) return { ok: false, reason: "held", message: held };
   const force = branch.includes("/") ? "+" : "";
-  const push = () => git.push(cwd, remote, `${force}refs/heads/${branch}:refs/heads/${branch}`);
+  // The story branch carries the story's heads ref in the same push: the remote never holds a
+  // boundary on the branch that the heads ref lacks. Forced: it follows the story's head wherever
+  // a takeover merged it from
+  const story = force ? null : (parseSpecDirName(branch)?.story ?? null);
+  const specs = [`${force}refs/heads/${branch}:refs/heads/${branch}`, ...(story ? [`+refs/heads/${branch}:${headsRef(story)}`] : [])];
+  const push = () => git.push(cwd, remote, specs);
   let r = await push();
   if (!r.ok && r.reason === "rejected" && !force) {
     const taken = await takeRemoteBranch(git, opts);
     if (taken !== true) return { ok: false, reason: r.reason, message: `${r.reason}: ${r.message}${taken ? `; ${taken}` : ""}` };
     r = await push();
   }
-  return r.ok ? { ok: true } : { ok: false, reason: r.reason, message: `${r.reason}: ${r.message}` };
+  if (!r.ok) return { ok: false, reason: r.reason, message: `${r.reason}: ${r.message}` };
+  // git keeps no tracking ref for a ref outside refs/heads: the local copy is what this checkout
+  // knows the remote holds, which the record push waits on
+  if (story) {
+    const sha = await git.revParse(cwd, `refs/heads/${branch}`);
+    if (sha) await git.updateRef(cwd, { ref: headsRef(story), sha });
+  }
+  return { ok: true };
 }
 
 /** Why the push of `branch` is held — its unpublished commits leave conflict markers — or null. */

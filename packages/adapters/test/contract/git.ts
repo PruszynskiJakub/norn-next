@@ -27,6 +27,7 @@ export type GitContractTest =
   | "refs: updateRef is compare-and-swap; readRef and listRefs see it"
   | "pushRef is compare-and-swap on the remote; a lost race is stale"
   | "push: a non-fast-forward is rejected, a lease the remote moved past is stale"
+  | "push: several refspecs go in one push, a ref outside refs/heads among them"
   | "ancestry and divergence"
   | "merge: clean merges commit, conflicts abort and name the paths; mergeTree agrees"
   | "conflictMarkers finds marker lines"
@@ -210,6 +211,14 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(stale.ok === false && stale.reason).toBe("stale");
       expect(await git.revParse(root, "HEAD")).toBe(mine);
       expect(sh(remote, "rev-parse", "main")).toBe(sh(other, "rev-parse", "HEAD"));
+    });
+
+    t("push: several refspecs go in one push, a ref outside refs/heads among them", async () => {
+      const { remote, root, git } = repo();
+      const head = commitFile(root, "d.txt", "both\n");
+      expect(await git.push(root, "origin", ["refs/heads/main:refs/heads/main", "+refs/heads/main:refs/norn/heads/gh-1"])).toEqual({ ok: true });
+      expect(sh(remote, "rev-parse", "main")).toBe(head);
+      expect(sh(remote, "rev-parse", "refs/norn/heads/gh-1")).toBe(head);
     });
 
     t("ancestry and divergence", async () => {
