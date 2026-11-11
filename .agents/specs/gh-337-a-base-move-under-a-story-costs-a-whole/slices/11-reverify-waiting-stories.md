@@ -2,7 +2,7 @@
 id: gh-337/11
 title: Waiting stories are re-verified when the base moves
 depends_on: [ gh-337/04, gh-337/03, gh-337/05, gh-337/06, gh-337/08, gh-337/09, gh-337/10 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
