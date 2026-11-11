@@ -51,7 +51,7 @@ steps:
   resolve:
     type: agent
     skill: norn-merge
-    inputs: [spec, handoff]
+    inputs: [spec, handoff, base_side]
     instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
     outcomes:
       done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" }

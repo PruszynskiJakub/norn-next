@@ -20,6 +20,7 @@ import { type ContractOptions, contractTest } from "./suite.ts";
 export type GitContractTest =
   | "a clone: roots, status, revParse, default branch, last commit time"
   | "commit returns the sha with its trailers; nothing to commit is null"
+  | "log limited to paths lists only the commits that touched them; a squash commit's trailers are its last block"
   | "commit refuses while a merge is in progress and says what is in progress"
   | "branches: create, push, exist locally and on the remote, delete"
   | "worktrees: add on a new branch, list, remove"
@@ -116,6 +117,19 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(last).toMatchObject({ sha, subject: "Edit a", trailers: { "Norn-Story": "gh-1", "Norn-Step": "implement" } });
       expect((await git.status(root)).untracked).toEqual(["b.txt"]);
       expect(await git.commit(root, { message: "nothing", trailers: {}, paths: ["a.txt"] })).toBeNull();
+    });
+
+    t("log limited to paths lists only the commits that touched them; a squash commit's trailers are its last block", async () => {
+      const { root, git } = repo();
+      const from = sh(root, "rev-parse", "HEAD");
+      writeFileSync(join(root, "a.txt"), "squashed\n");
+      sh(root, "add", "a.txt");
+      sh(root, "commit", "-q", "-m", "Login (#5)\n\n* first\n\nNorn-Tick: 01JAAAAAAAAAAAAAAAAAAAAAAA\n\n* second\n\nNorn-Story: gh-5\nNorn-Tick: 01JBBBBBBBBBBBBBBBBBBBBBBB");
+      const squash = sh(root, "rev-parse", "HEAD");
+      commitFile(root, "c.txt", "other\n");
+      expect((await git.log(root, `${from}..HEAD`, undefined, ["a.txt"])).map((c) => ({ sha: c.sha, subject: c.subject, story: c.trailers["Norn-Story"] }))).toEqual([{ sha: squash, subject: "Login (#5)", story: "gh-5" }]);
+      expect(await git.log(root, `${from}..HEAD`, undefined, ["b.txt"])).toEqual([]);
+      expect((await git.log(root, `${from}..HEAD`)).length).toBe(2);
     });
 
     t("commit refuses while a merge is in progress and says what is in progress", async () => {

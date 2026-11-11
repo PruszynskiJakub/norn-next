@@ -20,6 +20,8 @@ Without this, conflicts get resolved by picking a winner and one side's work qui
 
 ## Resolve each conflict by intent
 
+**Read the base side first.** In base mode, when the Base update section lists a **Base side**, start there, before you touch a file: for each conflicting path it names the base commits that touched it, the story that landed each, and that story's spec and PR body on the base. Read them (`git show <base commit>:<path>`) so you know what the other story meant before you rebuild it from `git log`. A commit listed without a story has no spec behind it: its message and diff are all you have.
+
 For each hunk, read the primary sources on both sides: the commits that touched those lines (`git log -p --merge -- <file>`; for the base side, `git log <merge base>..<base commit> -- <file>`), their messages, the spec and criteria each side serves, and the tests each side added.
 
 - Both added different things: keep both, in a sensible order.

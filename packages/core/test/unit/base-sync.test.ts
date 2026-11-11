@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 import { deriveUlid, type Receipt, type UnitState, type Workflow } from "@norn/schema";
 import type { Action, Decision } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
-import { renderBrief } from "../../src/brief.ts";
+import { type BaseSidePath, renderBrief } from "../../src/brief.ts";
 import { decide } from "../../src/decide/index.ts";
 import { storyMerged, storyPhase } from "../../src/policy.ts";
 import type { NumberedReceipt, StoryBase, StoryFacts } from "../../src/facts.ts";
@@ -192,6 +192,58 @@ describe("base sync replay", () => {
     expect(s.log).toEqual(["git.update", "receipts.apply", "agent.start", "receipts.apply", "git.update", "receipts.apply"]);
     // the second update found the story up to date
     expect(s.classifies().at(-1)).toMatchObject({ outcome: "done" });
+  });
+
+  test("2b: a resolve step with the base_side input: the base-update section lists the base side per conflicting path, trailer-less commits without a story", () => {
+    const wf: Workflow = { ...BASE_WF, steps: { ...BASE_WF.steps, resolve: { ...BASE_WF.steps.resolve, inputs: ["spec", "handoff", "base_side"] } as Workflow["steps"][string] } };
+    const s = new Sim(wf);
+    s.base = base({ behind: 4, conflicts: ["a.ts", "b.ts"] });
+    s.git = "conflict";
+    s.runUntil(at_("resolve"));
+    const spec = ".agents/specs/gh-5-login/spec.md";
+    const pr = ".agents/specs/gh-5-login/pr.md";
+    const side: BaseSidePath[] = [
+      {
+        path: "a.ts",
+        commits: [
+          { sha: SHA("1"), subject: "Login form validates", story: "gh-5", spec, pr },
+          { sha: SHA("2"), subject: "hotfix by hand", story: null, spec: null, pr: null },
+        ],
+      },
+      { path: "b.ts", commits: [] },
+    ];
+    const render = (over: { workflow?: Workflow; base_side?: typeof side | null }) =>
+      renderBrief({
+        unit: storyUnit(),
+        state: s.state,
+        workflow: over.workflow ?? wf,
+        mode: "auto",
+        runner: "herdr",
+        paths: { worktree: "/w", spec_dir: "/w/spec", story_file: "/w/spec/story.md", slice_file: null, unit_dir: "/w/spec/runs/_story" },
+        diff_range: null,
+        handoff: null,
+        receipts: s.receipts,
+        limits: { deadline: "60m", nudges: 2, retries: 1, slot: null, port_base: null },
+        ...(over.base_side !== undefined ? { base_side: over.base_side } : {}),
+      });
+    const brief = render({ base_side: side });
+    expect(brief.json.rework?.base).toEqual({ ref: BASE_REF, sha: SHA("b"), conflicts: ["a.ts", "b.ts"], side });
+    expect(brief.json.inputs).toContainEqual(expect.objectContaining({ kind: "base_side", label: "Base side", ref: "see Rework › Base update" }));
+    const md = brief.markdown;
+    const section = md.slice(md.indexOf("### Base update"));
+    // Read before resolving: the base side comes before the resolve guidance
+    expect(section.indexOf("Base side")).toBeLessThan(section.indexOf("Resolve each conflict by intent"));
+    expect(section).toContain(`git show ${SHA("b")}:<path>`);
+    expect(section).toContain(`- \`a.ts\`\n  - \`${SHA("1").slice(0, 12)}\` Login form validates — story gh-5: spec \`${spec}\`, PR body \`${pr}\``);
+    expect(section).toContain(`  - \`${SHA("2").slice(0, 12)}\` hotfix by hand — no story (made outside norn)`);
+    expect(section).toContain("- `b.ts`\n  - (no base commit since the merge base touched it)");
+    // A story whose spec folder has no pr.md on the base: only what is there
+    const noPr = render({ base_side: [{ path: "a.ts", commits: [{ sha: SHA("1"), subject: "s", story: "gh-5", spec, pr: null }] }] }).markdown;
+    expect(noPr).toContain(`— story gh-5: spec \`${spec}\`\n`);
+    // Without the input declared, nothing of the base side shows even when the caller passed it
+    const undeclared = render({ workflow: BASE_WF, base_side: side });
+    expect(undeclared.json.rework?.base).toEqual({ ref: BASE_REF, sha: SHA("b"), conflicts: ["a.ts", "b.ts"] });
+    expect(undeclared.markdown).not.toContain("Base side");
   });
 
   test("3: base_conflict_loop exhausted → $stuck with the reason", () => {

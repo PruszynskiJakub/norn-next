@@ -247,10 +247,10 @@ export function createGit(opts: GitOptions = {}): GitPort {
       return t ? Number(t) * 1000 : null;
     },
     diffStat: (cwd, range) => must(cwd, ["diff", "--stat", range]),
-    async log(cwd, range, limit) {
+    async log(cwd, range, limit, paths = []) {
       const args = ["log", "--format=%H%x1f%s%x1f%ct%x1f%(trailers:only,unfold)%x1e"];
       if (limit !== undefined) args.push(`-n${limit}`);
-      const out = await must(cwd, [...args, range, "--"]);
+      const out = await must(cwd, [...args, range, "--", ...paths]);
       return out
         .split("\x1e")
         .map((r) => r.replace(/^\n/, ""))
