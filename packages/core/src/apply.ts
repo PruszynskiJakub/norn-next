@@ -18,7 +18,7 @@ import {
   type Workflow,
 } from "@norn/schema";
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
-import { edgeOf, OVERRIDABLE_ROUTES, stepOf } from "./workflow.ts";
+import { edgeOf, OVERRIDABLE_ROUTES, resetEdges, stepOf } from "./workflow.ts";
 import { cmd } from "./commands.ts";
 import { stepLimits } from "./policy.ts";
 import { toDone, toParked, toReady, toRunning, toStuck } from "./unit-state.ts";
@@ -408,9 +408,9 @@ function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, las
     counters = { ...st.counters, [edge.counter]: value + 1 };
     counter = { name: edge.counter, value: value + 1, max };
   }
-  // Counters declaring `reset_on: <from>.<outcome>` start over (e.g. base_conflict_loop on update.done)
+  // Counters declaring `reset_on: <from>.<outcome>` (or a list holding it) start over (e.g. base_conflict_loop on update.done)
   const reset = Object.entries(wf.counters ?? {})
-    .filter(([name, c]) => c.reset_on === `${from}.${outcome}` && (counters[name] ?? 0) > 0)
+    .filter(([name, c]) => resetEdges(c).includes(`${from}.${outcome}`) && (counters[name] ?? 0) > 0)
     .map(([name]) => name);
   if (reset.length) counters = { ...counters, ...Object.fromEntries(reset.map((c) => [c, 0])) };
   const advance: Advance = { from, outcome, to: edge.to, ...(counter ? { counter } : {}), ...(reset.length ? { reset } : {}) };

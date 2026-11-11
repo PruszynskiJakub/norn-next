@@ -298,6 +298,15 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"], his
         return [{ kind: i, label: "Last failing check", ref: rw?.check ? "see Rework" : "none" }];
       case "last_findings":
         return [{ kind: i, label: "Last findings", ref: rw && (rw.findings || rw.report || rw.decision) ? "see Rework" : hist?.earlier?.findings ? "see Earlier findings" : "none" }];
+      // A remerge-diff is where a merge differs from git's own merge of its parents: what the resolver
+      // changed, a base change it dropped included, and nothing git merged by itself
+      case "resolution": {
+        const merges = resolutionMerges(input.receipts);
+        const purpose = "what the resolver changed against git's own merge, a dropped base change included";
+        return merges.length
+          ? merges.map((sha) => ({ kind: i, label: `Resolution of merge ${sha.slice(0, 12)}`, ref: `git show --remerge-diff ${sha}`, purpose }))
+          : [{ kind: i, label: "Resolution", ref: "none" }];
+      }
       // Run state is in the machine dir, not the worktree; evidence is linked by its record path
       case "record":
         return (input.record ?? []).flatMap((u) => [
@@ -306,6 +315,13 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"], his
         ]);
     }
   });
+}
+
+/** The merge commits, oldest first, of the git summary the latest routed update recorded (anchor = the round's latest approval). */
+function resolutionMerges(receipts: readonly NumberedReceipt[]): string[] {
+  const latest = receipts.findLast((nr) => nr.receipt.kind === "classify" && !!nr.receipt.history)?.receipt;
+  const commits = latest?.kind === "classify" ? (latest.history?.commits ?? []) : [];
+  return commits.filter((c) => c.parents.length > 1).map((c) => c.sha).reverse();
 }
 
 const isFailingCheck = (r: NumberedReceipt): r is NumberedReceipt & { receipt: CheckReceipt } => r.receipt.kind === "check" && r.receipt.outcome === "fail";

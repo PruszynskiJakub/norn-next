@@ -129,6 +129,10 @@
                           {
                             "const": "record",
                             "type": "string"
+                          },
+                          {
+                            "const": "resolution",
+                            "type": "string"
                           }
                         ]
                       },
@@ -984,9 +988,22 @@
               "type": "integer"
             },
             "reset_on": {
-              "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$",
-              "description": "<step>.<outcome> whose edge resets the counter",
-              "type": "string"
+              "anyOf": [
+                {
+                  "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$",
+                  "description": "<step>.<outcome> whose edge resets the counter",
+                  "type": "string"
+                },
+                {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$",
+                    "description": "<step>.<outcome> whose edge resets the counter",
+                    "type": "string"
+                  }
+                }
+              ]
             }
           }
         }

@@ -1,6 +1,7 @@
 /** Workflow load-time validation and per-unit level checks. */
 import {
   type CheckStep,
+  type CounterSpec,
   type OutcomeEdge,
   outcomeEdge,
   RESERVED_STEP_NAMES,
@@ -83,6 +84,9 @@ export function edgeOf(wf: Workflow, step: string, outcome: string): OutcomeEdge
   const spec = (wf.steps[step]?.outcomes as Record<string, Parameters<typeof outcomeEdge>[0] | undefined> | undefined)?.[outcome];
   return spec === undefined ? null : outcomeEdge(spec);
 }
+
+/** The edges `<step>.<outcome>` a counter's `reset_on` names, one or a list. */
+export const resetEdges = (c: CounterSpec): string[] => (c.reset_on === undefined ? [] : Array.isArray(c.reset_on) ? c.reset_on : [c.reset_on]);
 
 export function stepOf(wf: Workflow, name: string): Step | null {
   return Object.hasOwn(wf.steps, name) ? (wf.steps[name] as Step) : null;
@@ -187,12 +191,16 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
         });
   }
   // `reset_on` names a declared edge `<step>.<outcome>`
-  for (const [name, c] of Object.entries(counters)) {
-    if (c.reset_on === undefined) continue;
-    const [from, outcome] = c.reset_on.split(".") as [string, string];
-    if (!edgeOf(wf, from, outcome))
-      issues.push({ code: "unknown_reset", path: `/counters/${name}/reset_on`, message: `counter '${name}' resets on '${c.reset_on}', but step '${from}' declares no outcome '${outcome}'` });
-  }
+  for (const [name, c] of Object.entries(counters))
+    resetEdges(c).forEach((edge, i) => {
+      const [from, outcome] = edge.split(".") as [string, string];
+      if (!edgeOf(wf, from, outcome))
+        issues.push({
+          code: "unknown_reset",
+          path: `/counters/${name}/reset_on${Array.isArray(c.reset_on) ? `/${i}` : ""}`,
+          message: `counter '${name}' resets on '${edge}', but step '${from}' declares no outcome '${outcome}'`,
+        });
+    });
   // `base.step` names the step `norn story update-branch` re-enters
   if (wf.base?.step !== undefined && !stepOf(wf, wf.base.step))
     issues.push({ code: "unknown_target", path: "/base/step", message: `base.step '${wf.base.step}' does not exist` });

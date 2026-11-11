@@ -4,7 +4,7 @@
  * classify receipt, the check receipt, an agent report) fed back as receipts.
  */
 import { describe, expect, test } from "bun:test";
-import { deriveUlid, type Receipt, type UnitState, type Workflow } from "@norn/schema";
+import { deriveUlid, type Receipt, type UnitState, type Workflow, validate } from "@norn/schema";
 import type { Action, Decision } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { renderBrief } from "../../src/brief.ts";
@@ -427,6 +427,28 @@ describe("base sync replay", () => {
     // Reset_on names a declared edge
     const bad = validateWorkflowDefinition({ ...wf, counters: { ...wf.counters, stale_loop: { max: 3, reset_on: "update.merged" } } });
     expect(bad.issues).toMatchObject([{ code: "unknown_reset", path: "/counters/stale_loop/reset_on" }]);
+  });
+
+  test("reset_on takes a list of edges: a light-path update (clean or resolved) resets the counter like done", () => {
+    const wf: Workflow = {
+      name: "light",
+      start: "update",
+      steps: {
+        update: { type: "git", action: "update", outcomes: { done: "test", clean: "test", resolved: "test", conflict: { to: "resolve", counter: "base_conflict_loop" } } },
+        resolve: { type: "agent", skill: "norn-merge", outcomes: { done: { to: "update", means: "merged" } } },
+        test: { type: "check", run: "true", timeout: "1m", outcomes: { pass: "$done", fail: "$stuck" } },
+      },
+      counters: { base_conflict_loop: { max: 2, reset_on: ["update.done", "update.clean", "update.resolved"] } },
+    };
+    expect(validate("workflow", wf)).toMatchObject({ ok: true });
+    expect(validateWorkflowDefinition(wf).issues).toEqual([]);
+    for (const outcome of ["done", "clean", "resolved"]) {
+      const st = { ...stateFor(storyUnit(), wf), step: "update", status: "running", counters: { base_conflict_loop: 1 } } as UnitState;
+      const res = applyReceipts(st, [{ n: 1, file: "", receipt: { kind: "classify", receipt_id: deriveUlid("01JGGGGGGGGGGGGGGGGGGGGGGG", 2), run_id: null, step: "update", attempt: 1, at: at(), by: "norn", outcome, rule: "git.update", route: "test" } }], { workflow: wf, now: at() });
+      expect({ outcome, advance: res.advance }).toEqual({ outcome, advance: { from: "update", outcome, to: "test", reset: ["base_conflict_loop"] } });
+    }
+    const bad = validateWorkflowDefinition({ ...wf, counters: { base_conflict_loop: { max: 2, reset_on: ["update.done", "update.merged"] } } });
+    expect(bad.issues).toMatchObject([{ code: "unknown_reset", path: "/counters/base_conflict_loop/reset_on/1" }]);
   });
 
   test("no base observed → update waits", () => {

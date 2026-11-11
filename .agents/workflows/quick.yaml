@@ -37,22 +37,54 @@ steps:
       Run `bun run test` (the unit tier) after each change, and the type check; the integration and e2e tiers run in CI, which the `ci` check waits for, so do not run them before handing back.
     outcomes:
       done: { to: update, means: "the change is made; each behaviour change and rework point has a passing test" }
+  # the light path: when the story holds only base merges and spec-folder bookkeeping (never spec.md)
+  # since the round's latest approve, a merge git made alone (clean) or one a resolver finished
+  # (resolved) skips implement and the full review and describe; anything else is done, the full path
   update:
     type: git
     action: update
-    outcomes: { done: test, conflict: { to: resolve, counter: base_conflict_loop } }
+    outcomes:
+      done: test
+      clean: test-merge
+      resolved: test-resolution
+      conflict: { to: resolve, counter: base_conflict_loop }
   resolve:
     type: agent
     skill: norn-merge
     inputs: [spec, handoff]
-    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
+    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase."
     outcomes:
       done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" }
   test:
     type: check
-    run: "bun install --frozen-lockfile && bun run test && bun run typecheck"
+    run: &test-run "bun install --frozen-lockfile && bun run test && bun run typecheck"
     timeout: 15m
     outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
+  # the light path's tests run the same command (the anchor above); red is implement's work, which
+  # then takes the full path
+  test-merge:
+    type: check
+    run: *test-run
+    timeout: 15m
+    outcomes: { pass: open-pr, fail: { to: implement, counter: test_loop } }
+  test-resolution:
+    type: check
+    run: *test-run
+    timeout: 15m
+    outcomes: { pass: resolution-review, fail: { to: implement, counter: test_loop } }
+  # reviews only what the resolver changed (each merge's remerge-diff), never the whole story again
+  resolution-review:
+    type: agent
+    skill: norn-review
+    inputs: [spec, resolution]
+    instructions: >-
+      Review only the resolution: each remerge-diff under Inputs is where a merge differs from git's own
+      merge of its parents, a base change the resolver dropped included. Judge whether it keeps the intent
+      of both sides. Report `redescribe` when the merge danger pr.md describes no longer holds.
+    outcomes:
+      approve:           { to: open-pr, means: "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger" }
+      redescribe:        { to: describe, means: "the resolution is sound, but the merge danger pr.md describes changed" }
+      changes_requested: { to: resolve, counter: resolution_loop, means: "blocking findings on the resolution in the receipt" }
   review:
     type: agent
     skill: norn-review
@@ -127,9 +159,10 @@ counters:
   ci_loop: { max: 3 }
   review_loop: { max: 3 }
   ready_loop: { max: 2 }
-  # reset each time their update merges cleanly: only repeated conflicts on one base move count
+  # reset each time their update merges cleanly (on either path): only repeated conflicts on one base move count
   sync_conflict_loop: { max: 2, reset_on: sync.done }
-  base_conflict_loop: { max: 2, reset_on: update.done }
+  base_conflict_loop: { max: 2, reset_on: [update.done, update.clean, update.resolved] }
+  resolution_loop: { max: 2 }
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
 # update-branch re-enters update, not sync (the default would be the first update step)

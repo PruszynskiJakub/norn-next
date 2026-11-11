@@ -45,7 +45,8 @@ function fixedOutcomes<const K extends string>(keys: readonly K[]) {
 /**
  * Named input kinds of an agent step. `{ file }` is relative to the spec folder. `record`:
  * each unit's receipts and evidence folders in the machine dir, and the record path to link
- * evidence by.
+ * evidence by. `resolution`: one `git show --remerge-diff <sha>` per merge commit since the round's
+ * latest approval, from the git summary the last routed update recorded.
  */
 export const InputKind = Type.Union([
   Type.Literal("spec"),
@@ -56,6 +57,7 @@ export const InputKind = Type.Union([
   Type.Literal("last_check"),
   Type.Literal("last_findings"),
   Type.Literal("record"),
+  Type.Literal("resolution"),
 ]);
 export type InputKind = Static<typeof InputKind>;
 export const StepInput = Type.Union([
@@ -175,15 +177,17 @@ export const Step = TaggedUnion("type", [AgentStep, CheckStep, GateStep, GitStep
 export type Step = Static<typeof Step>;
 export type StepType = Step["type"];
 
+const ResetEdge = Type.String({ pattern: "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$", description: "<step>.<outcome> whose edge resets the counter" });
+
 export const CounterSpec = Type.Object(
   {
     max: PosInt,
     /**
-     * Taking the edge `<step>.<outcome>` resets this counter to 0, journaled in the
-     * advance (trace, commit) and the classify receipt. E.g. `base_conflict_loop` resets on
-     * `update.done`: each base move is a fresh attempt, only repeated failures on one move count.
+     * Taking the edge `<step>.<outcome>` (or any edge of a list) resets this counter to 0,
+     * journaled in the advance (trace, commit) and the classify receipt. E.g. `base_conflict_loop`
+     * resets on `update.done`: each base move is a fresh attempt, only repeated failures on one move count.
      */
-    reset_on: Type.Optional(Type.String({ pattern: "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$", description: "<step>.<outcome> whose edge resets the counter" })),
+    reset_on: Type.Optional(Type.Union([ResetEdge, Type.Array(ResetEdge, { minItems: 1 })])),
   },
   { additionalProperties: false },
 );
