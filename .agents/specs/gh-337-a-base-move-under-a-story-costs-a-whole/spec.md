@@ -8,12 +8,90 @@ title: A base move under a story costs a whole round and a CI run per boundary p
 assignee: PruszynskiJakub
 labels:
   - norn
-  - norn:wf:refinement
+  - norn:wf:story
 workflow: story
 status: active
 intake_at: 2026-11-11T08:57:13.816Z
 body_hash: 1b55f889d5de53b6fa4f6dbe2428a8cb2c5656d55a45a93059f08ed6e5ef6e61
 refined_body_hash: 1b55f889d5de53b6fa4f6dbe2428a8cb2c5656d55a45a93059f08ed6e5ef6e61
+criteria:
+  - { id: "01.AC1", verifier: test }
+  - { id: "01.AC2", verifier: test }
+  - { id: "01.AC3", verifier: test }
+  - { id: "02.AC1", verifier: test }
+  - { id: "02.AC2", verifier: test }
+  - { id: "02.AC3", verifier: test }
+  - { id: "02.AC4", verifier: test }
+  - { id: "02.AC5", verifier: agent }
+  - { id: "03.AC1", verifier: test }
+  - { id: "03.AC2", verifier: test }
+  - { id: "03.AC3", verifier: test }
+  - { id: "03.AC4", verifier: test }
+  - { id: "03.AC5", verifier: test }
+  - { id: "03.AC6", verifier: test }
+  - { id: "03.AC7", verifier: test }
+  - { id: "04.AC1", verifier: test }
+  - { id: "04.AC2", verifier: test }
+  - { id: "04.AC3", verifier: test }
+  - { id: "04.AC4", verifier: test }
+  - { id: "04.AC5", verifier: test }
+  - { id: "04.AC6", verifier: test }
+  - { id: "04.AC7", verifier: test }
+  - { id: "04.AC8", verifier: test }
+  - { id: "04.AC9", verifier: agent }
+  - { id: "05.AC1", verifier: test }
+  - { id: "05.AC2", verifier: test }
+  - { id: "05.AC3", verifier: test }
+  - { id: "06.AC1", verifier: test }
+  - { id: "06.AC2", verifier: test }
+  - { id: "06.AC3", verifier: agent }
+  - { id: "07.AC1", verifier: test }
+  - { id: "07.AC2", verifier: test }
+  - { id: "07.AC3", verifier: test }
+  - { id: "07.AC4", verifier: test }
+  - { id: "07.AC5", verifier: test }
+  - { id: "07.AC6", verifier: test }
+  - { id: "08.AC1", verifier: test }
+  - { id: "08.AC2", verifier: test }
+  - { id: "08.AC3", verifier: test }
+  - { id: "08.AC4", verifier: test }
+  - { id: "08.AC5", verifier: test }
+  - { id: "08.AC6", verifier: test }
+  - { id: "09.AC1", verifier: test }
+  - { id: "09.AC2", verifier: test }
+  - { id: "09.AC3", verifier: test }
+  - { id: "09.AC4", verifier: test }
+  - { id: "10.AC1", verifier: test }
+  - { id: "10.AC2", verifier: test }
+  - { id: "10.AC3", verifier: test }
+  - { id: "10.AC4", verifier: test }
+  - { id: "10.AC5", verifier: agent }
+  - { id: "11.AC1", verifier: test }
+  - { id: "11.AC2", verifier: test }
+  - { id: "11.AC3", verifier: test }
+  - { id: "11.AC4", verifier: test }
+  - { id: "11.AC5", verifier: test }
+  - { id: "11.AC6", verifier: test }
+  - { id: "11.AC7", verifier: test }
+  - { id: "12.AC1", verifier: test }
+  - { id: "12.AC2", verifier: test }
+  - { id: "12.AC3", verifier: test }
+  - { id: "12.AC4", verifier: test }
+  - { id: "12.AC5", verifier: test }
+  - { id: "13.AC1", verifier: test }
+  - { id: "13.AC2", verifier: test }
+  - { id: "13.AC3", verifier: test }
+  - { id: "13.AC4", verifier: test }
+  - { id: "13.AC5", verifier: test }
+  - { id: "13.AC6", verifier: test }
+  - { id: "13.AC7", verifier: test }
+  - { id: "13.AC8", verifier: agent }
+  - { id: "14.AC1", verifier: test }
+  - { id: "14.AC2", verifier: test }
+  - { id: "14.AC3", verifier: test }
+  - { id: "14.AC4", verifier: test }
+  - { id: "14.AC5", verifier: test }
+  - { id: "14.AC6", verifier: agent }
 ---
 
 # A base move under a story costs a whole round and a CI run per boundary push
