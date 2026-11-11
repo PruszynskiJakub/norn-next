@@ -1,19 +1,21 @@
 /**
- * Claim release: push the story and slice branches first, then the story's record to its ref
- * (under either policy), then delete the claim ref by CAS. Only by the heartbeat holding
- * the claim, and only fast-forward pushes. Edited handoff.md files are committed first. A failed
+ * Claim release: push the story and slice branches first, through the one push path (a person's
+ * push to the story branch is merged in, never rebased: runtime/push.ts), then the story's record to
+ * its ref (under either policy), then delete the claim ref by CAS. Only by the heartbeat holding
+ * the claim. Edited handoff.md files are committed first. A failed
  * record push releases nothing. Used by a clean `watch` exit and `norn story handoff`;
  * `norn story close`, the merged-story cleanup and the closed-issue close make the same push
  * (`pushHeldRecord`, runtime/close.ts).
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import { cmd, type GitPort, type StoryFacts } from "@norn/core";
-import { ulid } from "@norn/schema";
+import { askingMidMerge, cmd, prOpen, type StoryFacts } from "@norn/core";
+import { headsRef, ulid } from "@norn/schema";
 import { releaseClaim, writtenHere } from "@norn/store";
 import type { Context } from "../context.ts";
 import { refuse } from "../output.ts";
 import { pushHeldRecord, recordPushError } from "./close.ts";
+import { pushBranch } from "./push.ts";
 import { waitForTickLock } from "./tick-lock.ts";
 import { type Observed, observe } from "./observe/index.ts";
 
@@ -38,6 +40,8 @@ export interface ReleaseResult {
   record?: { sha: string; branch_commit: string | null } | null;
   /** `record`: the record push failed, so the claim is kept */
   failed?: "record";
+  /** `merge_in_progress`: a resolve waits at an ask mid-merge, so the claim is kept on purpose (ok: nothing failed) */
+  kept?: "merge_in_progress";
   error?: string;
 }
 
@@ -63,6 +67,11 @@ async function commitHandoffs(obs: Observed, story: StoryFacts): Promise<string[
   return out;
 }
 
+/** Trailers of the merge commit a release makes when it takes in a person's push. */
+function releaseTrailers(key: string, slice: string | null, obs: Observed): Record<string, string> {
+  return { "Norn-Story": key, ...(slice ? { "Norn-Slice": slice } : {}), "Norn-Step": "release", "Norn-Tick": obs.facts.tick_id };
+}
+
 export async function releaseStory(obs: Observed, story: StoryFacts): Promise<ReleaseResult> {
   if (!heldHere(obs, story) || (story.claim.state !== "mine" && story.claim.state !== "expired")) return { story: story.key, ok: false, pushed: [], error: `claim is ${story.claim.state}, not held here` };
   const sha = story.claim.sha;
@@ -71,23 +80,21 @@ export async function releaseStory(obs: Observed, story: StoryFacts): Promise<Re
   await commitHandoffs(obs, story);
   if (obs.remote) {
     const remote = obs.remote;
-    const branches: Array<{ cwd: string; branch: string }> = [];
+    const branches: Array<{ cwd: string; branch: string; slice: string | null }> = [];
     const loc = obs.stories[story.key];
-    if (loc?.worktree) branches.push({ cwd: loc.worktree, branch: loc.branch });
+    if (loc?.worktree) branches.push({ cwd: loc.worktree, branch: loc.branch, slice: null });
     for (const u of story.units) {
       const ul = obs.units[u.unit.key];
-      if (u.unit.slice && ul?.worktree && u.worktree?.exists) branches.push({ cwd: ul.worktree, branch: ul.branch });
+      if (u.unit.slice && ul?.worktree && u.worktree?.exists) branches.push({ cwd: ul.worktree, branch: ul.branch, slice: u.unit.slice });
     }
-    // Push only fast-forwards of the remote branches — a stale local branch never
-    // replaces the record. Checked for every branch before anything is pushed or deleted.
+    // While the PR is open the story's latest boundary goes to its heads ref: the PR head stays the commit CI ran on
+    const heads = prOpen(story);
+    // Stop at the first failed push: the record and the claim wait for every branch
     for (const b of branches) {
-      const ff = await fastForwardOf(git, obs.root, remote, b.branch);
-      if (!ff.ok) return { story: story.key, ok: false, pushed, error: `${b.branch} is not a fast-forward of ${remote}/${b.branch} (${ff.reason}); nothing pushed or released` };
-    }
-    for (const b of branches) {
-      const r = await git.push(b.cwd, remote, `refs/heads/${b.branch}:refs/heads/${b.branch}`);
-      if (!r.ok) return { story: story.key, ok: false, pushed, error: `push ${b.branch} failed: ${r.message}` };
-      pushed.push(b.branch);
+      const headsOnly = heads && b.slice === null;
+      const r = await pushBranch(git, { cwd: b.cwd, remote, branch: b.branch, trailers: releaseTrailers(story.key, b.slice, obs), tick: obs.facts.tick_id, heads: headsOnly });
+      if (!r.ok) return { story: story.key, ok: false, pushed, error: `push ${b.branch} failed: ${r.message}; the claim is kept` };
+      pushed.push(headsOnly ? headsRef(story.key) : b.branch);
     }
   }
   // The record goes before the claim; a failed push keeps the claim and deletes nothing
@@ -98,28 +105,19 @@ export async function releaseStory(obs: Observed, story: StoryFacts): Promise<Re
   return r.ok ? { story: story.key, ok: true, pushed, record } : { story: story.key, ok: false, pushed, record, error: r.message };
 }
 
-/** Is local `branch` a fast-forward of the remote one (fetched now; absent remotely counts)? */
-async function fastForwardOf(git: GitPort, root: string, remote: string, branch: string): Promise<{ ok: true } | { ok: false; reason: string }> {
-  const tracking = `refs/remotes/${remote}/${branch}`;
-  const failed = await git.fetch(root, remote, [`+refs/heads/${branch}:${tracking}`], { quiet: true }).then(
-    () => null,
-    (e: unknown) => (e instanceof Error ? e.message : String(e)),
-  );
-  // a branch missing on the remote (never pushed) is fine; any other fetch failure decides nothing
-  if (failed !== null && !/couldn't find remote ref/i.test(failed)) return { ok: false, reason: failed };
-  if (!(await git.hasRef(root, tracking))) return { ok: true };
-  const anc = await git.isAncestor(root, tracking, `refs/heads/${branch}`).catch(() => false);
-  return anc ? { ok: true } : { ok: false, reason: "the remote has commits this checkout does not" };
-}
-
-/** Release every claim this heartbeat holds (clean `watch` exit). */
+/** Release every claim this heartbeat holds (clean `watch` exit), but a story asking mid-merge. */
 export async function releaseHeldClaims(ctx: Context): Promise<ReleaseResult[]> {
   // The clean-exit release waits for a running tick too; its abort signal has already fired
   const lock = await waitForTickLock(ctx, "norn story handoff", "retry when it finishes", null);
   try {
     const obs = await observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });
     const out: ReleaseResult[] = [];
-    for (const s of obs.facts.stories) if (s.claim.state === "mine") out.push(await releaseStory(obs, s));
+    for (const s of obs.facts.stories) {
+      if (s.claim.state !== "mine") continue;
+      // The partial resolution lives only in this worktree: keep the claim so a restart here resumes it
+      if (askingMidMerge(s)) out.push({ story: s.key, ok: true, pushed: [], kept: "merge_in_progress" });
+      else out.push(await releaseStory(obs, s));
+    }
     return out;
   } finally {
     lock.release();

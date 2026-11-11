@@ -357,7 +357,7 @@ export function buildStepTimeline(input: StepTimelineInput, opts: StepTimelineOp
     const start = ms(s.entered_at);
     const duration = Number.isFinite(start) && Number.isFinite(end) ? Math.max(0, end - start) : null;
     const { type, attended } = inferType(s, input.workflow);
-    const wait = type === "gate" ? (duration ?? 0) : askWait(s.receipts, end);
+    const wait = type === "gate" || type === "merge" ? (duration ?? 0) : askWait(s.receipts, end);
     const evidence = s.receipts.flatMap(({ receipt: r }) => (r.kind === "done" && r.evidence ? [abs(input.runs_dir, r.evidence)] : []));
     const logs = s.receipts.flatMap(({ receipt: r }) => (r.kind === "check" && r.log ? [abs(input.runs_dir, r.log)] : []));
     const row: StepRow = {

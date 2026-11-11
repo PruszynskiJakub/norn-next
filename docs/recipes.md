@@ -68,15 +68,19 @@ No heartbeat runs on this checkout, so the agent's `norn brief` and `norn done` 
 
 norn merges the base into the story branch in an `update` step, never by rebasing. When the merge conflicts, a `resolve` step has an agent resolve it, and the story goes on.
 
-A story waiting at a gate with a `stale` route goes back through update by itself. When the story has a PR, norn first waits for the next sync to fetch it: if the base moved because that PR merged, the story ends through the merge path and no second PR is opened.
+Two kinds of conflict need no agent. When every conflicting path is a generated file the team's `regenerate` key maps (see [Reference: Config](reference.md#config)), norn takes the base's version of each, runs the mapped commands, and commits the merge with a `Norn-Regenerated` trailer; the story then goes through its test step as after any merge. A command that fails or times out, or a path still conflicted after the commands ran, aborts the merge and goes to `resolve`, with what the commands printed in the resolver's brief. A story branch that holds nothing but its own spec folder (a story waiting in triage or refinement) takes the base's version of every conflicting file outside that folder, with no key needed; it is still a merge. On the light path, a regenerated merge counts as clean when everything it changed over git's own merge is a mapped file.
 
-**You see:** a Check item such as `gh-3 conflicts with main in a.ts, b.ts (4 behind)` when the story waits at a gate, is stuck or is done with its PR not merged yet.
+A story waiting at a gate or a `merge` step with a `stale` route goes back through update by itself. In the shipped `story` and `quick` workflows a story past the `ready` gate waits at the `merge` step until you merge its PR, so a conflicting base move while the PR waits needs nothing from you. When git merged the base by itself (a clean merge) and test and CI then pass, your earlier `ready` approval carries over: norn gives the `approve` and History shows `approval carried: clean base merge`. When a merge needed a resolution, you approve `ready` again; its item, the brief and the PR body list one `git show --remerge-diff <sha>` per merge, which shows only what the resolver changed. When the story has a PR, norn first waits for the next sync to fetch it: if the base moved because that PR merged, the story ends through the merge path and no second PR is opened.
+
+A base move without a conflict can still break the story: a rename on the base that the story's new code still calls. With `base.verify: <check step>` in the workflow, set to `test` in the shipped `story` and `quick`, norn runs that check on the merge of the base into the story head when the base moves under a story waiting at `ready` or `merge` without a conflict. It runs once per base move, detached in a temporary worktree like any check step and taking a check slot, and it pushes nothing, starts no CI and asks no approval. Green leaves the story waiting. Red sends it back, from whichever of `ready` or `merge` it waits at when the run ends (a person may approve `ready` while it runs), through update by the waiting step's `stale` route and counter, with the failing output as the next step's `last_check`. A workflow without `base.verify` verifies nothing, and one with `base.stale: behind` cannot set it: there every base move goes through update already.
+
+**You see:** a Check item such as `gh-3 conflicts with main in a.ts, b.ts (4 behind)` when the story waits at a gate without a `stale` route, is stuck, or is done with its PR not merged yet (a workflow without a `merge` step).
 
 ```sh
 norn story update-branch gh-3
 ```
 
-The story goes back through its update step; you approve the `ready` gate again afterwards, since the head changed. You may also push to the story branch yourself at any time: norn merges your push in and never loses it.
+The story goes back through its update step; you approve the `ready` gate again afterwards, since the head changed. A finished story with a conflicting PR is updated this way, never with a new round: `norn story edit gh-3 --workflow <the workflow its round ran>` is refused there and names `norn story update-branch gh-3`. Starting a new round, with another workflow or `--at <step>`, is for new work. You may also push to the story branch yourself at any time: norn merges your push in and never loses it.
 
 ## The base refused a merged story's done record
 
@@ -99,6 +103,10 @@ Set `status: done` in the story's `spec.md` on the base yourself and commit it, 
     outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
 ```
 
+   A `merge` step after the last gate keeps a story past that gate in its workflow until its PR merges: `merge: { type: merge, outcomes: { stale: { to: update, counter: stale_loop } } }`. Its one outcome is `stale`; the merge itself ends the story.
+
+   Once `open-pr` has run, every route from a step that changes code (an agent step or `git: update`) to a gate or merge step the round can end from must pass `open-pr` again: then the PR head a person merges is the commit CI checked. norn refuses a workflow that skips it and names the path. At run time, a story waiting at such a gate or merge step whose local head changes a path outside its spec folder that the PR lacks goes back to `open-pr` on its own. Changes inside the spec folder stay local.
+
    A check ends in `pass` (exit 0) or `fail` (any other exit). One that can end another way names the outcome per exit code in `exits` and routes it like any other: the shipped `ci` check exits 3 on a PR that conflicts with its base, and `exits: { 3: stale }` with `stale: { to: update, counter: stale_loop }` sends the story to take the base instead of to `implement`.
 
 3. Commit it. norn validates a workflow before a unit uses it and refuses one that does not hold together, naming what is wrong.
@@ -114,7 +122,7 @@ On your machine, when you stop working on the story:
 norn story handoff gh-12
 ```
 
-It pushes the branches (with the handoffs on them), then the story's record to `refs/norn/runs/gh-12`, and only then releases the claim; it names the record commit and the story branch commit it matches. If the record push fails, nothing is released: check the remote and run it again. A clean `norn watch` exit and `norn story close` push the record the same way before they release a claim. On the colleague's machine:
+It pushes the branches (with the handoffs on them), then the story's record to `refs/norn/runs/gh-12`, and only then releases the claim; it names the record commit and the story branch commit it matches. If the record push fails, nothing is released: check the remote and run it again. A clean `norn watch` exit and `norn story close` push the record the same way before they release a claim. While a resolve step waits at a question with its base merge in progress, the unfinished merge lives only in your worktree and cannot be pushed: `norn story handoff` refuses the story (`merge_in_progress`) until the question is answered and the merge concluded, and a clean `norn watch` exit keeps that story's claim, so a restart on the same machine resumes the merge. On the colleague's machine:
 
 ```sh
 norn story checkout gh-12

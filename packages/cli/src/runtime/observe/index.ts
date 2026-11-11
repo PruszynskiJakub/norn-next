@@ -53,6 +53,7 @@ import {
   readUnitMarker,
   traceForeignCommits,
   writeBaseFacts,
+  writeOverlapFacts,
   writeIssueFacts,
   writePrFacts,
   writeRemoteCache,
@@ -64,8 +65,8 @@ import { bundledSkillSet } from "../skills-drift.ts";
 import { PhaseTimer } from "../timing.ts";
 import { checkedRepoWorkflows } from "../workflows.ts";
 import { mapBounded } from "./bounded.ts";
-import { findOrphanBranches, foreignCommits, intakeOnly, refMap, storyBase, worktreeFacts } from "./git-facts.ts";
-import { gitRemote, mergedByAncestry, readyHead, trackingRef } from "./remote.ts";
+import { findOrphanBranches, foreignCommits, intakeOnly, refMap, storyBase, storyOverlaps, worktreeFacts } from "./git-facts.ts";
+import { gitRemote, mergedByAncestry, prUnpushed, readyHead, trackingRef } from "./remote.ts";
 import { duringRun, type LocalRunEnv, runWindows, unitFacts } from "./run-facts.ts";
 
 export { type DatedCommit, findOrphanBranches, foreignCommits, storyBaseRef } from "./git-facts.ts";
@@ -366,6 +367,7 @@ async function storyFactsOf(env: StoryEnv, ls: LocalStory): Promise<{ facts: Sto
 
   const baseNext: BaseFactsCache = {};
   const { storyPrs, prSeen, issueSeen } = env;
+  const knownPr = storyPrs.has(s.key) ? storyPrs.get(s.key) : prSeen[s.key]?.pr;
   const facts: StoryFacts = {
     ...baseStoryFacts(ls, env.workflows, config),
     worktree: storyWorktree,
@@ -377,7 +379,8 @@ async function storyFactsOf(env: StoryEnv, ls: LocalStory): Promise<{ facts: Sto
     ...(issueSeen[s.key] ? { issue_seen: issueSeen[s.key] } : {}),
     ...(env.byAncestry.has(s.key) ? { merged_by_ancestry: true } : {}),
     ...(foreign.length ? { foreign_commits: foreign } : {}),
-    ...(await readyHead(root, s.key, ls.ready, (storyPrs.has(s.key) ? storyPrs.get(s.key) : prSeen[s.key]?.pr)?.head_sha)),
+    ...(await readyHead(root, s.key, ls.ready, knownPr?.head_sha)),
+    ...(await prUnpushed(git, root, branch, knownPr)),
     ...(s.base_status !== undefined ? { base_status: s.base_status } : {}),
     ...(localRecord ? { local_record: localRecord } : {}),
     ...(claim.state === "none" && s.frontmatter?.status === "new" ? await intakeOnly(git, root, remote ? env.baseRef : `refs/heads/${env.base}`, branch, s.key, refs) : {}),
@@ -503,6 +506,8 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
   for (const [slice, path] of sliceWts) if (!known.has(slice.split("/")[0] as string)) orphanWts.push(path);
 
   writeIfChanged(root, baseCache, baseCacheIn, writeBaseFacts);
+  const overlaps = await timer.time("overlap", () => storyOverlaps(git, root, stories, base, local.overlap));
+  writeIfChanged(root, overlaps, local.overlap, writeOverlapFacts);
   const orphanBranches = findOrphanBranches(refs, wtList, stories);
   traceForeignCommits(root, stories, opts.tick_id, now);
 
@@ -520,6 +525,7 @@ export async function observe(ctx: Context, opts: ObserveOptions): Promise<Obser
     },
     remote: { issues },
     stories,
+    ...(overlaps.length ? { overlaps } : {}),
     heartbeat: { last_tick_at: now },
     ...(local.norn ? { norn: local.norn } : {}),
     // Run state an older norn left on the base, pointed to `norn upgrade`

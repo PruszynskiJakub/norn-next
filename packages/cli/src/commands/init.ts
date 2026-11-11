@@ -21,7 +21,7 @@ import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
 import { agentsInUse } from "../runtime/agents-in-use.ts";
 import { assetsDir } from "../runtime/assets.ts";
-import { detectTestCommand, TEMPLATE_TEST_COMMAND, withTestCommand } from "../runtime/detect.ts";
+import { detectTestCommand, hasTemplateTestCommand, TEMPLATE_TEST_COMMAND, withTestCommand } from "../runtime/detect.ts";
 import { type LabelsReport, labelsLines, remoteLabels } from "../runtime/labels.ts";
 import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
 import { cmd, versionBaseline } from "@norn/core";
@@ -190,7 +190,7 @@ export const initCommand = defineCommand({
         const template = readFileSync(join(assets, "workflows", f), "utf8");
         const text = detected ? withTestCommand(template, testCommand) : template;
         atomicWrite(dest, text);
-        if (text.includes(detected ? JSON.stringify(testCommand) : `run: ${testCommand}`)) setIn.push(f);
+        if (hasTemplateTestCommand(template)) setIn.push(f);
         workflows.created.push(f);
       }
     }

@@ -12,9 +12,11 @@ import { cmd, nextCommand, skillsDriftHint, startAgentCommand, unstickCommand, v
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
-import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, skillsDiffer, issueProblem, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyLanded, storyPhase, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, skillsDiffer, issueProblem, knownPr, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyLanded, storyPhase, storyUnit, unitWorktree } from "../policy.ts";
+import { overlapItems } from "../overlap.ts";
 import { optionsLine } from "../prompt.ts";
 import { hookActivity } from "../session.ts";
+import { CARRIED_CLEAN, carriedApproval, isReadyGate, readyApprovalReceipt, remergeCommands } from "../ready-carry.ts";
 import { isParked } from "../verbs.ts";
 import { epoch, formatAge, iso } from "../time.ts";
 import { baseUpdateStep, edgeOf, edgesOf, isStale, stepOf } from "../workflow.ts";
@@ -354,6 +356,18 @@ function judgedDetail(story: StoryFacts, uf: UnitFacts): { detail: string; full:
   return { detail: `step ${r.step}#${r.attempt} reported ${"outcome" in r ? r.outcome : r.kind} (receipt ${receiptNumber(nr.n)})`, full: lines.join("\n") };
 }
 
+/**
+ * At the ready gate after a base merge that needed a resolution: what the resolver changed, one
+ * remerge-diff command per merge since the last ready approval, so the person reads only that.
+ */
+function resolvedMerges(story: StoryFacts, uf: UnitFacts): { detail: string; full: string } | null {
+  const since = story.ready_since;
+  const st = uf.state;
+  if (uf.unit.slice !== null || !since?.resolved || !since.merges.length || !st || !uf.workflow || !isReadyGate(uf.workflow, st.step)) return null;
+  const cmds = remergeCommands(since.merges);
+  return { detail: `resolved base merge since your approval: review ${cmds.join("; ")}`, full: ["What the resolver changed since your last approval:", ...cmds.map((c) => `- ${c}`)].join("\n") };
+}
+
 const oneLine = (t: string) => t.replace(/\s*\n\s*/g, " ").trim();
 
 /**
@@ -429,12 +443,10 @@ function noteItems(story: StoryFacts): InboxItem[] {
   }));
 }
 
-/** The PR fetched this tick, else the last one this checkout saw (`pr_seen`); null/undefined = none known. */
-const knownPr = (story: StoryFacts): StoryFacts["pr"] => (story.pr !== undefined ? story.pr : story.pr_seen?.pr);
 
 /**
- * The story unit finished its workflow and its PR is open — merging it is the person's
- * last action, so it is an item (Your turn) with the PR URL, not "Recently done".
+ * The story unit finished its workflow, or waits at a merge step, and its PR is open — merging it
+ * is the person's last action, so it is an item (Your turn) with the PR URL, not "Recently done".
  */
 function mergeItem(story: StoryFacts, st: UnitState, base: string): InboxItem | null {
   const pr = knownPr(story);
@@ -489,6 +501,8 @@ function staleItem(story: StoryFacts, base: string): InboxItem | null {
   const wf = uf?.workflow ?? null;
   if (!b || !st || !wf || !isStale(wf, b)) return null;
   const step = stepOf(wf, st.step);
+  // A merge step's only outcome is `stale`, so the tick classifies it: never an item
+  if (isParked(st, "merge")) return null;
   const atGate = isParked(st, "gate") && step?.type === "gate";
   const stuck = st.status === "stuck" && !baseSyncSteps(wf).has(st.step);
   if (!atGate && !stuck) return null;
@@ -628,12 +642,18 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
         case "ask":
           return answerItem(uf, st, park, item);
         case "gate": {
+          // The person's earlier approval carries over this tick: nothing for them to approve
+          if (uf.workflow && carriedApproval(story, uf, st, uf.workflow)) return item("running", `${st.step}: approval carried: ${CARRIED_CLEAN}`, cmd.runList(key), park.since);
           const judged = judgedDetail(story, uf);
           const reject = `or reject: ${cmd.storyReject(key)}`;
           const { detail, full } = gateChecks(story, uf);
-          const fullText = [judged?.full, full].filter(Boolean).join("\n\n");
-          return item("approve", park.reason, cmd.storyApprove(key), park.since, { detail: [judged?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
+          const resolved = resolvedMerges(story, uf);
+          const fullText = [judged?.full, full, resolved?.full].filter(Boolean).join("\n\n");
+          return item("approve", park.reason, cmd.storyApprove(key), park.since, { detail: [judged?.detail, resolved?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
         }
+        case "merge":
+          // The person's last action is merging the PR: today's merge item, never a gate item
+          return mergeItem(story, st, facts.repo.default_branch) ?? item("your_turn", park.reason, cmd.storyView(story.key, { web: true }), park.since);
         case "attended": {
           const pending = unappliedRun(uf);
           if (pending) return tickWait(pending);
@@ -727,15 +747,12 @@ export function bodyChangedItem(story: StoryFacts): InboxItem | null {
   };
 }
 
-/** Receipts that send a finished story unit back into its workflow — the head will change, the ready gate is passed again. */
-export const RE_ENTRY_KINDS = ["update", "workflow"] as const;
-
 /**
  * The story branch head when the person gave `approve` at the `ready` gate — the `head_sha` of
- * the newest `approve` receipt at that gate (the `ready` step, or any gate whose `approve` goes to
- * `$done`). Only an approval newer than the unit's last re-entry (`norn story update-branch`, `norn story edit
- * --at`) counts; a re-entry voids it until a new approve at the gate. `receipts` are the story
- * unit's, at least of the kinds `approve` and RE_ENTRY_KINDS; order does not matter.
+ * the newest `approve` receipt at that gate (`isReadyGate`). Only an approval newer than the unit's
+ * last re-entry (`norn story update-branch`, `norn story edit --at`) counts; a re-entry voids it until
+ * a new approve at the gate. `receipts` are the story unit's, at least of the kinds `approve` and
+ * RE_ENTRY_KINDS; order does not matter.
  */
 function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[]): string | undefined {
   return readyApproval(wf, receipts)?.sha;
@@ -743,20 +760,15 @@ function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[]): strin
 
 /** The head the ready approval let through and when it was given (`readyHeadSha`). */
 export function readyApproval(wf: Workflow, receipts: readonly NumberedReceipt[]): { sha: string; at: string } | undefined {
-  const isReady = (step: string) => step === "ready" || (stepOf(wf, step)?.type === "gate" && edgeOf(wf, step, "approve")?.to === "$done");
-  const sorted = [...receipts].sort((a, b) => b.n - a.n);
-  for (const { receipt: r } of sorted) {
-    if ((RE_ENTRY_KINDS as readonly string[]).includes(r.kind)) return undefined;
-    if (r.kind === "approve" && isReady(r.step)) return r.head_sha ? { sha: r.head_sha, at: r.at } : undefined;
-  }
-  return undefined;
+  const r = readyApprovalReceipt(wf, receipts)?.receipt;
+  return r?.kind === "approve" && r.head_sha ? { sha: r.head_sha, at: r.at } : undefined;
 }
 
 /** The PR head moved after the `ready.approve` — what would merge is not what was reviewed. */
 function headChangedItem(story: StoryFacts): InboxItem | null {
   const pr = knownPr(story);
   const ready = story.ready_head_sha;
-  // Norn's own commits after the approval (its `$done` state commit) leave the head the person let through as it was
+  // Only norn's own commits between the approval and the PR head (its `$done` commit, heads-only boundaries) leave the head the person let through as it was
   if (!pr || pr.state !== "open" || !ready || !pr.head_sha || pr.head_sha === ready || pr.head_sha === story.ready_head_norn) return null;
   // a PR remembered from before the approval says nothing about what came after it
   if (story.pr === undefined && story.pr_seen && story.ready_approved_at && story.pr_seen.observed_at < epoch(story.ready_approved_at)) return null;
@@ -944,6 +956,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   add(repoSkillsDriftItem(facts));
   for (const it of supersededItems(facts)) add(it);
   for (const it of owedRecordItems(facts)) add(it);
+  for (const it of overlapItems(facts)) add(it);
   // The version item comes first, whatever its age
   const pinned = (it: InboxEntry) => (it.id.startsWith(VERSION_ITEM) ? 0 : 1);
   for (const g of INBOX_GROUPS) groups[g].sort((a, b) => pinned(a) - pinned(b) || epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));

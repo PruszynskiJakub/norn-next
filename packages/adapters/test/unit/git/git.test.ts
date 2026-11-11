@@ -1,6 +1,6 @@
 /** git adapter parsers and pure helpers; the real-repo tests are in test/integration/git/. */
 import { describe, expect, test } from "bun:test";
-import { addedConflictMarkers, classifyPush, gitVersionOk, parseGitVersion, parseStatusV2, parseWorktreeList } from "../../../src/git/index.ts";
+import { addedConflictMarkers, classifyPush, createGit, fixtureExec, gitVersionOk, parseGitVersion, parseStatusV2, parseWorktreeList } from "../../../src/git/index.ts";
 
 describe("git adapter: base sync", () => {
   test("H1: addedConflictMarkers needs both an opening and a closing marker in one file", () => {
@@ -15,6 +15,17 @@ describe("git adapter: base sync", () => {
     expect(gitVersionOk("git version 2.37.9")).toBe(false);
     expect(gitVersionOk("git version 3.0")).toBe(true);
     expect(gitVersionOk("nope")).toBe(false);
+  });
+});
+
+describe("git adapter: remergeDiff", () => {
+  const SHA = "a".repeat(40);
+  test("a git too old to remerge (unknown option) gives null, never an empty diff", async () => {
+    const exec = fixtureExec([
+      { argv: ["git", "log", "-1", "--format=%P", SHA], stdout: `${"b".repeat(40)} ${"c".repeat(40)}\n` },
+      { argv: ["git", "show", "--remerge-diff", "--format=", "--name-only", "-z", SHA, "--"], code: 128, stderr: "fatal: unrecognized argument: --remerge-diff" },
+    ]);
+    expect(await createGit({ exec }).remergeDiff("/r", SHA)).toBeNull();
   });
 });
 

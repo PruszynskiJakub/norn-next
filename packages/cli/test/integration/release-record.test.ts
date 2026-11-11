@@ -327,3 +327,63 @@ describe("under remote, the tick that closes a story pushes its record once (rev
     }
   });
 });
+
+describe("a person's push to the story branch is merged at claim release, never rebased", () => {
+  /** A commit by a person on the remote story branch, made from a clone of its own; its sha. */
+  function personPushes(branch: string, name: string): string {
+    const other = join(h.dir, `person-${name}`);
+    sh(h.dir, ["clone", "-q", "-b", branch, h.remoteDir, other]);
+    writeFileSync(join(other, `${name}.txt`), "from a person\n");
+    sh(other, ["add", "-A"]);
+    sh(other, ["-c", "user.email=p@example.com", "-c", "user.name=P", "commit", "-q", "-m", `person: ${name}`]);
+    sh(other, ["push", "-q", "origin", branch]);
+    return sh(other, ["rev-parse", "HEAD"]);
+  }
+  /** A local boundary in the story worktree the remote lacks; its sha. */
+  function localBoundary(wt: string, name: string): string {
+    writeFileSync(join(wt, `${name}-local.txt`), "norn's boundary\n");
+    sh(wt, ["add", "-A"]);
+    sh(wt, ["-c", "user.email=n@example.com", "-c", "user.name=N", "commit", "-q", "-m", `norn: ${name} boundary`]);
+    return sh(wt, ["rev-parse", "HEAD"]);
+  }
+  /** The remote story branch holds both commits, joined by a merge commit at its head. */
+  function expectMerged(branch: string, person: string, local: string) {
+    const head = remoteRef(`refs/heads/${branch}`) as string;
+    const git = ["--git-dir", h.remoteDir];
+    expect(sh(h.dir, [...git, "merge-base", "--is-ancestor", person, head])).toBe("");
+    expect(sh(h.dir, [...git, "merge-base", "--is-ancestor", local, head])).toBe("");
+    expect(sh(h.dir, [...git, "rev-list", "--parents", "-n", "1", head]).split(" ")).toHaveLength(3);
+  }
+
+  test("story handoff merges the person's commit with norn's local boundary and releases the claim", async () => {
+    const s = await storyAt(20, "person-handoff");
+    const person = personPushes(s.branch, "handoff");
+    const local = localBoundary(s.wt, "handoff");
+    const r = await h.norn("story", "handoff", "gh-20", "--json");
+    expect(r.exit).toBe(0);
+    expect(r.value).toMatchObject({ story: "gh-20", released: true, pushed: [s.branch] });
+    expectMerged(s.branch, person, local);
+    expect(remoteRef(claimRef("gh-20"))).toBeNull();
+  });
+
+  test("a clean watch exit merges the person's commit with norn's local boundary and releases the claim", async () => {
+    const s = await storyAt(21, "person-watch");
+    const person = personPushes(s.branch, "watch");
+    const local = localBoundary(s.wt, "watch");
+    const r = await runChecked(["watch", "--interval", "1ms", "--max-ticks", "1"], { ...h.deps, log: () => {} });
+    expect(r.exit).toBe(0);
+    expect((r.value as { released: Array<{ story: string; ok: boolean }> }).released).toContainEqual(expect.objectContaining({ story: "gh-21", ok: true }));
+    expectMerged(s.branch, person, local);
+    expect(remoteRef(claimRef("gh-21"))).toBeNull();
+  });
+
+  test("story close merges the person's commit with norn's local boundary and releases the claim", async () => {
+    const s = await storyAt(22, "person-close");
+    const person = personPushes(s.branch, "close");
+    const local = localBoundary(s.wt, "close");
+    const r = await h.norn("story", "close", "gh-22", "--yes", "--json");
+    expect(r.exit).toBe(0);
+    expectMerged(s.branch, person, local);
+    expect(remoteRef(claimRef("gh-22"))).toBeNull();
+  });
+});

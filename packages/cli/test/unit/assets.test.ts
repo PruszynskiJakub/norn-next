@@ -56,7 +56,8 @@ const prose = (text: string) => text.replace(/```[\s\S]*?```/g, "").replace(/`[^
 
 /** Steps that can reach `$done`, walking declared edges backwards. */
 function stepsReachingDone(wf: Workflow): Set<string> {
-  const reach = new Set<string>(["$done"]);
+  // a merge step ends the round when its PR merges
+  const reach = new Set<string>(["$done", ...Object.keys(wf.steps).filter((s) => wf.steps[s]?.type === "merge")]);
   let grew = true;
   while (grew) {
     grew = false;
@@ -240,11 +241,31 @@ describe("single-purpose workflows (#136)", () => {
     expect(targets("quick", "ci")).toEqual({ pass: "ready", fail: "implement", stale: "update" });
   });
 
-  test("story and quick wait for CI with the same script, and update-branch re-enters update", () => {
+  test("story, quick and release approve at ready into a merge step that goes back to update when stale, in both copies", () => {
+    const local = (name: string) => parse(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "workflows", `${name}.yaml`), "utf8")) as Workflow;
+    const all = [wf("story"), wf("quick"), local("story"), local("quick"), local("release")];
+    for (const w of all) {
+      const ready = Object.fromEntries(Object.entries(w.steps.ready?.outcomes ?? {}).map(([o, e]) => [o, outcomeEdge(e as Parameters<typeof outcomeEdge>[0]).to]));
+      expect({ name: w.name, approve: ready.approve }).toEqual({ name: w.name, approve: "merge" });
+      expect({ name: w.name, merge: w.steps.merge }).toMatchObject({ name: w.name, merge: { type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } } });
+    }
+  });
+
+  test("story and quick wait for CI with the same script, update-branch re-enters update, and test re-verifies a waiting story, in both copies", () => {
     const run = (name: string) => (wf(name).steps.ci as { run?: string }).run;
     expect(run("story")).toContain("gh pr checks");
     expect(run("quick")).toBe(run("story"));
-    for (const name of ["story", "quick"]) expect(wf(name).base).toEqual({ stale: "conflict", step: "update" });
+    const local = (name: string) => parse(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "workflows", `${name}.yaml`), "utf8")) as Workflow;
+    for (const w of [wf("story"), wf("quick"), local("story"), local("quick")]) {
+      expect({ name: w.name, base: w.base }).toEqual({ name: w.name, base: { stale: "conflict", step: "update", verify: "test" } });
+      expect({ name: w.name, verify: w.steps.test?.type }).toEqual({ name: w.name, verify: "check" });
+    }
+    // release updates on any base move (stale: behind), which leaves nothing to re-verify
+    expect(local("release").base).toEqual({ stale: "behind" });
+  });
+
+  test("story's and quick's resolve take the base side of each conflict", () => {
+    for (const name of ["story", "quick"]) expect((wf(name).steps.resolve as { inputs?: unknown[] }).inputs).toContain("base_side");
   });
 });
 

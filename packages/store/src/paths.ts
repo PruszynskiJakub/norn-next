@@ -164,6 +164,7 @@ export const pendingRecordsPath = (root: string) => join(machineDir(root), "reco
 export const foreignCommitsPath = (root: string) => join(machineDir(root), "foreign.json");
 export const inboxOpenPath = (root: string) => join(machineDir(root), "inbox.json");
 export const baseFactsPath = (root: string) => join(machineDir(root), "base.json");
+export const overlapFactsPath = (root: string) => join(machineDir(root), "overlap.json");
 export const noticesPath = (root: string) => join(machineDir(root), "notices.json");
 /** The mailbox receipts this checkout's ticks rejected, next to the notices */
 export const rejectedReceiptsPath = (root: string) => join(machineDir(root), "rejected.json");

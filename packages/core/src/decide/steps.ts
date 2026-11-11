@@ -1,6 +1,7 @@
 /** decide for the other step types: story start, check and git steps, and the slices step. */
 import {
   type GitStep,
+  parseDuration,
   PR_BODY_FILE,
   type ReceiptOf,
   type SliceFrontmatter,
@@ -19,7 +20,8 @@ import { initialState, routeOf } from "../apply.ts";
 import { cmd, sliceWorktreePath, storyWorktreePath } from "../commands.ts";
 import type { SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { sha256 } from "../hash.ts";
-import { unitWorktree } from "../policy.ts";
+import { prOpen, unitWorktree } from "../policy.ts";
+import { CARRIED_CLEAN, isReadyGate, remergeCommands } from "../ready-carry.ts";
 import { checkWorkflowLevel, stepOf, type UnitLevel } from "../workflow.ts";
 import { commitFor, type Ctx, emitApplied, endedWith, nextReceiptNumber, nornReceipt, park, rebasing, synth, trailersFor, unitBranch } from "./receipts.ts";
 
@@ -68,7 +70,16 @@ export function recordOf(uf: UnitFacts): string {
 /** The story unit's record is flat, `_story/state.json` directly in its folder (an older norn's). */
 export const hasFlatRecord = (uf: UnitFacts): boolean => uf.unit.slice === null && uf.record !== undefined && normalRecord(uf.record) === unitRecordPath(STORY_UNIT_DIR);
 
-export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, command: string, timeout_ms: number, exits?: Record<string, string>): void {
+export function runCheck(
+  ctx: Ctx,
+  story: StoryFacts,
+  uf: UnitFacts,
+  st: UnitState,
+  command: string,
+  timeout_ms: number,
+  exits?: Record<string, string>,
+  verify?: { head: string; base: string },
+): void {
   const ref = uf.unit;
   if (uf.lease?.kind === "check") return ctx.noop(ref, "check.running", `check run ${uf.lease.run_id ?? "?"} in progress`);
   const cwd = unitWorktree(story, uf);
@@ -81,7 +92,7 @@ export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitSta
   ctx.emit({
     kind: "run_check",
     unit: ref,
-    rule: "check.run",
+    rule: verify ? "verify.run" : "check.run",
     step: st.step,
     run_id,
     command,
@@ -90,7 +101,30 @@ export function runCheck(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitSta
     env,
     log_path: `${recordRunStatePath(story, recordOf(uf))}/logs/${run_id}.log`,
     ...(exits ? { exits } : {}),
+    ...(verify ? { verify } : {}),
   });
+}
+
+/**
+ * A story waiting at `ready` or a merge step whose base moved without a conflict runs the
+ * workflow's `base.verify` check on the merged tree, once per (story head, base sha): the newest
+ * verify receipt's pair is the cache. False when no verify is due, and nothing was decided.
+ */
+export function reverify(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): boolean {
+  const name = wf.base?.verify;
+  const check = name === undefined ? undefined : stepOf(wf, name);
+  const b = story.base;
+  if (uf.unit.slice !== null || check?.type !== "check" || !b || b.behind === 0 || b.conflicts.length) return false;
+  const waiting = st.park?.kind === "merge" || (st.park?.kind === "gate" && isReadyGate(wf, st.step));
+  if (!waiting || (story.verified?.head === b.head && story.verified.base === b.sha)) return false;
+  // A base that moved because the story's own PR merged ends the story; only a fetched PR shows that
+  if (story.pr === undefined && story.pr_seen?.pr) {
+    ctx.noop(uf.unit, "verify.awaits_sync", `base moved; waiting for a sync to show whether PR #${story.pr_seen.pr.number} merged`);
+    return true;
+  }
+  // Any exit but 0 is red: the step's `exits` name outcomes of its own place in the workflow, not of a verify
+  runCheck(ctx, story, uf, st, check.run, parseDuration(check.timeout), undefined, { head: b.head, base: b.sha });
+  return true;
 }
 
 export function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow, step: GitStep): void {
@@ -129,10 +163,18 @@ export function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState
     onto: step.action === "integrate" ? story.branch : null,
     pr:
       step.action === "open-pr"
-        ? { base: ctx.facts.repo.default_branch, title: fm.title, body: `Closes ${fm.url}\n\nDelivered by norn (story ${story.key}).`, body_file: `${story.spec_dir}/${PR_BODY_FILE}` }
+        ? { base: ctx.facts.repo.default_branch, title: fm.title, body: `Closes ${fm.url}\n\nDelivered by norn (story ${story.key}).${resolvedEvidence(story)}`, body_file: `${story.spec_dir}/${PR_BODY_FILE}` }
         : null,
     ...(update ? { update } : {}),
+    ...((step.action === "integrate" || step.action === "update") && prOpen(story) ? { heads: true as const } : {}),
   });
+}
+
+/** A base merge since the ready approval needed a resolution: the PR names what the resolver changed, for the person who approves again. */
+function resolvedEvidence(story: StoryFacts): string {
+  const since = story.ready_since;
+  if (!since?.resolved || !since.merges.length) return "";
+  return `\n\nResolved base merges since the ready approval; what the resolver changed:\n\n${remergeCommands(since.merges).map((c) => `- \`${c}\``).join("\n")}`;
 }
 
 /** The base a classify receipt records. */
@@ -165,6 +207,17 @@ export function classifyNorn(
     state: res.state,
     commit: commitFor(ctx, story, uf, `norn: ${uf.unit.key} ${st.step} ${outcome} → ${receipt.route}`, st.step, { ended: endedWith(res) }),
   });
+}
+
+/**
+ * Norn approves the ready gate on its own (`carriedApproval`) at the story head the base facts
+ * measured, the receipt marked carried, so History tells it from a person's approval and the next
+ * base update measures from that head.
+ */
+export function carryApproval(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, wf: Workflow): void {
+  const approve = nornReceipt(ctx, st, "approve", { carried: CARRIED_CLEAN, ...(story.base ? { head_sha: story.base.head } : {}) });
+  const { nr, res } = synth(ctx, st, wf, nextReceiptNumber(uf), approve);
+  emitApplied(ctx, story, uf, "gate.carried", res, [nr], { message: `norn: ${uf.unit.key} ${st.step} approval carried: ${CARRIED_CLEAN}`, step: st.step, ended: endedWith(res) });
 }
 
 /**

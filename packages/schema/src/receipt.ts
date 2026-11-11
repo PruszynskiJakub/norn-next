@@ -16,6 +16,7 @@ import {
   TaggedUnion,
   Target,
   Ulid,
+  VerifyPair,
 } from "./common.ts";
 import { CriterionVerdict, Note, NoteId } from "./criteria.ts";
 
@@ -90,6 +91,8 @@ export const DoneReceipt = receipt("done", {
   criteria: Type.Optional(Type.Array(CriterionVerdict, { minItems: 1 })),
   /** Notes for a person; never block, never change the route */
   notes: Type.Optional(Type.Array(Note, { minItems: 1 })),
+  /** The unit worktree's HEAD at `norn done`; an `approve` from it anchors the light path of a later base update */
+  head_sha: Type.Optional(GitSha),
   /**
    * Verified at `norn done` of a base-mode step: the base merged, the merge commit that brought
    * it in (null = reached without a merge commit) and the story head reported.
@@ -136,6 +139,8 @@ export const ApproveReceipt = mailboxReceipt("approve", {
   head_sha: Type.Optional(GitSha),
   /** Open notes of the story listed at this story-level gate at `approve`; they leave the inbox */
   acknowledged_notes: Type.Optional(Type.Array(NoteId, { uniqueItems: true })),
+  /** Set when norn gave this `approve` on its own, carrying the person's earlier ready approval over: why (e.g. "clean base merge") */
+  carried: Type.Optional(NonEmpty),
 });
 export const RejectReceipt = mailboxReceipt("reject", {
   comment: Type.Optional(Type.String()),
@@ -160,6 +165,11 @@ export const CheckReceipt = receipt("check", {
   output_tail: Type.String(),
   /** `logs/<run_id>.log`, present unless it passed */
   log: Type.Optional(NonEmpty),
+  /**
+   * A re-verify run of the workflow's `base.verify` check on the merge of `base` into `head`, made
+   * while the story waits (its step is the waiting step): red takes that step's `stale` edge, green leaves it waiting
+   */
+  verify: Type.Optional(VerifyPair),
 });
 export const SessionInfo = Type.Object(
   {
@@ -210,6 +220,38 @@ export const ClassifyReceipt = receipt("classify", {
         head: Type.Optional(GitSha),
         /** A `done` update made a merge commit (false = already up to date) */
         merged: Type.Optional(Type.Boolean()),
+        /** A `done` update completed its conflicts without an agent: the paths it took from the base */
+        regenerated: Type.Optional(Type.Array(NonEmpty)),
+        /** A `conflict` update tried the regenerate commands first: what they printed and why they did not finish it */
+        regenerate: Type.Optional(Type.Object({ output: Type.String() }, { additionalProperties: false })),
+      },
+      { additionalProperties: false },
+    ),
+  ),
+  /**
+   * The git summary a routed `git: update` chose its outcome from: the story's first-parent commits
+   * from the head at the round's latest `approve` to the head after the merge, newest first.
+   */
+  history: Type.Optional(
+    Type.Object(
+      {
+        anchor: GitSha,
+        spec_dir: NonEmpty,
+        commits: Type.Array(
+          Type.Object(
+            {
+              sha: GitSha,
+              parents: Type.Array(GitSha),
+              paths: Type.Array(NonEmpty),
+              trailers: Type.Record(Type.String(), Type.String()),
+              /** a merge whose other parents are in the base's history */
+              from_base: Type.Optional(Type.Boolean()),
+              /** a merge's remerge-diff paths; null = git could not tell */
+              remerge: Type.Optional(Type.Union([Type.Array(NonEmpty), Type.Null()])),
+            },
+            { additionalProperties: false },
+          ),
+        ),
       },
       { additionalProperties: false },
     ),

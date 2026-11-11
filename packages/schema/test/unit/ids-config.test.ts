@@ -4,6 +4,9 @@ import { join } from "node:path";
 import { JSON_DIR, renderSchema } from "../../scripts/emit.ts";
 import {
   DEFAULT_CONFIG,
+  HEADS_REF_PREFIX,
+  headsRef,
+  RecordConfig,
   SCHEMAS,
   type SchemaName,
   isGitSha,
@@ -110,6 +113,18 @@ describe("keys and names", () => {
 describe("config", () => {
   test("the built-in values are a valid resolved config", () => {
     expect(validate("resolved-config", DEFAULT_CONFIG).ok).toBe(true);
+  });
+  test("no config key turns the heads ref push off: the record config has only its policy, and a push key is refused everywhere", () => {
+    expect(Object.keys(RecordConfig.properties)).toEqual(["policy"]);
+    for (const name of ["repo-config", "user-config", "local-config"] as const) {
+      expect(validate(name, { push: false }).ok).toBe(false);
+      expect(validate(name, { heads_ref: false }).ok).toBe(false);
+    }
+    expect(validate("repo-config", { record: { policy: "local", push: false } }).ok).toBe(false);
+  });
+  test("the heads ref sits beside the other norn ref prefixes", () => {
+    expect(headsRef("gh-7")).toBe("refs/norn/heads/gh-7");
+    expect(HEADS_REF_PREFIX).toBe("refs/norn/heads/");
   });
 });
 

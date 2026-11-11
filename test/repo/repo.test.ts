@@ -598,7 +598,7 @@ describe("test layout (AGENTS.md)", () => {
     }
   });
 
-  test("release goes prepare → open-pr → ci → ready, a red CI goes $stuck, and a base commit or a conflicting PR makes it stale", () => {
+  test("release goes prepare → open-pr → ci → ready → merge, a red CI goes $stuck, and a base commit or a conflicting PR makes it stale", () => {
     const { start, steps, counters, base } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", "release.yaml"), "utf8")) as {
       start: string;
       steps: Record<string, { type: string; run?: string; outcomes: Record<string, unknown> }>;
@@ -606,12 +606,14 @@ describe("test layout (AGENTS.md)", () => {
       base: unknown;
     };
     expect(start).toBe("prepare");
-    expect(Object.keys(steps).sort()).toEqual(["ci", "open-pr", "prepare", "ready", "resolve", "update"]);
+    expect(Object.keys(steps).sort()).toEqual(["ci", "merge", "open-pr", "prepare", "ready", "resolve", "update"]);
     expect(steps.prepare?.outcomes.done).toMatchObject({ to: "open-pr" });
     expect(steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
     expect(steps.ci?.type).toBe("check");
     expect(steps.ci?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: { to: "update", counter: "stale_loop" } });
     expect(steps.ready?.outcomes.reject).toEqual({ to: "prepare", counter: "ready_loop" });
+    expect(steps.ready?.outcomes.approve).toBe("merge");
+    expect(steps.merge).toEqual({ type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } });
     expect(counters.version_loop).toBeUndefined();
     expect(base).toEqual({ stale: "behind" });
   });

@@ -13,9 +13,11 @@ import {
   readPendingRecords,
   readHeartbeatFile,
   readLocalJson,
+  readOverlapFacts,
   readPrFacts,
   readTrace,
   machineDir,
+  writeOverlapFacts,
 } from "../../src/index.ts";
 import { tmp } from "../helpers.ts";
 
@@ -80,6 +82,16 @@ describe("readLocalJson (BUG-4)", () => {
     expect(readPrFacts(r)).toEqual({});
     expect(cachedDefaultBranch(r)).toBeNull();
     expect(localEvents(r)).toHaveLength(5);
+  });
+
+  test("overlap.json: the pairs written read back; a wrong shape reads as empty", () => {
+    const r = repo();
+    expect(readOverlapFacts(r)).toEqual([]);
+    const pairs = [{ stories: ["gh-1", "gh-2"] as [string, string], heads: ["a".repeat(40), "b".repeat(40)] as [string, string], paths: ["src/x.ts"] }];
+    writeOverlapFacts(r, pairs);
+    expect(readOverlapFacts(r)).toEqual(pairs);
+    put(r, "overlap.json", { pairs: [{ stories: ["gh-1"], heads: [], paths: "x" }] });
+    expect(readOverlapFacts(r)).toEqual([]);
   });
 
   test("a lock of the wrong shape is reclaimed as unreadable", async () => {

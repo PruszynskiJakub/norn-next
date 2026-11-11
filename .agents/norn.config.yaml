@@ -5,7 +5,7 @@
 # Three files, each with its own keys:
 #   ~/.norn/config.yaml              this machine (max_agents, notify, trace) and your defaults (mode, agent, agents)
 #   .agents/norn.config.local.yaml   you, in this repo (mode, agent, agents): overrides your user file; gitignored
-#   .agents/norn.config.yaml         this file: the team (provider, base_branch, workflow, slice_workflow)
+#   .agents/norn.config.yaml         this file: the team (provider, base_branch, workflow, slice_workflow, regenerate)
 # Everything else has no key: norn detects it, derives it or fixes it.
 #
 # Every key is optional. A commented value is the built-in default.
@@ -25,3 +25,10 @@ norn_version: 0.32.0
 # triage gate with `norn story edit <story> --workflow <name> --at <step>`.
 # workflow: triage
 # slice_workflow: slice
+
+# Generated files and the command that writes them: a base update whose conflicts are all such
+# files takes the base's version, runs the command and commits the merge, with no agent. Golden
+# cases are never mapped: a change in what decide decides is always reviewed.
+regenerate:
+  - { paths: ["packages/schema/json/*.schema.json"], run: bun run schema:emit }
+  - { paths: [docs/reference.md], run: bun run docs:emit }

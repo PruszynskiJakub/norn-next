@@ -62,6 +62,12 @@ describe("validateWorkflowDefinition", () => {
     expect(codes({ name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { ok: "$done", exhausted: "$done" } } } })).toEqual(["reserved_outcome"]);
   });
 
+  test("the light-path outcomes clean and resolved are declared only on a git update step", () => {
+    const wf = (action: string) => ({ name: "x", start: "g", steps: { g: { type: "git", action, outcomes: { done: "$done", clean: "$done", resolved: "$done" } } } });
+    expect(codes(wf("update"))).toEqual([]);
+    expect(codes(wf("push"))).toEqual(["unknown_outcome", "unknown_outcome"]);
+  });
+
   test("a check declares extra outcomes by exit code: each outcome is pass, fail or named by exits, and exits names a declared one", () => {
     const wf = (check: Record<string, unknown>) => ({
       name: "x",

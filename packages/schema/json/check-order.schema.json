@@ -112,6 +112,34 @@
           "type": "null"
         }
       ]
+    },
+    "verify": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "head",
+        "base",
+        "repo",
+        "worktree"
+      ],
+      "properties": {
+        "head": {
+          "pattern": "^[0-9a-f]{40,64}$",
+          "type": "string"
+        },
+        "base": {
+          "pattern": "^[0-9a-f]{40,64}$",
+          "type": "string"
+        },
+        "repo": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "worktree": {
+          "minLength": 1,
+          "type": "string"
+        }
+      }
     }
   }
 }

@@ -1,6 +1,7 @@
 /** Workflow load-time validation and per-unit level checks. */
 import {
   type CheckStep,
+  type CounterSpec,
   type OutcomeEdge,
   outcomeEdge,
   RESERVED_STEP_NAMES,
@@ -9,6 +10,7 @@ import {
   type Workflow,
 } from "@norn/schema";
 import { cmd } from "./commands.ts";
+import { LIGHT_OUTCOMES } from "./update-outcome.ts";
 
 export type WorkflowIssueCode =
   | "schema"
@@ -22,6 +24,8 @@ export type WorkflowIssueCode =
   | "unknown_outcome"
   | "cannot_reach_done"
   | "uncounted_cycle"
+  | "open_pr_bypass"
+  | "base_verify"
   | "verdict"
   | "level";
 
@@ -83,6 +87,9 @@ export function edgeOf(wf: Workflow, step: string, outcome: string): OutcomeEdge
   return spec === undefined ? null : outcomeEdge(spec);
 }
 
+/** The edges `<step>.<outcome>` a counter's `reset_on` names, one or a list. */
+export const resetEdges = (c: CounterSpec): string[] => (c.reset_on === undefined ? [] : Array.isArray(c.reset_on) ? c.reset_on : [c.reset_on]);
+
 export function stepOf(wf: Workflow, name: string): Step | null {
   return Object.hasOwn(wf.steps, name) ? (wf.steps[name] as Step) : null;
 }
@@ -99,6 +106,7 @@ export function validateWorkflowDefinition(input: unknown, opts: ValidateOptions
       if (isReservedStep(name))
         issues.push({ code: "reserved_name", path: `/steps/${name}`, message: `step name '${name}' is reserved` });
 
+  issues.push(...mergeOutcomeIssues(rawSteps));
   const schema = validate("workflow", input);
   if (!schema.ok) {
     const reservedPaths = new Set(issues.map((i) => i.path));
@@ -110,6 +118,39 @@ export function validateWorkflowDefinition(input: unknown, opts: ValidateOptions
   const wf = schema.value;
   issues.push(...graphIssues(wf, opts));
   return issues.length ? { ok: false, workflow: wf, issues } : { ok: true, workflow: wf, issues: [] };
+}
+
+/**
+ * A merge step's one outcome is `stale`: the schema alone would report another as a failed match
+ * of every step type, so it is named here with the reason.
+ */
+function mergeOutcomeIssues(rawSteps: unknown): WorkflowIssue[] {
+  if (!rawSteps || typeof rawSteps !== "object") return [];
+  const issues: WorkflowIssue[] = [];
+  for (const [name, step] of Object.entries(rawSteps as Record<string, unknown>)) {
+    const s = step as { type?: unknown; outcomes?: unknown } | null;
+    if (s?.type !== "merge" || !s.outcomes || typeof s.outcomes !== "object") continue;
+    for (const o of Object.keys(s.outcomes))
+      if (o !== "stale")
+        issues.push({ code: "unknown_outcome", path: `/steps/${name}/outcomes/${o}`, message: `a merge step has only the outcome 'stale'; '${o}' cannot be declared (the PR merging ends the wait)` });
+  }
+  return issues;
+}
+
+/**
+ * `base.verify` runs a check step on the merged tree; under `stale: behind` every base move already
+ * sends the story through update, so a verify would never run and only look like it does.
+ */
+function baseVerifyIssues(wf: Workflow): WorkflowIssue[] {
+  const name = wf.base?.verify;
+  if (name === undefined) return [];
+  const path = "/base/verify";
+  if (wf.base?.stale === "behind")
+    return [{ code: "base_verify", path, message: "base.verify cannot be set with base.stale: behind (any base move already updates the story, so nothing would be verified)" }];
+  const step = stepOf(wf, name);
+  if (!step) return [{ code: "unknown_target", path, message: `base.verify '${name}' does not exist` }];
+  if (step.type !== "check") return [{ code: "base_verify", path, message: `base.verify '${name}' is a ${step.type} step; it must name a check step, whose command norn runs on the merged tree` }];
+  return [];
 }
 
 function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
@@ -144,6 +185,12 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
     }
   }
   for (const [name, step] of Object.entries(wf.steps)) {
+    if (step.type !== "git" || step.action === "update") continue;
+    for (const outcome of LIGHT_OUTCOMES)
+      if (Object.hasOwn(step.outcomes, outcome))
+        issues.push({ code: "unknown_outcome", path: `/steps/${name}/outcomes/${outcome}`, message: `'${outcome}' is an outcome of a base update only (action: update), not of action: ${step.action}` });
+  }
+  for (const [name, step] of Object.entries(wf.steps)) {
     if (step.type !== "check") continue;
     const named = new Set(Object.values(step.exits ?? {}));
     for (const [code, outcome] of Object.entries(step.exits ?? {})) {
@@ -162,15 +209,20 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
         });
   }
   // `reset_on` names a declared edge `<step>.<outcome>`
-  for (const [name, c] of Object.entries(counters)) {
-    if (c.reset_on === undefined) continue;
-    const [from, outcome] = c.reset_on.split(".") as [string, string];
-    if (!edgeOf(wf, from, outcome))
-      issues.push({ code: "unknown_reset", path: `/counters/${name}/reset_on`, message: `counter '${name}' resets on '${c.reset_on}', but step '${from}' declares no outcome '${outcome}'` });
-  }
+  for (const [name, c] of Object.entries(counters))
+    resetEdges(c).forEach((edge, i) => {
+      const [from, outcome] = edge.split(".") as [string, string];
+      if (!edgeOf(wf, from, outcome))
+        issues.push({
+          code: "unknown_reset",
+          path: `/counters/${name}/reset_on${Array.isArray(c.reset_on) ? `/${i}` : ""}`,
+          message: `counter '${name}' resets on '${edge}', but step '${from}' declares no outcome '${outcome}'`,
+        });
+    });
   // `base.step` names the step `norn story update-branch` re-enters
   if (wf.base?.step !== undefined && !stepOf(wf, wf.base.step))
     issues.push({ code: "unknown_target", path: "/base/step", message: `base.step '${wf.base.step}' does not exist` });
+  issues.push(...baseVerifyIssues(wf));
   for (const e of edgesOf(wf)) {
     const path = `/steps/${e.from}/outcomes/${e.outcome}`;
     if (!e.to.startsWith("$") && !stepOf(wf, e.to))
@@ -182,8 +234,8 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
       issues.push({ code: "verdict", path, message: `${e.from}.${e.outcome} declares verdict '${e.verdict}', but only outcomes an agent reports with norn done can be gated by a verdict` });
   }
 
-  // every step can reach $done: reverse search from $done
-  const reach = new Set<string>(["$done"]);
+  // every step can reach $done: reverse search from $done; a merge step ends the round when its PR merges
+  const reach = new Set<string>(["$done", ...steps.filter((s) => wf.steps[s]?.type === "merge")]);
   const edges = edgesOf(wf);
   for (let grew = true; grew; ) {
     grew = false;
@@ -195,6 +247,8 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
   }
   for (const s of steps)
     if (!reach.has(s)) issues.push({ code: "cannot_reach_done", path: `/steps/${s}`, message: `step '${s}' cannot reach $done` });
+
+  issues.push(...openPrBypassIssues(wf));
 
   // A cycle is uncounted iff it is a cycle of the subgraph of uncounted edges
   const uncounted = new Map<string, Map<string, string>>();
@@ -215,6 +269,67 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
     });
   }
   return issues;
+}
+
+const isOpenPr = (step: Step | null | undefined) => step?.type === "git" && step.action === "open-pr";
+/** A step that can change the story branch's code: an agent's commits, or a base merge. */
+const changesCode = (step: Step | null | undefined) => step?.type === "agent" || (step?.type === "git" && step.action === "update");
+
+/** The workflow's `git: open-pr` step (the first one); null = none. */
+export function openPrStep(wf: Workflow): string | null {
+  return Object.entries(wf.steps).find(([, s]) => isOpenPr(s as Step))?.[0] ?? null;
+}
+
+/**
+ * Gates and merge steps the round can end from without passing `open-pr` again: every merge step,
+ * and each gate with a path to a merge step or `$done` that avoids `open-pr`. Past one of them the
+ * PR head is what a person merges, so it must be the commit `ci` checked.
+ */
+export function mergeBoundSteps(wf: Workflow): Set<string> {
+  const ends = new Set<string>(["$done", ...Object.keys(wf.steps).filter((s) => wf.steps[s]?.type === "merge")]);
+  const edges = edgesOf(wf);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const e of edges)
+      if (ends.has(e.to) && !ends.has(e.from) && !isOpenPr(stepOf(wf, e.from))) {
+        ends.add(e.from);
+        grew = true;
+      }
+  }
+  return new Set([...ends].filter((s) => ["gate", "merge"].includes(stepOf(wf, s)?.type ?? "")));
+}
+
+/**
+ * A path from `open-pr` that reaches a merge-bound step through an agent step or `git: update`
+ * without passing `open-pr` again would let a person merge a head CI never ran on.
+ */
+function openPrBypassIssues(wf: Workflow): WorkflowIssue[] {
+  const bound = mergeBoundSteps(wf);
+  const next = new Map<string, string[]>();
+  for (const e of edgesOf(wf)) if (stepOf(wf, e.to)) next.set(e.from, [...(next.get(e.from) ?? []), e.to]);
+  const found = new Map<string, string[]>();
+  for (const [start, step] of Object.entries(wf.steps)) {
+    if (!isOpenPr(step as Step)) continue;
+    // Breadth-first over (step, changed since open-pr): the first path found is a shortest one
+    type Node = { step: string; changed: boolean; path: string[] };
+    const seen = new Set<string>();
+    const queue: Node[] = (next.get(start) ?? []).map((s) => ({ step: s, changed: false, path: [start, s] }));
+    while (queue.length) {
+      const n = queue.shift() as Node;
+      const key = `${n.step}:${n.changed}`;
+      const step = stepOf(wf, n.step);
+      if (seen.has(key) || isOpenPr(step)) continue;
+      seen.add(key);
+      if (n.changed && bound.has(n.step) && !found.has(n.step)) found.set(n.step, n.path);
+      const changed = n.changed || changesCode(step);
+      for (const s of next.get(n.step) ?? []) queue.push({ step: s, changed, path: [...n.path, s] });
+    }
+  }
+  return [...found].map(([step, path]) => ({
+    code: "open_pr_bypass",
+    path: `/steps/${step}`,
+    message: `${path.join(" → ")}: a change reaches ${step} without going through open-pr again, so the PR head a person merges would not be the commit CI checked`,
+  }));
 }
 
 /**

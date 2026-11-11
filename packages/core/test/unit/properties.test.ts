@@ -94,6 +94,14 @@ const LIMITS = { deadline: "60m", nudges: 2, retries: 1, stalled: "15m" };
  * and `$done` is reachable. Git actions fit the unit level.
  */
 function randomWorkflow(rng: Rng, name: string, level: "story" | "slice"): Workflow {
+  // A random graph can let a change past open-pr reach a gate the round ends from: draw again
+  for (;;) {
+    const wf = drawWorkflow(rng, name, level);
+    if (wf) return wf;
+  }
+}
+
+function drawWorkflow(rng: Rng, name: string, level: "story" | "slice"): Workflow | null {
   const n = rng.range(2, 5);
   const names = STEP_NAMES.slice(0, n);
   const counterNames = Array.from({ length: rng.range(1, 2) }, (_, i) => `loop_${i}`);
@@ -140,6 +148,7 @@ function randomWorkflow(rng: Rng, name: string, level: "story" | "slice"): Workf
   const wf: Workflow = { name, start: names[0] as string, steps, counters };
   const check = validateWorkflowDefinition(wf);
   const level_ = checkWorkflowLevel(wf, level);
+  if (!check.ok && check.issues.every((i) => i.code === "open_pr_bypass")) return null;
   if (!check.ok || level_.length) throw new Error(`generator made an invalid workflow: ${JSON.stringify([...check.issues, ...level_])}\n${JSON.stringify(wf)}`);
   return wf;
 }

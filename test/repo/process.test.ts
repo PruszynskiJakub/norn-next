@@ -60,6 +60,9 @@ describe("repo workflows", () => {
     expect(result.ok ? [] : result.issues).toEqual([]);
     if (result.ok) expect(checkWorkflowLevel(result.workflow, SLICE_WORKFLOWS.has(name) ? "slice" : "story")).toEqual([]);
   });
+  test("story's and quick's resolve take the base side of each conflict, as the shipped copies do", () => {
+    for (const name of ["story", "quick"]) expect((listing.workflows[name]!.workflow.steps.resolve as { inputs?: unknown[] }).inputs).toContain("base_side");
+  });
 });
 
 describe("repo skills", () => {

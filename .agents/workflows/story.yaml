@@ -1,10 +1,10 @@
 # Story workflow — repo-local copy of the shipped one, with this repo's check commands and its
 # ci.yml wait. Delivers a story a refinement round planned: sync, cut slices against the current base,
 # approve them, run the slices, update, check, QA the whole story once, describe, open the draft PR,
-# wait for its CI, and wait for a person at ready. The local check runs the unit tier and the type
+# wait for its CI, wait for a person at ready, then at merge for the PR's merge. The local check runs the unit tier and the type
 # check; CI runs every tier, integration and e2e sharded. Story-level rework is reviewed before it is
 # checked again.
-# A story waiting at human-qa or ready goes back through update when the base moved under it in a way
+# A story waiting at human-qa, ready or merge goes back through update when the base moved under it in a way
 # that conflicts (base.stale: conflict).
 name: story
 description: Slice a planned story against the current base, run the slices, verify the story, open the draft PR, wait for CI.
@@ -44,22 +44,56 @@ steps:
   slices:
     type: slices
     outcomes: { done: update, stuck: $stuck }
+  # the light path: when the story holds only base merges and spec-folder bookkeeping (never spec.md)
+  # since the round's latest approve, a merge git made alone (clean) or one a resolver finished
+  # (resolved) skips implement and the full review and describe; anything else is done, the full path
+  # (only an approve the PR already holds counts: open-pr ran after it, or it is at ready or merge;
+  # so a base move before the PR is out never skips a gate or describe)
   update:
     type: git
     action: update
-    outcomes: { done: test, conflict: { to: resolve, counter: base_conflict_loop } }
+    outcomes:
+      done: test
+      clean: test-merge
+      resolved: test-resolution
+      conflict: { to: resolve, counter: base_conflict_loop }
   resolve:
     type: agent
     skill: norn-merge
-    inputs: [spec, handoff]
-    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
+    inputs: [spec, handoff, base_side]
+    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase."
     outcomes:
       done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" }
   test:
     type: check
-    run: "bun install --frozen-lockfile && bun run test && bun run typecheck"
+    run: &test-run "bun install --frozen-lockfile && bun run test && bun run typecheck"
     timeout: 15m
     outcomes: { pass: qa, fail: { to: implement, counter: test_loop } }
+  # the light path's tests run the same command (the anchor above); red is implement's work, which
+  # then takes the full path
+  test-merge:
+    type: check
+    run: *test-run
+    timeout: 15m
+    outcomes: { pass: open-pr, fail: { to: implement, counter: test_loop } }
+  test-resolution:
+    type: check
+    run: *test-run
+    timeout: 15m
+    outcomes: { pass: resolution-review, fail: { to: implement, counter: test_loop } }
+  # reviews only what the resolver changed (each merge's remerge-diff), never the whole story again
+  resolution-review:
+    type: agent
+    skill: norn-review
+    inputs: [spec, resolution]
+    instructions: >-
+      Review only the resolution: each remerge-diff under Inputs is where a merge differs from git's own
+      merge of its parents, a base change the resolver dropped included. Judge whether it keeps the intent
+      of both sides. Report `redescribe` when the merge danger pr.md describes no longer holds.
+    outcomes:
+      approve:           { to: open-pr, means: "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger" }
+      redescribe:        { to: describe, means: "the resolution is sound, but the merge danger pr.md describes changed" }
+      changes_requested: { to: resolve, counter: resolution_loop, means: "blocking findings on the resolution in the receipt" }
   qa:
     type: agent
     skill: norn-qa
@@ -145,11 +179,17 @@ steps:
     outcomes: { pass: ready, fail: { to: implement, counter: ci_loop }, stale: { to: update, counter: stale_loop } }
   ready:
     type: gate
-    prompt: "Read the draft PR. Approve to mark the story finished (a person still merges the PR), or reject with what to change."
+    prompt: "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change."
     outcomes:
-      approve: $done
+      approve: merge
       reject:  { to: implement, counter: ready_loop }
       stale:   { to: update, counter: stale_loop }
+  # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
+  # move it counts as stale (base.stale) sends it back through update by itself
+  merge:
+    type: merge
+    outcomes:
+      stale: { to: update, counter: stale_loop }
 counters:
   slice_loop: { max: 3 }
   test_loop: { max: 5 }
@@ -157,10 +197,13 @@ counters:
   qa_loop: { max: 2 }
   ready_loop: { max: 2 }
   review_loop: { max: 3 }
-  # reset each time their update merges cleanly: only repeated conflicts on one base move count
+  # reset each time their update merges cleanly (on either path): only repeated conflicts on one base move count
   sync_conflict_loop: { max: 2, reset_on: sync.done }
-  base_conflict_loop: { max: 2, reset_on: update.done }
+  base_conflict_loop: { max: 2, reset_on: [update.done, update.clean, update.resolved] }
+  resolution_loop: { max: 2 }
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
-# update-branch re-enters update, not sync (the default would be the first update step)
-base: { stale: conflict, step: update }
+# update-branch re-enters update, not sync (the default would be the first update step); a base move
+# without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once per
+# base move (no push, no CI): red goes back through update like a conflict
+base: { stale: conflict, step: update, verify: test }

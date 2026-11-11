@@ -6,7 +6,7 @@
  * and fast-forward, and the reads the runtime makes (4.1): remotes, commonDir, hasRef, hasPath,
  * show, lsTree, listRefs over several prefixes, firstParentLog, revList, quiet fetch, detached
  * worktrees and prune, and what the commands call (4.2): version, remoteBranches, changedPaths,
- * checkoutPaths and untrack, and what `norn upgrade` calls: move, stage and ignored. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
+ * checkoutPaths and untrack, and what `norn upgrade` calls: move, stage and ignored, and what a base update's light path reads: commitPaths and remergeDiff, and what regenerate does: a merge that keeps its conflicts, takeSide, concludeMerge and abortMerge. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
  * beyond the last commit, and the port methods only the runtime's own wiring reaches.
  */
 import { afterAll, describe, expect } from "bun:test";
@@ -20,14 +20,18 @@ import { type ContractOptions, contractTest } from "./suite.ts";
 export type GitContractTest =
   | "a clone: roots, status, revParse, default branch, last commit time"
   | "commit returns the sha with its trailers; nothing to commit is null"
+  | "log limited to paths lists only the commits that touched them; a squash commit's trailers are its last block"
   | "commit refuses while a merge is in progress and says what is in progress"
   | "branches: create, push, exist locally and on the remote, delete"
   | "worktrees: add on a new branch, list, remove"
   | "refs: updateRef is compare-and-swap; readRef and listRefs see it"
   | "pushRef is compare-and-swap on the remote; a lost race is stale"
   | "push: a non-fast-forward is rejected, a lease the remote moved past is stale"
+  | "push: several refspecs go in one push, a ref outside refs/heads among them"
+  | "push: several refspecs land together or not at all: a rejected branch leaves a forced ref unmoved"
   | "ancestry and divergence"
   | "merge: clean merges commit, conflicts abort and name the paths; mergeTree agrees"
+  | "merge keeping its conflicts: takeSide resolves to a side, concludeMerge commits the merge, abortMerge drops it"
   | "conflictMarkers finds marker lines"
   | "outgoingConflictMarkers names marked files changed by commits not on the remote"
   | "baseMergeCommit is the merge that brought base into head, or null"
@@ -43,7 +47,8 @@ export type GitContractTest =
   | "version names git; remoteBranches lists the remote's branches matching a pattern"
   | "changedPaths lists what two revisions change; checkoutPaths and untrack put paths back"
   | "move stages a rename of a tracked file and leaves an untracked one; stage adds paths to the index"
-  | "ignored names the paths git ignores, never a tracked one";
+  | "ignored names the paths git ignores, never a tracked one"
+  | "commitPaths: first-parent commits of a range with parents, paths and trailers; remergeDiff names what a merge's author changed";
 
 /** Deterministic git for the suite's own setup and for the port under test. */
 export const GIT_ENV = {
@@ -115,6 +120,19 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(last).toMatchObject({ sha, subject: "Edit a", trailers: { "Norn-Story": "gh-1", "Norn-Step": "implement" } });
       expect((await git.status(root)).untracked).toEqual(["b.txt"]);
       expect(await git.commit(root, { message: "nothing", trailers: {}, paths: ["a.txt"] })).toBeNull();
+    });
+
+    t("log limited to paths lists only the commits that touched them; a squash commit's trailers are its last block", async () => {
+      const { root, git } = repo();
+      const from = sh(root, "rev-parse", "HEAD");
+      writeFileSync(join(root, "a.txt"), "squashed\n");
+      sh(root, "add", "a.txt");
+      sh(root, "commit", "-q", "-m", "Login (#5)\n\n* first\n\nNorn-Tick: 01JAAAAAAAAAAAAAAAAAAAAAAA\n\n* second\n\nNorn-Story: gh-5\nNorn-Tick: 01JBBBBBBBBBBBBBBBBBBBBBBB");
+      const squash = sh(root, "rev-parse", "HEAD");
+      commitFile(root, "c.txt", "other\n");
+      expect((await git.log(root, `${from}..HEAD`, undefined, ["a.txt"])).map((c) => ({ sha: c.sha, subject: c.subject, story: c.trailers["Norn-Story"] }))).toEqual([{ sha: squash, subject: "Login (#5)", story: "gh-5" }]);
+      expect(await git.log(root, `${from}..HEAD`, undefined, ["b.txt"])).toEqual([]);
+      expect((await git.log(root, `${from}..HEAD`)).length).toBe(2);
     });
 
     t("commit refuses while a merge is in progress and says what is in progress", async () => {
@@ -197,6 +215,29 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(sh(remote, "rev-parse", "main")).toBe(sh(other, "rev-parse", "HEAD"));
     });
 
+    t("push: several refspecs go in one push, a ref outside refs/heads among them", async () => {
+      const { remote, root, git } = repo();
+      const head = commitFile(root, "d.txt", "both\n");
+      expect(await git.push(root, "origin", ["refs/heads/main:refs/heads/main", "+refs/heads/main:refs/norn/heads/gh-1"])).toEqual({ ok: true });
+      expect(sh(remote, "rev-parse", "main")).toBe(head);
+      expect(sh(remote, "rev-parse", "refs/norn/heads/gh-1")).toBe(head);
+    });
+
+    t("push: several refspecs land together or not at all: a rejected branch leaves a forced ref unmoved", async () => {
+      const { base, remote, root, git } = repo();
+      const start = sh(root, "rev-parse", "HEAD");
+      sh(root, "push", "-q", "origin", "refs/heads/main:refs/norn/heads/gh-1");
+      const other = join(base, "other");
+      sh(base, "clone", "-q", remote, other);
+      commitFile(other, "b.txt", "theirs\n");
+      sh(other, "push", "-q", "origin", "main");
+      commitFile(root, "c.txt", "mine\n");
+      const r = await git.push(root, "origin", ["refs/heads/main:refs/heads/main", "+refs/heads/main:refs/norn/heads/gh-1"]);
+      expect(r.ok === false && r.reason).toBe("rejected");
+      expect(sh(remote, "rev-parse", "main")).toBe(sh(other, "rev-parse", "HEAD"));
+      expect(sh(remote, "rev-parse", "refs/norn/heads/gh-1")).toBe(start);
+    });
+
     t("ancestry and divergence", async () => {
       const { root, git } = repo();
       const init = sh(root, "rev-parse", "HEAD");
@@ -229,6 +270,45 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(await git.merge(root, "clash", { message: "Merge clash", trailers: {} })).toEqual({ ok: false, conflict: true, files: ["a.txt"] });
       expect(await git.inProgress(root)).toEqual({ operation: null, unmerged: [] });
       expect(sh(root, "rev-parse", "HEAD")).toBe(before);
+      expect((await git.status(root)).clean).toBe(true);
+    });
+
+    t("merge keeping its conflicts: takeSide resolves to a side, concludeMerge commits the merge, abortMerge drops it", async () => {
+      const { root, git } = repo();
+      commitFile(root, "gone.txt", "both\n");
+      sh(root, "checkout", "-q", "-b", "base");
+      commitFile(root, "a.txt", "base\n");
+      sh(root, "rm", "-q", "gone.txt");
+      sh(root, "commit", "-q", "-m", "base drops gone");
+      sh(root, "checkout", "-q", "main");
+      commitFile(root, "a.txt", "ours\n");
+      commitFile(root, "gone.txt", "ours changed\n");
+      const before = sh(root, "rev-parse", "HEAD");
+      // kept: the merge stays in progress with its conflicts
+      expect(await git.merge(root, "base", { message: "Merge base", trailers: {} }, { keepConflicts: true })).toEqual({ ok: false, conflict: true, files: ["a.txt", "gone.txt"] });
+      expect(await git.inProgress(root)).toEqual({ operation: "merge", unmerged: ["a.txt", "gone.txt"] });
+      await expect(git.concludeMerge(root, { message: "too early", trailers: {} })).rejects.toThrow(/unmerged/);
+      // dropped even after a path was resolved and rewritten, and with a new file beside it
+      await git.takeSide(root, "base", ["a.txt"]);
+      writeFileSync(join(root, "a.txt"), "rewritten\n");
+      writeFileSync(join(root, "new.txt"), "made by a command\n");
+      await git.abortMerge(root);
+      expect(await git.inProgress(root)).toEqual({ operation: null, unmerged: [] });
+      expect(sh(root, "rev-parse", "HEAD")).toBe(before);
+      expect((await git.status(root)).clean).toBe(true);
+      await expect(git.concludeMerge(root, { message: "no merge", trailers: {} })).rejects.toThrow(/no merge in progress/);
+      // taking the base side of each path (removed where the base has none), plus a new file, concludes as one merge
+      await git.merge(root, "base", { message: "Merge base", trailers: {} }, { keepConflicts: true });
+      await git.takeSide(root, "base", ["a.txt", "gone.txt"]);
+      expect((await git.inProgress(root)).unmerged).toEqual([]);
+      writeFileSync(join(root, "generated.txt"), "regenerated\n");
+      const merge = await git.concludeMerge(root, { message: "Merge base", trailers: { "Norn-Regenerated": "a.txt, gone.txt" } });
+      expect(merge).toBe(sh(root, "rev-parse", "HEAD"));
+      expect(sh(root, "log", "-1", "--format=%P").split(" ")).toEqual([before, sh(root, "rev-parse", "base")]);
+      expect(sh(root, "log", "-1", "--format=%(trailers:key=Norn-Regenerated,valueonly)")).toBe("a.txt, gone.txt");
+      expect(readFileSync(join(root, "a.txt"), "utf8")).toBe("base\n");
+      expect(sh(root, "ls-files")).toBe("a.txt\ngenerated.txt");
+      expect(await git.inProgress(root)).toEqual({ operation: null, unmerged: [] });
       expect((await git.status(root)).clean).toBe(true);
     });
 
@@ -468,6 +548,47 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(await git.ignored(root, ["kept.txt", "skip/x.txt"])).toEqual(["skip/x.txt"]);
       sh(root, "add", "-f", "skip/x.txt");
       expect(await git.ignored(root, ["skip/x.txt"])).toEqual([]);
+    });
+
+    t("commitPaths: first-parent commits of a range with parents, paths and trailers; remergeDiff names what a merge's author changed", async () => {
+      const { root, git } = repo();
+      const anchor = sh(root, "rev-parse", "HEAD");
+      sh(root, "checkout", "-q", "-b", "story");
+      const story = commitFile(root, "a.txt", "story\n");
+      writeFileSync(join(root, "s.md"), "s\n");
+      mkdirSync(join(root, "d"));
+      writeFileSync(join(root, "d", "h.md"), "h\n");
+      sh(root, "add", "-A");
+      sh(root, "commit", "-q", "-m", "bookkeeping\n\nNorn-Step: implement");
+      const book = sh(root, "rev-parse", "HEAD");
+      sh(root, "checkout", "-q", "main");
+      commitFile(root, "b.txt", "base\n");
+      const clashing = commitFile(root, "a.txt", "main\n");
+      sh(root, "checkout", "-q", "story");
+      // a merge git cannot make alone: the resolution is what its author wrote
+      spawnSyncCaptured(["git", "merge", "--no-edit", "main"], { cwd: root, env: { ...process.env, ...GIT_ENV } });
+      writeFileSync(join(root, "a.txt"), "resolved\n");
+      sh(root, "add", "a.txt");
+      sh(root, "commit", "-q", "--no-edit");
+      const resolved = sh(root, "rev-parse", "HEAD");
+      sh(root, "checkout", "-q", "main");
+      commitFile(root, "c.txt", "more base\n");
+      sh(root, "checkout", "-q", "story");
+      sh(root, "merge", "-q", "--no-edit", "main");
+      const clean = sh(root, "rev-parse", "HEAD");
+      const main = sh(root, "rev-parse", "main");
+
+      expect(await git.commitPaths(root, clean, anchor)).toEqual([
+        { sha: clean, parents: [resolved, main], paths: ["c.txt"], trailers: {} },
+        { sha: resolved, parents: [book, clashing], paths: ["a.txt", "b.txt"], trailers: {} },
+        { sha: book, parents: [story], paths: ["d/h.md", "s.md"], trailers: { "Norn-Step": "implement" } },
+        { sha: story, parents: [anchor], paths: ["a.txt"], trailers: {} },
+      ]);
+      expect(await git.commitPaths(root, clean, clean)).toEqual([]);
+      expect(await git.remergeDiff(root, clean)).toEqual([]);
+      expect(await git.remergeDiff(root, resolved)).toEqual(["a.txt"]);
+      // not a merge: nothing to remerge
+      expect(await git.remergeDiff(root, book)).toBeNull();
     });
   });
 }

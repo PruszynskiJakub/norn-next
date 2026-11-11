@@ -26,9 +26,9 @@ export const isParked = (u: Pick<UnitSituation, "status" | "park">, kind: ParkKi
 /** `story start`: a person starts it — parked at an attended step, or a ready agent step in manual mode. */
 export const startable = (u: UnitSituation): boolean => isParked(u, "attended") || (u.status === "ready" && u.step_type === "agent" && u.effective_mode === "manual");
 
-/** `story update-branch`: done (its PR unmerged), at a gate, stuck, or held by drifted skills. */
+/** `story update-branch`: done (its PR unmerged), at a gate or a merge step, stuck, or held by drifted skills. */
 export const waitsForBaseUpdate = (u: Pick<UnitSituation, "status" | "park">, heldBySkillsDrift: boolean): boolean =>
-  u.status === "done" || u.status === "stuck" || isParked(u, "gate") || heldBySkillsDrift;
+  u.status === "done" || u.status === "stuck" || isParked(u, "gate") || isParked(u, "merge") || heldBySkillsDrift;
 
 /** `run rerun`: stuck or parked, a gate or an ask included. */
 export const rerunnable = (u: Pick<UnitSituation, "status">): boolean => u.status === "stuck" || u.status === "parked";

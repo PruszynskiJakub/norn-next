@@ -162,6 +162,35 @@ describe("three files and where keys belong", () => {
     expect(by(await entries(h), "trace.retain")).toMatchObject({ value: "30d", source: "user" });
   });
 
+  test("regenerate is a team key: entries load with their source; a malformed entry is refused with the reason", async () => {
+    expect(by(await entries(h), "regenerate")).toMatchObject({ value: [], source: "built-in", meaning: expect.stringContaining("no agent") });
+    h.write(repoConfigPath(h.root), "regenerate:\n  - { paths: [packages/schema/json/*.json], run: bun run schema:emit }\n  - { paths: [docs/reference.md], run: bun run docs:emit, timeout: 30s }\n");
+    expect(by(await entries(h), "regenerate")).toMatchObject({
+      value: [
+        { paths: ["packages/schema/json/*.json"], run: "bun run schema:emit" },
+        { paths: ["docs/reference.md"], run: "bun run docs:emit", timeout: "30s" },
+      ],
+      source: "repo",
+    });
+    const cases: Array<[string, string]> = [
+      ["regenerate: { paths: [a] }\n", "`regenerate` must be a list of entries with `paths`, `run` and an optional `timeout`"],
+      ["regenerate: [{ paths: [], run: x }]\n", "`regenerate.0.paths` must be a non-empty list of path globs"],
+      ["regenerate: [{ paths: [a] }]\n", "`regenerate.0.run` is required"],
+      ["regenerate: [nope]\n", "`regenerate` must be a list of entries with `paths`, `run` and an optional `timeout`"],
+      ["regenerate: [{ paths: [a], run: x, timeout: soon }]\n", "`regenerate.0.timeout` must be a duration like 2m"],
+      ["regenerate: [{ paths: [a], run: x, shell: zsh }]\n", "unknown key `regenerate.0.shell`"],
+    ];
+    for (const [text, error] of cases) {
+      h.write(repoConfigPath(h.root), text);
+      const r = await h.norn("config", "list", "--json");
+      expect(r.exit).toBe(ExitCode.config);
+      expect(r.value).toMatchObject({ code: "config_invalid", error: `\`${CONFIG_FILES.repo}\`: ${error}` });
+    }
+    h.write(userFile(h), "regenerate: []\n");
+    rmSync(repoConfigPath(h.root), { force: true });
+    expect((await h.norn("config", "list", "--json")).value).toMatchObject({ code: "config_wrong_file" });
+  });
+
   test("B29: herdr on the env's PATH → runner herdr (derived)", async () => {
     const bin = join(h.dir, "bin");
     mkdirSync(bin, { recursive: true });

@@ -262,7 +262,7 @@ export interface ElsewhereView {
 export type { Inbox, InboxEntry };
 
 /** Workflow step type of a timeline row; `unknown` when the pinned workflow is unreadable. */
-export type StepType = "agent" | "check" | "gate" | "git" | "slices" | "unknown";
+export type StepType = "agent" | "check" | "gate" | "git" | "slices" | "merge" | "unknown";
 
 /** Who acted in a step: an agent run, a norn tick, or a person (`user@machine`). */
 export interface StepWho {

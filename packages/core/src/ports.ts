@@ -142,6 +142,15 @@ export interface FirstParentCommit {
   trailer: string;
 }
 
+/** A commit of `GitPort.commitPaths`. */
+export interface CommitPaths {
+  sha: string;
+  parents: string[];
+  /** paths changed against the first parent (all of a root commit's), sorted */
+  paths: string[];
+  trailers: Record<string, string>;
+}
+
 /** Git, run in a given repo or worktree directory (`cwd`). */
 export interface GitPort {
   /** Top-level of the repo containing cwd (main checkout, not the worktree). */
@@ -159,14 +168,22 @@ export interface GitPort {
   lastCommitTime(cwd: string): Promise<number | null>;
   /** `git diff --stat <range>` text */
   diffStat(cwd: string, range: string): Promise<string>;
-  /** commits in range, newest first */
-  log(cwd: string, range: string, limit?: number): Promise<Array<{ sha: string; subject: string; at: number; trailers: Record<string, string> }>>;
+  /** commits in range, newest first; with `paths`, only those that touched one of them (`git log <range> -- <paths>`); trailers are the last trailer block */
+  log(cwd: string, range: string, limit?: number, paths?: readonly string[]): Promise<Array<{ sha: string; subject: string; at: number; trailers: Record<string, string> }>>;
   /**
    * The first-parent line of `rev` (not reachable from `exclude`), newest first, at most
    * `limit` commits, each with its author, ISO author and committer dates and the value of the
    * `trailer` trailer ("" when absent).
    */
   firstParentLog(cwd: string, rev: string, opts: { exclude?: string; limit: number; trailer: string }): Promise<FirstParentCommit[]>;
+  /** The first-parent line of `rev` not reachable from `exclude`, newest first: each commit's parents, the paths it changes and its trailers. */
+  commitPaths(cwd: string, rev: string, exclude: string): Promise<CommitPaths[]>;
+  /**
+   * Paths of the merge commit `sha`'s remerge-diff (`git show --remerge-diff`): where it differs
+   * from the merge git makes alone ([] = git made it alone). null when `sha` is not a merge of two
+   * parents or this git cannot remerge (older than 2.36).
+   */
+  remergeDiff(cwd: string, sha: string): Promise<string[] | null>;
   /** `git rev-list` of `range`: shas, newest first unless `reverse`. */
   revList(cwd: string, range: string, opts?: { ancestryPath?: boolean; firstParent?: boolean; limit?: number; reverse?: boolean }): Promise<string[]>;
   /** The file at `path` in `rev` (`git show <rev>:<path>`); null when there is none. */
@@ -229,8 +246,8 @@ export interface GitPort {
    * `base..head` — or null when there is none (`base` not merged, or reached without a merge).
    */
   baseMergeCommit(cwd: string, base: string, head: string): Promise<string | null>;
-  /** Push a branch (`refspec` like `HEAD:refs/heads/x`), optional force-with-lease. */
-  push(cwd: string, remote: string, refspec: string, opts?: { forceWithLease?: string; setUpstream?: boolean }): Promise<PushResult>;
+  /** Push a branch (`refspec` like `HEAD:refs/heads/x`; several go in one atomic push: all land or none), optional force-with-lease. */
+  push(cwd: string, remote: string, refspec: string | readonly string[], opts?: { forceWithLease?: string; setUpstream?: boolean }): Promise<PushResult>;
   /** Fetch `refspecs` (none: the remote's configured ones), no tags; `quiet` drops progress output. */
   fetch(cwd: string, remote: string, refspecs: string[], opts?: { quiet?: boolean }): Promise<void>;
   /** `git pull --ff-only` equivalent for the current branch. */
@@ -247,9 +264,24 @@ export interface GitPort {
   mergeTree(cwd: string, ours: string, theirs: string): Promise<string[]>;
   /**
    * `git merge --no-ff <rev>` in cwd, committed with `spec.message` and its trailers. On a
-   * conflict the merge is aborted (`git merge --abort`) and the conflicting paths are reported.
+   * conflict the merge is aborted (`git merge --abort`) and the conflicting paths are reported;
+   * with `keepConflicts` it is left in progress instead, its conflicts in the worktree, for
+   * `takeSide` / `concludeMerge` / `abortMerge`.
    */
-  merge(cwd: string, rev: string, spec: Pick<CommitSpec, "message" | "trailers">): Promise<MergeResult>;
+  merge(cwd: string, rev: string, spec: Pick<CommitSpec, "message" | "trailers">, opts?: { keepConflicts?: boolean }): Promise<MergeResult>;
+  /** Each of `paths` in the work tree and index as it is in `rev`, removed where `rev` has none; a conflicted path is resolved so. */
+  takeSide(cwd: string, rev: string, paths: string[]): Promise<void>;
+  /**
+   * Stage every change in the work tree and commit the merge in progress with `spec.message` and its
+   * trailers; returns the merge commit. Throws (nothing committed) when no merge is in progress or a
+   * path is still unmerged.
+   */
+  concludeMerge(cwd: string, spec: Pick<CommitSpec, "message" | "trailers">): Promise<string>;
+  /**
+   * Drop the merge in progress and everything the work tree gained since (`git reset --hard HEAD`,
+   * `git clean -fd`; ignored files stay): only for a merge begun on a clean work tree.
+   */
+  abortMerge(cwd: string): Promise<void>;
 
   readRef(cwd: string, ref: string): Promise<string | null>;
   /** Does `ref` (or any revision) resolve here (`git rev-parse --verify --quiet`)? */

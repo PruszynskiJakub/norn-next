@@ -92,7 +92,7 @@ describe("norn init", () => {
     expect(readFileSync(join(h.home, "config.yaml"), "utf8")).toStartWith("# yaml-language-server: $schema=config.schema.json\n");
     expect(readFileSync(join(h.root, ".agents/norn.config.yaml"), "utf8")).toStartWith("# yaml-language-server: $schema=norn.config.schema.json\n");
     const teamSchema = JSON.parse(readFileSync(join(h.root, ".agents/norn.config.schema.json"), "utf8")) as { properties: Record<string, unknown> };
-    expect(Object.keys(teamSchema.properties).sort()).toEqual(["$schema", "base_branch", "norn_version", "provider", "record", "slice_workflow", "workflow"]);
+    expect(Object.keys(teamSchema.properties).sort()).toEqual(["$schema", "base_branch", "norn_version", "provider", "record", "regenerate", "slice_workflow", "workflow"]);
     // gh-195 B37 (S10 retired): no runs/** line, and no .gitattributes created for norn alone
     expect(existsSync(join(h.root, ".gitattributes"))).toBe(false);
     expect(r.value).not.toHaveProperty("gitattributes");
@@ -418,7 +418,10 @@ describe("a story through the slice workflow", () => {
     expect(kinds(await h.tick())).toEqual(["gh-7 apply_receipts"]);
     expect(h.state(storyRuns())).toMatchObject({ step: "$done", status: "done" });
     expect(h.git(["status", "--porcelain"], storyWt())).toBe("");
-    expect(h.git(["rev-parse", "gh-7-add-login-form"])).toBe(h.git(["ls-remote", "origin", "refs/heads/gh-7-add-login-form"]).split("\t")[0] as string);
+    // With the PR open, the boundary after open-pr moves only the heads ref: the PR head stays the commit open-pr pushed
+    const remoteHead = (ref: string) => h.git(["ls-remote", "origin", ref]).split("\t")[0] as string;
+    expect(h.git(["rev-parse", "gh-7-add-login-form"])).toBe(remoteHead("refs/norn/heads/gh-7"));
+    expect(remoteHead("refs/heads/gh-7-add-login-form")).toBe(h.git(["rev-parse", "gh-7-add-login-form~1"]));
 
     expect(renewals).toContain("gh-7"); // The beat renewed the claim along the way
     const ticks = readTrace(h.root, { types: ["tick"] }).events as TickTrace[];
@@ -462,7 +465,7 @@ describe("norn init in a repository with a test command and no remote", () => {
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ remote: { url: null }, test_command: { command: "npm ci && npm test", detected_from: "package.json", set_in: ["quick.yaml", "slice.yaml", "story.yaml"] } });
     const story = readFileSync(join(workflowsDir(f.root), "story.yaml"), "utf8");
-    expect(story).toContain('run: "npm ci && npm test"');
+    expect(story).toContain('run: &test-run "npm ci && npm test"');
     expect(story).not.toContain("run: bun test");
     expect(r.stdout).toContain("remote          no git remote named origin");
     expect(r.stdout).toContain("Next steps\n  1. Add the remote norn syncs issues from and pushes branches to: `git remote add origin <url>`.\n  2. Check the test command `npm ci && npm test`");

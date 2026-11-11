@@ -18,7 +18,7 @@ import { targetKey, type TargetRule } from "../runtime/target.ts";
 const updatable: TargetRule = {
   verb: "story update-branch",
   story: true,
-  none: "No story waits for a base update (done with an unmerged PR, at a gate, or stuck)",
+  none: "No story waits for a base update (done with an unmerged PR, at a gate or a merge step, or stuck)",
   command: (k) => cmd.storyUpdateBranch(k),
   applies: (_key, u) =>
     // the view carries no skills drift: a unit held by it is not offered
@@ -28,7 +28,7 @@ const updatable: TargetRule = {
 export const storyUpdateBranchCommand = defineCommand({
   name: "story update-branch",
   version: "acts",
-  summary: "Send a waiting story back through its base update: done with an unmerged PR, at a gate, or stuck",
+  summary: "Send a waiting story back through its base update: done with an unmerged PR, at a gate or a merge step, or stuck",
   usage: "norn story update-branch [<story>]",
   positionals: { max: 1 },
   async run(ctx, args) {
@@ -50,9 +50,9 @@ export const storyUpdateBranchCommand = defineCommand({
         if (fm?.status === "done" || sf?.pr?.state === "merged" || sf?.merged_by_ancestry)
           throw refuse(`${t.story} is merged; nothing to update`, cmd.storyView(t.story), "story_merged");
         if (fm?.status === "dropped") throw refuse(`${t.story} is dropped`, cmd.storyView(t.story), "story_dropped");
-        // Skills drift (`false`) holds no unit, so only done, a gate or stuck waits
+        // Skills drift (`false`) holds no unit, so only done, a gate, a merge step or stuck waits
         if (!waitsForBaseUpdate(st, false))
-          throw refuse(`${t.story} is not waiting: it is at ${at(st)}; update re-enters a story that is done, at a gate or stuck`, cmd.storyView(t.story), "not_waiting");
+          throw refuse(`${t.story} is not waiting: it is at ${at(st)}; update re-enters a story that is done, at a gate or a merge step, or stuck`, cmd.storyView(t.story), "not_waiting");
         const wf = t.workflow;
         if (!wf) throw refuse(`${t.story} has no readable pinned workflow`, cmd.runView(t.story, { why: true }), "workflow_missing");
         const step = baseUpdateStep(wf);

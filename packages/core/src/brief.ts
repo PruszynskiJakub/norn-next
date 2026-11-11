@@ -26,6 +26,7 @@ import { cmd } from "./commands.ts";
 import { HANDOFF_MAX_BYTES, HANDOFF_SECTIONS, handoffBytes, handoffCounters, handoffLastOutcome } from "./handoff.ts";
 import { branchRewrittenLine, recordLostLine } from "./apply.ts";
 import { ruleWithReason } from "./hard-rules.ts";
+import { readySince, remergeCommands } from "./ready-carry.ts";
 
 type Runner = ResolvedConfig["runner"]["adapter"];
 
@@ -60,6 +61,27 @@ export interface BriefInput {
    * current round for `_story`), when the caller listed them
    */
   record?: ReadonlyArray<{ unit: string; dir: string }>;
+  /** For the `base_side` input, the base side of each path the base update conflicts in, when the caller gathered it */
+  base_side?: readonly BaseSidePath[] | null;
+}
+
+/**
+ * A base commit that touched a conflicting path: the story that landed it (its `Norn-Story`
+ * trailer; null for a commit made outside norn) and that story's spec and PR body paths on the base,
+ * each null when the base holds none.
+ */
+export interface BaseSideCommit {
+  sha: string;
+  subject: string;
+  story: string | null;
+  spec: string | null;
+  pr: string | null;
+}
+
+/** A conflicting path and the base commits between the merge base and the base sha that touched it, newest first. */
+export interface BaseSidePath {
+  path: string;
+  commits: BaseSideCommit[];
 }
 
 /**
@@ -176,7 +198,7 @@ export interface BriefJson {
      * Base mode: `git: update` stopped on conflicts — merge `sha` (the tip of `ref`) into the
      * story branch in this worktree, resolve, commit the merge; never rebase. Absent otherwise.
      */
-    base?: { ref: string; sha: string; conflicts: string[] };
+    base?: { ref: string; sha: string; conflicts: string[]; side?: BaseSidePath[]; regenerate?: { output: string } };
   } | null;
   /**
    * Checks recorded since the last `done` report — what ran on the code that report
@@ -187,6 +209,11 @@ export interface BriefJson {
   checks: { since: string; items: BriefCheck[] } | null;
   /** Gate rulings of the story, oldest first (the one shown under Rework excepted) */
   rulings: Ruling[];
+  /**
+   * A base merge since the story's ready approval needed a resolution: one remerge-diff command per
+   * merge since that approval, what the resolver changed. null when none did.
+   */
+  resolved_merges: string[] | null;
   context: {
     handoff: string | null;
     /** the handoff's size; `norn done` refuses it past `max`, and the brief cuts it past twice that */
@@ -245,6 +272,7 @@ export function renderBrief(input: BriefInput): Briefing {
     rework: rw,
     checks: checksSince(input, step),
     rulings: rulingsFor(input),
+    resolved_merges: resolvedMerges(input),
     context: { handoff: handoff.text, handoff_bytes: handoff.bytes, handoff_warning: handoff.warning, resume_dropped: handoff.resume_dropped, answers: answers(input), notes: rw ? null : notes(input) },
     log: receiptLog(input),
     handoff_file: `${input.paths.spec_dir}/${unitHandoffPath(input.unit.dir)}`,
@@ -253,6 +281,12 @@ export function renderBrief(input: BriefInput): Briefing {
     limits: limits(input, step),
   };
   return { markdown: markdown(json), json };
+}
+
+function resolvedMerges(input: BriefInput): string[] | null {
+  if (input.unit.slice !== null) return null;
+  const since = readySince(input.workflow, input.receipts);
+  return since?.resolved && since.merges.length ? remergeCommands(since.merges) : null;
 }
 
 function where(input: BriefInput, step: AgentStep): BriefJson["where"] {
@@ -298,6 +332,17 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"], his
         return [{ kind: i, label: "Last failing check", ref: rw?.check ? "see Rework" : "none" }];
       case "last_findings":
         return [{ kind: i, label: "Last findings", ref: rw && (rw.findings || rw.report || rw.decision) ? "see Rework" : hist?.earlier?.findings ? "see Earlier findings" : "none" }];
+      // A remerge-diff is where a merge differs from git's own merge of its parents: what the resolver
+      // changed, a base change it dropped included, and nothing git merged by itself
+      case "resolution": {
+        const merges = resolutionMerges(input.receipts);
+        const purpose = "what the resolver changed against git's own merge, a dropped base change included";
+        return merges.length
+          ? merges.map((sha) => ({ kind: i, label: `Resolution of merge ${sha.slice(0, 12)}`, ref: `git show --remerge-diff ${sha}`, purpose }))
+          : [{ kind: i, label: "Resolution", ref: "none" }];
+      }
+      case "base_side":
+        return [{ kind: i, label: "Base side", ref: rw?.base?.side ? "see Rework › Base update" : "none", purpose: "what the base changed in each conflicting path, and the story that changed it" }];
       // Run state is in the machine dir, not the worktree; evidence is linked by its record path
       case "record":
         return (input.record ?? []).flatMap((u) => [
@@ -306,6 +351,13 @@ function inputs(input: BriefInput, step: AgentStep, rw: BriefJson["rework"], his
         ]);
     }
   });
+}
+
+/** The merge commits, oldest first, of the git summary the latest routed update recorded (anchor = the round's latest approval). */
+function resolutionMerges(receipts: readonly NumberedReceipt[]): string[] {
+  const latest = receipts.findLast((nr) => nr.receipt.kind === "classify" && !!nr.receipt.history)?.receipt;
+  const commits = latest?.kind === "classify" ? (latest.history?.commits ?? []) : [];
+  return commits.filter((c) => c.parents.length > 1).map((c) => c.sha).reverse();
 }
 
 const isFailingCheck = (r: NumberedReceipt): r is NumberedReceipt & { receipt: CheckReceipt } => r.receipt.kind === "check" && r.receipt.outcome === "fail";
@@ -514,6 +566,7 @@ export function receiptLine(r: Receipt): string | null {
     case "stuck":
       return `${at} stuck: ${oneLine(r.reason)}`;
     case "approve":
+      if (r.carried) return `${at} approval carried: ${r.carried}`;
       return `${at} approve${by}${r.comment?.trim() ? `: ${oneLine(r.comment)}` : ""}`;
     case "reject":
       return `${at} reject${by}: ${r.comment?.trim() ? oneLine(r.comment) : "(no comment given)"}`;
@@ -612,8 +665,13 @@ function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
     decision,
     detail: r.kind === "classify" ? (r.detail ?? `${r.step}: ${r.outcome}`) : null,
     // The base the update could not merge, as data (never parsed from `detail`)
-    ...(r.kind === "classify" && r.outcome === "conflict" && r.base ? { base: { ref: r.base.ref, sha: r.base.sha, conflicts: [...r.base.conflicts] } } : {}),
+    ...(r.kind === "classify" && r.outcome === "conflict" && r.base ? { base: { ref: r.base.ref, sha: r.base.sha, conflicts: [...r.base.conflicts], ...baseSide(input, step), ...(r.base.regenerate ? { regenerate: { output: r.base.regenerate.output } } : {}) } } : {}),
   };
+}
+
+function baseSide(input: BriefInput, step: AgentStep): { side?: BaseSidePath[] } {
+  if (!input.base_side || !(step.inputs ?? []).includes("base_side")) return {};
+  return { side: input.base_side.map((p) => ({ path: p.path, commits: p.commits.map((c) => ({ ...c })) })) };
 }
 
 /** The checks recorded after the unit's last `done` report, oldest first; the one under Rework left out. */
@@ -868,6 +926,12 @@ function markdown(b: BriefJson): string {
   for (const i of b.inputs.filter((x) => x.kind !== "last_check" && x.kind !== "last_findings")) out.push(`- ${i.label}: \`${i.ref}\`${i.purpose ? ` — ${i.purpose}` : ""}`);
   out.push("");
 
+  if (b.resolved_merges) {
+    out.push("## Resolved base merges", "", "A base merge since the ready approval needed a resolution. What the resolver changed, per merge:", "");
+    for (const c of b.resolved_merges) out.push(`- \`${c}\``);
+    out.push("");
+  }
+
   out.push("## Context", "");
   if (b.context.answers.length) {
     out.push("Answers to your questions in this step:", "");
@@ -961,8 +1025,38 @@ function reworkLines(out: string[], rw: NonNullable<BriefJson["rework"]>): void 
     out.push(`Merge \`${bs.sha}\` (${branch}) into the story branch in this worktree, resolve, commit the merge; never rebase:`, "");
     out.push("```sh", `git merge --no-ff ${bs.sha}`, "```", "");
     out.push(`Conflicting paths: ${bs.conflicts.length ? bs.conflicts.map((p) => `\`${p}\``).join(", ") : "(not reported)"}`, "");
-    out.push("Resolve each conflict by intent; resolve to existing behaviour only. When no resolution fits without new behaviour, run `git merge --abort` (the worktree stays clean) and report `" + cmd.stuck("<why>") + "`. Otherwise commit the merge, run the checks, and report done. Do not push.", "");
+    if (bs.regenerate) {
+      // a fence longer than any backtick run in the output, so the output cannot close it
+      const fence = "`".repeat(Math.max(3, ...[...bs.regenerate.output.matchAll(/`+/g)].map((m) => m[0].length + 1)));
+      out.push("norn took the base side of the conflicting paths and ran the team's regenerate commands; that did not finish the merge, so it was aborted. What they printed:", "", `${fence}text`, bs.regenerate.output, fence, "");
+    }
+    if (bs.side) baseSideLines(out, bs.sha, bs.side);
+    out.push(
+      "Resolve each conflict by intent; resolve to existing behaviour only. Then commit the merge, run the checks, and report done. Do not push. When you cannot finish it:",
+      "",
+      // An ask keeps the partial resolution: the merge waits in this worktree and the answer resumes this step
+      `- When both sides' intents are valid but keeping both needs a person's decision (which side wins, or a rule neither side has), keep the merge in progress and report \`${cmd.ask()}\` with the files, what each side wants and the decision needed. Leave the merge as it is (no abort, no commit); the answer resumes this step with the merge still in progress.`,
+      `- When you cannot understand the merge (what a side meant, or how the sides fit at all), run \`git merge --abort\` (the worktree stays clean) and report \`${cmd.stuck("<why>")}\`.`,
+      "",
+    );
   }
+}
+
+function baseSideLines(out: string[], sha: string, side: readonly BaseSidePath[]): void {
+  out.push(
+    `Base side — read it first: what the base changed in each conflicting path since the merge base, and the story that changed it. Read that story's spec and PR body on the base (\`git show ${sha}:<path>\`), then resolve by both sides' intent:`,
+    "",
+  );
+  for (const p of side) {
+    out.push(`- \`${p.path}\``);
+    if (!p.commits.length) out.push("  - (no base commit since the merge base touched it)");
+    for (const c of p.commits) {
+      const where = [c.spec ? `spec \`${c.spec}\`` : null, c.pr ? `PR body \`${c.pr}\`` : null].filter(Boolean).join(", ");
+      const story = c.story ? `story ${c.story}${where ? `: ${where}` : ""}` : "no story (made outside norn)";
+      out.push(`  - \`${c.sha.slice(0, 12)}\` ${c.subject} — ${story}`);
+    }
+  }
+  out.push("");
 }
 
 function finishLines(out: string[], b: BriefJson): void {

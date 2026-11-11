@@ -22,6 +22,7 @@ import type {
   Workflow,
 } from "@norn/schema";
 import type { GitInProgress, PaneState, PullRequestCi, RemoteIssue, RemotePullRequest, RunnerCapabilities, SessionRef, WorktreeStatus } from "./ports.ts";
+import type { ReadySince } from "./ready-carry.ts";
 
 /** A file that failed to read or validate. */
 export interface FileError {
@@ -283,6 +284,17 @@ export interface StoryBase {
   conflicts: string[];
 }
 
+/**
+ * Two open stories' heads merged with each other (`git merge-tree`), keys and heads in key order.
+ * `paths` are the conflicted paths, spec folders included ([] = clean); the inbox drops the
+ * paths inside either story's spec folder.
+ */
+export interface StoryOverlap {
+  stories: [string, string];
+  heads: [string, string];
+  paths: string[];
+}
+
 /** A story PR observation (`null` = the remote said there is none) and its time (ms epoch). */
 export interface StoryPrSeen {
   pr: RemotePullRequest | null;
@@ -343,14 +355,31 @@ export interface StoryFacts {
    * unit — an agent's commit while its unit is parked on an ask. Absent = none / not observed.
    */
   foreign_commits?: ForeignCommit[];
+  /**
+   * Paths the local story branch head changes since the known PR head (`pr`, else `pr_seen`) when
+   * that head is an ancestor of the local one: what open-pr has not pushed yet, spec folder included.
+   * Absent = the same head, diverged, or not observed.
+   */
+  pr_unpushed?: string[];
+  /**
+   * The (story head, base sha) of the newest re-verify run in the story unit's receipts of the
+   * round (a check receipt with `verify`): decide orders no second run for that pair. Absent = none.
+   */
+  verified?: { head: string; base: string };
   /** story branch head when the person gave `approve` at the `ready` gate (the approve receipt's `head_sha`) */
   ready_head_sha?: string;
+  /**
+   * What happened since that approval (`readySince` over the story unit's receipts): whether it
+   * carries over, and the merges brought in. Absent = no ready approval in the round, or not observed.
+   */
+  ready_since?: ReadySince;
   /** When that approval was given (the approve receipt's `at`); PRs seen before it are not compared */
   ready_approved_at?: string;
   /**
-   * The known PR head, when every commit after `ready_head_sha` up to it is norn's own for this
-   * story (`Norn-Tick` + `Norn-Story` trailers — the `ready.approve → $done` commit and later state
-   * commits); the head-changed item ignores that head. Absent = moved by someone else, or unknown.
+   * The known PR head, when every commit between it and `ready_head_sha`, in either direction, is
+   * norn's own for this story (`Norn-Tick` + `Norn-Story` trailers — the `ready.approve → $done`
+   * commit after it, or the heads-only boundaries the PR head lacks); the head-changed item ignores
+   * that head. Absent = moved by someone else, or unknown.
    */
   ready_head_norn?: string;
   /**
@@ -459,6 +488,11 @@ export interface Facts {
   superseded?: SupersededRecord[];
   /** Merged stories whose base-branch done record norn stopped retrying (records.json). Absent = none. */
   owed_records?: OwedRecord[];
+  /**
+   * Every pair of stories `overlapEligible` this tick, merged with each other (cached per pair of
+   * heads), clean pairs included. Absent = no pair compared.
+   */
+  overlaps?: StoryOverlap[];
   /** worktrees/branches with no matching unit */
   orphans: { worktrees: string[]; branches: string[] };
   /**

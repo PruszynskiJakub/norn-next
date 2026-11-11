@@ -43,6 +43,7 @@ import {
   checkWorkflowLevel,
   cmd,
   type GitPort,
+  type RemotePort,
   type Ports,
   initialState,
   recordLostLine,
@@ -52,12 +53,13 @@ import {
   sliceWorktreePath,
   storyWorktreePath,
 } from "@norn/core";
-import { ExitCode, type ReceiptOf, recordRef, type RunStory, sliceBranch, sliceDirName, SPEC_FILE, specDir, STORY_UNIT_DIR, ulid, type UnitState, type Workflow } from "@norn/schema";
+import { ExitCode, headsRef, type ReceiptOf, recordRef, type RunStory, sliceBranch, sliceDirName, SPEC_FILE, specDir, STORY_UNIT_DIR, ulid, type UnitState, type Workflow } from "@norn/schema";
 import {
   acquireClaim,
   appendReceipt,
   appendTrace,
   fetchRecordCommit,
+  listRemoteRefs,
   handoffPath,
   listReceipts,
   loadStory,
@@ -290,6 +292,27 @@ function writeLostRound(base: string, key: string, lost: LostRecord, take: TakeF
   return r;
 }
 
+/**
+ * How the heads ref `ref` stands to the remote branch `base`: `ahead` (commits `base` lacks, none
+ * it lacks), `diverged` (each has commits the other lacks), or `behind` (nothing `base` lacks).
+ */
+async function headsVersus(git: GitPort, root: string, ref: string, base: string): Promise<"ahead" | "diverged" | "behind"> {
+  const a = await git.readRef(root, ref);
+  const b = await git.readRef(root, base);
+  if (!a || a === b) return "behind";
+  if (!b || (await git.isAncestor(root, b, a))) return "ahead";
+  return (await git.isAncestor(root, a, b)) ? "behind" : "diverged";
+}
+
+/** The story branch's PR is open on the remote; a provider failure refuses before anything is taken. */
+async function prOpen(remote: RemotePort | null, branch: string, again: string): Promise<boolean> {
+  if (!remote) return false;
+  const pr = await remote.findPullRequest(branch).catch((e: unknown) => {
+    throw failure(`cannot read the pull request of ${branch}: ${(e as Error).message}; nothing was taken`, `check the network, then ${again} again`, "network");
+  });
+  return pr?.state === "open";
+}
+
 /** A local branch that has commits its remote branch does not, and the other way round (norn never resets work). */
 async function divergedFrom(git: GitPort, root: string, branch: string, upstream: string): Promise<boolean> {
   const cur = await git.readRef(root, `refs/heads/${branch}`);
@@ -381,11 +404,11 @@ interface WorktreeRestore {
 }
 
 /** One unit's branch brought here (only created or moved forward) and its worktree equipped; false, with a problem noted, when the branch cannot be. */
-async function checkoutWorktree(w: WorktreeRestore, t: WorktreeTarget, unitKey: string): Promise<boolean> {
+async function checkoutWorktree(w: WorktreeRestore, t: WorktreeTarget, unitKey: string, upstream?: string | null): Promise<boolean> {
   const { git, root, remote } = w;
   const existing = w.wtByBranch.get(t.branch) ?? null;
   const path = existing ?? t.path;
-  const synced = remote ? await syncLocalBranch(git, root, t.branch, `refs/remotes/${remote}/${t.branch}`, existing) : { ok: true as const, local: "up-to-date" as const };
+  const synced = remote ? await syncLocalBranch(git, root, t.branch, upstream ?? `refs/remotes/${remote}/${t.branch}`, existing) : { ok: true as const, local: "up-to-date" as const };
   if (!synced.ok) {
     w.problems.push(`${unitKey}: ${synced.error}`);
     return false;
@@ -428,7 +451,7 @@ async function restoreWorktrees(
   remote: string | null,
   run: RunStory,
   branch: string | null,
-  o: { placedRuns: string; storyState: UnitState | null; nowIso: string; onStoryFailed: (problems: string[]) => Error },
+  o: { storyUpstream: string | null; mergeIn: { rev: string; message: string; trailers: Record<string, string> } | null; placedRuns: string; storyState: UnitState | null; nowIso: string; onStoryFailed: (problems: string[]) => Error },
 ) {
   const root = ctx.root;
   const git = ports.git;
@@ -445,7 +468,12 @@ async function restoreWorktrees(
   const wtByBranch = w.wtByBranch;
 
   const storyWt = branch ? (wtByBranch.get(branch) ?? storyWorktreePath(worktreesDir(root), key, branch.slice(key.length + 1))) : null;
-  if (branch && storyWt && !(await checkoutWorktree(w, { path: storyWt, branch, story: key, slice: null, unit: STORY_UNIT_DIR, spec_dir }, key))) throw o.onStoryFailed(w.problems);
+  if (branch && storyWt && !(await checkoutWorktree(w, { path: storyWt, branch, story: key, slice: null, unit: STORY_UNIT_DIR, spec_dir }, key, o.storyUpstream))) throw o.onStoryFailed(w.problems);
+  if (storyWt && o.mergeIn) {
+    // the merge was checked clean before the claim; a failure here is a worktree that changed meanwhile
+    const m = await git.merge(storyWt, o.mergeIn.rev, { message: o.mergeIn.message, trailers: o.mergeIn.trailers }).catch((e: unknown) => ({ ok: false as const, error: (e as Error).message }));
+    if (!m.ok) throw o.onStoryFailed([`${key}: cannot merge ${o.mergeIn.rev} into ${branch}: ${"files" in m ? `conflicts in ${m.files.join(", ")}` : m.error}`]);
+  }
 
   const snapshot = storyWt ? loadStory(storyWt, join(storyWt, spec_dir)) : null;
   const units: UnitView[] = [];
@@ -545,16 +573,44 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
   const staged = prepared?.staged ?? null;
   try {
     // 3. the branches, then the record's branch commit against the story branch
+    // The story's heads ref holds its real last boundary, which the remote branch may lack (a holder
+    // that crashed before pushing the branch); the take resumes from it
+    let heads = false;
+    // the remote branch to merge into the story worktree once it is here (diverged from the heads ref)
+    let mergeIn: string | null = null;
     if (remote && branch) {
+      const listed = await listRemoteRefs(root, remote, headsRef(key)).catch((e: unknown) => e as Error);
+      if (listed instanceof Error) throw failure(`cannot list ${headsRef(key)} on ${remote}: ${listed.message}; nothing was taken`, `check the network, then ${again} again`, "network");
+      heads = listed.some((r) => r.ref === headsRef(key));
       const f = await git
-        .fetch(root, remote, [`+refs/heads/${branch}:refs/remotes/${remote}/${branch}`, `+refs/heads/${key}/*:refs/remotes/${remote}/${key}/*`], { quiet: true })
+        .fetch(root, remote, [`+refs/heads/${branch}:refs/remotes/${remote}/${branch}`, `+refs/heads/${key}/*:refs/remotes/${remote}/${key}/*`, ...(heads ? [`+${headsRef(key)}:${headsRef(key)}`] : [])], { quiet: true })
         .catch((e: unknown) => e as Error);
       if (f instanceof Error) throw failure(`fetch failed: ${f.message}; nothing was taken`, `check the network, then ${again} again`, "network");
-      if (await divergedFrom(git, root, branch, `refs/remotes/${remote}/${branch}`))
-        throw failure(`${branch} has diverged from ${remote}/${branch}; nothing was taken`, `reconcile ${branch} by hand (norn never resets work), then ${again} again`, "branch_diverged");
+      // Only a heads ref the branch does not contain holds boundaries the branch lacks. The heads ref
+      // moves alone only while the PR is open, so a divergence then is a person's push onto the PR
+      // branch: merged into the heads ref once the worktree is here, neither side dropped or
+      // rewritten, and a merge that would conflict refused before anything is taken. With no PR open
+      // the two move in one push: a divergence is a rewrite of the branch, which is taken as it is
+      const tracking = `refs/remotes/${remote}/${branch}`;
+      let stand = heads ? await headsVersus(git, root, headsRef(key), tracking) : "behind";
+      if (stand === "diverged" && !(await prOpen(ports.remote, branch, again))) stand = "behind";
+      heads = stand !== "behind";
+      if (stand === "diverged") {
+        const clash = await git.mergeTree(root, headsRef(key), tracking);
+        if (clash.length)
+          throw failure(
+            `${headsRef(key)} (the story's last boundary) and ${remote}/${branch} have diverged and merging them conflicts in ${clash.join(", ")}; nothing was taken`,
+            `merge ${headsRef(key)} into ${branch} by hand and push it, then ${again} again`,
+            "branch_diverged",
+          );
+        mergeIn = tracking;
+      }
+      const upstream = heads ? headsRef(key) : `refs/remotes/${remote}/${branch}`;
+      if (await divergedFrom(git, root, branch, upstream))
+        throw failure(`${branch} has diverged from ${heads ? headsRef(key) : `${remote}/${branch}`}; nothing was taken`, `reconcile ${branch} by hand (norn never resets work), then ${again} again`, "branch_diverged");
     }
-    // the story branch as taken: the remote's, else the local one
-    const headRef = branch ? (remote ? `refs/remotes/${remote}/${branch}` : `refs/heads/${branch}`) : null;
+    // the story branch as taken: the heads ref, else the remote branch, else the local one
+    const headRef = branch ? (remote ? (heads ? headsRef(key) : `refs/remotes/${remote}/${branch}`) : `refs/heads/${branch}`) : null;
     // No record on the ref and none of this checkout's own: the record may be lost
     const maybeLost = !prepared && !keepLocal && opts.record !== false;
     const head = headRef && (prepared || maybeLost) ? await git.revParse(root, headRef) : null;
@@ -632,6 +688,8 @@ export async function checkoutStory(ctx: Context, key: string, force: boolean, m
 
     // 5b. branches → worktrees
     const { problems, worktrees, units, storyWt } = await restoreWorktrees(ctx, ports, remote, run, branch, {
+      storyUpstream: headRef,
+      mergeIn: mergeIn ? { rev: mergeIn, message: `norn: ${key} take merges ${branch} into its last boundary`, trailers: { "Norn-Story": key, "Norn-Step": "take", "Norn-Tick": ulid(now) } } : null,
       placedRuns,
       storyState: next.state,
       nowIso,

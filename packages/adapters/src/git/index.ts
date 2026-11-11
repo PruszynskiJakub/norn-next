@@ -6,7 +6,7 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { gitTimeoutMs } from "@norn/store";
-import type { CommitSpec, ConflictMarker, FirstParentCommit, GitFactory, GitInProgress, GitPort, MergeResult, OutgoingMarkers, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
+import type { CommitPaths, CommitSpec, ConflictMarker, FirstParentCommit, GitFactory, GitInProgress, GitPort, MergeResult, OutgoingMarkers, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
 import { bunExec, isAuthError, isNetworkError, okOrThrow, portError, type Exec, type ExecResult } from "../exec.ts";
 
 export { bunExec, fixtureExec, portError, type Exec, type ExecFixture, type ExecOptions, type ExecResult } from "../exec.ts";
@@ -247,10 +247,10 @@ export function createGit(opts: GitOptions = {}): GitPort {
       return t ? Number(t) * 1000 : null;
     },
     diffStat: (cwd, range) => must(cwd, ["diff", "--stat", range]),
-    async log(cwd, range, limit) {
+    async log(cwd, range, limit, paths = []) {
       const args = ["log", "--format=%H%x1f%s%x1f%ct%x1f%(trailers:only,unfold)%x1e"];
       if (limit !== undefined) args.push(`-n${limit}`);
-      const out = await must(cwd, [...args, range, "--"]);
+      const out = await must(cwd, [...args, range, "--", ...paths]);
       return out
         .split("\x1e")
         .map((r) => r.replace(/^\n/, ""))
@@ -271,6 +271,28 @@ export function createGit(opts: GitOptions = {}): GitPort {
         commits.push({ sha: sha as string, subject: subject ?? "", author: author ?? "", authored_at: authored ?? "", committed_at: committed ?? "", trailer: (trailer ?? "").trim() });
       }
       return commits;
+    },
+    async commitPaths(cwd, rev, exclude): Promise<CommitPaths[]> {
+      const out = await must(cwd, ["log", "--first-parent", "--format=%H%x1f%P%x1f%(trailers:only,unfold)%x1e", rev, `^${exclude}`, "--"]);
+      const commits: CommitPaths[] = [];
+      for (const rec of out.split("\x1e")) {
+        const r = rec.replace(/^\n/, "");
+        if (!r) continue;
+        const [sha, parents, trailers] = r.split("\x1f") as [string, string, string];
+        const ps = parents.split(" ").filter(Boolean);
+        const diff = ps[0] ? ["diff-tree", "-r", "--no-commit-id", "--name-only", "-z", ps[0], sha] : ["diff-tree", "-r", "--root", "--no-commit-id", "--name-only", "-z", sha];
+        const paths = (await must(cwd, diff)).split("\0").filter(Boolean).sort();
+        commits.push({ sha, parents: ps, paths, trailers: parseTrailers(trailers ?? "") });
+      }
+      return commits;
+    },
+    async remergeDiff(cwd, sha) {
+      const parents = (await line(cwd, ["log", "-1", "--format=%P", sha])).split(" ").filter(Boolean);
+      if (parents.length !== 2) return null;
+      // an unknown option (git < 2.36) fails: the caller must never read that as a clean merge
+      const r = await run(cwd, ["show", "--remerge-diff", "--format=", "--name-only", "-z", sha, "--"]);
+      if (r.code !== 0) return null;
+      return [...new Set(r.stdout.split("\0").filter(Boolean))].sort();
     },
     async revList(cwd, range, o) {
       const args = ["rev-list"];
@@ -439,7 +461,11 @@ export function createGit(opts: GitOptions = {}): GitPort {
       const args = ["push", "--porcelain"];
       if (o?.forceWithLease !== undefined) args.push(o.forceWithLease ? `--force-with-lease=${o.forceWithLease}` : "--force-with-lease");
       if (o?.setUpstream) args.push("--set-upstream");
-      return classifyPush(await run(cwd, [...args, remote, refspec]));
+      const specs = typeof refspec === "string" ? [refspec] : refspec;
+      // all or nothing: without it a forced refspec lands while its rejected sibling does not,
+      // and the remote holds refs that were meant to move together apart
+      if (specs.length > 1) args.push("--atomic");
+      return classifyPush(await run(cwd, [...args, remote, ...specs]));
     },
     async fetch(cwd, remote, refspecs, o) {
       // LC_ALL=C: callers tell a missing remote branch apart by git's English message
@@ -479,7 +505,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
       if (r.code !== 1) okOrThrow(r, "git merge-tree", "git");
       return [...new Set(lines(r.stdout).slice(1))].sort();
     },
-    async merge(cwd, rev, spec): Promise<MergeResult> {
+    async merge(cwd, rev, spec, opts = {}): Promise<MergeResult> {
       // A merge already in progress is someone's (a resolve agent's): never abort or conclude it
       const busy = await inProgress(cwd);
       if (busy.operation || busy.unmerged.length) throw portError(IN_PROGRESS, `${busy.operation ?? "a merge"} in progress in ${cwd}: not merging ${rev}`);
@@ -493,6 +519,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
       if (r.code !== 0) {
         if (!(await inMerge())) okOrThrow(r, "git merge", "git"); // e.g. dirty tree: not a conflict
         const files = lines((await run(cwd, ["diff", "--name-only", "--diff-filter=U"])).stdout);
+        if (opts.keepConflicts) return { ok: false, conflict: true, files: [...new Set(files)].sort() };
         const abort = await run(cwd, ["merge", "--abort"]);
         if (abort.code !== 0) throw portError("git_merge_abort_failed", `git merge --abort failed: ${abort.stderr.trim()}`);
         return { ok: false, conflict: true, files: [...new Set(files)].sort() };
@@ -502,6 +529,28 @@ export function createGit(opts: GitOptions = {}): GitPort {
       for (const [k, v] of Object.entries(spec.trailers)) args.push("--trailer", `${k}: ${v}`);
       await must(cwd, args, spec.message);
       return { ok: true, head: await head() };
+    },
+    async takeSide(cwd, rev, paths) {
+      for (const path of paths) {
+        if ((await run(cwd, ["cat-file", "-e", `${rev}:${path}`])).code === 0) await must(cwd, ["checkout", rev, "--", path]);
+        else await must(cwd, ["rm", "-q", "-f", "--ignore-unmatch", "--", path]);
+      }
+    },
+    async concludeMerge(cwd, spec) {
+      const busy = await inProgress(cwd);
+      if (busy.operation !== "merge") throw portError("git_no_merge", `no merge in progress in ${cwd}`);
+      if (busy.unmerged.length) throw portError(IN_PROGRESS, `unmerged paths in ${cwd}: ${busy.unmerged.join(", ")}`);
+      await must(cwd, ["add", "-A"]);
+      const args = ["commit", "--no-edit", "-F", "-", "--cleanup=strip"];
+      for (const [k, v] of Object.entries(spec.trailers)) args.push("--trailer", `${k}: ${v}`);
+      await must(cwd, args, spec.message);
+      return line(cwd, ["rev-parse", "HEAD"]);
+    },
+    async abortMerge(cwd) {
+      // `merge --abort` refuses once a command rewrote a staged path; the tree was clean when the merge began
+      const reset = await run(cwd, ["reset", "-q", "--hard", "HEAD"]);
+      if (reset.code !== 0) throw portError("git_merge_abort_failed", `git reset --hard failed: ${reset.stderr.trim()}`);
+      await must(cwd, ["clean", "-fdq"]);
     },
 
     readRef: (cwd, ref) => nullIfFail(cwd, ["rev-parse", "--verify", "--quiet", "--end-of-options", ref]),

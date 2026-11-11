@@ -65,6 +65,39 @@
           ]
         }
       }
+    },
+    "regenerate": {
+      "description": "generated files: path globs and the command that rewrites them, so a base update conflicting only in them needs no agent",
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "paths",
+          "run"
+        ],
+        "properties": {
+          "paths": {
+            "minItems": 1,
+            "description": "path globs, repo-relative, of the files `run` writes",
+            "type": "array",
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "run": {
+            "minLength": 1,
+            "description": "shell command, run at the repo root, that rewrites those files; fast and deterministic",
+            "type": "string"
+          },
+          "timeout": {
+            "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+            "description": "how long `run` may take, a duration like 2m (default 2m)",
+            "type": "string"
+          }
+        }
+      }
     }
   }
 }

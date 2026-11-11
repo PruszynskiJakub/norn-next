@@ -7,10 +7,15 @@
  * and waits (`check.running`), and the tick after it ends applies the receipt. The process also takes
  * the lease over itself as it starts, so one the tick could not identify still holds it. One that dies
  * leaves a dead lease: it is reclaimed and the check runs again.
+ *
+ * A re-verify run (`verify`) runs in a temporary worktree of the merge of the base into the story
+ * head, made from the main checkout and never pushed; `norn check-run` removes it when it ends.
  */
-import { readdirSync } from "node:fs";
-import { join } from "node:path";
-import { type Action, type ActionResult, checkOutcome } from "@norn/core";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { git as gitAdapter } from "@norn/adapters";
+import { type Action, type ActionResult, checkOutcome, type GitPort } from "@norn/core";
 import { assertValid, type CheckOrder, type ReceiptOf, ulid } from "@norn/schema";
 import {
   acquireRunLease,
@@ -51,6 +56,13 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
   });
   if (!lease.ok) throw new QueueFull(`queued: max_agents ${act.config.max_agents} in use`);
   await sweepCheckOrders(act);
+  let verify: CheckOrder["verify"];
+  try {
+    verify = a.verify ? { ...a.verify, repo: act.root, worktree: await mergedTree(act.git, act.root, a.verify) } : undefined;
+  } catch (e) {
+    releaseLease(act.ctx.home, lease.entry.file);
+    throw e;
+  }
   // the process env is inherited by `norn check-run`, not written: the order holds only `.env.norn`, the step env and NORN_HOME
   const env = definedOnly({ ...(readEnvNorn(a.cwd) ?? {}), ...a.env, NORN_HOME: act.root });
   const order: CheckOrder = {
@@ -64,11 +76,12 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
     tick_id: act.tick,
     who: act.obs.facts.machine.holder,
     command: a.command,
-    cwd: a.cwd,
+    cwd: verify?.worktree ?? a.cwd,
     env,
     timeout_ms: a.timeout_ms,
     ...(a.exits ? { exits: a.exits } : {}),
     ports: slotPorts({ ...act.ctx.env, ...env }.PORT_BASE),
+    ...(verify ? { verify } : {}),
   };
   const path = checkOrderPath(act.ctx.home, a.run_id);
   let started = false;
@@ -92,9 +105,34 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
     if (!started) {
       safeUnlink(path);
       releaseLease(act.ctx.home, lease.entry.file);
+      if (verify) await removeMergedTree(gitAdapter.createGit(), verify);
     }
     throw e;
   }
+}
+
+/**
+ * A detached worktree of `head` with `base` merged in, in a fresh temporary folder: the tree the
+ * story would have once its PR merges. The merge commit stays on no branch, so nothing is pushed.
+ */
+async function mergedTree(git: GitPort, root: string, v: { head: string; base: string }): Promise<string> {
+  const worktree = join(mkdtempSync(join(tmpdir(), "norn-verify-")), "wt");
+  try {
+    await git.worktreeAddDetached(root, worktree, v.head);
+    const m = await git.merge(worktree, v.base, { message: `norn: verify ${v.head.slice(0, 7)} merged with base ${v.base.slice(0, 7)}`, trailers: {} });
+    // the base moved into a conflict since observe measured it: the next tick sees that and sends the story through update
+    if (!m.ok) throw new Error(`verify: base ${v.base.slice(0, 7)} no longer merges cleanly into ${v.head.slice(0, 7)}: ${m.files.join(", ")}`);
+    return worktree;
+  } catch (e) {
+    await removeMergedTree(git, { repo: root, worktree });
+    throw e;
+  }
+}
+
+async function removeMergedTree(git: GitPort, v: { repo: string; worktree: string }): Promise<void> {
+  await git.worktreeRemove(v.repo, v.worktree, { force: true }).catch(() => undefined);
+  rmSync(dirname(v.worktree), { recursive: true, force: true });
+  await git.worktreePrune(v.repo).catch(() => undefined);
 }
 
 /** The order runCheck wrote for a run, or null when it is missing or invalid. */
@@ -124,6 +162,7 @@ export async function runCheckOrder(order: CheckOrder, now: () => number): Promi
       duration_ms: res.duration_ms,
       output_tail: tailLines(res.output, 200),
       ...(res.timed_out ? { reason: "timeout" as const } : {}),
+      ...(order.verify ? { verify: { head: order.verify.head, base: order.verify.base } } : {}),
     };
   };
   try {
@@ -141,6 +180,7 @@ export async function runCheckOrder(order: CheckOrder, now: () => number): Promi
     appendReceipt(order.runs_dir, r);
     return r;
   } finally {
+    if (order.verify) await removeMergedTree(gitAdapter.createGit(), order.verify);
     safeUnlink(checkOrderPath(order.home, order.run_id));
     releaseRunLease(order.home, order.lease_file, order.run_id); // one reclaimed meanwhile may be another run's now
   }

@@ -2,7 +2,8 @@
  * Receipt application: a pure fold of numbered receipts over
  * `UnitState` given the unit's pinned workflow. Receipts numbered ≤ applied_through are
  * skipped, so re-applying after a crash is idempotent. Receipts whose step/attempt do not
- * match the cursor are rejected, never applied.
+ * match the cursor are rejected, never applied; a re-verify run's receipt alone applies at the
+ * gate or merge step the story waits at, whichever step it was ordered at.
  */
 import {
   type AgentStep,
@@ -18,7 +19,7 @@ import {
   type Workflow,
 } from "@norn/schema";
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
-import { edgeOf, OVERRIDABLE_ROUTES, stepOf } from "./workflow.ts";
+import { edgeOf, openPrStep, OVERRIDABLE_ROUTES, resetEdges, stepOf } from "./workflow.ts";
 import { cmd } from "./commands.ts";
 import { stepLimits } from "./policy.ts";
 import { toDone, toParked, toReady, toRunning, toStuck } from "./unit-state.ts";
@@ -158,6 +159,7 @@ function enterStep(prev: UnitStateRecord, wf: Workflow, name: string, now: strin
   const step = stepOf(wf, name);
   if (!step) return toStuck(st, parkOf("workflow", `step '${name}' does not exist in workflow ${wf.name}`, now));
   if (step.type === "gate") return toParked(st, parkOf("gate", step.prompt ?? `approve or reject ${name}`, now));
+  if (step.type === "merge") return toParked(st, parkOf("merge", `${name}: waiting for the story's PR to merge`, now));
   if (step.type === "agent" && step.attended) return toParked(st, parkOf("attended", `attended step ${name}: work with the agent in the worktree`, now));
   return st;
 }
@@ -222,7 +224,11 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   // `norn story update-branch` may re-enter a story unit that is done (PR unmerged), at a gate, or stuck
   if (r.kind === "update") return updateFrom(st, r, ctx);
   if (st.step === "$done") return { reject: "unit is done" };
-  if (r.step !== st.step || r.attempt !== st.attempt)
+  // A verify run outlives the park it was ordered at (a person approves `ready` while it runs). Its
+  // pair is cached once written, so refusing it would lose a red run for good: it judges the story
+  // wherever it waits now, and verified() refuses it anywhere but a gate or merge park
+  const verifyRun = r.kind === "check" && !!r.verify && (st.park?.kind === "gate" || st.park?.kind === "merge");
+  if (!verifyRun && (r.step !== st.step || r.attempt !== st.attempt))
     return { reject: `stale: receipt for ${r.step}#${r.attempt}, cursor at ${st.step}#${st.attempt}` };
 
   const step = stepOf(wf, st.step);
@@ -307,6 +313,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       return take(toReady(st), r.kind, r, ctx, lastOutcome(r.kind));
     }
     case "check": {
+      if (r.verify) return verified(st, r, step, ctx, lastOutcome("stale"));
       if (step.type !== "check") return { reject: `${st.step} is a ${step.type} step, not a check` };
       return take(st, r.outcome, r, ctx, lastOutcome(r.outcome));
     }
@@ -379,6 +386,18 @@ function updateFrom(st: UnitState, r: ReceiptOf<"update">, ctx: ApplyContext): S
   return { state: next, log: `update by ${r.who ?? r.by}: ${st.step} → ${r.to}`, advance: { from: st.step, outcome: "update", to: r.to, moved: true } };
 }
 
+/**
+ * A story waiting where the round can end holds changes its PR lacks: it re-enters the workflow's
+ * open-pr step, no edge and no counter, since open-pr makes the PR head the local head and the
+ * guard cannot fire again until something changes the code.
+ */
+function backToOpenPr(st: UnitState, r: ReceiptOf<"classify">, ctx: ApplyContext, last: LastOutcome): Step1 {
+  const to = openPrStep(ctx.workflow);
+  if (!to || (st.park?.kind !== "gate" && st.park?.kind !== "merge")) return { reject: `outcome 'unpushed' cannot be classified at ${st.step}` };
+  const next = { ...enterStep(st, ctx.workflow, to, ctx.now), last_outcome: last };
+  return { state: next, log: `${st.step} unpushed: ${r.detail ?? "changes since open-pr are not on the PR"} → ${to}`, advance: { from: st.step, outcome: "unpushed", to } };
+}
+
 /** Take the declared edge for `outcome` at the cursor, counting it. */
 function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, last: LastOutcome): Step1 {
   const wf = ctx.workflow;
@@ -407,9 +426,9 @@ function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, las
     counters = { ...st.counters, [edge.counter]: value + 1 };
     counter = { name: edge.counter, value: value + 1, max };
   }
-  // Counters declaring `reset_on: <from>.<outcome>` start over (e.g. base_conflict_loop on update.done)
+  // Counters declaring `reset_on: <from>.<outcome>` (or a list holding it) start over (e.g. base_conflict_loop on update.done)
   const reset = Object.entries(wf.counters ?? {})
-    .filter(([name, c]) => c.reset_on === `${from}.${outcome}` && (counters[name] ?? 0) > 0)
+    .filter(([name, c]) => resetEdges(c).includes(`${from}.${outcome}`) && (counters[name] ?? 0) > 0)
     .map(([name]) => name);
   if (reset.length) counters = { ...counters, ...Object.fromEntries(reset.map((c) => [c, 0])) };
   const advance: Advance = { from, outcome, to: edge.to, ...(counter ? { counter } : {}), ...(reset.length ? { reset } : {}) };
@@ -425,6 +444,19 @@ function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, las
 }
 
 /** Tick-classified outcomes. Agent routes: nudge / retry / park, unless the step overrides them. */
+/**
+ * A re-verify run's receipt at the step the story waits at: green leaves it waiting; red takes the
+ * step's `stale` edge (its counter bounds a base that stays broken) and the receipt is the next
+ * step's last_check. Without a `stale` edge the story stays where it is.
+ */
+function verified(st: UnitState, r: ReceiptOf<"check">, step: NonNullable<ReturnType<typeof stepOf>>, ctx: ApplyContext, last: LastOutcome): Step1 {
+  const pair = `${r.verify?.head.slice(0, 7)} + base ${r.verify?.base.slice(0, 7)}`;
+  if ((step.type !== "gate" && step.type !== "merge") || st.park?.kind !== step.type) return { reject: `a verify run applies only while the story waits at a gate or merge step, not at ${st.step}` };
+  if (r.outcome === "pass") return { state: st, log: `verify pass (${pair})` };
+  if (!edgeOf(ctx.workflow, st.step, "stale")) return { state: st, log: `verify ${r.outcome} (${pair}); ${st.step} has no stale route` };
+  return take(toReady(st), "stale", r, ctx, last);
+}
+
 function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<ReturnType<typeof stepOf>>, ctx: ApplyContext, last: LastOutcome): Step1 {
   const o = r.outcome;
   if (o === "exhausted") {
@@ -439,9 +471,14 @@ function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<Ret
       const reason = r.detail ?? `${st.step}: stuck`;
       return { state: { ...toStuck(st, parkOf("stuck", reason, r.at, r.receipt_id)), last_outcome: last }, log: `${st.step} stuck: ${reason}` };
     }
+    if ((step.type === "gate" || step.type === "merge") && o === "unpushed") return backToOpenPr(st, r, ctx, last);
     if (step.type === "gate") {
       // Only `stale` is tick-classified at a gate, and only through a declared route
       if (o !== "stale" || st.park?.kind !== "gate" || !edgeOf(ctx.workflow, st.step, o)) return { reject: `outcome '${o}' cannot be classified at gate ${st.step}` };
+      return take(toReady(st), o, r, ctx, last);
+    }
+    if (step.type === "merge") {
+      if (o !== "stale" || st.park?.kind !== "merge" || !edgeOf(ctx.workflow, st.step, o)) return { reject: `outcome '${o}' cannot be classified at merge step ${st.step}` };
       return take(toReady(st), o, r, ctx, last);
     }
     return take(st, o, r, ctx, last);

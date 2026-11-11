@@ -129,6 +129,14 @@
                           {
                             "const": "record",
                             "type": "string"
+                          },
+                          {
+                            "const": "resolution",
+                            "type": "string"
+                          },
+                          {
+                            "const": "base_side",
+                            "type": "string"
                           }
                         ]
                       },
@@ -658,6 +666,106 @@
                           }
                         }
                       ]
+                    },
+                    "clean": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    "resolved": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
                     }
                   }
                 }
@@ -786,6 +894,80 @@
                   }
                 }
               }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "type",
+                "outcomes"
+              ],
+              "properties": {
+                "type": {
+                  "const": "merge",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "stale": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "means": {
+                              "minLength": 1,
+                              "description": "Shown to the agent in the brief",
+                              "type": "string"
+                            },
+                            "verdict": {
+                              "anyOf": [
+                                {
+                                  "const": "fail",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unverified",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "person",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "pass",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
             }
           ],
           "discriminator": {
@@ -810,9 +992,22 @@
               "type": "integer"
             },
             "reset_on": {
-              "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$",
-              "description": "<step>.<outcome> whose edge resets the counter",
-              "type": "string"
+              "anyOf": [
+                {
+                  "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$",
+                  "description": "<step>.<outcome> whose edge resets the counter",
+                  "type": "string"
+                },
+                {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$",
+                    "description": "<step>.<outcome> whose edge resets the counter",
+                    "type": "string"
+                  }
+                }
+              ]
             }
           }
         }
@@ -835,6 +1030,10 @@
           ]
         },
         "step": {
+          "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+          "type": "string"
+        },
+        "verify": {
           "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
           "type": "string"
         }

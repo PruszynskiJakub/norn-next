@@ -5,7 +5,7 @@
  * - R2.3, T7a: the checkout that lost the claim sets its record aside as superseded in its
  *     machine dir, pushes nothing and shows one Check item.
  *   - R3.1: the loser of an intake race removes its local intake.
- *   - R3.3: release refuses a push that is not a fast-forward and keeps the claim.
+ *   - R3.3: release merges a person's push to the story branch (never rebased) and releases the claim.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
@@ -263,7 +263,7 @@ describe("intake race and release", () => {
     }
   });
 
-  test("R3.3: release refuses a push that is not a fast-forward; the claim and the remote branch stay", async () => {
+  test("R3.3: release merges someone else's push to the story branch with the local one and releases the claim", async () => {
     step();
     expect(all(await A.tick())).toEqual(["gh-10 story.start"]);
     // someone else's commit lands on the remote story branch
@@ -271,11 +271,18 @@ describe("intake race and release", () => {
     sh(h.dir, ["clone", "-q", "-b", BRANCH, h.remoteDir, other]);
     sh(other, ["-c", "user.email=o@example.com", "-c", "user.name=O", "commit", "-q", "--allow-empty", "-m", "outside"]);
     sh(other, ["push", "-q", "origin", BRANCH]);
-    const head = h.git(["ls-remote", "origin", `refs/heads/${BRANCH}`]).split("\t")[0];
+    const outside = h.git(["ls-remote", "origin", `refs/heads/${BRANCH}`]).split("\t")[0] as string;
+    // and a local commit the remote lacks
+    const wt = A.worktree(BRANCH);
+    sh(wt, ["-c", "user.email=a@example.com", "-c", "user.name=A", "commit", "-q", "--allow-empty", "-m", "local"]);
+    const local = sh(wt, ["rev-parse", "HEAD"]);
     const r = await A.norn("story", "handoff", "gh-10");
-    expect(r.exit).not.toBe(0);
-    expect((r.value as { error: string }).error).toContain(`${BRANCH} is not a fast-forward of origin/${BRANCH}`);
-    expect(h.git(["ls-remote", "origin", `refs/heads/${BRANCH}`]).split("\t")[0]).toBe(head);
-    expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-10"])).not.toBe("");
+    expect(r.exit).toBe(0);
+    const head = h.git(["ls-remote", "origin", `refs/heads/${BRANCH}`]).split("\t")[0] as string;
+    expect(head).not.toBe(outside);
+    sh(h.remoteDir, ["merge-base", "--is-ancestor", outside, head]);
+    sh(h.remoteDir, ["merge-base", "--is-ancestor", local, head]);
+    expect(sh(h.remoteDir, ["rev-list", "--parents", "-n", "1", head]).split(" ")).toHaveLength(3);
+    expect(h.git(["ls-remote", "origin", "refs/norn/claims/gh-10"])).toBe("");
   });
 });

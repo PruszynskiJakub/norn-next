@@ -18,12 +18,20 @@ A command a person runs that needs the tick lock (`norn story edit --workflow`, 
 |---|---|---|
 | `~/.norn/config.yaml` | this machine, and your defaults for every repository | machine: `max_agents`, `notify`, `trace.retain` · yours: `mode`, `agent`, `agents.<name>` |
 | `.agents/norn.config.local.yaml` (gitignored) | you, in this repository | `mode`, `agent`, `agents.<name>`: these override the user file |
-| `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow`, `record.policy`, `norn_version` |
+| `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow`, `record.policy`, `regenerate`, `norn_version` |
 | a workflow file | the workflow | top-level `mode`; `defaults:` with `deadline`, `nudges`, `retries`, `stalled` |
 
 For your keys the nearer file wins: local over user over built-in. Maps merge key by key; lists and scalars replace, so `agents: {claude: {model: …}}` keeps Claude's built-in `--permission-mode auto`, while setting `agents.claude.args` replaces that list, and `notify: {ntfy: <url>}` keeps OS notifications. A story's mode is, nearest first: the story's own (`norn story edit --auto|--manual`), its workflow's `mode`, the local file, the user file, then `manual`. A key in the wrong file, or one an older norn used, is refused with the file and key to use instead. `norn config` lists every setting in effect and the file it came from; `norn config set <key> <value>` changes one in the file you name with `--user`, `--local` or `--repo`.
 
 `norn_version` is the repo's norn version: `norn init` records it on a repo with no team file (and refuses a team file with no or a pre-0.30 one), and only `norn upgrade` moves it (`norn config set|unset` refuse it). A binary of another minor, or an earlier patch, is refused by every command that acts, and so is a repo that records no `norn_version` (`version_missing`) or one below 0.30 (`version_too_old`); see [Concepts: the repo's norn version](concepts.md#the-repos-norn-version) and [Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team).
+
+`regenerate` maps generated files to the command that writes them, so a base update whose conflicts are all such files needs no agent: norn takes the base's version of each conflicting path, runs the command of every entry whose `paths` match one, and commits the merge with a `Norn-Regenerated: <paths>` trailer; any conflicting path no entry matches goes to `resolve` as before. Each entry is `{ paths: [<glob>…], run: <command>, timeout: <duration> }`: globs are repo-relative (`*` stays in a folder, `**` crosses folders), the command runs with `sh -c` at the root of the story's worktree, and `timeout` defaults to `2m`. The command holds up the tick while it runs, so it must be fast and deterministic: given the same sources it writes the same files. A command that fails or times out, or a path still conflicted after the commands ran, aborts the merge and sends it to `resolve` with the output in the brief. Map only files no person reviews by hand; never golden cases or snapshots that pin what code decides.
+
+```yaml
+regenerate:
+  - { paths: ["packages/schema/json/*.schema.json"], run: bun run schema:emit }
+  - { paths: [docs/reference.md], run: bun run docs:emit, timeout: 1m }
+```
 
 Everything else has no key. The runner is detected: Herdr when norn runs inside Herdr or `herdr` is installed, otherwise headless. GitHub or GitLab is read from the remote URL (`provider` is only for a self-hosted host). The git remote is the one the base branch tracks, else `origin`. Claims are timed from the tick interval (`norn watch --interval`, `norn tick --interval`). The label `norn`, the sync about every 5 minutes, slots 1–9 with ten ports each from 4010, and the 2-minute attended wait are fixed.
 
@@ -143,7 +151,7 @@ norn story reject [<story|slice>] --reason "…" [--delegated]
 
 ##### `norn story update-branch`
 
-Send a waiting story back through its base update: done with an unmerged PR, at a gate, or stuck
+Send a waiting story back through its base update: done with an unmerged PR, at a gate or a merge step, or stuck
 
 ```sh
 norn story update-branch [<story>]
@@ -528,6 +536,7 @@ norn help [--all] [<command> | <noun> [<verb>]]
 | `slice_workflow` | team | string | `"slice"` |
 | `norn_version` | team | string | `null` |
 | `record.policy` | team | `"local"` or `"remote"` | `"local"` |
+| `regenerate` | team | list of maps | none |
 
 ### Shipped workflows
 

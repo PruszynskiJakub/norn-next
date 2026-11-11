@@ -51,7 +51,19 @@ const STALE_WF: Workflow = {
   counters: { stale_loop: { max: 3 } },
   base: { stale: "behind" },
 };
-const ALL: RepoWorkflows = { ...WORKFLOWS, gitty: loaded(GIT_WF), routed: loaded(ROUTED_WF), staled: loaded(STALE_WF) };
+const MERGE_WF: Workflow = {
+  ...STALE_WF,
+  name: "merging",
+  steps: { ...STALE_WF.steps, ready: { type: "gate", outcomes: { approve: "merge", reject: "$stuck" } }, merge: { type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } } },
+};
+/** Re-verifies a story waiting at its merge step with a check step (`base.verify`). */
+const VERIFY_WF: Workflow = {
+  ...MERGE_WF,
+  name: "verifying",
+  steps: { ...MERGE_WF.steps, test: { type: "check", run: "bun test", timeout: "5m", outcomes: { pass: "ready" } } },
+  base: { stale: "conflict", verify: "test" },
+};
+const ALL: RepoWorkflows = { ...WORKFLOWS, gitty: loaded(GIT_WF), routed: loaded(ROUTED_WF), staled: loaded(STALE_WF), merging: loaded(MERGE_WF), verifying: loaded(VERIFY_WF) };
 
 const agentLease = (run_id: string | null = null): LeaseFile => ({ version: 1, kind: "agent", repo: "/x", story: "gh-9", slice: null, run_id, holder: { pid: 1, pid_start: "1" }, created_at: at() });
 const checkLease = (): LeaseFile => ({ version: 1, kind: "check", repo: "/x", story: "gh-9", slice: null, run_id: null, holder: { pid: 1, pid_start: "1" }, created_at: at() });
@@ -263,6 +275,8 @@ function cases(): RuleCase[] {
 
   // ---- gates and git steps
   out.push(c("a ready unit at a gate step", "gate.wait", facts([story(STORY_WF, ready("ready"))])));
+  out.push(c("a ready unit at a merge step", "merge.wait", facts([story(MERGE_WF, ready("merge"))])));
+  out.push(c("a story waiting at a merge step for its PR", "unit.parked.merge", facts([story(MERGE_WF, { status: "parked", step: "merge", park: { kind: "merge", reason: "merge: waiting for the story's PR to merge", since: at() } })])));
   out.push(c("a git step with no worktree", "git.no_worktree", facts([story(STORY_WF, ready("open-pr"), null, { worktree: null, pr: null }, noWorktree)])));
   out.push(c("open-pr with a PR already open runs again: the body is updated (main 0.9.x)", "git.open-pr", facts([story(STORY_WF, ready("open-pr"), null, { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "h" } })])));
   out.push(c("a push step", "git.push", facts([story(GIT_WF, ready("push"))])));
@@ -273,6 +287,26 @@ function cases(): RuleCase[] {
     const prSeen = { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "c".repeat(40) } as const, observed_at: T0 };
     const { pr: _, ...unfetched } = story(STALE_WF, parked, null, { base, pr_seen: prSeen });
     out.push(c("a stale-routed gate whose base moved, the story PR not fetched this tick", "gate.stale.awaits_sync", facts([unfetched])));
+    // Since the ready approve only a clean base merge and green checks: the approval carries over
+    const merged = { ...base, behind: 0 };
+    out.push(c("a ready gate whose approval carries over a clean base merge", "gate.carried", facts([story(STALE_WF, parked, null, { base: merged, ready_since: { carry: true, resolved: false, merges: ["e".repeat(40)] } })])));
+  }
+  {
+    // Waiting at the merge step, the base moved without a conflict: the base.verify check runs on the merged tree
+    const base = { ref: "refs/remotes/origin/main", sha: "b".repeat(40), head: "c".repeat(40), merge_base: "d".repeat(40), behind: 2, ahead: 1, conflicts: [] };
+    const parked = { status: "parked", step: "merge", park: { kind: "merge", reason: "merge: waiting for the story's PR to merge", since: at() } } as const;
+    const pr = { number: 7, url: "u", state: "open", is_draft: false, head_sha: "c".repeat(40) } as const;
+    out.push(c("a story at its merge step whose base moved cleanly re-verifies the merged tree", "verify.run", facts([story(VERIFY_WF, parked, null, { base, pr })])));
+    const { pr: _, ...unfetched } = story(VERIFY_WF, parked, null, { base, pr_seen: { pr, observed_at: T0 } });
+    out.push(c("the same, the story PR not fetched this tick", "verify.awaits_sync", facts([unfetched])));
+  }
+  {
+    // Waiting at ready past open-pr, the local head holds a code change the open PR lacks
+    const parked = { status: "parked", step: "ready", park: { kind: "gate", reason: "PR ready for review?", since: at() } } as const;
+    const pr = { number: 7, url: "u", state: "open", is_draft: true, head_sha: "c".repeat(40) } as const;
+    out.push(c("a ready gate whose local head changes code the open PR lacks", "open_pr.guard", facts([story(STORY_WF, parked, null, { pr, pr_unpushed: ["src/a.ts"] })])));
+    const { pr: _, ...unfetched } = story(STORY_WF, parked, null, { pr_seen: { pr, observed_at: T0 }, pr_unpushed: ["src/a.ts"] });
+    out.push(c("the same, the story PR not fetched this tick", "open_pr.guard.awaits_sync", facts([unfetched])));
   }
   out.push(c("an update step with no base observed", "git.update.no_base", facts([story(GIT_WF, ready("update"))])));
   {

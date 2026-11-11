@@ -40,6 +40,8 @@ export function nextCommand(unitKey: string, state: UnitState | null, start?: st
     case "parked":
       if (state.park?.kind === "ask") return cmd.storyAnswer(unitKey);
       if (state.park?.kind === "gate") return cmd.storyApprove(unitKey);
+      // the person merges the PR; nothing norn runs answers a merge step
+      if (state.park?.kind === "merge") return null;
       if (state.park?.kind === "attended") return start ?? cmd.brief();
       return unstickCommand(unitKey, state);
     case "ready":

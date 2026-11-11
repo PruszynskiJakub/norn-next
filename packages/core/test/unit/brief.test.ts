@@ -836,3 +836,35 @@ describe("How to work outranks any skill and reaches subagents", () => {
     }
   });
 });
+
+describe("the resolution input: what the resolver did, as one remerge-diff per merge since the last approval", () => {
+  const SHA = (c: string) => c.repeat(40);
+  const STORY = storyUnit();
+  const WF: Workflow = {
+    name: "light",
+    start: "update",
+    steps: {
+      update: { type: "git", action: "update", outcomes: { done: "$done", resolved: "resolution-review", conflict: "$stuck" } },
+      "resolution-review": { type: "agent", skill: "norn-review", inputs: ["spec", "resolution"], outcomes: { approve: { to: "$done", means: "ok" } } },
+    },
+  };
+  const classify = (commits: unknown[]) => (s: UnitState) =>
+    receipt(s, "classify", { outcome: "resolved", rule: "git.update", route: "resolution-review", history: { anchor: SHA("a"), spec_dir: ".agents/specs/gh-1-login", commits } }, "norn");
+  const merge = (c: string, remerge: string[]) => ({ sha: SHA(c), parents: [SHA("p"), SHA("q")], paths: ["src/x.ts"], trailers: {}, from_base: true, remerge });
+  const bookkeeping = { sha: SHA("b"), parents: [SHA("p")], paths: [".agents/specs/gh-1-login/handoffs/story.md"], trailers: {} };
+
+  test("lists one `git show --remerge-diff <sha>` per merge commit since the last approval, oldest first, a clean one included", () => {
+    // the recorded history is newest first: merge 1 is the latest
+    const { st, rs } = history(stateFor(STORY, WF), WF, classify([merge("1", ["src/a.ts"]), bookkeeping, merge("2", [])]));
+    const b = renderBrief(input(st, rs, { unit: STORY, workflow: WF }));
+    expect(st.step).toBe("resolution-review");
+    expect(b.json.inputs.filter((i) => i.kind === "resolution").map((i) => i.ref)).toEqual([`git show --remerge-diff ${SHA("2")}`, `git show --remerge-diff ${SHA("1")}`]);
+    expect(b.markdown).toContain(`\`git show --remerge-diff ${SHA("1")}\``);
+  });
+
+  test("no merge since the last approval: the input says none", () => {
+    const { st, rs } = history(stateFor(STORY, WF), WF, classify([bookkeeping]));
+    const b = renderBrief(input(st, rs, { unit: STORY, workflow: WF }));
+    expect(b.json.inputs.filter((i) => i.kind === "resolution").map((i) => i.ref)).toEqual(["none"]);
+  });
+});

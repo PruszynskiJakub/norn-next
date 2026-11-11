@@ -4,12 +4,13 @@
  * classify receipt, the check receipt, an agent report) fed back as receipts.
  */
 import { describe, expect, test } from "bun:test";
-import { deriveUlid, type Receipt, type UnitState, type Workflow } from "@norn/schema";
+import { type AgentStep, deriveUlid, type LeaseFile, type Receipt, type UnitState, type Workflow, validate } from "@norn/schema";
 import type { Action, Decision } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
-import { renderBrief } from "../../src/brief.ts";
+import { type BaseSidePath, renderBrief } from "../../src/brief.ts";
 import { decide } from "../../src/decide/index.ts";
-import { storyMerged, storyPhase } from "../../src/policy.ts";
+import { askingMidMerge, storyMerged, storyPhase } from "../../src/policy.ts";
+import type { GitInProgress } from "../../src/ports.ts";
 import type { NumberedReceipt, StoryBase, StoryFacts } from "../../src/facts.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
 import { baseUpdateStep, checkWorkflowLevel, isStale, validateWorkflowDefinition } from "../../src/workflow.ts";
@@ -49,9 +50,17 @@ class Sim {
   /** what the next `git: update` effect yields (act's classify receipt, BS3) */
   git: "merge" | "conflict" | "stuck" = "merge";
   /** what the resolve agent reports */
-  agent: "done" | "stuck" = "done";
+  agent: "done" | "stuck" | "ask" = "done";
+  /** the git operation in progress in the story worktree, as observe reports it */
+  inProgress: GitInProgress | undefined = undefined;
   /** the base keeps moving into new conflicts while the agent resolves */
   moving = false;
+  /** what a re-verify run (`run_check` with `verify`) ends in */
+  verifyOutcome: "pass" | "fail" = "pass";
+  /** the machine's live leases (a check slot in use) */
+  leases: LeaseFile[] = [];
+  /** every check run decide ordered */
+  checks: Array<Extract<Action, { kind: "run_check" }>> = [];
   log: string[] = [];
   constructor(
     readonly wf: Workflow,
@@ -69,12 +78,23 @@ class Sim {
   facts() {
     const tick = deriveUlid("01JAAAAAAAAAAAAAAAAAAAAAAA", this.k);
     const uf = unitFacts(storyUnit(), this.wf, this.state, { unapplied: this.receipts.filter((r) => r.n > this.state.applied_through) });
+    if (this.inProgress && uf.worktree) uf.worktree = { ...uf.worktree, in_progress: this.inProgress };
     const fm = { ...storyFacts("gh-1", []).frontmatter!, workflow: this.wf.name };
     const claim: StoryFacts["claim"] = this.claimMine
       ? { state: "mine", sha: "c", blob: { version: 1, story: "gh-1", holder: "jakub@mac", heartbeat_id: HB, acquired_at: at(this.now), renewed_at: at(this.now), expires_at: at(this.now + 600_000), last_tick_id: null } }
       : { state: "none" };
-    const sf = storyFacts("gh-1", [uf], { frontmatter: fm, claim, pr: this.pr, ...(this.prSeen ? { pr_seen: this.prSeen } : {}), ...(this.base ? { base: this.base } : {}) });
-    return facts([sf], { tick_id: tick, repo: { root: "/r", default_branch: "main", remote: "origin", worktrees: "/r-worktrees", ...this.repoPatch } }, this.now);
+    // as observe reads it: the newest verify receipt's pair
+    const verified = this.receipts.map((r) => r.receipt).findLast((r) => r.kind === "check" && r.verify);
+    const sf = storyFacts("gh-1", [uf], {
+      frontmatter: fm,
+      claim,
+      pr: this.pr,
+      ...(this.prSeen ? { pr_seen: this.prSeen } : {}),
+      ...(this.base ? { base: this.base } : {}),
+      ...(verified?.kind === "check" && verified.verify ? { verified: verified.verify } : {}),
+    });
+    const f = facts([sf], { tick_id: tick, repo: { root: "/r", default_branch: "main", remote: "origin", worktrees: "/r-worktrees", ...this.repoPatch } }, this.now);
+    return { ...f, machine: { ...f.machine, leases: this.leases } };
   }
   /** one tick: decide (twice: pure), perform the unit's action like act, return it */
   tick(): Decision {
@@ -103,14 +123,21 @@ class Sim {
         this.write({ kind: "classify", ...head, run_id: a.run_id, by: "norn", outcome: "done", rule: a.rule, detail: "merged", route: "test", base: { ref: u.ref, sha: u.sha, conflicts: [] } });
       }
     }
-    if (a.kind === "run_check") this.write({ kind: "check", ...head, run_id: a.run_id, by: "norn", outcome: "pass", command: a.command, exit_code: 0, duration_ms: 10, output_tail: "ok" });
+    if (a.kind === "run_check") {
+      this.checks.push(a);
+      if (a.verify) {
+        const red = this.verifyOutcome === "fail";
+        this.write({ kind: "check", ...head, run_id: a.run_id, by: "norn", outcome: this.verifyOutcome, command: a.command, exit_code: red ? 1 : 0, duration_ms: 10, output_tail: red ? "FAIL src/a.test.ts: rename broke the call" : "ok", ...(red ? { log: `logs/${a.run_id}.log` } : {}), verify: a.verify });
+      } else this.write({ kind: "check", ...head, run_id: a.run_id, by: "norn", outcome: "pass", command: a.command, exit_code: 0, duration_ms: 10, output_tail: "ok" });
+    }
     if (a.kind === "start_run") {
       const run_id = a.launch.run_id;
       if (this.agent === "done") {
         // the resolve agent merged the base and committed
         if (this.base && !this.moving) this.base = { ...this.base, behind: 0, conflicts: [], head: SHA("8") };
         this.write({ kind: "done", ...head, run_id, by: "agent", outcome: "done", handoff: "merged the base" });
-      } else this.write({ kind: "stuck", ...head, run_id, by: "agent", reason: "a.ts: both sides need a new rule for discounts" });
+      } else if (this.agent === "ask") this.write({ kind: "ask", ...head, run_id, by: "agent", question: "a.ts: keep the story's discount cap or the base's?" });
+      else this.write({ kind: "stuck", ...head, run_id, by: "agent", reason: "a.ts: both sides need a new rule for discounts" });
     }
   }
   /** a person at the gate */
@@ -192,6 +219,85 @@ describe("base sync replay", () => {
     expect(s.log).toEqual(["git.update", "receipts.apply", "agent.start", "receipts.apply", "git.update", "receipts.apply"]);
     // the second update found the story up to date
     expect(s.classifies().at(-1)).toMatchObject({ outcome: "done" });
+  });
+
+  test("2b: a resolve step with the base_side input: the base-update section lists the base side per conflicting path, trailer-less commits without a story", () => {
+    const wf: Workflow = { ...BASE_WF, steps: { ...BASE_WF.steps, resolve: { ...BASE_WF.steps.resolve, inputs: ["spec", "handoff", "base_side"] } as Workflow["steps"][string] } };
+    const s = new Sim(wf);
+    s.base = base({ behind: 4, conflicts: ["a.ts", "b.ts"] });
+    s.git = "conflict";
+    s.runUntil(at_("resolve"));
+    const spec = ".agents/specs/gh-5-login/spec.md";
+    const pr = ".agents/specs/gh-5-login/pr.md";
+    const side: BaseSidePath[] = [
+      {
+        path: "a.ts",
+        commits: [
+          { sha: SHA("1"), subject: "Login form validates", story: "gh-5", spec, pr },
+          { sha: SHA("2"), subject: "hotfix by hand", story: null, spec: null, pr: null },
+        ],
+      },
+      { path: "b.ts", commits: [] },
+    ];
+    const render = (over: { workflow?: Workflow; base_side?: typeof side | null }) =>
+      renderBrief({
+        unit: storyUnit(),
+        state: s.state,
+        workflow: over.workflow ?? wf,
+        mode: "auto",
+        runner: "herdr",
+        paths: { worktree: "/w", spec_dir: "/w/spec", story_file: "/w/spec/story.md", slice_file: null, unit_dir: "/w/spec/runs/_story" },
+        diff_range: null,
+        handoff: null,
+        receipts: s.receipts,
+        limits: { deadline: "60m", nudges: 2, retries: 1, slot: null, port_base: null },
+        ...(over.base_side !== undefined ? { base_side: over.base_side } : {}),
+      });
+    const brief = render({ base_side: side });
+    expect(brief.json.rework?.base).toEqual({ ref: BASE_REF, sha: SHA("b"), conflicts: ["a.ts", "b.ts"], side });
+    expect(brief.json.inputs).toContainEqual(expect.objectContaining({ kind: "base_side", label: "Base side", ref: "see Rework › Base update" }));
+    const md = brief.markdown;
+    const section = md.slice(md.indexOf("### Base update"));
+    // Read before resolving: the base side comes before the resolve guidance
+    expect(section.indexOf("Base side")).toBeLessThan(section.indexOf("Resolve each conflict by intent"));
+    expect(section).toContain(`git show ${SHA("b")}:<path>`);
+    expect(section).toContain(`- \`a.ts\`\n  - \`${SHA("1").slice(0, 12)}\` Login form validates — story gh-5: spec \`${spec}\`, PR body \`${pr}\``);
+    expect(section).toContain(`  - \`${SHA("2").slice(0, 12)}\` hotfix by hand — no story (made outside norn)`);
+    expect(section).toContain("- `b.ts`\n  - (no base commit since the merge base touched it)");
+    // A story whose spec folder has no pr.md on the base: only what is there
+    const noPr = render({ base_side: [{ path: "a.ts", commits: [{ sha: SHA("1"), subject: "s", story: "gh-5", spec, pr: null }] }] }).markdown;
+    expect(noPr).toContain(`— story gh-5: spec \`${spec}\`\n`);
+    // Without the input declared, nothing of the base side shows even when the caller passed it
+    const undeclared = render({ workflow: BASE_WF, base_side: side });
+    expect(undeclared.json.rework?.base).toEqual({ ref: BASE_REF, sha: SHA("b"), conflicts: ["a.ts", "b.ts"] });
+    expect(undeclared.markdown).not.toContain("Base side");
+  });
+
+  test("2c: regenerating did not finish the merge → the resolver's base-update section carries what the commands printed", () => {
+    const s = new Sim(BASE_WF);
+    s.base = base({ behind: 4, conflicts: ["gen/out.json"] });
+    s.git = "conflict";
+    s.runUntil(at_("resolve"));
+    // act tried the team's regenerate commands before going to resolve, and recorded their output
+    const classify = s.classifies().at(-1) as Extract<Receipt, { kind: "classify" }>;
+    const output = "$ bun run schema:emit\nerror: schema.ts: unexpected token\n(exit 1)";
+    classify.base = { ...(classify.base as NonNullable<typeof classify.base>), regenerate: { output } };
+    const brief = renderBrief({
+      unit: storyUnit(),
+      state: s.state,
+      workflow: BASE_WF,
+      mode: "auto",
+      runner: "herdr",
+      paths: { worktree: "/w", spec_dir: "/w/spec", story_file: "/w/spec/story.md", slice_file: null, unit_dir: "/w/spec/runs/_story" },
+      diff_range: null,
+      handoff: null,
+      receipts: s.receipts,
+      limits: { deadline: "60m", nudges: 2, retries: 1, slot: null, port_base: null },
+    });
+    expect(brief.json.rework?.base).toEqual({ ref: BASE_REF, sha: SHA("b"), conflicts: ["gen/out.json"], regenerate: { output } });
+    const section = brief.markdown.slice(brief.markdown.indexOf("### Base update"));
+    expect(section).toContain(`norn took the base side of the conflicting paths and ran the team's regenerate commands; that did not finish the merge, so it was aborted. What they printed:\n\n\`\`\`text\n${output}\n\`\`\``);
+    expect(section.indexOf("regenerate commands")).toBeLessThan(section.indexOf("Resolve each conflict by intent"));
   });
 
   test("3: base_conflict_loop exhausted → $stuck with the reason", () => {
@@ -349,6 +455,85 @@ describe("base sync replay", () => {
     expect(s.state).toMatchObject({ step: "resolve", park: { kind: "stuck", reason: "a.ts: both sides need a new rule for discounts" } });
   });
 
+  describe("ask instead of abort: the resolver may ask with the merge kept in progress", () => {
+    const MERGING: GitInProgress = { operation: "merge", unmerged: ["a.ts"] };
+    const resolveBrief = (s: Sim) =>
+      renderBrief({
+        unit: storyUnit(),
+        state: s.state,
+        workflow: BASE_WF,
+        mode: "auto",
+        runner: "herdr",
+        paths: { worktree: "/w", spec_dir: "/w/spec", story_file: "/w/spec/story.md", slice_file: null, unit_dir: "/w/spec/runs/_story" },
+        diff_range: null,
+        handoff: null,
+        receipts: s.receipts,
+        limits: { deadline: "60m", nudges: 2, retries: 1, slot: null, port_base: null },
+      });
+    const atResolve = () => {
+      const s = new Sim(BASE_WF);
+      s.base = base({ behind: 2, conflicts: ["a.ts"] });
+      s.git = "conflict";
+      s.agent = "ask";
+      return s;
+    };
+
+    test("the base-update section offers norn ask with the merge kept in progress, and keeps abort + norn stuck for a merge it cannot understand", () => {
+      const s = atResolve();
+      s.runUntil(at_("resolve"));
+      const md = resolveBrief(s).markdown;
+      const section = md.slice(md.indexOf("### Base update"));
+      expect(section).toContain('`norn ask "<question>"`');
+      expect(section).toMatch(/keep the merge in progress/i);
+      expect(section).toContain("the files, what each side wants and the decision needed");
+      expect(section).toContain("`git merge --abort`");
+      expect(section).toContain('`norn stuck "<why>"`');
+      expect(section).toMatch(/cannot understand/);
+      // ask comes before abort: the way out that keeps the partial resolution first
+      expect(section.indexOf("norn ask")).toBeLessThan(section.indexOf("git merge --abort"));
+    });
+
+    test("an answer resumes the same resolve step while the merge stays in progress", () => {
+      const s = atResolve();
+      s.runUntil(at_("resolve", "parked"));
+      s.inProgress = MERGING;
+      expect(s.state.park).toMatchObject({ kind: "ask" });
+      const attempt = s.state.attempt;
+      const ask = s.state.park?.receipt_id;
+      s.write({ kind: "answer", receipt_id: deriveUlid("01JFFFFFFFFFFFFFFFFFFFFFFF", s.k), run_id: null, step: "resolve", attempt, at: at(s.now), by: "human", who: "jakub@mac", answer: "keep the story's cap", ...(ask ? { ask_receipt_id: ask } : {}) });
+      const before = s.log.length;
+      s.tick();
+      expect(s.state).toMatchObject({ step: "resolve", attempt, park: null });
+      s.agent = "done";
+      s.moving = true;
+      s.tick();
+      expect(s.state).toMatchObject({ step: "resolve", attempt });
+      expect(s.log.at(-1)).toBe("agent.start");
+      // no new update: the merge in progress is the resolver's, left for it to conclude
+      expect(s.log.slice(before)).not.toContain("git.update");
+    });
+
+    test("askingMidMerge: a unit parked at an ask with a merge in progress in its worktree, nothing else", () => {
+      const s = atResolve();
+      s.runUntil(at_("resolve", "parked"));
+      const story = (inProgress: GitInProgress | undefined) => {
+        s.inProgress = inProgress;
+        return s.facts().stories[0]!;
+      };
+      expect(askingMidMerge(story(MERGING))?.unit.key ?? null).toBe("gh-1");
+      expect(askingMidMerge(story(undefined))?.unit.key ?? null).toBe(null);
+      expect(askingMidMerge(story({ operation: null, unmerged: [] }))?.unit.key ?? null).toBe(null);
+      expect(askingMidMerge(story({ operation: "rebase", unmerged: [] }))?.unit.key ?? null).toBe(null);
+      // a merge in progress while the resolver still runs is no ask
+      const running = atResolve();
+      running.agent = "done";
+      running.moving = true;
+      running.runUntil(at_("resolve", "running"));
+      running.inProgress = MERGING;
+      expect(askingMidMerge(running.facts().stories[0]!)?.unit.key ?? null).toBe(null);
+    });
+  });
+
   test("7b: PR merged into another branch → no cleanup, parked `remote: PR merged into …`; base_branch develop → update and open-pr use it", () => {
     const s = new Sim(BASE_WF);
     s.runUntil(at_("ready", "parked"));
@@ -429,9 +614,299 @@ describe("base sync replay", () => {
     expect(bad.issues).toMatchObject([{ code: "unknown_reset", path: "/counters/stale_loop/reset_on" }]);
   });
 
+  test("reset_on takes a list of edges: a light-path update (clean or resolved) resets the counter like done", () => {
+    const wf: Workflow = {
+      name: "light",
+      start: "update",
+      steps: {
+        update: { type: "git", action: "update", outcomes: { done: "test", clean: "test", resolved: "test", conflict: { to: "resolve", counter: "base_conflict_loop" } } },
+        resolve: { type: "agent", skill: "norn-merge", outcomes: { done: { to: "update", means: "merged" } } },
+        test: { type: "check", run: "true", timeout: "1m", outcomes: { pass: "$done", fail: "$stuck" } },
+      },
+      counters: { base_conflict_loop: { max: 2, reset_on: ["update.done", "update.clean", "update.resolved"] } },
+    };
+    expect(validate("workflow", wf)).toMatchObject({ ok: true });
+    expect(validateWorkflowDefinition(wf).issues).toEqual([]);
+    for (const outcome of ["done", "clean", "resolved"]) {
+      const st = { ...stateFor(storyUnit(), wf), step: "update", status: "running", counters: { base_conflict_loop: 1 } } as UnitState;
+      const res = applyReceipts(st, [{ n: 1, file: "", receipt: { kind: "classify", receipt_id: deriveUlid("01JGGGGGGGGGGGGGGGGGGGGGGG", 2), run_id: null, step: "update", attempt: 1, at: at(), by: "norn", outcome, rule: "git.update", route: "test" } }], { workflow: wf, now: at() });
+      expect({ outcome, advance: res.advance }).toEqual({ outcome, advance: { from: "update", outcome, to: "test", reset: ["base_conflict_loop"] } });
+    }
+    const bad = validateWorkflowDefinition({ ...wf, counters: { base_conflict_loop: { max: 2, reset_on: ["update.done", "update.merged"] } } });
+    expect(bad.issues).toMatchObject([{ code: "unknown_reset", path: "/counters/base_conflict_loop/reset_on/1" }]);
+  });
+
   test("no base observed → update waits", () => {
     const s = new Sim(BASE_WF);
     s.base = undefined;
     expect(s.tick().rule).toBe("git.update.no_base");
+  });
+});
+
+/** BASE_WF with a merge step after ready: an approved story waits there for its PR to merge. */
+const MERGE_WF: Workflow = {
+  ...BASE_WF,
+  name: "merging",
+  steps: {
+    ...BASE_WF.steps,
+    ready: { type: "gate", outcomes: { approve: "merge", reject: "$stuck", stale: { to: "update", counter: "stale_loop" } } },
+    merge: { type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } },
+  },
+};
+const OPEN_PR: NonNullable<StoryFacts["pr"]> = { number: 7, url: "https://github.com/o/r/pull/7", state: "open", is_draft: false, head_sha: SHA("h"), base_branch: "main" };
+
+/** A Sim approved at ready, its story waiting at the merge step with an open PR. */
+function atMerge(wf: Workflow = MERGE_WF): Sim {
+  const s = new Sim(wf);
+  s.pr = OPEN_PR;
+  s.runUntil(at_("ready", "parked"));
+  s.approve();
+  s.tick();
+  return s;
+}
+
+describe("merge step", () => {
+  test("a merge step validates with stale as its only outcome; any other outcome is refused with the reason", () => {
+    expect(validateWorkflowDefinition(MERGE_WF).issues).toEqual([]);
+    const other = validateWorkflowDefinition({ ...MERGE_WF, steps: { ...MERGE_WF.steps, merge: { type: "merge", outcomes: { approve: "$done", stale: { to: "update", counter: "stale_loop" } } } } });
+    expect(other.ok).toBe(false);
+    expect(other.issues.map((i) => i.path)).toContain("/steps/merge/outcomes/approve");
+    expect(other.issues.find((i) => i.path === "/steps/merge/outcomes/approve")?.message).toContain("a merge step has only the outcome 'stale'");
+    // a stale route without a counter loops forever
+    const uncounted = validateWorkflowDefinition({ ...MERGE_WF, steps: { ...MERGE_WF.steps, merge: { type: "merge", outcomes: { stale: "update" } } } });
+    expect(uncounted.issues.some((i) => i.code === "uncounted_cycle")).toBe(true);
+  });
+
+  test("ready approving enters the merge step, which waits for the PR: the story stays active and keeps its claim", () => {
+    const s = atMerge();
+    expect(s.state).toMatchObject({ step: "merge", status: "parked", park: { kind: "merge" } });
+    expect(s.tick().rule).toBe("unit.parked.merge");
+    const story = s.facts().stories[0] as StoryFacts;
+    expect(storyPhase(story, "main")).toEqual({ phase: "active" });
+  });
+
+  test("the inbox shows exactly one item for a story at the merge step: today's merge item, never a gate item", () => {
+    const s = atMerge();
+    s.base = base({ behind: 2 });
+    const inbox = buildInbox(s.facts(), CONFIG);
+    const items = Object.values(inbox.groups).flat().filter((i) => i.story === "gh-1");
+    expect(items).toMatchObject([{ id: "merge:gh-1:7", group: "your_turn", title: "Merge PR #7", command: "gh pr merge 7", detail: "https://github.com/o/r/pull/7 · behind main by 2", url: OPEN_PR.url }]);
+    // a draft PR keeps today's draft note
+    s.pr = { ...OPEN_PR, is_draft: true };
+    expect(buildInbox(s.facts(), CONFIG).groups.your_turn[0]).toMatchObject({ title: "Merge PR #7 (still a draft)", detail: expect.stringContaining("draft: mark it ready first (gh pr ready 7)") });
+  });
+
+  test("the PR merging ends the story through today's merge path; a PR closed unmerged parks it as today", () => {
+    const merged = atMerge();
+    merged.pr = { ...OPEN_PR, state: "merged", merged_at: at(merged.now) };
+    const d = merged.tick();
+    expect(d.rule).toBe("remote.pr_merged");
+    expect(d.action).toMatchObject({ kind: "cleanup_merged_story", story_status: "done", finish: [{ state: { step: "$done", status: "done" } }] });
+
+    const closed = atMerge();
+    closed.pr = { ...OPEN_PR, state: "closed" };
+    const c = closed.tick();
+    expect(c.rule).toBe("remote.park");
+    expect(closed.state).toMatchObject({ status: "stuck", park: { kind: "remote", reason: "remote: PR closed unmerged" } });
+  });
+
+  test("a stale base move sends a story at the merge step back to update through stale_loop, after a sync shows the PR", () => {
+    const s = atMerge();
+    s.base = base({ behind: 3, conflicts: ["a.ts"], sha: SHA("c") });
+    const d = s.tick();
+    expect(d.rule).toBe("gate.stale");
+    expect(s.classifies().at(-1)).toMatchObject({ outcome: "stale", step: "merge", route: "update", detail: "3 behind, conflicts: a.ts" });
+    expect(s.state).toMatchObject({ step: "update", status: "ready", counters: { stale_loop: 1 } });
+    // back through update and ready, into the merge step again
+    s.runUntil(at_("ready", "parked"));
+    s.approve();
+    s.tick();
+    expect(s.state).toMatchObject({ step: "merge", status: "parked" });
+
+    // between syncs, a moved base may be the story's own squash-merged PR: wait for a sync
+    const t = atMerge({ ...MERGE_WF, base: { stale: "behind" } });
+    t.pr = undefined;
+    t.prSeen = { pr: OPEN_PR, observed_at: T0 };
+    t.base = base({ behind: 1, sha: SHA("c") });
+    expect(t.tick().rule).toBe("gate.stale.awaits_sync");
+    t.pr = { ...OPEN_PR, state: "merged", merged_at: at(t.now) };
+    expect(t.tick().rule).toBe("remote.pr_merged");
+
+    // a counter at its max stops the loop
+    const u = atMerge({ ...MERGE_WF, counters: { ...MERGE_WF.counters, stale_loop: { max: 1 } } });
+    u.base = base({ behind: 3, conflicts: ["a.ts"], sha: SHA("c") });
+    u.tick();
+    u.runUntil(at_("ready", "parked"));
+    u.approve();
+    u.tick();
+    u.base = base({ behind: 3, conflicts: ["b.ts"], sha: SHA("d") });
+    u.tick();
+    u.tick();
+    expect(u.state).toMatchObject({ status: "stuck", park: { kind: "exhausted", reason: "stale_loop 1/1 at merge.stale" } });
+  });
+
+  test("nothing at the merge step can be approved or rejected", () => {
+    const s = atMerge();
+    for (const kind of ["approve", "reject"] as const) {
+      const res = applyReceipts(s.state, [{ n: s.state.applied_through + 1, file: "", receipt: { kind, receipt_id: deriveUlid("01JEEEEEEEEEEEEEEEEEEEEEEE", 9), run_id: null, step: "merge", attempt: s.state.attempt, at: at(), by: "human", who: "jakub@mac" } }], { workflow: MERGE_WF, now: at() });
+      expect(res.rejected[0]?.reason).toBe("merge is not a gate waiting for a decision");
+      expect(res.state).toMatchObject({ step: "merge", status: "parked" });
+    }
+  });
+
+  test("story update-branch brings the base in for a story waiting at the merge step", () => {
+    const s = atMerge();
+    const res = applyReceipts(s.state, [{ n: s.state.applied_through + 1, file: "", receipt: { kind: "update", receipt_id: deriveUlid("01JFFFFFFFFFFFFFFFFFFFFFFF", 1), run_id: null, step: "merge", attempt: s.state.attempt, at: at(), by: "human", who: "jakub@mac", from: "merge", to: "update", reason: "person" } as Receipt }], { workflow: MERGE_WF, now: at() });
+    expect(res.rejected).toEqual([]);
+    expect(res.state).toMatchObject({ step: "update", status: "ready" });
+  });
+});
+
+/** The merge step workflow re-verifying waiting stories with its test step. */
+const VERIFY_WF: Workflow = { ...MERGE_WF, name: "verifying", base: { stale: "conflict", verify: "test" } };
+const CHECK_LEASE: LeaseFile = { version: 1, kind: "check", repo: "/x", story: "gh-9", slice: null, run_id: null, holder: { pid: 1, pid_start: "1" }, created_at: at() };
+
+describe("re-verify waiting stories (base.verify)", () => {
+  test("base.verify naming a check step validates; with stale: behind, or naming a step that is not a check, it is refused with the reason", () => {
+    expect(validateWorkflowDefinition(VERIFY_WF).issues).toEqual([]);
+    const behind = validateWorkflowDefinition({ ...VERIFY_WF, base: { stale: "behind", verify: "test" } });
+    expect(behind.issues).toEqual([{ code: "base_verify", path: "/base/verify", message: "base.verify cannot be set with base.stale: behind (any base move already updates the story, so nothing would be verified)" }]);
+    const gate = validateWorkflowDefinition({ ...VERIFY_WF, base: { verify: "ready" } });
+    expect(gate.issues).toEqual([{ code: "base_verify", path: "/base/verify", message: "base.verify 'ready' is a gate step; it must name a check step, whose command norn runs on the merged tree" }]);
+    expect(validateWorkflowDefinition({ ...VERIFY_WF, base: { verify: "nope" } }).issues.map((i) => i.path)).toEqual(["/base/verify"]);
+  });
+
+  test("a story waiting at ready or the merge step whose base moved without a conflict runs the verify check on the merged pair, a check slot taken, nothing pushed", () => {
+    for (const where of ["ready", "merge"] as const) {
+      const s = where === "merge" ? atMerge(VERIFY_WF) : new Sim(VERIFY_WF);
+      if (where === "ready") s.runUntil(at_("ready", "parked"));
+      s.base = base({ behind: 2, sha: SHA("c") });
+      const d = s.tick();
+      expect(d.rule).toBe("verify.run");
+      expect(d.action).toMatchObject({ kind: "run_check", step: where, command: "bun test", timeout_ms: 300_000, verify: { head: SHA("h"), base: SHA("c") } });
+      // a check run: no commit, no push, no PR, no approval
+      expect(Object.keys(d.action).filter((k) => ["commit", "receipts", "state", "update"].includes(k))).toEqual([]);
+      s.tick();
+      expect(s.state).toMatchObject({ step: where, status: "parked" });
+    }
+  });
+
+  test("a verify run already recorded for the story head and base sha is not ordered again; a new base sha orders a new one", () => {
+    const s = atMerge(VERIFY_WF);
+    s.base = base({ behind: 2, sha: SHA("c") });
+    s.tick(); // verify.run
+    s.tick(); // its receipt applied
+    expect(s.tick().rule).toBe("unit.parked.merge");
+    expect(s.tick().rule).toBe("unit.parked.merge");
+    expect(s.checks.filter((c) => c.verify)).toHaveLength(1);
+    s.base = base({ behind: 3, sha: SHA("d") });
+    expect(s.tick().rule).toBe("verify.run");
+    expect(s.checks.filter((c) => c.verify).map((c) => c.verify)).toEqual([{ head: SHA("h"), base: SHA("c") }, { head: SHA("h"), base: SHA("d") }]);
+  });
+
+  test("with no check slot free no verify run is ordered until one is", () => {
+    const s = atMerge(VERIFY_WF);
+    s.leases = Array.from({ length: CONFIG.max_agents }, () => CHECK_LEASE);
+    s.base = base({ behind: 2, sha: SHA("c") });
+    expect(s.tick().rule).toBe("check.queued");
+    expect(s.tick().rule).toBe("check.queued");
+    expect(s.checks.filter((c) => c.verify)).toEqual([]);
+    s.leases = [];
+    expect(s.tick().rule).toBe("verify.run");
+  });
+
+  test("a red verify run takes the waiting step's stale edge to update through stale_loop, the failure the next brief's last_check; a counter at its max stops the loop", () => {
+    const s = atMerge(VERIFY_WF);
+    s.verifyOutcome = "fail";
+    s.base = base({ behind: 2, sha: SHA("c") });
+    s.tick(); // verify.run
+    s.tick(); // red receipt applied
+    expect(s.state).toMatchObject({ step: "update", status: "ready", counters: { stale_loop: 1 }, last_outcome: { step: "merge", outcome: "stale" } });
+    // the next agent step that reads last_check sees the verify failure: the update meets a conflict, resolve takes it
+    const wf: Workflow = { ...VERIFY_WF, steps: { ...VERIFY_WF.steps, resolve: { ...(VERIFY_WF.steps.resolve as AgentStep), inputs: ["spec", "handoff", "last_check"] } } };
+    const r = new Sim(wf);
+    r.pr = OPEN_PR;
+    r.runUntil(at_("ready", "parked"));
+    r.approve();
+    r.tick();
+    r.verifyOutcome = "fail";
+    r.base = base({ behind: 2, sha: SHA("c") });
+    r.tick();
+    r.tick();
+    r.git = "conflict";
+    r.runUntil(at_("resolve"));
+    const brief = renderBrief({
+      unit: storyUnit(),
+      state: r.state,
+      workflow: wf,
+      mode: "auto",
+      runner: "herdr",
+      paths: { worktree: "/w", spec_dir: "/w/spec", story_file: "/w/spec/story.md", slice_file: null, unit_dir: "/w/spec/runs/_story" },
+      diff_range: null,
+      handoff: null,
+      receipts: r.receipts,
+      limits: { deadline: "60m", nudges: 2, retries: 1, slot: null, port_base: null },
+    });
+    expect(brief.json.rework?.check).toMatchObject({ step: "merge", command: "bun test", exit_code: 1, output_tail: expect.stringContaining("rename broke the call") });
+
+    const u = atMerge({ ...VERIFY_WF, counters: { ...VERIFY_WF.counters, stale_loop: { max: 1 } } });
+    u.verifyOutcome = "fail";
+    u.base = base({ behind: 2, sha: SHA("c") });
+    u.tick();
+    u.tick();
+    expect(u.state.step).toBe("update");
+    u.verifyOutcome = "pass";
+    u.runUntil(at_("ready", "parked"));
+    u.approve();
+    u.tick();
+    u.verifyOutcome = "fail";
+    u.base = base({ behind: 1, sha: SHA("d"), head: SHA("9") });
+    u.tick();
+    u.tick();
+    expect(u.state).toMatchObject({ status: "stuck", park: { kind: "exhausted", reason: "stale_loop 1/1 at merge.stale" } });
+  });
+
+  test("a red verify run ordered at ready whose receipt lands after a person approved ready still takes the stale edge from the merge step the story now waits at", () => {
+    const s = new Sim(VERIFY_WF);
+    s.pr = OPEN_PR;
+    s.runUntil(at_("ready", "parked"));
+    s.verifyOutcome = "fail";
+    s.base = base({ behind: 2, sha: SHA("c") });
+    expect(s.tick().rule).toBe("verify.run");
+    // the run is still going: its receipt lands only after the approval moved the story to merge
+    const red = s.receipts.pop()!;
+    s.approve();
+    s.tick();
+    expect(s.state).toMatchObject({ step: "merge", status: "parked" });
+    s.write(red.receipt);
+    s.tick();
+    expect(s.state).toMatchObject({ step: "update", status: "ready", counters: { stale_loop: 1 }, last_outcome: { step: "merge", outcome: "stale" } });
+  });
+
+  test("a green verify run leaves the story where it waits", () => {
+    const s = new Sim(VERIFY_WF);
+    s.runUntil(at_("ready", "parked"));
+    const before = { step: s.state.step, status: s.state.status, counters: s.state.counters };
+    s.base = base({ behind: 2, sha: SHA("c") });
+    s.tick();
+    s.tick();
+    expect(s.state).toMatchObject(before);
+    expect(s.tick().rule).toBe("unit.parked.gate");
+  });
+
+  test("a workflow without base.verify orders no verify run", () => {
+    const s = atMerge(MERGE_WF);
+    s.base = base({ behind: 2, sha: SHA("c") });
+    for (let i = 0; i < 3; i++) expect(s.tick().rule).toBe("unit.parked.merge");
+    expect(s.checks.filter((c) => c.verify)).toEqual([]);
+  });
+
+  test("between syncs a moved base may be the story's own merged PR: the verify waits for a sync", () => {
+    const s = atMerge(VERIFY_WF);
+    s.pr = undefined;
+    s.prSeen = { pr: OPEN_PR, observed_at: T0 };
+    s.base = base({ behind: 1, sha: SHA("c") });
+    expect(s.tick().rule).toBe("verify.awaits_sync");
+    expect(s.checks.filter((c) => c.verify)).toEqual([]);
   });
 });

@@ -19,6 +19,9 @@ import {
   type OwedRecord,
   RE_ENTRY_KINDS,
   readyApproval,
+  readyApprovalReceipt,
+  type ReadySince,
+  readySince,
   recordPushSlot,
   type StepRunFacts,
   type StoryFacts,
@@ -28,7 +31,7 @@ import {
 } from "@norn/core";
 import { type HookFact, type LeaseFile, parseDuration, type ReceiptOf, type RejectedMailboxReceipt, type ResolvedConfig, type RunInfo, storyBranch, type UnitState, type Workflow } from "@norn/schema";
 import type { LoadedConfig } from "./config.ts";
-import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
+import { type BaseFactsCache, type IssueFactsCache, type OverlapFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readOverlapFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
 import { owedRecords, readPendingRecords, readRejectedReceipts } from "./local.ts";
 import { listSuperseded, type SupersededCopy } from "./superseded.ts";
@@ -109,6 +112,10 @@ export interface LocalStory {
   notes?: StoryFacts["notes"];
   /** The story unit's ready approval (`readyApproval`) */
   ready?: { sha: string; at: string };
+  /** What happened since it (`readySince`) */
+  ready_since?: ReadySince;
+  /** The newest re-verify run's pair (`StoryFacts.verified`) */
+  verified?: { head: string; base: string };
   /** The story's refused record push, from its own slot of failures.json (`StoryFacts.record_refused`) */
   record_refused?: ActFailure;
   /** The local record ref's commit while the story unit has no run state (`StoryFacts.record_unplaced`) */
@@ -129,6 +136,8 @@ export interface LocalFacts {
   issue_seen: IssueFactsCache;
   /** The base measurement cache as the last tick left it */
   base: BaseFactsCache;
+  /** The overlap cache as the last tick left it */
+  overlap: OverlapFactsCache;
   /**
    * The running version and the one this checkout's team config records (null = none);
    * absent when no running version was given or the config failed to load.
@@ -197,7 +206,8 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
       const skills_drift = worktree && u.state?.status !== "done" ? drift(worktree) : undefined;
       return skills_drift ? { ...lu, skills_drift } : lu;
     });
-    const ready = readyOf(s, s.units[0], indexOf);
+    const { ready, since } = readyOf(s, s.units[0], indexOf);
+    const verified = s.units[0] ? lastVerify(s, s.units[0], indexOf(s.units[0])) : undefined;
     const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"], indexOf(u)) })));
     const refused = failures[recordPushSlot(s.key)];
     // A record ref here while the story unit has no run state — the record is not in place
@@ -209,6 +219,8 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
       units,
       ...(notes.length ? { notes } : {}),
       ...(ready ? { ready } : {}),
+      ...(since ? { ready_since: since } : {}),
+      ...(verified ? { verified } : {}),
       ...(refused ? { record_refused: refused } : {}),
       ...(unplaced ? { record_unplaced: unplaced } : {}),
       ...(open.length ? { rejected: open } : {}),
@@ -218,7 +230,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   const mainDrift = drift(root);
   const norn =
     opts.running !== undefined && snapshot.config.ok ? { running: opts.running, repo: snapshot.config.config.norn_version ?? null, ...(mainDrift ? { skills_drift: mainDrift } : {}) } : undefined;
-  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root), ...(norn ? { norn } : {}), superseded: listSuperseded(root), owed_records: owedRecords(readPendingRecords(root)) };
+  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root), overlap: readOverlapFacts(root), ...(norn ? { norn } : {}), superseded: listSuperseded(root), owed_records: owedRecords(readPendingRecords(root)) };
 }
 
 /**
@@ -297,7 +309,7 @@ export function baseStoryFacts(
   ls: LocalStory,
   workflows: Readonly<Record<string, { workflow: Workflow | null } | undefined>>,
   config: Pick<ResolvedConfig, "mode" | "workflow">,
-): Pick<StoryFacts, "key" | "slug" | "spec_dir" | "branch" | "frontmatter" | "frontmatter_error" | "mode" | "notes" | "rejected_mailbox" | "record_refused" | "record_unplaced" | "record_only"> {
+): Pick<StoryFacts, "key" | "slug" | "spec_dir" | "branch" | "frontmatter" | "frontmatter_error" | "mode" | "notes" | "ready_since" | "verified" | "rejected_mailbox" | "record_refused" | "record_unplaced" | "record_only"> {
   const s = ls.snapshot;
   const story = s.units[0];
   return {
@@ -309,6 +321,8 @@ export function baseStoryFacts(
     frontmatter_error: s.frontmatter_error,
     mode: storyMode(story?.state, story?.workflow?.workflow ?? workflows[s.frontmatter?.workflow ?? config.workflow]?.workflow, config),
     ...(ls.notes ? { notes: ls.notes } : {}),
+    ...(ls.ready_since ? { ready_since: ls.ready_since } : {}),
+    ...(ls.verified ? { verified: ls.verified } : {}),
     ...(ls.rejected ? { rejected_mailbox: ls.rejected } : {}),
     ...(ls.record_refused ? { record_refused: ls.record_refused } : {}),
     ...(ls.record_unplaced ? { record_unplaced: ls.record_unplaced } : {}),
@@ -316,12 +330,28 @@ export function baseStoryFacts(
   };
 }
 
-/** The story unit's approve and re-entry receipts give its ready approval (with its time). */
-function readyOf(story: StorySnapshot, u: UnitSnapshot | undefined, indexOf: (u: UnitSnapshot) => ReceiptIndex): { sha: string; at: string } | undefined {
+/**
+ * The story unit's approve and re-entry receipts give its ready approval (with its time); the
+ * receipts after that approval give what happened since (`readySince`). Only those few are read; one
+ * that does not read as a receipt leaves `since` out, so nothing is carried on a guess.
+ */
+function readyOf(story: StorySnapshot, u: UnitSnapshot | undefined, indexOf: (u: UnitSnapshot) => ReceiptIndex): { ready?: { sha: string; at: string }; since?: ReadySince } {
   const wf = u?.workflow?.workflow;
-  if (!u || !wf) return undefined;
-  const ready = readyApproval(wf, receiptsOfKinds(story, u, ["approve", ...RE_ENTRY_KINDS], indexOf(u)));
-  return ready ? { sha: ready.sha, at: ready.at } : undefined;
+  if (!u || !wf) return {};
+  const index = indexOf(u);
+  const gate = receiptsOfKinds(story, u, ["approve", ...RE_ENTRY_KINDS], index);
+  const ready = readyApproval(wf, gate);
+  const out = ready ? { ready: { sha: ready.sha, at: ready.at } } : {};
+  const approval = readyApprovalReceipt(wf, gate);
+  if (!approval) return out;
+  const later: NumberedReceipt[] = [];
+  for (const { n } of index.entries.filter((e) => e.n > approval.n)) {
+    const r = index.read(n, story.root);
+    if (!r || !("receipt" in r)) return out;
+    later.push(r);
+  }
+  const since = readySince(wf, [approval, ...later]);
+  return since ? { ...out, since } : out;
 }
 
 /**
@@ -364,6 +394,17 @@ function openRejections(story: StorySnapshot, rejected: readonly RejectedMailbox
       .map((r) => ({ unit: u.unit.key, n: r.n })),
   );
   return mine.filter((x) => !accepted.some((r) => r.n > (x.seen[r.unit] ?? 0)));
+}
+
+/** The (head, base) of the story unit's newest check receipt that records a re-verify run, newest read first. */
+function lastVerify(story: StorySnapshot, u: UnitSnapshot, index: ReceiptIndex): { head: string; base: string } | undefined {
+  // a workflow that verifies nothing never makes one: its check receipts are not opened
+  if (!u.workflow?.workflow?.base?.verify) return undefined;
+  for (const { n } of index.entries.filter((e) => e.kind === "check").reverse()) {
+    const r = index.read(n, story.root);
+    if (r && "receipt" in r && r.receipt.kind === "check" && r.receipt.verify) return { ...r.receipt.verify };
+  }
+  return undefined;
 }
 
 /** Receipts of the given kinds in a unit's runs dir, ascending — read by file name, the others never opened. */

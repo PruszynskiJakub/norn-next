@@ -8,11 +8,13 @@ import {
   type Receipt,
   type RejectedMailboxReceipt,
   claimRef,
+  headsRef,
   isClosedStatus,
   sliceBranch,
   SPEC_FILE,
   type StoryFrontmatter,
   type UnitState,
+  type Workflow,
   roundRunStatePath,
   runStatePath,
   STORY_UNIT_DIR,
@@ -24,14 +26,15 @@ import type { NumberedReceipt, StoryFacts, UnitFacts, UnitRef } from "../facts.t
 import { initialState } from "../apply.ts";
 import { sha256 } from "../hash.ts";
 import { bodyChangedItem } from "../inbox/items.ts";
-import { baseClosed, issueProblem, prProblem, roundFinished, type StoryPhase, stepLabel, storyFinished, storyMerged, storyPhase, storyUnit, WF_LABEL } from "../policy.ts";
+import { baseClosed, issueProblem, prOpen, prProblem, roundFinished, type StoryPhase, stepLabel, storyFinished, storyMerged, storyPhase, storyUnit, WF_LABEL } from "../policy.ts";
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
 import { roundRejected, toCorrupt, toDone } from "../unit-state.ts";
-import { edgeOf, isStale, stepOf } from "../workflow.ts";
+import { edgeOf, isStale, mergeBoundSteps, openPrStep, stepOf } from "../workflow.ts";
+import { carriedApproval } from "../ready-carry.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
 import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitItem } from "./receipts.ts";
-import { baseOf, classifyNorn, hasFlatRecord, recordOf, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit, usableWorkflow } from "./steps.ts";
+import { baseOf, carryApproval, classifyNorn, hasFlatRecord, recordOf, resumeSlices, reverify, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit, usableWorkflow } from "./steps.ts";
 import { cmd } from "../commands.ts";
 
 /**
@@ -241,7 +244,7 @@ function storyLifecycle(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: U
       worktrees: [...(story.worktree?.exists ? [story.worktree.path] : []), ...sliceWts],
       local_branches: [...sliceBranches, story.branch],
       remote_branches: sliceBranches,
-      refs: [claimRef(story.key), ...(story.mailbox ?? []).map((m) => m.ref)],
+      refs: [claimRef(story.key), headsRef(story.key), ...(story.mailbox ?? []).map((m) => m.ref)],
       story_status: "done",
       finish: finishMerged(ctx, story),
     });
@@ -481,6 +484,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
           rule: "slice.done.cleanup",
           cleanup: { worktree: wt, branch_local: kept === null ? branch : null, ...(kept ? { branch_kept: kept } : {}), release_slot: true },
           slice_status: "integrated",
+          ...(prOpen(story) ? { heads: true as const } : {}),
           receipts: [],
           state: null,
           commit: null,
@@ -495,8 +499,8 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       // An implicit ask a later fact shows the agent has moved past resolves itself
       const moved = implicitAskResolved(st, uf);
       if (moved) return resolveImplicitAsk(ctx, story, uf, st, wf, moved);
-      // A story waiting at a gate with a `stale` route goes back to update when the base moved under it
-      if (ref.slice === null && st.park.kind === "gate" && story.base && edgeOf(wf, st.step, "stale") && isStale(wf, story.base)) {
+      // A story waiting at a gate or a merge step with a `stale` route goes back to update when the base moved under it
+      if (ref.slice === null && (st.park.kind === "gate" || st.park.kind === "merge") && story.base && edgeOf(wf, st.step, "stale") && isStale(wf, story.base)) {
         // A base that moved because the story's own PR merged must end the story through the merge
         // path, and only a fetched PR can show that: between syncs a story with a PR waits for one
         if (story.pr === undefined && story.pr_seen?.pr) return ctx.noop(ref, "gate.stale.awaits_sync", `base moved; waiting for a sync to show whether PR #${story.pr_seen.pr.number} merged`);
@@ -504,6 +508,14 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
         const detail = `${b.behind} behind, conflicts: ${b.conflicts.length ? b.conflicts.join(", ") : "none"}`;
         return classifyNorn(ctx, story, uf, st, wf, "stale", "gate.stale", detail, { receiptRule: "base moved", base: baseOf(b) });
       }
+      const unpushed = ref.slice === null && (st.park.kind === "gate" || st.park.kind === "merge") ? unpushedCode(story, wf, st.step) : [];
+      if (unpushed.length) {
+        // Only a fetched PR shows whether the head is still unpushed (a person may have pushed it, or merged)
+        if (story.pr === undefined) return ctx.noop(ref, "open_pr.guard.awaits_sync", `changes since open-pr; waiting for a sync to show PR #${story.pr_seen?.pr?.number ?? "?"}`);
+        return classifyNorn(ctx, story, uf, st, wf, "unpushed", "open_pr.guard", `changes since open-pr are not on the PR: ${unpushed.join(", ")}`);
+      }
+      if (carriedApproval(story, uf, st, wf)) return carryApproval(ctx, story, uf, st, wf);
+      if (reverify(ctx, story, uf, st, wf)) return;
       // Parked keeps the claim; a restart never answers
       return ctx.noop(ref, `unit.parked.${st.park.kind}`, st.park.reason);
     }
@@ -521,6 +533,8 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       return runGit(ctx, story, uf, st, wf, step);
     case "gate":
       return ctx.noop(ref, "gate.wait", "waiting for approve / reject");
+    case "merge":
+      return ctx.noop(ref, "merge.wait", "waiting for the PR to merge");
     case "slices":
       return slicesStep(ctx, story, uf, st, wf);
   }
@@ -577,4 +591,15 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
     // The issue label follows the round; it is never read back as a request for one
     label: story.frontmatter && st.workflow !== r.workflow ? { number: story.frontmatter.number, remove: `${WF_LABEL}${st.workflow}`, add: `${WF_LABEL}${r.workflow}` } : null,
   });
+}
+
+/**
+ * Paths outside the spec folder the local head changes and the open PR lacks, while the story waits
+ * where the round can end; [] = none, or nothing to guard. Spec-folder changes are bookkeeping that
+ * stays local until the next open-pr.
+ */
+function unpushedCode(story: StoryFacts, wf: Workflow, step: string): string[] {
+  if (!story.pr_unpushed?.length || !prOpen(story) || !openPrStep(wf) || !mergeBoundSteps(wf).has(step)) return [];
+  const inSpec = (p: string) => p === story.spec_dir || p.startsWith(`${story.spec_dir}/`);
+  return story.pr_unpushed.filter((p) => !inSpec(p));
 }
