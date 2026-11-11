@@ -1,8 +1,8 @@
 ---
 id: gh-337/02
 title: Heads ref at every boundary; takeover resumes from it
-depends_on: [gh-337/01]
-status: planned
+depends_on: [ gh-337/01 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
