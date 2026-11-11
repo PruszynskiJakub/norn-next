@@ -9,13 +9,13 @@ Every push of the story branch also puts the story's head on `refs/norn/heads/<s
 - AC5: `docs/limitations.md` (Gaps › cross-machine handoff), plus a paragraph in `docs/concepts.md` after the record policies.
 - `bun run test` 1759 pass; `bun run typecheck` clean. Integration files run locally: heads-ref (7 pass), adapters contract (90 pass). The e2e transcripts (base-sync, slice-workflow, recovery-claim-lost) were rewritten with `NORN_TRANSCRIPT_UPDATE=1`; the rework's diff there is only `--atomic` on the story-branch push lines.
 
-Review #1 traceability:
+Review #2 traceability (review #1's finding, the non-atomic push, is fixed):
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
-| AC1 | no PR yet: the branch is pushed as today and the heads ref goes with it at the same commit, in one push | test | `packages/cli/test/integration/heads-ref.test.ts` › "AC1: no PR yet…"; git contract › "push: several refspecs go in one push…" (the push is not atomic: see review finding F1) |
+| AC1 | no PR yet: the branch is pushed as today and the heads ref goes with it at the same commit, in one push | test | `packages/cli/test/integration/heads-ref.test.ts` › "AC1: no PR yet…"; git contract › "push: several refspecs go in one push…" and "push: several refspecs land together or not at all: a rejected branch leaves a forced ref unmoved" |
 | AC2 | `record.policy: remote`: the record is pushed after the heads ref and names its commit (`Norn-Branch-Commit`) | test | heads-ref.test.ts › "AC2: record.policy remote…" |
-| AC3 | a takeover after a crash resumes from the heads ref merged with the remote branch (never rebased), under both policies | test | heads-ref.test.ts › "AC3: record.policy local / remote…" proves only a heads ref ahead of the branch; a diverged heads ref is not merged (finding F1) |
+| AC3 | a takeover after a crash resumes from the heads ref merged with the remote branch (never rebased), under both policies | test | heads-ref.test.ts › "AC3: record.policy local / remote…" (heads ref ahead of the branch) and "AC1/AC3: a person pushed a clashing commit, the take-in fails…" (a rejected push leaves both refs unmoved; B takes the person's commit with the heads ref inside it) |
 | AC4 | the heads ref goes at merged-PR cleanup, `story close` and `norn tidy`; no config key turns the push off | test | `packages/core/test/unit/decide.test.ts` › "PR merged → cleanup, the story's heads ref removed with its claim"; heads-ref.test.ts › "AC4: story close…", "AC4: norn tidy…"; `packages/schema/test/unit/ids-config.test.ts` › "no config key turns the heads ref push off…" |
 | AC5 | `docs/limitations.md`: under `local` a crash still loses the receipts and counters since the last record push; the step restarts at that boundary | agent | QA (agent) |
 
@@ -27,7 +27,7 @@ Review #1 traceability:
 
 ### Not proven yet
 - A heads ref that diverged from the remote branch is **not** merged at takeover; it is taken from the remote branch as today. With the atomic push the two refs only diverge before a PR when the branch is rewritten (force-push), where taking the branch is intended. User story 12 asks for a merge, never a rebase, once a lagging branch makes divergence normal (slice 03). Slice 03 must decide how to tell a person's push from a rewrite. Candidate: merge when the record's `Norn-Branch-Commit` is the heads ref and the branch's old tip is in both.
-- The full integration and e2e tiers run in CI.
+- The e2e tier runs in CI. Review #2 ran the full integration tier locally: 936 pass.
 
 ### Notes
 - `docs/limitations.md`: under `local` the step restarts at the boundary of the last record push, with the counters that record holds. Only a story with no record restarts with fresh counters. AC5 says "fresh counters" for both; the doc says what the code does.
@@ -37,4 +37,4 @@ Review #1 traceability:
 - Friction: none.
 
 ### Resume
-Review the rework: the atomic push (`packages/adapters/src/git/index.ts` push) and its two tests named under Proof.
+QA the slice against AC1-AC5; AC5 (the limitations note) is the agent-verified one.
