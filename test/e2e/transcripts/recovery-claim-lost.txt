@@ -73,7 +73,9 @@
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git rev-parse HEAD
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-9-add-search --not --remotes=origin --
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-9-add-search -- .agents/specs/gh-9-add-search/handoffs/story.md .agents/specs/gh-9-add-search/spec.md
-  spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search
+  spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search +refs/heads/gh-9-add-search:refs/norn/heads/gh-9
+  spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-9-add-search
+  spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git update-ref refs/norn/heads/gh-9 <sha:4>
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/state.json
       {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"51d9743b83bdefcffc2af22c467294a98d957b6a7fca5a1ede44a62a468c618e","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:2>","mode":"auto"}
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/workflow.yaml
@@ -101,7 +103,9 @@
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git add -A -- .agents/specs/gh-9-add-search/handoffs/story.md
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git diff --cached --quiet -- .agents/specs/gh-9-add-search/handoffs/story.md
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-9-add-search --not --remotes=origin --
-  spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search
+  spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search +refs/heads/gh-9-add-search:refs/norn/heads/gh-9
+  spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-9-add-search
+  spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git update-ref refs/norn/heads/gh-9 <sha:4>
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0001-started.json
       {"kind":"started","receipt_id":"<ulid:4>","run_id":"<ulid:3>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:5>","how":"auto","agent":"claude","worktree":"<dir>/home/repos/repo-<id>/worktrees/gh-9-add-search","machine":"tester@box","heartbeat_id":"<ulid:6>"}
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0002-started.json
@@ -117,7 +121,10 @@
   spawn repo-b $ git fetch --quiet --no-tags origin +refs/norn/claims/gh-9:refs/norn/claims/gh-9
   spawn repo-b $ git cat-file blob <sha:3>
   spawn repo-b $ git ls-remote origin refs/norn/runs/gh-9
-  spawn repo-b $ git fetch --quiet --no-tags origin +refs/heads/gh-9-add-search:refs/remotes/origin/gh-9-add-search "+refs/heads/gh-9/*:refs/remotes/origin/gh-9/*"
+  spawn repo-b $ git ls-remote origin refs/norn/heads/gh-9
+  spawn repo-b $ git fetch --quiet --no-tags origin +refs/heads/gh-9-add-search:refs/remotes/origin/gh-9-add-search "+refs/heads/gh-9/*:refs/remotes/origin/gh-9/*" +refs/norn/heads/gh-9:refs/norn/heads/gh-9
+  spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/norn/heads/gh-9
+  spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/gh-9-add-search
   spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-9-add-search
   spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/gh-9-add-search
   spawn repo-b $ git rev-parse --verify --quiet --end-of-options refs/remotes/origin/gh-9-add-search
