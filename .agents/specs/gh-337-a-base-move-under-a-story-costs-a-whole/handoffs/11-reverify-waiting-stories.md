@@ -12,7 +12,7 @@ When the base moves under a story waiting at `ready` or a merge step without a t
 | AC6 | a green verify leaves the story where it waits | test | `base-sync.test.ts` › "a green verify run leaves the story where it waits" |
 | AC7 | a workflow without `base.verify` orders no verify | test | `base-sync.test.ts` › "a workflow without base.verify orders no verify run" |
 
-- implement#2: `bun run test` (1875 pass) and `bun run typecheck` green after the F1 fix.
+- review#2 approved at 128c30bdf: `bun run test` (1875 pass) and `bun run typecheck` re-run green; every criterion traced to a test read and seen to assert it.
 
 ### Easy to miss
 - The verify receipt is a `check` receipt at the *waiting* step (`ready`/`merge`), with `verify: {head, base}`; `apply.ts` › `verified()` handles it before the "not a check step" refusal. Green returns the same state; red does `take(toReady(st), "stale", …)`, so the counter and exhausted path are the stale edge's. With no `stale` edge it stays put (plan D11 said "today's Check item"; none exists for a non-conflicting base, so nothing new is shown).
@@ -23,7 +23,7 @@ When the base moves under a story waiting at `ready` or a merge step without a t
 - Verify runs only after `carriedApproval` and the stale/unpushed checks in the parked branch of decide.
 
 ### Not proven yet
-- review#1 minor (left as notes per the brief): a dead `norn check-run` leaks its norn-verify- worktree (`sweepCheckOrders` does not remove `order.verify`); classify's doc comment now sits above `verified()` in `apply.ts:441`.
+- Minor notes for the person, not rework (review#1, still open at review#2): a killed `norn check-run` leaks its norn-verify- worktree (`sweepCheckOrders` in `cli/src/runtime/act/check.ts:190` unlinks the order without removing `order.verify`); classify's doc comment sits above `verified()` in `apply.ts:446`.
 - Integration and e2e tiers as a whole run in CI.
 
 ### Notes
@@ -33,4 +33,4 @@ When the base moves under a story waiting at `ready` or a merge step without a t
 - F1 fix chosen over "cache only applied receipts": store cannot tell an applied receipt from a refused one without replaying apply (a red verify moves the cursor itself, as does an earlier approve). Known residue: apply has no head, so a verify receipt landing after the head changed while the story is parked again would still apply; head changes pass through non-parked steps, so this needs a run that outlives a whole update round.
 
 ### Resume
-Review the F1 rework: `packages/core/src/apply.ts` (`verifyRun` in applyOne) and the new base-sync test.
+QA the slice against AC1–AC7 (review#2 approved; the findings file has the two minor notes).
