@@ -1,8 +1,8 @@
 ---
 id: gh-337/05
 title: The PR head at merge is the commit CI ran on
-depends_on: [gh-337/03, gh-337/04]
-status: planned
+depends_on: [ gh-337/03, gh-337/04 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
