@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { headsRef, ulid } from "@norn/schema";
-import { appendReceipt, readState, workflowsDir } from "@norn/store";
+import { appendReceipt, inboxOpenPath, readState, workflowsDir } from "@norn/store";
 import { createHarness, type Harness, issue, runChecked, sh, worktreeOf } from "../../../../test/support/harness.ts";
 import { runStateOf } from "../../../../test/support/run-state.ts";
 
@@ -105,6 +105,13 @@ async function atReviewWithPr(n: number, slug: string): Promise<Story> {
 
 const head = (s: Story) => sh(h.root, ["rev-parse", `refs/heads/${s.branch}`]);
 const branchPushes = (s: Story) => pushes().filter((p) => p.includes(`refs/heads/${s.branch}`));
+/** The read model's inbox, as `norn status` shows it, and the tick-side open set. */
+async function inbox(): Promise<string[]> {
+  const v = (await h.norn("status")).value as { groups: Record<string, Array<{ id: string }>> };
+  const open = Object.keys((JSON.parse(h.read(inboxOpenPath(h.root))) as { open: Record<string, unknown> }).open);
+  return [...new Set([...Object.values(v.groups).flatMap((g) => g.map((i) => i.id)), ...open])];
+}
+const headItems = (ids: string[]) => ids.filter((i) => i.startsWith("head:"));
 
 /** A person's own clone of the remote (plain git, no norn). */
 function personClone(name: string): string {
@@ -173,6 +180,24 @@ describe("once the PR is open, the story branch moves only at open-pr", () => {
     expect(remoteRef(`refs/heads/${s.branch}`)).toBe(atOpenPr);
     expect(branchPushes(s).length).toBe(1);
     expect(remoteRef(headsRef(s.key))).toBe(head(s));
+
+    // the PR head is behind the approved head by norn's own commits only: no head change
+    const pr = h.remote.prs.find((p) => p.head === s.branch) as (typeof h.remote.prs)[number];
+    pr.head_sha = atOpenPr as string;
+    await h.tick("--sync");
+    expect(headItems(await inbox())).toEqual([]);
+    // a person's push to the branch after the approval is one
+    const c = personClone("after-ready");
+    sh(c, ["fetch", "-q", "origin", s.branch]);
+    sh(c, ["checkout", "-q", "-B", s.branch, `origin/${s.branch}`]);
+    writeFileSync(join(c, "late.txt"), "late\n");
+    sh(c, ["add", "-A"]);
+    sh(c, ["commit", "-q", "-m", "a late fix"]);
+    sh(c, ["push", "-q", "origin", s.branch]);
+    pr.head_sha = sh(c, ["rev-parse", "HEAD"]);
+    h.clock.advance(10_000);
+    await h.tick("--sync");
+    expect(headItems(await inbox())).toEqual([`head:${s.key}:${pr.head_sha}`]);
   });
 
   test("AC6: a person's push to the story branch while norn holds local boundaries is merged at open-pr, never rebased", async () => {

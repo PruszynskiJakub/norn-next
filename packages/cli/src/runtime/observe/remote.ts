@@ -26,10 +26,14 @@ export async function mergedByAncestry(git: GitPort, root: string, remote: strin
   return git.isAncestor(root, head, baseRef).catch(() => false);
 }
 
-/** The story's ready approval (store), and `ready_head_norn` when the known PR head moved past it by norn's own commits of the story only. */
+/**
+ * The story's ready approval (store), and `ready_head_norn` when the known PR head and the head the
+ * approval let through are apart by norn's own commits of the story only, either way: past it (the `$done` commit) or
+ * behind it, since boundaries after open-pr move only the heads ref and the approval records the local head.
+ */
 export async function readyHead(root: string, story: string, ready: { sha: string; at: string } | undefined, prHead: string | undefined): Promise<{ ready_head_sha?: string; ready_approved_at?: string; ready_head_norn?: string }> {
   if (!ready) return {};
   const sha = ready.sha;
-  const norn = prHead && prHead !== sha && (await onlyNornCommitsSince(root, sha, prHead, story));
+  const norn = prHead && prHead !== sha && ((await onlyNornCommitsSince(root, sha, prHead, story)) || (await onlyNornCommitsSince(root, prHead, sha, story)));
   return { ready_head_sha: sha, ready_approved_at: ready.at, ...(norn ? { ready_head_norn: prHead } : {}) };
 }

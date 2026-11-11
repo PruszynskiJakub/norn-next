@@ -348,13 +348,15 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
   const baseRef = snap.base_ref;
   const defaultBranch = config.base_branch ?? cachedDefaultBranch(opts.repoRoot) ?? "main";
   const prSeen = local.pr_seen;
-  // The ready approval's head, voided by a later re-entry; and whether only norn moved the PR head since
+  // The ready approval's head, voided by a later re-entry; and whether only norn's commits lie between it and the PR head
   const readyHeads = await Promise.all(
     local.stories.map(async (ls): Promise<{ ready_head_sha?: string; ready_approved_at?: string; ready_head_norn?: string }> => {
       if (!ls.ready) return {};
       const sha = ls.ready.sha;
       const prHead = prSeen[ls.snapshot.key]?.pr?.head_sha;
-      const norn = !!prHead && prHead !== sha && (await onlyNornCommitsSince(opts.repoRoot, sha, prHead, ls.snapshot.key).catch(() => false));
+      const nornOnly = (from: string, to: string) => onlyNornCommitsSince(opts.repoRoot, from, to, ls.snapshot.key).catch(() => false);
+      // either way: the PR head past the approval by norn's `$done` commit, or behind it by heads-only boundaries
+      const norn = !!prHead && prHead !== sha && ((await nornOnly(sha, prHead)) || (await nornOnly(prHead, sha)));
       return { ready_head_sha: sha, ready_approved_at: ls.ready.at, ...(norn ? { ready_head_norn: prHead } : {}) };
     }),
   );

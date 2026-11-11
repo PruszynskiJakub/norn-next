@@ -767,7 +767,7 @@ export function readyApproval(wf: Workflow, receipts: readonly NumberedReceipt[]
 function headChangedItem(story: StoryFacts): InboxItem | null {
   const pr = knownPr(story);
   const ready = story.ready_head_sha;
-  // Norn's own commits after the approval (its `$done` state commit) leave the head the person let through as it was
+  // Only norn's own commits between the approval and the PR head (its `$done` commit, heads-only boundaries) leave the head the person let through as it was
   if (!pr || pr.state !== "open" || !ready || !pr.head_sha || pr.head_sha === ready || pr.head_sha === story.ready_head_norn) return null;
   // a PR remembered from before the approval says nothing about what came after it
   if (story.pr === undefined && story.pr_seen && story.ready_approved_at && story.pr_seen.observed_at < epoch(story.ready_approved_at)) return null;

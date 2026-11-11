@@ -354,9 +354,10 @@ export interface StoryFacts {
   /** When that approval was given (the approve receipt's `at`); PRs seen before it are not compared */
   ready_approved_at?: string;
   /**
-   * The known PR head, when every commit after `ready_head_sha` up to it is norn's own for this
-   * story (`Norn-Tick` + `Norn-Story` trailers — the `ready.approve → $done` commit and later state
-   * commits); the head-changed item ignores that head. Absent = moved by someone else, or unknown.
+   * The known PR head, when every commit between it and `ready_head_sha`, in either direction, is
+   * norn's own for this story (`Norn-Tick` + `Norn-Story` trailers — the `ready.approve → $done`
+   * commit after it, or the heads-only boundaries the PR head lacks); the head-changed item ignores
+   * that head. Absent = moved by someone else, or unknown.
    */
   ready_head_norn?: string;
   /**
