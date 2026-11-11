@@ -38,7 +38,11 @@ steps:
       rework: { to: implement, counter: review_loop, means: "fix it" }
   ready:
     type: gate
-    outcomes: { approve: $done, reject: { to: implement, counter: review_loop } }
+    outcomes: { approve: fin, reject: { to: implement, counter: review_loop } }
+  fin:
+    type: git
+    action: open-pr
+    outcomes: { done: $done }
 counters: { review_loop: { max: 5 } }
 `;
 const CONFIG = "provider: gh\nworkflow: loop\nmode: auto\n";
@@ -176,14 +180,18 @@ describe("once the PR is open, the story branch moves only at open-pr", () => {
     report(s.runs, "approve");
     await tickUntil(() => state(s.runs)?.step === "ready");
     expect((await h.norn("story", "approve", s.key)).exit).toBe(0);
-    await tickUntil(() => state(s.runs)?.step === "$done");
+    await tickUntil(() => state(s.runs)?.step === "fin");
     expect(remoteRef(`refs/heads/${s.branch}`)).toBe(atOpenPr);
     expect(branchPushes(s).length).toBe(1);
     expect(remoteRef(headsRef(s.key))).toBe(head(s));
+    // the round ends through open-pr again (the guard): the one more branch push is its own
+    await tickUntil(() => state(s.runs)?.step === "$done");
+    expect(branchPushes(s).length).toBe(2);
+    const atFin = remoteRef(`refs/heads/${s.branch}`) as string;
 
     // the PR head is behind the approved head by norn's own commits only: no head change
     const pr = h.remote.prs.find((p) => p.head === s.branch) as (typeof h.remote.prs)[number];
-    pr.head_sha = atOpenPr as string;
+    pr.head_sha = atFin;
     await h.tick("--sync");
     expect(headItems(await inbox())).toEqual([]);
     // a person's push to the branch after the approval is one

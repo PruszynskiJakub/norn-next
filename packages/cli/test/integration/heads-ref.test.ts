@@ -6,8 +6,8 @@
  * what the remote received logged by a real `post-receive` hook (one `--` line per push).
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { claimRef, headsRef, recordRef, ulid } from "@norn/schema";
 import { appendReceipt, readState, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
@@ -24,6 +24,26 @@ steps:
     type: agent
     skill: norn-implement
     outcomes: { done: { to: review, means: "built" } }
+  review:
+    type: agent
+    skill: norn-review
+    outcomes:
+      approve: { to: $done, means: "good" }
+      rework: { to: implement, counter: review_loop, means: "fix it" }
+counters: { review_loop: { max: 3 } }
+`;
+// the PR opens before review, so a rework boundary moves the heads ref alone
+const PR = `name: pr
+start: implement
+steps:
+  implement:
+    type: agent
+    skill: norn-implement
+    outcomes: { done: { to: open-pr, means: "built" } }
+  open-pr:
+    type: git
+    action: open-pr
+    outcomes: { done: review }
   review:
     type: agent
     skill: norn-review
@@ -112,6 +132,7 @@ beforeAll(async () => {
   expect((await h.norn("init")).exit).toBe(0);
   h.config(CONFIG);
   h.write(join(workflowsDir(h.root), "rv.yaml"), RV);
+  h.write(join(workflowsDir(h.root), "pr.yaml"), PR);
   h.git(["add", "-A"]);
   h.git(["commit", "-q", "-m", "norn init"]);
   h.git(["push", "-q", "origin", "main"]);
@@ -173,8 +194,91 @@ describe("a takeover after a crash resumes from the heads ref", () => {
         h.config(CONFIG);
       }
     });
+    test(`AC3: record.policy ${policy}: with the PR open, a person pushed to its branch: B's worktree merges the heads ref and the branch, never rebased`, async () => {
+      const n = policy === "local" ? 9 : 10;
+      h.config(policy === "remote" ? REMOTE : CONFIG);
+      try {
+        const s = await headsAheadOfPr(n, `diverged-${policy}`);
+        const theirs = personPushes(s.branch, `person-${policy}`, "person.txt", "theirs\n");
+        expire(s.key);
+        const B = cloneOf(h, `b-diverged-${policy}`, "bob");
+        const r = await B.norn("story", "checkout", s.key, "--json");
+        expect(r.exit).toBe(0);
+        const head = sh(s.wt(B.root), ["rev-parse", "HEAD"]);
+        // a merge of the boundary and the person's commit, each kept as it was
+        expect(sh(B.root, ["log", "-1", "--format=%P", head]).split(" ")).toEqual([s.boundary, theirs]);
+        const v = r.value as { units: Array<{ unit: string; step: string }> };
+        // local: the step the last record push left (open-pr opened the PR); remote: the real last boundary
+        expect(v.units.find((u) => u.unit === s.key)?.step).toBe(policy === "remote" ? "implement" : "open-pr");
+      } finally {
+        h.config(CONFIG);
+      }
+    });
   }
+  test("AC3: with the PR open, a person's push that clashes with the boundary the heads ref holds: the takeover is refused and nothing is taken", async () => {
+    const s = await headsAheadOfPr(11, "diverged-clash", (wt) => {
+      writeFileSync(join(wt, "clash.txt"), "mine\n");
+      sh(wt, ["add", "clash.txt"]);
+      sh(wt, ["commit", "-q", "-m", "agent's edit"]);
+    });
+    personPushes(s.branch, "person-clash", "clash.txt", "theirs\n");
+    expire(s.key);
+    const claim = remoteRef(claimRef(s.key));
+    const B = cloneOf(h, "b-diverged-clash", "bob");
+    const r = await B.norn("story", "checkout", s.key, "--json");
+    expect(r.exit).not.toBe(0);
+    expect((r.value as { code?: string }).code).toBe("branch_diverged");
+    expect(remoteRef(claimRef(s.key))).toBe(claim);
+  });
+  test("AC3: with no PR open, a branch that diverged from the heads ref was rewritten: B takes the branch as it is", async () => {
+    const s = await atReview(12, "rewritten-no-pr");
+    const boundary = branchLacksBoundary(s.branch, 12);
+    const theirs = personPushes(s.branch, "person-rewrite", "person.txt", "theirs\n");
+    expire(s.key);
+    const B = cloneOf(h, "b-rewritten-no-pr", "bob");
+    const r = await B.norn("story", "checkout", s.key, "--json");
+    expect(r.exit).toBe(0);
+    expect(sh(s.wt(B.root), ["rev-parse", "HEAD"])).toBe(theirs);
+    expect(() => sh(B.root, ["merge-base", "--is-ancestor", boundary, theirs])).toThrow();
+  });
 });
+
+/**
+ * A story on the `pr` workflow whose PR opened, then review reworked it: the boundary review → implement
+ * is on the heads ref only, the PR branch behind it. `inReview` runs in A's worktree before the rework.
+ */
+async function headsAheadOfPr(n: number, slug: string, inReview?: (wt: string) => void) {
+  const key = `gh-${n}`;
+  const spec = `.agents/specs/${key}-${slug}`;
+  const branch = `${key}-${slug}`;
+  const wt = (root: string) => worktreeOf(root, branch);
+  const runs = () => runStateOf(join(wt(h.root), spec));
+  h.remote.issues = [...h.remote.issues, issue(n, slug, ["norn", "norn:wf:pr"])];
+  await h.tick("--sync");
+  await tickUntil(() => state(runs())?.status === "running");
+  report(runs(), "done");
+  await tickUntil(() => state(runs())?.step === "review" && state(runs())?.status === "running");
+  expect(h.remote.prs.find((p) => p.head === branch)?.state).toBe("open");
+  inReview?.(wt(h.root));
+  report(runs(), "rework");
+  await tickUntil(() => state(runs())?.step === "implement" && state(runs())?.status === "running");
+  const boundary = remoteRef(headsRef(key)) as string;
+  expect(remoteRef(`refs/heads/${branch}`)).not.toBe(boundary);
+  sh(h.root, ["merge-base", "--is-ancestor", remoteRef(`refs/heads/${branch}`) as string, boundary]);
+  return { key, spec, branch, wt, boundary };
+}
+
+/** A person pushes one commit writing `file` onto the story branch on the remote; its sha. */
+function personPushes(branch: string, dir: string, file: string, text: string): string {
+  const person = join(h.dir, dir);
+  sh(h.dir, ["clone", "-q", "-b", branch, h.remoteDir, person]);
+  mkdirSync(dirname(join(person, file)), { recursive: true });
+  writeFileSync(join(person, file), text);
+  sh(person, ["add", file]);
+  sh(person, ["-c", "user.name=person", "-c", "user.email=person@example.com", "commit", "-q", "-m", "person's commit"]);
+  sh(person, ["push", "-q", "origin", branch]);
+  return sh(person, ["rev-parse", "HEAD"]);
+}
 
 describe("a rejected push never moves the heads ref alone", () => {
   test("AC1/AC3: a person pushed a clashing commit, the take-in fails: the heads ref stays where the branch was, and a takeover after a crash drops nothing the remote held", async () => {
