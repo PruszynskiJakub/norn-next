@@ -13,9 +13,16 @@ labels:
   - norn:risk:medium
   - norn:wf:quick
 workflow: quick
-status: active
+status: done
 intake_at: 2026-11-10T15:08:44.663Z
 body_hash: 1481602b42324df07715701cad3b23838648253528ae18abe9c46d2732fcace6
+merge:
+  pr: 334
+  url: https://github.com/PruszynskiJakub/norn-next/pull/334
+  head_sha: 0c7ec6011f7d73397af99cc4cb7096584b0535ec
+  merge_commit_sha: dc67523438de338c2d13f11db81f5ec0968d4018
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-11T08:17:40.000Z
 ---
 
 ## Problem
