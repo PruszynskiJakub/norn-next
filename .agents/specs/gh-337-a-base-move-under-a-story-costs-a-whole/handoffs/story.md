@@ -112,4 +112,4 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 ## Resume
 
-CI fix committed. Next: review the rework, then test → … → open-pr pushes the branch and ci watches the new head.
+Review #3 approved the CI fix (unit, typecheck, slice-workflow e2e green). Next: test → … → open-pr pushes the branch; ci watches it.
