@@ -30,7 +30,7 @@ export async function pushBranch(git: GitPort, opts: PushBranchOptions): Promise
   const held = await markersHeld(git, cwd, remote, branch);
   if (held) return { ok: false, reason: "held", message: held };
   const force = branch.includes("/") ? "+" : "";
-  // The story branch carries the story's heads ref in the same push: the remote never holds a
+  // The story branch carries the story's heads ref in the same (atomic) push: the remote never holds a
   // boundary on the branch that the heads ref lacks. Forced: it follows the story's head wherever
   // a takeover merged it from
   const story = force ? null : (parseSpecDirName(branch)?.story ?? null);

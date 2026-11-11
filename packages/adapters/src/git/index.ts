@@ -461,7 +461,11 @@ export function createGit(opts: GitOptions = {}): GitPort {
       const args = ["push", "--porcelain"];
       if (o?.forceWithLease !== undefined) args.push(o.forceWithLease ? `--force-with-lease=${o.forceWithLease}` : "--force-with-lease");
       if (o?.setUpstream) args.push("--set-upstream");
-      return classifyPush(await run(cwd, [...args, remote, ...(typeof refspec === "string" ? [refspec] : refspec)]));
+      const specs = typeof refspec === "string" ? [refspec] : refspec;
+      // all or nothing: without it a forced refspec lands while its rejected sibling does not,
+      // and the remote holds refs that were meant to move together apart
+      if (specs.length > 1) args.push("--atomic");
+      return classifyPush(await run(cwd, [...args, remote, ...specs]));
     },
     async fetch(cwd, remote, refspecs, o) {
       // LC_ALL=C: callers tell a missing remote branch apart by git's English message

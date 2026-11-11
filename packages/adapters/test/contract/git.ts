@@ -28,6 +28,7 @@ export type GitContractTest =
   | "pushRef is compare-and-swap on the remote; a lost race is stale"
   | "push: a non-fast-forward is rejected, a lease the remote moved past is stale"
   | "push: several refspecs go in one push, a ref outside refs/heads among them"
+  | "push: several refspecs land together or not at all: a rejected branch leaves a forced ref unmoved"
   | "ancestry and divergence"
   | "merge: clean merges commit, conflicts abort and name the paths; mergeTree agrees"
   | "conflictMarkers finds marker lines"
@@ -219,6 +220,21 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(await git.push(root, "origin", ["refs/heads/main:refs/heads/main", "+refs/heads/main:refs/norn/heads/gh-1"])).toEqual({ ok: true });
       expect(sh(remote, "rev-parse", "main")).toBe(head);
       expect(sh(remote, "rev-parse", "refs/norn/heads/gh-1")).toBe(head);
+    });
+
+    t("push: several refspecs land together or not at all: a rejected branch leaves a forced ref unmoved", async () => {
+      const { base, remote, root, git } = repo();
+      const start = sh(root, "rev-parse", "HEAD");
+      sh(root, "push", "-q", "origin", "refs/heads/main:refs/norn/heads/gh-1");
+      const other = join(base, "other");
+      sh(base, "clone", "-q", remote, other);
+      commitFile(other, "b.txt", "theirs\n");
+      sh(other, "push", "-q", "origin", "main");
+      commitFile(root, "c.txt", "mine\n");
+      const r = await git.push(root, "origin", ["refs/heads/main:refs/heads/main", "+refs/heads/main:refs/norn/heads/gh-1"]);
+      expect(r.ok === false && r.reason).toBe("rejected");
+      expect(sh(remote, "rev-parse", "main")).toBe(sh(other, "rev-parse", "HEAD"));
+      expect(sh(remote, "rev-parse", "refs/norn/heads/gh-1")).toBe(start);
     });
 
     t("ancestry and divergence", async () => {

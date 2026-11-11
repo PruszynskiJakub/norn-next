@@ -176,6 +176,48 @@ describe("a takeover after a crash resumes from the heads ref", () => {
   }
 });
 
+describe("a rejected push never moves the heads ref alone", () => {
+  test("AC1/AC3: a person pushed a clashing commit, the take-in fails: the heads ref stays where the branch was, and a takeover after a crash drops nothing the remote held", async () => {
+    const n = 7;
+    const slug = "rejected-push";
+    const key = `gh-${n}`;
+    const spec = `.agents/specs/${key}-${slug}`;
+    const branch = `${key}-${slug}`;
+    const runs = () => runStateOf(join(worktreeOf(h.root, branch), spec));
+    h.remote.issues = [...h.remote.issues, issue(n, slug, ["norn", "norn:wf:rv"])];
+    await h.tick("--sync");
+    await tickUntil(() => state(runs())?.status === "running");
+    const before = remoteRef(headsRef(key)) as string;
+    expect(remoteRef(`refs/heads/${branch}`)).toBe(before);
+    // a person pushes a commit to the story branch that clashes with the agent's work
+    const person = join(h.dir, "person-rejected");
+    sh(h.dir, ["clone", "-q", "-b", branch, h.remoteDir, person]);
+    writeFileSync(join(person, "clash.txt"), "theirs\n");
+    sh(person, ["add", "clash.txt"]);
+    sh(person, ["-c", "user.name=person", "-c", "user.email=person@example.com", "commit", "-q", "-m", "person's edit"]);
+    sh(person, ["push", "-q", "origin", branch]);
+    const theirs = sh(person, ["rev-parse", "HEAD"]);
+    const wt = worktreeOf(h.root, branch);
+    writeFileSync(join(wt, "clash.txt"), "mine\n");
+    sh(wt, ["add", "clash.txt"]);
+    sh(wt, ["commit", "-q", "-m", "agent's edit"]);
+    report(runs(), "done");
+    await tick();
+    await tick();
+    // the boundary push was rejected and the merge clashed: neither ref took the boundary
+    expect(remoteRef(`refs/heads/${branch}`)).toBe(theirs);
+    expect(remoteRef(headsRef(key))).toBe(before);
+    // A crashes; B takes over from what the remote holds: the person's commit, the heads ref inside it
+    expire(key);
+    const B = cloneOf(h, "b-rejected", "bob");
+    const r = await B.norn("story", "checkout", key, "--json");
+    expect(r.exit).toBe(0);
+    expect(sh(worktreeOf(B.root, branch), ["rev-parse", "HEAD"])).toBe(theirs);
+    // throws unless the heads ref is inside the branch B took
+    sh(B.root, ["merge-base", "--is-ancestor", before, theirs]);
+  });
+});
+
 describe("the heads ref goes when the story ends", () => {
   test("AC4: story close removes the story's heads ref from the remote", async () => {
     const s = await atReview(5, "close-heads");

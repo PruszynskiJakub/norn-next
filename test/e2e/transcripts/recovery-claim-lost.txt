@@ -73,7 +73,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git rev-parse HEAD
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-9-add-search --not --remotes=origin --
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git grep -n -I -z --no-color -E "^(<{7}|>{7}) " refs/heads/gh-9-add-search -- .agents/specs/gh-9-add-search/handoffs/story.md .agents/specs/gh-9-add-search/spec.md
-  spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search +refs/heads/gh-9-add-search:refs/norn/heads/gh-9
+  spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git push --porcelain --atomic origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search +refs/heads/gh-9-add-search:refs/norn/heads/gh-9
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-9-add-search
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git update-ref refs/norn/heads/gh-9 <sha:4>
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/state.json
@@ -103,7 +103,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git add -A -- .agents/specs/gh-9-add-search/handoffs/story.md
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git diff --cached --quiet -- .agents/specs/gh-9-add-search/handoffs/story.md
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-9-add-search --not --remotes=origin --
-  spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git push --porcelain origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search +refs/heads/gh-9-add-search:refs/norn/heads/gh-9
+  spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git push --porcelain --atomic origin refs/heads/gh-9-add-search:refs/heads/gh-9-add-search +refs/heads/gh-9-add-search:refs/norn/heads/gh-9
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-9-add-search
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git update-ref refs/norn/heads/gh-9 <sha:4>
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0001-started.json
