@@ -2,7 +2,7 @@
 id: gh-337/01
 title: One push path for claim release; update outcome chosen in core
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
