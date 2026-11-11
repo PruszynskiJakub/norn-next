@@ -4,15 +4,18 @@ A resolver that needs a person's decision can `norn ask` with the base merge kep
 
 ### Proof
 
-- AC1, the brief offers ask with the merge kept in progress (files, each side's intent, the decision): `packages/core/test/unit/base-sync.test.ts` › "ask instead of abort…" › "the base-update section offers norn ask with the merge kept in progress, and keeps abort + norn stuck for a merge it cannot understand". This test failed before the brief change.
-- AC2, the answer resumes the same resolve with the merge still in progress:
-  - core: same describe › "an answer resumes the same resolve step while the merge stays in progress".
-  - S3: `packages/cli/test/integration/ask-mid-merge.test.ts` › "the resolver asks mid-merge; the answer resumes…". It runs on real git: MERGE_HEAD and the unmerged a.txt survive, and the staged b.txt stays staged. This already held before this slice; the tests pin it.
-- AC3, a clean watch exit keeps that claim, releases the others' and is not blocked: `ask-mid-merge.test.ts` › "a clean watch exit keeps that story's claim…". It failed first: exit 1.
-- AC4, handoff is refused with `merge_in_progress`: `ask-mid-merge.test.ts` › "story handoff refuses…". It failed first: exit 1, because the release tried to push.
-- AC5, abort plus `norn stuck` escalates as before: the existing `base-sync.test.ts` › "7a: resolve reports stuck…" covers it, and the AC1 test checks that the brief still names `git merge --abort` and `norn stuck "<why>"`.
-- AC6, the skill: the bundled `packages/cli/assets/skills/norn-merge/SKILL.md` now has "Ask or abort when you cannot finish". Ask when both intents are valid and a person must choose: a rule neither side has, or contradicting sides the spec does not settle. Abort when the merge cannot be understood. This is for an agent to verify.
-- `bun run test` passes 1867 and `bun run typecheck` is clean.
+Review #1 approved: no findings. Traceability:
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 (story 71) | the resolve brief's base-update section offers `norn ask` with files, each side's intent and the decision, keeping the merge in progress; abort + `norn stuck` stay for a merge it cannot understand | test | `packages/core/test/unit/base-sync.test.ts` › "ask instead of abort…" › "the base-update section offers norn ask with the merge kept in progress, and keeps abort + norn stuck…" |
+| AC2 (story 72) | an answer resumes the same resolve step with the merge still in progress | test | `base-sync.test.ts` › "an answer resumes the same resolve step while the merge stays in progress"; `packages/cli/test/integration/ask-mid-merge.test.ts` › "the resolver asks mid-merge; the answer resumes the same resolve with the merge still in progress" (real git: MERGE_HEAD, unmerged a.txt, staged b.txt survive) |
+| AC3 (story 73) | a clean watch exit keeps that story's claim, releases the others' and is not blocked | test | `ask-mid-merge.test.ts` › "a clean watch exit keeps that story's claim, releases the others' and is not blocked" |
+| AC4 (story 74) | `story handoff` is refused with `merge_in_progress` and a do_instead to answer or unstick first | test | `ask-mid-merge.test.ts` › "story handoff refuses the story with merge_in_progress and says to answer or unstick first" |
+| AC5 (story 75) | abort + `norn stuck` escalates as today | test | `base-sync.test.ts` › "7a: resolve reports stuck … → $stuck with its reason"; the AC1 test asserts the brief still names `git merge --abort` and `norn stuck "<why>"` |
+| AC6 (story 76) | bundled `norn-merge` says when to ask (both intents valid, a person must choose) and when to abort (merge cannot be understood) | agent | QA (agent): `packages/cli/assets/skills/norn-merge/SKILL.md` › "Ask or abort when you cannot finish" (read in review; matches) |
+
+Review ran: unit tier `base-sync.test.ts` 29 pass; `bun test --config=bunfig.integration.toml packages/cli/test/integration/ask-mid-merge.test.ts` 3 pass; check test#1 (`bun run test` + `typecheck`) pass.
 
 ### Easy to miss
 
@@ -32,4 +35,4 @@ A resolver that needs a person's decision can `norn ask` with the base merge kep
 
 ### Resume
 
-Implementation is complete and committed. The next step is review.
+Review approved; the next step is QA (AC6 is an agent verifier: read the bundled norn-merge skill).
