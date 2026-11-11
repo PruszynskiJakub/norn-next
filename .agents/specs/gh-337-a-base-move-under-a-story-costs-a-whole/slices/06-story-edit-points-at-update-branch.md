@@ -2,7 +2,7 @@
 id: gh-337/06
 title: story edit points at update-branch for a conflicting PR
 depends_on: [ gh-337/01 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
