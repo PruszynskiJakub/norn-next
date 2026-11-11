@@ -8,6 +8,9 @@ title: A norn-workflow skill that interviews, drafts and validates a workflow
 assignee: PruszynskiJakub
 labels:
   - norn
+  - norn:kind:feature
+  - norn:priority:medium
+  - norn:risk:medium
 workflow: triage
 status: active
 intake_at: 2026-11-11T21:47:27.335Z
