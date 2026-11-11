@@ -11,7 +11,8 @@
  * hash) and re-pins its `workflow.yaml` to the new workflow, which the next tick applies by entering
  * `--at`. A started story: starts a new round — refused while the claim is held
  * elsewhere, for an unknown workflow or step, or while the round is unfinished without `--force` (with it:
- * while an agent runs a step of the round or a slice is unfinished); otherwise writes only a `round`
+ * while an agent runs a step of the round or a slice is unfinished), and for the workflow the finished round
+ * ran with no `--at` while its open PR conflicts with the base (`story update-branch` instead); otherwise writes only a `round`
  * receipt into the current round, which the next tick applies (`round.start`). Runs under the tick lock
  * so no tick sees a pin without its receipt.
  *
@@ -83,6 +84,24 @@ function refuseWhileWorking(story: StoryFacts, st: UnitState): void {
   if (open) throw refuse(`slice ${open.key} is not finished; finish or drop it first`, cmd.storyView(open.key), "slice_unfinished");
 }
 
+/**
+ * Restarting the workflow a finished round ran, on a story whose open PR conflicts with its base, would
+ * run a whole round to bring the base in; `story update-branch` does that alone. A different workflow
+ * or an explicit `--at` is new work and still starts a round.
+ */
+function refuseUpdateBranchInstead(story: StoryFacts, st: UnitState, name: string, at: string | undefined): void {
+  if (at !== undefined || name !== st.workflow) return;
+  // the PR fetched this tick, else the one the last sync saw
+  const pr = story.pr !== undefined ? story.pr : story.pr_seen?.pr;
+  const conflicts = story.base?.conflicts ?? [];
+  if (pr?.state !== "open" || story.merged_by_ancestry || conflicts.length === 0) return;
+  throw refuse(
+    `${st.story}'s PR #${pr.number} conflicts with its base in ${conflicts.join(", ")}; bring the base in with ${cmd.storyUpdateBranch(st.story)} — a new ${name} round is for new work`,
+    cmd.storyUpdateBranch(st.story),
+    "update_branch_instead",
+  );
+}
+
 async function editWorkflow(ctx: Context, raw: string, name: string, at: string | undefined, force: boolean, d: Delegation) {
   const key = parseUnitKey(raw);
   const lock = await waitForTickLock(ctx, "norn story edit --workflow", "retry when it finishes");
@@ -139,7 +158,7 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
         mailbox: false,
         ...(claim ? { claim } : {}),
         check(t, st) {
-          if (roundFinished(st)) return;
+          if (roundFinished(st)) return refuseUpdateBranchInstead(sf, st, name, at);
           // An unfinished round is ended only on purpose
           if (!force)
             throw refuse(`${t.story}'s ${st.workflow} round is not finished; pass --force to end it and start a ${name} round`, cmd.storyEdit(t.story, { workflow: name, force: true, ...(at ? { at } : {}) }), "round_unfinished");

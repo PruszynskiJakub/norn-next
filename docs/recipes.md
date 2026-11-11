@@ -76,7 +76,7 @@ A story waiting at a gate with a `stale` route goes back through update by itsel
 norn story update-branch gh-3
 ```
 
-The story goes back through its update step; you approve the `ready` gate again afterwards, since the head changed. You may also push to the story branch yourself at any time: norn merges your push in and never loses it.
+The story goes back through its update step; you approve the `ready` gate again afterwards, since the head changed. A finished story with a conflicting PR is updated this way, never with a new round: `norn story edit gh-3 --workflow <the workflow its round ran>` is refused there and names `norn story update-branch gh-3`. Starting a new round, with another workflow or `--at <step>`, is for new work. You may also push to the story branch yourself at any time: norn merges your push in and never loses it.
 
 ## The base refused a merged story's done record
 
