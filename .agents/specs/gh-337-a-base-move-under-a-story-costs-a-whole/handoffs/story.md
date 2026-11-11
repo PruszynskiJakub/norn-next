@@ -7,7 +7,7 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 ## Proof
 
 - spec.md: 76 user stories, Plan seams S1–S5, D1–D14; 14 slices integrated; 77 criteria in frontmatter.
-- QA #2 (HEAD 087e1aae): 77/77 pass; evidence per criterion in its evidence.
+- QA #3 (HEAD cab27ae0): 77/77 pass, re-checked in full after the CI fix; evidence per criterion in its evidence.
 - Traceability: full test names and the abbreviations below (RR, HR, PRT, OG, BSI, RV, OV, RG, IN, AM, BS, UO, CA, LR, LP) in review evidence `traceability.md`; Fn = review finding.
 
 | Criterion | What it says | Verifier | Proven by |
@@ -98,7 +98,7 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 ## Not proven yet
 
-- The light-path anchor fix is proven on the pure function (unit tests; QA ran it on this story's real receipts), not end to end through act.
+- The light-path anchor fix is proven on the pure function (unit tests; QA #3 ran it on this story's real receipts: full path now, light once open-pr is done), not end to end through act.
 
 ## Notes
 
@@ -107,9 +107,9 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 - 02.AC5 (local-policy crash note): docs say the counters of the last record push, not "fresh"; QA passed it with a note.
 - `.agents/workflows/{story,quick}.yaml` lack the shipped copies' new light-path comment (comment only).
 - No GitPort fake exists: 07.AC6/13.AC7 run against the real adapter only.
-- CI fix: init's `withTestCommand` missed the anchored run line (fixed, test in detect.test.ts). The other CI failures were stale expectations of intended changes (heads-ref push after open-pr, `regenerate` key); e2e transcript rewritten.
+- CI fix: init's `withTestCommand` missed the anchored run line (test in detect.test.ts); the other CI failures were stale expectations of intended changes.
 - Friction: a fresh worktree needs `bun install`.
 
 ## Resume
 
-Review #3 approved the CI fix (unit, typecheck, slice-workflow e2e green). Next: test → … → open-pr pushes the branch; ci watches it.
+QA #3 passed on cab27ae0. Next: describe/open-pr push the branch; ci watches it.
