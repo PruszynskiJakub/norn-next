@@ -28,5 +28,7 @@ Traceability (review #1; each test read and seen to assert its row; the light-ro
 - `resolve`'s instructions gained one sentence for re-entry from the resolution review: fix the resolution the findings name and commit. Its findings show under Rework without a new input. A fix commit that is not a merge makes the next update `done`, so the story takes the full path. That is the safe direction; slice 09 or a later round may want the resolver to amend the merge instead.
 - `redescribe` is a new outcome for `norn-review`, used only in this step. The brief's Finish list shows it with its `means` text; the skill text is unchanged.
 
+- Merged the story branch in (it had taken slice 10, "the resolver sees the base side"). Both sides added a new input kind in the same places: `InputKind` and `inputs()` in brief.ts keep `resolution` and `base_side`; `resolve` in all four workflow copies takes `[spec, handoff, base_side]` and keeps this slice's re-entry sentence. workflow.schema.json regenerated. `bun run test` (1826 pass) and `bun run typecheck` green after the merge.
+
 ## Resume
-Review #1 approved with no blocking findings (two minor notes in its findings receipt). Nothing is open for this slice.
+Review #1 approved with no blocking findings (two minor notes in its findings receipt). Merge conflict with the story branch resolved and committed (6537bdcdd); next is integrate again. Nothing else is open for this slice.
