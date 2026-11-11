@@ -4,11 +4,11 @@ No change outside the spec folder reaches a gate or the merge step that the roun
 ### Proof
 `bun run test` 1864 pass, `bun run typecheck` clean. Integration file `packages/cli/test/integration/open-pr-guard.test.ts` 3/3 pass when run alone (`bun run test:integration packages/cli/test/integration/open-pr-guard.test.ts`).
 
-| Criterion | What it says | Verifier | Proven by (red first where marked) |
+| Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
-| AC1 | a path from open-pr through an agent step or `git: update` to a gate/merge step without open-pr again is refused with the reason; the shipped workflows validate | test | `packages/core/test/unit/open-pr-guard.test.ts` › "an agent step between open-pr and a gate that lets the round end is refused with the path" (red first), › "a git: update between open-pr and the merge step is refused; …" (red first), › "a workflow whose every change goes back through open-pr…validates"; shipped story/quick/release still validate (`assets.test.ts`, `repo.test.ts` unchanged and green) |
-| AC2 | at a gate or merge step, a local head that changes a path outside the spec folder the PR lacks sends the story to open-pr with a receipt; spec-folder-only differences stay local | test | open-pr-guard.test.ts (core) › "a change outside the spec folder…sends the story back to open-pr with a receipt" (red first), › "spec-folder-only differences stay local…", › "a gate the round cannot end from…keeps waiting; between syncs the guard waits for one" (red first); S3 open-pr-guard.test.ts (cli) › "AC2: a spec-folder-only change stays local…", › "AC2: a code change the PR lacks sends the story back through open-pr and ci, with a receipt saying why" |
-| AC3 | passes ci, approved at ready, waits at merge: the PR head on the remote is the commit ci watched; no branch push after ci passed or ready approved | test | S3 open-pr-guard.test.ts (cli) › "AC3: after ci passes and ready approves…" (the `ci` check records the remote branch tip it ran on; a post-receive hook logs pushes). This holds since slice 03; the test pins it. |
+| AC1 | a path from open-pr through an agent step or `git: update` to a gate or merge step, without open-pr again, is refused with the reason; the shipped workflows validate | test | `packages/core/test/unit/open-pr-guard.test.ts` › "an agent step between open-pr and a gate that lets the round end is refused with the path", › "a git: update between open-pr and the merge step is refused; a gate the round cannot end from is not", › "a workflow whose every change goes back through open-pr before ready or merge validates"; shipped workflows: `assets.test.ts` / `repo.test.ts` green (merge-bound reading, see Easy to miss) |
+| AC2 | at a gate or merge step, a local head that changes a path outside the spec folder the PR lacks sends the story to open-pr with a receipt; spec-folder-only differences stay local and the story keeps waiting | test | core `open-pr-guard.test.ts` › "a change outside the spec folder that the PR head lacks sends the story back to open-pr with a receipt", › "spec-folder-only differences stay local and the story keeps waiting"; cli `packages/cli/test/integration/open-pr-guard.test.ts` › "AC2: a code change the PR lacks sends the story back through open-pr and ci…" (its detail lists only `fix.txt`, not the spec-folder `notes.md`). The cli "spec-folder-only change stays local" test runs no tick after its commit (review F1) |
+| AC3 | passes ci, approved at ready, waits at merge: the PR head on the remote is the commit ci watched; no branch push after ci passed or ready approved | test | cli `open-pr-guard.test.ts` › "AC3: after ci passes and ready approves…": covers arrival at merge, but runs no tick while the story waits at merge (review F1) |
 
 New rule ids `open_pr.guard` and `open_pr.guard.awaits_sync` have hand-built cases in `packages/core/test/rule-cases.ts`.
 
@@ -19,6 +19,7 @@ New rule ids `open_pr.guard` and `open_pr.guard.awaits_sync` have hand-built cas
 - Observe (`prUnpushed`, `packages/cli/src/runtime/observe/remote.ts`) fills `pr_unpushed` only when the known open PR's head is an ancestor of the local branch head. A diverged PR head (a person's push) is left to the existing head-changed item.
 
 ### Not proven yet
+- Review F1 (blocking): `until(() => true)` in the cli integration test runs zero ticks, so the AC2 spec-folder-only test and AC3's waiting at merge are never observed over ticks. Fix: tick for real (lines 217, 227), then check the AC2 test goes red without the spec-folder filter.
 - The rest of the integration tier and the e2e tier run in CI. Only open-pr-guard.test.ts ran here.
 
 ### Notes
@@ -27,4 +28,4 @@ New rule ids `open_pr.guard` and `open_pr.guard.awaits_sync` have hand-built cas
 - Friction: AC3 and the observe half of AC2 can only be observed at the integration tier, but the brief says not to run that tier, so this one file was run alone.
 
 ### Resume
-Review the slice against AC1–AC3 using the Proof table. Weigh the merge-bound reading of AC1 under Easy to miss.
+Fix review F1 in `packages/cli/test/integration/open-pr-guard.test.ts`: replace `until(() => true)` loops with real ticks, prove the spec-folder test red by dropping the filter in `unpushedCode` temporarily, re-run the file alone. Findings: review#1 findings file in this run's receipts.
