@@ -16,6 +16,7 @@ import {
   TaggedUnion,
   Target,
   Ulid,
+  VerifyPair,
 } from "./common.ts";
 import { CriterionVerdict, Note, NoteId } from "./criteria.ts";
 
@@ -164,6 +165,11 @@ export const CheckReceipt = receipt("check", {
   output_tail: Type.String(),
   /** `logs/<run_id>.log`, present unless it passed */
   log: Type.Optional(NonEmpty),
+  /**
+   * A re-verify run of the workflow's `base.verify` check on the merge of `base` into `head`, made
+   * while the story waits (its step is the waiting step): red takes that step's `stale` edge, green leaves it waiting
+   */
+  verify: Type.Optional(VerifyPair),
 });
 export const SessionInfo = Type.Object(
   {

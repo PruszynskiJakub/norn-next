@@ -56,7 +56,14 @@ const MERGE_WF: Workflow = {
   name: "merging",
   steps: { ...STALE_WF.steps, ready: { type: "gate", outcomes: { approve: "merge", reject: "$stuck" } }, merge: { type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } } },
 };
-const ALL: RepoWorkflows = { ...WORKFLOWS, gitty: loaded(GIT_WF), routed: loaded(ROUTED_WF), staled: loaded(STALE_WF), merging: loaded(MERGE_WF) };
+/** Re-verifies a story waiting at its merge step with a check step (`base.verify`). */
+const VERIFY_WF: Workflow = {
+  ...MERGE_WF,
+  name: "verifying",
+  steps: { ...MERGE_WF.steps, test: { type: "check", run: "bun test", timeout: "5m", outcomes: { pass: "ready" } } },
+  base: { stale: "conflict", verify: "test" },
+};
+const ALL: RepoWorkflows = { ...WORKFLOWS, gitty: loaded(GIT_WF), routed: loaded(ROUTED_WF), staled: loaded(STALE_WF), merging: loaded(MERGE_WF), verifying: loaded(VERIFY_WF) };
 
 const agentLease = (run_id: string | null = null): LeaseFile => ({ version: 1, kind: "agent", repo: "/x", story: "gh-9", slice: null, run_id, holder: { pid: 1, pid_start: "1" }, created_at: at() });
 const checkLease = (): LeaseFile => ({ version: 1, kind: "check", repo: "/x", story: "gh-9", slice: null, run_id: null, holder: { pid: 1, pid_start: "1" }, created_at: at() });
@@ -283,6 +290,15 @@ function cases(): RuleCase[] {
     // Since the ready approve only a clean base merge and green checks: the approval carries over
     const merged = { ...base, behind: 0 };
     out.push(c("a ready gate whose approval carries over a clean base merge", "gate.carried", facts([story(STALE_WF, parked, null, { base: merged, ready_since: { carry: true, resolved: false, merges: ["e".repeat(40)] } })])));
+  }
+  {
+    // Waiting at the merge step, the base moved without a conflict: the base.verify check runs on the merged tree
+    const base = { ref: "refs/remotes/origin/main", sha: "b".repeat(40), head: "c".repeat(40), merge_base: "d".repeat(40), behind: 2, ahead: 1, conflicts: [] };
+    const parked = { status: "parked", step: "merge", park: { kind: "merge", reason: "merge: waiting for the story's PR to merge", since: at() } } as const;
+    const pr = { number: 7, url: "u", state: "open", is_draft: false, head_sha: "c".repeat(40) } as const;
+    out.push(c("a story at its merge step whose base moved cleanly re-verifies the merged tree", "verify.run", facts([story(VERIFY_WF, parked, null, { base, pr })])));
+    const { pr: _, ...unfetched } = story(VERIFY_WF, parked, null, { base, pr_seen: { pr, observed_at: T0 } });
+    out.push(c("the same, the story PR not fetched this tick", "verify.awaits_sync", facts([unfetched])));
   }
   {
     // Waiting at ready past open-pr, the local head holds a code change the open PR lacks

@@ -231,6 +231,12 @@ export interface RunCheckAction extends UnitBase {
   log_path: string;
   /** the step's `exits` (exit code → outcome), when it declares any */
   exits?: Record<string, string>;
+  /**
+   * A re-verify run (`base.verify`) while the story waits at `step`: act runs the command in a
+   * temporary worktree of the merge of `base` into `head` (`cwd` gives only `.env.norn`), pushes
+   * nothing, and the receipt records the pair.
+   */
+  verify?: { head: string; base: string };
 }
 
 /** Run a git step. Act writes a `classify` receipt with `done` or `conflict`. */

@@ -361,6 +361,11 @@ export interface StoryFacts {
    * Absent = the same head, diverged, or not observed.
    */
   pr_unpushed?: string[];
+  /**
+   * The (story head, base sha) of the newest re-verify run in the story unit's receipts of the
+   * round (a check receipt with `verify`): decide orders no second run for that pair. Absent = none.
+   */
+  verified?: { head: string; base: string };
   /** story branch head when the person gave `approve` at the `ready` gate (the approve receipt's `head_sha`) */
   ready_head_sha?: string;
   /**

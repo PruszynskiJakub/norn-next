@@ -34,7 +34,7 @@ import { edgeOf, isStale, mergeBoundSteps, openPrStep, stepOf } from "../workflo
 import { carriedApproval } from "../ready-carry.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
 import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitItem } from "./receipts.ts";
-import { baseOf, carryApproval, classifyNorn, hasFlatRecord, recordOf, resumeSlices, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit, usableWorkflow } from "./steps.ts";
+import { baseOf, carryApproval, classifyNorn, hasFlatRecord, recordOf, resumeSlices, reverify, runCheck, runGit, slicesCanResume, slicesStep, startStoryUnit, usableWorkflow } from "./steps.ts";
 import { cmd } from "../commands.ts";
 
 /**
@@ -515,6 +515,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
         return classifyNorn(ctx, story, uf, st, wf, "unpushed", "open_pr.guard", `changes since open-pr are not on the PR: ${unpushed.join(", ")}`);
       }
       if (carriedApproval(story, uf, st, wf)) return carryApproval(ctx, story, uf, st, wf);
+      if (reverify(ctx, story, uf, st, wf)) return;
       // Parked keeps the claim; a restart never answers
       return ctx.noop(ref, `unit.parked.${st.park.kind}`, st.park.reason);
     }

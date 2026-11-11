@@ -196,13 +196,19 @@ export const CounterSpec = Type.Object(
 );
 export type CounterSpec = Static<typeof CounterSpec>;
 
-/** When a waiting story counts as stale, and the step `norn story update-branch` re-enters. */
+/** When a waiting story counts as stale, the step `norn story update-branch` re-enters, and the check that re-verifies it. */
 export const BaseSync = Type.Object(
   {
     /** `conflict` (default): a merge of the base would conflict; `behind`: the base has any commit the story lacks */
     stale: Type.Optional(Type.Union([Type.Literal("conflict"), Type.Literal("behind")])),
     /** step `norn story update-branch` re-enters; default: the first step with `action: update` */
     step: Type.Optional(StepName),
+    /**
+     * A check step norn runs on the merge of a base that moved under a story waiting at `ready` or a
+     * merge step without a conflict, once per (story head, base sha); red takes the waiting step's
+     * `stale` edge. Not with `stale: behind`, where any base move updates the story already.
+     */
+    verify: Type.Optional(StepName),
   },
   { additionalProperties: false },
 );

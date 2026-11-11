@@ -1406,6 +1406,24 @@
         "log": {
           "minLength": 1,
           "type": "string"
+        },
+        "verify": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "head",
+            "base"
+          ],
+          "properties": {
+            "head": {
+              "pattern": "^[0-9a-f]{40,64}$",
+              "type": "string"
+            },
+            "base": {
+              "pattern": "^[0-9a-f]{40,64}$",
+              "type": "string"
+            }
+          }
         }
       }
     },

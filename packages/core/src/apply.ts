@@ -308,6 +308,7 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
       return take(toReady(st), r.kind, r, ctx, lastOutcome(r.kind));
     }
     case "check": {
+      if (r.verify) return verified(st, r, step, ctx, lastOutcome("stale"));
       if (step.type !== "check") return { reject: `${st.step} is a ${step.type} step, not a check` };
       return take(st, r.outcome, r, ctx, lastOutcome(r.outcome));
     }
@@ -438,6 +439,19 @@ function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, las
 }
 
 /** Tick-classified outcomes. Agent routes: nudge / retry / park, unless the step overrides them. */
+/**
+ * A re-verify run's receipt at the step the story waits at: green leaves it waiting; red takes the
+ * step's `stale` edge (its counter bounds a base that stays broken) and the receipt is the next
+ * step's last_check. Without a `stale` edge the story stays where it is.
+ */
+function verified(st: UnitState, r: ReceiptOf<"check">, step: NonNullable<ReturnType<typeof stepOf>>, ctx: ApplyContext, last: LastOutcome): Step1 {
+  const pair = `${r.verify?.head.slice(0, 7)} + base ${r.verify?.base.slice(0, 7)}`;
+  if ((step.type !== "gate" && step.type !== "merge") || st.park?.kind !== step.type) return { reject: `a verify run applies only while the story waits at a gate or merge step, not at ${st.step}` };
+  if (r.outcome === "pass") return { state: st, log: `verify pass (${pair})` };
+  if (!edgeOf(ctx.workflow, st.step, "stale")) return { state: st, log: `verify ${r.outcome} (${pair}); ${st.step} has no stale route` };
+  return take(toReady(st), "stale", r, ctx, last);
+}
+
 function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<ReturnType<typeof stepOf>>, ctx: ApplyContext, last: LastOutcome): Step1 {
   const o = r.outcome;
   if (o === "exhausted") {

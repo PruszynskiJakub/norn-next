@@ -25,6 +25,7 @@ export type WorkflowIssueCode =
   | "cannot_reach_done"
   | "uncounted_cycle"
   | "open_pr_bypass"
+  | "base_verify"
   | "verdict"
   | "level";
 
@@ -136,6 +137,22 @@ function mergeOutcomeIssues(rawSteps: unknown): WorkflowIssue[] {
   return issues;
 }
 
+/**
+ * `base.verify` runs a check step on the merged tree; under `stale: behind` every base move already
+ * sends the story through update, so a verify would never run and only look like it does.
+ */
+function baseVerifyIssues(wf: Workflow): WorkflowIssue[] {
+  const name = wf.base?.verify;
+  if (name === undefined) return [];
+  const path = "/base/verify";
+  if (wf.base?.stale === "behind")
+    return [{ code: "base_verify", path, message: "base.verify cannot be set with base.stale: behind (any base move already updates the story, so nothing would be verified)" }];
+  const step = stepOf(wf, name);
+  if (!step) return [{ code: "unknown_target", path, message: `base.verify '${name}' does not exist` }];
+  if (step.type !== "check") return [{ code: "base_verify", path, message: `base.verify '${name}' is a ${step.type} step; it must name a check step, whose command norn runs on the merged tree` }];
+  return [];
+}
+
 function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
   const issues: WorkflowIssue[] = [];
   const steps = Object.keys(wf.steps);
@@ -205,6 +222,7 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
   // `base.step` names the step `norn story update-branch` re-enters
   if (wf.base?.step !== undefined && !stepOf(wf, wf.base.step))
     issues.push({ code: "unknown_target", path: "/base/step", message: `base.step '${wf.base.step}' does not exist` });
+  issues.push(...baseVerifyIssues(wf));
   for (const e of edgesOf(wf)) {
     const path = `/steps/${e.from}/outcomes/${e.outcome}`;
     if (!e.to.startsWith("$") && !stepOf(wf, e.to))

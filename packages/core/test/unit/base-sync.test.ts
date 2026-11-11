@@ -4,7 +4,7 @@
  * classify receipt, the check receipt, an agent report) fed back as receipts.
  */
 import { describe, expect, test } from "bun:test";
-import { deriveUlid, type Receipt, type UnitState, type Workflow, validate } from "@norn/schema";
+import { type AgentStep, deriveUlid, type LeaseFile, type Receipt, type UnitState, type Workflow, validate } from "@norn/schema";
 import type { Action, Decision } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { type BaseSidePath, renderBrief } from "../../src/brief.ts";
@@ -55,6 +55,12 @@ class Sim {
   inProgress: GitInProgress | undefined = undefined;
   /** the base keeps moving into new conflicts while the agent resolves */
   moving = false;
+  /** what a re-verify run (`run_check` with `verify`) ends in */
+  verifyOutcome: "pass" | "fail" = "pass";
+  /** the machine's live leases (a check slot in use) */
+  leases: LeaseFile[] = [];
+  /** every check run decide ordered */
+  checks: Array<Extract<Action, { kind: "run_check" }>> = [];
   log: string[] = [];
   constructor(
     readonly wf: Workflow,
@@ -77,8 +83,18 @@ class Sim {
     const claim: StoryFacts["claim"] = this.claimMine
       ? { state: "mine", sha: "c", blob: { version: 1, story: "gh-1", holder: "jakub@mac", heartbeat_id: HB, acquired_at: at(this.now), renewed_at: at(this.now), expires_at: at(this.now + 600_000), last_tick_id: null } }
       : { state: "none" };
-    const sf = storyFacts("gh-1", [uf], { frontmatter: fm, claim, pr: this.pr, ...(this.prSeen ? { pr_seen: this.prSeen } : {}), ...(this.base ? { base: this.base } : {}) });
-    return facts([sf], { tick_id: tick, repo: { root: "/r", default_branch: "main", remote: "origin", worktrees: "/r-worktrees", ...this.repoPatch } }, this.now);
+    // as observe reads it: the newest verify receipt's pair
+    const verified = this.receipts.map((r) => r.receipt).findLast((r) => r.kind === "check" && r.verify);
+    const sf = storyFacts("gh-1", [uf], {
+      frontmatter: fm,
+      claim,
+      pr: this.pr,
+      ...(this.prSeen ? { pr_seen: this.prSeen } : {}),
+      ...(this.base ? { base: this.base } : {}),
+      ...(verified?.kind === "check" && verified.verify ? { verified: verified.verify } : {}),
+    });
+    const f = facts([sf], { tick_id: tick, repo: { root: "/r", default_branch: "main", remote: "origin", worktrees: "/r-worktrees", ...this.repoPatch } }, this.now);
+    return { ...f, machine: { ...f.machine, leases: this.leases } };
   }
   /** one tick: decide (twice: pure), perform the unit's action like act, return it */
   tick(): Decision {
@@ -107,7 +123,13 @@ class Sim {
         this.write({ kind: "classify", ...head, run_id: a.run_id, by: "norn", outcome: "done", rule: a.rule, detail: "merged", route: "test", base: { ref: u.ref, sha: u.sha, conflicts: [] } });
       }
     }
-    if (a.kind === "run_check") this.write({ kind: "check", ...head, run_id: a.run_id, by: "norn", outcome: "pass", command: a.command, exit_code: 0, duration_ms: 10, output_tail: "ok" });
+    if (a.kind === "run_check") {
+      this.checks.push(a);
+      if (a.verify) {
+        const red = this.verifyOutcome === "fail";
+        this.write({ kind: "check", ...head, run_id: a.run_id, by: "norn", outcome: this.verifyOutcome, command: a.command, exit_code: red ? 1 : 0, duration_ms: 10, output_tail: red ? "FAIL src/a.test.ts: rename broke the call" : "ok", ...(red ? { log: `logs/${a.run_id}.log` } : {}), verify: a.verify });
+      } else this.write({ kind: "check", ...head, run_id: a.run_id, by: "norn", outcome: "pass", command: a.command, exit_code: 0, duration_ms: 10, output_tail: "ok" });
+    }
     if (a.kind === "start_run") {
       const run_id = a.launch.run_id;
       if (this.agent === "done") {
@@ -710,5 +732,137 @@ describe("merge step", () => {
     const res = applyReceipts(s.state, [{ n: s.state.applied_through + 1, file: "", receipt: { kind: "update", receipt_id: deriveUlid("01JFFFFFFFFFFFFFFFFFFFFFFF", 1), run_id: null, step: "merge", attempt: s.state.attempt, at: at(), by: "human", who: "jakub@mac", from: "merge", to: "update", reason: "person" } as Receipt }], { workflow: MERGE_WF, now: at() });
     expect(res.rejected).toEqual([]);
     expect(res.state).toMatchObject({ step: "update", status: "ready" });
+  });
+});
+
+/** The merge step workflow re-verifying waiting stories with its test step. */
+const VERIFY_WF: Workflow = { ...MERGE_WF, name: "verifying", base: { stale: "conflict", verify: "test" } };
+const CHECK_LEASE: LeaseFile = { version: 1, kind: "check", repo: "/x", story: "gh-9", slice: null, run_id: null, holder: { pid: 1, pid_start: "1" }, created_at: at() };
+
+describe("re-verify waiting stories (base.verify)", () => {
+  test("base.verify naming a check step validates; with stale: behind, or naming a step that is not a check, it is refused with the reason", () => {
+    expect(validateWorkflowDefinition(VERIFY_WF).issues).toEqual([]);
+    const behind = validateWorkflowDefinition({ ...VERIFY_WF, base: { stale: "behind", verify: "test" } });
+    expect(behind.issues).toEqual([{ code: "base_verify", path: "/base/verify", message: "base.verify cannot be set with base.stale: behind (any base move already updates the story, so nothing would be verified)" }]);
+    const gate = validateWorkflowDefinition({ ...VERIFY_WF, base: { verify: "ready" } });
+    expect(gate.issues).toEqual([{ code: "base_verify", path: "/base/verify", message: "base.verify 'ready' is a gate step; it must name a check step, whose command norn runs on the merged tree" }]);
+    expect(validateWorkflowDefinition({ ...VERIFY_WF, base: { verify: "nope" } }).issues.map((i) => i.path)).toEqual(["/base/verify"]);
+  });
+
+  test("a story waiting at ready or the merge step whose base moved without a conflict runs the verify check on the merged pair, a check slot taken, nothing pushed", () => {
+    for (const where of ["ready", "merge"] as const) {
+      const s = where === "merge" ? atMerge(VERIFY_WF) : new Sim(VERIFY_WF);
+      if (where === "ready") s.runUntil(at_("ready", "parked"));
+      s.base = base({ behind: 2, sha: SHA("c") });
+      const d = s.tick();
+      expect(d.rule).toBe("verify.run");
+      expect(d.action).toMatchObject({ kind: "run_check", step: where, command: "bun test", timeout_ms: 300_000, verify: { head: SHA("h"), base: SHA("c") } });
+      // a check run: no commit, no push, no PR, no approval
+      expect(Object.keys(d.action).filter((k) => ["commit", "receipts", "state", "update"].includes(k))).toEqual([]);
+      s.tick();
+      expect(s.state).toMatchObject({ step: where, status: "parked" });
+    }
+  });
+
+  test("a verify run already recorded for the story head and base sha is not ordered again; a new base sha orders a new one", () => {
+    const s = atMerge(VERIFY_WF);
+    s.base = base({ behind: 2, sha: SHA("c") });
+    s.tick(); // verify.run
+    s.tick(); // its receipt applied
+    expect(s.tick().rule).toBe("unit.parked.merge");
+    expect(s.tick().rule).toBe("unit.parked.merge");
+    expect(s.checks.filter((c) => c.verify)).toHaveLength(1);
+    s.base = base({ behind: 3, sha: SHA("d") });
+    expect(s.tick().rule).toBe("verify.run");
+    expect(s.checks.filter((c) => c.verify).map((c) => c.verify)).toEqual([{ head: SHA("h"), base: SHA("c") }, { head: SHA("h"), base: SHA("d") }]);
+  });
+
+  test("with no check slot free no verify run is ordered until one is", () => {
+    const s = atMerge(VERIFY_WF);
+    s.leases = Array.from({ length: CONFIG.max_agents }, () => CHECK_LEASE);
+    s.base = base({ behind: 2, sha: SHA("c") });
+    expect(s.tick().rule).toBe("check.queued");
+    expect(s.tick().rule).toBe("check.queued");
+    expect(s.checks.filter((c) => c.verify)).toEqual([]);
+    s.leases = [];
+    expect(s.tick().rule).toBe("verify.run");
+  });
+
+  test("a red verify run takes the waiting step's stale edge to update through stale_loop, the failure the next brief's last_check; a counter at its max stops the loop", () => {
+    const s = atMerge(VERIFY_WF);
+    s.verifyOutcome = "fail";
+    s.base = base({ behind: 2, sha: SHA("c") });
+    s.tick(); // verify.run
+    s.tick(); // red receipt applied
+    expect(s.state).toMatchObject({ step: "update", status: "ready", counters: { stale_loop: 1 }, last_outcome: { step: "merge", outcome: "stale" } });
+    // the next agent step that reads last_check sees the verify failure: the update meets a conflict, resolve takes it
+    const wf: Workflow = { ...VERIFY_WF, steps: { ...VERIFY_WF.steps, resolve: { ...(VERIFY_WF.steps.resolve as AgentStep), inputs: ["spec", "handoff", "last_check"] } } };
+    const r = new Sim(wf);
+    r.pr = OPEN_PR;
+    r.runUntil(at_("ready", "parked"));
+    r.approve();
+    r.tick();
+    r.verifyOutcome = "fail";
+    r.base = base({ behind: 2, sha: SHA("c") });
+    r.tick();
+    r.tick();
+    r.git = "conflict";
+    r.runUntil(at_("resolve"));
+    const brief = renderBrief({
+      unit: storyUnit(),
+      state: r.state,
+      workflow: wf,
+      mode: "auto",
+      runner: "herdr",
+      paths: { worktree: "/w", spec_dir: "/w/spec", story_file: "/w/spec/story.md", slice_file: null, unit_dir: "/w/spec/runs/_story" },
+      diff_range: null,
+      handoff: null,
+      receipts: r.receipts,
+      limits: { deadline: "60m", nudges: 2, retries: 1, slot: null, port_base: null },
+    });
+    expect(brief.json.rework?.check).toMatchObject({ step: "merge", command: "bun test", exit_code: 1, output_tail: expect.stringContaining("rename broke the call") });
+
+    const u = atMerge({ ...VERIFY_WF, counters: { ...VERIFY_WF.counters, stale_loop: { max: 1 } } });
+    u.verifyOutcome = "fail";
+    u.base = base({ behind: 2, sha: SHA("c") });
+    u.tick();
+    u.tick();
+    expect(u.state.step).toBe("update");
+    u.verifyOutcome = "pass";
+    u.runUntil(at_("ready", "parked"));
+    u.approve();
+    u.tick();
+    u.verifyOutcome = "fail";
+    u.base = base({ behind: 1, sha: SHA("d"), head: SHA("9") });
+    u.tick();
+    u.tick();
+    expect(u.state).toMatchObject({ status: "stuck", park: { kind: "exhausted", reason: "stale_loop 1/1 at merge.stale" } });
+  });
+
+  test("a green verify run leaves the story where it waits", () => {
+    const s = new Sim(VERIFY_WF);
+    s.runUntil(at_("ready", "parked"));
+    const before = { step: s.state.step, status: s.state.status, counters: s.state.counters };
+    s.base = base({ behind: 2, sha: SHA("c") });
+    s.tick();
+    s.tick();
+    expect(s.state).toMatchObject(before);
+    expect(s.tick().rule).toBe("unit.parked.gate");
+  });
+
+  test("a workflow without base.verify orders no verify run", () => {
+    const s = atMerge(MERGE_WF);
+    s.base = base({ behind: 2, sha: SHA("c") });
+    for (let i = 0; i < 3; i++) expect(s.tick().rule).toBe("unit.parked.merge");
+    expect(s.checks.filter((c) => c.verify)).toEqual([]);
+  });
+
+  test("between syncs a moved base may be the story's own merged PR: the verify waits for a sync", () => {
+    const s = atMerge(VERIFY_WF);
+    s.pr = undefined;
+    s.prSeen = { pr: OPEN_PR, observed_at: T0 };
+    s.base = base({ behind: 1, sha: SHA("c") });
+    expect(s.tick().rule).toBe("verify.awaits_sync");
+    expect(s.checks.filter((c) => c.verify)).toEqual([]);
   });
 });

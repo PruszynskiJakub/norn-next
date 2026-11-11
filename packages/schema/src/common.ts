@@ -34,6 +34,8 @@ export const Ulid = Type.String({ pattern: ULID_PATTERN, description: "ULID" });
 export const IsoTime = Type.String({ format: "date-time", description: "ISO-8601 timestamp, UTC" });
 export const Duration = Type.String({ pattern: DURATION_PATTERN, description: "Duration like 30s, 10m, 1h30m" });
 export const GitSha = Type.String({ pattern: GIT_SHA_PATTERN });
+/** A re-verify run's (story head, base sha): the merged tree it checked, and the key that runs it once per base move. */
+export const VerifyPair = Type.Object({ head: GitSha, base: GitSha }, { additionalProperties: false });
 export const StoryKey = Type.String({ pattern: STORY_KEY_PATTERN, description: "Story key, e.g. gh-123 or gl-45" });
 export const SliceKey = Type.String({ pattern: SLICE_KEY_PATTERN, description: "Slice key, e.g. gh-123/03" });
 export const Slug = Type.String({ pattern: SLUG_PATTERN, maxLength: 48 });

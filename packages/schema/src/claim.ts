@@ -1,5 +1,5 @@
 import { type Static, Type } from "@sinclair/typebox";
-import { IsoTime, NonEmpty, NonNegInt, OutcomeName, PosInt, ProcessIdentity, SliceKey, StoryKey, Ulid } from "./common.ts";
+import { GitSha, IsoTime, NonEmpty, NonNegInt, OutcomeName, PosInt, ProcessIdentity, SliceKey, StoryKey, Ulid } from "./common.ts";
 
 /** Blob behind `refs/norn/claims/<story>`. */
 export const ClaimBlob = Type.Object(
@@ -72,6 +72,11 @@ export const CheckOrder = Type.Object(
     exits: Type.Optional(Type.Record(Type.String({ pattern: "^[1-9][0-9]*$" }), OutcomeName)),
     /** The slot's port range, when the unit has one */
     ports: Type.Union([Type.Object({ from: PosInt, to: PosInt }, { additionalProperties: false }), Type.Null()]),
+    /**
+     * A re-verify run: the pair the receipt records, and the temporary worktree of the merged tree
+     * (`cwd`) that `norn check-run` removes from `repo` when it ends.
+     */
+    verify: Type.Optional(Type.Object({ head: GitSha, base: GitSha, repo: NonEmpty, worktree: NonEmpty }, { additionalProperties: false })),
   },
   { $id: "https://norn.dev/schema/check-order.json", title: "norn check order", additionalProperties: false },
 );
