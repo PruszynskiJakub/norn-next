@@ -363,6 +363,10 @@
             }
           }
         },
+        "head_sha": {
+          "pattern": "^[0-9a-f]{40,64}$",
+          "type": "string"
+        },
         "base_merge": {
           "additionalProperties": false,
           "type": "object",
@@ -1789,6 +1793,83 @@
             },
             "merged": {
               "type": "boolean"
+            }
+          }
+        },
+        "history": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "anchor",
+            "spec_dir",
+            "commits"
+          ],
+          "properties": {
+            "anchor": {
+              "pattern": "^[0-9a-f]{40,64}$",
+              "type": "string"
+            },
+            "spec_dir": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "commits": {
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "sha",
+                  "parents",
+                  "paths",
+                  "trailers"
+                ],
+                "properties": {
+                  "sha": {
+                    "pattern": "^[0-9a-f]{40,64}$",
+                    "type": "string"
+                  },
+                  "parents": {
+                    "type": "array",
+                    "items": {
+                      "pattern": "^[0-9a-f]{40,64}$",
+                      "type": "string"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "trailers": {
+                    "type": "object",
+                    "patternProperties": {
+                      "^(.*)$": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "from_base": {
+                    "type": "boolean"
+                  },
+                  "remerge": {
+                    "anyOf": [
+                      {
+                        "type": "array",
+                        "items": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
             }
           }
         },

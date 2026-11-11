@@ -90,6 +90,8 @@ export const DoneReceipt = receipt("done", {
   criteria: Type.Optional(Type.Array(CriterionVerdict, { minItems: 1 })),
   /** Notes for a person; never block, never change the route */
   notes: Type.Optional(Type.Array(Note, { minItems: 1 })),
+  /** The unit worktree's HEAD at `norn done`; an `approve` from it anchors the light path of a later base update */
+  head_sha: Type.Optional(GitSha),
   /**
    * Verified at `norn done` of a base-mode step: the base merged, the merge commit that brought
    * it in (null = reached without a merge commit) and the story head reported.
@@ -210,6 +212,34 @@ export const ClassifyReceipt = receipt("classify", {
         head: Type.Optional(GitSha),
         /** A `done` update made a merge commit (false = already up to date) */
         merged: Type.Optional(Type.Boolean()),
+      },
+      { additionalProperties: false },
+    ),
+  ),
+  /**
+   * The git summary a routed `git: update` chose its outcome from: the story's first-parent commits
+   * from the head at the round's latest `approve` to the head after the merge, newest first.
+   */
+  history: Type.Optional(
+    Type.Object(
+      {
+        anchor: GitSha,
+        spec_dir: NonEmpty,
+        commits: Type.Array(
+          Type.Object(
+            {
+              sha: GitSha,
+              parents: Type.Array(GitSha),
+              paths: Type.Array(NonEmpty),
+              trailers: Type.Record(Type.String(), Type.String()),
+              /** a merge whose other parents are in the base's history */
+              from_base: Type.Optional(Type.Boolean()),
+              /** a merge's remerge-diff paths; null = git could not tell */
+              remerge: Type.Optional(Type.Union([Type.Array(NonEmpty), Type.Null()])),
+            },
+            { additionalProperties: false },
+          ),
+        ),
       },
       { additionalProperties: false },
     ),

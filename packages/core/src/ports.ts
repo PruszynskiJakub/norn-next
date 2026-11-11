@@ -142,6 +142,15 @@ export interface FirstParentCommit {
   trailer: string;
 }
 
+/** A commit of `GitPort.commitPaths`. */
+export interface CommitPaths {
+  sha: string;
+  parents: string[];
+  /** paths changed against the first parent (all of a root commit's), sorted */
+  paths: string[];
+  trailers: Record<string, string>;
+}
+
 /** Git, run in a given repo or worktree directory (`cwd`). */
 export interface GitPort {
   /** Top-level of the repo containing cwd (main checkout, not the worktree). */
@@ -167,6 +176,14 @@ export interface GitPort {
    * `trailer` trailer ("" when absent).
    */
   firstParentLog(cwd: string, rev: string, opts: { exclude?: string; limit: number; trailer: string }): Promise<FirstParentCommit[]>;
+  /** The first-parent line of `rev` not reachable from `exclude`, newest first: each commit's parents, the paths it changes and its trailers. */
+  commitPaths(cwd: string, rev: string, exclude: string): Promise<CommitPaths[]>;
+  /**
+   * Paths of the merge commit `sha`'s remerge-diff (`git show --remerge-diff`): where it differs
+   * from the merge git makes alone ([] = git made it alone). null when `sha` is not a merge of two
+   * parents or this git cannot remerge (older than 2.36).
+   */
+  remergeDiff(cwd: string, sha: string): Promise<string[] | null>;
   /** `git rev-list` of `range`: shas, newest first unless `reverse`. */
   revList(cwd: string, range: string, opts?: { ancestryPath?: boolean; firstParent?: boolean; limit?: number; reverse?: boolean }): Promise<string[]>;
   /** The file at `path` in `rev` (`git show <rev>:<path>`); null when there is none. */

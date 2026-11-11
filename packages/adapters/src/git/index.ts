@@ -6,7 +6,7 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { gitTimeoutMs } from "@norn/store";
-import type { CommitSpec, ConflictMarker, FirstParentCommit, GitFactory, GitInProgress, GitPort, MergeResult, OutgoingMarkers, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
+import type { CommitPaths, CommitSpec, ConflictMarker, FirstParentCommit, GitFactory, GitInProgress, GitPort, MergeResult, OutgoingMarkers, PushResult, RefUpdate, WorktreeInfo, WorktreeStatus } from "@norn/core";
 import { bunExec, isAuthError, isNetworkError, okOrThrow, portError, type Exec, type ExecResult } from "../exec.ts";
 
 export { bunExec, fixtureExec, portError, type Exec, type ExecFixture, type ExecOptions, type ExecResult } from "../exec.ts";
@@ -271,6 +271,28 @@ export function createGit(opts: GitOptions = {}): GitPort {
         commits.push({ sha: sha as string, subject: subject ?? "", author: author ?? "", authored_at: authored ?? "", committed_at: committed ?? "", trailer: (trailer ?? "").trim() });
       }
       return commits;
+    },
+    async commitPaths(cwd, rev, exclude): Promise<CommitPaths[]> {
+      const out = await must(cwd, ["log", "--first-parent", "--format=%H%x1f%P%x1f%(trailers:only,unfold)%x1e", rev, `^${exclude}`, "--"]);
+      const commits: CommitPaths[] = [];
+      for (const rec of out.split("\x1e")) {
+        const r = rec.replace(/^\n/, "");
+        if (!r) continue;
+        const [sha, parents, trailers] = r.split("\x1f") as [string, string, string];
+        const ps = parents.split(" ").filter(Boolean);
+        const diff = ps[0] ? ["diff-tree", "-r", "--no-commit-id", "--name-only", "-z", ps[0], sha] : ["diff-tree", "-r", "--root", "--no-commit-id", "--name-only", "-z", sha];
+        const paths = (await must(cwd, diff)).split("\0").filter(Boolean).sort();
+        commits.push({ sha, parents: ps, paths, trailers: parseTrailers(trailers ?? "") });
+      }
+      return commits;
+    },
+    async remergeDiff(cwd, sha) {
+      const parents = (await line(cwd, ["log", "-1", "--format=%P", sha])).split(" ").filter(Boolean);
+      if (parents.length !== 2) return null;
+      // an unknown option (git < 2.36) fails: the caller must never read that as a clean merge
+      const r = await run(cwd, ["show", "--remerge-diff", "--format=", "--name-only", "-z", sha, "--"]);
+      if (r.code !== 0) return null;
+      return [...new Set(r.stdout.split("\0").filter(Boolean))].sort();
     },
     async revList(cwd, range, o) {
       const args = ["rev-list"];

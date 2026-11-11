@@ -140,7 +140,8 @@ export const GitStep = Type.Object(
     type: Type.Literal("git"),
     ...common,
     action: GitAction,
-    outcomes: fixedOutcomes(["done", "conflict"] as const),
+    /** `clean` and `resolved` (the light path after a base update) only on `action: update` */
+    outcomes: fixedOutcomes(["done", "conflict", "clean", "resolved"] as const),
   },
   { additionalProperties: false },
 );
@@ -237,7 +238,7 @@ export const CLASSIFIED_OUTCOMES = {
   agent: ["silent", "died", "timeout", "stalled", "ask", "exhausted"],
   check: ["pass", "fail", "exhausted"],
   gate: ["approve", "reject", "stale", "exhausted"],
-  git: ["done", "conflict", "stuck", "exhausted"],
+  git: ["done", "conflict", "clean", "resolved", "stuck", "exhausted"],
   slices: ["done", "stuck", "exhausted"],
   merge: ["stale", "exhausted"],
 } as const satisfies Record<StepType, readonly string[]>;

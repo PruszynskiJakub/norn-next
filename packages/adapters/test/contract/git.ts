@@ -6,7 +6,7 @@
  * and fast-forward, and the reads the runtime makes (4.1): remotes, commonDir, hasRef, hasPath,
  * show, lsTree, listRefs over several prefixes, firstParentLog, revList, quiet fetch, detached
  * worktrees and prune, and what the commands call (4.2): version, remoteBranches, changedPaths,
- * checkoutPaths and untrack, and what `norn upgrade` calls: move, stage and ignored. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
+ * checkoutPaths and untrack, and what `norn upgrade` calls: move, stage and ignored, and what a base update's light path reads: commitPaths and remergeDiff. Run against real temp repos with a bare remote. Not covered: rebase, log ranges
  * beyond the last commit, and the port methods only the runtime's own wiring reaches.
  */
 import { afterAll, describe, expect } from "bun:test";
@@ -43,7 +43,8 @@ export type GitContractTest =
   | "version names git; remoteBranches lists the remote's branches matching a pattern"
   | "changedPaths lists what two revisions change; checkoutPaths and untrack put paths back"
   | "move stages a rename of a tracked file and leaves an untracked one; stage adds paths to the index"
-  | "ignored names the paths git ignores, never a tracked one";
+  | "ignored names the paths git ignores, never a tracked one"
+  | "commitPaths: first-parent commits of a range with parents, paths and trailers; remergeDiff names what a merge's author changed";
 
 /** Deterministic git for the suite's own setup and for the port under test. */
 export const GIT_ENV = {
@@ -468,6 +469,47 @@ export function gitContract(name: string, make: () => GitPort, opts: ContractOpt
       expect(await git.ignored(root, ["kept.txt", "skip/x.txt"])).toEqual(["skip/x.txt"]);
       sh(root, "add", "-f", "skip/x.txt");
       expect(await git.ignored(root, ["skip/x.txt"])).toEqual([]);
+    });
+
+    t("commitPaths: first-parent commits of a range with parents, paths and trailers; remergeDiff names what a merge's author changed", async () => {
+      const { root, git } = repo();
+      const anchor = sh(root, "rev-parse", "HEAD");
+      sh(root, "checkout", "-q", "-b", "story");
+      const story = commitFile(root, "a.txt", "story\n");
+      writeFileSync(join(root, "s.md"), "s\n");
+      mkdirSync(join(root, "d"));
+      writeFileSync(join(root, "d", "h.md"), "h\n");
+      sh(root, "add", "-A");
+      sh(root, "commit", "-q", "-m", "bookkeeping\n\nNorn-Step: implement");
+      const book = sh(root, "rev-parse", "HEAD");
+      sh(root, "checkout", "-q", "main");
+      commitFile(root, "b.txt", "base\n");
+      const clashing = commitFile(root, "a.txt", "main\n");
+      sh(root, "checkout", "-q", "story");
+      // a merge git cannot make alone: the resolution is what its author wrote
+      spawnSyncCaptured(["git", "merge", "--no-edit", "main"], { cwd: root, env: { ...process.env, ...GIT_ENV } });
+      writeFileSync(join(root, "a.txt"), "resolved\n");
+      sh(root, "add", "a.txt");
+      sh(root, "commit", "-q", "--no-edit");
+      const resolved = sh(root, "rev-parse", "HEAD");
+      sh(root, "checkout", "-q", "main");
+      commitFile(root, "c.txt", "more base\n");
+      sh(root, "checkout", "-q", "story");
+      sh(root, "merge", "-q", "--no-edit", "main");
+      const clean = sh(root, "rev-parse", "HEAD");
+      const main = sh(root, "rev-parse", "main");
+
+      expect(await git.commitPaths(root, clean, anchor)).toEqual([
+        { sha: clean, parents: [resolved, main], paths: ["c.txt"], trailers: {} },
+        { sha: resolved, parents: [book, clashing], paths: ["a.txt", "b.txt"], trailers: {} },
+        { sha: book, parents: [story], paths: ["d/h.md", "s.md"], trailers: { "Norn-Step": "implement" } },
+        { sha: story, parents: [anchor], paths: ["a.txt"], trailers: {} },
+      ]);
+      expect(await git.commitPaths(root, clean, clean)).toEqual([]);
+      expect(await git.remergeDiff(root, clean)).toEqual([]);
+      expect(await git.remergeDiff(root, resolved)).toEqual(["a.txt"]);
+      // not a merge: nothing to remerge
+      expect(await git.remergeDiff(root, book)).toBeNull();
     });
   });
 }

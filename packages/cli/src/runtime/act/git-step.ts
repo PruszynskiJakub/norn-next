@@ -1,9 +1,9 @@
 /** act: git steps — integrate, update, push, open-pr. */
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { type Action, type ActionResult, applyReceipts, nornTrailers, type RemotePort, routeOf, updateOutcome } from "@norn/core";
+import { type Action, type ActionResult, applyReceipts, LIGHT_OUTCOMES, lightAnchor, nornTrailers, type RemotePort, routeOf, type UpdateHistory, type UpdateMerge, type UpdateOutcome, updateOutcome } from "@norn/core";
 import { type ReceiptOf, recordRef, ulid } from "@norn/schema";
-import { acquireIntegrateLock, appendReceipt, machineDir, pushRecord, readPrFacts, readRecordRef, readText, writePrFacts } from "@norn/store";
+import { acquireIntegrateLock, appendReceipt, listReceipts, machineDir, pushRecord, readPrFacts, readRecordRef, readText, writePrFacts } from "@norn/store";
 import { integrate, update as updateStory } from "../integrate.ts";
 import type { PushBranchResult } from "../push.ts";
 import { type ActEnv, QueueFull } from "./env.ts";
@@ -60,12 +60,33 @@ async function pushUpdated(act: ActEnv, cwd: string, branch: string): Promise<Pu
   return r;
 }
 
+/**
+ * The story's first-parent commits from the head at the round's latest `approve` to `head`, with
+ * what the light path needs of each merge; null when there is no approval to measure from or its
+ * head is not under the branch (rewritten, or unknown here), which takes the full path.
+ */
+async function updateHistory(act: ActEnv, cwd: string, runsDir: string, specDir: string, baseSha: string, head: string): Promise<UpdateHistory | null> {
+  const anchor = lightAnchor(listReceipts(runsDir).receipts);
+  if (!anchor || !(await act.git.isAncestor(cwd, anchor, head).catch(() => false))) return null;
+  const commits: UpdateHistory["commits"] = [];
+  for (const c of await act.git.commitPaths(cwd, head, anchor)) {
+    if (c.parents.length < 2) {
+      commits.push(c);
+      continue;
+    }
+    const fromBase = await Promise.all(c.parents.slice(1).map((p) => act.git.isAncestor(cwd, p, baseSha).catch(() => false)));
+    commits.push({ ...c, from_base: fromBase.every(Boolean), remerge: await act.git.remergeDiff(cwd, c.sha) });
+  }
+  return { anchor, spec_dir: specDir, commits };
+}
+
 async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>): Promise<ActionResult> {
   const loc = act.unitLoc(a.unit);
   const st = loc.state;
   const wf = loc.workflow;
   if (!st || !wf) throw new Error(`${a.unit.key} has no state or pinned workflow`);
-  let outcome: "done" | "conflict" | "stuck";
+  let outcome: UpdateOutcome | "stuck";
+  let history: UpdateHistory | null = null;
   let detail: string;
   let base: ReceiptOf<"classify">["base"];
   const extra: Record<string, unknown> = {};
@@ -81,8 +102,12 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
         break;
       }
       if (res.adopted) extra.adopted = res.adopted;
+      const merge: UpdateMerge = res.outcome === "conflict" ? { outcome: "conflict", files: res.files } : { outcome: res.merged ? "merged" : "up_to_date" };
+      // the light path is measured only where the step routes it: other workflows update as before
+      const routed = Object.keys(wf.steps[a.step]?.outcomes ?? {});
+      history = res.outcome === "done" && LIGHT_OUTCOMES.some((o) => routed.includes(o)) ? await updateHistory(act, a.cwd, loc.runsDir, act.storyLoc(a.unit.story).spec_dir, u.sha, res.head) : null;
       // core chooses the outcome; below only records what the merge did
-      outcome = updateOutcome({ merge: res.outcome === "conflict" ? { outcome: "conflict", files: res.files } : { outcome: res.merged ? "merged" : "up_to_date" } });
+      outcome = updateOutcome({ merge, history }, routed);
       if (res.outcome === "conflict") {
         // the merge was aborted; the resolve step gets the base sha and the paths
         base = { ref: u.ref, sha: u.sha, conflicts: res.files };
@@ -164,6 +189,7 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
     detail,
     route: "$stuck", // set below from the in-memory apply
     ...(base ? { base } : {}),
+    ...(history ? { history } : {}),
   };
   // The route is where applying this receipt sends the unit — an exhausted counter
   // (e.g. integrate.conflict past conflict_loop's max) records `$stuck`, not the edge's target.

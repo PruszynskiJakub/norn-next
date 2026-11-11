@@ -9,6 +9,7 @@ import {
   type Workflow,
 } from "@norn/schema";
 import { cmd } from "./commands.ts";
+import { LIGHT_OUTCOMES } from "./update-outcome.ts";
 
 export type WorkflowIssueCode =
   | "schema"
@@ -160,6 +161,12 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
           message: "'exhausted' always routes to $stuck and cannot be declared",
         });
     }
+  }
+  for (const [name, step] of Object.entries(wf.steps)) {
+    if (step.type !== "git" || step.action === "update") continue;
+    for (const outcome of LIGHT_OUTCOMES)
+      if (Object.hasOwn(step.outcomes, outcome))
+        issues.push({ code: "unknown_outcome", path: `/steps/${name}/outcomes/${outcome}`, message: `'${outcome}' is an outcome of a base update only (action: update), not of action: ${step.action}` });
   }
   for (const [name, step] of Object.entries(wf.steps)) {
     if (step.type !== "check") continue;

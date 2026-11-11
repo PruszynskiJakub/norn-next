@@ -202,7 +202,10 @@ export const doneCommand = defineCommand({
     const base = baseToMerge(t.s);
     const baseMerge = base ? await verifyBaseMerge(ctx, t.s, base) : null;
 
+    // the head this report judged: an `approve` from it anchors the light path of a later base update
+    const head = await ctx.git.revParse(t.s.worktree, "HEAD").catch(() => null);
     const receipt: ReceiptOf<"done"> = { kind: "done", ...reportHeader(ctx, t), outcome, handoff };
+    if (head) receipt.head_sha = head;
     if (baseMerge) receipt.base_merge = baseMerge;
     if (findings) receipt.findings = findings;
     if (evidencePath) receipt.evidence = `evidence/${t.run_id}`;
