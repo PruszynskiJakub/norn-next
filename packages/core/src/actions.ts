@@ -224,6 +224,8 @@ export interface RunCheckAction extends UnitBase {
   env: Record<string, string>;
   /** where act writes the full log on fail: runs/<unit>/logs/<run_id>.log */
   log_path: string;
+  /** the step's `exits` (exit code → outcome), when it declares any */
+  exits?: Record<string, string>;
 }
 
 /** Run a git step. Act writes a `classify` receipt with `done` or `conflict`. */

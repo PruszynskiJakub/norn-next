@@ -205,7 +205,7 @@ describe("single-purpose workflows (#136)", () => {
     expect(targets("story", "approve-slices")).toEqual({ approve: "slices", reject: "slice" });
     expect(Object.keys(wf("story").steps)).not.toContain("refine");
     expect(targets("story", "open-pr")).toEqual({ done: "ci" });
-    expect(targets("story", "ci")).toEqual({ pass: "ready", fail: "implement" });
+    expect(targets("story", "ci")).toEqual({ pass: "ready", fail: "implement", stale: "update" });
   });
 
   test("story's describe step reads the record, not runs/ in the worktree, here and in this repo's copy (B28)", () => {
@@ -237,7 +237,7 @@ describe("single-purpose workflows (#136)", () => {
     expect(wf("quick").start).toBe("sync");
     expect(targets("quick", "sync")).toEqual({ done: "implement", conflict: "sync-resolve" });
     expect(targets("quick", "open-pr")).toEqual({ done: "ci" });
-    expect(targets("quick", "ci")).toEqual({ pass: "ready", fail: "implement" });
+    expect(targets("quick", "ci")).toEqual({ pass: "ready", fail: "implement", stale: "update" });
   });
 
   test("story and quick wait for CI with the same script, and update-branch re-enters update", () => {

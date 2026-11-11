@@ -10,7 +10,7 @@
  */
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { type Action, type ActionResult } from "@norn/core";
+import { type Action, type ActionResult, checkOutcome } from "@norn/core";
 import { assertValid, type CheckOrder, type ReceiptOf, ulid } from "@norn/schema";
 import {
   acquireRunLease,
@@ -67,6 +67,7 @@ export async function runCheck(act: ActEnv, a: Extract<Action, { kind: "run_chec
     cwd: a.cwd,
     env,
     timeout_ms: a.timeout_ms,
+    ...(a.exits ? { exits: a.exits } : {}),
     ports: slotPorts({ ...act.ctx.env, ...env }.PORT_BASE),
   };
   const path = checkOrderPath(act.ctx.home, a.run_id);
@@ -107,7 +108,6 @@ export async function runCheckOrder(order: CheckOrder, now: () => number): Promi
   const started = now();
   claimRunLease(order.home, order.lease_file, order.run_id, localProcess.self()); // The lease dies with this process
   const receipt = (res: ShellResult): ReceiptOf<"check"> => {
-    const pass = !res.timed_out && res.exit_code === 0;
     return {
       kind: "check",
       receipt_id: ulid(now()),
@@ -118,7 +118,7 @@ export async function runCheckOrder(order: CheckOrder, now: () => number): Promi
       by: "norn",
       who: order.who,
       tick_id: order.tick_id,
-      outcome: pass ? "pass" : "fail",
+      outcome: checkOutcome(order.exits, res),
       command: order.command,
       exit_code: res.exit_code,
       duration_ms: res.duration_ms,
@@ -132,7 +132,7 @@ export async function runCheckOrder(order: CheckOrder, now: () => number): Promi
     const res = await runShell(order.command, { cwd: order.cwd, env: { ...process.env, ...order.env }, timeoutMs: order.timeout_ms });
     if (stopped.length) res.output = `${stopped.map((s) => `norn: stopped pid ${s.pid} (${s.command}) left listening on :${s.port} from this worktree`).join("\n")}\n${res.output}`;
     const r = receipt(res);
-    if (r.outcome === "fail") r.log = writeLog(order.runs_dir, order.run_id, res.output);
+    if (r.outcome !== "pass") r.log = writeLog(order.runs_dir, order.run_id, res.output);
     appendReceipt(order.runs_dir, r);
     return r;
   } catch (e) {

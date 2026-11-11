@@ -269,62 +269,24 @@
                   "description": "Duration like 30s, 10m, 1h30m",
                   "type": "string"
                 },
+                "exits": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "description": "Exit code → outcome; exit 0 is pass, an undeclared one fail",
+                  "type": "object",
+                  "patternProperties": {
+                    "^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$": {
+                      "pattern": "^[a-z][a-z0-9_-]*$",
+                      "type": "string"
+                    }
+                  }
+                },
                 "outcomes": {
                   "minProperties": 1,
                   "additionalProperties": false,
                   "type": "object",
-                  "properties": {
-                    "pass": {
-                      "anyOf": [
-                        {
-                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
-                          "type": "string"
-                        },
-                        {
-                          "additionalProperties": false,
-                          "type": "object",
-                          "required": [
-                            "to"
-                          ],
-                          "properties": {
-                            "to": {
-                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
-                              "type": "string"
-                            },
-                            "counter": {
-                              "pattern": "^[a-z][a-z0-9_-]*$",
-                              "type": "string"
-                            },
-                            "means": {
-                              "minLength": 1,
-                              "description": "Shown to the agent in the brief",
-                              "type": "string"
-                            },
-                            "verdict": {
-                              "anyOf": [
-                                {
-                                  "const": "fail",
-                                  "type": "string"
-                                },
-                                {
-                                  "const": "unverified",
-                                  "type": "string"
-                                },
-                                {
-                                  "const": "person",
-                                  "type": "string"
-                                },
-                                {
-                                  "const": "pass",
-                                  "type": "string"
-                                }
-                              ]
-                            }
-                          }
-                        }
-                      ]
-                    },
-                    "fail": {
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_-]*$": {
                       "anyOf": [
                         {
                           "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",

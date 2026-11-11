@@ -93,13 +93,27 @@ export const AgentStep = Type.Object(
 );
 export type AgentStep = Static<typeof AgentStep>;
 
+const EXIT_CODE_PATTERN = "^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
+
 export const CheckStep = Type.Object(
   {
     type: Type.Literal("check"),
     ...common,
     run: NonEmpty,
     timeout: Duration,
-    outcomes: fixedOutcomes(["pass", "fail"] as const),
+    /**
+     * Exit code (1–255) → outcome name, for a check that ends in more than pass or fail; exit 0 is
+     * always `pass` and any other exit `fail`. Each named outcome is declared in `outcomes`.
+     */
+    exits: Type.Optional(
+      Type.Record(Type.String({ pattern: EXIT_CODE_PATTERN }), OutcomeName, {
+        minProperties: 1,
+        additionalProperties: false,
+        description: "Exit code → outcome; exit 0 is pass, an undeclared one fail",
+      }),
+    ),
+    /** `pass`, `fail` and the outcomes `exits` names; load-time validation refuses any other */
+    outcomes: openOutcomes(),
   },
   { additionalProperties: false },
 );

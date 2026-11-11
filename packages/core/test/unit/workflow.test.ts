@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { workflowHash } from "../../src/hash.ts";
-import { checkWorkflowLevel, elementaryCycles, validateWorkflowDefinition } from "../../src/workflow.ts";
+import { checkOutcome, checkWorkflowLevel, elementaryCycles, validateWorkflowDefinition } from "../../src/workflow.ts";
 import { SLICE_WF, STORY_WF } from "../fixtures.ts";
 
 const clone = <T>(v: T): T => structuredClone(v);
@@ -62,6 +62,21 @@ describe("validateWorkflowDefinition", () => {
     expect(codes({ name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { ok: "$done", exhausted: "$done" } } } })).toEqual(["reserved_outcome"]);
   });
 
+  test("a check declares extra outcomes by exit code: each outcome is pass, fail or named by exits, and exits names a declared one", () => {
+    const wf = (check: Record<string, unknown>) => ({
+      name: "x",
+      start: "c",
+      steps: { c: { type: "check", run: "true", timeout: "1m", ...check }, u: { type: "gate", outcomes: { approve: "c" } } },
+    });
+    const pass = { pass: "$done", fail: "$stuck" };
+    expect(codes(wf({ exits: { 3: "stale" }, outcomes: { ...pass, stale: { to: "u", counter: "n" } } }))).toEqual(["unknown_counter"]);
+    expect(codes({ ...wf({ exits: { 3: "stale" }, outcomes: { ...pass, stale: { to: "u", counter: "n" } } }), counters: { n: { max: 2 } } })).toEqual([]);
+    expect(codes(wf({ outcomes: { ...pass, flaky: "$done" } }))).toEqual(["unknown_outcome"]);
+    expect(codes(wf({ exits: { 3: "stale" }, outcomes: pass }))).toEqual(["unknown_outcome"]);
+    expect(codes(wf({ exits: { 3: "fail" }, outcomes: pass }))).toEqual(["reserved_outcome"]);
+    expect(codes(wf({ exits: { 3: "exhausted" }, outcomes: pass }))).toEqual(["reserved_outcome"]);
+  });
+
   test("a step's skill must be installed for the agent that runs it", () => {
     const wf = { name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { ok: "b" } }, b: { type: "agent", skill: "t", agent: "codex", outcomes: { ok: "$done" } } } };
     const check = (visible: Record<string, string[]>) => validateWorkflowDefinition(wf, { agentSkills: { agent: "claude", visible } }).issues.map((i) => i.path);
@@ -109,4 +124,15 @@ test("workflowHash is stable across key order", () => {
   expect(workflowHash(reordered)).toBe(workflowHash(SLICE_WF));
   expect(workflowHash(STORY_WF)).not.toBe(workflowHash(SLICE_WF));
   expect(workflowHash(SLICE_WF)).toMatch(/^[0-9a-f]{64}$/);
+});
+
+describe("checkOutcome: the outcome a check's exit names", () => {
+  const exits = { "3": "stale" };
+  test("exit 0 passes; a declared exit code names its outcome; anything else, a timeout included, fails", () => {
+    expect(checkOutcome(exits, { exit_code: 0, timed_out: false })).toBe("pass");
+    expect(checkOutcome(exits, { exit_code: 3, timed_out: false })).toBe("stale");
+    expect(checkOutcome(exits, { exit_code: 1, timed_out: false })).toBe("fail");
+    expect(checkOutcome(exits, { exit_code: null, timed_out: true })).toBe("fail");
+    expect(checkOutcome(undefined, { exit_code: 3, timed_out: false })).toBe("fail");
+  });
 });

@@ -78,18 +78,37 @@ steps:
     type: check
     run: |
       sha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1
+      # GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story
+      # updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.
+      mergeable() {
+        m=UNKNOWN
+        for i in 1 2 3 4 5 6; do
+          m=$(gh pr view --json mergeable -q .mergeable) || return 1
+          [ "$m" != UNKNOWN ] && return 0
+          sleep 5
+        done
+      }
+      conflicting() { [ "$m" = CONFLICTING ] && echo "PR conflicts with its base: no CI runs on it until the branch takes the base"; }
+      mergeable || exit 1
+      conflicting && exit 3
       run=
       for i in $(seq 1 30); do
         run=$(gh run list --workflow ci.yml --commit "$sha" --event pull_request --limit 1 --json databaseId -q '.[0].databaseId')
         [ -n "$run" ] && break
         sleep 10
       done
-      [ -n "$run" ] || { echo "no ci.yml run for $sha after 5m"; exit 1; }
+      if [ -z "$run" ]; then
+        mergeable || exit 1
+        conflicting && exit 3
+        echo "no ci.yml run for $sha after 5m (PR mergeable: $m)"
+        exit 1
+      fi
       gh run watch "$run" --exit-status --interval 30 >/dev/null && exit 0
       sh .agents/scripts/ci-failures.sh "$run"
       exit 1
     timeout: 30m
-    outcomes: { pass: ready, fail: { to: implement, counter: ci_loop } }
+    exits: { 3: stale }
+    outcomes: { pass: ready, fail: { to: implement, counter: ci_loop }, stale: { to: update, counter: stale_loop } }
   ready:
     type: gate
     prompt: "Read the draft PR. Approve to mark the story finished (a person still merges the PR), or reject with what to change."

@@ -6,6 +6,11 @@ import { join } from "node:path";
 import { spawnSyncCaptured } from "@norn/store";
 import { REPO_ROOT as ROOT } from "../../../../test/support/repo-root.ts";
 
+/** The `ci` step of the workflow `wf` in `dir`. */
+function ciStep(dir: string, wf: string): unknown {
+  return (Bun.YAML.parse(readFileSync(join(dir, `${wf}.yaml`), "utf8")) as { steps: Record<string, unknown> }).steps.ci;
+}
+
 /** The `ci` check script of a repo workflow, as norn runs it (`sh -c`, packages/cli/src/runtime/shell.ts). */
 function ciScript(wf: string): string {
   const { steps } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as { steps: Record<string, { run?: string }> };
@@ -17,6 +22,11 @@ describe("the ci check waits for the ci.yml run of the PR's head commit (#125)",
   // A fake gh and sleep on PATH: `gh run list` finds run 42 for SHA from its APPEAR-th call on (never when 0).
   const FAKE_GH = `#!/bin/sh
 echo "$*" >> "$FAKE/calls"
+# MERGEABLE: the PR's mergeable state per call, the last one repeating
+case "$*" in *"--json mergeable -q .mergeable")
+  n=$(($(cat "$FAKE/merges" 2>/dev/null || echo 0) + 1)); echo $n > "$FAKE/merges"
+  set -- $MERGEABLE; [ $n -gt $# ] && n=$#; eval "echo \\\${$n}"; exit 0 ;;
+esac
 case "$1 $2" in
   "pr view") echo "${SHA}" ;;
   "run list")
@@ -42,7 +52,7 @@ esac
     { databaseId: 9, name: "integration (shard 3/4)", conclusion: "success" },
     { databaseId: 10, name: "package", conclusion: "skipped" },
   ];
-  const run = (appear: number, watchExit: number) => {
+  const run = (appear: number, watchExit: number, mergeable = "MERGEABLE") => {
     const fake = mkdtempSync(join(tmpdir(), "norn-ci-check-"));
     writeFileSync(join(fake, "gh"), FAKE_GH);
     writeFileSync(join(fake, "sleep"), `#!/bin/sh\necho "$1" >> "$FAKE/sleeps"\n`);
@@ -54,7 +64,7 @@ esac
     writeFileSync(join(fake, "jobs.json"), JSON.stringify({ jobs: JOBS }));
     const proc = spawnSyncCaptured(["sh", "-c", `exec 2>&1\n${ciScript("quick")}`], {
       cwd: fake,
-      env: { ...process.env, PATH: `${fake}:${process.env.PATH}`, FAKE: fake, APPEAR: String(appear), WATCH_EXIT: String(watchExit) },
+      env: { ...process.env, PATH: `${fake}:${process.env.PATH}`, FAKE: fake, APPEAR: String(appear), WATCH_EXIT: String(watchExit), MERGEABLE: mergeable },
     });
     const read = (f: string) => (existsSync(join(fake, f)) ? readFileSync(join(fake, f), "utf8").trim().split("\n") : []);
     return { exit: proc.exitCode, out: proc.stdout.toString(), calls: read("calls"), sleeps: read("sleeps") };
@@ -84,8 +94,39 @@ esac
     const r = run(0, 0);
     expect(r.exit).toBe(1);
     expect(r.sleeps.length).toBe(30);
-    expect(r.out).toContain(`no ci.yml run for ${SHA} after 5m`);
+    expect(r.out).toContain(`no ci.yml run for ${SHA} after 5m (PR mergeable: MERGEABLE)`);
     expect(r.calls.some((c) => c.startsWith("run watch"))).toBe(false);
+  });
+
+  test("exits 3 (stale) at once on a PR that conflicts with its base, waiting for no run", () => {
+    const r = run(1, 0, "CONFLICTING");
+    expect(r.exit).toBe(3);
+    expect(r.out).toContain("PR conflicts with its base");
+    expect(r.calls.some((c) => c.startsWith("run "))).toBe(false);
+    expect(r.sleeps).toEqual([]);
+  });
+
+  test("asks again while mergeability is UNKNOWN, never taking it for a conflict", () => {
+    const r = run(1, 0, "UNKNOWN UNKNOWN MERGEABLE");
+    expect(r.exit).toBe(0);
+    expect(r.sleeps).toEqual(["5", "5"]);
+  });
+
+  test("goes on to wait when mergeability stays UNKNOWN", () => {
+    const r = run(1, 0, "UNKNOWN");
+    expect(r.exit).toBe(0);
+    expect(r.calls.filter((c) => c.startsWith("run watch")).length).toBe(1);
+  });
+
+  test("exits 3 (stale) when the PR came to conflict while no run appeared", () => {
+    const r = run(0, 0, "MERGEABLE CONFLICTING");
+    expect(r.exit).toBe(3);
+    expect(r.sleeps.filter((s) => s === "10").length).toBe(30);
+  });
+
+  test("story runs the same script as quick, declaring exit 3 as stale → update", () => {
+    expect(ciScript("story")).toBe(ciScript("quick"));
+    for (const wf of ["story", "quick"]) expect(ciStep(join(ROOT, ".agents", "workflows"), wf)).toMatchObject({ exits: { 3: "stale" }, outcomes: { stale: { to: "update", counter: "stale_loop" } } });
   });
 });
 
@@ -100,6 +141,11 @@ describe("the shipped ci check waits for the checks on the PR (#136)", () => {
   // A fake gh and sleep: PR 7 has checks from the APPEAR-th rollup call on (never when 0).
   const FAKE_GH = `#!/bin/sh
 echo "$*" >> "$FAKE/calls"
+# MERGEABLE: the PR's mergeable state per call, the last one repeating
+case "$*" in *"--json mergeable -q .mergeable")
+  n=$(($(cat "$FAKE/merges" 2>/dev/null || echo 0) + 1)); echo $n > "$FAKE/merges"
+  set -- $MERGEABLE; [ $n -gt $# ] && n=$#; eval "echo \\\${$n}"; exit 0 ;;
+esac
 case "$*" in
   "pr view --json number -q .number") echo 7 ;;
   "pr view --json headRefOid -q .headRefOid") echo "${SHA}" ;;
@@ -112,7 +158,7 @@ case "$*" in
   *) echo "unexpected gh $*" >&2; exit 9 ;;
 esac
 `;
-  const run = (appear: number, watchExit: number, withGh = true) => {
+  const run = (appear: number, watchExit: number, withGh = true, mergeable = "MERGEABLE") => {
     const fake = mkdtempSync(join(tmpdir(), "norn-ci-check-"));
     if (withGh) writeFileSync(join(fake, "gh"), FAKE_GH);
     writeFileSync(join(fake, "sleep"), `#!/bin/sh\necho "$1" >> "$FAKE/sleeps"\n`);
@@ -121,7 +167,7 @@ esac
     // without gh, PATH is the fake dir alone: CI runners ship gh in /usr/bin
     const proc = spawnSyncCaptured(["/bin/sh", "-c", `exec 2>&1\n${bundledCiScript("quick")}`], {
       cwd: fake,
-      env: { PATH: withGh ? `${fake}:/usr/bin:/bin` : fake, FAKE: fake, APPEAR: String(appear), WATCH_EXIT: String(watchExit) },
+      env: { PATH: withGh ? `${fake}:/usr/bin:/bin` : fake, FAKE: fake, APPEAR: String(appear), WATCH_EXIT: String(watchExit), MERGEABLE: mergeable },
     });
     const read = (f: string) => (existsSync(join(fake, f)) ? readFileSync(join(fake, f), "utf8").trim().split("\n") : []);
     return { exit: proc.exitCode, out: proc.stdout.toString(), calls: read("calls"), sleeps: read("sleeps") };
@@ -147,8 +193,26 @@ esac
     const r = run(0, 0);
     expect(r.exit).toBe(0);
     expect(r.sleeps.length).toBe(30);
-    expect(r.out).toContain("no checks on PR #7 after 5m");
+    expect(r.out).toContain("no checks on PR #7 after 5m (PR mergeable: MERGEABLE)");
     expect(r.calls.some((c) => c.startsWith("pr checks"))).toBe(false);
+  });
+
+  test("exits 3 (stale) at once on a PR that conflicts with its base, waiting for no check", () => {
+    const r = run(1, 0, true, "CONFLICTING");
+    expect(r.exit).toBe(3);
+    expect(r.out).toContain("PR conflicts with its base");
+    expect(r.calls.some((c) => c.includes("statusCheckRollup") || c.startsWith("pr checks"))).toBe(false);
+  });
+
+  test("asks again while mergeability is UNKNOWN, never taking it for a conflict", () => {
+    const r = run(1, 0, true, "UNKNOWN MERGEABLE");
+    expect(r.exit).toBe(0);
+    expect(r.sleeps).toEqual(["5"]);
+  });
+
+  test("exits 3 (stale) rather than pass when no check appeared because the PR came to conflict", () => {
+    const r = run(0, 0, true, "MERGEABLE CONFLICTING");
+    expect(r.exit).toBe(3);
   });
 
   test("passes without gh, saying there is no CI to wait for", () => {
@@ -157,7 +221,9 @@ esac
     expect(r.out).toContain("gh not found");
   });
 
-  test("story runs the same script as quick", () => {
+  test("story runs the same script as quick, declaring exit 3 as stale → update", () => {
     expect(bundledCiScript("story")).toBe(bundledCiScript("quick"));
+    for (const wf of ["story", "quick"])
+      expect(ciStep(join(ROOT, "packages", "cli", "assets", "workflows"), wf)).toMatchObject({ exits: { 3: "stale" }, outcomes: { stale: { to: "update", counter: "stale_loop" } } });
   });
 });

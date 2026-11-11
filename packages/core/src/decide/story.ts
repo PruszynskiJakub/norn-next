@@ -516,7 +516,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
     case "agent":
       return st.status === "running" ? classifyRun(ctx, story, uf, st, wf, step) : startRun(ctx, story, uf, st, wf, step);
     case "check":
-      return runCheck(ctx, story, uf, st, step.run, parseDuration(step.timeout));
+      return runCheck(ctx, story, uf, st, step.run, parseDuration(step.timeout), step.exits);
     case "git":
       return runGit(ctx, story, uf, st, wf, step);
     case "gate":

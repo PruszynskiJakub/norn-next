@@ -81,13 +81,31 @@ steps:
       command -v gh >/dev/null || { echo "gh not found: no CI to wait for"; exit 0; }
       pr=$(gh pr view --json number -q .number) || exit 1
       sha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1
+      # GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story
+      # updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.
+      mergeable() {
+        m=UNKNOWN
+        for i in 1 2 3 4 5 6; do
+          m=$(gh pr view "$pr" --json mergeable -q .mergeable) || return 1
+          [ "$m" != UNKNOWN ] && return 0
+          sleep 5
+        done
+      }
+      conflicting() { [ "$m" = CONFLICTING ] && echo "PR conflicts with its base: no CI runs on it until the branch takes the base"; }
+      mergeable || exit 1
+      conflicting && exit 3
       n=0
       for i in $(seq 1 30); do
         n=$(gh pr view "$pr" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1
         [ "$n" -gt 0 ] && break
         sleep 10
       done
-      [ "$n" -gt 0 ] || { echo "no checks on PR #$pr after 5m: nothing to wait for"; exit 0; }
+      if [ "$n" -eq 0 ]; then
+        mergeable || exit 1
+        conflicting && exit 3
+        echo "no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for"
+        exit 0
+      fi
       gh pr checks "$pr" --watch --interval 30 >/dev/null && exit 0
       gh pr checks "$pr"
       # where the failures are, never the log: a failed step's log buries the failure in passing output
@@ -97,7 +115,8 @@ steps:
       echo "Only if that is not enough, the full log is behind its link."
       exit 1
     timeout: 30m
-    outcomes: { pass: ready, fail: { to: implement, counter: ci_loop } }
+    exits: { 3: stale }
+    outcomes: { pass: ready, fail: { to: implement, counter: ci_loop }, stale: { to: update, counter: stale_loop } }
   ready:
     type: gate
     prompt: "Read the draft PR. Approve to mark the story finished (a person still merges the PR), or reject with what to change."

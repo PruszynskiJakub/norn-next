@@ -584,7 +584,7 @@ describe("test layout (AGENTS.md)", () => {
     ]);
   });
 
-  test("quick and story wait for the PR's CI after open-pr and send a red run back to implement", () => {
+  test("quick and story wait for the PR's CI after open-pr, send a red run back to implement and a conflicting PR to update", () => {
     for (const wf of ["quick", "story"]) {
       const { steps, counters } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as {
         steps: Record<string, { type: string; run?: string; outcomes: Record<string, unknown> }>;
@@ -593,12 +593,12 @@ describe("test layout (AGENTS.md)", () => {
       expect(steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
       expect(steps.ci?.type).toBe("check");
       expect(steps.ci?.run).toBe(ciScript("release"));
-      expect(steps.ci?.outcomes).toEqual({ pass: "ready", fail: { to: "implement", counter: "ci_loop" } });
+      expect(steps.ci?.outcomes).toEqual({ pass: "ready", fail: { to: "implement", counter: "ci_loop" }, stale: { to: "update", counter: "stale_loop" } });
       expect(counters.ci_loop).toEqual({ max: 3 });
     }
   });
 
-  test("release goes prepare → open-pr → ci → ready, a red CI goes $stuck, and a base commit makes it stale", () => {
+  test("release goes prepare → open-pr → ci → ready, a red CI goes $stuck, and a base commit or a conflicting PR makes it stale", () => {
     const { start, steps, counters, base } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", "release.yaml"), "utf8")) as {
       start: string;
       steps: Record<string, { type: string; run?: string; outcomes: Record<string, unknown> }>;
@@ -610,7 +610,7 @@ describe("test layout (AGENTS.md)", () => {
     expect(steps.prepare?.outcomes.done).toMatchObject({ to: "open-pr" });
     expect(steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
     expect(steps.ci?.type).toBe("check");
-    expect(steps.ci?.outcomes).toEqual({ pass: "ready", fail: "$stuck" });
+    expect(steps.ci?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: { to: "update", counter: "stale_loop" } });
     expect(steps.ready?.outcomes.reject).toEqual({ to: "prepare", counter: "ready_loop" });
     expect(counters.version_loop).toBeUndefined();
     expect(base).toEqual({ stale: "behind" });
