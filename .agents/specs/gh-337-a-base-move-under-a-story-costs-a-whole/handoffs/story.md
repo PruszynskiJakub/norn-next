@@ -7,7 +7,7 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 ## Proof
 
 - spec.md: 76 user stories, Plan seams S1–S5, D1–D14; 14 slices integrated; 77 criteria in frontmatter.
-- Review #2 (HEAD dc73fb91): unit 1911 pass / 0 fail, typecheck green; F1 verified fixed at update-outcome.ts lightAnchor.
+- QA #2 (HEAD 087e1aae): 77/77 pass. Re-ran every criterion's test file on this head (integration 62, unit 603, contract 139, e2e 18 pass) and re-read the agent criteria's docs; evidence per criterion in this step's evidence.
 - Traceability: full test names in review evidence `traceability.md`. Test files: RR release-record, HR heads-ref, PRT push-rule, OG open-pr-guard, BSI base-side, RV reverify, OV overlap, RG regenerate, IN integrate, AM ask-mid-merge (cli integration); BS base-sync, UO update-outcome, CA carried-approval (core unit); LR cli unit light-route; LP e2e light-path; contract git.ts in adapters. Fn = review finding.
 
 | Criterion | What it says | Verifier | Proven by |
@@ -97,16 +97,17 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 ## Not proven yet
 
-- F1 fix proven at S1 (pure lightAnchor + shipped-workflow receipts), not end to end through act.
-- No UNTRACED criterion. Agent-verified: 02.AC5, 04.AC9, 06.AC3, 10.AC5, 13.AC8, 14.AC6.
+- The light-path anchor fix is proven on the pure function (unit tests, and QA ran it over this story's real receipts), not end to end through act.
 
 ## Notes
 
 - Review #2: F1 (light path skipping human-qa/describe) fixed: lightAnchor anchors only when open-pr ended done after the approve, or its step lies past open-pr; no new findings. F2–F15 (minor/nit; listed in review #1's findings file) are unchanged and stay notes for the person, not rework.
-- Takeover: a divergence is merged only while the PR is open.
+- Takeover: a divergence is merged only while the PR is open. With no PR open the branch and heads ref go in one `--atomic` push, so a divergence then is a rewrite and the branch is taken as it is.
+- 02.AC5: the criterion says the step restarts "with fresh counters"; docs/limitations.md says with the counters the last record push recorded (fresh only when no record was ever pushed). QA passed it; a note asks the person.
+- The repo copies `.agents/workflows/{story,quick}.yaml` lack the new comment about the light-path anchor (comment only), and `.agents/skills/norn-merge` is older than the bundled skill (refreshed at release).
 - No GitPort fake exists: 07.AC6/13.AC7 run against the real adapter only.
 - Friction: a fresh worktree needs `bun install`.
 
 ## Resume
 
-Review #2 approved at dc73fb91: next is the workflow's step after review (test, then QA), which re-checks the criteria marked agent-verified.
+QA #2 passed every criterion at 087e1aae: next is the workflow's step after qa.
