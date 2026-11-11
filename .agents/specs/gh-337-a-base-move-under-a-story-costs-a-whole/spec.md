@@ -13,6 +13,7 @@ workflow: refinement
 status: active
 intake_at: 2026-11-11T08:57:13.816Z
 body_hash: 1b55f889d5de53b6fa4f6dbe2428a8cb2c5656d55a45a93059f08ed6e5ef6e61
+refined_body_hash: 1b55f889d5de53b6fa4f6dbe2428a8cb2c5656d55a45a93059f08ed6e5ef6e61
 ---
 
 # A base move under a story costs a whole round and a CI run per boundary push
