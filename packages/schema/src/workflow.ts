@@ -46,7 +46,9 @@ function fixedOutcomes<const K extends string>(keys: readonly K[]) {
  * Named input kinds of an agent step. `{ file }` is relative to the spec folder. `record`:
  * each unit's receipts and evidence folders in the machine dir, and the record path to link
  * evidence by. `resolution`: one `git show --remerge-diff <sha>` per merge commit since the round's
- * latest approval, from the git summary the last routed update recorded.
+ * latest approval, from the git summary the last routed update recorded. `base_side`: per path a base
+ * update conflicts in, the base commits that touched it since the merge base, with the story that landed
+ * each and where that story's spec and PR body are on the base.
  */
 export const InputKind = Type.Union([
   Type.Literal("spec"),
@@ -58,6 +60,7 @@ export const InputKind = Type.Union([
   Type.Literal("last_findings"),
   Type.Literal("record"),
   Type.Literal("resolution"),
+  Type.Literal("base_side"),
 ]);
 export type InputKind = Static<typeof InputKind>;
 export const StepInput = Type.Union([

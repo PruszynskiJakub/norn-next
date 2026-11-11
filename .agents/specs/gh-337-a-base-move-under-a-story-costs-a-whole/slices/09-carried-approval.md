@@ -1,8 +1,8 @@
 ---
 id: gh-337/09
 title: Approval carried over a clean base merge
-depends_on: [gh-337/07]
-status: planned
+depends_on: [ gh-337/07 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

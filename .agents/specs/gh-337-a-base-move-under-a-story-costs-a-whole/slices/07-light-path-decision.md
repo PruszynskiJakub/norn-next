@@ -2,7 +2,7 @@
 id: gh-337/07
 title: The base update chooses the light path from git and receipts
 depends_on: [ gh-337/01 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }

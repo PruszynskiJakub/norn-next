@@ -257,6 +257,10 @@ describe("single-purpose workflows (#136)", () => {
     expect(run("quick")).toBe(run("story"));
     for (const name of ["story", "quick"]) expect(wf(name).base).toEqual({ stale: "conflict", step: "update" });
   });
+
+  test("story's and quick's resolve take the base side of each conflict", () => {
+    for (const name of ["story", "quick"]) expect((wf(name).steps.resolve as { inputs?: unknown[] }).inputs).toContain("base_side");
+  });
 });
 
 describe("skills", () => {

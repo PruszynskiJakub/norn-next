@@ -168,8 +168,8 @@ export interface GitPort {
   lastCommitTime(cwd: string): Promise<number | null>;
   /** `git diff --stat <range>` text */
   diffStat(cwd: string, range: string): Promise<string>;
-  /** commits in range, newest first */
-  log(cwd: string, range: string, limit?: number): Promise<Array<{ sha: string; subject: string; at: number; trailers: Record<string, string> }>>;
+  /** commits in range, newest first; with `paths`, only those that touched one of them (`git log <range> -- <paths>`); trailers are the last trailer block */
+  log(cwd: string, range: string, limit?: number, paths?: readonly string[]): Promise<Array<{ sha: string; subject: string; at: number; trailers: Record<string, string> }>>;
   /**
    * The first-parent line of `rev` (not reachable from `exclude`), newest first, at most
    * `limit` commits, each with its author, ISO author and committer dates and the value of the

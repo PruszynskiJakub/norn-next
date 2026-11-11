@@ -14,6 +14,7 @@ import { appendReceipt, appendTrace, defaultBaseRef, listReceipts, readEnvNorn, 
 import { defineCommand } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
+import { gatherBaseSide } from "../runtime/base-side.ts";
 import { agentName, callerSession, loadUnitSession, refuseUnlessAgentWork, refuseForeignSession, reportCommand, unitStoryMode, type UnitSession, unitCriteria } from "../runtime/agent-unit.ts";
 
 /** Wrappers between the agent and `norn` that exit right after it (never the run's process). */
@@ -180,6 +181,7 @@ export const briefCommand = defineCommand({
     const base = s.unit.slice ? storyBranch(s.unit.story, slug) : storyDiffBase(ctx, s.root);
     // Only rendered, never written: the run this brief is about to report, on the state as it stands
     const state = run.applied ? s.state : ({ ...s.state, run: { run_id: run.run_id, step: s.state.step, attempt: s.state.attempt, started_at: ctx.clock.iso(), how: "manual" as const } } as UnitState);
+    const base_side = await gatherBaseSide((await ctx.ports()).git, s.worktree, step, s);
     const briefing = renderBrief({
       unit: s.unit,
       state,
@@ -209,6 +211,7 @@ export const briefCommand = defineCommand({
       rulings: rulings(s),
       criteria: unitCriteria(s),
       record: storyRecord(s),
+      base_side,
     });
     // The exact briefing of every run, in the trace
     const id = ulid(ctx.clock.now());
