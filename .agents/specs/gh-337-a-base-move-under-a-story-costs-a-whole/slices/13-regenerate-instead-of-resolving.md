@@ -1,8 +1,8 @@
 ---
 id: gh-337/13
 title: Generated files regenerate instead of resolving
-depends_on: [gh-337/07, gh-337/03, gh-337/05, gh-337/06, gh-337/08, gh-337/09, gh-337/10]
-status: planned
+depends_on: [ gh-337/07, gh-337/03, gh-337/05, gh-337/06, gh-337/08, gh-337/09, gh-337/10 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
