@@ -51,7 +51,12 @@ const STALE_WF: Workflow = {
   counters: { stale_loop: { max: 3 } },
   base: { stale: "behind" },
 };
-const ALL: RepoWorkflows = { ...WORKFLOWS, gitty: loaded(GIT_WF), routed: loaded(ROUTED_WF), staled: loaded(STALE_WF) };
+const MERGE_WF: Workflow = {
+  ...STALE_WF,
+  name: "merging",
+  steps: { ...STALE_WF.steps, ready: { type: "gate", outcomes: { approve: "merge", reject: "$stuck" } }, merge: { type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } } },
+};
+const ALL: RepoWorkflows = { ...WORKFLOWS, gitty: loaded(GIT_WF), routed: loaded(ROUTED_WF), staled: loaded(STALE_WF), merging: loaded(MERGE_WF) };
 
 const agentLease = (run_id: string | null = null): LeaseFile => ({ version: 1, kind: "agent", repo: "/x", story: "gh-9", slice: null, run_id, holder: { pid: 1, pid_start: "1" }, created_at: at() });
 const checkLease = (): LeaseFile => ({ version: 1, kind: "check", repo: "/x", story: "gh-9", slice: null, run_id: null, holder: { pid: 1, pid_start: "1" }, created_at: at() });
@@ -263,6 +268,8 @@ function cases(): RuleCase[] {
 
   // ---- gates and git steps
   out.push(c("a ready unit at a gate step", "gate.wait", facts([story(STORY_WF, ready("ready"))])));
+  out.push(c("a ready unit at a merge step", "merge.wait", facts([story(MERGE_WF, ready("merge"))])));
+  out.push(c("a story waiting at a merge step for its PR", "unit.parked.merge", facts([story(MERGE_WF, { status: "parked", step: "merge", park: { kind: "merge", reason: "merge: waiting for the story's PR to merge", since: at() } })])));
   out.push(c("a git step with no worktree", "git.no_worktree", facts([story(STORY_WF, ready("open-pr"), null, { worktree: null, pr: null }, noWorktree)])));
   out.push(c("open-pr with a PR already open runs again: the body is updated (main 0.9.x)", "git.open-pr", facts([story(STORY_WF, ready("open-pr"), null, { pr: { number: 7, url: "u", state: "open", is_draft: true, head_sha: "h" } })])));
   out.push(c("a push step", "git.push", facts([story(GIT_WF, ready("push"))])));

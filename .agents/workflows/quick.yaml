@@ -2,7 +2,7 @@
 # check commands and its ci.yml wait. For refactors, docs, chores, other small changes and the fix of
 # a bug `reproduce` confirmed. A story workflow without `slices`: every step works in the story
 # worktree. Sync, implement, update, check, review, describe, open the draft PR, wait for its CI, and
-# wait for a person at ready; the person merges the PR. The local check runs the unit tier and the
+# wait for a person at ready, then at merge until the person merges the PR. The local check runs the unit tier and the
 # type check; CI runs every tier, integration and e2e sharded.
 name: quick
 description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
@@ -111,11 +111,17 @@ steps:
     outcomes: { pass: ready, fail: { to: implement, counter: ci_loop }, stale: { to: update, counter: stale_loop } }
   ready:
     type: gate
-    prompt: "Read the draft PR. Approve to mark the story finished (a person still merges the PR), or reject with what to change."
+    prompt: "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change."
     outcomes:
-      approve: $done
+      approve: merge
       reject:  { to: implement, counter: ready_loop }
       stale:   { to: update, counter: stale_loop }
+  # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
+  # move it counts as stale (base.stale) sends it back through update by itself
+  merge:
+    type: merge
+    outcomes:
+      stale: { to: update, counter: stale_loop }
 counters:
   test_loop: { max: 5 }
   ci_loop: { max: 3 }

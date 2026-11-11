@@ -158,6 +158,7 @@ function enterStep(prev: UnitStateRecord, wf: Workflow, name: string, now: strin
   const step = stepOf(wf, name);
   if (!step) return toStuck(st, parkOf("workflow", `step '${name}' does not exist in workflow ${wf.name}`, now));
   if (step.type === "gate") return toParked(st, parkOf("gate", step.prompt ?? `approve or reject ${name}`, now));
+  if (step.type === "merge") return toParked(st, parkOf("merge", `${name}: waiting for the story's PR to merge`, now));
   if (step.type === "agent" && step.attended) return toParked(st, parkOf("attended", `attended step ${name}: work with the agent in the worktree`, now));
   return st;
 }
@@ -442,6 +443,10 @@ function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<Ret
     if (step.type === "gate") {
       // Only `stale` is tick-classified at a gate, and only through a declared route
       if (o !== "stale" || st.park?.kind !== "gate" || !edgeOf(ctx.workflow, st.step, o)) return { reject: `outcome '${o}' cannot be classified at gate ${st.step}` };
+      return take(toReady(st), o, r, ctx, last);
+    }
+    if (step.type === "merge") {
+      if (o !== "stale" || st.park?.kind !== "merge" || !edgeOf(ctx.workflow, st.step, o)) return { reject: `outcome '${o}' cannot be classified at merge step ${st.step}` };
       return take(toReady(st), o, r, ctx, last);
     }
     return take(st, o, r, ctx, last);

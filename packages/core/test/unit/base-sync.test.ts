@@ -446,3 +446,122 @@ describe("base sync replay", () => {
     expect(s.tick().rule).toBe("git.update.no_base");
   });
 });
+
+/** BASE_WF with a merge step after ready: an approved story waits there for its PR to merge. */
+const MERGE_WF: Workflow = {
+  ...BASE_WF,
+  name: "merging",
+  steps: {
+    ...BASE_WF.steps,
+    ready: { type: "gate", outcomes: { approve: "merge", reject: "$stuck", stale: { to: "update", counter: "stale_loop" } } },
+    merge: { type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } },
+  },
+};
+const OPEN_PR: NonNullable<StoryFacts["pr"]> = { number: 7, url: "https://github.com/o/r/pull/7", state: "open", is_draft: false, head_sha: SHA("h"), base_branch: "main" };
+
+/** A Sim approved at ready, its story waiting at the merge step with an open PR. */
+function atMerge(wf: Workflow = MERGE_WF): Sim {
+  const s = new Sim(wf);
+  s.pr = OPEN_PR;
+  s.runUntil(at_("ready", "parked"));
+  s.approve();
+  s.tick();
+  return s;
+}
+
+describe("merge step", () => {
+  test("a merge step validates with stale as its only outcome; any other outcome is refused with the reason", () => {
+    expect(validateWorkflowDefinition(MERGE_WF).issues).toEqual([]);
+    const other = validateWorkflowDefinition({ ...MERGE_WF, steps: { ...MERGE_WF.steps, merge: { type: "merge", outcomes: { approve: "$done", stale: { to: "update", counter: "stale_loop" } } } } });
+    expect(other.ok).toBe(false);
+    expect(other.issues.map((i) => i.path)).toContain("/steps/merge/outcomes/approve");
+    expect(other.issues.find((i) => i.path === "/steps/merge/outcomes/approve")?.message).toContain("a merge step has only the outcome 'stale'");
+    // a stale route without a counter loops forever
+    const uncounted = validateWorkflowDefinition({ ...MERGE_WF, steps: { ...MERGE_WF.steps, merge: { type: "merge", outcomes: { stale: "update" } } } });
+    expect(uncounted.issues.some((i) => i.code === "uncounted_cycle")).toBe(true);
+  });
+
+  test("ready approving enters the merge step, which waits for the PR: the story stays active and keeps its claim", () => {
+    const s = atMerge();
+    expect(s.state).toMatchObject({ step: "merge", status: "parked", park: { kind: "merge" } });
+    expect(s.tick().rule).toBe("unit.parked.merge");
+    const story = s.facts().stories[0] as StoryFacts;
+    expect(storyPhase(story, "main")).toEqual({ phase: "active" });
+  });
+
+  test("the inbox shows exactly one item for a story at the merge step: today's merge item, never a gate item", () => {
+    const s = atMerge();
+    s.base = base({ behind: 2 });
+    const inbox = buildInbox(s.facts(), CONFIG);
+    const items = Object.values(inbox.groups).flat().filter((i) => i.story === "gh-1");
+    expect(items).toMatchObject([{ id: "merge:gh-1:7", group: "your_turn", title: "Merge PR #7", command: "gh pr merge 7", detail: "https://github.com/o/r/pull/7 · behind main by 2", url: OPEN_PR.url }]);
+    // a draft PR keeps today's draft note
+    s.pr = { ...OPEN_PR, is_draft: true };
+    expect(buildInbox(s.facts(), CONFIG).groups.your_turn[0]).toMatchObject({ title: "Merge PR #7 (still a draft)", detail: expect.stringContaining("draft: mark it ready first (gh pr ready 7)") });
+  });
+
+  test("the PR merging ends the story through today's merge path; a PR closed unmerged parks it as today", () => {
+    const merged = atMerge();
+    merged.pr = { ...OPEN_PR, state: "merged", merged_at: at(merged.now) };
+    const d = merged.tick();
+    expect(d.rule).toBe("remote.pr_merged");
+    expect(d.action).toMatchObject({ kind: "cleanup_merged_story", story_status: "done", finish: [{ state: { step: "$done", status: "done" } }] });
+
+    const closed = atMerge();
+    closed.pr = { ...OPEN_PR, state: "closed" };
+    const c = closed.tick();
+    expect(c.rule).toBe("remote.park");
+    expect(closed.state).toMatchObject({ status: "stuck", park: { kind: "remote", reason: "remote: PR closed unmerged" } });
+  });
+
+  test("a stale base move sends a story at the merge step back to update through stale_loop, after a sync shows the PR", () => {
+    const s = atMerge();
+    s.base = base({ behind: 3, conflicts: ["a.ts"], sha: SHA("c") });
+    const d = s.tick();
+    expect(d.rule).toBe("gate.stale");
+    expect(s.classifies().at(-1)).toMatchObject({ outcome: "stale", step: "merge", route: "update", detail: "3 behind, conflicts: a.ts" });
+    expect(s.state).toMatchObject({ step: "update", status: "ready", counters: { stale_loop: 1 } });
+    // back through update and ready, into the merge step again
+    s.runUntil(at_("ready", "parked"));
+    s.approve();
+    s.tick();
+    expect(s.state).toMatchObject({ step: "merge", status: "parked" });
+
+    // between syncs, a moved base may be the story's own squash-merged PR: wait for a sync
+    const t = atMerge({ ...MERGE_WF, base: { stale: "behind" } });
+    t.pr = undefined;
+    t.prSeen = { pr: OPEN_PR, observed_at: T0 };
+    t.base = base({ behind: 1, sha: SHA("c") });
+    expect(t.tick().rule).toBe("gate.stale.awaits_sync");
+    t.pr = { ...OPEN_PR, state: "merged", merged_at: at(t.now) };
+    expect(t.tick().rule).toBe("remote.pr_merged");
+
+    // a counter at its max stops the loop
+    const u = atMerge({ ...MERGE_WF, counters: { ...MERGE_WF.counters, stale_loop: { max: 1 } } });
+    u.base = base({ behind: 3, conflicts: ["a.ts"], sha: SHA("c") });
+    u.tick();
+    u.runUntil(at_("ready", "parked"));
+    u.approve();
+    u.tick();
+    u.base = base({ behind: 3, conflicts: ["b.ts"], sha: SHA("d") });
+    u.tick();
+    u.tick();
+    expect(u.state).toMatchObject({ status: "stuck", park: { kind: "exhausted", reason: "stale_loop 1/1 at merge.stale" } });
+  });
+
+  test("nothing at the merge step can be approved or rejected", () => {
+    const s = atMerge();
+    for (const kind of ["approve", "reject"] as const) {
+      const res = applyReceipts(s.state, [{ n: s.state.applied_through + 1, file: "", receipt: { kind, receipt_id: deriveUlid("01JEEEEEEEEEEEEEEEEEEEEEEE", 9), run_id: null, step: "merge", attempt: s.state.attempt, at: at(), by: "human", who: "jakub@mac" } }], { workflow: MERGE_WF, now: at() });
+      expect(res.rejected[0]?.reason).toBe("merge is not a gate waiting for a decision");
+      expect(res.state).toMatchObject({ step: "merge", status: "parked" });
+    }
+  });
+
+  test("story update-branch brings the base in for a story waiting at the merge step", () => {
+    const s = atMerge();
+    const res = applyReceipts(s.state, [{ n: s.state.applied_through + 1, file: "", receipt: { kind: "update", receipt_id: deriveUlid("01JFFFFFFFFFFFFFFFFFFFFFFF", 1), run_id: null, step: "merge", attempt: s.state.attempt, at: at(), by: "human", who: "jakub@mac", from: "merge", to: "update", reason: "person" } as Receipt }], { workflow: MERGE_WF, now: at() });
+    expect(res.rejected).toEqual([]);
+    expect(res.state).toMatchObject({ step: "update", status: "ready" });
+  });
+});

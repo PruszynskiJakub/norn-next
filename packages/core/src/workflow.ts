@@ -99,6 +99,7 @@ export function validateWorkflowDefinition(input: unknown, opts: ValidateOptions
       if (isReservedStep(name))
         issues.push({ code: "reserved_name", path: `/steps/${name}`, message: `step name '${name}' is reserved` });
 
+  issues.push(...mergeOutcomeIssues(rawSteps));
   const schema = validate("workflow", input);
   if (!schema.ok) {
     const reservedPaths = new Set(issues.map((i) => i.path));
@@ -110,6 +111,23 @@ export function validateWorkflowDefinition(input: unknown, opts: ValidateOptions
   const wf = schema.value;
   issues.push(...graphIssues(wf, opts));
   return issues.length ? { ok: false, workflow: wf, issues } : { ok: true, workflow: wf, issues: [] };
+}
+
+/**
+ * A merge step's one outcome is `stale`: the schema alone would report another as a failed match
+ * of every step type, so it is named here with the reason.
+ */
+function mergeOutcomeIssues(rawSteps: unknown): WorkflowIssue[] {
+  if (!rawSteps || typeof rawSteps !== "object") return [];
+  const issues: WorkflowIssue[] = [];
+  for (const [name, step] of Object.entries(rawSteps as Record<string, unknown>)) {
+    const s = step as { type?: unknown; outcomes?: unknown } | null;
+    if (s?.type !== "merge" || !s.outcomes || typeof s.outcomes !== "object") continue;
+    for (const o of Object.keys(s.outcomes))
+      if (o !== "stale")
+        issues.push({ code: "unknown_outcome", path: `/steps/${name}/outcomes/${o}`, message: `a merge step has only the outcome 'stale'; '${o}' cannot be declared (the PR merging ends the wait)` });
+  }
+  return issues;
 }
 
 function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
@@ -182,8 +200,8 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
       issues.push({ code: "verdict", path, message: `${e.from}.${e.outcome} declares verdict '${e.verdict}', but only outcomes an agent reports with norn done can be gated by a verdict` });
   }
 
-  // every step can reach $done: reverse search from $done
-  const reach = new Set<string>(["$done"]);
+  // every step can reach $done: reverse search from $done; a merge step ends the round when its PR merges
+  const reach = new Set<string>(["$done", ...steps.filter((s) => wf.steps[s]?.type === "merge")]);
   const edges = edgesOf(wf);
   for (let grew = true; grew; ) {
     grew = false;

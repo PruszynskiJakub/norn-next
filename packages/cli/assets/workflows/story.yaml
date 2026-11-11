@@ -2,12 +2,13 @@
 # Delivers a story whose spec and plan a refinement round agreed: bring the story up to date with its
 # base, cut slices from the plan against that base, approve them, run the slices, bring the story up
 # to date again, verify the whole story once (QA over every slice's criteria), describe it, open the
-# draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a person at ready.
+# draft PR (or rewrite the body of the open one), wait for the PR's CI, wait for a person at ready,
+# then wait at merge until a person merges the PR.
 # Rework found by the story-level test, QA, CI or a person is done in the story worktree and reviewed
 # before it is checked again.
 # QA reports a verdict per acceptance criterion (criteria: required) and may only report the outcome
 # matching its worst verdict; `unverified` (could not check here) goes to a person at human-qa.
-# A story waiting at human-qa or ready goes back through update when the base moved
+# A story waiting at human-qa, ready or merge goes back through update when the base moved
 # under it in a way that conflicts (base.stale; `behind` re-updates on any base commit).
 # Change `test.run` to your repo's test command.
 name: story
@@ -156,11 +157,17 @@ steps:
     outcomes: { pass: ready, fail: { to: implement, counter: ci_loop }, stale: { to: update, counter: stale_loop } }
   ready:
     type: gate
-    prompt: "Read the draft PR. Approve to mark the story finished (a person still merges the PR), or reject with what to change."
+    prompt: "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change."
     outcomes:
-      approve: $done
+      approve: merge
       reject:  { to: implement, counter: ready_loop }
       stale:   { to: update, counter: stale_loop }
+  # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
+  # move it counts as stale (base.stale) sends it back through update by itself
+  merge:
+    type: merge
+    outcomes:
+      stale: { to: update, counter: stale_loop }
 counters:
   slice_loop: { max: 3 }
   test_loop: { max: 5 }

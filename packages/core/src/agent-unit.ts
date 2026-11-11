@@ -81,6 +81,7 @@ export function agentWorkRefusal(s: AgentUnit, verb: string): CliError | null {
   const step = cursorStep(s);
   if (!step) return no(`step '${st.step}' does not exist in workflow ${s.workflow.name}`, `end your turn; a person fixes it with: ${cmd.runRerun(key, { step: "<step>" })}`, "no_step");
   if (step.type === "gate") return no(`${st.step} is a gate: a person decides, not an agent`, `end your turn; a person runs: ${cmd.storyApprove(key)} (or ${cmd.storyReject(key)})`, "gate_step");
+  if (step.type === "merge") return no(`${st.step} waits for the story's PR to merge: a person merges it, not an agent`, "end your turn", "merge_step");
   if (step.type !== "agent") return no(`${st.step} is a ${step.type} step: norn runs it, not an agent`, `end your turn; the heartbeat (${cmd.tick()} / ${cmd.watch()}) runs it`, "not_agent_step");
   // An implicit ask (a prompt norn saw in the pane or a hook) does not hold the agent back: its
   // report is the answer, even once a person's answer waits to be applied. An explicit `norn ask`

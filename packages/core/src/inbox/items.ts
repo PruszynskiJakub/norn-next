@@ -433,8 +433,8 @@ function noteItems(story: StoryFacts): InboxItem[] {
 const knownPr = (story: StoryFacts): StoryFacts["pr"] => (story.pr !== undefined ? story.pr : story.pr_seen?.pr);
 
 /**
- * The story unit finished its workflow and its PR is open — merging it is the person's
- * last action, so it is an item (Your turn) with the PR URL, not "Recently done".
+ * The story unit finished its workflow, or waits at a merge step, and its PR is open — merging it
+ * is the person's last action, so it is an item (Your turn) with the PR URL, not "Recently done".
  */
 function mergeItem(story: StoryFacts, st: UnitState, base: string): InboxItem | null {
   const pr = knownPr(story);
@@ -489,6 +489,8 @@ function staleItem(story: StoryFacts, base: string): InboxItem | null {
   const wf = uf?.workflow ?? null;
   if (!b || !st || !wf || !isStale(wf, b)) return null;
   const step = stepOf(wf, st.step);
+  // A merge step's only outcome is `stale`, so the tick classifies it: never an item
+  if (isParked(st, "merge")) return null;
   const atGate = isParked(st, "gate") && step?.type === "gate";
   const stuck = st.status === "stuck" && !baseSyncSteps(wf).has(st.step);
   if (!atGate && !stuck) return null;
@@ -634,6 +636,9 @@ export function unitInboxItem(story: StoryFacts, uf: UnitFacts, facts: Facts, co
           const fullText = [judged?.full, full].filter(Boolean).join("\n\n");
           return item("approve", park.reason, cmd.storyApprove(key), park.since, { detail: [judged?.detail, detail, reject].filter(Boolean).join(" · "), ...(fullText ? { full: fullText } : {}) });
         }
+        case "merge":
+          // The person's last action is merging the PR: today's merge item, never a gate item
+          return mergeItem(story, st, facts.repo.default_branch) ?? item("your_turn", park.reason, cmd.storyView(story.key, { web: true }), park.since);
         case "attended": {
           const pending = unappliedRun(uf);
           if (pending) return tickWait(pending);
@@ -733,7 +738,7 @@ export const RE_ENTRY_KINDS = ["update", "workflow"] as const;
 /**
  * The story branch head when the person gave `approve` at the `ready` gate — the `head_sha` of
  * the newest `approve` receipt at that gate (the `ready` step, or any gate whose `approve` goes to
- * `$done`). Only an approval newer than the unit's last re-entry (`norn story update-branch`, `norn story edit
+ * `$done` or to a merge step). Only an approval newer than the unit's last re-entry (`norn story update-branch`, `norn story edit
  * --at`) counts; a re-entry voids it until a new approve at the gate. `receipts` are the story
  * unit's, at least of the kinds `approve` and RE_ENTRY_KINDS; order does not matter.
  */
@@ -743,7 +748,8 @@ function readyHeadSha(wf: Workflow, receipts: readonly NumberedReceipt[]): strin
 
 /** The head the ready approval let through and when it was given (`readyHeadSha`). */
 export function readyApproval(wf: Workflow, receipts: readonly NumberedReceipt[]): { sha: string; at: string } | undefined {
-  const isReady = (step: string) => step === "ready" || (stepOf(wf, step)?.type === "gate" && edgeOf(wf, step, "approve")?.to === "$done");
+  const approvesTo = (step: string) => edgeOf(wf, step, "approve")?.to ?? "";
+  const isReady = (step: string) => step === "ready" || (stepOf(wf, step)?.type === "gate" && (approvesTo(step) === "$done" || stepOf(wf, approvesTo(step))?.type === "merge"));
   const sorted = [...receipts].sort((a, b) => b.n - a.n);
   for (const { receipt: r } of sorted) {
     if ((RE_ENTRY_KINDS as readonly string[]).includes(r.kind)) return undefined;

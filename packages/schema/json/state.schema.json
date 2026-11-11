@@ -646,6 +646,10 @@
                   "type": "string"
                 },
                 {
+                  "const": "merge",
+                  "type": "string"
+                },
+                {
                   "const": "attended",
                   "type": "string"
                 }

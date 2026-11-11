@@ -22,7 +22,7 @@ import { SessionInfo } from "./receipt.ts";
  * Unit lifecycle in state.json.
  * - ready: cursor step can start (manual: waits for `norn brief`; auto: tick launches; check/git: tick runs)
  * - running: a live run exists for the cursor step
- * - parked: waiting for a human in the normal flow (ask, gate, attended step)
+ * - parked: waiting for a human in the normal flow (ask, gate, merge step, attended step)
  * - stuck: needs `norn run rerun` ($stuck, exhausted, remote change, missing step)
  * - done: reached `$done`
  * - corrupt: a file of this unit failed validation; never guessed past
@@ -40,6 +40,7 @@ export type UnitStatus = Static<typeof UnitStatus>;
 export const ParkKind = Type.Union([
   Type.Literal("ask"),
   Type.Literal("gate"),
+  Type.Literal("merge"),
   Type.Literal("attended"),
   Type.Literal("stuck"),
   Type.Literal("exhausted"),
@@ -50,7 +51,7 @@ export const ParkKind = Type.Union([
 export type ParkKind = Static<typeof ParkKind>;
 
 /** The park kinds a `parked` unit holds: it waits for a person in the normal flow. */
-export const ParkedKind = Type.Union([Type.Literal("ask"), Type.Literal("gate"), Type.Literal("attended")]);
+export const ParkedKind = Type.Union([Type.Literal("ask"), Type.Literal("gate"), Type.Literal("merge"), Type.Literal("attended")]);
 export type ParkedKind = Static<typeof ParkedKind>;
 
 /** The park kinds a `stuck` unit holds: it waits for `norn run rerun`. */

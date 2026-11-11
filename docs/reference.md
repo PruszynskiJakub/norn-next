@@ -143,7 +143,7 @@ norn story reject [<story|slice>] --reason "…" [--delegated]
 
 ##### `norn story update-branch`
 
-Send a waiting story back through its base update: done with an unmerged PR, at a gate, or stuck
+Send a waiting story back through its base update: done with an unmerged PR, at a gate or a merge step, or stuck
 
 ```sh
 norn story update-branch [<story>]

@@ -156,7 +156,21 @@ export const SlicesStep = Type.Object(
 );
 export type SlicesStep = Static<typeof SlicesStep>;
 
-export const Step = TaggedUnion("type", [AgentStep, CheckStep, GateStep, GitStep, SlicesStep]);
+/**
+ * Waits for the story's PR to merge: entered like a gate, but a person gives no decision there. The merge (or a PR closed unmerged) ends the wait through the story's lifecycle;
+ * `stale` is tick-classified when the base moved under the story.
+ */
+export const MergeStep = Type.Object(
+  {
+    type: Type.Literal("merge"),
+    ...common,
+    outcomes: fixedOutcomes(["stale"] as const),
+  },
+  { additionalProperties: false },
+);
+export type MergeStep = Static<typeof MergeStep>;
+
+export const Step = TaggedUnion("type", [AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep]);
 export type Step = Static<typeof Step>;
 export type StepType = Step["type"];
 
@@ -225,6 +239,7 @@ export const CLASSIFIED_OUTCOMES = {
   gate: ["approve", "reject", "stale", "exhausted"],
   git: ["done", "conflict", "stuck", "exhausted"],
   slices: ["done", "stuck", "exhausted"],
+  merge: ["stale", "exhausted"],
 } as const satisfies Record<StepType, readonly string[]>;
 
 export function outcomeEdge(spec: OutcomeSpec): OutcomeEdge {

@@ -68,9 +68,9 @@ No heartbeat runs on this checkout, so the agent's `norn brief` and `norn done` 
 
 norn merges the base into the story branch in an `update` step, never by rebasing. When the merge conflicts, a `resolve` step has an agent resolve it, and the story goes on.
 
-A story waiting at a gate with a `stale` route goes back through update by itself. When the story has a PR, norn first waits for the next sync to fetch it: if the base moved because that PR merged, the story ends through the merge path and no second PR is opened.
+A story waiting at a gate or a `merge` step with a `stale` route goes back through update by itself. In the shipped `story` and `quick` workflows a story past the `ready` gate waits at the `merge` step until you merge its PR, so a conflicting base move while the PR waits needs nothing from you. When the story has a PR, norn first waits for the next sync to fetch it: if the base moved because that PR merged, the story ends through the merge path and no second PR is opened.
 
-**You see:** a Check item such as `gh-3 conflicts with main in a.ts, b.ts (4 behind)` when the story waits at a gate, is stuck or is done with its PR not merged yet.
+**You see:** a Check item such as `gh-3 conflicts with main in a.ts, b.ts (4 behind)` when the story waits at a gate without a `stale` route, is stuck, or is done with its PR not merged yet (a workflow without a `merge` step).
 
 ```sh
 norn story update-branch gh-3
@@ -98,6 +98,8 @@ Set `status: done` in the story's `spec.md` on the base yourself and commit it, 
     timeout: 15m
     outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
 ```
+
+   A `merge` step after the last gate keeps a story past that gate in its workflow until its PR merges: `merge: { type: merge, outcomes: { stale: { to: update, counter: stale_loop } } }`. Its one outcome is `stale`; the merge itself ends the story.
 
    A check ends in `pass` (exit 0) or `fail` (any other exit). One that can end another way names the outcome per exit code in `exits` and routes it like any other: the shipped `ci` check exits 3 on a PR that conflicts with its base, and `exits: { 3: stale }` with `stale: { to: update, counter: stale_loop }` sends the story to take the base instead of to `implement`.
 

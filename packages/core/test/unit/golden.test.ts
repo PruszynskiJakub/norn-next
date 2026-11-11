@@ -91,7 +91,7 @@ const ROUTED = ["agent.died", "agent.died.foreign", "agent.died.launch_unknown",
 const ROUTE_SUFFIXES = ["nudge", "nudge.resume", "surface", "retry", "retry.no_nudge", "stuck", "route"];
 
 /** Kinds a unit parks on with status `parked` (apply.ts `park` with its default status). */
-const PARKED_KINDS = ["ask", "attended", "gate"];
+const PARKED_KINDS = ["ask", "attended", "gate", "merge"];
 const GIT_ACTIONS = GitAction.anyOf.map((s) => s.const as string);
 const SERIALIZED_GIT = ["integrate", "update"];
 

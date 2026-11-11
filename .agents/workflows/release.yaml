@@ -6,7 +6,7 @@
 # person at `ready`, who judges the version and the changelog there; the person merges the PR, and
 # CI smokes every binary on its own OS, tags and publishes on that merge.
 # Any commit on the base makes the changelog incomplete (base.stale: behind): a release
-# waiting at `ready` goes back through update and prepare. A red CI means the base is
+# waiting at `ready` or `merge` goes back through update and prepare. A red CI means the base is
 # broken: the story goes $stuck; fix the base in its own story, then
 # `norn run rerun gh-N --step update`.
 name: release
@@ -87,12 +87,18 @@ steps:
     type: gate
     prompt: >-
       Read the draft release PR: the proposed version and its reason, and the new CHANGELOG.md section.
-      Approve to mark the release finished (a person merges the PR; CI then tags and publishes), or
+      Approve to wait for the merge (a person merges the PR; CI then tags and publishes), or
       reject with the version or changelog changes you want.
     outcomes:
-      approve: $done
+      approve: merge
       reject:  { to: prepare, counter: ready_loop }
       stale:   { to: update, counter: stale_loop }
+  # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
+  # move it counts as stale (base.stale) sends it back through update by itself
+  merge:
+    type: merge
+    outcomes:
+      stale: { to: update, counter: stale_loop }
 counters:
   ready_loop: { max: 2 }
   # resets each time update merges cleanly: only repeated conflicts on one base move count

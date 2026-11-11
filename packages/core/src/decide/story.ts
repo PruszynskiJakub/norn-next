@@ -495,8 +495,8 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       // An implicit ask a later fact shows the agent has moved past resolves itself
       const moved = implicitAskResolved(st, uf);
       if (moved) return resolveImplicitAsk(ctx, story, uf, st, wf, moved);
-      // A story waiting at a gate with a `stale` route goes back to update when the base moved under it
-      if (ref.slice === null && st.park.kind === "gate" && story.base && edgeOf(wf, st.step, "stale") && isStale(wf, story.base)) {
+      // A story waiting at a gate or a merge step with a `stale` route goes back to update when the base moved under it
+      if (ref.slice === null && (st.park.kind === "gate" || st.park.kind === "merge") && story.base && edgeOf(wf, st.step, "stale") && isStale(wf, story.base)) {
         // A base that moved because the story's own PR merged must end the story through the merge
         // path, and only a fetched PR can show that: between syncs a story with a PR waits for one
         if (story.pr === undefined && story.pr_seen?.pr) return ctx.noop(ref, "gate.stale.awaits_sync", `base moved; waiting for a sync to show whether PR #${story.pr_seen.pr.number} merged`);
@@ -521,6 +521,8 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
       return runGit(ctx, story, uf, st, wf, step);
     case "gate":
       return ctx.noop(ref, "gate.wait", "waiting for approve / reject");
+    case "merge":
+      return ctx.noop(ref, "merge.wait", "waiting for the PR to merge");
     case "slices":
       return slicesStep(ctx, story, uf, st, wf);
   }

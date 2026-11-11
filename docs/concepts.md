@@ -24,7 +24,7 @@ A **unit** is a story or a slice: anything that runs a workflow. Commands that a
 
 Each workflow does one thing, and a story goes through them as **rounds**, one after another on the same branch. A new story starts with the default workflow (`triage`), or the one its issue label names (`norn:wf:<name>`). A round ends at `$done`; only a person starts the next one, with `norn story edit <story> --workflow <name>`. The usual paths are a feature `triage → refinement → story`, a small change `triage → quick`, and a bug `reproduce → quick`.
 
-A **step** is one node of a workflow. There are five kinds:
+A **step** is one node of a workflow. There are six kinds:
 
 | Step | What happens |
 |---|---|
@@ -33,6 +33,7 @@ A **step** is one node of a workflow. There are five kinds:
 | git | norn does a git action: merge the base into the story (`update`), integrate a slice, open the draft PR, wait for CI |
 | gate | a person decides: `approve` or `reject` |
 | slices | the story waits while its slices run, each with its own workflow |
+| merge | the story waits for a person to merge its PR; the merge ends the story. A person gives no `approve` or `reject` there: its one outcome, `stale`, is taken by norn when the base moved under the story (see `base.stale`) and routes it back through `update` with a counter |
 
 An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). The workflow maps each outcome to the next step. A route back (a failed test sends the story back to `implement`) carries a **counter** with a max.
 
@@ -55,10 +56,10 @@ The kind, risk and priority labels are for you, to filter and sort the backlog: 
 Three things decide where a person comes in:
 
 - An **attended step** (`attended: true`, such as refine and plan) is an agent step done *with* a person in the agent's pane. A person always starts it.
-- A **gate** is a step with no agent: a person approves it or rejects it with what to change. The `ready` gate at the end of a delivery workflow is where you look at the PR before you merge it.
+- A **gate** is a step with no agent: a person approves it or rejects it with what to change. The `ready` gate near the end of a delivery workflow is where you look at the PR; after you approve it, the story waits at the `merge` step until you merge the PR.
 - The **mode** of a story says who starts its other agent steps. In **manual** mode (the default) the inbox shows the step as ready and how to start it. In **auto** mode norn starts the agent itself through the runner it detects: Herdr when norn runs inside Herdr or `herdr` is installed, otherwise headless. A story's mode is, nearest first: its own (`norn story edit <story> --auto|--manual` switches it), its workflow's `mode`, `mode` in your local or user config, then `manual`. The mode decides only who starts an agent step: in either mode the heartbeat ([One tick](#one-tick)) moves every step on, so an agent's `norn done` changes nothing until a tick applies it.
 
-`check` and `git` steps always run on their own. Gates and attended steps always wait for a person, in either mode.
+`check` and `git` steps always run on their own. Gates, merge steps and attended steps always wait for a person, in either mode.
 
 ## The inbox
 
@@ -131,7 +132,7 @@ A repo without the key, or one recording a version below 0.30, is refused the sa
 | unit | A story or a slice: anything that runs a workflow and has its own run state and handoff. |
 | workflow | A YAML (or JSON) graph of steps, in `.agents/workflows/`. |
 | round | One workflow applied to a story, from its start step to `$done`. A story goes through one or more rounds; a slice runs one workflow. |
-| step | One node of a workflow: agent, check, git, gate or slices. |
+| step | One node of a workflow: agent, check, git, gate, merge or slices. |
 | run | One attempt at a step; it produces receipts. |
 | outcome | How a step ended, spelled as its reporter types it (`done`, `approve`, `stuck`, …). |
 | counter | A named bound on a retry, nudge or loop; past its max the unit is stuck. |
