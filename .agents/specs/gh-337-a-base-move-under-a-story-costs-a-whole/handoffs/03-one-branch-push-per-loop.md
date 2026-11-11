@@ -14,7 +14,7 @@ Once a story's PR is open (a draft counts), norn pushes the story branch only at
 
 - "PR open" is `prOpen(story)` in `packages/core/src/policy.ts`: the PR fetched this tick, else the one last seen (`knownPr`), with state `open`.
 - Review #1 F1 (false "PR head changed after ready approval" item) is fixed: `readyHead` (`packages/cli/src/runtime/observe/remote.ts`) and its copy in `packages/view/src/load.ts` accept a PR head apart from the approved head by this story's norn commits only, in either direction (PR head behind the approval by heads-only boundaries, or past it by the `$done` commit). Red first: push-rule.test.ts › "AC1, AC2, AC3, AC4…" failed with `head:gh-1:<atOpenPr>` before the fix.
-- `bun run test` 1856 pass, `bun run typecheck` clean. Golden diff is `push:true → push:false, heads:true` in 6 open-PR cases, nothing else changed.
+- Review #2 approved: F1 confirmed fixed at remote.ts:37 and load.ts:357-359; `bun run test` 1856 pass, `bun run typecheck` clean, push-rule.test.ts 5/5 pass when run alone (`bun run test:integration packages/cli/test/integration/push-rule.test.ts`). Golden diff is `push:true → push:false, heads:true` in 6 open-PR cases, nothing else changed.
 
 ### Easy to miss
 - The rule applies only to the story branch. Slice branches (names with `/`) still push at every boundary: they are not PR heads and carry no heads ref.
@@ -29,7 +29,8 @@ Once a story's PR is open (a draft counts), norn pushes the story branch only at
 
 ### Notes
 - `docs/concepts.md`: a new paragraph after the heads-ref paragraph explains the push rule.
+- Review #2 note (not blocking): the "behind" direction of `readyHead` also accepts norn's commits that carry code (the leftover commit an agent's report makes), so a PR head reset to an older norn commit would not raise the head-changed item. In the shipped workflow only bookkeeping boundaries follow open-pr, so this does not happen in practice.
 - Friction: the brief says not to run the slower tiers, but the slice's checks need the base-sync transcript rewritten and the F1 test is integration-only (store git helpers are banned in unit tests), so base-sync e2e and push-rule.test.ts were run alone.
 
 ### Resume
-Review the F1 fix and the whole slice against AC1-AC7: `git diff 7e6ec8698` for the rework, `bun run test` and `bun run typecheck` for the fast checks.
+QA the slice against AC1-AC7 using the Proof table; the integration and e2e tiers run in CI.
