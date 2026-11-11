@@ -2,7 +2,7 @@
 id: gh-337/08
 title: Shipped workflows take the light route with a resolution review
 depends_on: [ gh-337/07 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
