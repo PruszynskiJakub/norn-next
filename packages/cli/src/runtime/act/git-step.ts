@@ -1,7 +1,7 @@
 /** act: git steps — integrate, update, push, open-pr. */
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { type Action, type ActionResult, applyReceipts, nornTrailers, type RemotePort, routeOf } from "@norn/core";
+import { type Action, type ActionResult, applyReceipts, nornTrailers, type RemotePort, routeOf, updateOutcome } from "@norn/core";
 import { type ReceiptOf, recordRef, ulid } from "@norn/schema";
 import { acquireIntegrateLock, appendReceipt, machineDir, pushRecord, readPrFacts, readRecordRef, readText, writePrFacts } from "@norn/store";
 import { integrate, update as updateStory } from "../integrate.ts";
@@ -81,16 +81,16 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
         break;
       }
       if (res.adopted) extra.adopted = res.adopted;
+      // core chooses the outcome; below only records what the merge did
+      outcome = updateOutcome({ merge: res.outcome === "conflict" ? { outcome: "conflict", files: res.files } : { outcome: res.merged ? "merged" : "up_to_date" } });
       if (res.outcome === "conflict") {
         // the merge was aborted; the resolve step gets the base sha and the paths
-        outcome = "conflict";
         base = { ref: u.ref, sha: u.sha, conflicts: res.files };
         detail = `merging ${u.branch} (${u.sha.slice(0, 12)}) into ${a.branch} conflicts in ${res.files.join(", ") || "?"}`;
         // an adopted fast-forward is still the record: publish it
         if (res.adopted) extra.story_push = await pushUpdated(act, a.cwd, a.branch);
         break;
       }
-      outcome = "done";
       // The merge commit (or the head found up to date) goes into the record, for status and why
       base = { ref: u.ref, sha: u.sha, conflicts: [], head: res.head, merged: res.merged };
       detail = res.merged ? `merged ${u.branch} (${u.sha.slice(0, 12)}) into ${a.branch} at ${res.head.slice(0, 12)}` : `${a.branch} is up to date with ${u.branch} (${u.sha.slice(0, 12)})`;

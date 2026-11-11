@@ -12,6 +12,7 @@ import { decide } from "../../src/decide/index.ts";
 import { storyMerged, storyPhase } from "../../src/policy.ts";
 import type { NumberedReceipt, StoryBase, StoryFacts } from "../../src/facts.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
+import { updateOutcome } from "../../src/update-outcome.ts";
 import { baseUpdateStep, checkWorkflowLevel, isStale, validateWorkflowDefinition } from "../../src/workflow.ts";
 import { at, CONFIG, facts, HB, loaded, stateFor, storyFacts, storyUnit, T0, unitFacts } from "../fixtures.ts";
 
@@ -125,6 +126,16 @@ class Sim {
     return this.receipts.map((r) => r.receipt).filter((r): r is Extract<Receipt, { kind: "classify" }> => r.kind === "classify");
   }
 }
+
+describe("the update step's outcome is chosen by a pure function of the merge result", () => {
+  test("a clean merge, or a story already up to date with the base, ends done", () => {
+    expect(updateOutcome({ merge: { outcome: "merged" } })).toBe("done");
+    expect(updateOutcome({ merge: { outcome: "up_to_date" } })).toBe("done");
+  });
+  test("a conflicting merge ends conflict", () => {
+    expect(updateOutcome({ merge: { outcome: "conflict", files: ["a.ts"] } })).toBe("conflict");
+  });
+});
 
 const at_ = (step: string, status?: UnitState["status"]) => (s: Sim) => s.state.step === step && (status === undefined || s.state.status === status);
 
