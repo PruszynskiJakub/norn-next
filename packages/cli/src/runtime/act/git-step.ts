@@ -5,6 +5,7 @@ import { type Action, type ActionResult, applyReceipts, nornTrailers, type Remot
 import { type ReceiptOf, recordRef, ulid } from "@norn/schema";
 import { acquireIntegrateLock, appendReceipt, machineDir, pushRecord, readPrFacts, readRecordRef, readText, writePrFacts } from "@norn/store";
 import { integrate, update as updateStory } from "../integrate.ts";
+import type { PushBranchResult } from "../push.ts";
 import { type ActEnv, QueueFull } from "./env.ts";
 import { recordLinkResolver, rewriteRecordLinks } from "./record-links.ts";
 
@@ -52,7 +53,7 @@ export async function runGit(act: ActEnv, a: Extract<Action, { kind: "run_git" }
 }
 
 /** Push the updated story branch; a refused push is a failed effect, the receipt still stands. */
-async function pushUpdated(act: ActEnv, cwd: string, branch: string): Promise<{ ok: true } | { ok: false; message: string }> {
+async function pushUpdated(act: ActEnv, cwd: string, branch: string): Promise<PushBranchResult> {
   const r = await act.pushBranch(cwd, branch);
   if (r.ok) act.effectsOk.add("push");
   else act.effectErrors.push({ effect: "push", reason: `push of ${branch} failed: ${r.message}` });

@@ -16,6 +16,7 @@ import { recordRef } from "@norn/schema";
 import { patchStoryFile, pushRecord, readRecordRef, type RecordPushResult, releaseClaim, releaseStoryLeases, storyFile } from "@norn/store";
 import { refuse } from "../output.ts";
 import type { Observed } from "./observe/index.ts";
+import { pushBranch } from "./push.ts";
 import { runnerFor } from "../wiring.ts";
 
 export interface StoryClosed {
@@ -91,9 +92,10 @@ export async function closeStory(obs: Observed, story: StoryFacts, opts: CloseSt
   // 3. push first; stop on any failure with everything still in place
   const pushed: string[] = [];
   if (obs.remote) {
-    const branches = [...(storyWt && loc ? [{ cwd: storyWt, branch: loc.branch, force: false }] : []), ...sliceWts.map((w) => ({ cwd: w.path, branch: w.branch, force: true }))];
+    // The one push path: a person's push to the story branch is merged in, never rebased
+    const branches = [...(storyWt && loc ? [{ cwd: storyWt, branch: loc.branch, unit: null }] : []), ...sliceWts.map((w) => ({ cwd: w.path, branch: w.branch, unit: w.unit }))];
     for (const b of branches) {
-      const r = await git.push(b.cwd, obs.remote, `${b.force ? "+" : ""}refs/heads/${b.branch}:refs/heads/${b.branch}`);
+      const r = await pushBranch(git, { cwd: b.cwd, remote: obs.remote, branch: b.branch, trailers: trailers(b.unit, "drop"), tick });
       if (!r.ok) return { ok: false, reason: "push_failed", story: key, branch: b.branch, push_reason: r.reason, message: r.message, pushed };
       pushed.push(b.branch);
     }

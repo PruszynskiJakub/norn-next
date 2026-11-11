@@ -28,9 +28,9 @@ import {
   runStateDir,
 } from "@norn/store";
 import type { Context } from "../../context.ts";
-import { syncRemoteBranch } from "../integrate.ts";
 import { leaseLiveness } from "../leases.ts";
 import type { Observed, StoryLoc, UnitLoc } from "../observe/index.ts";
+import { pushBranch, type PushBranchResult } from "../push.ts";
 
 export class QueueFull extends Error {}
 /** A receipt number another writer (an agent verb, a person) took since observe. */
@@ -166,50 +166,11 @@ export class ActEnv {
     return r.ok ? { sha, pushed: true } : { sha, pushed: false, push_error: r.message };
   }
 
-  /**
-   * Push a branch (only the claim holder; decide acts only on held stories). Slice branches are
-   * rebased by integrate, so they force-push. Never publishes a commit that leaves conflict
-   * markers (an agent's merge included); a story branch someone pushed to meanwhile is
-   * merged in (never rebased) and pushed again.
-   */
-  async pushBranch(cwd: string, branch: string, trailers: Record<string, string> = {}): Promise<{ ok: true } | { ok: false; message: string }> {
+  /** Push a branch through the one push path (runtime/push.ts); nothing to do without a git remote. */
+  async pushBranch(cwd: string, branch: string, trailers: Record<string, string> = {}): Promise<PushBranchResult> {
     const remote = this.obs.remote;
     if (!remote) return { ok: true };
-    const held = await this.markersHeld(cwd, remote, branch);
-    if (held) return { ok: false, message: held };
-    const force = branch.includes("/") ? "+" : "";
-    const push = () => this.git.push(cwd, remote, `${force}refs/heads/${branch}:refs/heads/${branch}`);
-    let r = await push();
-    if (!r.ok && r.reason === "rejected" && !force) {
-      const taken = await this.takeRemoteBranch(cwd, remote, branch, trailers);
-      if (taken !== true) return { ok: false, message: `${r.reason}: ${r.message}${taken ? `; ${taken}` : ""}` };
-      r = await push();
-    }
-    return r.ok ? { ok: true } : { ok: false, message: `${r.reason}: ${r.message}` };
-  }
-
-  /** Why the push of `branch` is held — its unpublished commits leave conflict markers — or null. */
-  async markersHeld(cwd: string, remote: string, branch: string): Promise<string | null> {
-    const marked = await this.git.outgoingConflictMarkers(cwd, remote, `refs/heads/${branch}`);
-    if (!marked.length) return null;
-    const where = marked.map((m) => `${m.path}${m.commit ? ` (commit ${m.commit.slice(0, 12)})` : ""}`);
-    return `held: conflict markers in ${where.join(", ")}; nothing pushed — resolve them in a new commit (never rewrite the branch)`;
-  }
-
-  /**
-   * The push of the story branch was rejected — someone pushed to it. Take the
-   * remote branch in (fast-forward, else a merge commit with norn's trailers); true when the push may
-   * be retried, else why not (null = nothing new on the remote, e.g. a protected branch).
-   */
-  async takeRemoteBranch(cwd: string, remote: string, branch: string, trailers: Record<string, string>): Promise<true | string | null> {
-    try {
-      if ((await this.git.status(cwd)).branch !== branch) return `${branch} is not checked out in ${cwd}`;
-      const r = await syncRemoteBranch(this.git, { cwd, branch, remote, message: `Merge ${remote}/${branch} into ${branch}`, trailers: { ...trailers, "Norn-Tick": this.tick } });
-      if (r.outcome === "conflict") return `story branch diverged from ${remote}/${branch}; merging it conflicts in ${r.files.join(", ") || "?"} — merge it in ${cwd} by hand`;
-      return r.outcome === "adopted" || r.outcome === "merged" ? true : null;
-    } catch (e) {
-      return `taking in ${remote}/${branch} failed: ${(e as Error).message}`;
-    }
+    return pushBranch(this.git, { cwd, remote, branch, trailers, tick: this.tick });
   }
 
   /** Notify once per inbox item id; the id is persisted before sending (receipt-first). */
