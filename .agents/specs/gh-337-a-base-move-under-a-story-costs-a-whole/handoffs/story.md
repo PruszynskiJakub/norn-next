@@ -7,7 +7,7 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 ## Proof
 
 - spec.md: 76 user stories, Plan seams S1–S5, D1–D14; 14 slices integrated; 77 criteria in frontmatter.
-- QA #2 (HEAD 087e1aae): 77/77 pass. Re-ran every criterion's test file on this head (integration 62, unit 603, contract 139, e2e 18 pass) and re-read the agent criteria's docs; evidence per criterion in this step's evidence.
+- QA #2 (HEAD 087e1aae): 77/77 pass; evidence per criterion in its evidence.
 - Traceability: full test names and the abbreviations below (RR, HR, PRT, OG, BSI, RV, OV, RG, IN, AM, BS, UO, CA, LR, LP) in review evidence `traceability.md`; Fn = review finding.
 
 | Criterion | What it says | Verifier | Proven by |
@@ -102,12 +102,12 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 ## Notes
 
-- Review #2: F1 (light path skipping human-qa/describe) fixed; no new findings. F2–F15 (minor/nit, review #1's findings file) stay notes for the person.
+- F2–F15 (minor/nit, review #1's findings file) stay notes for the person.
 - Takeover: a divergence is merged only while the PR is open. With no PR the two go in one `--atomic` push, so a divergence is a rewrite: the branch is taken as is.
 - 02.AC5: the criterion says the step restarts "with fresh counters"; docs/limitations.md says with the counters the last record push recorded. QA: pass, with a note.
 - `.agents/workflows/{story,quick}.yaml` lack the shipped copies' new light-path comment (comment only).
 - No GitPort fake exists: 07.AC6/13.AC7 run against the real adapter only.
-- CI fix (ci_loop 1): CI failed in e2e `slice-workflow.test.ts` and integration `non-holder-views.test.ts`. Real bug: `norn init` no longer set a detected test command in story/quick.yaml because the anchored run line didn't match (red first: `packages/cli/test/unit/detect.test.ts` › "keeps a YAML anchor on the run line…"); fixed in `withTestCommand` and `set_in` now uses `hasTemplateTestCommand`. The rest were stale expectations of intended changes: team schema gains `regenerate`; after open-pr the boundary moves only the heads ref (transcript `e2e-slice-workflow.txt` rewritten, test now checks heads ref = local branch, PR branch one behind); F9 in non-holder-views reads the heads ref since the PR is open there. Both files pass locally.
+- CI fix: init's `withTestCommand` missed the anchored run line (fixed, test in detect.test.ts). The other CI failures were stale expectations of intended changes (heads-ref push after open-pr, `regenerate` key); e2e transcript rewritten.
 - Friction: a fresh worktree needs `bun install`.
 
 ## Resume
