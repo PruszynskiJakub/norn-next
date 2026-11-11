@@ -7,7 +7,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { applyReceipts, initialState, type NumberedReceipt, validateWorkflowDefinition } from "@norn/core";
+import { applyReceipts, initialState, lightAnchor, type NumberedReceipt, validateWorkflowDefinition } from "@norn/core";
 import { deriveUlid, outcomeEdge, type Receipt, type UnitState, type Workflow } from "@norn/schema";
 import { parseWorkflowText } from "@norn/store";
 
@@ -104,6 +104,44 @@ describe.each(COPIES)("%s workflow routes the light path", (_name, path) => {
 
   test("a light-path update resets base_conflict_loop like a full one: conflicts on one base move count, not across moves", () => {
     for (const outcome of ["done", "clean", "resolved"]) expect({ outcome, loop: walk(wf, "update", [outcome], { base_conflict_loop: 1 }).at(-1)?.counters.base_conflict_loop }).toEqual({ outcome, loop: 0 });
+  });
+
+  describe("the light path is measured only from an approval the PR already holds", () => {
+    const SHA = (c: string) => c.repeat(40);
+    /** The round's receipts, numbered in order: `step:outcome`, with `step:approve@c` an approval at head `c`. */
+    const round = (...ends: string[]): NumberedReceipt[] =>
+      ends.map((e, i) => {
+        const [stepOutcome, at] = e.split("@") as [string, string | undefined];
+        const [step, outcome] = stepOutcome.split(":") as [string, string];
+        const head = { receipt_id: deriveUlid("01JDDDDDDDDDDDDDDDDDDDDDDD", i), run_id: null, step, at: "2026-11-11T10:00:00.000Z", ...(at ? { head_sha: SHA(at) } : {}) };
+        const type = wf.steps[step]?.type;
+        const receipt = type === "gate" ? { ...head, kind: outcome, by: "person" } : type === "agent" ? { ...head, kind: "done", by: "agent", outcome, handoff: "h" } : { ...head, kind: "classify", by: "norn", outcome, rule: `git.${step}`, route: "t" };
+        return { n: i + 1, file: "", receipt: receipt as Receipt };
+      });
+
+    const hasQa = wf.steps["human-qa"] !== undefined;
+    test.if(hasQa)("a conflicting base move at human-qa in the first round, after a rework review approve, takes the full path", () => {
+      // test fail → implement → review approve → test pass → qa partial → human-qa parked, no PR yet
+      const rs = round("slices:done", "update:done", "test:fail", "implement:done", "review:approve@1", "test:pass", "qa:partial", "human-qa:stale", "update:conflict", "resolve:done");
+      expect(lightAnchor(rs, wf)).toBeNull();
+    });
+
+    test.if(hasQa)("human-qa parked again after a ci fail's rework review approve takes the full path, though open-pr ran before it", () => {
+      const rs = round("describe:done", "open-pr:done", "ci:fail", "implement:done", "review:approve@1", "test:pass", "qa:partial", "human-qa:stale");
+      expect(lightAnchor(rs, wf)).toBeNull();
+    });
+
+    test.if(hasQa)("a stale ready measures from the human-qa approval open-pr went out after", () => {
+      expect(lightAnchor(round("qa:partial", "human-qa:approve@1", "describe:done", "open-pr:done", "ci:pass", "ready:stale"), wf)).toBe(SHA("1"));
+    });
+
+    test("a stale ci measures from the rework review approval open-pr went out after", () => {
+      expect(lightAnchor(round("ci:fail", "implement:done", "review:approve@2", "test:pass", "describe:done", "open-pr:done", "ci:stale"), wf)).toBe(SHA("2"));
+    });
+
+    test("an approve at a step reachable only past open-pr (ready) anchors without a later open-pr", () => {
+      expect(lightAnchor(round("open-pr:done", "ci:pass", "ready:approve@3", "merge:stale"), wf)).toBe(SHA("3"));
+    });
   });
 });
 

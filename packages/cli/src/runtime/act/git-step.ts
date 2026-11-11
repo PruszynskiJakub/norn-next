@@ -2,7 +2,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { type Action, type ActionResult, applyReceipts, LIGHT_OUTCOMES, lightAnchor, nornTrailers, type RemotePort, routeOf, type UpdateHistory, type UpdateMerge, type UpdateOutcome, updateOutcome } from "@norn/core";
-import { type ReceiptOf, recordRef, ulid } from "@norn/schema";
+import { type ReceiptOf, recordRef, ulid, type Workflow } from "@norn/schema";
 import { acquireIntegrateLock, appendReceipt, listReceipts, machineDir, pushRecord, readPrFacts, readRecordRef, readText, writePrFacts } from "@norn/store";
 import { integrate, type UpdateRegenerate, update as updateStory } from "../integrate.ts";
 import { runShell, tailLines } from "../shell.ts";
@@ -66,8 +66,8 @@ async function pushUpdated(act: ActEnv, cwd: string, branch: string, heads: bool
  * what the light path needs of each merge; null when there is no approval to measure from or its
  * head is not under the branch (rewritten, or unknown here), which takes the full path.
  */
-async function updateHistory(act: ActEnv, cwd: string, runsDir: string, specDir: string, baseSha: string, head: string): Promise<UpdateHistory | null> {
-  const anchor = lightAnchor(listReceipts(runsDir).receipts);
+async function updateHistory(act: ActEnv, cwd: string, runsDir: string, wf: Workflow, specDir: string, baseSha: string, head: string): Promise<UpdateHistory | null> {
+  const anchor = lightAnchor(listReceipts(runsDir).receipts, wf);
   if (!anchor || !(await act.git.isAncestor(cwd, anchor, head).catch(() => false))) return null;
   const commits: UpdateHistory["commits"] = [];
   for (const c of await act.git.commitPaths(cwd, head, anchor)) {
@@ -120,7 +120,7 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
       const merge: UpdateMerge = res.outcome === "conflict" ? { outcome: "conflict", files: res.files } : { outcome: res.merged ? "merged" : "up_to_date" };
       // the light path is measured only where the step routes it: other workflows update as before
       const routed = Object.keys(wf.steps[a.step]?.outcomes ?? {});
-      history = res.outcome === "done" && LIGHT_OUTCOMES.some((o) => routed.includes(o)) ? await updateHistory(act, a.cwd, loc.runsDir, specDir, u.sha, res.head) : null;
+      history = res.outcome === "done" && LIGHT_OUTCOMES.some((o) => routed.includes(o)) ? await updateHistory(act, a.cwd, loc.runsDir, wf, specDir, u.sha, res.head) : null;
       // core chooses the outcome; below only records what the merge did
       outcome = updateOutcome({ merge, history, ...(act.config.regenerate ? { regenerate: act.config.regenerate } : {}) }, routed);
       if (res.outcome === "conflict") {

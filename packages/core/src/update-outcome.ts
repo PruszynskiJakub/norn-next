@@ -6,6 +6,7 @@
  * machine. A dirty worktree or a diverged story branch never reaches here: act ends the step
  * `stuck` before any merge.
  */
+import { outcomeEdge, type Workflow } from "@norn/schema";
 import type { NumberedReceipt } from "./facts.ts";
 import { allRegenerable, REGENERATED_TRAILER, type RegenerateGlobs } from "./regenerate.ts";
 
@@ -80,12 +81,39 @@ export function updateOutcome(summary: UpdateSummary, routed: readonly string[] 
   return routed.includes(outcome) ? outcome : "done";
 }
 
+const isOpenPr = (wf: Workflow, step: string) => {
+  const s = wf.steps[step];
+  return s?.type === "git" && s.action === "open-pr";
+};
+
+/** Steps the round can reach from its start without passing a `git: open-pr` step. */
+function beforeOpenPr(wf: Workflow): Set<string> {
+  const seen = new Set<string>();
+  const queue = isOpenPr(wf, wf.start) ? [] : [wf.start];
+  while (queue.length) {
+    const step = queue.shift() as string;
+    if (seen.has(step)) continue;
+    seen.add(step);
+    for (const spec of Object.values((wf.steps[step]?.outcomes ?? {}) as Record<string, Parameters<typeof outcomeEdge>[0] | undefined>)) {
+      if (spec === undefined) continue;
+      const to = outcomeEdge(spec).to;
+      if (wf.steps[to] && !isOpenPr(wf, to)) queue.push(to);
+    }
+  }
+  return seen;
+}
+
 /**
  * The head at the latest receipt of the round whose outcome is `approve` — a gate's approve or an
- * agent's (a review) — or null when there is none or that receipt recorded no head: the full path
- * is the safe one. `receipts` are the story unit's of this round; order does not matter.
+ * agent's (a review) — or null when there is none, that receipt recorded no head, or the story's PR
+ * does not already hold every approval the light path skips: the full path is the safe one. The light
+ * path goes back through `open-pr`, never through the gates and describe before it, so it is taken
+ * only when `open-pr` ended `done` after the anchor, or the anchor's step is reachable only past
+ * `open-pr` (ready, merge). Otherwise a gate the person has not ruled on yet (human-qa parked when
+ * the base moved), or a PR body never written, would be skipped. `receipts` are the story unit's of
+ * this round; order does not matter.
  */
-export function lightAnchor(receipts: readonly NumberedReceipt[]): string | null {
+export function lightAnchor(receipts: readonly NumberedReceipt[], wf: Workflow): string | null {
   let latest: NumberedReceipt | null = null;
   for (const nr of receipts) {
     const r = nr.receipt;
@@ -93,5 +121,9 @@ export function lightAnchor(receipts: readonly NumberedReceipt[]): string | null
     if (approve && (!latest || nr.n > latest.n)) latest = nr;
   }
   const r = latest?.receipt;
-  return r && (r.kind === "approve" || r.kind === "done") ? (r.head_sha ?? null) : null;
+  if (!latest || !r || (r.kind !== "approve" && r.kind !== "done") || !r.head_sha) return null;
+  const anchorN = latest.n;
+  const openedSince = receipts.some((nr) => nr.n > anchorN && isOpenPr(wf, nr.receipt.step) && "outcome" in nr.receipt && nr.receipt.outcome === "done");
+  const pastOpenPr = wf.steps[r.step] !== undefined && !beforeOpenPr(wf).has(r.step);
+  return openedSince || pastOpenPr ? r.head_sha : null;
 }

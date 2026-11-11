@@ -7,7 +7,7 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 ## Proof
 
 - spec.md: 76 user stories, Plan seams S1–S5, D1–D14; 14 slices integrated; 77 criteria in frontmatter.
-- Review #1: unit 1895 pass, typecheck green; QA #1's two findings (02.AC3 takeover merge, 03 push-rule test) fixed, integration files re-run green.
+- Implement #2: unit 1911 pass, typecheck green. F1 fixed: light path only from an approve the PR holds (UO 'an approve open-pr has not gone out after…', LR 'a conflicting base move at human-qa in the first round…').
 - Traceability: full test names in review evidence `traceability.md`. Test files: RR release-record, HR heads-ref, PRT push-rule, OG open-pr-guard, BSI base-side, RV reverify, OV overlap, RG regenerate, IN integrate, AM ask-mid-merge (cli integration); BS base-sync, UO update-outcome, CA carried-approval (core unit); LR cli unit light-route; LP e2e light-path; contract git.ts in adapters. Fn = review finding.
 
 | Criterion | What it says | Verifier | Proven by |
@@ -92,21 +92,21 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 ## Easy to miss
 
-- Light-path anchor = latest `approve` at any step; human-qa has `stale: update`, and a gate goes stale on a local conflict even with no PR.
+- Light-path anchor (`lightAnchor`, core update-outcome.ts) = latest `approve`, only if open-pr ended `done` after it or its step is reachable only past open-pr (ready, merge); else full path.
 - Heads ref is pushed at every boundary; while the PR is open it replaces the branch push. Only open-pr pushes the branch; `story close` pushes the branch first.
 
 ## Not proven yet
 
-- F1 (blocking, 08.AC1 / light path): a conflicting base move at human-qa (or anywhere before the PR exists) takes the light route and skips the human-qa gate and describe. No test covers it.
+- F1 fix proven at S1 (pure lightAnchor + shipped-workflow receipts), not end to end through act.
 - No UNTRACED criterion. Agent-verified: 02.AC5, 04.AC9, 06.AC3, 10.AC5, 13.AC8, 14.AC6.
 
 ## Notes
 
-- Review #1: 15 findings, 1 blocking (F1); the minor and nit findings (F2–F15) are notes for the person, not rework (findings file in review evidence).
+- Review #1: 15 findings, 1 blocking (F1, light path skipping human-qa/describe: fixed in implement #2); the minor and nit findings (F2–F15) are notes for the person, not rework (findings file in review evidence).
 - Takeover: a divergence is merged only while the PR is open.
 - No GitPort fake exists: 07.AC6/13.AC7 run against the real adapter only.
 - Friction: a fresh worktree needs `bun install`.
 
 ## Resume
 
-Fix F1 in `packages/core/src/update-outcome.ts` (or its caller `act/git-step.ts:69`): `clean`/`resolved` only when open-pr has a done receipt after the anchor in this round, else `done`. Red-first core test: round 1, review approve → test → qa partial → human-qa, conflicting base move → update ends `done`.
+Review implement #2's diff (update-outcome.ts lightAnchor, git-step.ts call site, the two tests, the workflow comments).

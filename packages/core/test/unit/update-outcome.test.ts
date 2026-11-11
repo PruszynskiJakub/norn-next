@@ -78,17 +78,44 @@ describe("light path: only base merges and spec-folder bookkeeping since the las
   });
 });
 
-describe("the anchor is the head at the latest approve in the round", () => {
+describe("the anchor is the head at the latest approve in the round, once the PR holds it", () => {
   let n = 0;
   const num = (receipt: Partial<Receipt> & { kind: Receipt["kind"] }): NumberedReceipt => ({ n: ++n, file: "", receipt: { receipt_id: "01J", run_id: null, step: "x", at: "2026-01-01T00:00:00Z", by: "agent", ...receipt } as unknown as Receipt });
+  const step = (to: string) => ({ type: "agent", skill: "s", outcomes: { done: to, approve: to } }) as never;
+  // review → human-qa → describe → open-pr → ci → ready → merge, with human-qa going stale to update
+  const WF = {
+    name: "anchor",
+    start: "review",
+    steps: {
+      review: step("human-qa"),
+      "human-qa": { type: "gate", prompt: "p", outcomes: { approve: "describe", reject: "review", stale: "update" } },
+      update: { type: "git", action: "update", outcomes: { done: "review", clean: "open-pr" } },
+      describe: step("open-pr"),
+      "open-pr": { type: "git", action: "open-pr", outcomes: { done: "ci" } },
+      ci: { type: "check", run: "true", timeout: "1m", outcomes: { pass: "ready", fail: "review" } },
+      ready: { type: "gate", prompt: "p", outcomes: { approve: "$done", reject: "review", stale: "update" } },
+    },
+  } as unknown as Workflow;
+  const openPr = () => num({ kind: "classify", step: "open-pr", outcome: "done", rule: "git.open-pr", route: "ci" } as never);
+  const review = (c: string) => num({ kind: "done", step: "review", outcome: "approve", handoff: "h", head_sha: SHA(c) } as never);
   test("an agent review approve and a gate approve both anchor; the latest wins", () => {
-    const rs = [num({ kind: "approve", step: "ready", head_sha: SHA("1") }), num({ kind: "done", step: "review", outcome: "approve", handoff: "h", head_sha: SHA("2") } as never), num({ kind: "done", step: "implement", outcome: "done", handoff: "h", head_sha: SHA("3") } as never)];
-    expect(lightAnchor(rs)).toBe(SHA("2"));
-    expect(lightAnchor([...rs].reverse())).toBe(SHA("2"));
+    const rs = [num({ kind: "approve", step: "ready", head_sha: SHA("1") }), review("2"), num({ kind: "done", step: "implement", outcome: "done", handoff: "h", head_sha: SHA("3") } as never), openPr()];
+    expect(lightAnchor(rs, WF)).toBe(SHA("2"));
+    expect(lightAnchor([...rs].reverse(), WF)).toBe(SHA("2"));
   });
   test("no approve in the round, or a latest approve without its head, is no anchor", () => {
-    expect(lightAnchor([num({ kind: "done", step: "implement", outcome: "done", handoff: "h", head_sha: SHA("3") } as never)])).toBeNull();
-    expect(lightAnchor([num({ kind: "approve", step: "ready", head_sha: SHA("1") }), num({ kind: "approve", step: "human-qa" })])).toBeNull();
+    expect(lightAnchor([num({ kind: "done", step: "implement", outcome: "done", handoff: "h", head_sha: SHA("3") } as never)], WF)).toBeNull();
+    expect(lightAnchor([num({ kind: "approve", step: "ready", head_sha: SHA("1") }), num({ kind: "approve", step: "human-qa" })], WF)).toBeNull();
+  });
+  test("an approve open-pr has not gone out after, at a step before open-pr, is no anchor: the full path keeps the person's gate and describe", () => {
+    expect(lightAnchor([review("2")], WF)).toBeNull();
+    expect(lightAnchor([openPr(), review("2")], WF)).toBeNull();
+    // so a base move at human-qa ends done, the full path, whatever the merge brought
+    const anchor = lightAnchor([review("2")], WF);
+    expect(updateOutcome({ merge: { outcome: "merged" }, history: anchor ? history(merge("1")) : null }, ROUTED)).toBe("done");
+  });
+  test("an approve at a step reachable only past open-pr anchors on its own", () => {
+    expect(lightAnchor([openPr(), num({ kind: "approve", step: "ready", head_sha: SHA("4") })], WF)).toBe(SHA("4"));
   });
 });
 

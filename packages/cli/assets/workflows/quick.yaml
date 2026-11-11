@@ -40,6 +40,8 @@ steps:
   # the light path: when the story holds only base merges and spec-folder bookkeeping (never spec.md)
   # since the round's latest approve, a merge git made alone (clean) or one a resolver finished
   # (resolved) skips implement and the full review and describe; anything else is done, the full path
+  # (only an approve the PR already holds counts: open-pr ran after it, or it is at ready or merge;
+  # so a base move before the PR is out never skips a gate or describe)
   update:
     type: git
     action: update
