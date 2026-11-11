@@ -4,12 +4,17 @@ A resolving agent's brief lists, for each conflicting path, the base commits sin
 
 ### Proof
 
-- AC1 brief lists the base side per conflicting path (sha, subject, story from the trailer incl. a squash commit's last trailer block, spec and PR body paths on the base), with or without the merge in progress: `packages/cli/test/integration/base-side.test.ts` › "the brief lists the base side per conflicting path, before and during the resolver's merge" (S3, real git; went red with the cli wiring disabled). Git op: `packages/adapters/test/contract/git.ts` › "log limited to paths lists only the commits that touched them; a squash commit's trailers are its last block" (S4).
-- AC2 a trailer-less base commit is listed with its subject and no story: same integration test (`hand fix on main`), and `packages/core/test/unit/base-sync.test.ts` › "2b: a resolve step with the base_side input: …" (S2).
-- AC3 the brief's Base update section shows the base side, before the resolve guidance; only when the step declares `base_side`: `base-sync.test.ts` › "2b …" (went red first).
-- AC4 shipped story and quick (both copies) `resolve` takes `base_side` and validates: `packages/cli/test/unit/assets.test.ts` › "story's and quick's resolve take the base side of each conflict"; `test/repo/process.test.ts` › "story's and quick's resolve take the base side of each conflict, as the shipped copies do" (both red first); existing per-file validation tests cover validity.
-- AC5 bundled `packages/cli/assets/skills/norn-merge/SKILL.md` › "Read the base side first" paragraph at the top of "Resolve each conflict by intent" (agent verifier: review).
-- `bun run test` (1760 pass) and `bun run typecheck` green; `bun run schema:emit` regenerated `workflow.schema.json`; `bun run docs:emit` changed nothing.
+Review #1: approved, no blocking findings. Traceability (each test read and seen to assert its item):
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | brief lists per conflicting path each base commit since the merge base that touched it: sha, subject, story from its `Norn-Story` trailer (squash's last block), spec.md / pr.md paths on the base | test | `packages/cli/test/integration/base-side.test.ts` › "the brief lists the base side per conflicting path, before and during the resolver's merge"; `packages/adapters/test/contract/git.ts` › "log limited to paths lists only the commits that touched them; a squash commit's trailers are its last block" |
+| AC2 | a conflicting base commit with no story trailer is listed with its subject and no story | test | same integration test (`hand fix on main`); `packages/core/test/unit/base-sync.test.ts` › "2b: a resolve step with the base_side input: …" |
+| AC3 | the brief's base-update section shows the base side | test | `packages/core/test/unit/base-sync.test.ts` › "2b: a resolve step with the base_side input: …" (before the resolve guidance; hidden when the step does not declare it) |
+| AC4 | shipped story and quick (both copies) `resolve` takes `base_side` and validates | test | `packages/cli/test/unit/assets.test.ts` › "story's and quick's resolve take the base side of each conflict"; `test/repo/process.test.ts` › "story's and quick's resolve take the base side of each conflict, as the shipped copies do"; existing per-file validation tests |
+| AC5 | bundled norn-merge skill tells the resolver to read the base side first | agent | QA (agent) — review read `packages/cli/assets/skills/norn-merge/SKILL.md` "Read the base side first" paragraph: present |
+
+- `bun run test` (1760 pass) and `bun run typecheck` green at review; the integration test and the contract test pass locally under `bunfig.integration.toml`.
 
 ### Easy to miss
 
@@ -20,16 +25,17 @@ A resolving agent's brief lists, for each conflicting path, the base commits sin
 
 ### Not proven yet
 
-- The new integration test and the contract test run in CI's integration tier; I ran only those two files locally (both pass), not the tier.
-- AC5 is for review to judge.
+- AC5 (agent verifier) goes to QA; review found the paragraph in place.
+- Full integration tier not run locally; CI runs it.
 
 ### Notes
 
 - `GitPort.log` gained an optional `paths` argument (`git log <range> -- <paths>`) rather than a new port method. Slice 07 (light path) also adds commits-per-path to the git port; whichever lands second should reuse one of them.
 - Only `resolve` takes `base_side` in the shipped workflows, as the spec asks; `sync-resolve` (the first sync's resolver) was left as is — a candidate for later.
+- Review minor note (not rework): a trailer-less commit is labelled `no story (made outside norn)`, which is wrong for agent commits of a story landed by merge commit rather than squash; findings file has it.
 - No commit cap per path: every base commit since the merge base that touched the path is listed, as AC1 says.
 - If git fails while gathering (e.g. base sha missing locally), `norn brief` fails rather than hiding it; the base sha is the fetched base tip, so this should not happen.
 
 ### Resume
 
-Nothing left in this step: next is the slice's review.
+Review approved; next is the slice's QA.
