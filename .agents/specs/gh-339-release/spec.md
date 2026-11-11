@@ -4,7 +4,7 @@ slug: release
 provider: gh
 number: 339
 url: https://github.com/PruszynskiJakub/norn-next/issues/339
-title: Release
+title: Release 0.33.0
 assignee: PruszynskiJakub
 labels:
   - norn
