@@ -4,7 +4,7 @@ The `ci` check notices a PR that conflicts with its base before it waits for a C
 
 ## Proof
 
-Review #1 traceability (the spec has no frontmatter criteria; rows are its Wanted bullets and Decision):
+Review traceability, re-checked by review #2 after the sync merge (the spec has no frontmatter criteria; rows are its Wanted bullets and Decision):
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -19,7 +19,7 @@ Review #1 traceability (the spec has no frontmatter criteria; rows are its Wante
 - check-run records the named outcome (with the log): `packages/cli/test/integration/check-run.test.ts` › "a check-run whose step declares outcomes by exit code".
 - apply routes a `stale` check receipt over its own counted edge: `packages/core/test/unit/apply.test.ts` › "check outcomes declared by exit code".
 - ci scripts (repo story/quick/release, shipped story/quick): CONFLICTING → exit 3 with no run wait; UNKNOWN asked again up to 6×5s and never a conflict; a 5m timeout re-reads mergeable (exit 3 if it came to conflict) and names the state in its message. Tests: `packages/cli/test/integration/ci-check.test.ts` (new conflicting / UNKNOWN / timeout cases for both scripts).
-- Review #1 re-ran: `bun run test` 1755 pass, `bun run typecheck` green, the two integration files 22 pass.
+- Review #2 (after the merge of main) re-ran: `bun run test` 1755 pass, `bun run typecheck` green, ci-check + check-run integration 22 pass.
 
 ## Easy to miss
 
@@ -37,7 +37,7 @@ Review #1 traceability (the spec has no frontmatter criteria; rows are its Wante
 - Decision: the receipt carries the real outcome (`stale`), so history, brief and `last_check` treat it as not a failing check (no rework shown to implement). `CheckReceipt.outcome` widened to `OutcomeName`; `CheckOrder` gained optional `exits`.
 - Check outcomes are now an open map in the schema; the pass/fail/exits rule moved to load-time validation (`unknown_outcome`).
 - Schema JSON emitted; `docs:emit` produced no change; concepts glossary and the "Write your own workflow" recipe mention `exits`.
-- Review #1 approved with no blocking findings. Note for the person: seven harvested golden cases (`packages/core/test/golden/{human,merged-pr,pr-body,runtime}-*.json`) appeared untracked at 16:21:43, after the test check, not from this change; norn's report commit sweeps them into the branch. Drop them before merge if unwanted.
+- Review #1 approved with no blocking findings. Review #2, after the sync merge, approved again with no findings. Note for the person: seven harvested golden cases (`packages/core/test/golden/{human,merged-pr,pr-body,runtime}-*.json`) appeared untracked at 16:21:43, after the test check, not from this change; norn's report commit sweeps them into the branch. Drop them before merge if unwanted.
 - describe#1 wrote pr.md. It calls the change one-way, because once a `stale` check receipt exists the old schema refuses it, and it tells the person to drop the seven harvested golden cases.
 - sync-resolve#1 merged main (7780accfd2f9, which brings the CI change where one failing shard no longer cancels the others) into the branch. The only conflict was in `ci-check.test.ts`: main added a `JOBS` fixture and a jq-backed `gh run view --json jobs` fake, and this branch added the `mergeable` parameter to the repo-script `run` helper. The resolution keeps both. After the merge: `bun run test` 1755 pass, typecheck green, ci-check + story-reset integration 19 pass.
 - Friction: something in the test step left harvested golden files untracked in the worktree, so they ride along in the next report commit.
@@ -45,4 +45,4 @@ Review #1 traceability (the spec has no frontmatter criteria; rows are its Wante
 
 ## Resume
 
-The branch is built, reviewed and up to date with main (7780accfd2f9). pr.md still describes it. Next: the workflow's later steps update the draft PR and run `ci`.
+Review #2 approved. Nothing to rework; the workflow takes the story on from review. Before merge the person drops the seven harvested golden cases if they do not want them.
