@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { cpSync, existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { herdr } from "@norn/adapters";
-import { STORY_UNIT_DIR } from "@norn/schema";
+import { headsRef, STORY_UNIT_DIR } from "@norn/schema";
 import { handoffPath, inboxOpenPath, installSkills, linkSkills, machineDir, pinnedWorkflowPath, repoConfigPath, workflowsDir } from "@norn/store";
 import { bundledSkills, type TickReport } from "../../packages/cli/src/index.ts";
 import { assetsDir } from "../../packages/cli/src/runtime/assets.ts";
@@ -255,7 +255,7 @@ describe("BS3.3a (dogfood D4): a person's push to the branch of a $done story", 
   });
   afterAll(() => h.cleanup());
 
-  test("norn's next commit merges it in (never rebases) and pushes; norn update does not end stuck diverged", async () => {
+  test("norn's next branch push (open-pr) merges it in (never rebases); later boundaries go to the heads ref; norn update does not end stuck diverged", async () => {
     await until(() => h.state(runs())?.step === "ready" && h.state(runs())?.status === "parked", "ready");
     expect((await h.norn("story", "approve", "gh-13")).exit).toBe(0);
     await until(() => h.state(runs())?.status === "done", "done");
@@ -267,7 +267,11 @@ describe("BS3.3a (dogfood D4): a person's push to the branch of a $done story", 
     const head = h.git(["rev-parse", "HEAD"], wt());
     expect(h.git(["merge-base", "--is-ancestor", person, head], wt())).toBe("");
     expect(h.git(["log", "--format=%s", "-n", "20"], wt())).toContain("Merge origin/gh-13-take-person-pushes into gh-13-take-person-pushes");
-    expect(h.git(["ls-remote", "origin", "refs/heads/gh-13-take-person-pushes"]).split("\t")[0]).toBe(head);
+    // the PR is open: open-pr pushed the branch with the person's commit merged in; the boundaries since are on the heads ref
+    const branch = h.git(["ls-remote", "origin", "refs/heads/gh-13-take-person-pushes"]).split("\t")[0] as string;
+    expect(h.git(["merge-base", "--is-ancestor", person, branch], wt())).toBe("");
+    expect(h.git(["merge-base", "--is-ancestor", branch, head], wt())).toBe("");
+    expect(h.git(["ls-remote", "origin", headsRef("gh-13")]).split("\t")[0]).toBe(head);
     expect(readFileSync(join(wt(), "README.md"), "utf8")).toBe("a line from a person\n");
   }, 60_000);
 });
@@ -546,12 +550,14 @@ describe("H1/BS5: a resolve parked mid-merge — norn never concludes the merge;
     // an unresolved file left in the story worktree when the person approves
     writeFileSync(join(wt(), "b.txt"), ["<<<<<<< HEAD", "ours", "=======", "theirs", ">>>>>>> main", ""].join("\n"));
     const before = h.git(["rev-parse", "HEAD"], wt());
+    const pushed = h.git(["ls-remote", "origin", "refs/heads/gh-11-merge-safely"]).split("\t")[0];
     expect((await h.norn("story", "approve", "gh-11")).exit).toBe(0);
     h.clock.advance(10_000);
     const t = await h.tick();
     expect(kinds(t).find((k) => k.startsWith("gh-11 receipts.apply"))).toContain("FAILED commit on gh-11-merge-safely refused: conflict markers in b.txt");
     expect(h.git(["rev-parse", "HEAD"], wt())).toBe(before);
-    expect(h.git(["ls-remote", "origin", "refs/heads/gh-11-merge-safely"]).split("\t")[0]).toBe(before);
+    expect(h.git(["ls-remote", "origin", "refs/heads/gh-11-merge-safely"]).split("\t")[0]).toBe(pushed);
+    expect(h.git(["ls-remote", "origin", headsRef("gh-11")]).split("\t")[0]).toBe(before);
     const inbox = (await h.norn("status")).value as { groups: Record<string, Array<{ title: string }>> };
     expect(inbox.groups.unblock?.map((i) => i.title)).toEqual([expect.stringContaining("conflict markers in b.txt")]);
   }, 60_000);

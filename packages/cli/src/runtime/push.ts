@@ -14,6 +14,11 @@ export interface PushBranchOptions {
   /** trailers of the merge commit made when a person's push is taken in (`Norn-Tick` is added) */
   trailers: Record<string, string>;
   tick: string;
+  /**
+   * Push only the story's heads ref, never the branch: the story's PR is open and its head stays
+   * the commit CI ran on (`prOpen`). Ignored for a slice branch, which carries no heads ref.
+   */
+  heads?: boolean;
 }
 
 /** `reason`: `held` (conflict markers) or the git push reason; `message` says it in full */
@@ -34,10 +39,12 @@ export async function pushBranch(git: GitPort, opts: PushBranchOptions): Promise
   // boundary on the branch that the heads ref lacks. Forced: it follows the story's head wherever
   // a takeover merged it from
   const story = force ? null : (parseSpecDirName(branch)?.story ?? null);
-  const specs = [`${force}refs/heads/${branch}:refs/heads/${branch}`, ...(story ? [`+refs/heads/${branch}:${headsRef(story)}`] : [])];
+  const headsSpec = story ? [`+refs/heads/${branch}:${headsRef(story)}`] : [];
+  const specs = story && opts.heads ? headsSpec : [`${force}refs/heads/${branch}:refs/heads/${branch}`, ...headsSpec];
   const push = () => git.push(cwd, remote, specs);
   let r = await push();
-  if (!r.ok && r.reason === "rejected" && !force) {
+  // A forced heads ref is never rejected; a person's push to the branch is taken in at the next branch push
+  if (!r.ok && r.reason === "rejected" && !force && !opts.heads) {
     const taken = await takeRemoteBranch(git, opts);
     if (taken !== true) return { ok: false, reason: r.reason, message: `${r.reason}: ${r.message}${taken ? `; ${taken}` : ""}` };
     r = await push();

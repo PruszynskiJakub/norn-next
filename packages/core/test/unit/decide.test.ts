@@ -1104,3 +1104,39 @@ describe("gh-71 D1: round.start and the receipts after the round receipt", () =>
     expect(only(facts([f]))).toMatchObject({ kind: "round_start", ended: { applied_through: 1 }, rejected: [] });
   });
 });
+
+describe("push rule: once the story's PR is open, boundaries push the heads ref, not the branch", () => {
+  const pr = (state: "open" | "closed" | "merged", is_draft = false) => ({ number: 7, url: "u", state, is_draft, head_sha: "abc", head: "gh-1-login", base_branch: "main", merged_at: null });
+  const boundaryCommit = (story: Partial<StoryFacts>) => {
+    const a = only(facts([solo({}, null, story)]));
+    return "commit" in a ? a.commit : undefined;
+  };
+  test("no PR yet, or a closed one: the story branch is pushed as before", () => {
+    expect(boundaryCommit({ pr: null })).toMatchObject({ push: true });
+    expect(boundaryCommit({ pr: null })).not.toHaveProperty("heads");
+    expect(boundaryCommit({ pr: pr("closed") })).toMatchObject({ push: true });
+  });
+  test("an open PR, a draft one, or one last seen open: the boundary pushes only the heads ref", () => {
+    expect(boundaryCommit({ pr: pr("open") })).toMatchObject({ push: false, heads: true });
+    expect(boundaryCommit({ pr: pr("open", true) })).toMatchObject({ push: false, heads: true });
+    expect(boundaryCommit({ pr: undefined, pr_seen: { pr: pr("open"), observed_at: T0 - 60_000 } })).toMatchObject({ push: false, heads: true });
+    // a PR fetched this tick and gone outranks the one last seen
+    expect(boundaryCommit({ pr: null, pr_seen: { pr: pr("open"), observed_at: T0 - 60_000 } })).toMatchObject({ push: true });
+  });
+  test("a slice's boundary pushes its own branch whatever the PR: only the story branch is the PR head", () => {
+    const a = only(facts([storyAt("slices", { pr: pr("open") }, [{ nn: "01", state: { step: "integrate", visits: { integrate: 1 } } }])]), "gh-1/01");
+    expect(a).toMatchObject({ kind: "run_git", action: "integrate", heads: true });
+    const started = decide(facts([storyAt("slices", { pr: pr("open") }, [{ nn: "01", state: null }])]), WORKFLOWS, CONFIG).find((d) => d.action.kind === "start_slices")?.action;
+    expect(started?.kind === "start_slices" && started.starts[0]?.commit).toMatchObject({ push: true });
+    expect(started?.kind === "start_slices" && started.starts[0]?.commit).not.toHaveProperty("heads");
+  });
+  test("git steps that move the story branch (update, integrate) push only the heads ref while the PR is open; open-pr pushes the branch", () => {
+    expect(only(facts([storyAt("open-pr", { pr: pr("open") })]))).not.toHaveProperty("heads");
+    expect(only(facts([storyAt("slices", {}, [{ nn: "01", state: { step: "integrate", visits: { integrate: 1 } } }])]), "gh-1/01")).not.toHaveProperty("heads");
+  });
+  test("a finished slice's status commit onto the story branch pushes only the heads ref while the PR is open", () => {
+    const done = (extra: Partial<StoryFacts>) => only(facts([storyAt("slices", extra, [{ nn: "01", state: { step: "$done", status: "done" } }])]), "gh-1/01");
+    expect(done({ pr: pr("open") })).toMatchObject({ kind: "mark_done", rule: "slice.done.cleanup", heads: true });
+    expect(done({ pr: null })).not.toHaveProperty("heads");
+  });
+});

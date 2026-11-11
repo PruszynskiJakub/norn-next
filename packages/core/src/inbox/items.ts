@@ -12,7 +12,7 @@ import { cmd, nextCommand, skillsDriftHint, startAgentCommand, unstickCommand, v
 import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../criteria.ts";
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
-import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, skillsDiffer, issueProblem, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyLanded, storyPhase, storyUnit, unitWorktree } from "../policy.ts";
+import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, skillsDiffer, issueProblem, knownPr, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyLanded, storyPhase, storyUnit, unitWorktree } from "../policy.ts";
 import { optionsLine } from "../prompt.ts";
 import { hookActivity } from "../session.ts";
 import { CARRIED_CLEAN, carriedApproval, isReadyGate, readyApprovalReceipt, remergeCommands } from "../ready-carry.ts";
@@ -442,8 +442,6 @@ function noteItems(story: StoryFacts): InboxItem[] {
   }));
 }
 
-/** The PR fetched this tick, else the last one this checkout saw (`pr_seen`); null/undefined = none known. */
-const knownPr = (story: StoryFacts): StoryFacts["pr"] => (story.pr !== undefined ? story.pr : story.pr_seen?.pr);
 
 /**
  * The story unit finished its workflow, or waits at a merge step, and its PR is open — merging it

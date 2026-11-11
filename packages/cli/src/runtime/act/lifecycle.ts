@@ -123,7 +123,7 @@ export async function markDone(act: ActEnv, a: Extract<Action, { kind: "mark_don
     const r = patchSliceFile(file, { status: a.slice_status }, storyWt);
     if (!r.ok) throw new Error(`cannot set ${relative(storyWt, file)} status: ${r.reason}`);
     detail.commit = await act.commit(
-      { cwd: storyWt, branch: story.branch, message: `norn: ${a.unit.key} ${a.slice_status}`, trailers: nornTrailers(act.tick, a.unit.story, a.unit.slice, "$done"), push: true },
+      { cwd: storyWt, branch: story.branch, message: `norn: ${a.unit.key} ${a.slice_status}`, trailers: nornTrailers(act.tick, a.unit.story, a.unit.slice, "$done"), push: !a.heads, ...(a.heads ? { heads: true as const } : {}) },
       null,
       null,
       [relative(storyWt, file)],

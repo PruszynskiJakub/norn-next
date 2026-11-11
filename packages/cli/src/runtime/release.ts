@@ -9,8 +9,8 @@
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import { cmd, type StoryFacts } from "@norn/core";
-import { ulid } from "@norn/schema";
+import { cmd, prOpen, type StoryFacts } from "@norn/core";
+import { headsRef, ulid } from "@norn/schema";
 import { releaseClaim, writtenHere } from "@norn/store";
 import type { Context } from "../context.ts";
 import { refuse } from "../output.ts";
@@ -85,11 +85,14 @@ export async function releaseStory(obs: Observed, story: StoryFacts): Promise<Re
       const ul = obs.units[u.unit.key];
       if (u.unit.slice && ul?.worktree && u.worktree?.exists) branches.push({ cwd: ul.worktree, branch: ul.branch, slice: u.unit.slice });
     }
+    // While the PR is open the story's latest boundary goes to its heads ref: the PR head stays the commit CI ran on
+    const heads = prOpen(story);
     // Stop at the first failed push: the record and the claim wait for every branch
     for (const b of branches) {
-      const r = await pushBranch(git, { cwd: b.cwd, remote, branch: b.branch, trailers: releaseTrailers(story.key, b.slice, obs), tick: obs.facts.tick_id });
+      const headsOnly = heads && b.slice === null;
+      const r = await pushBranch(git, { cwd: b.cwd, remote, branch: b.branch, trailers: releaseTrailers(story.key, b.slice, obs), tick: obs.facts.tick_id, heads: headsOnly });
       if (!r.ok) return { story: story.key, ok: false, pushed, error: `push ${b.branch} failed: ${r.message}; the claim is kept` };
-      pushed.push(b.branch);
+      pushed.push(headsOnly ? headsRef(story.key) : b.branch);
     }
   }
   // The record goes before the claim; a failed push keeps the claim and deletes nothing

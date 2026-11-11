@@ -53,8 +53,8 @@ export async function runGit(act: ActEnv, a: Extract<Action, { kind: "run_git" }
 }
 
 /** Push the updated story branch; a refused push is a failed effect, the receipt still stands. */
-async function pushUpdated(act: ActEnv, cwd: string, branch: string): Promise<PushBranchResult> {
-  const r = await act.pushBranch(cwd, branch);
+async function pushUpdated(act: ActEnv, cwd: string, branch: string, heads: boolean): Promise<PushBranchResult> {
+  const r = await act.pushBranch(cwd, branch, {}, heads);
   if (r.ok) act.effectsOk.add("push");
   else act.effectErrors.push({ effect: "push", reason: `push of ${branch} failed: ${r.message}` });
   return r;
@@ -113,14 +113,14 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
         base = { ref: u.ref, sha: u.sha, conflicts: res.files };
         detail = `merging ${u.branch} (${u.sha.slice(0, 12)}) into ${a.branch} conflicts in ${res.files.join(", ") || "?"}`;
         // an adopted fast-forward is still the record: publish it
-        if (res.adopted) extra.story_push = await pushUpdated(act, a.cwd, a.branch);
+        if (res.adopted) extra.story_push = await pushUpdated(act, a.cwd, a.branch, a.heads === true);
         break;
       }
       // The merge commit (or the head found up to date) goes into the record, for status and why
       base = { ref: u.ref, sha: u.sha, conflicts: [], head: res.head, merged: res.merged };
       detail = res.merged ? `merged ${u.branch} (${u.sha.slice(0, 12)}) into ${a.branch} at ${res.head.slice(0, 12)}` : `${a.branch} is up to date with ${u.branch} (${u.sha.slice(0, 12)})`;
       // pushed at the step boundary, as integrate does
-      if (res.merged || res.adopted) extra.story_push = await pushUpdated(act, a.cwd, a.branch);
+      if (res.merged || res.adopted) extra.story_push = await pushUpdated(act, a.cwd, a.branch, a.heads === true);
       break;
     }
     case "integrate": {
@@ -132,7 +132,7 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
       } else {
         outcome = "done";
         detail = `${a.branch} integrated into ${a.onto} at ${res.head.slice(0, 12)}`;
-        extra.story_push = await act.pushBranch(a.cwd, a.onto);
+        extra.story_push = await act.pushBranch(a.cwd, a.onto, {}, a.heads === true);
       }
       break;
     }

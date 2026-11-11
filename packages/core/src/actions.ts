@@ -58,6 +58,11 @@ export interface BoundaryCommit {
   /** push the branch after committing (only the claim holder) */
   push: boolean;
   /**
+   * Push only the story's heads ref, never the branch (`push` is false): the story's PR is open,
+   * so the branch, its head, moves only at `open-pr` and `norn story close` (`prOpen`).
+   */
+  heads?: true;
+  /**
    * Commit even when nothing changed — a story unit's boundary, so the story branch
    * always carries the last boundary (`Norn-Outcome`, `Norn-Next`) a non-holder reads the step from.
    * Absent = no commit without changes (a slice's boundary: no reader needs it).
@@ -238,6 +243,8 @@ export interface RunGitAction extends UnitBase {
   branch: string;
   /** integrate: the story branch to rebase onto and fast-forward */
   onto: string | null;
+  /** integrate, update: the moved story branch goes to its heads ref only; the PR is open (`BoundaryCommit.heads`) */
+  heads?: true;
   /**
    * open-pr: act reads `body_file` (worktree-relative, prose decide never reads) and puts
    * `body` (the issue link) under it; no file → `body` alone. An open PR gets the new body.
@@ -289,6 +296,8 @@ export interface MarkDoneAction extends UnitBase, Transition {
    */
   cleanup: { worktree: string | null; branch_local: string | null; branch_kept?: string; release_slot: boolean };
   slice_status: "integrated" | null;
+  /** the slice status commit onto the story branch pushes only its heads ref; the PR is open (`BoundaryCommit.heads`) */
+  heads?: true;
 }
 
 /** Recovery: state/receipts were written but not committed (crash between 3 and 4). */

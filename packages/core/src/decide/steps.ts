@@ -19,7 +19,7 @@ import { initialState, routeOf } from "../apply.ts";
 import { cmd, sliceWorktreePath, storyWorktreePath } from "../commands.ts";
 import type { SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { sha256 } from "../hash.ts";
-import { unitWorktree } from "../policy.ts";
+import { prOpen, unitWorktree } from "../policy.ts";
 import { CARRIED_CLEAN, remergeCommands } from "../ready-carry.ts";
 import { checkWorkflowLevel, stepOf, type UnitLevel } from "../workflow.ts";
 import { commitFor, type Ctx, emitApplied, endedWith, nextReceiptNumber, nornReceipt, park, rebasing, synth, trailersFor, unitBranch } from "./receipts.ts";
@@ -133,6 +133,7 @@ export function runGit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState
         ? { base: ctx.facts.repo.default_branch, title: fm.title, body: `Closes ${fm.url}\n\nDelivered by norn (story ${story.key}).${resolvedEvidence(story)}`, body_file: `${story.spec_dir}/${PR_BODY_FILE}` }
         : null,
     ...(update ? { update } : {}),
+    ...((step.action === "integrate" || step.action === "update") && prOpen(story) ? { heads: true as const } : {}),
   });
 }
 

@@ -16,7 +16,7 @@ import type { Action, BoundaryCommit, Decision, Delivery, NewReceipt } from "../
 import { type ApplyResult, applyReceipts } from "../apply.ts";
 import type { Facts, NumberedReceipt, SliceFileFacts, StoryFacts, UnitFacts, UnitRef } from "../facts.ts";
 import { unitInboxItem } from "../inbox/items.ts";
-import { nornTrailers, type StepEnd, unitWorktree } from "../policy.ts";
+import { nornTrailers, prOpen, type StepEnd, unitWorktree } from "../policy.ts";
 import type { InboxItem } from "../ports.ts";
 import { iso } from "../time.ts";
 import { toStuck } from "../unit-state.ts";
@@ -152,8 +152,17 @@ export function commitFor(ctx: Ctx, story: StoryFacts | string, uf: UnitFacts | 
   const cwd = unitWorktree(story, uf);
   if (!cwd) return null;
   const slice = uf?.unit.slice ?? null;
+  const heads = slice === null && prOpen(story);
   // A story unit's boundary is committed even when nothing changed (the non-holder's last boundary)
-  return { cwd, branch: unitBranch(story, uf), message, trailers: trailersFor(ctx, key, slice, step, o.ended), push: true, ...(o.ended && slice === null ? { allow_empty: true as const } : {}) };
+  return {
+    cwd,
+    branch: unitBranch(story, uf),
+    message,
+    trailers: trailersFor(ctx, key, slice, step, o.ended),
+    push: !heads,
+    ...(heads ? { heads: true as const } : {}),
+    ...(o.ended && slice === null ? { allow_empty: true as const } : {}),
+  };
 }
 
 /**

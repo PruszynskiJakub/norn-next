@@ -25,7 +25,7 @@ import type { NumberedReceipt, StoryFacts, UnitFacts, UnitRef } from "../facts.t
 import { initialState } from "../apply.ts";
 import { sha256 } from "../hash.ts";
 import { bodyChangedItem } from "../inbox/items.ts";
-import { baseClosed, issueProblem, prProblem, roundFinished, type StoryPhase, stepLabel, storyFinished, storyMerged, storyPhase, storyUnit, WF_LABEL } from "../policy.ts";
+import { baseClosed, issueProblem, prOpen, prProblem, roundFinished, type StoryPhase, stepLabel, storyFinished, storyMerged, storyPhase, storyUnit, WF_LABEL } from "../policy.ts";
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
 import { roundRejected, toCorrupt, toDone } from "../unit-state.ts";
@@ -483,6 +483,7 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
           rule: "slice.done.cleanup",
           cleanup: { worktree: wt, branch_local: kept === null ? branch : null, ...(kept ? { branch_kept: kept } : {}), release_slot: true },
           slice_status: "integrated",
+          ...(prOpen(story) ? { heads: true as const } : {}),
           receipts: [],
           state: null,
           commit: null,

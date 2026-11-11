@@ -158,19 +158,19 @@ export class ActEnv {
       throw e;
     }
     this.effectsOk.add("commit");
-    if (!c.push || !this.obs.remote) return { sha, pushed: null };
-    const r = await this.pushBranch(c.cwd, c.branch, c.trailers);
+    if ((!c.push && !c.heads) || !this.obs.remote) return { sha, pushed: null };
+    const r = await this.pushBranch(c.cwd, c.branch, c.trailers, c.heads);
     if (r.ok) this.effectsOk.add("push");
     // Committed but not pushed is a failed effect (the record is not on the remote)
     else this.effectErrors.push({ effect: "push", reason: `push of ${c.branch} failed: ${r.message}` });
     return r.ok ? { sha, pushed: true } : { sha, pushed: false, push_error: r.message };
   }
 
-  /** Push a branch through the one push path (runtime/push.ts); nothing to do without a git remote. */
-  async pushBranch(cwd: string, branch: string, trailers: Record<string, string> = {}): Promise<PushBranchResult> {
+  /** Push a branch through the one push path (runtime/push.ts), `heads`: only the story's heads ref (the PR is open); nothing to do without a git remote. */
+  async pushBranch(cwd: string, branch: string, trailers: Record<string, string> = {}, heads = false): Promise<PushBranchResult> {
     const remote = this.obs.remote;
     if (!remote) return { ok: true };
-    return pushBranch(this.git, { cwd, remote, branch, trailers, tick: this.tick });
+    return pushBranch(this.git, { cwd, remote, branch, trailers, tick: this.tick, heads });
   }
 
   /** Notify once per inbox item id; the id is persisted before sending (receipt-first). */
