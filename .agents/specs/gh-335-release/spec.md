@@ -4,7 +4,7 @@ slug: release
 provider: gh
 number: 335
 url: https://github.com/PruszynskiJakub/norn-next/issues/335
-title: Release
+title: Release 0.32.0
 assignee: PruszynskiJakub
 labels:
   - norn
