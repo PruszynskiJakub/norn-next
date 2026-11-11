@@ -8,7 +8,7 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 - spec.md: 76 user stories, Plan seams S1–S5, D1–D14; 14 slices integrated; 77 criteria in frontmatter.
 - QA #2 (HEAD 087e1aae): 77/77 pass. Re-ran every criterion's test file on this head (integration 62, unit 603, contract 139, e2e 18 pass) and re-read the agent criteria's docs; evidence per criterion in this step's evidence.
-- Traceability: full test names in review evidence `traceability.md`. Test files: RR release-record, HR heads-ref, PRT push-rule, OG open-pr-guard, BSI base-side, RV reverify, OV overlap, RG regenerate, IN integrate, AM ask-mid-merge (cli integration); BS base-sync, UO update-outcome, CA carried-approval (core unit); LR cli unit light-route; LP e2e light-path; contract git.ts in adapters. Fn = review finding.
+- Traceability: full test names and the abbreviations below (RR, HR, PRT, OG, BSI, RV, OV, RG, IN, AM, BS, UO, CA, LR, LP) in review evidence `traceability.md`; Fn = review finding.
 
 | Criterion | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -97,14 +97,14 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 ## Not proven yet
 
-- The light-path anchor fix is proven on the pure function (unit tests, and QA ran it over this story's real receipts), not end to end through act.
+- The light-path anchor fix is proven on the pure function (unit tests; QA ran it on this story's real receipts), not end to end through act.
 
 ## Notes
 
-- Review #2: F1 (light path skipping human-qa/describe) fixed: lightAnchor anchors only when open-pr ended done after the approve, or its step lies past open-pr; no new findings. F2–F15 (minor/nit; listed in review #1's findings file) are unchanged and stay notes for the person, not rework.
-- Takeover: a divergence is merged only while the PR is open. With no PR open the branch and heads ref go in one `--atomic` push, so a divergence then is a rewrite and the branch is taken as it is.
-- 02.AC5: the criterion says the step restarts "with fresh counters"; docs/limitations.md says with the counters the last record push recorded (fresh only when no record was ever pushed). QA passed it; a note asks the person.
-- The repo copies `.agents/workflows/{story,quick}.yaml` lack the new comment about the light-path anchor (comment only), and `.agents/skills/norn-merge` is older than the bundled skill (refreshed at release).
+- Review #2: F1 (light path skipping human-qa/describe) fixed; no new findings. F2–F15 (minor/nit, review #1's findings file) stay notes for the person.
+- Takeover: a divergence is merged only while the PR is open. With no PR the two go in one `--atomic` push, so a divergence is a rewrite: the branch is taken as is.
+- 02.AC5: the criterion says the step restarts "with fresh counters"; docs/limitations.md says with the counters the last record push recorded. QA: pass, with a note.
+- `.agents/workflows/{story,quick}.yaml` lack the shipped copies' new light-path comment (comment only).
 - No GitPort fake exists: 07.AC6/13.AC7 run against the real adapter only.
 - Friction: a fresh worktree needs `bun install`.
 
