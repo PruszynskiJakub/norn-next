@@ -18,7 +18,7 @@ import {
   type Workflow,
 } from "@norn/schema";
 import type { NumberedReceipt, UnitRef } from "./facts.ts";
-import { edgeOf, OVERRIDABLE_ROUTES, resetEdges, stepOf } from "./workflow.ts";
+import { edgeOf, openPrStep, OVERRIDABLE_ROUTES, resetEdges, stepOf } from "./workflow.ts";
 import { cmd } from "./commands.ts";
 import { stepLimits } from "./policy.ts";
 import { toDone, toParked, toReady, toRunning, toStuck } from "./unit-state.ts";
@@ -380,6 +380,18 @@ function updateFrom(st: UnitState, r: ReceiptOf<"update">, ctx: ApplyContext): S
   return { state: next, log: `update by ${r.who ?? r.by}: ${st.step} → ${r.to}`, advance: { from: st.step, outcome: "update", to: r.to, moved: true } };
 }
 
+/**
+ * A story waiting where the round can end holds changes its PR lacks: it re-enters the workflow's
+ * open-pr step, no edge and no counter, since open-pr makes the PR head the local head and the
+ * guard cannot fire again until something changes the code.
+ */
+function backToOpenPr(st: UnitState, r: ReceiptOf<"classify">, ctx: ApplyContext, last: LastOutcome): Step1 {
+  const to = openPrStep(ctx.workflow);
+  if (!to || (st.park?.kind !== "gate" && st.park?.kind !== "merge")) return { reject: `outcome 'unpushed' cannot be classified at ${st.step}` };
+  const next = { ...enterStep(st, ctx.workflow, to, ctx.now), last_outcome: last };
+  return { state: next, log: `${st.step} unpushed: ${r.detail ?? "changes since open-pr are not on the PR"} → ${to}`, advance: { from: st.step, outcome: "unpushed", to } };
+}
+
 /** Take the declared edge for `outcome` at the cursor, counting it. */
 function take(st: UnitState, outcome: string, r: Receipt, ctx: ApplyContext, last: LastOutcome): Step1 {
   const wf = ctx.workflow;
@@ -440,6 +452,7 @@ function classify(st: UnitState, r: ReceiptOf<"classify">, step: NonNullable<Ret
       const reason = r.detail ?? `${st.step}: stuck`;
       return { state: { ...toStuck(st, parkOf("stuck", reason, r.at, r.receipt_id)), last_outcome: last }, log: `${st.step} stuck: ${reason}` };
     }
+    if ((step.type === "gate" || step.type === "merge") && o === "unpushed") return backToOpenPr(st, r, ctx, last);
     if (step.type === "gate") {
       // Only `stale` is tick-classified at a gate, and only through a declared route
       if (o !== "stale" || st.park?.kind !== "gate" || !edgeOf(ctx.workflow, st.step, o)) return { reject: `outcome '${o}' cannot be classified at gate ${st.step}` };

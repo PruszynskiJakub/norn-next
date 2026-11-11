@@ -344,6 +344,12 @@ export interface StoryFacts {
    * unit — an agent's commit while its unit is parked on an ask. Absent = none / not observed.
    */
   foreign_commits?: ForeignCommit[];
+  /**
+   * Paths the local story branch head changes since the known PR head (`pr`, else `pr_seen`) when
+   * that head is an ancestor of the local one: what open-pr has not pushed yet, spec folder included.
+   * Absent = the same head, diverged, or not observed.
+   */
+  pr_unpushed?: string[];
   /** story branch head when the person gave `approve` at the `ready` gate (the approve receipt's `head_sha`) */
   ready_head_sha?: string;
   /**

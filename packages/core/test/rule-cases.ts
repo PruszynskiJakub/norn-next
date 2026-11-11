@@ -284,6 +284,14 @@ function cases(): RuleCase[] {
     const merged = { ...base, behind: 0 };
     out.push(c("a ready gate whose approval carries over a clean base merge", "gate.carried", facts([story(STALE_WF, parked, null, { base: merged, ready_since: { carry: true, resolved: false, merges: ["e".repeat(40)] } })])));
   }
+  {
+    // Waiting at ready past open-pr, the local head holds a code change the open PR lacks
+    const parked = { status: "parked", step: "ready", park: { kind: "gate", reason: "PR ready for review?", since: at() } } as const;
+    const pr = { number: 7, url: "u", state: "open", is_draft: true, head_sha: "c".repeat(40) } as const;
+    out.push(c("a ready gate whose local head changes code the open PR lacks", "open_pr.guard", facts([story(STORY_WF, parked, null, { pr, pr_unpushed: ["src/a.ts"] })])));
+    const { pr: _, ...unfetched } = story(STORY_WF, parked, null, { pr_seen: { pr, observed_at: T0 }, pr_unpushed: ["src/a.ts"] });
+    out.push(c("the same, the story PR not fetched this tick", "open_pr.guard.awaits_sync", facts([unfetched])));
+  }
   out.push(c("an update step with no base observed", "git.update.no_base", facts([story(GIT_WF, ready("update"))])));
   {
     // One integration per story per tick — two slices at integrate, then a slice before a story update

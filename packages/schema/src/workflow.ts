@@ -244,10 +244,10 @@ export type Workflow = Static<typeof Workflow>;
 export const CLASSIFIED_OUTCOMES = {
   agent: ["silent", "died", "timeout", "stalled", "ask", "exhausted"],
   check: ["pass", "fail", "exhausted"],
-  gate: ["approve", "reject", "stale", "exhausted"],
+  gate: ["approve", "reject", "stale", "unpushed", "exhausted"],
   git: ["done", "conflict", "clean", "resolved", "stuck", "exhausted"],
   slices: ["done", "stuck", "exhausted"],
-  merge: ["stale", "exhausted"],
+  merge: ["stale", "unpushed", "exhausted"],
 } as const satisfies Record<StepType, readonly string[]>;
 
 export function outcomeEdge(spec: OutcomeSpec): OutcomeEdge {

@@ -14,6 +14,7 @@ import {
   SPEC_FILE,
   type StoryFrontmatter,
   type UnitState,
+  type Workflow,
   roundRunStatePath,
   runStatePath,
   STORY_UNIT_DIR,
@@ -29,7 +30,7 @@ import { baseClosed, issueProblem, prOpen, prProblem, roundFinished, type StoryP
 import type { RemoteIssue } from "../ports.ts";
 import { epoch, iso } from "../time.ts";
 import { roundRejected, toCorrupt, toDone } from "../unit-state.ts";
-import { edgeOf, isStale, stepOf } from "../workflow.ts";
+import { edgeOf, isStale, mergeBoundSteps, openPrStep, stepOf } from "../workflow.ts";
 import { carriedApproval } from "../ready-carry.ts";
 import { applyAction, classifyRun, implicitAskResolved, launchUnknown, resolveImplicitAsk, startRun } from "./agent.ts";
 import { commitFor, type Ctx, gitBusy, nextReceiptNumber, park, rebasing, sliceFileOf, unitItem } from "./receipts.ts";
@@ -507,6 +508,12 @@ function decideUnit(ctx: Ctx, story: StoryFacts, uf: UnitFacts, halted: boolean)
         const detail = `${b.behind} behind, conflicts: ${b.conflicts.length ? b.conflicts.join(", ") : "none"}`;
         return classifyNorn(ctx, story, uf, st, wf, "stale", "gate.stale", detail, { receiptRule: "base moved", base: baseOf(b) });
       }
+      const unpushed = ref.slice === null && (st.park.kind === "gate" || st.park.kind === "merge") ? unpushedCode(story, wf, st.step) : [];
+      if (unpushed.length) {
+        // Only a fetched PR shows whether the head is still unpushed (a person may have pushed it, or merged)
+        if (story.pr === undefined) return ctx.noop(ref, "open_pr.guard.awaits_sync", `changes since open-pr; waiting for a sync to show PR #${story.pr_seen?.pr?.number ?? "?"}`);
+        return classifyNorn(ctx, story, uf, st, wf, "unpushed", "open_pr.guard", `changes since open-pr are not on the PR: ${unpushed.join(", ")}`);
+      }
       if (carriedApproval(story, uf, st, wf)) return carryApproval(ctx, story, uf, st, wf);
       // Parked keeps the claim; a restart never answers
       return ctx.noop(ref, `unit.parked.${st.park.kind}`, st.park.reason);
@@ -583,4 +590,15 @@ function roundStart(ctx: Ctx, story: StoryFacts, uf: UnitFacts, st: UnitState, n
     // The issue label follows the round; it is never read back as a request for one
     label: story.frontmatter && st.workflow !== r.workflow ? { number: story.frontmatter.number, remove: `${WF_LABEL}${st.workflow}`, add: `${WF_LABEL}${r.workflow}` } : null,
   });
+}
+
+/**
+ * Paths outside the spec folder the local head changes and the open PR lacks, while the story waits
+ * where the round can end; [] = none, or nothing to guard. Spec-folder changes are bookkeeping that
+ * stays local until the next open-pr.
+ */
+function unpushedCode(story: StoryFacts, wf: Workflow, step: string): string[] {
+  if (!story.pr_unpushed?.length || !prOpen(story) || !openPrStep(wf) || !mergeBoundSteps(wf).has(step)) return [];
+  const inSpec = (p: string) => p === story.spec_dir || p.startsWith(`${story.spec_dir}/`);
+  return story.pr_unpushed.filter((p) => !inSpec(p));
 }

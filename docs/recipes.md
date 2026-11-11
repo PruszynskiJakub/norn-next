@@ -101,6 +101,8 @@ Set `status: done` in the story's `spec.md` on the base yourself and commit it, 
 
    A `merge` step after the last gate keeps a story past that gate in its workflow until its PR merges: `merge: { type: merge, outcomes: { stale: { to: update, counter: stale_loop } } }`. Its one outcome is `stale`; the merge itself ends the story.
 
+   Once `open-pr` has run, every route from a step that changes code (an agent step or `git: update`) to a gate or merge step the round can end from must pass `open-pr` again: then the PR head a person merges is the commit CI checked. norn refuses a workflow that skips it and names the path. At run time, a story waiting at such a gate or merge step whose local head changes a path outside its spec folder that the PR lacks goes back to `open-pr` on its own. Changes inside the spec folder stay local.
+
    A check ends in `pass` (exit 0) or `fail` (any other exit). One that can end another way names the outcome per exit code in `exits` and routes it like any other: the shipped `ci` check exits 3 on a PR that conflicts with its base, and `exits: { 3: stale }` with `stale: { to: update, counter: stale_loop }` sends the story to take the base instead of to `implement`.
 
 3. Commit it. norn validates a workflow before a unit uses it and refuses one that does not hold together, naming what is wrong.

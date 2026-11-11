@@ -24,6 +24,7 @@ export type WorkflowIssueCode =
   | "unknown_outcome"
   | "cannot_reach_done"
   | "uncounted_cycle"
+  | "open_pr_bypass"
   | "verdict"
   | "level";
 
@@ -229,6 +230,8 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
   for (const s of steps)
     if (!reach.has(s)) issues.push({ code: "cannot_reach_done", path: `/steps/${s}`, message: `step '${s}' cannot reach $done` });
 
+  issues.push(...openPrBypassIssues(wf));
+
   // A cycle is uncounted iff it is a cycle of the subgraph of uncounted edges
   const uncounted = new Map<string, Map<string, string>>();
   for (const e of edges) {
@@ -248,6 +251,67 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
     });
   }
   return issues;
+}
+
+const isOpenPr = (step: Step | null | undefined) => step?.type === "git" && step.action === "open-pr";
+/** A step that can change the story branch's code: an agent's commits, or a base merge. */
+const changesCode = (step: Step | null | undefined) => step?.type === "agent" || (step?.type === "git" && step.action === "update");
+
+/** The workflow's `git: open-pr` step (the first one); null = none. */
+export function openPrStep(wf: Workflow): string | null {
+  return Object.entries(wf.steps).find(([, s]) => isOpenPr(s as Step))?.[0] ?? null;
+}
+
+/**
+ * Gates and merge steps the round can end from without passing `open-pr` again: every merge step,
+ * and each gate with a path to a merge step or `$done` that avoids `open-pr`. Past one of them the
+ * PR head is what a person merges, so it must be the commit `ci` checked.
+ */
+export function mergeBoundSteps(wf: Workflow): Set<string> {
+  const ends = new Set<string>(["$done", ...Object.keys(wf.steps).filter((s) => wf.steps[s]?.type === "merge")]);
+  const edges = edgesOf(wf);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const e of edges)
+      if (ends.has(e.to) && !ends.has(e.from) && !isOpenPr(stepOf(wf, e.from))) {
+        ends.add(e.from);
+        grew = true;
+      }
+  }
+  return new Set([...ends].filter((s) => ["gate", "merge"].includes(stepOf(wf, s)?.type ?? "")));
+}
+
+/**
+ * A path from `open-pr` that reaches a merge-bound step through an agent step or `git: update`
+ * without passing `open-pr` again would let a person merge a head CI never ran on.
+ */
+function openPrBypassIssues(wf: Workflow): WorkflowIssue[] {
+  const bound = mergeBoundSteps(wf);
+  const next = new Map<string, string[]>();
+  for (const e of edgesOf(wf)) if (stepOf(wf, e.to)) next.set(e.from, [...(next.get(e.from) ?? []), e.to]);
+  const found = new Map<string, string[]>();
+  for (const [start, step] of Object.entries(wf.steps)) {
+    if (!isOpenPr(step as Step)) continue;
+    // Breadth-first over (step, changed since open-pr): the first path found is a shortest one
+    type Node = { step: string; changed: boolean; path: string[] };
+    const seen = new Set<string>();
+    const queue: Node[] = (next.get(start) ?? []).map((s) => ({ step: s, changed: false, path: [start, s] }));
+    while (queue.length) {
+      const n = queue.shift() as Node;
+      const key = `${n.step}:${n.changed}`;
+      const step = stepOf(wf, n.step);
+      if (seen.has(key) || isOpenPr(step)) continue;
+      seen.add(key);
+      if (n.changed && bound.has(n.step) && !found.has(n.step)) found.set(n.step, n.path);
+      const changed = n.changed || changesCode(step);
+      for (const s of next.get(n.step) ?? []) queue.push({ step: s, changed, path: [...n.path, s] });
+    }
+  }
+  return [...found].map(([step, path]) => ({
+    code: "open_pr_bypass",
+    path: `/steps/${step}`,
+    message: `${path.join(" → ")}: a change reaches ${step} without going through open-pr again, so the PR head a person merges would not be the commit CI checked`,
+  }));
 }
 
 /**

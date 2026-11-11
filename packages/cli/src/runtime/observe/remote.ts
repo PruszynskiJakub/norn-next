@@ -37,3 +37,16 @@ export async function readyHead(root: string, story: string, ready: { sha: strin
   const norn = prHead && prHead !== sha && ((await onlyNornCommitsSince(root, sha, prHead, story)) || (await onlyNornCommitsSince(root, prHead, sha, story)));
   return { ready_head_sha: sha, ready_approved_at: ready.at, ...(norn ? { ready_head_norn: prHead } : {}) };
 }
+
+/**
+ * `pr_unpushed`: the paths the local story branch changes since the known open PR's head, when that
+ * head is an ancestor of it (the usual case: boundaries after open-pr move only the heads ref). A
+ * diverged head is a person's push, which the head-changed item reports instead.
+ */
+export async function prUnpushed(git: GitPort, root: string, branch: string, pr: RemotePullRequest | null | undefined): Promise<{ pr_unpushed?: string[] }> {
+  if (pr?.state !== "open") return {};
+  const [prHead, head] = await Promise.all([commitOf(git, root, pr.head_sha).catch(() => null), commitOf(git, root, `refs/heads/${branch}`).catch(() => null)]);
+  if (!prHead || !head || prHead === head || !(await git.isAncestor(root, prHead, head).catch(() => false))) return {};
+  const paths = await git.changedPaths(root, prHead, head).catch(() => null);
+  return paths?.length ? { pr_unpushed: paths } : {};
+}
