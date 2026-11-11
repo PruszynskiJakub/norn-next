@@ -2,7 +2,7 @@
 id: gh-337/10
 title: The resolver sees the base side of each conflict
 depends_on: [ gh-337/01 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
