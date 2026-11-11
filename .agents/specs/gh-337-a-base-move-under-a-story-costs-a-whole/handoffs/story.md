@@ -110,4 +110,4 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 ## Resume
 
-QA #2 passed every criterion at 087e1aae: next is the workflow's step after qa.
+pr.md written (evidence links QA #2's files, `Closes #126`). Next: open-pr opens the draft PR with it.
