@@ -24,7 +24,8 @@ New rule ids `open_pr.guard` and `open_pr.guard.awaits_sync` have hand-built cas
 ### Notes
 - `docs/recipes.md` (writing a workflow) has a paragraph on the rule and the runtime return to open-pr.
 - The property-test generator (`properties.test.ts`) now draws again when a random workflow fails only on `open_pr_bypass`.
+- Review#2 approved. The person still has to confirm one decision: AC1 says "a gate", but the guard only covers merge-bound gates (ready, merge), not human-qa or approve-slices. Cite this in the PR body.
 - Friction: AC3 and the observe half of AC2 can only be observed at the integration tier, but the brief says not to run that tier, so this one file was run alone.
 
 ### Resume
-Review F1 fixed: the cli integration test's `ticks(n)` helper runs real ticks where `until(() => true)` ran none. Next: review again.
+Review approved on HEAD 8f434a87e. Next: QA against AC1-AC3 as given in the table under Proof.
