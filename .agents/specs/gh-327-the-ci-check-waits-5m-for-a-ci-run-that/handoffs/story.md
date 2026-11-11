@@ -39,8 +39,9 @@ Review #1 traceability (the spec has no frontmatter criteria; rows are its Wante
 - Schema JSON emitted; `docs:emit` produced no change; concepts glossary and the "Write your own workflow" recipe mention `exits`.
 - Review #1 approved with no blocking findings. Note for the person: seven harvested golden cases (`packages/core/test/golden/{human,merged-pr,pr-body,runtime}-*.json`) appeared untracked at 16:21:43, after the test check, not from this change; norn's report commit sweeps them into the branch. Drop them before merge if unwanted.
 - describe#1 wrote pr.md. It calls the change one-way, because once a `stale` check receipt exists the old schema refuses it, and it tells the person to drop the seven harvested golden cases.
+- sync-resolve#1 merged main (7780accfd2f9, which brings the CI change where one failing shard no longer cancels the others) into the branch. The only conflict was in `ci-check.test.ts`: main added a `JOBS` fixture and a jq-backed `gh run view --json jobs` fake, and this branch added the `mergeable` parameter to the repo-script `run` helper. The resolution keeps both. After the merge: `bun run test` 1755 pass, typecheck green, ci-check + story-reset integration 19 pass.
 - Friction: something in the test step left harvested golden files untracked in the worktree, so they ride along in the next report commit.
 
 ## Resume
 
-pr.md (spec folder) describes the branch as it is now: summary, test evidence, merge danger. Next: norn opens or updates the draft PR, then `ci` runs.
+main is merged in (merge commit c80b03bbf). pr.md still describes the branch. Next: norn syncs again, then updates the draft PR and runs `ci`.
