@@ -165,5 +165,7 @@ counters:
   resolution_loop: { max: 2 }
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
-# update-branch re-enters update, not sync (the default would be the first update step)
-base: { stale: conflict, step: update }
+# update-branch re-enters update, not sync (the default would be the first update step); a base move
+# without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once per
+# base move (no push, no CI): red goes back through update like a conflict
+base: { stale: conflict, step: update, verify: test }

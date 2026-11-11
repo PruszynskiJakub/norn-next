@@ -114,6 +114,8 @@ export interface LocalStory {
   ready?: { sha: string; at: string };
   /** What happened since it (`readySince`) */
   ready_since?: ReadySince;
+  /** The newest re-verify run's pair (`StoryFacts.verified`) */
+  verified?: { head: string; base: string };
   /** The story's refused record push, from its own slot of failures.json (`StoryFacts.record_refused`) */
   record_refused?: ActFailure;
   /** The local record ref's commit while the story unit has no run state (`StoryFacts.record_unplaced`) */
@@ -205,6 +207,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
       return skills_drift ? { ...lu, skills_drift } : lu;
     });
     const { ready, since } = readyOf(s, s.units[0], indexOf);
+    const verified = s.units[0] ? lastVerify(s, s.units[0], indexOf(s.units[0])) : undefined;
     const notes = openNotes(s.units.map((u) => ({ unit: u.unit.key, receipts: receiptsOfKinds(s, u, ["done", "approve"], indexOf(u)) })));
     const refused = failures[recordPushSlot(s.key)];
     // A record ref here while the story unit has no run state — the record is not in place
@@ -217,6 +220,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
       ...(notes.length ? { notes } : {}),
       ...(ready ? { ready } : {}),
       ...(since ? { ready_since: since } : {}),
+      ...(verified ? { verified } : {}),
       ...(refused ? { record_refused: refused } : {}),
       ...(unplaced ? { record_unplaced: unplaced } : {}),
       ...(open.length ? { rejected: open } : {}),
@@ -305,7 +309,7 @@ export function baseStoryFacts(
   ls: LocalStory,
   workflows: Readonly<Record<string, { workflow: Workflow | null } | undefined>>,
   config: Pick<ResolvedConfig, "mode" | "workflow">,
-): Pick<StoryFacts, "key" | "slug" | "spec_dir" | "branch" | "frontmatter" | "frontmatter_error" | "mode" | "notes" | "ready_since" | "rejected_mailbox" | "record_refused" | "record_unplaced" | "record_only"> {
+): Pick<StoryFacts, "key" | "slug" | "spec_dir" | "branch" | "frontmatter" | "frontmatter_error" | "mode" | "notes" | "ready_since" | "verified" | "rejected_mailbox" | "record_refused" | "record_unplaced" | "record_only"> {
   const s = ls.snapshot;
   const story = s.units[0];
   return {
@@ -318,6 +322,7 @@ export function baseStoryFacts(
     mode: storyMode(story?.state, story?.workflow?.workflow ?? workflows[s.frontmatter?.workflow ?? config.workflow]?.workflow, config),
     ...(ls.notes ? { notes: ls.notes } : {}),
     ...(ls.ready_since ? { ready_since: ls.ready_since } : {}),
+    ...(ls.verified ? { verified: ls.verified } : {}),
     ...(ls.rejected ? { rejected_mailbox: ls.rejected } : {}),
     ...(ls.record_refused ? { record_refused: ls.record_refused } : {}),
     ...(ls.record_unplaced ? { record_unplaced: ls.record_unplaced } : {}),
@@ -389,6 +394,17 @@ function openRejections(story: StorySnapshot, rejected: readonly RejectedMailbox
       .map((r) => ({ unit: u.unit.key, n: r.n })),
   );
   return mine.filter((x) => !accepted.some((r) => r.n > (x.seen[r.unit] ?? 0)));
+}
+
+/** The (head, base) of the story unit's newest check receipt that records a re-verify run, newest read first. */
+function lastVerify(story: StorySnapshot, u: UnitSnapshot, index: ReceiptIndex): { head: string; base: string } | undefined {
+  // a workflow that verifies nothing never makes one: its check receipts are not opened
+  if (!u.workflow?.workflow?.base?.verify) return undefined;
+  for (const { n } of index.entries.filter((e) => e.kind === "check").reverse()) {
+    const r = index.read(n, story.root);
+    if (r && "receipt" in r && r.receipt.kind === "check" && r.receipt.verify) return { ...r.receipt.verify };
+  }
+  return undefined;
 }
 
 /** Receipts of the given kinds in a unit's runs dir, ascending — read by file name, the others never opened. */

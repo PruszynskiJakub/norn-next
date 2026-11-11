@@ -33,7 +33,7 @@ A **step** is one node of a workflow. There are six kinds:
 | git | norn does a git action: merge the base into the story (`update`), integrate a slice, open the draft PR, wait for CI |
 | gate | a person decides: `approve` or `reject` |
 | slices | the story waits while its slices run, each with its own workflow |
-| merge | the story waits for a person to merge its PR; the merge ends the story. A person gives no `approve` or `reject` there: its one outcome, `stale`, is taken by norn when the base moved under the story (see `base.stale`) and routes it back through `update` with a counter |
+| merge | the story waits for a person to merge its PR; the merge ends the story. A person gives no `approve` or `reject` there: its one outcome, `stale`, is taken by norn when the base moved under the story (see `base.stale`, and `base.verify` for a base move without a conflict that breaks the merged tree) and routes it back through `update` with a counter |
 
 An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). The workflow maps each outcome to the next step. A route back (a failed test sends the story back to `implement`) carries a **counter** with a max.
 

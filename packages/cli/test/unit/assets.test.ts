@@ -251,11 +251,17 @@ describe("single-purpose workflows (#136)", () => {
     }
   });
 
-  test("story and quick wait for CI with the same script, and update-branch re-enters update", () => {
+  test("story and quick wait for CI with the same script, update-branch re-enters update, and test re-verifies a waiting story, in both copies", () => {
     const run = (name: string) => (wf(name).steps.ci as { run?: string }).run;
     expect(run("story")).toContain("gh pr checks");
     expect(run("quick")).toBe(run("story"));
-    for (const name of ["story", "quick"]) expect(wf(name).base).toEqual({ stale: "conflict", step: "update" });
+    const local = (name: string) => parse(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "workflows", `${name}.yaml`), "utf8")) as Workflow;
+    for (const w of [wf("story"), wf("quick"), local("story"), local("quick")]) {
+      expect({ name: w.name, base: w.base }).toEqual({ name: w.name, base: { stale: "conflict", step: "update", verify: "test" } });
+      expect({ name: w.name, verify: w.steps.test?.type }).toEqual({ name: w.name, verify: "check" });
+    }
+    // release updates on any base move (stale: behind), which leaves nothing to re-verify
+    expect(local("release").base).toEqual({ stale: "behind" });
   });
 
   test("story's and quick's resolve take the base side of each conflict", () => {
