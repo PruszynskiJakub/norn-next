@@ -41,7 +41,8 @@ Review #1 traceability (the spec has no frontmatter criteria; rows are its Wante
 - describe#1 wrote pr.md. It calls the change one-way, because once a `stale` check receipt exists the old schema refuses it, and it tells the person to drop the seven harvested golden cases.
 - sync-resolve#1 merged main (7780accfd2f9, which brings the CI change where one failing shard no longer cancels the others) into the branch. The only conflict was in `ci-check.test.ts`: main added a `JOBS` fixture and a jq-backed `gh run view --json jobs` fake, and this branch added the `mergeable` parameter to the repo-script `run` helper. The resolution keeps both. After the merge: `bun run test` 1755 pass, typecheck green, ci-check + story-reset integration 19 pass.
 - Friction: something in the test step left harvested golden files untracked in the worktree, so they ride along in the next report commit.
+- implement#1 (after the sync round) re-checked the merged branch: there was nothing to rework. `bun run test` 1755 pass, typecheck green, no code change.
 
 ## Resume
 
-main is merged in (merge commit c80b03bbf). pr.md still describes the branch. Next: norn syncs again, then updates the draft PR and runs `ci`.
+The branch is built, reviewed and up to date with main (7780accfd2f9). pr.md still describes it. Next: the workflow's later steps update the draft PR and run `ci`.
