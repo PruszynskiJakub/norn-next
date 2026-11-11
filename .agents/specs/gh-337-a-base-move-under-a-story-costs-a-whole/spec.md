@@ -10,7 +10,7 @@ labels:
   - norn
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-11-11T08:57:13.816Z
 body_hash: 1b55f889d5de53b6fa4f6dbe2428a8cb2c5656d55a45a93059f08ed6e5ef6e61
 refined_body_hash: 1b55f889d5de53b6fa4f6dbe2428a8cb2c5656d55a45a93059f08ed6e5ef6e61
@@ -92,6 +92,13 @@ criteria:
   - { id: "14.AC4", verifier: test }
   - { id: "14.AC5", verifier: test }
   - { id: "14.AC6", verifier: agent }
+merge:
+  pr: 338
+  url: https://github.com/PruszynskiJakub/norn-next/pull/338
+  head_sha: 15055d20479580d6a5dfe0266e17943d9e5a684c
+  merge_commit_sha: bc7784ba6037bdcb4c22a9863be3e7122d4d2b30
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-11T12:38:10.000Z
 ---
 
 # A base move under a story costs a whole round and a CI run per boundary push
