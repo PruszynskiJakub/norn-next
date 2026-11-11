@@ -5,7 +5,8 @@
  * effect each.
  */
 import { git as gitAdapter } from "@norn/adapters";
-import type { GitPort } from "@norn/core";
+import { type GitPort, REGENERATED_TRAILER, regenerateEntriesFor } from "@norn/core";
+import { parseDuration, REGENERATE_TIMEOUT, type RegenerateEntry } from "@norn/schema";
 
 const { portError } = gitAdapter;
 
@@ -53,9 +54,18 @@ async function bringInStory(git: GitPort, cwd: string, storyBranch: string, trai
 }
 
 export type UpdateResult =
-  | { outcome: "done"; head: string; merged: boolean; adopted: string | null }
-  | { outcome: "conflict"; files: string[]; adopted: string | null }
+  | { outcome: "done"; head: string; merged: boolean; adopted: string | null; regenerated?: string[]; base_side?: string[] }
+  | { outcome: "conflict"; files: string[]; adopted: string | null; regenerate?: { output: string } }
   | { outcome: "stuck"; reason: string };
+
+/** What a base update may complete without an agent: the team's generated files, and a branch holding only its spec folder. */
+export interface UpdateRegenerate {
+  /** the story's spec folder, repo-relative */
+  specDir: string;
+  entries: readonly RegenerateEntry[];
+  /** run one command at the story worktree's root, killed after `timeoutMs`; `output` says how it ended */
+  run(command: string, timeoutMs: number): Promise<{ ok: boolean; output: string }>;
+}
 
 /**
  * How the local story branch took in `<remote>/<branch>` — `none` (no remote branch),
@@ -108,12 +118,16 @@ export async function syncRemoteBranch(
  *  3. nothing of `baseSha` missing → `done`, no commit;
  *  4. else `git merge --no-ff <baseSha>` with `message` and `trailers` (`Norn-Tick`, so the merge is
  *     not reported as foreign) → `done`;
- *  5. a conflicting merge is aborted → `conflict` with the paths.
+ *  5. a conflicting merge, given `regenerate`: on a branch holding only its spec folder, the base side of
+ *     every conflict, committed as the merge → `done`; when every conflicted path is a generated file,
+ *     the base side of each, the matched commands run bounded, committed with `Norn-Regenerated` →
+ *     `done`; a failed command or a path still conflicted aborts it → `conflict` with the output;
+ *  6. any other conflicting merge is aborted → `conflict` with the paths.
  * Merge, never rebase: the story branch is published.
  */
 export async function update(
   git: GitPort,
-  opts: { cwd: string; branch: string; baseSha: string; remote: string | null; message: string; trailers: Record<string, string> },
+  opts: { cwd: string; branch: string; baseSha: string; remote: string | null; message: string; trailers: Record<string, string>; regenerate?: UpdateRegenerate },
 ): Promise<UpdateResult> {
   const st = await git.status(opts.cwd);
   // A merge or rebase left in progress (a resolve agent's) is never aborted or concluded here
@@ -130,7 +144,59 @@ export async function update(
   }
   const d = await git.divergence(opts.cwd, "HEAD", opts.baseSha);
   if (d.behind === 0) return { outcome: "done", head: (await git.revParse(opts.cwd, "HEAD")) as string, merged: false, adopted };
-  const m = await git.merge(opts.cwd, opts.baseSha, { message: opts.message, trailers: opts.trailers });
-  if (!m.ok) return { outcome: "conflict", files: m.files, adopted };
-  return { outcome: "done", head: m.head, merged: true, adopted };
+  const spec = { message: opts.message, trailers: opts.trailers };
+  const m = await git.merge(opts.cwd, opts.baseSha, spec, { keepConflicts: !!opts.regenerate });
+  if (m.ok) return { outcome: "done", head: m.head, merged: true, adopted };
+  if (!opts.regenerate) return { outcome: "conflict", files: m.files, adopted };
+  // The merge is in progress with its conflicts: complete it without an agent, or abort it as before
+  const r = opts.regenerate;
+  const conflict = (output?: string): UpdateResult => ({ outcome: "conflict", files: m.files, adopted, ...(output !== undefined ? { regenerate: { output } } : {}) });
+  try {
+    if (await specFolderOnly(git, opts.cwd, opts.baseSha, r.specDir, m.files)) {
+      await git.takeSide(opts.cwd, opts.baseSha, m.files);
+      return { outcome: "done", head: await git.concludeMerge(opts.cwd, spec), merged: true, adopted, base_side: m.files };
+    }
+    const matched = m.files.map((p) => regenerateEntriesFor(r.entries, p));
+    if (!m.files.length || matched.some((e) => !e.length)) {
+      await git.abortMerge(opts.cwd);
+      return conflict();
+    }
+    await git.takeSide(opts.cwd, opts.baseSha, m.files);
+    const out: string[] = [];
+    for (const e of r.entries.filter((e) => matched.some((es) => es.includes(e)))) {
+      const res = await r.run(e.run, parseDuration(e.timeout ?? REGENERATE_TIMEOUT));
+      out.push(`$ ${e.run}`, res.output.replace(/\n$/, ""));
+      if (!res.ok) {
+        await git.abortMerge(opts.cwd);
+        return conflict(out.join("\n"));
+      }
+    }
+    const busy = await git.inProgress(opts.cwd);
+    const marked = [...new Set((await git.conflictMarkers(opts.cwd, { paths: m.files })).map((c) => c.path))];
+    const still = [...new Set([...busy.unmerged, ...marked])].sort();
+    if (still.length) {
+      await git.abortMerge(opts.cwd);
+      return conflict([...out, `still conflicted: ${still.join(", ")}`].join("\n"));
+    }
+    const head = await git.concludeMerge(opts.cwd, { message: spec.message, trailers: { ...spec.trailers, [REGENERATED_TRAILER]: m.files.join(", ") } });
+    return { outcome: "done", head, merged: true, adopted, regenerated: m.files };
+  } catch (e) {
+    // never leave a half-completed merge behind: the resolve step starts from a clean worktree
+    if ((await git.inProgress(opts.cwd)).operation === "merge") await git.abortMerge(opts.cwd);
+    throw e;
+  }
+}
+
+/**
+ * The story branch holds nothing but its spec folder: every commit of its own on the first-parent
+ * line since the base changes only that folder, and every merge there is a norn base update (a
+ * merge of the remote branch could carry a person's work). Then the base's side of every conflict
+ * outside the folder is the whole answer; a conflict inside it is the story's and goes to resolve.
+ */
+async function specFolderOnly(git: GitPort, cwd: string, baseSha: string, specDir: string, conflicts: readonly string[]): Promise<boolean> {
+  const dir = `${specDir.replace(/\/+$/, "")}/`;
+  if (!conflicts.length || conflicts.some((p) => p.startsWith(dir))) return false;
+  const commits = await git.commitPaths(cwd, "HEAD", baseSha);
+  const subjects = new Map((await git.log(cwd, `${baseSha}..HEAD`)).map((c) => [c.sha, c.subject]));
+  return commits.every((c) => (c.parents.length > 1 ? "Norn-Tick" in c.trailers && /^Update \S+ from /.test(subjects.get(c.sha) ?? "") : c.paths.every((p) => p.startsWith(dir))));
 }

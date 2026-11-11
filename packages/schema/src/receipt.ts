@@ -220,6 +220,10 @@ export const ClassifyReceipt = receipt("classify", {
         head: Type.Optional(GitSha),
         /** A `done` update made a merge commit (false = already up to date) */
         merged: Type.Optional(Type.Boolean()),
+        /** A `done` update completed its conflicts without an agent: the paths it took from the base */
+        regenerated: Type.Optional(Type.Array(NonEmpty)),
+        /** A `conflict` update tried the regenerate commands first: what they printed and why they did not finish it */
+        regenerate: Type.Optional(Type.Object({ output: Type.String() }, { additionalProperties: false })),
       },
       { additionalProperties: false },
     ),

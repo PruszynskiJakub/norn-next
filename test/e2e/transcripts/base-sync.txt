@@ -268,6 +268,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
@@ -303,6 +304,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:12> "^<sha:13>" --
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:12>...<sha:13> --
   spawn repo $ git merge-base <sha:12> <sha:13>
   spawn repo $ git merge-tree --write-tree --name-only --no-messages <sha:12> <sha:13>
@@ -336,6 +338,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:14> "^<sha:13>" --
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:14>...<sha:13> --
   spawn repo $ git merge-base <sha:14> <sha:13>
   spawn repo $ git merge-tree --write-tree --name-only --no-messages <sha:14> <sha:13>
@@ -354,7 +357,18 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git merge --no-ff --no-commit --no-edit <sha:13>
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U
-  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git merge --abort
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log --first-parent "--format=%H%x1f%P%x1f%(trailers:only,unfold)%x1e" HEAD "^<sha:13>" --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff-tree -r --no-commit-id --name-only -z <sha:12> <sha:14>
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff-tree -r --no-commit-id --name-only -z <sha:11> <sha:12>
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff-tree -r --no-commit-id --name-only -z <sha:8> <sha:11>
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff-tree -r --no-commit-id --name-only -z <sha:7> <sha:8>
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff-tree -r --no-commit-id --name-only -z <sha:6> <sha:7>
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff-tree -r --no-commit-id --name-only -z <sha:5> <sha:6>
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff-tree -r --no-commit-id --name-only -z <sha:2> <sha:5>
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff-tree -r --no-commit-id --name-only -z <sha:1> <sha:2>
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git log "--format=%H%x1f%s%x1f%ct%x1f%(trailers:only,unfold)%x1e" <sha:13>..HEAD --
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git reset -q --hard HEAD
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git clean -fdq
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/receipts/0005-classify.json
       {"kind":"classify","receipt_id":"<ulid:17>","run_id":"<ulid:18>","step":"update","attempt":2,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:19>","outcome":"conflict","rule":"git.update","detail":"merging main (<short:3>) into gh-7-add-login-form conflicts in a.txt","route":"resolve","base":{"ref":"refs/remotes/origin/main","sha":"<sha:13>","conflicts":["a.txt"]}}
 > norn tick
@@ -371,6 +385,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
@@ -399,6 +414,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:15> "^<sha:13>" --
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:15>...<sha:13> --
   spawn repo $ git merge-base <sha:15> <sha:13>
   spawn repo $ git merge-tree --write-tree --name-only --no-messages <sha:15> <sha:13>
@@ -435,6 +451,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   A.runner.paneState s-1
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:16>...<sha:13> --
   spawn repo $ git merge-base <sha:16> <sha:13>
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
@@ -465,6 +482,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:17> "^<sha:13>" --
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:17>...<sha:13> --
   spawn repo $ git merge-base <sha:17> <sha:13>
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
@@ -494,6 +512,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
@@ -522,6 +541,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:18> "^<sha:13>" --
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:18>...<sha:13> --
   spawn repo $ git merge-base <sha:18> <sha:13>
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ norn check-run <ulid:32>
@@ -541,6 +561,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
@@ -569,6 +590,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:19> "^<sha:13>" --
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:19>...<sha:13> --
   spawn repo $ git merge-base <sha:19> <sha:13>
   A.remote.findPullRequest gh-7-add-login-form
@@ -605,6 +627,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
@@ -633,6 +656,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:22> "^<sha:13>" --
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:22>...<sha:13> --
   spawn repo $ git merge-base <sha:22> <sha:13>
   spawn repo $ git remote
@@ -660,6 +684,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
@@ -688,6 +713,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:23> "^<sha:13>" --
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:23>...<sha:13> --
   spawn repo $ git merge-base <sha:23> <sha:13>
   spawn repo $ git remote
@@ -711,6 +737,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git remote
   spawn repo $ git ls-remote origin refs/norn/claims/gh-7
   spawn repo $ git rev-parse --verify --quiet refs/norn/claims/gh-7
@@ -730,6 +757,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git hash-object -w --stdin
   spawn repo $ git push --porcelain --force-with-lease=refs/norn/claims/gh-7:<sha:4> origin <sha:24>:refs/norn/claims/gh-7
   spawn repo $ git update-ref refs/norn/claims/gh-7 <sha:24>
@@ -757,6 +785,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --show-toplevel --git-path rebase-merge --git-path rebase-apply
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git status --porcelain=v2 --branch -z --untracked-files=all
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
@@ -784,6 +813,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
@@ -811,6 +841,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:25> "^<sha:13>" --
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:25>...<sha:13> --
   spawn repo $ git merge-base <sha:25> <sha:13>
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ norn check-run <ulid:48>
@@ -830,6 +861,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
@@ -857,6 +889,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:26> "^<sha:13>" --
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:26>...<sha:13> --
   spawn repo $ git merge-base <sha:26> <sha:13>
   A.remote.findPullRequest gh-7-add-login-form
@@ -892,6 +925,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
@@ -920,6 +954,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:29> "^<sha:13>" --
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:29>...<sha:13> --
   spawn repo $ git merge-base <sha:29> <sha:13>
   spawn repo $ git remote
@@ -947,6 +982,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git add -A
@@ -974,6 +1010,7 @@
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
   spawn repo $ git log --first-parent -n 100 "--format=%H%x1f%s%x1f%an%x1f%aI%x1f%cI%x1f%(trailers:key=Norn-Tick,valueonly,separator=%x2C)%x1e" <sha:30> "^<sha:13>" --
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git rev-list --left-right --count <sha:30>...<sha:13> --
   spawn repo $ git merge-base <sha:30> <sha:13>
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
@@ -1013,6 +1050,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --git-path MERGE_HEAD --git-path rebase-merge --git-path rebase-apply --git-path REBASE_HEAD --git-path CHERRY_PICK_HEAD --git-path REVERT_HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git remote
   spawn repo $ git ls-remote origin refs/norn/claims/gh-7
   spawn repo $ git update-ref -d refs/norn/claims/gh-7

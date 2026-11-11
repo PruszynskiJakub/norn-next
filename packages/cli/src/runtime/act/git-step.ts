@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { type Action, type ActionResult, applyReceipts, LIGHT_OUTCOMES, lightAnchor, nornTrailers, type RemotePort, routeOf, type UpdateHistory, type UpdateMerge, type UpdateOutcome, updateOutcome } from "@norn/core";
 import { type ReceiptOf, recordRef, ulid } from "@norn/schema";
 import { acquireIntegrateLock, appendReceipt, listReceipts, machineDir, pushRecord, readPrFacts, readRecordRef, readText, writePrFacts } from "@norn/store";
-import { integrate, update as updateStory } from "../integrate.ts";
+import { integrate, type UpdateRegenerate, update as updateStory } from "../integrate.ts";
+import { runShell, tailLines } from "../shell.ts";
 import type { PushBranchResult } from "../push.ts";
 import { type ActEnv, QueueFull } from "./env.ts";
 import { recordLinkResolver, rewriteRecordLinks } from "./record-links.ts";
@@ -80,6 +81,19 @@ async function updateHistory(act: ActEnv, cwd: string, runsDir: string, specDir:
   return { anchor, spec_dir: specDir, commits };
 }
 
+/** Regenerate commands run at the story worktree's root with the checkout's env; how each ended is the last line of its output. */
+function regenerateOpts(act: ActEnv, cwd: string, specDir: string): UpdateRegenerate {
+  return {
+    specDir,
+    entries: act.config.regenerate ?? [],
+    async run(command, timeoutMs) {
+      const r = await runShell(command, { cwd, env: { ...process.env, ...act.ctx.env }, timeoutMs });
+      const end = r.timed_out ? `(timed out after ${timeoutMs / 1000}s)` : r.exit_code === 0 ? "" : `(exit ${r.exit_code})`;
+      return { ok: !r.timed_out && r.exit_code === 0, output: [tailLines(r.output, 100), end].filter(Boolean).join("\n") };
+    },
+  };
+}
+
 async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>): Promise<ActionResult> {
   const loc = act.unitLoc(a.unit);
   const st = loc.state;
@@ -94,7 +108,8 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
     case "update": {
       const u = a.update;
       if (!u) throw new Error("update without a base");
-      const res = await updateStory(act.git, { cwd: a.cwd, branch: a.branch, baseSha: u.sha, remote: act.obs.remote, message: u.message, trailers: u.trailers });
+      const specDir = act.storyLoc(a.unit.story).spec_dir;
+      const res = await updateStory(act.git, { cwd: a.cwd, branch: a.branch, baseSha: u.sha, remote: act.obs.remote, message: u.message, trailers: u.trailers, regenerate: regenerateOpts(act, a.cwd, specDir) });
       if (res.outcome === "stuck") {
         // dirty worktree, diverged story branch → $stuck with the reason
         outcome = "stuck";
@@ -105,20 +120,23 @@ async function runGitLocked(act: ActEnv, a: Extract<Action, { kind: "run_git" }>
       const merge: UpdateMerge = res.outcome === "conflict" ? { outcome: "conflict", files: res.files } : { outcome: res.merged ? "merged" : "up_to_date" };
       // the light path is measured only where the step routes it: other workflows update as before
       const routed = Object.keys(wf.steps[a.step]?.outcomes ?? {});
-      history = res.outcome === "done" && LIGHT_OUTCOMES.some((o) => routed.includes(o)) ? await updateHistory(act, a.cwd, loc.runsDir, act.storyLoc(a.unit.story).spec_dir, u.sha, res.head) : null;
+      history = res.outcome === "done" && LIGHT_OUTCOMES.some((o) => routed.includes(o)) ? await updateHistory(act, a.cwd, loc.runsDir, specDir, u.sha, res.head) : null;
       // core chooses the outcome; below only records what the merge did
-      outcome = updateOutcome({ merge, history }, routed);
+      outcome = updateOutcome({ merge, history, ...(act.config.regenerate ? { regenerate: act.config.regenerate } : {}) }, routed);
       if (res.outcome === "conflict") {
         // the merge was aborted; the resolve step gets the base sha and the paths
-        base = { ref: u.ref, sha: u.sha, conflicts: res.files };
-        detail = `merging ${u.branch} (${u.sha.slice(0, 12)}) into ${a.branch} conflicts in ${res.files.join(", ") || "?"}`;
+        base = { ref: u.ref, sha: u.sha, conflicts: res.files, ...(res.regenerate ? { regenerate: res.regenerate } : {}) };
+        detail = `merging ${u.branch} (${u.sha.slice(0, 12)}) into ${a.branch} conflicts in ${res.files.join(", ") || "?"}${res.regenerate ? "; regenerating them did not finish the merge" : ""}`;
         // an adopted fast-forward is still the record: publish it
         if (res.adopted) extra.story_push = await pushUpdated(act, a.cwd, a.branch, a.heads === true);
         break;
       }
       // The merge commit (or the head found up to date) goes into the record, for status and why
-      base = { ref: u.ref, sha: u.sha, conflicts: [], head: res.head, merged: res.merged };
+      const taken = res.regenerated ?? res.base_side;
+      base = { ref: u.ref, sha: u.sha, conflicts: [], head: res.head, merged: res.merged, ...(taken ? { regenerated: taken } : {}) };
       detail = res.merged ? `merged ${u.branch} (${u.sha.slice(0, 12)}) into ${a.branch} at ${res.head.slice(0, 12)}` : `${a.branch} is up to date with ${u.branch} (${u.sha.slice(0, 12)})`;
+      if (res.regenerated) detail += `; regenerated ${res.regenerated.join(", ")} (base side, then the team's regenerate commands)`;
+      if (res.base_side) detail += `; took the base side of ${res.base_side.join(", ")} (the branch holds only its spec folder)`;
       // pushed at the step boundary, as integrate does
       if (res.merged || res.adopted) extra.story_push = await pushUpdated(act, a.cwd, a.branch, a.heads === true);
       break;

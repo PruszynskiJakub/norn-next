@@ -198,7 +198,7 @@ export interface BriefJson {
      * Base mode: `git: update` stopped on conflicts — merge `sha` (the tip of `ref`) into the
      * story branch in this worktree, resolve, commit the merge; never rebase. Absent otherwise.
      */
-    base?: { ref: string; sha: string; conflicts: string[]; side?: BaseSidePath[] };
+    base?: { ref: string; sha: string; conflicts: string[]; side?: BaseSidePath[]; regenerate?: { output: string } };
   } | null;
   /**
    * Checks recorded since the last `done` report — what ran on the code that report
@@ -665,7 +665,7 @@ function rework(input: BriefInput, step: AgentStep): BriefJson["rework"] {
     decision,
     detail: r.kind === "classify" ? (r.detail ?? `${r.step}: ${r.outcome}`) : null,
     // The base the update could not merge, as data (never parsed from `detail`)
-    ...(r.kind === "classify" && r.outcome === "conflict" && r.base ? { base: { ref: r.base.ref, sha: r.base.sha, conflicts: [...r.base.conflicts], ...baseSide(input, step) } } : {}),
+    ...(r.kind === "classify" && r.outcome === "conflict" && r.base ? { base: { ref: r.base.ref, sha: r.base.sha, conflicts: [...r.base.conflicts], ...baseSide(input, step), ...(r.base.regenerate ? { regenerate: { output: r.base.regenerate.output } } : {}) } } : {}),
   };
 }
 
@@ -1025,6 +1025,11 @@ function reworkLines(out: string[], rw: NonNullable<BriefJson["rework"]>): void 
     out.push(`Merge \`${bs.sha}\` (${branch}) into the story branch in this worktree, resolve, commit the merge; never rebase:`, "");
     out.push("```sh", `git merge --no-ff ${bs.sha}`, "```", "");
     out.push(`Conflicting paths: ${bs.conflicts.length ? bs.conflicts.map((p) => `\`${p}\``).join(", ") : "(not reported)"}`, "");
+    if (bs.regenerate) {
+      // a fence longer than any backtick run in the output, so the output cannot close it
+      const fence = "`".repeat(Math.max(3, ...[...bs.regenerate.output.matchAll(/`+/g)].map((m) => m[0].length + 1)));
+      out.push("norn took the base side of the conflicting paths and ran the team's regenerate commands; that did not finish the merge, so it was aborted. What they printed:", "", `${fence}text`, bs.regenerate.output, fence, "");
+    }
     if (bs.side) baseSideLines(out, bs.sha, bs.side);
     out.push(
       "Resolve each conflict by intent; resolve to existing behaviour only. Then commit the merge, run the checks, and report done. Do not push. When you cannot finish it:",

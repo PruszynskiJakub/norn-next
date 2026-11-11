@@ -505,7 +505,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
       if (r.code !== 1) okOrThrow(r, "git merge-tree", "git");
       return [...new Set(lines(r.stdout).slice(1))].sort();
     },
-    async merge(cwd, rev, spec): Promise<MergeResult> {
+    async merge(cwd, rev, spec, opts = {}): Promise<MergeResult> {
       // A merge already in progress is someone's (a resolve agent's): never abort or conclude it
       const busy = await inProgress(cwd);
       if (busy.operation || busy.unmerged.length) throw portError(IN_PROGRESS, `${busy.operation ?? "a merge"} in progress in ${cwd}: not merging ${rev}`);
@@ -519,6 +519,7 @@ export function createGit(opts: GitOptions = {}): GitPort {
       if (r.code !== 0) {
         if (!(await inMerge())) okOrThrow(r, "git merge", "git"); // e.g. dirty tree: not a conflict
         const files = lines((await run(cwd, ["diff", "--name-only", "--diff-filter=U"])).stdout);
+        if (opts.keepConflicts) return { ok: false, conflict: true, files: [...new Set(files)].sort() };
         const abort = await run(cwd, ["merge", "--abort"]);
         if (abort.code !== 0) throw portError("git_merge_abort_failed", `git merge --abort failed: ${abort.stderr.trim()}`);
         return { ok: false, conflict: true, files: [...new Set(files)].sort() };
@@ -528,6 +529,28 @@ export function createGit(opts: GitOptions = {}): GitPort {
       for (const [k, v] of Object.entries(spec.trailers)) args.push("--trailer", `${k}: ${v}`);
       await must(cwd, args, spec.message);
       return { ok: true, head: await head() };
+    },
+    async takeSide(cwd, rev, paths) {
+      for (const path of paths) {
+        if ((await run(cwd, ["cat-file", "-e", `${rev}:${path}`])).code === 0) await must(cwd, ["checkout", rev, "--", path]);
+        else await must(cwd, ["rm", "-q", "-f", "--ignore-unmatch", "--", path]);
+      }
+    },
+    async concludeMerge(cwd, spec) {
+      const busy = await inProgress(cwd);
+      if (busy.operation !== "merge") throw portError("git_no_merge", `no merge in progress in ${cwd}`);
+      if (busy.unmerged.length) throw portError(IN_PROGRESS, `unmerged paths in ${cwd}: ${busy.unmerged.join(", ")}`);
+      await must(cwd, ["add", "-A"]);
+      const args = ["commit", "--no-edit", "-F", "-", "--cleanup=strip"];
+      for (const [k, v] of Object.entries(spec.trailers)) args.push("--trailer", `${k}: ${v}`);
+      await must(cwd, args, spec.message);
+      return line(cwd, ["rev-parse", "HEAD"]);
+    },
+    async abortMerge(cwd) {
+      // `merge --abort` refuses once a command rewrote a staged path; the tree was clean when the merge began
+      const reset = await run(cwd, ["reset", "-q", "--hard", "HEAD"]);
+      if (reset.code !== 0) throw portError("git_merge_abort_failed", `git reset --hard failed: ${reset.stderr.trim()}`);
+      await must(cwd, ["clean", "-fdq"]);
     },
 
     readRef: (cwd, ref) => nullIfFail(cwd, ["rev-parse", "--verify", "--quiet", "--end-of-options", ref]),

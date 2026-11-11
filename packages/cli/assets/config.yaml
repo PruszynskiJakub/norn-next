@@ -5,7 +5,7 @@
 # Three files, each with its own keys:
 #   ~/.norn/config.yaml              this machine (max_agents, notify, trace) and your defaults (mode, agent, agents)
 #   .agents/norn.config.local.yaml   you, in this repo (mode, agent, agents): overrides your user file; gitignored
-#   .agents/norn.config.yaml         this file: the team (provider, base_branch, workflow, slice_workflow)
+#   .agents/norn.config.yaml         this file: the team (provider, base_branch, workflow, slice_workflow, regenerate)
 # Everything else has no key: norn detects it, derives it or fixes it.
 #
 # Every key is optional. A commented value is the built-in default.
@@ -19,3 +19,8 @@
 # Workflows in .agents/workflows/. An issue label norn:wf:<name> picks another one per story.
 # workflow: triage
 # slice_workflow: slice
+
+# Generated files and the command that writes them: a base update whose conflicts are all such
+# files takes the base's version, runs the command and commits the merge, with no agent. Commands
+# hold up the tick (timeout 2m unless set), so keep them fast and deterministic.
+# regenerate: [{ paths: ["docs/api/*.md"], run: npm run docs, timeout: 2m }]

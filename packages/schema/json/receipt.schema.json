@@ -1815,6 +1815,25 @@
             },
             "merged": {
               "type": "boolean"
+            },
+            "regenerated": {
+              "type": "array",
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "regenerate": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "output"
+              ],
+              "properties": {
+                "output": {
+                  "type": "string"
+                }
+              }
             }
           }
         },

@@ -264,9 +264,24 @@ export interface GitPort {
   mergeTree(cwd: string, ours: string, theirs: string): Promise<string[]>;
   /**
    * `git merge --no-ff <rev>` in cwd, committed with `spec.message` and its trailers. On a
-   * conflict the merge is aborted (`git merge --abort`) and the conflicting paths are reported.
+   * conflict the merge is aborted (`git merge --abort`) and the conflicting paths are reported;
+   * with `keepConflicts` it is left in progress instead, its conflicts in the worktree, for
+   * `takeSide` / `concludeMerge` / `abortMerge`.
    */
-  merge(cwd: string, rev: string, spec: Pick<CommitSpec, "message" | "trailers">): Promise<MergeResult>;
+  merge(cwd: string, rev: string, spec: Pick<CommitSpec, "message" | "trailers">, opts?: { keepConflicts?: boolean }): Promise<MergeResult>;
+  /** Each of `paths` in the work tree and index as it is in `rev`, removed where `rev` has none; a conflicted path is resolved so. */
+  takeSide(cwd: string, rev: string, paths: string[]): Promise<void>;
+  /**
+   * Stage every change in the work tree and commit the merge in progress with `spec.message` and its
+   * trailers; returns the merge commit. Throws (nothing committed) when no merge is in progress or a
+   * path is still unmerged.
+   */
+  concludeMerge(cwd: string, spec: Pick<CommitSpec, "message" | "trailers">): Promise<string>;
+  /**
+   * Drop the merge in progress and everything the work tree gained since (`git reset --hard HEAD`,
+   * `git clean -fd`; ignored files stay): only for a merge begun on a clean work tree.
+   */
+  abortMerge(cwd: string): Promise<void>;
 
   readRef(cwd: string, ref: string): Promise<string | null>;
   /** Does `ref` (or any revision) resolve here (`git rev-parse --verify --quiet`)? */

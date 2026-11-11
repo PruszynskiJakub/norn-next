@@ -38,6 +38,19 @@ describe("light path: only base merges and spec-folder bookkeeping since the las
     const h = history(merge("1"), commit("2", `${SPEC}/handoffs/s.md`), merge("3", ["src/a.ts"]));
     expect(updateOutcome({ merge: { outcome: "up_to_date" }, history: h }, ROUTED)).toBe("resolved");
   });
+  test("a regenerated merge is clean only with its trailer and a remerge-diff inside the regenerate mapping", () => {
+    const regenerate = [{ paths: ["packages/schema/json/*.json"] }, { paths: ["docs/reference.md"] }];
+    const regen = (remerge: string[] | null, trailer = true): UpdateCommit => ({ ...merge("1", remerge), trailers: trailer ? { "Norn-Regenerated": remerge?.join(", ") ?? "" } : {} });
+    const outcome = (c: UpdateCommit, mapping: typeof regenerate | null = regenerate) => updateOutcome({ merge: { outcome: "merged" }, history: history(c), ...(mapping ? { regenerate: mapping } : {}) }, ROUTED);
+    expect(outcome(regen(["packages/schema/json/state.schema.json", "docs/reference.md"]))).toBe("clean");
+    // the trailer alone is not enough: a path outside the mapping is a resolution to review
+    expect(outcome(regen(["packages/schema/json/state.schema.json", "src/a.ts"]))).toBe("resolved");
+    // mapped paths without the trailer: someone resolved them by hand
+    expect(outcome(regen(["docs/reference.md"], false))).toBe("resolved");
+    // no mapping (the team file dropped it): nothing counts as regenerated
+    expect(outcome(regen(["docs/reference.md"]), null)).toBe("resolved");
+    expect(outcome(regen(null))).toBe("resolved");
+  });
   test("a merge whose remerge-diff git cannot give (too old) ends resolved, never clean", () => {
     expect(updateOutcome({ merge: { outcome: "merged" }, history: history(merge("1", null)) }, ROUTED)).toBe("resolved");
   });

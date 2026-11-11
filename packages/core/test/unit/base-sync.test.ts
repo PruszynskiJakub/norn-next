@@ -273,6 +273,33 @@ describe("base sync replay", () => {
     expect(undeclared.markdown).not.toContain("Base side");
   });
 
+  test("2c: regenerating did not finish the merge → the resolver's base-update section carries what the commands printed", () => {
+    const s = new Sim(BASE_WF);
+    s.base = base({ behind: 4, conflicts: ["gen/out.json"] });
+    s.git = "conflict";
+    s.runUntil(at_("resolve"));
+    // act tried the team's regenerate commands before going to resolve, and recorded their output
+    const classify = s.classifies().at(-1) as Extract<Receipt, { kind: "classify" }>;
+    const output = "$ bun run schema:emit\nerror: schema.ts: unexpected token\n(exit 1)";
+    classify.base = { ...(classify.base as NonNullable<typeof classify.base>), regenerate: { output } };
+    const brief = renderBrief({
+      unit: storyUnit(),
+      state: s.state,
+      workflow: BASE_WF,
+      mode: "auto",
+      runner: "herdr",
+      paths: { worktree: "/w", spec_dir: "/w/spec", story_file: "/w/spec/story.md", slice_file: null, unit_dir: "/w/spec/runs/_story" },
+      diff_range: null,
+      handoff: null,
+      receipts: s.receipts,
+      limits: { deadline: "60m", nudges: 2, retries: 1, slot: null, port_base: null },
+    });
+    expect(brief.json.rework?.base).toEqual({ ref: BASE_REF, sha: SHA("b"), conflicts: ["gen/out.json"], regenerate: { output } });
+    const section = brief.markdown.slice(brief.markdown.indexOf("### Base update"));
+    expect(section).toContain(`norn took the base side of the conflicting paths and ran the team's regenerate commands; that did not finish the merge, so it was aborted. What they printed:\n\n\`\`\`text\n${output}\n\`\`\``);
+    expect(section.indexOf("regenerate commands")).toBeLessThan(section.indexOf("Resolve each conflict by intent"));
+  });
+
   test("3: base_conflict_loop exhausted → $stuck with the reason", () => {
     const s = new Sim(BASE_WF);
     s.base = base({ behind: 4, conflicts: ["a.ts"] });

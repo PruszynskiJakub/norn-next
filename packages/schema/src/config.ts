@@ -6,7 +6,7 @@
  * `ResolvedConfig` decide, the views and the commands read, and explains where each value came from.
  */
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
-import { Duration, Mode, NonEmpty, RemoteProvider } from "./common.ts";
+import { Duration, DURATION_PATTERN, Mode, NonEmpty, RemoteProvider } from "./common.ts";
 import { parseDuration } from "./ids.ts";
 import { check, type SchemaError } from "./check.ts";
 import { VERSION_PATTERN } from "./version.ts";
@@ -101,6 +101,24 @@ export const RecordConfig = Type.Object(
   { additionalProperties: false },
 );
 
+/** How long one regenerate command may run when its entry sets no `timeout`. */
+export const REGENERATE_TIMEOUT = "2m";
+
+/**
+ * One generated-file mapping: a base update whose conflicted paths all match some entry's `paths`
+ * takes the base side of each and runs the matched entries' `run` instead of a resolve agent.
+ */
+export const RegenerateEntry = Type.Object(
+  {
+    paths: Type.Array(NonEmpty, { minItems: 1, description: "path globs, repo-relative, of the files `run` writes" }),
+    run: Type.String({ minLength: 1, description: "shell command, run at the repo root, that rewrites those files; fast and deterministic" }),
+    timeout: Type.Optional(Type.String({ pattern: DURATION_PATTERN, description: "how long `run` may take, a duration like 2m (default 2m)" })),
+  },
+  { additionalProperties: false },
+);
+export type RegenerateEntry = Static<typeof RegenerateEntry>;
+const Regenerate = Type.Array(RegenerateEntry, { description: "generated files: path globs and the command that rewrites them, so a base update conflicting only in them needs no agent" });
+
 /** `~/.norn/config.yaml`: this machine and your defaults for every repo. */
 export const UserConfig = Type.Object(
   {
@@ -133,6 +151,7 @@ export const RepoConfig = Type.Object(
     /** The norn version this repo needs; written by `norn upgrade` and `norn init` only */
     norn_version: Type.Optional(Type.String({ pattern: VERSION_PATTERN, description: "the norn version this repo needs, X.Y.Z (written by norn upgrade and norn init)" })),
     record: Type.Optional(RecordConfig),
+    regenerate: Type.Optional(Regenerate),
   },
   { $id: "https://norn.dev/schema/repo-config.json", title: "norn team config", additionalProperties: false },
 );
@@ -176,6 +195,8 @@ export const ResolvedConfig = Type.Object(
     trace: Type.Object({ retain: Type.String({ minLength: 1 }) }, { additionalProperties: false }),
     /** The team's record policy, read at every tick */
     record: Type.Object({ policy: Type.Union(RECORD_POLICIES.map((p) => Type.Literal(p))) }, { additionalProperties: false }),
+    /** The team's generated-file mapping; absent when the team file sets none (and in configs an older norn recorded) */
+    regenerate: Type.Optional(Regenerate),
   },
   { additionalProperties: false },
 );
@@ -279,7 +300,7 @@ const MOVED_AGENT_FIELD: Record<string, string> = {
 
 const MACHINE_KEYS = ["max_agents", "notify", "trace"];
 const PERSON_KEYS = ["mode", "agent", "agents"];
-const TEAM_KEYS = ["provider", "base_branch", "workflow", "slice_workflow", "norn_version", "record"];
+const TEAM_KEYS = ["provider", "base_branch", "workflow", "slice_workflow", "norn_version", "record", "regenerate"];
 const FILE_KEYS: Record<ConfigFileKind, string[]> = { user: [...MACHINE_KEYS, ...PERSON_KEYS], local: PERSON_KEYS, repo: TEAM_KEYS };
 
 /** The file a top-level key belongs in, as a person reads it; null for an unknown key. */
@@ -381,6 +402,10 @@ const INVALID: Record<string, string> = {
   norn_version: "`norn_version` must be a version like 0.19.0",
   record: "`record` must be a map with `policy`",
   "record.policy": "`record.policy` must be local or remote",
+  regenerate: "`regenerate` must be a list of entries with `paths`, `run` and an optional `timeout`",
+  "regenerate.*.paths": "`regenerate.*.paths` must be a non-empty list of path globs",
+  "regenerate.*.run": "`regenerate.*.run` must be a command",
+  "regenerate.*.timeout": "`regenerate.*.timeout` must be a duration like 2m",
   $schema: "`$schema` must be a path or URL",
 };
 
@@ -393,10 +418,15 @@ function invalidProblem(e: SchemaError): { key: string; message: string } {
     if (segs.length === 1 && segs[0] === "agents") return { key, message: `unknown agent \`${unknown}\`: \`agents\` takes ${AGENT_NAMES.join(", ")}` };
     return { key, message: `unknown key \`${key}\`` };
   }
+  const required = /^must have required property '(.+)'$/.exec(e.message)?.[1];
+  if (required !== undefined) {
+    const key = [...segs, required].join(".");
+    return { key, message: `\`${key}\` is required` };
+  }
   // an element of a list is the list's problem (`agents.claude.args.0` → `agents.claude.args`)
   while (segs.length && /^\d+$/.test(segs.at(-1) as string)) segs.pop();
   const key = segs.join(".");
-  const pattern = segs[0] === "agents" && segs[1] ? ["agents", "*", ...segs.slice(2)].join(".") : key;
+  const pattern = (segs[0] === "agents" || segs[0] === "regenerate") && segs[1] ? [segs[0], "*", ...segs.slice(2)].join(".") : key;
   const message = INVALID[pattern]?.replace("*", segs[1] ?? "*") ?? `\`${key}\` ${e.message}`;
   return { key, message };
 }
@@ -540,6 +570,7 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
   const slice_workflow = team<string>("slice_workflow", "slice");
   const norn_version = team<string | null>("norn_version", null);
   const recordPolicy = team<RecordPolicy>("record.policy", "local");
+  const regenerate = team<RegenerateEntry[]>("regenerate", []);
 
   const max_agents = machine<number>("max_agents", 9);
   const notifyFile = (clean.user.notify ?? {}) as Notify;
@@ -576,6 +607,7 @@ export function resolveConfig(files: ConfigFiles = {}, derived: ConfigDerived = 
     claim,
     trace: { retain },
     record: { policy: recordPolicy },
+    ...(regenerate.length ? { regenerate } : {}),
   };
   return { config, entries, problems };
 }

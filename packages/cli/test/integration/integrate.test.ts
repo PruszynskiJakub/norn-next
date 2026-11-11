@@ -1,6 +1,6 @@
 /** W2 integrate, BS3 update and BS3.3a remote sync (runtime/integrate.ts) against real temp repos with a bare remote. */
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git as gitAdapter } from "@norn/adapters";
@@ -288,5 +288,115 @@ describe("update and remote sync (BS3.3a)", () => {
     expect(await run(wt, await baseMoves("b.txt", "b\n"))).toEqual({ outcome: "stuck", reason: "merge in progress in the story worktree" });
     expect(await git.revParse(wt, "HEAD")).toBe(head);
     expect(await git.inProgress(wt)).toEqual({ operation: "merge", unmerged: ["a.txt"] });
+  });
+
+  describe("generated files regenerate instead of resolving", () => {
+    const SPEC = ".agents/specs/gh-5-s";
+    /** a fake "emit": writes gen/out.txt from src.txt, so the regenerated file is what the command makes */
+    const EMIT = "mkdir -p gen && { echo generated; cat src.txt; } > gen/out.txt";
+    const ran: string[] = [];
+    const runCmd = async (command: string, timeoutMs: number) => {
+      ran.push(`${command} @${timeoutMs}`);
+      const r = await bunExec(["sh", "-c", `exec 2>&1\n${command}`], { cwd: R.base + "/story", env: ENV, timeoutMs });
+      return { ok: r.code === 0, output: r.stdout + r.stderr };
+    };
+    const regen = (entries: Array<{ paths: string[]; run: string; timeout?: string }>) => ({ specDir: SPEC, entries, run: runCmd });
+    /** the story and the base both change src.txt-derived gen/out.txt; src.txt itself merges cleanly */
+    async function generatedClash(): Promise<{ wt: string; base: string }> {
+      ran.length = 0;
+      writeFileSync(join(R.root, "src.txt"), "one\n");
+      mkdirSync(join(R.root, "gen"), { recursive: true });
+      writeFileSync(join(R.root, "gen", "out.txt"), "generated\none\n");
+      await git.commit(R.root, { message: "seed", trailers: {} });
+      const wt = await story();
+      writeFileSync(join(wt, "story.txt"), "story only\n");
+      writeFileSync(join(wt, "gen", "out.txt"), "generated\none\nstory\n");
+      await git.commit(wt, { message: "story regenerates", trailers: {} });
+      writeFileSync(join(R.root, "src.txt"), "two\n");
+      writeFileSync(join(R.root, "gen", "out.txt"), "generated\ntwo\n");
+      const base = (await git.commit(R.root, { message: "base moves src", trailers: {} })) as string;
+      return { wt, base };
+    }
+    const runWith = (wt: string, baseSha: string, regenerate: ReturnType<typeof regen>) =>
+      update(git, { cwd: wt, branch: "gh-5-s", baseSha, remote: "origin", message: `Update gh-5 from main (${baseSha.slice(0, 7)})`, trailers: TRAILERS, regenerate });
+
+    test("every conflict mapped → base side, the matched commands run bounded, the merge committed with Norn-Regenerated", async () => {
+      const { wt, base } = await generatedClash();
+      const before = await git.revParse(wt, "HEAD");
+      const res = await runWith(wt, base, regen([{ paths: ["docs/*.md"], run: "echo unmatched" }, { paths: ["gen/**"], run: EMIT }, { paths: ["gen/out.txt"], run: "true", timeout: "5s" }]));
+      expect(res).toMatchObject({ outcome: "done", merged: true, regenerated: ["gen/out.txt"] });
+      // only the matching entries, in mapping order, each with its timeout (default 2m)
+      expect(ran).toEqual([`${EMIT} @120000`, "true @5000"]);
+      const head = (await git.revParse(wt, "HEAD")) as string;
+      expect(await sh(wt, "log", "-1", "--format=%P")).toBe(`${before} ${base}`);
+      const [c] = await git.log(wt, "-1");
+      expect(c?.trailers).toMatchObject({ ...TRAILERS, "Norn-Regenerated": "gen/out.txt" });
+      expect(await sh(wt, "show", `${head}:gen/out.txt`)).toBe("generated\ntwo");
+      expect(await sh(wt, "show", `${head}:story.txt`)).toBe("story only");
+      expect(await git.status(wt)).toMatchObject({ clean: true });
+      expect(await git.inProgress(wt)).toEqual({ operation: null, unmerged: [] });
+    });
+
+    test("a conflicting path no glob matches → conflict as today, nothing run, the merge aborted", async () => {
+      const { wt, base } = await generatedClash();
+      writeFileSync(join(wt, "a.txt"), "story side\n");
+      const before = await git.commit(wt, { message: "story edits a", trailers: {} });
+      writeFileSync(join(R.root, "a.txt"), "base side\n");
+      const base2 = (await git.commit(R.root, { message: "base edits a", trailers: {} })) as string;
+      expect(await runWith(wt, base2, regen([{ paths: ["gen/**"], run: EMIT }]))).toEqual({ outcome: "conflict", files: ["a.txt", "gen/out.txt"], adopted: null });
+      expect(base).not.toBe(base2);
+      expect(ran).toEqual([]);
+      expect(await git.revParse(wt, "HEAD")).toBe(before);
+      expect(await git.status(wt)).toMatchObject({ clean: true });
+    });
+
+    test("a failing or timed-out command, or a path still conflicted, aborts the merge → conflict with the output", async () => {
+      const { wt, base } = await generatedClash();
+      const before = await git.revParse(wt, "HEAD");
+      const failed = await runWith(wt, base, regen([{ paths: ["gen/**"], run: "echo emit broke; exit 3" }]));
+      expect(structuredClone(failed)).toMatchObject({ outcome: "conflict", files: ["gen/out.txt"] });
+      expect((failed as { regenerate: { output: string } }).regenerate.output).toBe("$ echo emit broke; exit 3\nemit broke");
+      expect(await git.revParse(wt, "HEAD")).toBe(before);
+      expect(await git.status(wt)).toMatchObject({ clean: true });
+      expect(await git.inProgress(wt)).toEqual({ operation: null, unmerged: [] });
+      const slow = await runWith(wt, base, regen([{ paths: ["gen/**"], run: "sleep 5", timeout: "200ms" }]));
+      expect(slow).toMatchObject({ outcome: "conflict", files: ["gen/out.txt"], regenerate: { output: expect.stringContaining("sleep 5") } });
+      expect(await git.status(wt)).toMatchObject({ clean: true });
+      // the command writes conflict markers back: still conflicted
+      const marked = await runWith(wt, base, regen([{ paths: ["gen/**"], run: "printf '<<<<<<< a\\nx\\n=======\\ny\\n>>>>>>> b\\n' > gen/out.txt" }]));
+      expect(marked).toMatchObject({ outcome: "conflict", files: ["gen/out.txt"], regenerate: { output: expect.stringContaining("still conflicted: gen/out.txt") } });
+      expect(await git.revParse(wt, "HEAD")).toBe(before);
+      expect(await git.status(wt)).toMatchObject({ clean: true });
+    });
+
+    test("a branch holding only its spec folder takes the base side of every conflict outside it, as a merge, with no mapping", async () => {
+      const wt = join(R.base, "story");
+      await git.worktreeAdd(R.root, wt, "gh-5-s", { from: "main" });
+      mkdirSync(join(wt, SPEC), { recursive: true });
+      writeFileSync(join(wt, SPEC, "spec.md"), "# spec\n");
+      await git.commit(wt, { message: "intake", trailers: {} });
+      // the branch took in a base commit the base later rewrote: its file conflicts though the story never wrote it
+      writeFileSync(join(R.root, "a.txt"), "first try\n");
+      const first = (await git.commit(R.root, { message: "base first try", trailers: {} })) as string;
+      // as norn's base update merged it
+      await git.merge(wt, first, { message: "Update gh-5 from main (first)", trailers: TRAILERS });
+      await sh(R.root, "reset", "-q", "--hard", "HEAD~1");
+      writeFileSync(join(R.root, "a.txt"), "rewritten\n");
+      const base = (await git.commit(R.root, { message: "base rewritten", trailers: {} })) as string;
+      const before = await git.revParse(wt, "HEAD");
+      const res = await update(git, { cwd: wt, branch: "gh-5-s", baseSha: base, remote: null, message: "Update gh-5", trailers: TRAILERS, regenerate: regen([]) });
+      expect(res).toMatchObject({ outcome: "done", merged: true });
+      expect(await sh(wt, "log", "-1", "--format=%P")).toBe(`${before} ${base}`);
+      expect(await sh(wt, "show", "HEAD:a.txt")).toBe("rewritten");
+      expect(await sh(wt, "show", `HEAD:${SPEC}/spec.md`)).toBe("# spec");
+      expect(await git.status(wt)).toMatchObject({ clean: true });
+      // a story with work of its own outside the folder still goes to resolve
+      writeFileSync(join(wt, "a.txt"), "story side\n");
+      await git.commit(wt, { message: "story edits a", trailers: {} });
+      writeFileSync(join(R.root, "a.txt"), "base again\n");
+      const base2 = (await git.commit(R.root, { message: "base again", trailers: {} })) as string;
+      expect(await update(git, { cwd: wt, branch: "gh-5-s", baseSha: base2, remote: null, message: "Update gh-5", trailers: TRAILERS, regenerate: regen([]) })).toMatchObject({ outcome: "conflict", files: ["a.txt"] });
+      expect(await git.status(wt)).toMatchObject({ clean: true });
+    });
   });
 });

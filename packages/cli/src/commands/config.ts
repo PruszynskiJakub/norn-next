@@ -28,6 +28,7 @@ const GROUP_OF: Record<string, Group> = {
   workflow: "team",
   slice_workflow: "team",
   norn_version: "team",
+  regenerate: "team",
 };
 const GROUPS: Array<{ group: Group; title: string }> = [
   { group: "machine", title: `This machine (${CONFIG_FILES.user})` },
@@ -103,6 +104,7 @@ const MEANING: Record<string, string> = {
   workflow: "workflow for a new story",
   slice_workflow: "workflow for a new slice",
   norn_version: "the norn version this repo needs (only norn upgrade and norn init write it)",
+  regenerate: "generated files and the command that rewrites them: a base update conflicting only in them takes the base side and runs it, no agent",
   interval: "time between ticks (norn watch --interval, norn tick --interval)",
   "claim.lease": "a claim not renewed for this long is free to take",
   "claim.renew": "how often the holder renews its claim",
