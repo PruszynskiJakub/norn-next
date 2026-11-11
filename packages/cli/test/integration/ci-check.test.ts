@@ -37,12 +37,21 @@ case "$1 $2" in
   "run view")
     case "$*" in
       *"--json url"*) echo "https://example.test/run/$3" ;;
-      *"--json jobs"*) echo "- job 7: integration (shard 1/4)" ;;
+      # applies the script's own -q filter to the run's jobs, as gh does
+      *"--json jobs"*) shift 6; jq -r "$1" "$FAKE/jobs.json" ;;
       *) echo "unexpected gh $*" >&2; exit 9 ;;
     esac ;;
   *) echo "unexpected gh $*" >&2; exit 9 ;;
 esac
 `;
+  // a red run: one shard failed, one was cancelled, one passed, and a job after them was skipped
+  const JOBS = [
+    { databaseId: 6, name: "unit", conclusion: "success" },
+    { databaseId: 7, name: "integration (shard 1/4)", conclusion: "failure" },
+    { databaseId: 8, name: "integration (shard 2/4)", conclusion: "cancelled" },
+    { databaseId: 9, name: "integration (shard 3/4)", conclusion: "success" },
+    { databaseId: 10, name: "package", conclusion: "skipped" },
+  ];
   const run = (appear: number, watchExit: number, mergeable = "MERGEABLE") => {
     const fake = mkdtempSync(join(tmpdir(), "norn-ci-check-"));
     writeFileSync(join(fake, "gh"), FAKE_GH);
@@ -52,6 +61,7 @@ esac
     // the script calls the repo's .agents/scripts/ci-failures.sh relative to the checkout it runs in
     mkdirSync(join(fake, ".agents", "scripts"), { recursive: true });
     copyFileSync(join(ROOT, ".agents", "scripts", "ci-failures.sh"), join(fake, ".agents", "scripts", "ci-failures.sh"));
+    writeFileSync(join(fake, "jobs.json"), JSON.stringify({ jobs: JOBS }));
     const proc = spawnSyncCaptured(["sh", "-c", `exec 2>&1\n${ciScript("quick")}`], {
       cwd: fake,
       env: { ...process.env, PATH: `${fake}:${process.env.PATH}`, FAKE: fake, APPEAR: String(appear), WATCH_EXIT: String(watchExit), MERGEABLE: mergeable },
@@ -71,7 +81,11 @@ esac
     const r = run(1, 1);
     expect(r.exit).toBe(1);
     expect(r.out).toContain("CI run 42 failed: https://example.test/run/42");
-    expect(r.out).toContain("- job 7: integration (shard 1/4)");
+    expect(r.out.split("\n").filter((l) => l.startsWith("- job "))).toEqual([
+      "- job 7: integration (shard 1/4)",
+      "- job 8: integration (shard 2/4) (cancelled: unknown, not run to the end)",
+      "- job 10: package (skipped: unknown, not run to the end)",
+    ]);
     expect(r.out).toContain('gh api "repos/{owner}/{repo}/check-runs/<job>/annotations"');
     expect(r.calls.some((c) => c.includes("--log-failed"))).toBe(false);
   });

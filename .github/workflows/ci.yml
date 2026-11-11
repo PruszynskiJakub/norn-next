@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
     name: integration (shard ${{ matrix.shard }}/4)
@@ -52,13 +52,13 @@ jobs:
           git config --global init.defaultBranch main
           bun run test:integration --shard=${{ matrix.shard }}/4
 
-  # bun shards by file (B12); a red shard cancels the others.
+  # bun shards by file (B12); every shard runs to the end, so a red run reports each failing shard
   e2e:
     needs: unit
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         shard: [1, 2, 3]
     name: e2e (shard ${{ matrix.shard }}/3)

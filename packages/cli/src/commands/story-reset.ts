@@ -1,7 +1,7 @@
 /**
  * `norn story reset [<story>] [--yes] [--force]`: take a story back to before intake —
- * remove its worktrees, its local and remote branches (the record goes with them), leases, mailbox
- * refs and the claim. The remote issue is left alone, so the next sync takes it in again from the current base
+ * remove its worktrees, its local and remote branches (the record goes with them), its run state in the
+ * machine dir, leases, mailbox refs and the claim. The remote issue is left alone, so the next sync takes it in again from the current base
  * while it is assigned and labelled.
  *
  * Refused first, before anything changes: a claim another machine holds; work a reset would
@@ -9,12 +9,13 @@
  * `--force`. Then consent: `--yes`, or y at the terminal; without a terminal it is refused.
  *
  * Order: claim it if free → delete the remote branches, stopping on the first failure with
- * everything here still in place → remove worktrees, local branches, leases → delete the mailbox
- * refs → delete the claim ref.
+ * everything here still in place → remove worktrees, local branches, run state, leases → delete the
+ * mailbox refs → delete the claim ref.
  */
 import { existsSync } from "node:fs";
 import { cmd } from "@norn/core";
-import { deleteMailbox, fetchNornRefs, listMailbox, releaseClaim, releaseStoryLeases, scanWorktrees } from "@norn/store";
+import { ulid } from "@norn/schema";
+import { deleteMailbox, dropLocalRecord, fetchNornRefs, listMailbox, releaseClaim, releaseStoryLeases, scanWorktrees, storyRunStateDir } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import { failure, refuse } from "../output.ts";
 import { killLocalSessions } from "../runtime/close.ts";
@@ -26,7 +27,7 @@ import { claimIfFree, refuseOthers } from "./story-close.ts";
 export const storyResetCommand = defineCommand({
   name: "story reset",
   version: "acts",
-  summary: "Reset a story to before intake: remove its worktrees, local and remote branches, record and claim; the issue stays",
+  summary: "Reset a story to before intake: remove its worktrees, local and remote branches, run state, record and claim; the issue stays",
   usage: "norn story reset [<story>] [--yes] [--force]",
   options: { yes: { type: "boolean" }, force: { type: "boolean" } },
   optionHelp: {
@@ -89,6 +90,12 @@ export const storyResetCommand = defineCommand({
         await git.deleteBranch(obs.root, b, { force: true });
         deleted.push(b);
       }
+      // decide claims a story it takes in only while it has no run state, so a reset that left it would
+      // leave the story taken in again but never claimed, its old step still showing
+      const run = { key, spec_dir: story.spec_dir };
+      const runDir = storyRunStateDir(obs.root, run);
+      const runState = existsSync(runDir) ? runDir : null;
+      if (runState) dropLocalRecord(obs.root, run, ulid(ctx.clock.now()));
       const leases = await releaseStoryLeases(ctx.home, obs.root, key);
       // a receipt left for the old run would only be rejected later; delete it with the claim
       if (obs.remote) await fetchNornRefs(obs.root, obs.remote).catch(() => undefined);
@@ -103,6 +110,7 @@ export const storyResetCommand = defineCommand({
         worktrees_removed: removed,
         branches_deleted: deleted,
         remote_branches_deleted: remoteDeleted,
+        run_state_removed: runState,
         leases_released: leases,
         mailbox_deleted: mailbox,
         claim_deleted: rel.ok,

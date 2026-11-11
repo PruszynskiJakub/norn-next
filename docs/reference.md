@@ -221,7 +221,7 @@ norn story reopen [<story>]
 
 ##### `norn story reset`
 
-Reset a story to before intake: remove its worktrees, local and remote branches, record and claim; the issue stays
+Reset a story to before intake: remove its worktrees, local and remote branches, run state, record and claim; the issue stays
 
 ```sh
 norn story reset [<story>] [--yes] [--force]
