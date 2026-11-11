@@ -9,11 +9,11 @@
  */
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { StoryBase, StoryIssueSeen, StoryPrSeen } from "@norn/core";
+import type { StoryBase, StoryIssueSeen, StoryOverlap, StoryPrSeen } from "@norn/core";
 import { SPECS_DIR } from "@norn/schema";
 import { atomicWrite, atomicWriteJson } from "./fsx.ts";
 import { readLocalJson } from "./local-json.ts";
-import { baseCacheDir, baseFactsPath, issueFactsPath, prFactsPath, remoteCachePath } from "./paths.ts";
+import { baseCacheDir, baseFactsPath, issueFactsPath, overlapFactsPath, prFactsPath, remoteCachePath } from "./paths.ts";
 import { gitSync } from "./git.ts";
 
 /**
@@ -110,6 +110,21 @@ export function readBaseFacts(repoRoot: string): BaseFactsCache {
 
 export function writeBaseFacts(repoRoot: string, cache: BaseFactsCache): void {
   atomicWriteJson(baseFactsPath(repoRoot), { stories: cache });
+}
+
+/**
+ * Every pair of open stories the last tick merged with each other (`overlap.json`, machine-local),
+ * clean pairs included. Observe reruns `git merge-tree` only for a pair whose heads differ from
+ * the cached ones; the read model shows the overlap items from this without running git.
+ */
+export type OverlapFactsCache = StoryOverlap[];
+
+export function readOverlapFacts(repoRoot: string): OverlapFactsCache {
+  return readLocalJson("local-overlap", overlapFactsPath(repoRoot), {}, repoRoot).pairs ?? [];
+}
+
+export function writeOverlapFacts(repoRoot: string, cache: OverlapFactsCache): void {
+  atomicWriteJson(overlapFactsPath(repoRoot), { pairs: cache });
 }
 
 /**

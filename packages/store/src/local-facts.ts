@@ -31,7 +31,7 @@ import {
 } from "@norn/core";
 import { type HookFact, type LeaseFile, parseDuration, type ReceiptOf, type RejectedMailboxReceipt, type ResolvedConfig, type RunInfo, storyBranch, type UnitState, type Workflow } from "@norn/schema";
 import type { LoadedConfig } from "./config.ts";
-import { type BaseFactsCache, type IssueFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readPrFacts } from "./base.ts";
+import { type BaseFactsCache, type IssueFactsCache, type OverlapFactsCache, type PrFactsCache, readBaseFacts, readIssueFacts, readOverlapFacts, readPrFacts } from "./base.ts";
 import { readActFailures } from "./heartbeat.ts";
 import { owedRecords, readPendingRecords, readRejectedReceipts } from "./local.ts";
 import { listSuperseded, type SupersededCopy } from "./superseded.ts";
@@ -134,6 +134,8 @@ export interface LocalFacts {
   issue_seen: IssueFactsCache;
   /** The base measurement cache as the last tick left it */
   base: BaseFactsCache;
+  /** The overlap cache as the last tick left it */
+  overlap: OverlapFactsCache;
   /**
    * The running version and the one this checkout's team config records (null = none);
    * absent when no running version was given or the config failed to load.
@@ -224,7 +226,7 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
   const mainDrift = drift(root);
   const norn =
     opts.running !== undefined && snapshot.config.ok ? { running: opts.running, repo: snapshot.config.config.norn_version ?? null, ...(mainDrift ? { skills_drift: mainDrift } : {}) } : undefined;
-  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root), ...(norn ? { norn } : {}), superseded: listSuperseded(root), owed_records: owedRecords(readPendingRecords(root)) };
+  return { snapshot, stories, leases, failures, pr_seen: readPrFacts(root), issue_seen: readIssueFacts(root), base: readBaseFacts(root), overlap: readOverlapFacts(root), ...(norn ? { norn } : {}), superseded: listSuperseded(root), owed_records: owedRecords(readPendingRecords(root)) };
 }
 
 /**

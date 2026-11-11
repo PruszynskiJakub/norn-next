@@ -18,6 +18,7 @@ export * from "./hash.ts";
 export * from "./inbox/history.ts";
 export * from "./inbox/items.ts";
 export * from "./labels.ts";
+export * from "./overlap.ts";
 export * from "./policy.ts";
 export * from "./prompt.ts";
 export * from "./ready-carry.ts";

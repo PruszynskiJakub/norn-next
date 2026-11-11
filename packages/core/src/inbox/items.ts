@@ -13,6 +13,7 @@ import { criterionLine, noteTitle, personCriteria, type StoryNote } from "../cri
 import type { Facts, FileError, NumberedReceipt, StoryFacts, UnitFacts } from "../facts.ts";
 import type { InboxGroup, InboxItem } from "../ports.ts";
 import { checkRunningSince, effectiveMode, firstLine, heartbeatUp, skillsDiffer, issueProblem, knownPr, prBaseBranch, sessionStartedNoTurn, stepLabel, storyFinished, storyLanded, storyPhase, storyUnit, unitWorktree } from "../policy.ts";
+import { overlapItems } from "../overlap.ts";
 import { optionsLine } from "../prompt.ts";
 import { hookActivity } from "../session.ts";
 import { CARRIED_CLEAN, carriedApproval, isReadyGate, readyApprovalReceipt, remergeCommands } from "../ready-carry.ts";
@@ -955,6 +956,7 @@ export function buildInbox(facts: Facts, config: ResolvedConfig): Inbox {
   add(repoSkillsDriftItem(facts));
   for (const it of supersededItems(facts)) add(it);
   for (const it of owedRecordItems(facts)) add(it);
+  for (const it of overlapItems(facts)) add(it);
   // The version item comes first, whatever its age
   const pinned = (it: InboxEntry) => (it.id.startsWith(VERSION_ITEM) ? 0 : 1);
   for (const g of INBOX_GROUPS) groups[g].sort((a, b) => pinned(a) - pinned(b) || epoch(a.since) - epoch(b.since) || a.id.localeCompare(b.id));

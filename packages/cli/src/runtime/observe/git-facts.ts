@@ -1,9 +1,9 @@
 /** observe: git facts of the repository — story bases, intake-only branches, foreign commits, orphan branches, worktrees. */
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { type ForeignCommit, type GitInProgress, type GitPort, isIntakeCommit, type Ports, type StoryBase, type StoryFacts, type WorktreeFacts, type WorktreeStatus } from "@norn/core";
+import { type ForeignCommit, type GitInProgress, type GitPort, isIntakeCommit, overlapEligible, type Ports, type StoryBase, type StoryFacts, type StoryOverlap, type WorktreeFacts, type WorktreeStatus } from "@norn/core";
 import { isClosedStatus } from "@norn/schema";
-import { type BaseFactsCache, readEnvNorn } from "@norn/store";
+import { type BaseFactsCache, type OverlapFactsCache, readEnvNorn } from "@norn/store";
 
 /** Newest mtime of the given worktree-relative paths (ms), or null. */
 function newestMtime(dir: string, paths: string[]): number | null {
@@ -58,6 +58,32 @@ export async function storyBase(
   } catch {
     return {};
   }
+}
+
+/**
+ * Every pair of stories `overlapEligible`, their heads merged with each other (`git merge-tree`),
+ * in key order. A pair whose heads are the cached ones (`overlap.json`) is not merged again; the
+ * result is the next cache, so pairs no longer eligible drop out. A pair git fails on is left out.
+ */
+export async function storyOverlaps(git: Pick<GitPort, "mergeTree">, root: string, stories: readonly StoryFacts[], base: string, prev: OverlapFactsCache): Promise<StoryOverlap[]> {
+  const open = stories.filter((s) => overlapEligible(s, base)).sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  const cached = new Map(prev.map((o) => [`${o.stories.join("\0")}\0${o.heads.join("\0")}`, o]));
+  const out: StoryOverlap[] = [];
+  for (let i = 0; i < open.length; i++) {
+    for (let j = i + 1; j < open.length; j++) {
+      const a = open[i] as StoryFacts;
+      const b = open[j] as StoryFacts;
+      const heads: [string, string] = [a.base?.head ?? "", b.base?.head ?? ""];
+      const hit = cached.get(`${a.key}\0${b.key}\0${heads.join("\0")}`);
+      if (hit) {
+        out.push(hit);
+        continue;
+      }
+      const paths = await git.mergeTree(root, heads[0], heads[1]).catch(() => null);
+      if (paths) out.push({ stories: [a.key, b.key], heads, paths });
+    }
+  }
+  return out;
 }
 
 /**

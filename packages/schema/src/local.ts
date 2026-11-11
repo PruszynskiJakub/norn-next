@@ -135,6 +135,17 @@ export const StoryBaseEntry = Type.Object({
 export const LocalBaseFile = Type.Object({ stories: Type.Optional(Type.Record(Type.String(), StoryBaseEntry)) }, id("local-base", "norn measured story bases (trace/base.json)"));
 export type LocalBaseFile = Static<typeof LocalBaseFile>;
 
+/** One pair of open stories' heads merged with each other (core `StoryOverlap`). */
+export const StoryOverlapEntry = Type.Object({
+  stories: Type.Tuple([Type.String(), Type.String()]),
+  heads: Type.Tuple([Type.String(), Type.String()]),
+  paths: Type.Array(Type.String()),
+});
+
+/** `overlap.json`: every pair of open stories compared by the last tick, conflicting or not. */
+export const LocalOverlapFile = Type.Object({ pairs: Type.Optional(Type.Array(StoryOverlapEntry)) }, id("local-overlap", "norn overlap between open stories (trace/overlap.json)"));
+export type LocalOverlapFile = Static<typeof LocalOverlapFile>;
+
 /** A story PR as a sync saw it (core `RemotePullRequest`). */
 export const PullRequestEntry = Type.Object({
   number: Type.Number(),
@@ -291,6 +302,7 @@ export const LOCAL_SCHEMA_NAMES = [
   "local-heartbeat",
   "local-failures",
   "local-base",
+  "local-overlap",
   "local-pr",
   "local-issue",
   "local-cockpit",

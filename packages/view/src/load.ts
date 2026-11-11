@@ -472,6 +472,8 @@ export async function loadProjectView(opts: LoadProjectViewOptions): Promise<Pro
     },
     remote: { issues: undefined },
     stories: storyFacts,
+    // the pairs the last tick merged (overlap.json): the view never runs git
+    ...(local.overlap.length ? { overlaps: local.overlap } : {}),
     heartbeat: { last_tick_at: lastTick },
     ...(local.norn ? { norn: local.norn } : {}),
     // Run state an older norn left on the base, pointed to `norn upgrade`

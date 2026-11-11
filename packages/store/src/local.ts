@@ -8,6 +8,7 @@
  *   each with the merge facts to write (`merge`, StoryMerge)
  * - `foreign.json`: commit shas already traced as `foreign_commits` (once per sha)
  * - `base.json`: per story, the last `story.base` measured (base.ts)
+ * - `overlap.json`: every pair of open stories the last tick merged with each other (base.ts)
  * - `notices.json`: one-time notices already shown on this checkout
  * - `rejected.json`: mailbox receipts this checkout's ticks rejected
  * Every read is validated: a file that is unreadable or of the wrong shape reads as

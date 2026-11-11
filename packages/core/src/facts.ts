@@ -284,6 +284,17 @@ export interface StoryBase {
   conflicts: string[];
 }
 
+/**
+ * Two open stories' heads merged with each other (`git merge-tree`), keys and heads in key order.
+ * `paths` are the conflicted paths, spec folders included ([] = clean); the inbox drops the
+ * paths inside either story's spec folder.
+ */
+export interface StoryOverlap {
+  stories: [string, string];
+  heads: [string, string];
+  paths: string[];
+}
+
 /** A story PR observation (`null` = the remote said there is none) and its time (ms epoch). */
 export interface StoryPrSeen {
   pr: RemotePullRequest | null;
@@ -472,6 +483,11 @@ export interface Facts {
   superseded?: SupersededRecord[];
   /** Merged stories whose base-branch done record norn stopped retrying (records.json). Absent = none. */
   owed_records?: OwedRecord[];
+  /**
+   * Every pair of stories `overlapEligible` this tick, merged with each other (cached per pair of
+   * heads), clean pairs included. Absent = no pair compared.
+   */
+  overlaps?: StoryOverlap[];
   /** worktrees/branches with no matching unit */
   orphans: { worktrees: string[]; branches: string[] };
   /**

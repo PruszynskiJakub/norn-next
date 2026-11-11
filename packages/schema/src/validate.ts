@@ -7,6 +7,7 @@ import { LocalConfig, RepoConfig, ResolvedConfig, UserConfig } from "./config.ts
 import { SliceFrontmatter, StoryFrontmatter } from "./frontmatter.ts";
 import {
   LocalBaseFile,
+  LocalOverlapFile,
   LocalCheckoutFile,
   LocalCockpitFile,
   LocalFailuresFile,
@@ -60,6 +61,7 @@ export const SCHEMAS = {
   "local-heartbeat": LocalHeartbeatFile,
   "local-failures": LocalFailuresFile,
   "local-base": LocalBaseFile,
+  "local-overlap": LocalOverlapFile,
   "local-pr": LocalPrFile,
   "local-issue": LocalIssueFile,
   "local-cockpit": LocalCockpitFile,
