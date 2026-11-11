@@ -432,7 +432,7 @@ describe("test layout (AGENTS.md)", () => {
   const ciJobs = (file: string) => (Bun.YAML.parse(readFileSync(join(ROOT, ".github", "workflows", file), "utf8")) as { jobs: Record<string, CiJob> }).jobs;
   const runs = (job: CiJob) => job.steps.flatMap((s) => (s.run ?? "").split("\n").map((l) => l.trim()).filter(Boolean));
 
-  test("AC5 (B11, B12): ci.yml runs unit and the type check first; 4 integration shards and 3 e2e shards, each with fail-fast, and package need it; git-spawning jobs set an identity", () => {
+  test("AC5 (B11, B12): ci.yml runs unit and the type check first; 4 integration shards and 3 e2e shards, none with fail-fast so a red run reports every failing shard, and package need it; git-spawning jobs set an identity", () => {
     const jobs = ciJobs("ci.yml");
     const unit = jobs.unit;
     expect(unit && runs(unit).filter((r) => r.startsWith("bun run"))).toEqual(["bun run test", "bun run typecheck"]);
@@ -441,10 +441,10 @@ describe("test layout (AGENTS.md)", () => {
       ["integration", "e2e", "package"].map((n) => ({ n, needs: ["unit"] })),
     );
     const integration = jobs.integration;
-    expect({ failFast: integration?.strategy?.["fail-fast"], shards: integration?.strategy?.matrix?.shard }).toEqual({ failFast: true, shards: [1, 2, 3, 4] });
+    expect({ failFast: integration?.strategy?.["fail-fast"], shards: integration?.strategy?.matrix?.shard }).toEqual({ failFast: false, shards: [1, 2, 3, 4] });
     expect(integration && runs(integration)).toContain("bun run test:integration --shard=${{ matrix.shard }}/4");
     const e2e = jobs.e2e;
-    expect({ failFast: e2e?.strategy?.["fail-fast"], shards: e2e?.strategy?.matrix?.shard }).toEqual({ failFast: true, shards: [1, 2, 3] });
+    expect({ failFast: e2e?.strategy?.["fail-fast"], shards: e2e?.strategy?.matrix?.shard }).toEqual({ failFast: false, shards: [1, 2, 3] });
     expect(e2e && runs(e2e)).toContain("bun run test:e2e --shard=${{ matrix.shard }}/3");
     const identity = ["integration", "e2e", "package"].map((n) => ({
       n,
