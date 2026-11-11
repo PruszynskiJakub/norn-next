@@ -839,6 +839,23 @@ describe("re-verify waiting stories (base.verify)", () => {
     expect(u.state).toMatchObject({ status: "stuck", park: { kind: "exhausted", reason: "stale_loop 1/1 at merge.stale" } });
   });
 
+  test("a red verify run ordered at ready whose receipt lands after a person approved ready still takes the stale edge from the merge step the story now waits at", () => {
+    const s = new Sim(VERIFY_WF);
+    s.pr = OPEN_PR;
+    s.runUntil(at_("ready", "parked"));
+    s.verifyOutcome = "fail";
+    s.base = base({ behind: 2, sha: SHA("c") });
+    expect(s.tick().rule).toBe("verify.run");
+    // the run is still going: its receipt lands only after the approval moved the story to merge
+    const red = s.receipts.pop()!;
+    s.approve();
+    s.tick();
+    expect(s.state).toMatchObject({ step: "merge", status: "parked" });
+    s.write(red.receipt);
+    s.tick();
+    expect(s.state).toMatchObject({ step: "update", status: "ready", counters: { stale_loop: 1 }, last_outcome: { step: "merge", outcome: "stale" } });
+  });
+
   test("a green verify run leaves the story where it waits", () => {
     const s = new Sim(VERIFY_WF);
     s.runUntil(at_("ready", "parked"));

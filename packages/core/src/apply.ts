@@ -2,7 +2,8 @@
  * Receipt application: a pure fold of numbered receipts over
  * `UnitState` given the unit's pinned workflow. Receipts numbered ≤ applied_through are
  * skipped, so re-applying after a crash is idempotent. Receipts whose step/attempt do not
- * match the cursor are rejected, never applied.
+ * match the cursor are rejected, never applied; a re-verify run's receipt alone applies at the
+ * gate or merge step the story waits at, whichever step it was ordered at.
  */
 import {
   type AgentStep,
@@ -223,7 +224,11 @@ function applyOne(st: UnitState, r: Receipt, ctx: ApplyContext): Step1 {
   // `norn story update-branch` may re-enter a story unit that is done (PR unmerged), at a gate, or stuck
   if (r.kind === "update") return updateFrom(st, r, ctx);
   if (st.step === "$done") return { reject: "unit is done" };
-  if (r.step !== st.step || r.attempt !== st.attempt)
+  // A verify run outlives the park it was ordered at (a person approves `ready` while it runs). Its
+  // pair is cached once written, so refusing it would lose a red run for good: it judges the story
+  // wherever it waits now, and verified() refuses it anywhere but a gate or merge park
+  const verifyRun = r.kind === "check" && !!r.verify && (st.park?.kind === "gate" || st.park?.kind === "merge");
+  if (!verifyRun && (r.step !== st.step || r.attempt !== st.attempt))
     return { reject: `stale: receipt for ${r.step}#${r.attempt}, cursor at ${st.step}#${st.attempt}` };
 
   const step = stepOf(wf, st.step);
