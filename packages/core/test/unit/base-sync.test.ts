@@ -9,7 +9,8 @@ import type { Action, Decision } from "../../src/actions.ts";
 import { applyReceipts } from "../../src/apply.ts";
 import { type BaseSidePath, renderBrief } from "../../src/brief.ts";
 import { decide } from "../../src/decide/index.ts";
-import { storyMerged, storyPhase } from "../../src/policy.ts";
+import { askingMidMerge, storyMerged, storyPhase } from "../../src/policy.ts";
+import type { GitInProgress } from "../../src/ports.ts";
 import type { NumberedReceipt, StoryBase, StoryFacts } from "../../src/facts.ts";
 import { buildInbox } from "../../src/inbox/items.ts";
 import { baseUpdateStep, checkWorkflowLevel, isStale, validateWorkflowDefinition } from "../../src/workflow.ts";
@@ -49,7 +50,9 @@ class Sim {
   /** what the next `git: update` effect yields (act's classify receipt, BS3) */
   git: "merge" | "conflict" | "stuck" = "merge";
   /** what the resolve agent reports */
-  agent: "done" | "stuck" = "done";
+  agent: "done" | "stuck" | "ask" = "done";
+  /** the git operation in progress in the story worktree, as observe reports it */
+  inProgress: GitInProgress | undefined = undefined;
   /** the base keeps moving into new conflicts while the agent resolves */
   moving = false;
   log: string[] = [];
@@ -69,6 +72,7 @@ class Sim {
   facts() {
     const tick = deriveUlid("01JAAAAAAAAAAAAAAAAAAAAAAA", this.k);
     const uf = unitFacts(storyUnit(), this.wf, this.state, { unapplied: this.receipts.filter((r) => r.n > this.state.applied_through) });
+    if (this.inProgress && uf.worktree) uf.worktree = { ...uf.worktree, in_progress: this.inProgress };
     const fm = { ...storyFacts("gh-1", []).frontmatter!, workflow: this.wf.name };
     const claim: StoryFacts["claim"] = this.claimMine
       ? { state: "mine", sha: "c", blob: { version: 1, story: "gh-1", holder: "jakub@mac", heartbeat_id: HB, acquired_at: at(this.now), renewed_at: at(this.now), expires_at: at(this.now + 600_000), last_tick_id: null } }
@@ -110,7 +114,8 @@ class Sim {
         // the resolve agent merged the base and committed
         if (this.base && !this.moving) this.base = { ...this.base, behind: 0, conflicts: [], head: SHA("8") };
         this.write({ kind: "done", ...head, run_id, by: "agent", outcome: "done", handoff: "merged the base" });
-      } else this.write({ kind: "stuck", ...head, run_id, by: "agent", reason: "a.ts: both sides need a new rule for discounts" });
+      } else if (this.agent === "ask") this.write({ kind: "ask", ...head, run_id, by: "agent", question: "a.ts: keep the story's discount cap or the base's?" });
+      else this.write({ kind: "stuck", ...head, run_id, by: "agent", reason: "a.ts: both sides need a new rule for discounts" });
     }
   }
   /** a person at the gate */
@@ -399,6 +404,85 @@ describe("base sync replay", () => {
     s.agent = "stuck";
     s.runUntil((x) => x.state.status === "stuck");
     expect(s.state).toMatchObject({ step: "resolve", park: { kind: "stuck", reason: "a.ts: both sides need a new rule for discounts" } });
+  });
+
+  describe("ask instead of abort: the resolver may ask with the merge kept in progress", () => {
+    const MERGING: GitInProgress = { operation: "merge", unmerged: ["a.ts"] };
+    const resolveBrief = (s: Sim) =>
+      renderBrief({
+        unit: storyUnit(),
+        state: s.state,
+        workflow: BASE_WF,
+        mode: "auto",
+        runner: "herdr",
+        paths: { worktree: "/w", spec_dir: "/w/spec", story_file: "/w/spec/story.md", slice_file: null, unit_dir: "/w/spec/runs/_story" },
+        diff_range: null,
+        handoff: null,
+        receipts: s.receipts,
+        limits: { deadline: "60m", nudges: 2, retries: 1, slot: null, port_base: null },
+      });
+    const atResolve = () => {
+      const s = new Sim(BASE_WF);
+      s.base = base({ behind: 2, conflicts: ["a.ts"] });
+      s.git = "conflict";
+      s.agent = "ask";
+      return s;
+    };
+
+    test("the base-update section offers norn ask with the merge kept in progress, and keeps abort + norn stuck for a merge it cannot understand", () => {
+      const s = atResolve();
+      s.runUntil(at_("resolve"));
+      const md = resolveBrief(s).markdown;
+      const section = md.slice(md.indexOf("### Base update"));
+      expect(section).toContain('`norn ask "<question>"`');
+      expect(section).toMatch(/keep the merge in progress/i);
+      expect(section).toContain("the files, what each side wants and the decision needed");
+      expect(section).toContain("`git merge --abort`");
+      expect(section).toContain('`norn stuck "<why>"`');
+      expect(section).toMatch(/cannot understand/);
+      // ask comes before abort: the way out that keeps the partial resolution first
+      expect(section.indexOf("norn ask")).toBeLessThan(section.indexOf("git merge --abort"));
+    });
+
+    test("an answer resumes the same resolve step while the merge stays in progress", () => {
+      const s = atResolve();
+      s.runUntil(at_("resolve", "parked"));
+      s.inProgress = MERGING;
+      expect(s.state.park).toMatchObject({ kind: "ask" });
+      const attempt = s.state.attempt;
+      const ask = s.state.park?.receipt_id;
+      s.write({ kind: "answer", receipt_id: deriveUlid("01JFFFFFFFFFFFFFFFFFFFFFFF", s.k), run_id: null, step: "resolve", attempt, at: at(s.now), by: "human", who: "jakub@mac", answer: "keep the story's cap", ...(ask ? { ask_receipt_id: ask } : {}) });
+      const before = s.log.length;
+      s.tick();
+      expect(s.state).toMatchObject({ step: "resolve", attempt, park: null });
+      s.agent = "done";
+      s.moving = true;
+      s.tick();
+      expect(s.state).toMatchObject({ step: "resolve", attempt });
+      expect(s.log.at(-1)).toBe("agent.start");
+      // no new update: the merge in progress is the resolver's, left for it to conclude
+      expect(s.log.slice(before)).not.toContain("git.update");
+    });
+
+    test("askingMidMerge: a unit parked at an ask with a merge in progress in its worktree, nothing else", () => {
+      const s = atResolve();
+      s.runUntil(at_("resolve", "parked"));
+      const story = (inProgress: GitInProgress | undefined) => {
+        s.inProgress = inProgress;
+        return s.facts().stories[0]!;
+      };
+      expect(askingMidMerge(story(MERGING))?.unit.key ?? null).toBe("gh-1");
+      expect(askingMidMerge(story(undefined))?.unit.key ?? null).toBe(null);
+      expect(askingMidMerge(story({ operation: null, unmerged: [] }))?.unit.key ?? null).toBe(null);
+      expect(askingMidMerge(story({ operation: "rebase", unmerged: [] }))?.unit.key ?? null).toBe(null);
+      // a merge in progress while the resolver still runs is no ask
+      const running = atResolve();
+      running.agent = "done";
+      running.moving = true;
+      running.runUntil(at_("resolve", "running"));
+      running.inProgress = MERGING;
+      expect(askingMidMerge(running.facts().stories[0]!)?.unit.key ?? null).toBe(null);
+    });
   });
 
   test("7b: PR merged into another branch → no cleanup, parked `remote: PR merged into …`; base_branch develop → update and open-pr use it", () => {

@@ -1026,7 +1026,14 @@ function reworkLines(out: string[], rw: NonNullable<BriefJson["rework"]>): void 
     out.push("```sh", `git merge --no-ff ${bs.sha}`, "```", "");
     out.push(`Conflicting paths: ${bs.conflicts.length ? bs.conflicts.map((p) => `\`${p}\``).join(", ") : "(not reported)"}`, "");
     if (bs.side) baseSideLines(out, bs.sha, bs.side);
-    out.push("Resolve each conflict by intent; resolve to existing behaviour only. When no resolution fits without new behaviour, run `git merge --abort` (the worktree stays clean) and report `" + cmd.stuck("<why>") + "`. Otherwise commit the merge, run the checks, and report done. Do not push.", "");
+    out.push(
+      "Resolve each conflict by intent; resolve to existing behaviour only. Then commit the merge, run the checks, and report done. Do not push. When you cannot finish it:",
+      "",
+      // An ask keeps the partial resolution: the merge waits in this worktree and the answer resumes this step
+      `- When both sides' intents are valid but keeping both needs a person's decision (which side wins, or a rule neither side has), keep the merge in progress and report \`${cmd.ask()}\` with the files, what each side wants and the decision needed. Leave the merge as it is (no abort, no commit); the answer resumes this step with the merge still in progress.`,
+      `- When you cannot understand the merge (what a side meant, or how the sides fit at all), run \`git merge --abort\` (the worktree stays clean) and report \`${cmd.stuck("<why>")}\`.`,
+      "",
+    );
   }
 }
 

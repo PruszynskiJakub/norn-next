@@ -1,7 +1,8 @@
 /**
  * `norn watch [--interval 30s]`: ticks in a loop until SIGINT/SIGTERM (or `--max-ticks`).
  * Per-tick progress goes to stderr as JSON lines; stdout gets one summary at exit.
- * A clean exit releases the claims this heartbeat holds unless `--keep-claims`.
+ * A clean exit releases the claims this heartbeat holds unless `--keep-claims`, but keeps the claim of
+ * a story whose resolve waits at an ask with a merge in progress (never blocking the exit).
  * `--human` is for a person at the terminal: a line per action instead of JSON (quiet ticks print
  * nothing; the cockpit shows the last tick) and a sentence instead of the summary. `--json` wins.
  * A tick that left the next one something to do (`follow_up`) is followed at once, up to
@@ -43,7 +44,7 @@ export function humanSummary(s: { ticks: number; failed_actions: number; skipped
   ];
   const lines = [`Stopped after ${s.ticks} tick${s.ticks === 1 ? "" : "s"} (${counts.join(", ")}).`];
   for (const r of s.released)
-    lines.push(r.ok ? `Released ${r.story}${r.pushed.length ? ` (pushed ${r.pushed.join(", ")})` : ""}.` : `Could not release ${r.story}: ${r.error ?? "no detail"}.`);
+    lines.push(r.kept ? `Kept ${r.story}: a resolve waits at a question with a merge in progress here.` : r.ok ? `Released ${r.story}${r.pushed.length ? ` (pushed ${r.pushed.join(", ")})` : ""}.` : `Could not release ${r.story}: ${r.error ?? "no detail"}.`);
   if (!s.released.length) lines.push(kept ? "Kept the claims this checkout holds (--keep-claims)." : "No claims to release.");
   return lines.join("\n");
 }

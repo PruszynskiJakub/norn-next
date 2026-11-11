@@ -1,6 +1,6 @@
 ---
 name: norn-merge
-description: Resolves merge, rebase or cherry-pick conflicts by the intent of both sides and proves it with the tests, or aborts when a resolution needs new behaviour. Use when git stopped on conflicts or a branch must take in its base. Not for merging a pull request.
+description: Resolves merge, rebase or cherry-pick conflicts by the intent of both sides and proves it with the tests, or asks with the merge kept in progress when a person must choose, or aborts when the merge cannot be understood. Use when git stopped on conflicts or a branch must take in its base. Not for merging a pull request.
 ---
 
 # Merge
@@ -26,7 +26,7 @@ For each hunk, read the primary sources on both sides: the commits that touched 
 
 - Both added different things: keep both, in a sensible order.
 - One side refactored, the other changed behaviour: apply the behaviour change to the refactored code.
-- Both changed the same behaviour differently: follow the spec of the work on this branch and note the trade-off in the merge commit message. When the spec does not say which wins, stop.
+- Both changed the same behaviour differently: follow the spec of the work on this branch and note the trade-off in the merge commit message. When the spec does not say which wins, ask (below).
 - A generated file (lockfile, emitted schema, generated doc block): take either side, then regenerate it with the repo's command once the sources are resolved.
 
 Never take a side wholesale: no `-X ours/theirs`, `git checkout --ours/--theirs`, `--skip`, or a reset that drops either side. Resolve to existing behaviour only.
@@ -38,12 +38,17 @@ Then look for semantic conflicts: code that merged cleanly but calls something t
 1. Run the checks the repo names for local work (its `AGENTS.md`, or the test command your instructions name), not tiers it reserves for CI. Both sides' tests must pass; fix what the merge broke.
 2. `git add` the files and conclude the operation (`git commit --no-edit`, or with the trade-off noted; `--continue` for one already in progress) until it completes.
 
-## Stop when
+## Ask or abort when you cannot finish
 
-- Keeping both intents needs behaviour that neither side has (a new rule, a product decision).
-- The sides contradict each other and the spec does not say which wins.
-- You cannot tell what one side meant.
+Two ways out, chosen by what blocks you.
 
-Then abort (`git merge --abort`, `git rebase --abort` or `git cherry-pick --abort`) so the worktree is clean, and report why with the stuck report your instructions name: which files, what each side wants, the decision needed.
+**Ask, keeping the merge in progress**, when you understand both sides, both intents are valid, and a person must choose:
 
-Done when no conflict markers remain, the operation is concluded and committed, both sides' behaviour and tests survive and the checks pass; or, when you stopped, the operation is aborted, the worktree is clean, and you said which decision is needed.
+- keeping both intents needs behaviour that neither side has (a new rule, a product decision);
+- the sides contradict each other and the spec does not say which wins.
+
+Leave the operation as it is (no abort, no commit, the hunks you resolved staged) and ask with the question report your instructions name: which files, what each side wants, the decision needed. The answer resumes you in the same worktree with the operation still in progress: apply it and finish as above.
+
+**Abort** when you cannot understand the merge: you cannot tell what one side meant, or how the sides fit at all, so no question to a person would let you finish. Run `git merge --abort` (`git rebase --abort`, `git cherry-pick --abort`) so the worktree is clean, and report why with the stuck report your instructions name.
+
+Done when no conflict markers remain, the operation is concluded and committed, both sides' behaviour and tests survive and the checks pass; or, when you asked, the operation is still in progress and your question names the files, both sides' intents and the decision needed; or, when you aborted, the worktree is clean and you said why.

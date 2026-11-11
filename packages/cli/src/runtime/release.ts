@@ -9,7 +9,7 @@
  */
 import { existsSync } from "node:fs";
 import { join, relative } from "node:path";
-import { cmd, prOpen, type StoryFacts } from "@norn/core";
+import { askingMidMerge, cmd, prOpen, type StoryFacts } from "@norn/core";
 import { headsRef, ulid } from "@norn/schema";
 import { releaseClaim, writtenHere } from "@norn/store";
 import type { Context } from "../context.ts";
@@ -40,6 +40,8 @@ export interface ReleaseResult {
   record?: { sha: string; branch_commit: string | null } | null;
   /** `record`: the record push failed, so the claim is kept */
   failed?: "record";
+  /** `merge_in_progress`: a resolve waits at an ask mid-merge, so the claim is kept on purpose (ok: nothing failed) */
+  kept?: "merge_in_progress";
   error?: string;
 }
 
@@ -103,14 +105,19 @@ export async function releaseStory(obs: Observed, story: StoryFacts): Promise<Re
   return r.ok ? { story: story.key, ok: true, pushed, record } : { story: story.key, ok: false, pushed, record, error: r.message };
 }
 
-/** Release every claim this heartbeat holds (clean `watch` exit). */
+/** Release every claim this heartbeat holds (clean `watch` exit), but a story asking mid-merge. */
 export async function releaseHeldClaims(ctx: Context): Promise<ReleaseResult[]> {
   // The clean-exit release waits for a running tick too; its abort signal has already fired
   const lock = await waitForTickLock(ctx, "norn story handoff", "retry when it finishes", null);
   try {
     const obs = await observe(ctx, { tick_id: ulid(ctx.clock.now()), sync: "never" });
     const out: ReleaseResult[] = [];
-    for (const s of obs.facts.stories) if (s.claim.state === "mine") out.push(await releaseStory(obs, s));
+    for (const s of obs.facts.stories) {
+      if (s.claim.state !== "mine") continue;
+      // The partial resolution lives only in this worktree: keep the claim so a restart here resumes it
+      if (askingMidMerge(s)) out.push({ story: s.key, ok: true, pushed: [], kept: "merge_in_progress" });
+      else out.push(await releaseStory(obs, s));
+    }
     return out;
   } finally {
     lock.release();

@@ -3,11 +3,12 @@
  * the story and slice branches, then the story's record to its ref, then deletes the claim
  * ref by CAS — in that order, so whoever checks it out next finds everything on the remote. A
  * rejected record push releases nothing and is refused. Refused when this heartbeat does not
- * hold the claim.
+ * hold the claim, and while a resolve waits at an ask with its merge in progress (an unfinished
+ * merge cannot be pushed, so the partial resolution would stay behind).
  */
-import { cmd } from "@norn/core";
+import { askingMidMerge, cmd, type UnitFacts } from "@norn/core";
 import { defineCommand } from "../command.ts";
-import { claimHeld, failure, refuse, rendered } from "../output.ts";
+import { type CliFailure, claimHeld, failure, refuse, rendered } from "../output.ts";
 import { recordPushRefused } from "../runtime/close.ts";
 import { heldHere, releaseStory, withStory } from "../runtime/release.ts";
 import { aStory, resolveStory } from "../runtime/target.ts";
@@ -27,6 +28,8 @@ export const storyHandoffCommand = defineCommand({
         if (c.state === "other") throw claimHeld(c.blob, `only the holder hands it over; or ${cmd.storyCheckout(key, { force: true })}`);
         throw refuse(`${key} is not claimed by this machine (claim: ${c.state})`, null, "not_held");
       }
+      const asking = askingMidMerge(story);
+      if (asking) throw mergeInProgress(key, asking);
       const r = await releaseStory(obs, story);
       // The remote refused the record, so the claim is kept and nothing deleted
       if (!r.ok && r.failed === "record") throw recordPushRefused(r.error ?? "record push failed", cmd.storyHandoff(key), r.pushed);
@@ -38,3 +41,12 @@ export const storyHandoffCommand = defineCommand({
     });
   },
 });
+
+function mergeInProgress(story: string, u: UnitFacts): CliFailure {
+  const unit = u.unit.key;
+  return refuse(
+    `${story} waits at a question with a merge in progress in ${u.worktree?.path ?? "its worktree"}; an unfinished merge cannot be pushed, so it is not handed over`,
+    `answer the question (${cmd.storyAnswer(unit)}) or unstick the step (${cmd.runRerun(unit)}), let the resolve conclude the merge, then ${cmd.storyHandoff(story)}`,
+    "merge_in_progress",
+  );
+}

@@ -145,6 +145,14 @@ export const knownPr = (story: StoryFacts): StoryFacts["pr"] => (story.pr !== un
  * head on the story's heads ref instead.
  */
 export const prOpen = (story: StoryFacts): boolean => knownPr(story)?.state === "open";
+/**
+ * A unit of the story waits at an ask while a merge is in progress in its worktree: the resolver
+ * asked mid-merge, and the partial resolution lives only in that worktree (an unfinished merge
+ * cannot be committed or pushed). Its claim stays where the worktree is. Returns that unit.
+ */
+export const askingMidMerge = (story: StoryFacts): UnitFacts | null =>
+  story.units.find((u) => u.state?.status === "parked" && u.state.park?.kind === "ask" && u.worktree?.in_progress?.operation === "merge") ?? null;
+
 /** How the story's work reached its base, or null when it has not. */
 export function storyMerged(p: StoryPhase): MergedVia | null {
   if (p.phase === "merged") return p.via;

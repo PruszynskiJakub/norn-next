@@ -118,7 +118,7 @@ On your machine, when you stop working on the story:
 norn story handoff gh-12
 ```
 
-It pushes the branches (with the handoffs on them), then the story's record to `refs/norn/runs/gh-12`, and only then releases the claim; it names the record commit and the story branch commit it matches. If the record push fails, nothing is released: check the remote and run it again. A clean `norn watch` exit and `norn story close` push the record the same way before they release a claim. On the colleague's machine:
+It pushes the branches (with the handoffs on them), then the story's record to `refs/norn/runs/gh-12`, and only then releases the claim; it names the record commit and the story branch commit it matches. If the record push fails, nothing is released: check the remote and run it again. A clean `norn watch` exit and `norn story close` push the record the same way before they release a claim. While a resolve step waits at a question with its base merge in progress, the unfinished merge lives only in your worktree and cannot be pushed: `norn story handoff` refuses the story (`merge_in_progress`) until the question is answered and the merge concluded, and a clean `norn watch` exit keeps that story's claim, so a restart on the same machine resumes the merge. On the colleague's machine:
 
 ```sh
 norn story checkout gh-12
