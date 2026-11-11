@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { RunnerPort } from "@norn/core";
-import { type ClaimBlob, claimRef, recordRef } from "@norn/schema";
+import { type ClaimBlob, claimRef, headsRef, recordRef } from "@norn/schema";
 import { machineDir, repoConfigPath, setSpawnObserver, workflowsDir } from "@norn/store";
 import type { ElsewhereView } from "@norn/view";
 import { type CliDeps, type CliResult, runningVersion } from "../../src/index.ts";
@@ -115,7 +115,7 @@ const view = async (key: string, c: Clone = B) => {
 const markdown = async (key: string) => (await B.norn("story", "view", key)).stdout;
 const statusOf = async () => (await B.norn("status")).stdout;
 /** The commits of a remote branch newer than `since`, their subjects and trailers. */
-const commitsSince = (branch: string, since: string) => sh(h.dir, ["--git-dir", h.remoteDir, "log", "--format=%s%n%(trailers)", `${since}..refs/heads/${branch}`]);
+const commitsSince = (ref: string, since: string) => sh(h.dir, ["--git-dir", h.remoteDir, "log", "--format=%s%n%(trailers)", `${since}..${ref}`]);
 /** Every file under a folder with its mtime, for "the view wrote nothing". */
 function filesWithTimes(dir: string): string[] {
   const out: string[] = [];
@@ -224,7 +224,8 @@ describe("a story held elsewhere under local (B18, B19)", () => {
   });
 
   test("F9: a mirror and an ask commit after the boundary do not move it", async () => {
-    const before = remoteSha(`refs/heads/${s.branch}`) as string;
+    // The PR is open: the commits after a boundary move only the heads ref, never the PR's branch
+    const before = remoteSha(headsRef("gh-11")) as string;
     // a mirror commit: a label was added to the issue on the remote
     h.remote.issues = h.remote.issues.map((i) => (i.number === 11 ? { ...i, labels: [...i.labels, "ui"] } : i));
     await h.tick("--sync");
@@ -232,7 +233,7 @@ describe("a story held elsewhere under local (B18, B19)", () => {
     h.write(join(s.wt, "notes", "review.md"), "half done\n");
     expect((await inWt(s.wt, "ask", "Which option?")).exit).toBe(0);
     await tick();
-    const after = commitsSince(s.branch, before);
+    const after = commitsSince(headsRef("gh-11"), before);
     expect(after).toContain("norn: mirror gh-11 from the remote issue");
     expect(after).toContain("asks: Which option?");
     expect(after).not.toContain("Norn-Outcome");
@@ -271,7 +272,7 @@ describe("a story held elsewhere under local (B18, B19)", () => {
     h.write(join(t.wt, "notes", "stuck.md"), "unblocked\n");
     await tick();
     expect(h.state(t.runs())).toMatchObject({ step: "review", status: "ready" });
-    const after = commitsSince(t.branch, before);
+    const after = commitsSince(`refs/heads/${t.branch}`, before);
     expect(after).toContain("unstick");
     expect(after).not.toContain("Norn-Outcome");
 

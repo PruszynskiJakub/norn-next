@@ -94,6 +94,7 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 - Light-path anchor (`lightAnchor`, core update-outcome.ts) = latest `approve`, only if open-pr ended `done` after it or its step is reachable only past open-pr (ready, merge); else full path.
 - Heads ref is pushed at every boundary; while the PR is open it replaces the branch push. Only open-pr pushes the branch; `story close` pushes the branch first.
+- The shipped story/quick templates anchor the test command (`run: &test-run bun test`, aliased by test-merge/test-resolution): `norn init`'s test-command substitution (`withTestCommand`, cli runtime/detect.ts) must keep the anchor.
 
 ## Not proven yet
 
@@ -106,8 +107,9 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 - 02.AC5: the criterion says the step restarts "with fresh counters"; docs/limitations.md says with the counters the last record push recorded. QA: pass, with a note.
 - `.agents/workflows/{story,quick}.yaml` lack the shipped copies' new light-path comment (comment only).
 - No GitPort fake exists: 07.AC6/13.AC7 run against the real adapter only.
+- CI fix (ci_loop 1): CI failed in e2e `slice-workflow.test.ts` and integration `non-holder-views.test.ts`. Real bug: `norn init` no longer set a detected test command in story/quick.yaml because the anchored run line didn't match (red first: `packages/cli/test/unit/detect.test.ts` › "keeps a YAML anchor on the run line…"); fixed in `withTestCommand` and `set_in` now uses `hasTemplateTestCommand`. The rest were stale expectations of intended changes: team schema gains `regenerate`; after open-pr the boundary moves only the heads ref (transcript `e2e-slice-workflow.txt` rewritten, test now checks heads ref = local branch, PR branch one behind); F9 in non-holder-views reads the heads ref since the PR is open there. Both files pass locally.
 - Friction: a fresh worktree needs `bun install`.
 
 ## Resume
 
-pr.md written (evidence links QA #2's files, `Closes #126`). Next: open-pr opens the draft PR with it.
+CI fix committed. Next: review the rework, then test → … → open-pr pushes the branch and ci watches the new head.

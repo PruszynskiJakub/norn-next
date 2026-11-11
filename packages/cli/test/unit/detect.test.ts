@@ -54,4 +54,9 @@ describe("withTestCommand", () => {
     const yaml = "steps:\n  test:\n    type: check\n    run: bun test\n    timeout: 15m\n  lint:\n    run: bun test:lint\n";
     expect(withTestCommand(yaml, "npm ci && npm test")).toBe('steps:\n  test:\n    type: check\n    run: "npm ci && npm test"\n    timeout: 15m\n  lint:\n    run: bun test:lint\n');
   });
+
+  test("keeps a YAML anchor on the run line, so the steps that alias it get the command too", () => {
+    const yaml = "steps:\n  test:\n    run: &test-run bun test\n  verify:\n    run: *test-run\n";
+    expect(withTestCommand(yaml, "npm ci && npm test")).toBe('steps:\n  test:\n    run: &test-run "npm ci && npm test"\n  verify:\n    run: *test-run\n');
+  });
 });

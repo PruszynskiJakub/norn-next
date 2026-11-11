@@ -60,7 +60,14 @@ export function detectTestCommand(root: string): DetectedTestCommand | null {
 /** The test command the bundled workflow templates ship with. */
 export const TEMPLATE_TEST_COMMAND = "bun test";
 
-/** A workflow template with its `run: bun test` lines set to `command` (quoted, YAML-safe). */
+const TEMPLATE_TEST_LINE = /^(\s+run:(?: &[\w-]+)?) bun test[ \t]*$/gm;
+
+/** A workflow template with its `run: bun test` lines set to `command` (quoted, YAML-safe); an anchor on the line stays, so its aliases follow. */
 export function withTestCommand(yaml: string, command: string): string {
-  return yaml.replace(/^(\s+run:) bun test[ \t]*$/gm, (_m, key: string) => `${key} ${JSON.stringify(command)}`);
+  return yaml.replace(TEMPLATE_TEST_LINE, (_m, key: string) => `${key} ${JSON.stringify(command)}`);
+}
+
+/** Whether a workflow template has a `run: bun test` line that `withTestCommand` sets. */
+export function hasTemplateTestCommand(yaml: string): boolean {
+  return new RegExp(TEMPLATE_TEST_LINE.source, "m").test(yaml);
 }

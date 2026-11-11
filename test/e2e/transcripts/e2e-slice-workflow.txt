@@ -638,6 +638,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git diff --name-only --diff-filter=U -z
   spawn repo $ git for-each-ref "--format=%(objectname) %(refname)" refs/norn/claims/ refs/norn/inbox/
   spawn repo $ git cat-file --batch
+  spawn repo $ git rev-parse --verify --quiet --end-of-options "refs/heads/gh-7-add-login-form^{commit}"
   spawn repo $ git hash-object -w --stdin
   spawn repo $ git push --porcelain --force-with-lease=refs/norn/claims/gh-7:<sha:3> origin <sha:14>:refs/norn/claims/gh-7
   spawn repo $ git update-ref refs/norn/claims/gh-7 <sha:14>
@@ -648,7 +649,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git commit -F - --cleanup=strip --allow-empty --trailer "Norn-Story: gh-7" --trailer "Norn-Step: open-pr" --trailer "Norn-Outcome: done" --trailer "Norn-Next: $done" --trailer "Norn-Tick: <ulid:42>"
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse HEAD
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git -c core.quotePath=false log --format= --name-only -m --first-parent refs/heads/gh-7-add-login-form --not --remotes=origin --
-  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain --atomic origin refs/heads/gh-7-add-login-form:refs/heads/gh-7-add-login-form +refs/heads/gh-7-add-login-form:refs/norn/heads/gh-7
+  spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git push --porcelain origin +refs/heads/gh-7-add-login-form:refs/norn/heads/gh-7
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:15>
   A.notifier.notify merge:gh-7:100
