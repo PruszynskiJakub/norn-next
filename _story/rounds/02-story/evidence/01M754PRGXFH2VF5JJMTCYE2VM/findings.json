@@ -1,0 +1,23 @@
+{
+ "findings": [
+  {
+   "id": "F1",
+   "severity": "blocking",
+   "criterion": "02.AC3",
+   "title": "Takeover with a heads ref diverged from the remote story branch drops norn's boundary instead of merging it",
+   "repro": "Run `bun test --config=bunfig.integration.toml --timeout=30000 evidence/takeover-diverged.test.ts` from the repo root. Setup: the story reaches review; the remote branch is reset to boundary~1 (a crash after a boundary the branch lacks); a person pushes a commit onto the branch; the claim expires; clone B runs `norn story checkout`. Expected: B's worktree holds a merge of the heads-ref boundary and the person's commit. Observed under both record policies: B's HEAD is the person's commit with one parent, and the boundary is missing. Under remote policy the state says review while the implement.done commit is absent. Cause: packages/cli/src/runtime/checkout.ts:295 `aheadOf` uses the heads ref only when it is strictly ahead of the branch.",
+   "file": "packages/cli/src/runtime/checkout.ts",
+   "line": 295,
+   "detail": "The criterion: after a crash, another machine resumes from the heads ref merged with the remote branch, never rebased, under both policies. The strictly-ahead case passes (heads-ref.test.ts AC3). Once the PR is open, the heads ref is routinely ahead of the PR branch, so a person's push to the PR followed by a crash triggers this. docs/limitations.md:28 also says the takeover merges with the remote branch. Evidence: 02.AC3.md, takeover-diverged.test.ts."
+  },
+  {
+   "id": "F2",
+   "severity": "blocking",
+   "criterion": "03.AC1",
+   "title": "push-rule.test.ts, the verifier for one branch push per loop (03 AC1\u2013AC3, AC5, AC6), is red: its workflow breaks the open-pr guard",
+   "repro": "bun test --config=bunfig.integration.toml --timeout=20000 ./packages/cli/test/integration/push-rule.test.ts \u2192 0 pass, 5 fail (every test times out in setup: the story never starts because the test's LOOP workflow, open-pr \u2192 review agent \u2192 ready gate \u2192 $done, is refused by the open-pr guard as open_pr_bypass). Expected the 5 tests green. The behaviour itself holds: a scratch copy with a guard-compliant workflow passes 5/5 (see evidence). Log: push-rule-run.log",
+   "file": "packages/cli/test/integration/push-rule.test.ts",
+   "detail": "The open-pr guard commit 338d725a8 landed after this test and did not update its LOOP workflow. `doctor --repo` reports open_pr_bypass at /steps/ready. The integration tier in CI will fail. Fix the test workflow (e.g. ready.approve \u2192 a second open-pr step \u2192 $done); with that change all 5 tests and 51 expects pass. Same finding for 03.AC2, 03.AC3, 03.AC5 and 03.AC6. Evidence: 03.AC1.md."
+  }
+ ]
+}

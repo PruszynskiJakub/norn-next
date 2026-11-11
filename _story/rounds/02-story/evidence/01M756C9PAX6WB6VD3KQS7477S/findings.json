@@ -1,0 +1,160 @@
+{
+  "summary": "Changes requested. 15 findings, 1 blocking (spec). There were no earlier review findings; QA #1's two findings (02.AC3 takeover merge, 03 push-rule test) are fixed and proven: heads-ref.test.ts and push-rule.test.ts pass. Unit tier (1895 pass) and typecheck are green. Blocking: the light path's anchor is the latest approve at any step, so a story parked at the human-qa gate after a rework review approve, whose base moves with a conflict, goes update \u2192 resolve \u2192 resolved \u2192 test-resolution \u2192 resolution-review \u2192 open-pr \u2192 ci \u2192 ready. That skips the person's QA gate and, in round 1, describe (no pr.md exists). The rest are minor notes: the forced heads-ref push without a lease, a re-verify receipt accepted against a head it never tested, a subject-matching spec-folder check, a temp worktree leaked by a killed verify run, the heads-ref delete at close on a story that has none, a red verify with no stale route reaching nobody, docs/reference.md mapped whole to docs:emit, and some test-seam and duplication points.",
+  "findings": [
+    {
+      "id": "F1",
+      "axis": "spec",
+      "severity": "blocking",
+      "criterion": "08.AC1",
+      "file": "packages/core/src/update-outcome.ts",
+      "line": 88,
+      "title": "The light path skips the human-qa gate and, in round 1, describe",
+      "detail": "lightAnchor takes the head at the latest approve at any step, including the story review after rework. In shipped story.yaml (both copies) human-qa has `stale: update`, and a gate goes stale on a local conflict with no PR needed (packages/core/src/decide/story.ts:502-509: the awaits_sync guard applies only when pr_seen is set). Path: test fail \u2192 implement \u2192 review approve (anchor) \u2192 test pass \u2192 qa partial \u2192 human-qa parked \u2192 a conflicting base move \u2192 update \u2192 resolve \u2192 update `resolved` (only base merges and spec-folder handoff commits since the anchor) \u2192 test-resolution \u2192 resolution-review approve \u2192 open-pr \u2192 ci \u2192 ready. The person's human-qa gate is never approved. In the first round describe never ran, so open-pr opens the PR from a missing pr.md. The spec's light path keeps a PR body that already exists: Solution 'update \u2192 (resolve) \u2192 test \u2192 a review of the resolution only \u2192 open-pr (body kept) \u2192 ci \u2192 ready'; US 38 'otherwise `open-pr` to push and keep the PR body'; and slice 08's goal 'costs one test run, at most one short review and one CI run'. None of these allows a person's gate to be skipped. No test covers a base move at human-qa, or before the PR exists.",
+      "suggestion": "Take clean/resolved only when the story's PR has been opened in this round (open-pr has a done receipt after the anchor, or the anchor's step is reachable only after open-pr), or never from a gate the person has not approved; otherwise `done`. Add a decide test for a conflicting base move at human-qa in round 1 that takes the full path."
+    },
+    {
+      "id": "F2",
+      "axis": "standards",
+      "severity": "minor",
+      "file": "packages/cli/src/runtime/push.ts",
+      "line": 42,
+      "title": "The heads ref is force-pushed with no lease",
+      "detail": "`+refs/heads/<branch>:refs/norn/heads/<story>` is always forced, and while the PR is open it is the only ref pushed. A checkout releasing an `expired` claim (release.ts accepts expired) after another checkout took the story over can rewind the new holder's boundary on the heads ref. If the new holder then crashes, the next takeover resumes without it. The window needs a lapsed claim, a takeover and a crash, and the Plan's prefactor 1 drops the fast-forward check on purpose, so this is not blocking.",
+      "suggestion": "Push the heads ref with --force-with-lease against the local refs/norn/heads/<story> copy."
+    },
+    {
+      "id": "F3",
+      "axis": "standards",
+      "severity": "minor",
+      "file": "packages/core/src/apply.ts",
+      "line": 224,
+      "title": "A verify check receipt is accepted at any park, whatever head it tested",
+      "detail": "A check receipt carrying `verify` skips the step#attempt staleness check whenever the unit is parked at a gate or merge step. Nothing compares verify.head with the current story head. A red run ordered before the story went stale \u2192 update \u2192 resolve \u2192 back to a gate can land later and take `stale` for a head it never tested.",
+      "suggestion": "Reject a verify receipt whose head is not the story's current head."
+    },
+    {
+      "id": "F4",
+      "axis": "standards",
+      "severity": "minor",
+      "file": "packages/cli/src/runtime/integrate.ts",
+      "line": 785,
+      "title": "specFolderOnly recognises norn's update merges by their subject line",
+      "detail": "It matches /^Update \\S+ from /, which copies the message format from core/decide/steps.ts and parses prose. The update merge already carries a Norn-Step trailer.",
+      "suggestion": "Match on the Norn-Step trailer."
+    },
+    {
+      "id": "F5",
+      "axis": "standards",
+      "severity": "minor",
+      "file": "packages/cli/src/runtime/act/check.ts",
+      "line": 62,
+      "title": "A killed verify run leaks its temporary merged worktree",
+      "detail": "sweepCheckOrders deletes a dead order without reading order.verify. The $TMPDIR/norn-verify-* worktree, and its registration in the repo's worktree list, are never removed.",
+      "suggestion": "Remove order.verify.worktree when the dead order is swept."
+    },
+    {
+      "id": "F6",
+      "axis": "standards",
+      "severity": "minor",
+      "file": "packages/cli/src/runtime/close.ts",
+      "line": 663,
+      "title": "story close reports heads_error for a story that has no heads ref",
+      "detail": "deleteHeadsRef pushes `:refs/norn/heads/<story>` unconditionally. For a story an older norn delivered, or one that never crossed a boundary, git answers 'remote ref does not exist' and close reports heads_error.",
+      "suggestion": "Treat 'does not exist' as already deleted."
+    },
+    {
+      "id": "F7",
+      "axis": "spec",
+      "severity": "minor",
+      "file": "packages/core/src/apply.ts",
+      "line": 449,
+      "title": "A red verify run with no stale route reaches no one",
+      "detail": "D11: 'no edge \u2192 today's Check item'. verified() only logs '<step> has no stale route'. Under stale: conflict a clean base move is not stale, so no stale:* item shows. No criterion covers this branch.",
+      "suggestion": "Raise the Check item D11 names when the waiting step has no stale edge."
+    },
+    {
+      "id": "F8",
+      "axis": "spec",
+      "severity": "minor",
+      "file": ".agents/norn.config.yaml",
+      "line": 1,
+      "title": "docs/reference.md is mapped whole to docs:emit, which rewrites only its generated block",
+      "detail": "A conflict in the hand-written part of docs/reference.md (above the generated block, about lines 1-37) would take the base side and drop the story's prose unseen. The merge would also count as clean on the light path. This follows US68/13.AC8 literally but breaks US65 'hand-written code is always resolved by intent'. It is for the person to decide.",
+      "suggestion": "Narrow the mapping, or check that the conflict hunks fall inside the generated block."
+    },
+    {
+      "id": "F9",
+      "axis": "spec",
+      "severity": "minor",
+      "criterion": "09.AC3",
+      "file": "packages/core/test/unit/carried-approval.test.ts",
+      "line": 1,
+      "title": "09.AC3 and 08.AC5 are proven at a narrower seam than the Plan agreed",
+      "detail": "The Plan puts US43 (the ready item, brief and PR evidence show the remerge-diff) at S3 integration. Only scripted S1 receipts check it. 08.AC5 ('open-pr pushes and keeps the PR body') is proven only as routing in packages/cli/test/unit/light-route.test.ts. packages/cli/test/unit/overlap-cache.test.ts tests observe's internal storyOverlaps, a seam the Plan rules out ('never internals of act or observe'). The integration overlap test already proves 12.AC3.",
+      "suggestion": "Optional: add an S3 check of the PR body after a light-path approve."
+    },
+    {
+      "id": "F10",
+      "axis": "standards",
+      "severity": "minor",
+      "file": "packages/core/src/overlap.ts",
+      "line": 1,
+      "title": "The overlap item's `since` resets every tick",
+      "detail": "`since` is iso(facts.now), so its age and its inbox ordering mean nothing.",
+      "suggestion": "Use a stable time, such as when the pair was first cached."
+    },
+    {
+      "id": "F11",
+      "axis": "standards",
+      "severity": "nit",
+      "file": "packages/cli/src/commands/story-edit.ts",
+      "line": 94,
+      "title": "Duplicated helpers and a name collision",
+      "detail": "story-edit.ts re-implements core's knownPr. The 'either direction' onlyNornCommitsSince check is written twice (runtime/observe/remote.ts, view/src/load.ts). checkout.ts declares a local prOpen(remote, branch) that collides in name with core's prOpen(story).",
+      "suggestion": "Reuse the core helpers; rename the local one."
+    },
+    {
+      "id": "F12",
+      "axis": "standards",
+      "severity": "nit",
+      "file": "packages/cli/src/runtime/act/git-step.ts",
+      "line": 276,
+      "title": "History in comments; spec-folder-only merge recorded as regenerated",
+      "detail": "'as before' comments in integrate.ts and act/git-step.ts describe history. apply.ts has an orphaned classify docblock above verified(). `res.regenerated ?? res.base_side` writes a spec-folder-only merge's paths into base.regenerated.",
+      "suggestion": "Reword the comments; record base_side paths under their own field or leave regenerated unset."
+    },
+    {
+      "id": "F13",
+      "axis": "spec",
+      "severity": "minor",
+      "criterion": "02.AC3",
+      "file": "packages/cli/src/runtime/checkout.ts",
+      "line": 596,
+      "title": "With no PR open, a takeover takes a diverged branch as it is and leaves the heads ref's boundaries out",
+      "detail": "D2: 'Takeover resumes from it, merged with the remote branch, never rebased', with no condition. With no PR open the code reads a divergence as a person rewriting the branch. Heads-only boundaries from while the PR was open drop out of the worktree if a person then pushed and closed the PR unmerged. This is reasoned in the handoff Notes and docs/limitations.md:28, and pinned by heads-ref.test.ts 'with no PR open, a branch that diverged \u2026 B takes the branch as it is'. For the person to confirm.",
+      "suggestion": "Have the person confirm the narrowing, or merge in that case too."
+    },
+    {
+      "id": "F14",
+      "axis": "spec",
+      "severity": "minor",
+      "criterion": "05.AC1",
+      "file": "packages/core/src/workflow.ts",
+      "line": 283,
+      "title": "The static open-pr guard checks only gates the round can end from",
+      "detail": "05.AC1 says 'reaches a gate or a merge step \u2026 refused'. mergeBoundSteps narrows it to gates that can reach merge or $done; GUARD_WF (open-pr \u2192 ci \u2192 agent \u2192 gate) validates. Harmless in effect, and the handoff notes it for the person.",
+      "suggestion": "Have the person confirm, or update the criterion text."
+    },
+    {
+      "id": "F15",
+      "axis": "spec",
+      "severity": "minor",
+      "criterion": "03.AC3",
+      "file": "packages/cli/test/integration/push-rule.test.ts",
+      "line": 173,
+      "title": "03.AC3 is only partly asserted: no push-before-PR order, and the PR head is set by hand",
+      "detail": "The test asserts one branch push holding the base merge. It does not assert that the push precedes the PR create or update, or that the PR's head equals the pushed head (pr.head_sha is set by hand at :194), and the create path is not exercised. The close-order half of 03.AC5 is also not asserted while the PR is open.",
+      "suggestion": "Assert the order through FakeRemote, as open-pr-guard.test.ts hostSeesBranch does."
+    }
+  ]
+}

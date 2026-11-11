@@ -1,0 +1,88 @@
+bun test v1.3.13 (bf2e2cec)
+
+packages/cli/test/integration/push-rule.test.ts:
+53 |   h.clock.advance(10_000);
+54 |   return h.tick();
+55 | };
+56 | async function tickUntil(pred: () => boolean, max = 14) {
+57 |   for (let i = 0; i < max && !pred(); i++) await tick();
+58 |   expect(pred()).toBe(true);
+                      ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at tickUntil (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:58:18)
+      at async atReviewWithPr (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:99:9)
+      at async <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:147:21)
+(fail) once the PR is open, the story branch moves only at open-pr > AC1, AC2, AC3, AC4: a rework loop with a base update pushes the story branch once, at open-pr; ready approving pushes nothing to it [2579.44ms]
+53 |   h.clock.advance(10_000);
+54 |   return h.tick();
+55 | };
+56 | async function tickUntil(pred: () => boolean, max = 14) {
+57 |   for (let i = 0; i < max && !pred(); i++) await tick();
+58 |   expect(pred()).toBe(true);
+                      ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at tickUntil (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:58:18)
+      at async atReviewWithPr (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:99:9)
+      at async <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:204:21)
+(fail) once the PR is open, the story branch moves only at open-pr > AC6: a person's push to the story branch while norn holds local boundaries is merged at open-pr, never rebased [2582.05ms]
+53 |   h.clock.advance(10_000);
+54 |   return h.tick();
+55 | };
+56 | async function tickUntil(pred: () => boolean, max = 14) {
+57 |   for (let i = 0; i < max && !pred(); i++) await tick();
+58 |   expect(pred()).toBe(true);
+                      ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at tickUntil (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:58:18)
+      at async aheadOfPr (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:230:21)
+      at async <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:239:33)
+(fail) claim release and close while the PR is open > AC5: story handoff puts the latest boundary on the heads ref and leaves the PR head alone [2839.41ms]
+53 |   h.clock.advance(10_000);
+54 |   return h.tick();
+55 | };
+56 | async function tickUntil(pred: () => boolean, max = 14) {
+57 |   for (let i = 0; i < max && !pred(); i++) await tick();
+58 |   expect(pred()).toBe(true);
+                      ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at tickUntil (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:58:18)
+      at async atReviewWithPr (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:99:9)
+      at async <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:248:33)
+(fail) claim release and close while the PR is open > AC5: a clean watch exit does the same for every claim it releases [2909.79ms]
+53 |   h.clock.advance(10_000);
+54 |   return h.tick();
+55 | };
+56 | async function tickUntil(pred: () => boolean, max = 14) {
+57 |   for (let i = 0; i < max && !pred(); i++) await tick();
+58 |   expect(pred()).toBe(true);
+                      ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at tickUntil (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:58:18)
+      at async aheadOfPr (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:230:21)
+      at async <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-337-a-base-move-under-a-story-costs-a-whole/packages/cli/test/integration/push-rule.test.ts:256:25)
+(fail) claim release and close while the PR is open > AC5: story close pushes the story branch first [3214.74ms]
+
+ 0 pass
+ 5 fail
+ 5 expect() calls
+Ran 5 tests across 1 file. [14.98s]
