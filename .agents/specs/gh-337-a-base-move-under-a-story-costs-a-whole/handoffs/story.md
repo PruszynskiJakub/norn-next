@@ -112,4 +112,4 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 ## Resume
 
-QA #3 passed on cab27ae0. Next: describe/open-pr push the branch; ci watches it.
+describe #2 rewrote pr.md for head cab27ae0: evidence links QA #3 (run 01M758F46V8K0XXZPZPQY87W7W), incl. the init `&test-run` anchor fix. Next: open-pr updates PR #338 with this body, then ci watches it.
