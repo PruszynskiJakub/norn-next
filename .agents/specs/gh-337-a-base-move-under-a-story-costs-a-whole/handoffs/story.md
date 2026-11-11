@@ -107,9 +107,9 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 - 02.AC5 (local-policy crash note): docs say the counters of the last record push, not "fresh"; QA passed it with a note.
 - `.agents/workflows/{story,quick}.yaml` lack the shipped copies' new light-path comment (comment only).
 - No GitPort fake exists: 07.AC6/13.AC7 run against the real adapter only.
-- CI fix: init's `withTestCommand` missed the anchored run line (test in detect.test.ts); the other CI failures were stale expectations of intended changes.
+- CI fix: init's `withTestCommand` missed the anchored run line (test in detect.test.ts); other CI failures were stale expectations.
 - Friction: a fresh worktree needs `bun install`.
 
 ## Resume
 
-describe #2 rewrote pr.md for head cab27ae0: evidence links QA #3 (run 01M758F46V8K0XXZPZPQY87W7W), incl. the init `&test-run` anchor fix. Next: open-pr updates PR #338 with this body, then ci watches it.
+pr.md is current for cab27ae0 (evidence: QA #3). Next: open-pr updates PR #338, then ci.
