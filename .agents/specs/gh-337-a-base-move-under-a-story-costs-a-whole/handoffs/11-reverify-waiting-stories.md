@@ -2,15 +2,17 @@
 When the base moves under a story waiting at `ready` or a merge step without a textual conflict, norn runs the workflow's `base.verify` check on the merged tree locally, once per (head, base sha); red sends the story through `update`.
 
 ### Proof
-- AC1 (`base.verify` validates; invalid with `stale: behind` or a non-check step; shipped story/quick set it to `test`, both copies): `packages/core/test/unit/base-sync.test.ts` › "base.verify naming a check step validates; …"; `packages/cli/test/unit/assets.test.ts` › "story and quick wait for CI … and test re-verifies a waiting story, in both copies".
-- AC2 (verify runs detached on the merged tree in a temp worktree, takes a check slot, no push/CI/approval): S1 `base-sync.test.ts` › "a story waiting at ready or the merge step whose base moved without a conflict runs the verify check …"; S3 `packages/cli/test/integration/reverify.test.ts` › "a clean base move runs the verify check once on the merged tree in a temporary worktree; …" (cwd under `norn-verify-`, removed afterwards, the base's file in `ls`, remote refs other than main unchanged, no PR, no approve receipt).
-- AC3 (cached per head + base sha): `base-sync.test.ts` › "a verify run already recorded for the story head and base sha is not ordered again; a new base sha orders a new one"; S3 test above (3 more ticks, one verify receipt).
-- AC4 (no free check slot → none ordered): `base-sync.test.ts` › "with no check slot free no verify run is ordered until one is".
-- AC5 (red → `stale` edge to update through `stale_loop`, failure as `last_check`, counter max stops it): `base-sync.test.ts` › "a red verify run takes the waiting step's stale edge …"; S3 `reverify.test.ts` › "a base move the merged tree fails on sends the story through update, the failure on record".
-- AC6 (green stays): `base-sync.test.ts` › "a green verify run leaves the story where it waits".
-- AC7 (no `base.verify` → nothing): `base-sync.test.ts` › "a workflow without base.verify orders no verify run".
-- The S1 tests for AC2–AC5 went red with the `reverify` call in `decide/story.ts` disabled. New rule ids `verify.run`, `verify.awaits_sync` have hand-built cases in `packages/core/test/rule-cases.ts`.
-- `bun run test` (1874 pass), `bun run typecheck` green; `schema:emit` and `docs:emit` run; the one integration file run locally, green.
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | `base.verify` naming a check step validates; with `stale: behind` or a non-check step it is refused with the reason; shipped story/quick (both copies) set it to `test` | test | `packages/core/test/unit/base-sync.test.ts` › "base.verify naming a check step validates; …"; `packages/cli/test/unit/assets.test.ts` › "story and quick wait for CI … and test re-verifies a waiting story, in both copies" |
+| AC2 | a story waiting at ready or merge whose base moved cleanly runs the verify check detached on the merged tree in a temp worktree, a check slot taken, no push/CI/approval | test | `base-sync.test.ts` › "a story waiting at ready or the merge step whose base moved without a conflict runs the verify check …"; `packages/cli/test/integration/reverify.test.ts` › "a clean base move runs the verify check once on the merged tree in a temporary worktree; …" |
+| AC3 | a verify run already recorded for the head + base sha is not ordered again; a new base sha orders a new one | test | `base-sync.test.ts` › "a verify run already recorded for the story head and base sha is not ordered again; …"; S3 test above |
+| AC4 | no free check slot → no verify ordered until one is | test | `base-sync.test.ts` › "with no check slot free no verify run is ordered until one is" |
+| AC5 | a red verify takes the waiting step's `stale` edge to update through `stale_loop`, the failure is the next brief's `last_check`; the counter max stops it | test | `base-sync.test.ts` › "a red verify run takes the waiting step's stale edge …"; `reverify.test.ts` › "a base move the merged tree fails on sends the story through update, …" (happy path only: see finding F1) |
+| AC6 | a green verify leaves the story where it waits | test | `base-sync.test.ts` › "a green verify run leaves the story where it waits" |
+| AC7 | a workflow without `base.verify` orders no verify | test | `base-sync.test.ts` › "a workflow without base.verify orders no verify run" |
+
+- review#1: `bun run test` (1874 pass) and `bun run typecheck` green. Changes requested, findings in the review receipt.
 
 ### Easy to miss
 - The verify receipt is a `check` receipt at the *waiting* step (`ready`/`merge`), with `verify: {head, base}`; `apply.ts` › `verified()` handles it before the "not a check step" refusal. Green returns the same state; red does `take(toReady(st), "stale", …)`, so the counter and exhausted path are the stale edge's. With no `stale` edge it stays put (plan D11 said "today's Check item"; none exists for a non-conflicting base, so nothing new is shown).
@@ -20,6 +22,8 @@ When the base moves under a story waiting at `ready` or a merge step without a t
 - Verify runs only after `carriedApproval` and the stale/unpushed checks in the parked branch of decide.
 
 ### Not proven yet
+- review#1 F1 (blocking): a red verify whose receipt is refused because the story moved on (e.g. `ready` approved while the run goes → `merge`, same head) is lost: `lastVerify` (`packages/store/src/local-facts.ts:401`) caches refused receipts too, so no verify is ordered again at merge.
+- review#1 minor: a dead `norn check-run` leaks its norn-verify- worktree (`sweepCheckOrders` does not remove `order.verify`); classify's doc comment now sits above `verified()` in `apply.ts:441`.
 - Integration and e2e tiers as a whole run in CI.
 
 ### Notes
@@ -28,4 +32,4 @@ When the base moves under a story waiting at `ready` or a merge step without a t
 - Docs: `docs/recipes.md` (base moved section), `docs/concepts.md` (merge row).
 
 ### Resume
-Nothing left in this slice; next is the test check (`bun run test`, `bun run typecheck`).
+Rework F1: make a refused verify receipt not count as verified (or let it apply at the step the story now waits at when the head matches), with an S1 test: verify ordered at ready, approve applied before its red receipt, expect the stale route (or a fresh verify) at merge. Then `bun run test`, `bun run typecheck`.
