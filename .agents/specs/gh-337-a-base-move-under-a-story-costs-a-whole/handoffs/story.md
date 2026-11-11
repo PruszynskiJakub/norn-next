@@ -94,7 +94,7 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 - Light-path anchor (`lightAnchor`, core update-outcome.ts) = latest `approve`, only if open-pr ended `done` after it or its step is reachable only past open-pr (ready, merge); else full path.
 - Heads ref is pushed at every boundary; while the PR is open it replaces the branch push. Only open-pr pushes the branch; `story close` pushes the branch first.
-- The shipped story/quick templates anchor the test command (`run: &test-run bun test`, aliased by test-merge/test-resolution): `norn init`'s test-command substitution (`withTestCommand`, cli runtime/detect.ts) must keep the anchor.
+- story/quick templates anchor the test command (`&test-run`): init's `withTestCommand` must keep it.
 
 ## Not proven yet
 
@@ -104,7 +104,7 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 - F2–F15 (minor/nit, review #1's findings file) stay notes for the person.
 - Takeover: a divergence is merged only while the PR is open. With no PR the two go in one `--atomic` push, so a divergence is a rewrite: the branch is taken as is.
-- 02.AC5: the criterion says the step restarts "with fresh counters"; docs/limitations.md says with the counters the last record push recorded. QA: pass, with a note.
+- 02.AC5 (local-policy crash note): docs say the counters of the last record push, not "fresh"; QA passed it with a note.
 - `.agents/workflows/{story,quick}.yaml` lack the shipped copies' new light-path comment (comment only).
 - No GitPort fake exists: 07.AC6/13.AC7 run against the real adapter only.
 - CI fix: init's `withTestCommand` missed the anchored run line (fixed, test in detect.test.ts). The other CI failures were stale expectations of intended changes (heads-ref push after open-pr, `regenerate` key); e2e transcript rewritten.
