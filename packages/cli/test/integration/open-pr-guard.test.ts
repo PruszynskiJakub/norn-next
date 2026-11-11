@@ -69,6 +69,14 @@ async function until(done: () => boolean, max = 14) {
   }
   expect(done()).toBe(true);
 }
+/** Runs `n` real ticks, for what must hold while the story waits. */
+async function ticks(n: number) {
+  for (let i = 0; i < n; i++) {
+    h.clock.advance(10_000);
+    hostSeesBranch();
+    await h.tick("--sync");
+  }
+}
 function logReceived() {
   const hook = join(h.remoteDir, "hooks", "post-receive");
   writeFileSync(hook, `#!/bin/sh\nwhile read old new ref; do echo "$new $ref" >> "${PUSH_LOG()}"; done\nexit 0\n`);
@@ -107,7 +115,7 @@ describe("the PR head at merge is the commit ci ran on", () => {
     logReceived();
     expect((await h.norn("story", "approve", KEY)).exit).toBe(0);
     await until(at("merge"));
-    for (let i = 0; i < 2; i++) await until(() => true);
+    await ticks(3);
     expect(h.state(runs())).toMatchObject({ step: "merge", status: "parked" });
     expect(prBranch()).toBe(ciHeads().at(-1) as string);
     expect(branchPushes()).toEqual([]);
@@ -117,7 +125,7 @@ describe("the PR head at merge is the commit ci ran on", () => {
 
   test("AC2: a spec-folder-only change stays local; the story keeps waiting at merge", async () => {
     commitInWorktree(`${SPEC}/notes.md`, "bookkeeping\n");
-    for (let i = 0; i < 3; i++) await until(() => true);
+    await ticks(3);
     expect(h.state(runs())).toMatchObject({ step: "merge", status: "parked" });
     expect(prBranch()).toBe(ciHeads().at(-1) as string);
     expect(branchPushes()).toEqual([]);
