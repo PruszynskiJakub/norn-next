@@ -1,8 +1,8 @@
 ---
 id: gh-337/03
 title: One branch push per loop once the PR is open
-depends_on: [gh-337/02]
-status: planned
+depends_on: [ gh-337/02 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
