@@ -1,8 +1,8 @@
 ---
 id: gh-337/12
 title: norn status shows overlap between open stories
-depends_on: [gh-337/03, gh-337/05, gh-337/06, gh-337/08, gh-337/09, gh-337/10]
-status: planned
+depends_on: [ gh-337/03, gh-337/05, gh-337/06, gh-337/08, gh-337/09, gh-337/10 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
