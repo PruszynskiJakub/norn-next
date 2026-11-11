@@ -1,0 +1,1 @@
+{"kind":"classify","receipt_id":"01M74TP8W86Y92JZXC78KZNY4M","run_id":"01M74TP26ZZ90WHE193060APCS","step":"open-pr","attempt":1,"at":"2026-11-11T08:13:18.600Z","by":"norn","who":"jakubpruszynski@mac","tick_id":"01M74TP26Z2Y45AP7FFQWF3AVE","outcome":"done","rule":"git.open-pr","detail":"PR #334 body updated https://github.com/PruszynskiJakub/norn-next/pull/334","route":"ci"}
