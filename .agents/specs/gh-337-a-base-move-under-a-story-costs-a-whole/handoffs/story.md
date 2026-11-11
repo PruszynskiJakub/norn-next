@@ -8,7 +8,8 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 - spec.md: Problem Statement, Solution, 76 user stories, Out of Scope, Further Notes, Open questions: none (refine).
 - spec.md `## Plan`: seams S1 core decide, S2 core brief, S3 cli harness, S4 GitPort contract, S5 e2e base-sync transcript; coverage row per user story; two prefactors; decisions D1–D14; risks. Checked against this base (7d956944, unchanged since the plan): still holds.
-- `slices/01`–`14` written (depends_on reordered at the approve-slices rework; content and criteria unchanged); every user story is cited by some slice's acceptance; spec.md frontmatter `criteria` lists all 77 slice criteria (`01.AC1` …). `bun run test` green (1755 pass).
+- `slices/01`–`14` written; spec.md frontmatter `criteria` lists all 77 slice criteria. All 14 slices built and integrated; unit tier and typecheck green (test#1).
+- QA #1 (head 8cc853ef): 71 of 77 criteria pass, 6 fail. The full criteria report, the evidence and findings.json are in this run's QA evidence (report.md has one line per criterion).
 
 Slices (depends on):
 1. One push path for claim release; update outcome chosen in core — prefactors (none)
@@ -41,15 +42,18 @@ Order (the person's): 01 first; then changes 1–5 (02–10); then 11–14. Crit
 
 ## Not proven yet
 
-- Nothing built. The person reviews the slices at the gate.
+- F1, 02.AC3 "a takeover after a crash resumes from the heads ref merged with the remote branch, never rebased": fails when the heads ref and the remote branch have diverged (a person pushed to the PR branch and then the machine crashed). `packages/cli/src/runtime/checkout.ts:295` `aheadOf` uses the heads ref only when it is strictly ahead; otherwise it takes the remote branch and drops the boundary, under both policies. The repro test is `takeover-diverged.test.ts` in the QA evidence: run it from the repo root with `bun test --config=bunfig.integration.toml`. docs/limitations.md:28 makes the same "merged" claim.
+- F2, 03.AC1/AC2/AC3/AC5/AC6 "one branch push per loop once the PR is open": the behaviour holds, but the verifier `packages/cli/test/integration/push-rule.test.ts` is red (0/5) because its LOOP workflow (open-pr → review agent → ready gate) breaks the open-pr guard (`open_pr_bypass`). The integration tier in CI fails. Making the workflow comply (ready.approve → a second open-pr → $done) turns all 5 green.
 
 ## Notes
 
 - Order follows the person's ruling at approve-slices: every slice depends on 01 (prefactorings first); re-verify, overlap, regenerate and ask-instead-of-abort (11–14) also depend on the last slices of changes 1–5 (03, 05, 06, 08, 09, 10).
 - Slices 07 and 10 both need "commits touching a path in a range" from git; 07 and 13 both touch act's update; 01, 03, 14 all touch claim release. These are merge conflicts, not dependencies; whichever lands second reuses the other's code.
 - release.yaml gets the merge step (slice 04). Shipped workflows change in both copies; norn-merge in its bundled copy only.
+- QA notes for the person: 05.AC1 guards only gates that can reach merge or $done (agent → human-qa is accepted). 07.AC2: a ready reject re-reviewed with review approve sets a new light-path anchor. No GitPort fake exists, so the "and the fakes" parts of 07.AC6 and 13.AC7 were checked against the real adapter only.
+- Friction (QA): `bun run golden` without `--update` harvests cases into the repo rather than checking them; the replay check is `packages/core/test/unit/golden.test.ts`. Hooks block `git push`/`git checkout` even in scratch repos under $TMPDIR.
 - Friction: the worktree had no `node_modules`; `bun install` was needed before `bun run test`.
 
 ## Resume
 
-Person reviews slices 01–14 at the slice gate; then slices start in dependency order.
+Fix F1 in checkout.ts: when the heads ref and the remote branch diverge, merge them (never rebase) and resume from the merge. Turn takeover-diverged.test.ts into a heads-ref.test.ts case. Fix F2 by making push-rule.test.ts's LOOP workflow comply with the open-pr guard. Then run `bun run test:integration` on those files and QA again.
