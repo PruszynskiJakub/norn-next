@@ -7,7 +7,7 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 ## Proof
 
 - spec.md: 76 user stories, Plan seams S1–S5, D1–D14; 14 slices integrated; 77 criteria in frontmatter.
-- Implement #2: unit 1911 pass, typecheck green. F1 fixed: light path only from an approve the PR holds (UO 'an approve open-pr has not gone out after…', LR 'a conflicting base move at human-qa in the first round…').
+- Review #2 (HEAD dc73fb91): unit 1911 pass / 0 fail, typecheck green; F1 verified fixed at update-outcome.ts lightAnchor. Implement #2 fix: light path only from an approve the PR holds (UO 'an approve open-pr has not gone out after…', LR 'a conflicting base move at human-qa in the first round…').
 - Traceability: full test names in review evidence `traceability.md`. Test files: RR release-record, HR heads-ref, PRT push-rule, OG open-pr-guard, BSI base-side, RV reverify, OV overlap, RG regenerate, IN integrate, AM ask-mid-merge (cli integration); BS base-sync, UO update-outcome, CA carried-approval (core unit); LR cli unit light-route; LP e2e light-path; contract git.ts in adapters. Fn = review finding.
 
 | Criterion | What it says | Verifier | Proven by |
@@ -48,7 +48,7 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 | 07.AC4 | unrouted → done | test | UO |
 | 07.AC5 | deterministic; head_sha and git summary recorded | test | LP |
 | 07.AC6 | git port remerge-diff and paths; old git never clean | test | contract git.ts, git.test.ts, UO |
-| 08.AC1 | shipped light route validates, routes, test command once | test | LR · F1 |
+| 08.AC1 | shipped light route validates, routes, test command once; never skips human-qa or describe before the PR is out | test | LR (incl. 'a conflicting base move at human-qa in the first round… takes the full path'), UO 'an approve open-pr has not gone out after…' |
 | 08.AC2 | resolution input lists remerge-diff per merge | test | brief.test.ts |
 | 08.AC3 | clean skips the resolution review | test | LR |
 | 08.AC4 | resolution changes_requested → resolve | test | LR |
@@ -102,11 +102,11 @@ Make a base move under a story cheap, automatic and reviewable, and make each re
 
 ## Notes
 
-- Review #1: 15 findings, 1 blocking (F1, light path skipping human-qa/describe: fixed in implement #2); the minor and nit findings (F2–F15) are notes for the person, not rework (findings file in review evidence).
+- Review #1: 15 findings, 1 blocking (F1, light path skipping human-qa/describe). Review #2: F1 fixed (lightAnchor anchors only when open-pr ended done after the approve, or the approve's step lies past open-pr); no new findings. F2–F15 (minor/nit; listed in review #1's findings file) are unchanged and stay notes for the person, not rework.
 - Takeover: a divergence is merged only while the PR is open.
 - No GitPort fake exists: 07.AC6/13.AC7 run against the real adapter only.
 - Friction: a fresh worktree needs `bun install`.
 
 ## Resume
 
-Review implement #2's diff (update-outcome.ts lightAnchor, git-step.ts call site, the two tests, the workflow comments).
+Review #2 approved at dc73fb91: next is the workflow's step after review (test, then QA), which re-checks the criteria marked agent-verified.
