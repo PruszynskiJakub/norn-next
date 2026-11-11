@@ -1,31 +1,36 @@
-### Goal
+# gh-337 — handoff
+
+## Goal
 
 Make a base move under a story cheap, automatic and reviewable, and make each rework loop cost one CI run: all nine changes from the issue, in this one story.
 
-### Proof
+## Proof
 
-- spec.md holds Problem Statement, Solution, 76 user stories grouped by change, Out of Scope, Further Notes; Open questions: none. Every decision was confirmed with the person in the refine interview.
+- spec.md: Problem Statement, Solution, 76 user stories, Out of Scope, Further Notes, Open questions: none (refine).
+- spec.md `## Plan` (plan step, agreed with the person point by point): seams S1 core decide, S2 core brief, S3 cli harness, S4 GitPort contract, S5 e2e base-sync transcript; a coverage row for every user story; two prefactors; decisions D1–D14; testing decisions; risks.
 
-### Easy to miss
+## Easy to miss
 
-- Light-path trigger is NOT "PR is open": only base merges + spec-folder-only boundary commits (excluding `spec.md`) since the latest review / resolution-review / ready approve. A ready reject or ci fail → implement → update must take the full path.
-- A regenerated merge whose files are exactly what the mapped commands produce counts as clean (no resolution review, approval carried).
-- A clean `norn watch` exit is never blocked: with a resolve parked at an ask mid-merge it keeps that story's claim; only `norn story handoff` is refused.
-- `story edit` refuses (do_instead: `norn story update-branch gh-N`) only for the same workflow the finished round ran with no `--at`, on a finished story with a conflicting open PR; another workflow or `--at` starts the round.
-- Workflows without a merge step keep today's behaviour (ready.approve → $done, update-branch).
-- `base.verify` + `base.stale: behind` is a validation error.
+- Heads ref `refs/norn/heads/<story>` is pushed at every boundary under both record policies; while the PR is open it replaces the branch push, including at claim release (handoff, watch exit). Only open-pr pushes the branch then; `story close` pushes the branch first. User stories 7, 8, 12 were amended to say this.
+- Open-pr guard (D4): a non-spec-folder change after open-pr must go back through open-pr before a gate/merge step (static validation + runtime move).
+- Merge step takes `stale` only after `gate.stale.awaits_sync`, so a squash-merged PR is never read as a base move.
+- `clean` for a regenerated merge needs the `Norn-Regenerated` trailer AND a remerge-diff touching only mapped paths.
+- Light-path anchor = head at the latest `approve` outcome in the round, any step; agent done receipts gain `head_sha`.
+- Verify red reuses the `stale` edge and `stale_loop`; no new outcome. The cache is the check receipt's `verify: {head, base}`.
+- Regenerate runs inside act's update, default timeout 2m per entry, configurable; docs say commands must be fast and deterministic.
+- The shipped test command is written once with a YAML anchor (`&test-run` / `*test-run`); pin with a `parseWorkflowText` test.
 
-### Not proven yet
+## Not proven yet
 
-- Nothing built. The plan still has to choose: release.yaml gets the merge step (person leans yes); names of the merge step's outcomes, light-path update outcomes, resolution-review step, regenerate config key.
+- Nothing built. Slicing next.
 
-### Notes
+## Notes
 
-- Scope: the person keeps all nine in one story; slicing handles size. Slice order: push rule, merge step, story-edit pointer, light path, base side first; then re-verify (after merge step), overlap, regenerate, ask-instead-of-abort. A decision nothing settles in 6–9 goes to Open questions, never dropped.
-- PR must say "Closes #126" (spec-folder-only auto-resolve is built in here).
-- Regenerate mapping lives in `.agents/norn.config.yaml`; this repo maps schema:emit and docs:emit outputs, never golden cases.
-- Code anchors from the issue's "Where" (not in the spec on purpose): commitFor `packages/core/src/decide/receipts.ts:156`; gate stale `packages/core/src/decide/story.ts:498`; mergeItem/staleItem `packages/core/src/inbox/items.ts:439/:485`; pushUpdated/open-pr push `packages/cli/src/runtime/act/git-step.ts:55/:127`; syncRemoteBranch/update `packages/cli/src/runtime/integrate.ts:77/:114`; storyBase `packages/cli/src/runtime/observe/git-facts.ts:30`; resolver brief `packages/core/src/brief.ts:960`; StepInput `packages/schema/src/workflow.ts`.
+- The person wants both prefactors (one push path for claim release via `pushBranch`; update outcome choice as a pure core function) landed first, as their own slice. Slice order otherwise as the spec's Further Notes say.
+- release.yaml gets the merge step (decided).
+- S3 must also prove the PR head at merge is the commit `ci` watched (no branch push after ci.pass / ready.approve); S5 stays as the pinned push list.
+- Shipped workflows change in both copies; norn-merge in its bundled copy; `docs/limitations.md` note per amended user story 12.
 
-### Resume
+## Resume
 
-Plan the spec with the `norn-plan` skill.
+Slice the Plan in spec.md (norn-slice).

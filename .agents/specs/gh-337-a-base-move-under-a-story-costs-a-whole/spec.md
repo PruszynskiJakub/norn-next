@@ -58,12 +58,12 @@ A base move under a story becomes cheap, automatic and reviewable, and each rewo
 4. As a person watching a rework loop (implement → … → open-pr → ci), I want it to start exactly one CI run, the one the `ci` step waits on, so that no run is started only to be cancelled.
 5. As a person merging an approved PR, I want the PR's head at merge to be the commit the `ci` step saw pass, so that branch protection checks the run norn already watched, not a later one.
 6. As a person, I want `ready` approving and the story entering the merge step to push nothing, so that approving starts no new CI run.
-7. As a person handing a story to another machine with `norn story handoff`, I want norn to push the story branch with every local boundary commit before it releases the claim, so that the next holder starts from the story's latest boundary.
-8. As a person stopping `norn watch` cleanly, I want each story whose claim it releases to be pushed first, so that no local-only boundary is left behind when the claim goes.
+7. As a person handing a story to another machine with `norn story handoff`, I want norn to put the story's latest boundary on the remote before it releases the claim (the story branch, or `refs/norn/heads/<story>` while the PR is open, so the PR head stays the commit CI ran on), so that the next holder starts from the story's latest boundary.
+8. As a person stopping `norn watch` cleanly, I want each story whose claim it releases to have its latest boundary on the remote first (the story branch, or `refs/norn/heads/<story>` while the PR is open), so that no local-only boundary is left behind when the claim goes.
 9. As a person closing a story with `norn story close`, I want its branch pushed first, so that the closed story's last state is on the remote.
 10. As a person using `record.policy: remote`, I want the record push to keep working as today, so that another machine can read the story's state even while boundaries are local.
 11. As a person whose story has no PR yet, I want boundaries pushed exactly as today, so that nothing changes before CI could be triggered.
-12. As a person taking over a story under `record.policy: local` after the previous machine crashed, I want norn to resume from the last pushed boundary, and `docs/limitations.md` to say so, so that I know a crash can cost the steps since the last push (their commits are still in the crashed machine's worktree).
+12. As a person taking over a story after the previous machine crashed, I want norn to resume from the story's real last boundary (`refs/norn/heads/<story>`, pushed at every boundary under both record policies, merged with the remote branch, never rebased), and `docs/limitations.md` to say that under `record.policy: local` a crash still loses the receipts and counters since the last record push (the step restarts at that boundary with fresh counters), so that I know exactly what a crash costs.
 13. As a person who pushed to a story branch while norn held unpushed boundary commits, I want norn's next sync to merge my push with its local commits (never rebase, never drop either), so that both my change and norn's boundaries survive.
 14. As a person, I want this push rule always on with no setting, so that there is one push behaviour to understand and rely on.
 
@@ -176,3 +176,130 @@ A base move under a story becomes cheap, automatic and reviewable, and each rewo
 ## Open questions
 
 None.
+
+## Plan
+
+### Seams
+- **S1 core decide, through `decide`, `applyReceipts`, `buildInbox` and `validateWorkflowDefinition`** (scripted Facts and receipts in, decisions and inbox out). Observes: which boundary commits push the branch and which push only the heads ref; the merge step (waits, one merge item, ends on merge or a closed PR, `stale` back to update behind `gate.stale.awaits_sync`); the update outcome choice (`done` / `clean` / `resolved` / `conflict`) from the update's git summary; the carried approval at `ready`; when a verify run is ordered and where red goes; the open-pr guard; the overlap Check item; workflow validation (merge type, `base.verify`, the open-pr path rule).
+  Prior art: `base-sync.test.ts` (scripted `StoryBase`, BASE_WF, stale cases 4/4a/4b/5), `decide.test.ts`, `workflow.test.ts`, the golden corpus (`golden.test.ts`, `rule-cases.ts` for every new rule id).
+- **S2 core brief, through `renderBrief`.** Observes the `resolution` and `base_side` inputs, the base-update section's ask-or-abort guidance, and a failed regenerate's output in Rework.
+  Prior art: `brief.test.ts` and its snapshot (base section).
+- **S3 cli harness, through `createHarness` (`h.norn`, `h.tick`) on real git with `FakeRemote`.** Observes the push rule end to end (no branch push after open-pr, the heads ref at every boundary, the PR head at merge equals the commit `ci` watched: no branch push after `ci.pass` or `ready.approve`), claim release (handoff, watch exit, close; a person's push merged, never rebased), takeover from the heads ref, the record push, the `story edit` refusal, regenerate and the spec-folder-only auto-resolve, the git summary the update step gathers (remerge-diff, paths per commit, trailers), the base side gathered at `norn brief`, the verify run in a temp worktree, the overlap cache, the regenerate config key, ask-with-a-merge-in-progress (watch keeps the claim, handoff refused), workflow parsing (YAML anchors).
+  Prior art: `human.test.ts` (story edit, `refused`), `release-record.test.ts` (handoff / watch exit / close push order), `takeover-record*.test.ts`, `integrate.test.ts` (update, `syncRemoteBranch`, H1 merge in progress), `check-run.test.ts`, `ci-check.test.ts`, `config.test.ts`, `pr-evidence.test.ts`, `test/e2e/merged-pr.test.ts`; store's workflow parsing tests for `parseWorkflowText`.
+- **S4 GitPort contract, through `gitContract`.** Observes the new git operations: remerge-diff of a merge commit, a merge that keeps its conflicts in the worktree (for regenerate), the paths each commit in a range touches, pushing to a non-branch ref.
+  Prior art: `packages/adapters/test/contract/git.ts` ("merge: clean merges commit, conflicts abort…", inProgress), run by the git integration test and, for the fakes, `contract-fakes.test.ts`.
+- **S5 e2e base-sync transcript, through the recorded flow in `test/e2e/base-sync.test.ts`.** Observes that one rework loop with an open PR pushes the story branch exactly once, at open-pr: the transcript pins every push argv. Rewritten with `NORN_TRANSCRIPT_UPDATE=1` as an intended change and reviewed.
+  Prior art: the base-sync transcript itself and `test/support/transcript.ts`.
+
+Docs, skill text and shipped YAML are observed by the docs lint (`test/repo/docs.test.ts`), the reference staleness test (`reference.test.ts`), validation of the shipped workflows at S1, and review.
+
+### Coverage
+| User story | Seam | Test kind | Notes |
+|---|---|---|---|
+| 1 no branch push at boundaries once the PR is open (draft too) | S1 | unit | `commit.push` false, heads ref instead |
+| 2 `git: update` merges without pushing while the PR is open | S3 | integration | |
+| 3 open-pr pushes the branch before creating/updating the PR | S3 | integration | |
+| 4 a rework loop starts exactly one CI run | S5 | e2e | pinned push list |
+| 5 PR head at merge is the commit `ci` saw pass | S3 | integration | no branch push after ci.pass / ready.approve |
+| 6 ready approve and entering merge push nothing to the branch | S1 | unit | |
+| 7 handoff puts the latest boundary on the remote (heads ref while PR open) | S3 | integration | |
+| 8 clean watch exit does the same per released claim | S3 | integration | |
+| 9 story close pushes the branch first | S3 | integration | heads ref deleted after |
+| 10 `record.policy: remote` record push keeps working | S3 | integration | waits on the heads ref, not the branch |
+| 11 no PR yet: boundaries push as today | S1 | unit | plus the heads ref |
+| 12 takeover resumes from the heads ref; limitations note | S3 | integration | note: docs lint + review |
+| 13 a person's push merges with local boundaries, never rebased | S3 | integration | |
+| 14 push rule always on, no setting | S1 | unit | no config key exists to read |
+| 15 step type `merge` | S1 | unit | schema + validation |
+| 16 shipped story/quick route ready.approve → merge | S1 | unit | shipped workflows validated |
+| 17 one merge item at the merge step, no gate item | S1 | unit | `buildInbox` |
+| 18 PR merging ends the story through today's merge path | S1 | unit | |
+| 19 PR closed unmerged behaves as today | S1 | unit | |
+| 20 conflicting base move at merge → update via `stale_loop` (after awaits_sync) | S1 | unit | squash-merged PR never read as a base move |
+| 21 nothing to approve or reject at merge | S1 | unit | approve/reject refused |
+| 22 workflows without a merge step unchanged | S1 | unit | existing golden cases stay |
+| 23 `story update-branch` keeps working (also at merge) | S3 | integration | |
+| 24 merge step documented | — | docs lint + review | concepts.md, reference, recipes |
+| 25 `story edit` same workflow, no `--at`, conflicting PR → refused | S3 | integration | code `update_branch_instead` |
+| 26 other workflow or `--at` still starts the round | S3 | integration | |
+| 27 AGENTS.md and the base recipe point at update-branch | — | docs lint + review | |
+| 28 light path only for base merges + spec-folder-only commits (not spec.md) since the anchor | S1 | unit | pure outcome choice |
+| 29 ready reject / ci fail → implement → update takes the full path | S1 | unit | |
+| 30 spec.md changed since approval → full path | S1 | unit | |
+| 31 light path as update outcomes `clean` / `resolved` in YAML | S1 | unit | |
+| 32 unrouted outcomes fall back to `done` | S1 | unit | |
+| 33 decided from git and receipts alone | S1 | unit | facts in, outcome out |
+| 34 shipped story/quick route the light path | S1 | unit | shipped workflows validated |
+| 35 `resolution` input: remerge-diff per merge since the anchor | S2 | unit | gathering at S3 via update summary |
+| 36 clean merge skips the resolution review | S1 | unit | |
+| 37 resolution review blocking → resolve | S1 | unit | |
+| 38 describe again only on `redescribe`; else open-pr keeps the body | S1 | unit | |
+| 39 regenerated merge counts as clean only if remerge-diff ⊆ mapped paths | S1 | unit | trailer and paths both required |
+| 40 approval carried after a clean merge with green test and CI | S1 | unit | |
+| 41 carried approval in receipts and History | S1 | unit | |
+| 42 resolved merge asks for a fresh approval | S1 | unit | |
+| 43 ready item, brief and PR evidence show the remerge-diff | S3 | integration | item text at S1 too |
+| 44 red test/CI never reaches ready carried | S1 | unit | |
+| 45 `base_side` input per conflicting path | S3 | integration | gathered at `norn brief` |
+| 46 brief lists the base side; norn-merge reads it first | S2 | unit | skill: review |
+| 47 trailer-less base commits listed without a story | S2 | unit | |
+| 48 shipped resolve takes `base_side` | S1 | unit | shipped workflows validated |
+| 49 workflow key `base.verify` | S1 | unit | |
+| 50 shipped story/quick set `base.verify: test` | S1 | unit | |
+| 51 `base.verify` + `stale: behind`, or a non-check step → invalid | S1 | unit | |
+| 52 verify on the merged tree in a temp worktree, no push/CI/approval | S3 | integration | |
+| 53 verify cached per (head, base sha) | S1 | unit | receipt `verify: {head, base}` |
+| 54 verify runs detached and takes a slot | S1 | unit | `checksFree` |
+| 55 red verify → `stale` edge, `stale_loop`, `last_check` | S1 | unit | |
+| 56 green verify leaves the story waiting | S1 | unit | |
+| 57 no `base.verify` → no verify | S1 | unit | |
+| 58 overlap Check item naming both stories and paths | S1 | unit | |
+| 59 only stories with commits of their own, in flight or finished with an open PR | S1 | unit | eligibility from Facts |
+| 60 overlap cached per pair of heads | S3 | integration | `overlap.json` |
+| 61 item clears itself, no dismiss, no order | S1 | unit | |
+| 62 spec-folder-only conflicts don't count | S1 | unit | |
+| 63 regenerate key in the team config | S3 | integration | |
+| 64 all conflicts mapped → base side, commands, merge committed, no agent | S3 | integration | |
+| 65 any unmapped conflict → resolve | S3 | integration | |
+| 66 failed command or still conflicted → resolve with output in brief | S3 | integration | brief text at S2 |
+| 67 regenerated merge goes through test | S1 | unit | |
+| 68 this repo maps schema:emit and docs:emit, never golden cases | — | review | `.agents/norn.config.yaml` |
+| 69 spec-folder-only branch takes the base side with no agent, as a merge | S3 | integration | Closes #126 |
+| 70 regenerate key documented | — | reference staleness test + review | |
+| 71 resolver can ask with the merge in progress | S2 | unit | brief text; no abort required |
+| 72 answer resumes resolve with the merge still in progress | S3 | integration | |
+| 73 clean watch exit keeps that story's claim, never blocked | S3 | integration | |
+| 74 handoff refused (`merge_in_progress`) | S3 | integration | |
+| 75 abort and `norn stuck` stay available | S2 | unit | |
+| 76 norn-merge says when to ask and when to abort | — | review | bundled skill copy |
+
+### Prefactoring
+1. One push path for claim release — `releaseStory` (handoff, watch exit) and `closeStory` push through `ActEnv.pushBranch` (adopt-and-merge on a rejected push) instead of a plain push behind a fast-forward check. No behaviour change today; it is what keeps a person's push merged once boundaries stay local (7, 8, 9, 13). The person wants both prefactorings in a slice of their own, first.
+2. The update step's outcome choice moves into a pure core function — act passes the merge result (and later the commits since the anchor) and gets `done` / `conflict` back, instead of picking it in the git step. Makes the light-path outcomes (28–33, 36, 39) testable at S1.
+
+### Implementation decisions
+- D1 **"PR open"** for the push rule is `pr ?? pr_seen` with state `open`; a draft counts. Slice finishing (act's hard-coded push of the slice status commit onto the story branch) follows the same rule.
+- D2 **Heads ref.** `refs/norn/heads/<story>` (named in `ids.ts` beside the other prefixes) is pushed at every boundary under both record policies: with the branch in one `git push` before the PR is open, in place of the branch push while it is open. It is neither branch nor tag, so it starts no CI. Fetched per story like the record ref, never `refs/norn/*`. Removed when the story ends (merge cleanup, close) and by `norn tidy`. Takeover resumes from it, merged with the remote branch, never rebased. The record push waits on it, not on the branch, and `Norn-Branch-Commit` names it.
+- D3 **Claim release while the PR is open** (handoff, watch exit) puts the latest boundary on the heads ref, not the branch, so the PR head stays the commit CI ran on. `norn story close` pushes the branch first (the heads ref goes away at close). `update` never pushes while the PR is open; open-pr is the one branch push per loop.
+- D4 **Open-pr guard.** Static: `validateWorkflowDefinition` refuses a workflow where a path from an `open-pr` step reaches a gate or a `merge` step through an agent step or `git: update` without passing `open-pr` again. Runtime: observe reports the paths changed between the PR head and the local head; at a gate or merge step, any path outside the story's spec folder makes decide move the cursor to the workflow's `open-pr` step (receipt: changes since open-pr not on the PR). Spec-folder-only changes are bookkeeping and stay local.
+- D5 **Merge step.** `type: merge`; one fixed outcome, `stale`. Waits on entry like a gate; approve/reject there refused. The inbox shows today's `mergeItem` when the cursor is at a merge step (and on a finished round, as today), never a gate item. Merged and closed PRs go through today's `storyLifecycle`. `stale` is taken only after `gate.stale.awaits_sync` (a PR not fetched this tick waits for a sync), so a squash-merged PR is never read as a base move. `story update-branch` accepts a story waiting at a merge step. Added after `ready` in story, quick (both copies) and `release.yaml` (`stale: behind` → update → prepare rewrites the changelog; no `base.verify`, which `behind` forbids).
+- D6 **`story edit` refusal.** Code `update_branch_instead`, exit 3, `do_instead: norn story update-branch gh-N`, only for a finished round, no `--at`, the same workflow the round ran, and a known open PR (`pr ?? pr_seen`) whose base conflicts.
+- D7 **Light-path outcomes.** `git: update` gains outcomes `clean` and `resolved`, taken only when routed and the light condition holds; otherwise `done`. Anchor: the head at the latest receipt in the round whose outcome is `approve`, at any step (review, resolution review, `ready`); an agent `done` receipt gains `head_sha` (schema change) as gate approvals have. Light condition: every commit from the anchor to the pre-merge head is a merge of the base or touches only the story's spec folder, not `spec.md`. `clean`: every merge since the anchor has an empty remerge-diff, or carries `Norn-Regenerated` **and** its remerge-diff touches only paths the regenerate mapping matches. Otherwise `resolved`. Act gathers the git summary (per commit: parents, paths, trailers, remerge-diff paths) into the classify receipt; the core function from prefactor 2 chooses.
+- D8 **Shipped light route** (story and quick, both copies): `update: { done: test, clean: test-merge, resolved: test-resolution, conflict: resolve }`; `test-merge` pass → open-pr, `test-resolution` pass → `resolution-review`, both fail → implement (`test_loop`; a semantic break is implement's work and then takes the full path). The test command is written once with a YAML anchor (`run: &test-run …` / `run: *test-run`); the loader (`yaml` `parse`) resolves aliases, pinned by a test. `resolution-review`: agent, `norn-review`, inputs `[spec, resolution]`, outcomes `approve` → open-pr (body kept), `redescribe` → describe, `changes_requested` → resolve (counter `resolution_loop`).
+- D9 **Carried approval.** At `ready`, decide approves on its own (approve receipt with `carried: "clean base merge"`, shown in History) when, since the last `ready` approve, the only update outcomes were `clean` and test and CI passed. Any `resolved` update means a fresh approval; the `ready` item, the brief and the PR evidence then list the remerge-diff commands.
+- D10 **Inputs as pointers.** `resolution`: one `git show --remerge-diff <sha>` per merge since the anchor. `base_side`: per conflicted path, the base commits between merge base and base sha (sha, subject, `Norn-Story` trailer or none — squash commits on main keep it in their last trailer block — and that story's `spec.md` / `pr.md` paths on the base), computed by the cli at `norn brief`. Both added to `InputKind`; shipped `resolve` takes `base_side`.
+- D11 **Re-verify.** At `ready` or a merge step, base moved, no conflict, `base.verify` set: decide orders a `run_check` of that step marked verify (needs a free check slot). Act builds the merged tree (`merge-tree --write-tree`), runs the check detached in a temp worktree on it (the `record.ts` pattern), no push. The check receipt records `verify: {head, base}`; decide orders none for a pair that has one (the cache is the receipts). Red takes the waiting step's `stale` edge with `stale_loop`, the receipt becoming `last_check`; no edge → today's Check item. Green: nothing. Validation: `base.verify` must name a check step and is invalid with `base.stale: behind`.
+- D12 **Overlap.** Observe runs `git merge-tree --write-tree --name-only` per eligible pair of heads (own commits beyond the base; unit in flight or finished round with an open PR), cached per pair of heads in the machine dir (`overlap.json`, schema in `local.ts`, beside `base.json`), into Facts `overlaps`. `buildInbox` adds one Check item per pair, id `overlap:<a>:<b>`, paths inside either spec folder dropped; it clears with the facts.
+- D13 **Regenerate.** Team key `regenerate: [{ paths: [glob…], run: cmd, timeout?: duration }]`, timeout default 2m per entry (it holds the tick). In act's update: when every conflicted path matches, keep the merge's conflicts, take the base side of each, run the matched commands bounded, check nothing is still conflicted, commit with `Norn-Regenerated: <paths>`; a failure or timeout aborts the merge and goes `conflict` → resolve with the output in the brief. Spec-folder-only branch: built in, no config, base side of every conflicted file outside the folder, still a merge. Docs say commands must be fast and deterministic. This repo maps `schema:emit` and `docs:emit` outputs, never golden cases.
+- D14 **Ask instead of abort.** A clean watch exit keeps the claim of a story whose unit waits at an ask with `in_progress` merge in its worktree, never blocks. `story handoff` refuses `merge_in_progress` (do_instead: answer or unstick first). Brief's base section and `norn-merge` (bundled copy) say: ask when both intents are valid and a person must choose; abort and `norn stuck` when the merge cannot be understood.
+
+### Testing decisions
+A good test drives a seam with what a user or the tick would produce and checks what the user sees: decisions, inbox items, refusals and exit codes, refs on the remote, the brief's text. Never internals of act or observe. Core is tested with scripted Facts (S1/S2); cli behaviour with the harness on real git (S3); new git operations once in the contract suite (S4) so S3 fakes nothing of git. Only system boundaries are faked: the remote host (`FakeRemote`: PR state, mergeable, CI), the clock, the agent runner. Golden cases change only through `bun run golden -- --update` for the push flag and the merge step, reviewed as the behaviour change; each new rule id gets a golden or hand-built case. The base-sync transcript and observe snapshots are rewritten only as the intended change.
+
+### Risks
+- **Push rule breadth.** Every boundary's `commit.push` changes, as do record push, takeover and release; the golden and transcript diffs will be large. Land the heads ref and push rule early, behind prefactor 1, and read the diffs as the proof.
+- **Anchor accuracy.** A wrong anchor sends new work down the light path without a full review. Cover the reject / ci-fail / spec.md cases (29, 30) at S1 before routing the shipped workflows.
+- **Remerge-diff** needs git ≥ 2.36 (this machine has 2.54); the git contract pins it, and an older git must fail closed to `resolved`/`done`, never `clean`.
+- **Regenerate holds the tick** up to its timeout; bounded at 2m per entry by default.
+- **Verify slot pressure** competes with real checks; it only runs when `checksFree` allows and once per (head, base).
+- **Merge step and story phase.** Code that keys on a finished round (`roundFinished`, `storyPhase`, the inbox, update-branch's `waitsForBaseUpdate`) must treat a merge-step wait as waiting for the merge; S1 covers each.
