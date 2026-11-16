@@ -2,21 +2,23 @@
 norn loads a workflow written in the new wording (one head key, optional `skills:`, `by:`, `outcomes:` with sibling `means:` / `verdict:`) to the same `type`-tagged model as today, refuses malformed shapes naming the step, and still loads old-wording files everywhere through the translation.
 
 ### Proof
-`bun run test` (2031 pass) and `bun run typecheck` green. All in `packages/store/test/unit/new-wording.test.ts` unless named otherwise:
-- AC1 agent/check/gate by head key load the same as today's wording: "agent, check and gate steps load to the same workflow as today's wording"
-- AC2 value-less verbs, their kinds' outcomes, a verb with a value refused: "`%s:` with no value loads as today's step of its kind" ×6, "a verb takes only its kind's outcomes…", "a verb given a value is refused, naming the step"
-- AC3 two head keys or none refused: "a step with two head keys, or none, is refused naming the step"; `use:` unchanged: `shared-workflows.test.ts` (all green) and the shared-file case below
-- AC4 `like` inherits the head key; a different one is two: "a like copy has its target's head key…"
-- AC5 missing/empty orientation refused: "an orientation that is missing or empty (%s)…" ×3
-- AC6 skills optional, a set: "skills are optional and a set…"
-- AC7 `by:` picks the agent, its skills checked as `unknown_skill`: "`by:` picks the configured agent…"
-- AC8 edges carry meaning and verdict: "each route carries the meaning and verdict…"; brief finish lines unchanged: `packages/core/test/unit/brief.test.ts` snapshots untouched and green
-- AC9 routed reportable outcome without meaning refused, overridables free: "a routed outcome the agent may report with no meaning is refused…"
-- AC10 stale meaning/verdict, prose off agent steps: "a meaning or verdict for an outcome the step does not route…", "`means:` and `verdict:` on a step that is not an agent step…"
-- AC11 shared `{ exit }` routes with means from the shared `means:`: "a shared file's exits leave through the use step's routes…"
-- AC12 shipped old vs translation load equal: "each shipped workflow and shared file loads to the same workflow as its translation"; golden decisions byte-identical: `packages/core/test/unit/golden.test.ts` (embedded models rebuilt from each case's `source` through the loader, cases renamed by `git mv` to their new stable keys; no decision changed)
-- AC13 old wording loads from checkout and copy: "a file in today's wording still loads, from the main checkout or a copy" and the unchanged old-wording fixtures in `shared-workflows.test.ts`
-- Seen red: stubbing `stepWordingErrors` to `[]` fails 10 of the 23 tests; stubbing the means/verdict merge fails the 2 edge tests.
+`bun run test` (2031 pass) and `bun run typecheck` green (review#1 re-ran both). Golden decisions match the base exactly across all 139 cases; only the embedded facts moved.
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | agent/check/gate steps by their head key load to the same workflow as today's wording | test | `packages/store/test/unit/new-wording.test.ts` › "agent, check and gate steps load to the same workflow as today's wording" |
+| AC2 | value-less verbs load as today's git/merge/slices steps with their kinds' outcomes; a verb with a value is refused | test | `packages/store/test/unit/new-wording.test.ts` › "`%s:` with no value loads as today's step of its kind", "a verb takes only its kind's outcomes…", "a verb given a value is refused, naming the step" |
+| AC3 | two head keys or none are refused, naming the step; `use:` loads as today | test | `packages/store/test/unit/new-wording.test.ts` › "a step with two head keys, or none, is refused naming the step"; `packages/store/test/unit/shared-workflows.test.ts` |
+| AC4 | a `like` copy has its target's head key; writing a different one is two head keys | test | `packages/store/test/unit/new-wording.test.ts` › "a like copy has its target's head key…" |
+| AC5 | a missing or empty orientation is refused, naming the step | test | `packages/store/test/unit/new-wording.test.ts` › "an orientation that is missing or empty (%s)…" |
+| AC6 | `skills:` is optional; a skill named twice is refused | test | `packages/store/test/unit/new-wording.test.ts` › "skills are optional and a set…" |
+| AC7 | `by:` picks the configured agent; its skills are checked as `unknown_skill` | test | `packages/store/test/unit/new-wording.test.ts` › "`by:` picks the configured agent…" |
+| AC8 | each edge carries its meaning and verdict from the sibling maps; brief finish lines unchanged | test | `packages/store/test/unit/new-wording.test.ts` › "each route carries the meaning and verdict…"; `packages/core/test/unit/brief.test.ts` snapshots |
+| AC9 | a reportable routed outcome with no meaning is refused; overridable routes need none | test | `packages/store/test/unit/new-wording.test.ts` › "a routed outcome the agent may report with no meaning is refused…" |
+| AC10 | a stale meaning or verdict, or `means:`/`verdict:` off an agent step, is refused | test | `packages/store/test/unit/new-wording.test.ts` › "a meaning or verdict for an outcome the step does not route…", "`means:` and `verdict:` on a step that is not an agent step…" (a scalar `means:`/`verdict:` still slips through: finding F1) |
+| AC11 | shared `{ exit }` routes leave as today, with meanings from the shared `means:` | test | `packages/store/test/unit/new-wording.test.ts` › "a shared file's exits leave through the use step's routes…" |
+| AC12 | shipped files and their translations load equal; golden decisions byte-identical | test | `packages/store/test/unit/new-wording.test.ts` › "each shipped workflow and shared file loads to the same workflow as its translation"; `packages/core/test/unit/golden.test.ts` |
+| AC13 | a file in today's wording still loads from the checkout or a copy | test | `packages/store/test/unit/new-wording.test.ts` › "a file in today's wording still loads, from the main checkout or a copy" |
 
 ### Easy to miss
 - Loading uses the value translation `translateWordingValue` (new export in `wording.ts`, the same step mapping as the JSON path), not the lossless text rewrite. The text rewrite refuses flow-map steps and other layouts, and a copy must load anyway. `inNewWording(text)` gives the YAML text that flattening reads.
@@ -25,6 +27,7 @@ norn loads a workflow written in the new wording (one head key, optional `skills
 - The brief leaves out an orientation that equals the description or the skill line. Those are the translator's fallbacks, so an old pin's brief reads as before.
 
 ### Not proven yet
+- Review#1 finding F1 (blocking): `packages/store/src/step-wording.ts:263` skips a `means:`/`verdict:` that is not a map, and toModelStep then drops it. `verdict: pass` loads and the verdict is lost. Refuse it, naming `/steps/<name>/<key>`, and add a test for each key.
 - Integration and e2e tiers are not run locally (CI runs them). Old-wording workflows in those tests load through the translation. Where a test reads a model or a pin text, it may now see fallback `instructions`, `prompt` or `means`, or a flattened pin in the new wording.
 
 ### Notes
@@ -35,4 +38,4 @@ norn loads a workflow written in the new wording (one head key, optional `skills
 - Friction: none.
 
 ### Resume
-Implement done; next is review of the diff against the 13 criteria above.
+Rework F1: in `proseErrors` (`packages/store/src/step-wording.ts`), refuse a non-map `means:`/`verdict:` on an agent step, naming the step and key. Add a test for each to `new-wording.test.ts`, then run `bun run test` and `bun run typecheck`.
