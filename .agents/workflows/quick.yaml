@@ -13,10 +13,7 @@ steps:
     use: sync
     outcomes: { synced: implement }
   implement:
-    type: agent
-    skill: norn-implement
-    inputs: [spec, handoff, last_check, last_findings]
-    instructions: >-
+    agent: >-
       Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one,
       otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask.
       A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the
@@ -26,25 +23,33 @@ steps:
       Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
       Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (its .norn-unit marker) and a dev build run there would act on its claim and on its run state (state.json, receipts) in the checkout's machine dir.
       Run `bun run test` (the unit tier) after each change, and the type check; the integration and e2e tiers run in CI, which the `ci` check waits for, so do not run them before handing back.
+    skills: [norn-implement]
+    inputs: [spec, handoff, last_check, last_findings]
     outcomes:
-      done: { to: update, means: "the change is made; each behaviour change and rework point has a passing test" }
+      done: update
+    means:
+      done: "the change is made; each behaviour change and rework point has a passing test"
   base-update:
     use: base-update
     outcomes: { tested: review, failed: { to: implement, counter: test_loop }, merged: open-pr, redescribe: describe }
   review:
-    type: agent
-    skill: norn-review
+    agent: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
+    skills: [norn-review]
     inputs: [spec, diff, last_findings]
     outcomes:
-      approve:           { to: describe, means: "the change does what the story asks and nothing else, no blocking findings" }
-      changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
+      approve:           describe
+      changes_requested: { to: implement, counter: review_loop }
+    means:
+      approve: "the change does what the story asks and nothing else, no blocking findings"
+      changes_requested: "blocking findings in the receipt"
   describe:
-    type: agent
-    skill: norn-pr
+    agent: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
+    skills: [norn-pr]
     inputs: [spec, diff, handoff]
-    instructions: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
     outcomes:
-      done: { to: open-pr, means: "pr.md describes the branch as it is now: summary, evidence, merge danger" }
+      done: open-pr
+    means:
+      done: "pr.md describes the branch as it is now: summary, evidence, merge danger"
   # a red run's failures become last_check for implement, whose rework goes back through open-pr to the new head
   ship:
     use: ci

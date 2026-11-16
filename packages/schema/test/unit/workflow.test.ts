@@ -1,50 +1,58 @@
 import { describe, expect, test } from "bun:test";
 import { parse } from "yaml";
-import { outcomeEdge, validate } from "../../src/index.ts";
+import { outcomeEdge, toJsonSchema, validate } from "../../src/index.ts";
 
-/** §11 slice workflow example of the rules, verbatim. */
+/** §11 slice workflow example of the rules, as a file writes it: one head key per step. */
 export const SLICE_EXAMPLE = `
 name: slice
 start: implement
 steps:
   implement:
-    type: agent
-    skill: implement
-    outcomes: { done: { to: test, means: "every acceptance criterion (or rework point) has a passing test" } }
+    agent: Build the slice test-first.
+    skills: [implement]
+    outcomes: { done: test }
+    means: { done: "every acceptance criterion (or rework point) has a passing test" }
   test:
-    type: check
-    run: bun test
+    check: bun test
     timeout: 10m
     outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
   review:
-    type: agent
-    skill: review
+    agent: Review the slice.
+    skills: [review]
     outcomes:
-      approve:           { to: qa, means: "all criteria met, no blocking findings" }
-      changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
+      approve:           qa
+      changes_requested: { to: implement, counter: review_loop }
+    means:
+      approve: "all criteria met, no blocking findings"
+      changes_requested: "blocking findings in the receipt"
   qa:
-    type: agent
-    skill: qa
+    agent: Check every criterion from the user's side.
+    skills: [qa]
+    criteria: required
     outcomes:
-      pass:    { to: integrate, means: "every criterion verified with evidence" }
-      fail:    { to: implement, counter: qa_loop, means: "a criterion fails; repro in the receipt" }
-      partial: { to: human-qa, means: "criteria only a person can check are listed with prepared evidence" }
+      pass:    integrate
+      fail:    { to: implement, counter: qa_loop }
+      partial: human-qa
+    means:
+      pass: "every criterion verified with evidence"
+      fail: "a criterion fails; repro in the receipt"
+      partial: "criteria only a person can check are listed with prepared evidence"
+    verdict: { pass: pass, fail: fail, partial: person }
   human-qa:
-    type: gate
+    gate: Approve the slice's QA?
     outcomes: { approve: integrate, reject: { to: implement, counter: qa_loop } }
   integrate:
-    type: git
-    action: integrate
+    integrate:
     outcomes: { done: $done, conflict: { to: merge, counter: conflict_loop } }
   merge:
-    type: agent
-    skill: merge
+    agent: Resolve the conflicts.
+    skills: [merge]
     outcomes: { done: integrate }
+    means: { done: "conflicts resolved" }
 counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, qa_loop: { max: 2 }, conflict_loop: { max: 2 } }
 `;
 
 const example = () => parse(SLICE_EXAMPLE) as Record<string, any>;
-/** The example is a file as written: it names one `skill` per agent step, which the loaded model holds as `skills`. */
 const errorsOf = (v: unknown) => {
   const r = validate("workflow-source", v);
   return r.ok ? [] : r.errors;
@@ -124,10 +132,17 @@ describe("workflow schema", () => {
     ["check exit code not a number", (w: any) => (w.steps.test.exits = { x: "flaky" })],
     ["check exit naming a malformed outcome", (w: any) => (w.steps.test.exits = { 3: "Flaky!" })],
     ["gate outcome other than approve/reject", (w: any) => (w.steps["human-qa"].outcomes.answer = "qa")],
-    ["git outcome other than done/conflict", (w: any) => (w.steps.integrate.outcomes.ok = "$done")],
-    ["unknown git action", (w: any) => (w.steps.integrate.action = "merge")],
-    ["unknown step type", (w: any) => (w.steps.merge.type = "script")],
-    ["agent without skill", (w: any) => delete w.steps.merge.skill],
+    ["integrate outcome other than done/conflict", (w: any) => (w.steps.integrate.outcomes.clean = "$done")],
+    ["a verb given a value", (w: any) => (w.steps.integrate.integrate = "now")],
+    ["unknown head key", (w: any) => (w.steps.merge = { script: "x", outcomes: { done: "integrate" } })],
+    ["agent without orientation", (w: any) => delete w.steps.merge.agent],
+    ["agent with an empty orientation", (w: any) => (w.steps.merge.agent = " ")],
+    ["two head keys", (w: any) => (w.steps.merge.check = "bun test")],
+    ["a skill named twice", (w: any) => (w.steps.merge.skills = ["merge", "merge"])],
+    ["a meaning inside a route", (w: any) => (w.steps.merge.outcomes.done = { to: "integrate", means: "x" })],
+    ["a verdict inside a route", (w: any) => (w.steps.qa.outcomes.pass = { to: "integrate", verdict: "pass" })],
+    ["means on a check", (w: any) => (w.steps.test.means = { pass: "green" })],
+    ["a verdict that is not one", (w: any) => (w.steps.qa.verdict.pass = "great")],
     ["agent with no outcomes", (w: any) => (w.steps.merge.outcomes = {})],
     ["unknown step property", (w: any) => (w.steps.merge.when = "x")],
     ["edge with unknown property", (w: any) => (w.steps.merge.outcomes.done = { to: "integrate", when: "x" })],
@@ -163,25 +178,80 @@ describe("workflow schema", () => {
 });
 
 describe("workflow-source and workflow-shared schemas", () => {
-  const gate = { type: "gate", outcomes: { approve: "$done" } };
+  const gate = { gate: "Approve?", outcomes: { approve: "$done" } };
   test("a workflow file as written may hold a `use` step; the strict workflow schema refuses it", () => {
     const wf = { name: "story", start: "review", steps: { review: gate, base: { use: "base-update", outcomes: { tested: "review", broken: { to: "review", counter: "loop" } } } } };
     expect(validate("workflow-source", wf).ok).toBe(true);
     expect(validate("workflow", wf).ok).toBe(false);
-    expect(validate("workflow-source", { ...wf, steps: { ...wf.steps, base: { use: "base-update", skill: "x" } } }).ok).toBe(false);
+    expect(validate("workflow-source", { ...wf, steps: { ...wf.steps, base: { use: "base-update", skills: ["x"] } } }).ok).toBe(false);
   });
   test("a shared file holds start, steps and a description, and its routes may leave through an exit", () => {
-    const shared = { description: "d", start: "test", steps: { test: { type: "check", run: "bun test", timeout: "5m", outcomes: { pass: { exit: "tested", means: "green" }, fail: "$stuck" } } } };
+    const shared = { description: "d", start: "test", steps: { test: { check: "bun test", timeout: "5m", outcomes: { pass: { exit: "tested" }, fail: "$stuck" } } } };
     expect(validate("workflow-shared", shared).ok).toBe(true);
     for (const key of ["name", "counters", "defaults", "mode", "base"]) expect(validate("workflow-shared", { ...shared, [key]: {} }).ok).toBe(false);
     expect(validate("workflow", { name: "x", ...shared }).ok).toBe(false);
   });
+
+  /** One step of each head key, as a file writes it. */
+  const ONE_OF_EACH: Record<string, Record<string, unknown>> = {
+    agent: { agent: "Do the work.", skills: ["a"], by: "codex", outcomes: { done: "$done" }, means: { done: "the work is done" } },
+    check: { check: "bun test", timeout: "5m", outcomes: { pass: "$done" } },
+    gate: { gate: "Approve the work?", outcomes: { approve: "$done" } },
+    "update-branch": { "update-branch": null, outcomes: { done: "$done", clean: "$done", resolved: "$done" } },
+    "open-pr": { "open-pr": null, outcomes: { done: "$done" } },
+    integrate: { integrate: null, outcomes: { done: "$done" } },
+    push: { push: null, outcomes: { done: "$done" } },
+    "await-merge": { "await-merge": null, outcomes: { stale: "$done" } },
+    slices: { slices: null, outcomes: { done: "$done" } },
+  };
+  const source = (step: unknown) => ({ name: "x", start: "a", steps: { a: step } });
+  const shared = (step: unknown) => ({ start: "a", steps: { a: step } });
+
+  test("each schema has one step shape per head key, besides `use` and `like`", () => {
+    const shapes = (name: "workflow-source" | "workflow-shared") => {
+      const steps = (toJsonSchema(name) as any).properties.steps.patternProperties;
+      const union = (Object.values(steps)[0] as { anyOf: Array<{ properties: Record<string, unknown>; required?: string[] }> }).anyOf;
+      return union.map((v) => (v.required ?? []).filter((k) => k in ONE_OF_EACH || k === "use" || k === "like"));
+    };
+    const expected = [...Object.keys(ONE_OF_EACH).map((k) => [k]), ["like"]];
+    expect(shapes("workflow-source")).toEqual([...expected.slice(0, -1), ["use"], ["like"]]);
+    expect(shapes("workflow-shared")).toEqual(expected);
+    for (const [head, step] of Object.entries(ONE_OF_EACH)) {
+      expect({ head, source: errorsOf(source(step)), shared: validate("workflow-shared", shared(step)).ok }).toEqual({ head, source: [], shared: true });
+    }
+  });
+
+  test.each([
+    ["type", { type: "check" }],
+    ["skill", { skill: "a" }],
+    ["instructions", { instructions: "Do it." }],
+    ["run", { run: "bun test" }],
+    ["prompt", { prompt: "Approve?" }],
+    ["action", { action: "open-pr" }],
+  ])("neither schema accepts the old key `%s` on any step", (_key, extra) => {
+    for (const step of Object.values(ONE_OF_EACH)) {
+      expect(validate("workflow-source", source({ ...step, ...extra })).ok).toBe(false);
+      expect(validate("workflow-shared", shared({ ...step, ...extra })).ok).toBe(false);
+      expect(validate("workflow-source", source({ like: "b", ...extra })).ok).toBe(false);
+    }
+  });
+
+  test("neither schema accepts a meaning or verdict inside a route, nor a step in the old wording", () => {
+    const routed = { agent: "Do it.", outcomes: { done: { to: "$done", means: "done" } } };
+    const judged = { agent: "Do it.", outcomes: { done: { to: "$done", verdict: "pass" } }, means: { done: "done" } };
+    const exitMeans = { check: "bun test", timeout: "5m", outcomes: { pass: { exit: "tested", means: "green" } } };
+    for (const step of [routed, judged]) expect(validate("workflow-source", source(step)).ok).toBe(false);
+    expect(validate("workflow-shared", shared(exitMeans)).ok).toBe(false);
+    const old = { type: "agent", skill: "a", instructions: "Do it.", outcomes: { done: { to: "$done", means: "done" } } };
+    expect(validate("workflow-source", source(old)).ok).toBe(false);
+    expect(validate("workflow-shared", shared(old)).ok).toBe(false);
+  });
 });
 
 describe("like steps in the workflow-source and workflow-shared schemas", () => {
-  const check = { type: "check", run: "bun test", timeout: "5m", outcomes: { pass: "$done" } };
+  const check = { check: "bun test", timeout: "5m", outcomes: { pass: "$done" } };
   test("a like step holds the known step keys loosely; an unknown key is refused; the strict schema refuses it", () => {
-    const wf = { name: "story", start: "test", steps: { test: check, "test-merge": { like: "test", outcomes: { pass: "test" } } } };
+    const wf = { name: "story", start: "test", steps: { test: check, "test-merge": { like: "test", check: "bun test --again", outcomes: { pass: "test" } } } };
     expect(validate("workflow-source", wf).ok).toBe(true);
     expect(validate("workflow", wf).ok).toBe(false);
     expect(validate("workflow-source", { ...wf, steps: { ...wf.steps, "test-merge": { like: "test", runn: "x" } } }).ok).toBe(false);

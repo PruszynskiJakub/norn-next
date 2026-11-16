@@ -32,8 +32,9 @@ import { Workflow, WorkflowShared, WorkflowSource } from "./workflow.ts";
 
 export { check, type SchemaError, type ValidationResult } from "./check.ts";
 
-/** Every published schema, by short name. JSON files are emitted as `json/<name>.schema.json`. */
+/** Every schema `validate` checks against, by short name; those in `PUBLISHED_SCHEMAS` are emitted as `json/<name>.schema.json`. */
 export const SCHEMAS = {
+  // the loaded, flat workflow core reads; a person writes `workflow-source`, so it is not published
   workflow: Workflow,
   // a workflow file as written, and a shared file it brings in with `use:`; both flatten to `workflow`
   "workflow-source": WorkflowSource,
@@ -76,6 +77,9 @@ export const SCHEMAS = {
   "local-checkout": LocalCheckoutFile,
 } as const;
 export type SchemaName = keyof typeof SCHEMAS;
+
+/** The schemas emitted for editors and other tools: every one but the loaded workflow model. */
+export const PUBLISHED_SCHEMAS = (Object.keys(SCHEMAS) as SchemaName[]).filter((n) => n !== "workflow");
 export type SchemaType<N extends SchemaName> = Static<(typeof SCHEMAS)[N]>;
 
 export class SchemaValidationError extends Error {

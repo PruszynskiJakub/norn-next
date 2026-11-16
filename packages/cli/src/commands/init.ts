@@ -131,7 +131,7 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
   const steps: string[] = [];
   if (!r.remote.url) steps.push(`Add the remote norn syncs issues from and pushes branches to: \`git remote add ${r.remote.git_remote} <url>\`.`);
   const tc = r.test_command;
-  if (tc && !tc.detected_from) steps.push(`Set your test command: the \`test\` steps in ${WORKFLOWS_DIR}/ run \`${tc.command}\` — change \`run:\` there.`);
+  if (tc && !tc.detected_from) steps.push(`Set your test command: the \`test\` steps in ${WORKFLOWS_DIR}/ run \`${tc.command}\` — change \`check:\` there.`);
   else if (tc) steps.push(`Check the test command \`${tc.command}\` in the \`test\` steps of ${WORKFLOWS_DIR}/ (detected from ${tc.detected_from}).`);
   if (changed) {
     // each agent folder whole (`.claude`, not `.claude/settings.json`): skills and hooks live there

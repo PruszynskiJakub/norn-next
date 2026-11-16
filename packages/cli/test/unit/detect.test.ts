@@ -50,13 +50,13 @@ describe("detectTestCommand", () => {
 });
 
 describe("withTestCommand", () => {
-  test("replaces the template's `run: bun test` lines only, quoted for YAML", () => {
-    const yaml = "steps:\n  test:\n    type: check\n    run: bun test\n    timeout: 15m\n  lint:\n    run: bun test:lint\n";
-    expect(withTestCommand(yaml, "npm ci && npm test")).toBe('steps:\n  test:\n    type: check\n    run: "npm ci && npm test"\n    timeout: 15m\n  lint:\n    run: bun test:lint\n');
+  test("replaces the template's `check: bun test` lines only, quoted for YAML", () => {
+    const yaml = "steps:\n  test:\n    check: bun test\n    timeout: 15m\n  lint:\n    check: bun test:lint\n";
+    expect(withTestCommand(yaml, "npm ci && npm test")).toBe('steps:\n  test:\n    check: "npm ci && npm test"\n    timeout: 15m\n  lint:\n    check: bun test:lint\n');
   });
 
-  test("keeps a YAML anchor on the run line, so the steps that alias it get the command too", () => {
-    const yaml = "steps:\n  test:\n    run: &test-run bun test\n  verify:\n    run: *test-run\n";
-    expect(withTestCommand(yaml, "npm ci && npm test")).toBe('steps:\n  test:\n    run: &test-run "npm ci && npm test"\n  verify:\n    run: *test-run\n');
+  test("keeps a YAML anchor on the check line, so the steps that alias it get the command too", () => {
+    const yaml = "steps:\n  test:\n    check: &test-run bun test\n  verify:\n    check: *test-run\n";
+    expect(withTestCommand(yaml, "npm ci && npm test")).toBe('steps:\n  test:\n    check: &test-run "npm ci && npm test"\n  verify:\n    check: *test-run\n');
   });
 });

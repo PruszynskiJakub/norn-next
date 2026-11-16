@@ -33,8 +33,8 @@ const PERSON_ONLY_SKILLS = ["issue", "release-start"];
  * changed route, counter or instruction changes the hash, formatting and key order never do.
  */
 const PINNED_HASHES: Record<string, string> = {
-  quick: "a66c1219b0c9fadcef3c2db1d0b433f275cc5a4715e0bd8a8d236f24deed8d1b",
-  story: "4b6714816877780120d73d85c5eb2a747f60be550762dfff1b0bfc27a46581f8",
+  quick: "fccd62b8775a0e5861db502aafb93b5d03e7645ec2073f04b2f524f8a03367e9",
+  story: "66cb39c11f21ca5a5b18185fc1888fa69231b0b78d5c5079096cae93fe86c926",
   release: "8032f58290802bb801afd45308ccb2d785a3d61847d513cadda4bfe8ff60c682",
 };
 

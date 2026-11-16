@@ -6,8 +6,9 @@ import type { Workflow } from "@norn/schema";
 import { loadWorkflow, loadWorkflows, parseWorkflowText, workflowsDir } from "../../src/index.ts";
 import { tmp } from "../helpers.ts";
 
-const SHIPPED = join(import.meta.dir, "../../../cli/assets/workflows");
-const TRANSLATED = join(import.meta.dir, "../fixtures/wording");
+/** The shipped workflows and shared files as they were written in the old wording, and their translations. */
+const SHIPPED = join(import.meta.dir, "../fixtures/wording/old");
+const TRANSLATED = join(import.meta.dir, "../fixtures/wording/new");
 
 const wf = (steps: string, rest = "") => `name: x\nstart: a\n${rest}steps:\n${steps}`;
 

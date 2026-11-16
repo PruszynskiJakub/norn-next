@@ -3,8 +3,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { translateWording } from "../../src/index.ts";
 
-const SHIPPED = join(import.meta.dir, "../../../cli/assets/workflows");
-const EXPECTED = join(import.meta.dir, "../fixtures/wording");
+/** The shipped workflows and shared files as they were written in the old wording, and their expected translations. */
+const SHIPPED = join(import.meta.dir, "../fixtures/wording/old");
+const EXPECTED = join(import.meta.dir, "../fixtures/wording/new");
 
 function ok(text: string, file = "wf.yaml"): string {
   const r = translateWording(text, file);

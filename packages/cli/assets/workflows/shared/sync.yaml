@@ -6,13 +6,13 @@ description: Bring the story branch up to date with its base before the work sta
 start: sync
 steps:
   sync:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: { exit: synced }, conflict: { to: sync-resolve, counter: sync_conflict_loop } }
   sync-resolve:
-    type: agent
-    skill: norn-merge
+    agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
+    skills: [norn-merge]
     inputs: [spec, handoff]
-    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
     outcomes:
-      done: { to: sync, means: "base merged into the story branch, conflicts resolved and committed" }
+      done: sync
+    means:
+      done: "base merged into the story branch, conflicts resolved and committed"

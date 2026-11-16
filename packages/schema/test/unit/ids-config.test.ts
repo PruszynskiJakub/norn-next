@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { JSON_DIR, renderSchema } from "../../scripts/emit.ts";
 import {
@@ -7,6 +7,7 @@ import {
   HEADS_REF_PREFIX,
   headsRef,
   RecordConfig,
+  PUBLISHED_SCHEMAS,
   SCHEMAS,
   type SchemaName,
   isGitSha,
@@ -129,7 +130,14 @@ describe("config", () => {
 });
 
 describe("published JSON schemas", () => {
-  test.each(Object.keys(SCHEMAS) as SchemaName[])("json/%s.schema.json is up to date (bun run schema:emit)", (name) => {
+  test.each(PUBLISHED_SCHEMAS)("json/%s.schema.json is up to date (bun run schema:emit)", (name) => {
     expect(readFileSync(join(JSON_DIR, `${name}.schema.json`), "utf8")).toBe(renderSchema(name));
+  });
+
+  test("the loaded workflow model is checked against but not published: a file is written in workflow-source", () => {
+    expect(Object.keys(SCHEMAS)).toContain("workflow");
+    expect(PUBLISHED_SCHEMAS).not.toContain("workflow");
+    expect(PUBLISHED_SCHEMAS).toEqual((Object.keys(SCHEMAS) as SchemaName[]).filter((n) => n !== "workflow"));
+    expect(existsSync(join(JSON_DIR, "workflow.schema.json"))).toBe(false);
   });
 });

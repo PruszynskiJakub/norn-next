@@ -14,10 +14,7 @@ description: Write the changelog and propose the version, open the draft PR, wai
 start: prepare
 steps:
   prepare:
-    type: agent
-    skill: release
-    inputs: [spec, handoff]
-    instructions: >-
+    agent: >-
       Write the changelog section, the version bumps and the proposed version with its reason as the
       skill says; a version given in the issue's `## Version` or by the person in Rework wins over
       your proposal. Also write the PR body to pr.md in the spec folder: the proposed version, its
@@ -27,27 +24,30 @@ steps:
       over .agents/skills/norn* as the skill says, so that once the PR merges the published binary is
       the one main asks for. Rename the issue to "Release X.Y.Z" with `gh issue edit`, the one remote
       write this step allows. Change no code.
+    skills: [release]
+    inputs: [spec, handoff]
     outcomes:
-      done: { to: open-pr, means: "CHANGELOG.md, packages/cli/package.json, the README badge and norn_version in .agents/norn.config.yaml carry version X.Y.Z, .agents/skills/norn* match the bundled sources; pr.md and the handoff name it with its reason" }
+      done: open-pr
+    means:
+      done: "CHANGELOG.md, packages/cli/package.json, the README badge and norn_version in .agents/norn.config.yaml carry version X.Y.Z, .agents/skills/norn* match the bundled sources; pr.md and the handoff name it with its reason"
   update:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: prepare, conflict: { to: resolve, counter: base_conflict_loop } }
   resolve:
-    type: agent
-    skill: norn-merge
+    agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. CHANGELOG.md and version conflicts: keep the base side; prepare writes the release section again next."
+    skills: [norn-merge]
     inputs: [spec, handoff]
-    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. CHANGELOG.md and version conflicts: keep the base side; prepare writes the release section again next."
     outcomes:
-      done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" }
+      done: update
+    means:
+      done: "base merged into the story branch, conflicts resolved and committed"
   # release.yml smokes every binary on its own OS after the merge, before it pushes the tag; a red
   # CI means the base is broken
   ship:
     use: ci
     outcomes: { passed: ready, failed: $stuck, stale: { to: update, counter: stale_loop } }
   ready:
-    type: gate
-    prompt: >-
+    gate: >-
       Read the draft release PR: the proposed version and its reason, and the new CHANGELOG.md section.
       Approve to wait for the merge (a person merges the PR; CI then tags and publishes), or
       reject with the version or changelog changes you want.
@@ -58,7 +58,7 @@ steps:
   # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
   # move it counts as stale (base.stale) sends it back through update by itself
   merge:
-    type: merge
+    await-merge:
     outcomes:
       stale: { to: update, counter: stale_loop }
 counters:

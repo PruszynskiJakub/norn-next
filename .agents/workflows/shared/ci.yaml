@@ -5,15 +5,13 @@ description: Open the draft PR and wait for its ci.yml run.
 start: open-pr
 steps:
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: ci }
   # waits for the PR's CI (a detached check run, so the tick is not blocked): the ci.yml run of the
   # PR's head commit, up to 5m for it to appear, else fail: tests, typecheck, the npm package and a
   # binary built and smoke-tested
   ci:
-    type: check
-    run: |
+    check: |
       sha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1
       # GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story
       # updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.

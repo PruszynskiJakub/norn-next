@@ -4,8 +4,7 @@ description: Wait for a person at ready, then for the PR's merge.
 start: ready
 steps:
   ready:
-    type: gate
-    prompt: "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change."
+    gate: "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change."
     outcomes:
       approve: merge
       reject:  { exit: rejected }
@@ -13,6 +12,6 @@ steps:
   # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
   # move it counts as stale (base.stale) sends it back through update by itself
   merge:
-    type: merge
+    await-merge:
     outcomes:
       stale: { exit: stale }

@@ -67,8 +67,8 @@ const routeCount = (wf: Workflow) => Object.values(wf.steps).reduce((n, step) =>
  * route, counter or instruction changes the hash, formatting and key order never do.
  */
 const PINNED_HASHES: Record<string, string> = {
-  quick: "54f3e627925209349ee5988e91d0a3e8dfc1d6bbd41376e3dbb8beb59abad602",
-  story: "d8e49347ab520b6226ba30e99b7199a7ac551e20a5c47bcde7d7b4bb892756c9",
+  quick: "2122ed85165f59700571d04a4237c24a995480aabddfa5feef6c97fcd29eeced",
+  story: "a6e95b266e84d789ac20549ff3be785cb50ad3b23417db24389091cc5d308316",
 };
 
 /** Splits a SKILL.md into its YAML frontmatter and body. */
@@ -227,6 +227,67 @@ describe("workflow templates", () => {
     // @norn/core. Once it is, also assert:
     // validateWorkflowDefinition(wf, { skills: SKILLS }).issues → []
     // checkWorkflowLevel(wf, file === "story.yaml" ? "story": "slice") → []
+  });
+});
+
+/** The keys of the old wording, none of which a step written now holds. */
+const OLD_STEP_KEYS = ["type", "skill", "instructions", "run", "prompt", "action"];
+const REPO_WORKFLOWS_DIR = join(ASSETS, "..", "..", "..", ".agents", "workflows");
+/** Every workflow and shared file in a workflows folder, as `name.yaml` and `shared/name.yaml`. */
+const filesIn = (dir: string) => [
+  ...readdirSync(dir).filter((f) => /\.(ya?ml|json)$/.test(f)),
+  ...readdirSync(join(dir, "shared")).map((f) => `shared/${f}`),
+];
+
+/** What in a file, as written, is not the new wording, or is a translator's fallback where a hand-written text belongs. */
+function wordingProblems(dir: string, file: string): string[] {
+  const text = readFileSync(join(dir, file), "utf8");
+  const doc = parse(text) as { $schema?: string; steps: Record<string, Record<string, unknown>> };
+  const shared = file.startsWith("shared/");
+  const out: string[] = [];
+  const schema = validate(shared ? "workflow-shared" : "workflow-source", doc);
+  if (!schema.ok) out.push(...schema.errors.map((e) => `${e.path} ${e.message}`));
+  // A file that names its schema names the one it is written in
+  const named = doc.$schema ?? /^# yaml-language-server: \$schema=(\S+)$/m.exec(text)?.[1];
+  if (named !== undefined && !named.endsWith(shared ? "workflow-shared.schema.json" : "workflow-source.schema.json")) out.push(`$schema ${named}`);
+  for (const [name, step] of Object.entries(doc.steps)) {
+    for (const key of OLD_STEP_KEYS) if (key in step) out.push(`${name}: old key \`${key}\``);
+    for (const [o, route] of Object.entries((step.outcomes ?? {}) as Record<string, unknown>))
+      if (route !== null && typeof route === "object" && ("means" in route || "verdict" in route)) out.push(`${name}.${o}: means or verdict inside the route`);
+    if ("like" in step || "use" in step) continue;
+    const skills = (step.skills ?? []) as string[];
+    if ("agent" in step) {
+      const orientation = String(step.agent ?? "").trim();
+      if (orientation === "" || orientation === step.description || skills.some((x) => orientation === `Use the \`${x}\` skill.`)) out.push(`${name}: no hand-written orientation`);
+    }
+    if ("gate" in step && (step.gate === `approve or reject ${name}` || step.gate === step.description)) out.push(`${name}: no hand-written gate text`);
+    for (const [o, m] of Object.entries((step.means ?? {}) as Record<string, string>)) if (m === `step finished with outcome ${o}`) out.push(`${name}.${o}: no hand-written meaning`);
+  }
+  return out;
+}
+
+describe("the new wording", () => {
+  test("norn init writes every workflow and shared file in the new wording, each agent step with a hand-written orientation", () => {
+    const written = filesIn(workflowsDir(TEMPLATES_ROOT));
+    expect(written.sort()).toEqual([...workflowFiles, ...sharedFiles.map((f) => `shared/${f}`)].sort());
+    expect(Object.fromEntries(written.map((f) => [f, wordingProblems(workflowsDir(TEMPLATES_ROOT), f)]))).toEqual(Object.fromEntries(written.map((f) => [f, []])));
+  });
+
+  test("this repo's workflows, with release.yaml and shared/, are in the new wording and load", () => {
+    const files = filesIn(REPO_WORKFLOWS_DIR);
+    expect(files).toContain("release.yaml");
+    expect(Object.fromEntries(files.map((f) => [f, wordingProblems(REPO_WORKFLOWS_DIR, f)]))).toEqual(Object.fromEntries(files.map((f) => [f, []])));
+    const repo = loadWorkflows(join(REPO_WORKFLOWS_DIR, "..", ".."));
+    expect(repo.errors).toEqual([]);
+    expect(Object.keys(repo.workflows).sort()).toEqual(files.filter((f) => !f.startsWith("shared/")).map((f) => f.replace(/\.ya?ml$/, "")).sort());
+  });
+
+  test("this repo's shared copies have the shipped ones' steps, each with the same head key", () => {
+    const heads = (dir: string, files: string[]) =>
+      Object.fromEntries(files.flatMap((f) => Object.entries((parse(readFileSync(join(dir, "shared", f), "utf8")) as { steps: Record<string, object> }).steps).map(([n, step]) => [n, Object.keys(step)[0]])));
+    // this repo splits shipping in two: its own CI wait (ci.yaml) and the person's part (land.yaml)
+    const repo = { "base-update.yaml": ["base-update.yaml"], "sync.yaml": ["sync.yaml"], "ship.yaml": ["ci.yaml", "land.yaml"] };
+    for (const [shipped, copies] of Object.entries(repo)) expect({ shipped, heads: heads(REPO_WORKFLOWS_DIR, copies) }).toEqual({ shipped, heads: heads(WORKFLOWS_DIR, [shipped]) });
   });
 });
 

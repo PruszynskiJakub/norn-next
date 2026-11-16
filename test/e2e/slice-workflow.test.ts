@@ -465,8 +465,8 @@ describe("norn init in a repository with a test command and no remote", () => {
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ remote: { url: null }, test_command: { command: "npm ci && npm test", detected_from: "package.json", set_in: ["slice.yaml", "shared/base-update.yaml"] } });
     const shared = readFileSync(join(workflowsDir(f.root), "shared", "base-update.yaml"), "utf8");
-    expect(shared).toContain('run: "npm ci && npm test"');
-    expect(shared).not.toContain("run: bun test");
+    expect(shared).toContain('check: "npm ci && npm test"');
+    expect(shared).not.toContain("check: bun test");
     expect(r.stdout).toContain("remote          no git remote named origin");
     expect(r.stdout).toContain("Next steps\n  1. Add the remote norn syncs issues from and pushes branches to: `git remote add origin <url>`.\n  2. Check the test command `npm ci && npm test`");
     // the edited templates still validate, with the command as the test check's run
