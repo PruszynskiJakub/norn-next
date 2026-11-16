@@ -235,6 +235,14 @@ describe("like: copies a step of its own file", () => {
     expect(wf.included).toBeUndefined();
   });
 
+  test("a copy that keeps an object value of its target writes it out in full, with no YAML anchor or alias", () => {
+    const keeps = LIKE.replace("    outcomes: { pass: $done, fail: review }\n", "");
+    const wf = loaded({ "story.yaml": keeps });
+    expect(wf.source).not.toMatch(/[&*]a\d/);
+    expect(parseYaml(wf.source)).toEqual(wf.workflow);
+    expect(wf.workflow.steps["test-merge"]?.outcomes).toEqual({ pass: "review", fail: "implement" });
+  });
+
   test("a like in a shared file is resolved within the shared file before its steps come in", () => {
     const shared = BASE_UPDATE.replace("  test:\n", "  retest:\n    like: test\n    outcomes: { pass: $done }\n  test:\n");
     const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": shared });

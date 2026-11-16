@@ -18,7 +18,8 @@ All in `packages/store/test/unit/shared-workflows.test.ts` (S1, the loader over 
 - AC2 `like` inside a shared file resolved within it before its steps come in (and the copy is listed in `included`): › "a like in a shared file is resolved within the shared file before its steps come in".
 - AC3 refusals: "like: refusals" › "a like naming a missing step, itself, a like step or a use step is refused with its reason", › "a like naming a step of another file is refused, from the workflow and from the shared file", › "a use step carrying like is refused". Errors are on the workflow file, path `/steps/<step>/like`, shared-file ones prefixed `shared/<name>.yaml:`.
 - AC4 like without use: `source` is the flattened text (no `like:`), `hash` its sha256, no `included`: › "a workflow with like but no use loads as its flattened text, with no like left"; schemas accept `like` steps: `packages/schema/test/unit/workflow.test.ts` › "like steps in the workflow-source and workflow-shared schemas" plus the existing "json/<name>.schema.json is up to date" (re-emitted with `bun run schema:emit`; `workflow.schema.json` unchanged).
-- `bun run test` (1945 pass, 0 fail) and `bun run typecheck` green.
+- Review #1 blocking (no YAML anchors/aliases in a copy's flattened text): › "a copy that keeps an object value of its target writes it out in full, with no YAML anchor or alias" (went red with the fix reverted).
+- `bun run test` (1946 pass, 0 fail) and `bun run typecheck` green.
 
 ## Easy to miss
 
@@ -28,14 +29,15 @@ All in `packages/store/test/unit/shared-workflows.test.ts` (S1, the loader over 
 
 ## Not proven yet
 
-- Review #1 blocking: the flattened text of a copy carries YAML anchors/aliases (`&a1`/`*a1`) when the copy keeps an object value of its target (shallow spread shares the object; `stringifyYaml` aliases duplicates). Minor note: a step named `__proto__` is dropped by `out[name] = step` instead of refused. Details in the review findings.
+- Review #1 minor note, left unfixed by the brief's ruling: a step named `__proto__` is dropped by `out[name] = step` in `resolveLikes` instead of reaching the schema check and being refused (fix: build `out` with `Object.create(null)` or `Object.defineProperty`).
 - Replacing YAML anchors with `like:` in the shipped and repo workflows is slices 05/06; cli surfacing is 07; recipes 08.
 
 ## Notes
 
 - `packages/store/src/shared-workflow.ts`: `resolveLikes(steps, elsewhere)` runs per file — on the workflow's steps first (before `use` flattening), and inside `readShared` on the shared file's steps before its `workflow-shared` validation, so the strict check runs on the copies. `elsewhere` maps step names of the other file(s) to their label so a cross-file copy says where the step lives (workflow side: steps of the used shared files, read raw; shared side: the workflow's steps, "the workflow").
+- A copy is `structuredClone({ ...of, ...rest })`, so the loaded workflow never shares an object between two steps; both flattened-text `stringifyYaml` calls use `FLAT_YAML` (`aliasDuplicateObjects: false`) so the pinned bytes and hash follow from content, not object identity.
 - `LikeStep` in `packages/schema/src/workflow.ts` (built by `likeStep(variants)`): `like: StepName`, optional `type` (any step type), every other known step key as `unknown` — "loosely" per Plan D3; unknown keys refused.
 
 ## Resume
 
-Rework the review's blocking finding: in `packages/store/src/shared-workflow.ts` stop the flattened text aliasing shared objects (`aliasDuplicateObjects: false` on both `stringifyYaml` calls, or deep-copy the target in `resolveLikes`), with a test where a copy keeps an object key (e.g. `outcomes`) of its target and the source has no `&`/`*` alias.
+Review the rework: the blocking alias finding is fixed and tested; run `bun run test` and `bun run typecheck` to confirm green.

@@ -7,6 +7,9 @@
 import { check, type SchemaError, UseStep, validate } from "@norn/schema";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
+// The flattened text is pinned and hashed: its bytes must follow from content alone, never from which values share an object
+const FLAT_YAML = { lineWidth: 0, aliasDuplicateObjects: false } as const;
+
 /** The folder of shared files, inside the workflows folder. */
 export const SHARED_DIR = "shared";
 export const sharedFile = (name: string) => `${SHARED_DIR}/${name}.yaml`;
@@ -75,7 +78,7 @@ export function flattenWorkflowText(text: string, read: SharedReader): Flattened
   const own = resolveLikes(written.steps as Obj, elsewhere);
   if ("errors" in own) return { ok: false, errors: own.errors };
   const doc: Obj = { ...written, steps: own.steps };
-  if (!uses.length) return { ok: true, source: stringifyYaml(doc, { lineWidth: 0 }) };
+  if (!uses.length) return { ok: true, source: stringifyYaml(doc, FLAT_YAML) };
   const workflowSteps = new Map(Object.keys(own.steps).map((s) => [s, "the workflow"]));
 
   const errors: SchemaError[] = [];
@@ -130,7 +133,7 @@ export function flattenWorkflowText(text: string, read: SharedReader): Flattened
     else if (k === "base" && isObj(v) && "step" in v) flat[k] = { ...v, step: enter(v.step) };
     else flat[k] = v;
   }
-  return { ok: true, source: stringifyYaml(flat, { lineWidth: 0 }), included: from };
+  return { ok: true, source: stringifyYaml(flat, FLAT_YAML), included: from };
 }
 
 function readShared(name: string, by: string, routes: Obj, read: SharedReader, elsewhere: Map<string, string>): Included | { errors: SchemaError[] } {
@@ -206,7 +209,7 @@ function resolveLikes(steps: Obj, elsewhere: Map<string, string>): { steps: Obj 
       refuse(other ? `\`${target}\` is a step of ${other}: like copies a step of its own file` : `\`${target}\` is not a step of this file`);
     } else if ("like" in of) refuse(`\`${target}\` is a like step: name the step it copies, \`${String(of.like)}\``);
     else if ("use" in of) refuse(`\`${target}\` is a use step: like copies a step written in its own file`);
-    else out[name] = { ...of, ...rest };
+    else out[name] = structuredClone({ ...of, ...rest });
   }
   return errors.length ? { errors } : { steps: out };
 }
