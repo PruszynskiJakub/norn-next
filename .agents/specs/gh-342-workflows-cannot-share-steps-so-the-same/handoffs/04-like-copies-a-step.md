@@ -4,6 +4,15 @@ A step written `like: <step>` copies a step of the same file (workflow or shared
 
 ## Proof
 
+Review #1 traceability (each test read and seen to assert its item):
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | a `like` copy keeps the target's keys, replaces only those it writes, whole; text lists target's keys then the copy's new keys | test | `packages/store/test/unit/shared-workflows.test.ts` › "a copy keeps the target's keys and replaces only those it writes, whole; its text lists the target's keys then its own" |
+| AC2 | a `like` inside a shared file is resolved within it before its steps come in | test | `packages/store/test/unit/shared-workflows.test.ts` › "a like in a shared file is resolved within the shared file before its steps come in" |
+| AC3 | a bad `like` (missing, itself, a like step, a use step, another file's step, on a use step) is refused naming file and step | test | `packages/store/test/unit/shared-workflows.test.ts` › "like: refusals" (all three tests) |
+| AC4 | `like` without `use` loads as the flattened text; the source and shared schemas accept `like` steps | test | `packages/store/test/unit/shared-workflows.test.ts` › "a workflow with like but no use loads as its flattened text, with no like left"; `packages/schema/test/unit/workflow.test.ts` › "like steps in the workflow-source and workflow-shared schemas" |
+
 All in `packages/store/test/unit/shared-workflows.test.ts` (S1, the loader over a temp repo) unless named; each went red before the code:
 - AC1 shallow copy, written keys replace whole, flattened key order = target's keys then the copy's new keys: "like: copies a step of its own file" › "a copy keeps the target's keys and replaces only those it writes, whole; its text lists the target's keys then its own".
 - AC2 `like` inside a shared file resolved within it before its steps come in (and the copy is listed in `included`): › "a like in a shared file is resolved within the shared file before its steps come in".
@@ -19,6 +28,7 @@ All in `packages/store/test/unit/shared-workflows.test.ts` (S1, the loader over 
 
 ## Not proven yet
 
+- Review #1 blocking: the flattened text of a copy carries YAML anchors/aliases (`&a1`/`*a1`) when the copy keeps an object value of its target (shallow spread shares the object; `stringifyYaml` aliases duplicates). Minor note: a step named `__proto__` is dropped by `out[name] = step` instead of refused. Details in the review findings.
 - Replacing YAML anchors with `like:` in the shipped and repo workflows is slices 05/06; cli surfacing is 07; recipes 08.
 
 ## Notes
@@ -28,4 +38,4 @@ All in `packages/store/test/unit/shared-workflows.test.ts` (S1, the loader over 
 
 ## Resume
 
-Implementation done and committed; next is review of this slice.
+Rework the review's blocking finding: in `packages/store/src/shared-workflow.ts` stop the flattened text aliasing shared objects (`aliasDuplicateObjects: false` on both `stringifyYaml` calls, or deep-copy the target in `resolveLikes`), with a test where a copy keeps an object key (e.g. `outcomes`) of its target and the source has no `&`/`*` alias.
