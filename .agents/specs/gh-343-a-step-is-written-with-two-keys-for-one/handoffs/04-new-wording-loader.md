@@ -2,7 +2,7 @@
 norn loads a workflow written in the new wording (one head key, optional `skills:`, `by:`, `outcomes:` with sibling `means:` / `verdict:`) to the same `type`-tagged model as today, refuses malformed shapes naming the step, and still loads old-wording files everywhere through the translation.
 
 ### Proof
-`bun run test` (2031 pass) and `bun run typecheck` green (review#1 re-ran both). Golden decisions match the base exactly across all 139 cases; only the embedded facts moved.
+`bun run test` (2033 pass) and `bun run typecheck` green after the scalar-prose rework. Golden decisions match the base exactly across all 139 cases; only the embedded facts moved.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -15,7 +15,7 @@ norn loads a workflow written in the new wording (one head key, optional `skills
 | AC7 | `by:` picks the configured agent; its skills are checked as `unknown_skill` | test | `packages/store/test/unit/new-wording.test.ts` › "`by:` picks the configured agent…" |
 | AC8 | each edge carries its meaning and verdict from the sibling maps; brief finish lines unchanged | test | `packages/store/test/unit/new-wording.test.ts` › "each route carries the meaning and verdict…"; `packages/core/test/unit/brief.test.ts` snapshots |
 | AC9 | a reportable routed outcome with no meaning is refused; overridable routes need none | test | `packages/store/test/unit/new-wording.test.ts` › "a routed outcome the agent may report with no meaning is refused…" |
-| AC10 | a stale meaning or verdict, or `means:`/`verdict:` off an agent step, is refused | test | `packages/store/test/unit/new-wording.test.ts` › "a meaning or verdict for an outcome the step does not route…", "`means:` and `verdict:` on a step that is not an agent step…" (a scalar `means:`/`verdict:` still slips through: finding F1) |
+| AC10 | a stale meaning or verdict, or `means:`/`verdict:` off an agent step, is refused | test | `packages/store/test/unit/new-wording.test.ts` › "a meaning or verdict for an outcome the step does not route…", "`means:` and `verdict:` on a step that is not an agent step…", "a `%s:` that is not a map is refused naming the step" |
 | AC11 | shared `{ exit }` routes leave as today, with meanings from the shared `means:` | test | `packages/store/test/unit/new-wording.test.ts` › "a shared file's exits leave through the use step's routes…" |
 | AC12 | shipped files and their translations load equal; golden decisions byte-identical | test | `packages/store/test/unit/new-wording.test.ts` › "each shipped workflow and shared file loads to the same workflow as its translation"; `packages/core/test/unit/golden.test.ts` |
 | AC13 | a file in today's wording still loads from the checkout or a copy | test | `packages/store/test/unit/new-wording.test.ts` › "a file in today's wording still loads, from the main checkout or a copy" |
@@ -27,7 +27,6 @@ norn loads a workflow written in the new wording (one head key, optional `skills
 - The brief leaves out an orientation that equals the description or the skill line. Those are the translator's fallbacks, so an old pin's brief reads as before.
 
 ### Not proven yet
-- Review#1 finding F1 (blocking): `packages/store/src/step-wording.ts:263` skips a `means:`/`verdict:` that is not a map, and toModelStep then drops it. `verdict: pass` loads and the verdict is lost. Refuse it, naming `/steps/<name>/<key>`, and add a test for each key.
 - Integration and e2e tiers are not run locally (CI runs them). Old-wording workflows in those tests load through the translation. Where a test reads a model or a pin text, it may now see fallback `instructions`, `prompt` or `means`, or a flattened pin in the new wording.
 
 ### Notes
@@ -38,4 +37,4 @@ norn loads a workflow written in the new wording (one head key, optional `skills
 - Friction: none.
 
 ### Resume
-Rework F1: in `proseErrors` (`packages/store/src/step-wording.ts`), refuse a non-map `means:`/`verdict:` on an agent step, naming the step and key. Add a test for each to `new-wording.test.ts`, then run `bun run test` and `bun run typecheck`.
+Review the slice again: the review#1 finding (a scalar `means:`/`verdict:` on an agent step was dropped silently) is fixed in `proseErrors` (`packages/store/src/step-wording.ts`), which now refuses it at `/steps/<name>/<key>`.

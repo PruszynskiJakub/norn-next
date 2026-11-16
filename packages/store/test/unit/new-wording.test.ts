@@ -183,6 +183,13 @@ describe("outcomes, meanings and verdicts", () => {
     expect(refused(wf(step))).toEqual(["/steps/a/means/gone `gone` is not an outcome this step routes", "/steps/a/verdict/lost `lost` is not an outcome this step routes"]);
   });
 
+  test.each([
+    ["means", "    means: hello\n", "/steps/a/means `means:` is a map from outcome to meaning"],
+    ["verdict", "    means: { done: built }\n    verdict: pass\n", "/steps/a/verdict `verdict:` is a map from outcome to verdict"],
+  ])("a `%s:` that is not a map is refused naming the step", (_key, prose, error) => {
+    expect(refused(wf(`  a:\n    agent: do it\n    outcomes: { done: $done }\n${prose}`))).toContain(error);
+  });
+
   test("`means:` and `verdict:` on a step that is not an agent step are refused naming it", () => {
     expect(refused(wf("  a:\n    check: bun test\n    timeout: 1m\n    outcomes: { pass: $done }\n    means: { pass: green }\n"))).toEqual(["/steps/a/means only an agent step has `means:`"]);
     expect(refused(wf("  a:\n    gate: ok?\n    outcomes: { approve: $done }\n    verdict: { approve: pass }\n"))).toEqual(["/steps/a/verdict only an agent step has `verdict:`"]);

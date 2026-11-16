@@ -77,7 +77,11 @@ function proseErrors(at: string, head: string, step: Obj): SchemaError[] {
       continue;
     }
     const map = step[key];
-    if (!isObj(map)) continue; // the schema names the shape
+    // The model has no place for a scalar here, so the schema never sees it: refuse it before it is dropped.
+    if (!isObj(map)) {
+      out.push({ path: `${at}/${key}`, message: `\`${key}:\` is a map from outcome to ${key === "means" ? "meaning" : "verdict"}` });
+      continue;
+    }
     for (const o of Object.keys(map))
       if (!Object.hasOwn(routes, o)) out.push({ path: `${at}/${key}/${o}`, message: `\`${o}\` is not an outcome this step routes` });
   }
