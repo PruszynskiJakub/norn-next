@@ -1,6 +1,6 @@
 #### Goal
 
-Derived default counters for workflow edges (`<step>.<outcome>`, `<use step>.<exit>`, `max:` on the edge). All six slices are built and integrated. Story QA has run.
+Derived default counters for workflow edges (`<step>.<outcome>`, `<use step>.<exit>`, `max:` on the edge). All six slices are built and integrated. Story QA passed, the person approved at human QA, and pr.md describes the branch.
 
 #### Proof
 
@@ -25,7 +25,7 @@ QA (qa#1) checked all 33 slice criteria through the dev CLI and the loader. 32 a
 
 #### Not proven yet
 
-- Criterion 04.AC2 (the brief warns `Last round on review.changes_requested (2/3)`) is `person`. The brief's last-round line names the derived counter and appears exactly one send-back before stuck, but it reads `(3/3)` with the counter at 3 of 3. At 2/3 the brief shows only `fix round … 2/3`. The threshold is the same as for named counters, and this story does not change it. A person confirms that the user story's intent is met, or rules otherwise.
+- Nothing open. The brief's last-round warning reads (3/3) where the criterion's example said (2/3). The person ruled at human QA that the example was off by one, and pr.md says so in that entry.
 
 #### Notes
 
@@ -33,4 +33,4 @@ QA (qa#1) checked all 33 slice criteria through the dev CLI and the loader. 32 a
 
 #### Resume
 
-QA has reported `partial`. Next is the person's QA (human-qa) on the one `person` criterion, then describe.
+pr.md in the spec folder is the PR body: one evidence entry per user story, linked to the story QA run 01M7JZA5GJEH5AFXT61KD47K53. Merge danger is one-way, because dotted counter names in stored state cannot be read by an older norn. Next: norn opens the PR.
