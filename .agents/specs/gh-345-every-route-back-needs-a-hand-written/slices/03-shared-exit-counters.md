@@ -1,8 +1,8 @@
 ---
 id: gh-345/03
 title: One derived counter per shared-file exit
-depends_on: [gh-345/01, gh-345/02]
-status: planned
+depends_on: [ gh-345/01, gh-345/02 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
