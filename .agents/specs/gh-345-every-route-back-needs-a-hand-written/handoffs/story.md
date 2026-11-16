@@ -1,35 +1,39 @@
+# gh-345 — handoff
+
 ## Goal
 
-Refine gh-345 (derived default counters for workflow edges): spec written in spec.md, every decision made by the person, no open questions.
+Derived default counters for workflow edges (`<step>.<outcome>`, `<use step>.<exit>`, `max:` on the edge): the spec is refined, and the plan is agreed with the person and written to spec.md's Plan.
 
 ## Proof
 
-- spec.md: Problem Statement, Solution (with the table of defaults), 32 user stories, Out of Scope, Further Notes; Open questions: none.
-- Every decision confirmed by the person in the refine session (summary under Notes).
+- spec.md: 32 user stories. Stories 27 and 28 were corrected in the plan session (`approve-slices.reject`, `integrate.conflict`/`integrate.done`, `stale_loop` kept shared).
+- spec.md › Plan: seams S1–S4, coverage for all 32 stories, one prefactor, decisions D1–D11, risks. Each seam and decision was agreed with the person.
 
 ## Easy to miss
 
-- A dotted counter name becomes valid in stored formats (`state.json` counters, the exhausted park): this is a one-way choice. An older norn reading such a state marks the unit corrupt, so it belongs in the PR's merge danger. Names declared under `counters:` stay dotless.
-- A shared exit's counter is `<use step>.<exit>`, shared by every inner edge that leaves through it. Its default comes from the kind of those inner edges, not a fixed "exit" row. Edges of mixed kinds behind one exit are refused unless the route gives `max:`.
-- "an outcome named by exits" in the issue's table means a check's own `exits:` code map (max 5), not a shared file's exits.
-- `norn status`, `story view` and the watch take a counter's max from the pinned workflow's `counters:`. Derived counters must show their max there too, as must the brief's at_limit and `rerun --reset`.
-- Shipped overrides needed: `ship.ci-failed` max 3, `resolution-review.changes_requested` max 2, story's `slice.reject` max 3. `qa_loop` stays a shared name (a check fail plus a gate reject share 2).
+- Derivation happens once, in the store's `loadWorkflowText`, before pinning (D1). The pinned workflow.yaml writes every counter out, and apply, brief, rerun and view don't change. A pin is never derived again.
+- A file that derives nothing keeps its pin byte for byte (D2).
+- Dotted names become valid in state.json, receipts **and the pinned workflow.yaml**: one-way, in the PR's merge danger.
+- `stale_loop` stays a shared name wherever more than one edge shares it (shipped story, release, this repo's quick and story); `qa_loop` stays too.
+- A shared exit's counter covers only the feeders that derive a counter; forward feeders stay uncounted (D5).
+- Rows 1–4 of the defaults count an edge to a step even when it lies on no loop; only the agent row needs one (D4).
+- Shipped workflow edits go into both `packages/cli/assets/workflows/` and `.agents/workflows/` (release only in `.agents/`).
 
 ## Not proven yet
 
-- Nothing for refinement. The invariant (shipped workflows keep the same edges, maxima, sharing and resets) is for the plan and build to prove, with a test for slice's `merge.conflict` exception.
+- All of it: nothing is built. The invariant table (D9) must be taken from today's files before any workflow file is edited.
 
 ## Notes
 
-Decisions by the person:
-- Name `<step>.<outcome>`, the dot allowed in stored names only; one-way format, listed in the merge danger.
-- A check's `exits:`-named outcome other than `stale`: 5, never resets.
-- A shared exit: `<use step>.<exit>`, with the default from the kind of the inner edges; mixed kinds refused unless `max:` is given (names the exit and the kinds).
-- `max:` together with `counter:`: refused. `max:` on an edge that derives nothing: counts it as `<step>.<outcome>`, with no reset. `max:` on an edge to `$done`/`$stuck`: refused.
-- slice's `conflict_loop` is dropped and derived. The added reset on `merge.done` (to `$done`) is the one stated exception to "reset edges unchanged", with a test showing the bound is the same.
-- Listing derived counters before a run (doctor): out of scope, belongs with #341.
-- Derived counters show with their max in status, story view and the watch: in scope.
+Decisions by the person in the plan session:
+- Derive at load into the pin, not on every read in core.
+- Keep `stale_loop` shared where more than one edge shares it.
+- Correct the step names in stories 27 and 28.
+- An exit counter covers only feeders that derive; the mixed-kinds refusal applies only among those.
+- Rows 1–4 follow the table as written, with no loop condition.
+
+The prefactor: the flattener (store, shared-workflow) also hands back, per flat edge, the `<use>.<exit>` it left by and that route's counter/max.
 
 ## Resume
 
-Next round: planning (`norn-plan`) against spec.md, started by a person.
+Next step: slice the Plan (prefactor first; the invariant table before any shipped-workflow edit).

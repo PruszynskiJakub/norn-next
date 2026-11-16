@@ -73,8 +73,8 @@ A derived counter shows up under its name wherever a counter does: `state.json`,
 24. As a person unsticking a unit, I want `norn run rerun <unit> --reset review.changes_requested` to reset that derived counter to 0, so that I can give one loop more laps without editing the workflow.
 25. As a person who passes `--reset` a name that the unit's pinned workflow neither declares nor derives, I want the rerun refused as today with the counters it does have, so that a typo does not pass silently.
 26. As a `--json` reader of `state.json`, the brief or the status output, I want a derived counter's dotted name to validate wherever a counter name is stored, so that a unit with a derived counter is never marked corrupt by the norn that wrote it.
-27. As a maintainer of the shipped workflows, I want `quick`, `story`, `slice`, `refinement` (and this repo's `release`) to drop every counter whose max and reset match the defaults and keep the rest as `max:` overrides or shared names (for example `ship.ci-failed` with `max: 3`, `resolution-review.changes_requested` with `max: 2`, `slice.reject` with `max: 3`, `qa_loop` kept as a shared name), so that the files hold only what differs from the defaults.
-28. As a maintainer, I want every shipped workflow, once loaded, to keep the same set of (edge, max, edges sharing a counter, reset edges) as today, apart from counter names, so that no decision changes. The one stated exception is `slice`'s `merge.conflict`, whose derived counter also resets on `merge.done`. That edge goes to `$done`, so no lap is ever counted after it, and a test shows that the bound on every run is the same as with today's `conflict_loop`.
+27. As a maintainer of the shipped workflows, I want `quick`, `story`, `slice`, `refinement` (and this repo's `release`) to drop every counter whose max and reset match the defaults and keep the rest as `max:` overrides or shared names (for example `ship.ci-failed` with `max: 3`, `resolution-review.changes_requested` with `max: 2`, `approve-slices.reject` with `max: 3`, `qa_loop` kept as a shared name, and `stale_loop` kept as a shared name wherever more than one edge shares it), so that the files hold only what differs from the defaults.
+28. As a maintainer, I want every shipped workflow, once loaded, to keep the same set of (edge, max, edges sharing a counter, reset edges) as today, apart from counter names, so that no decision changes. The one stated exception is `slice`'s `integrate.conflict`, whose derived counter also resets on `integrate.done`. That edge goes to `$done`, so no lap is ever counted after it, and a test shows that the bound on every run is the same as with today's `conflict_loop`.
 29. As a maintainer, I want the golden cases updated for the counter names only, so that their diff shows no changed decision.
 30. As a user of a repo whose workflows were installed before this change, I want those workflows, with their `counter:` names and `counters:` block, to load and run exactly as before, so that upgrading norn needs no workflow edit.
 31. As a person with a unit already running, I want it to keep its pinned workflow and its counters under their old names after the upgrade, so that a rerun or `--reset` with the old name still works mid-round.
@@ -98,3 +98,98 @@ A derived counter shows up under its name wherever a counter does: `state.json`,
 ## Open questions
 
 None.
+
+## Plan
+
+### Seams
+
+- **S1 The store's workflow loader, through `loadWorkflowText` (and `loadWorkflows`), followed by core's `validateWorkflowDefinition` the way `repoWorkflows` runs them for doctor and the tick.** Observes everything an author writes and what gets pinned: the derived name, max and reset per kind of edge, `max:` overrides, the new refusals, shared-exit counters, an uncounted loop still refused, an old workflow keeping its pin byte for byte, and every shipped workflow keeping today's counting.
+  Prior art: the store's shared-workflows tests (`use: brings in a shared file's steps`, `shared files and the loaded text`), core's `validateWorkflowDefinition` tests, and the cli's `workflow templates` tests over the bundled files.
+- **S2 Core's classify/advance and the brief, through the apply functions and the brief builder, fed a pinned workflow that holds derived counters.** Observes a derived counter counting its edge, its reset, the exhausted park naming it with its edge and target, the brief's last-round warning, and that `integrate.conflict` gives the same bound as today's `conflict_loop`.
+  Prior art: core's apply and brief tests, and the fixtures in core's test folder.
+- **S3 The schema validators, through `validate`/`assertValid` on `state`, receipts and `workflow`.** Observes that a dotted name validates where a counter name is stored, while the as-written forms (`workflow-source`, `workflow-shared`) still refuse one under `counters:` and `counter:`.
+  Prior art: the schema package's state, records and workflow tests.
+- **S4 The CLI, through the cli harness.** Observes `norn doctor` reporting each new refusal, `norn status` and `norn story view` listing `review.changes_requested 1/3`, `norn run rerun --reset` with a derived name, an old name in a unit pinned before the upgrade, and an unknown name refused with the counters the unit has.
+  Prior art: the run-rerun-check and shared-workflows integration tests in the cli, the non-holder-views test, and the view package's integration test.
+- Golden cases (`bun run golden`) cover the decisions; docs are covered by the docs lint in the unit tier and by review.
+
+### Coverage
+
+| User story | Seam | Test kind | Notes |
+|---|---|---|---|
+| 1 a check's fail is bounded at 5 | S1 | unit | store tier |
+| 2 an outcome a check's exits map names (other than stale): 5, never reset | S1 | unit | |
+| 3 a gate's reject: 2 | S1 | unit | |
+| 4 conflict: 2, reset on every other outcome of the same step | S1 | unit | reset_on lists the step's other declared outcomes |
+| 5 stale on any step kind: 10 | S1 | unit | check exits-named `stale`, gate, merge |
+| 6 an agent send-back on an uncounted loop: 3 | S1 | unit | |
+| 7 forward edges and agent outcomes on no uncounted loop: no counter | S1 | unit | |
+| 8 the name is `<step>.<outcome>` | S1 | unit | |
+| 9 `max:` replaces the default, keeping name and reset | S1 | unit | |
+| 10 `max:` on an edge that derives nothing counts it, no reset | S1 | unit | |
+| 11 `max:` together with `counter:` refused | S1 | unit | doctor's report under story 20 |
+| 12 `max:` on an edge to `$done`/`$stuck` refused | S1 | unit | |
+| 13 `counter:` and `counters:` work as today | S1 | unit | qa_loop shape |
+| 14 an edge with `counter:` derives nothing | S1 | unit | |
+| 15 declared names stay dotless; `counter: review.changes_requested` refused as undeclared | S1 | unit | schema side under S3 |
+| 16 a shared exit counted once, as `<use step>.<exit>` | S1 | unit | base-update.broken shape |
+| 17 a shared exit's default comes from its feeders' kind; `max:` on the use route overrides it | S1 | unit | |
+| 18 mixed deriving kinds behind one exit refused without `max:` | S1 | unit | message names the exit and the kinds |
+| 19 a loop still uncounted is refused as today | S1 | unit | |
+| 20 doctor passes defaults and reports each refusal with its edge or exit | S4 | integration | |
+| 21 an exhausted derived counter is named in the park and its Unblock item | S2 | unit | |
+| 22 the last-round warning names a derived counter | S2 | unit | |
+| 23 status, story view and the watch list a derived counter with its max | S4 | integration | the watch shares the view's counter formatting |
+| 24 `rerun --reset <derived>` resets it | S4 | integration | |
+| 25 `--reset` with an unknown name refused, listing the unit's counters | S4 | integration | |
+| 26 dotted names validate in state, park, receipts and the pinned workflow | S3 | unit | |
+| 27 the shipped files hold only what differs from the defaults | S1 | unit | the counter-count assertion in `workflow templates` changes; review checks each file |
+| 28 every shipped workflow keeps its counting; integrate.conflict is the exception | S1 | unit | the integrate.conflict bound itself under S2 |
+| 29 golden cases change in counter names only | golden | unit | `bun run golden -- --update`, the diff reviewed |
+| 30 workflows installed before this change load and run as before | S1 | unit | today's bundled and repo texts load with the same source and hash |
+| 31 a running unit keeps its pin and old counter names | S4 | integration | rerun `--reset ready_loop` on a unit pinned with explicit counters |
+| 32 docs give the defaults table, naming, `max:` and when `counters:` is still needed | docs | review | the docs lint covers the glossary terms |
+
+### Prefactoring
+
+1. The flattener hands back the flat document plus where its routes left a shared file, before it writes the YAML text: for each flat edge that left through an exit, the `<use step>.<exit>` it left by, and that use route's `counter:`/`max:`. The pinned text and its hash don't change. Without this, stories 16–18 have nothing to derive from: once the workflow is flat, which exit an edge took is gone.
+
+### Implementation decisions
+
+- D1 **Derive at load, into the pin.** `loadWorkflowText` derives right after flattening and before pinning: the edge gets `counter: <name>`, and `counters:` gets `<name>: { max, reset_on? }`. Everything that reads counters today (`enterStep`'s initial counters, the advance and exhausted park in apply, the brief's at_limit and Rework, `run rerun --reset`, the view's counter list) keeps reading the pinned workflow, unchanged. A pin is read as written and never derived again, so a unit started before the upgrade keeps its counters and their names (story 31). This beat deriving on every read in core, which needs the shared-exit information in the pin and changes every reader.
+- D2 **A file that derives nothing keeps its pin byte for byte.** Only a file that derives at least one counter, or writes `max:`, is pinned as its derived text, written out the way the flattener writes one today (so its hash changes once). A workflow with every route counted by hand keeps its source and hash (story 30).
+- D3 **The pure derivation lives in core.** It is one function over the flat workflow in model form plus the exit information from the prefactor. It returns, per edge, the counter name to write, the counter specs to add, and the refusals. The store writes the result into the text. Edges are keyed the same in the file wording and the model wording, so the edits apply to the file's text directly.
+- D4 **Rules, exactly:**
+  - Only an edge whose target is a step derives anything. An edge with `counter:` derives nothing.
+  - A check's `fail`, or an outcome its `exits:` names other than `stale`: 5, no reset. A gate's `reject`: 2. Any `conflict`: 2, `reset_on` = every other outcome declared on that step. `stale` on any step: 10.
+  - An agent outcome other than `done`, `pass` or `approve`: 3, only when the edge lies on an elementary cycle of the edges still uncounted after the rows above and the named counters (reusing `elementaryCycles`).
+  - Rows 1–4 count such an edge even when it lies on no loop (the person's decision).
+  - `max:` on a deriving edge replaces only the max. `max:` on a non-deriving edge counts it as `<step>.<outcome>` with that max and no reset.
+- D5 **Shared exits.** The flat edges that left through `<use step>.<exit>`, with no `counter:` on that use route, are the exit's feeders. The ones that derive a counter share one counter `<use step>.<exit>`; feeders that derive nothing stay uncounted (the person's decision). If those deriving feeders all have one kind, that kind's default applies; a conflict's `reset_on` is the union of every feeder step's other outcomes. If they have different kinds, the load is refused unless the use route gives `max:`; with `max:` they share it, with no reset. Agent feeders derive when any of them lies on an uncounted loop. `max:` on a use route with no deriving feeder counts every feeder. A use route to `$done`/`$stuck` derives nothing. Names never clash: the flattener already refuses an included step named like its use step.
+- D6 **Schema.** A new stored counter name, `IDENT` or `IDENT.IDENT`, goes on `state.counters`, the park's `counter.name`, a receipt's `reset` list, and the loaded `workflow`'s `counters:` keys and edge `counter:`. The as-written forms (`workflow-source`, `workflow-shared`, use routes) keep the dotless `CounterName` and gain `max: PosInt` on an edge route (not on `{ exit: }`); the loaded `workflow` has no `max`. Then `bun run schema:emit`. This is one-way: an older norn marks a unit corrupt if its state.json, receipts or **pinned workflow.yaml** hold a dotted name. That goes in the PR's merge danger.
+- D7 **Refusals are loader errors** (a file error with a JSON pointer to the edge or the use route), reported by doctor like any loader error and prefixed with the shared file when the edge came from one. Messages:
+  - `max:` with `counter:`: "`<step>.<outcome>` sets both max and counter: a named counter's max goes under counters".
+  - `max:` to an end: "`<step>.<outcome>` → `$done` sets max, but there is no loop to bound".
+  - A mixed exit: "exit `<exit>` of `<use step>` is fed by edges of different kinds (check fail: `test.fail`; gate reject: `ready.reject`): give max: on `<use step>`'s route".
+  - An uncounted loop stays `uncounted_cycle`, from `validateWorkflowDefinition`.
+- D8 **Shipped workflows, in `packages/cli/assets/workflows/` and `.agents/workflows/` both.** Every counter whose max and reset match the defaults is dropped. Kept or overridden:
+  - `ship`'s CI-failed exit gets `max: 3` (`ci-failed` shipped, `failed` in this repo's copy).
+  - `resolution-review.changes_requested` gets `max: 2`, in base-update.yaml.
+  - `approve-slices.reject` gets `max: 3`.
+  - `qa_loop` stays a shared name.
+  - `stale_loop` stays a shared name wherever it spans more than one edge: shipped story, release, and this repo's quick and story. Shipped quick derives `ship.stale`.
+  - slice drops `conflict_loop`; `integrate.conflict` now also resets on `integrate.done`, the stated exception.
+- D9 **The invariant test** pins a table per shipped workflow (the bundled ones and this repo's, release included), taken from today's files before any edit. The table holds, per counted edge, its max and reset edges, plus the groups of edges sharing a counter, all without counter names. The test loads the edited files and compares. `integrate.conflict`'s added reset is the only listed difference. S2 proves its bound: two conflicts, a third parks exhausted, and `integrate.done` ends at `$done`, as today.
+- D10 **No code change in run-rerun, the brief, apply or the view.** They see derived counters through the pin; S2 and S4 tests prove it.
+- D11 **Docs.** The workflow recipes and concepts get the defaults table, both naming rules, `max:`, and when `counter:`/`counters:` is still needed; the glossary's counter entry says a counter is named or derived from its edge; then `bun run docs:emit`.
+
+### Testing decisions
+
+A good test writes a workflow the way an author does (YAML text, plus shared texts through the reader) and checks what is pinned and refused. Or it drives a unit through the harness and reads what a person or agent sees. It never calls the derivation function or reads flattener internals. Workflow texts come from the shipped files or inline fixtures named after the shape they test; ref names and shapes come from the code. Nothing is faked except what the harness already fakes at system boundaries (the forge, the clock). The golden diff and the invariant table are pinned outputs: they change only together with the behaviour this spec names.
+
+### Risks
+
+- **The agent row and the shared-exit kinds could miscount a shipped workflow.** That is the most likely failure. The invariant table is written first, from today's files, so every later change is checked against it.
+- **Another path pins or parses a workflow file without going through `loadWorkflowText`.** Such a path would refuse `max:` as a schema error, or pin an underived text. The slice that adds `max:` lists every caller of `parseWorkflowText` and the flattener (record-ref restart, story edit, upgrade wording) and routes each file read through the loader.
+- **The format can't be taken back** (dotted names in state.json, receipts and workflow.yaml), and the released `norn` running hooks next to a newer pin hits it. That goes in the merge danger; nothing to test.
+- **The status line could get longer.** The view lists every counter with a max while a unit runs. A shipped workflow gets about as many derived counters as it declared before, so expect a similar length; S4 checks the line.
