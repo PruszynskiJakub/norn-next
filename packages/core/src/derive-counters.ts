@@ -3,7 +3,7 @@
  * share one between edges or to reset it on a chosen edge. Pure over the flat workflow as written
  * (in the model's step form, before validation): the loader writes the result into the text it pins.
  */
-import type { CounterSpec } from "@norn/schema";
+import { type CounterSpec, OUTCOME_NAME_PATTERN, STEP_NAME_PATTERN } from "@norn/schema";
 
 export interface DerivedCounting {
   /** edge `<step>.<outcome>` → the counter it now names; holds every edge that wrote `max:` */
@@ -33,6 +33,11 @@ interface WrittenEdge {
   counter?: unknown;
   max?: unknown;
 }
+
+// An edge is named `<step>.<outcome>`, so a malformed name would make a name that splits wrongly:
+// such an edge derives nothing and the schema check that follows refuses the file.
+const STEP_NAME = new RegExp(STEP_NAME_PATTERN);
+const OUTCOME_NAME = new RegExp(OUTCOME_NAME_PATTERN);
 
 const nameOf = (e: { step: string; outcome: string }) => `${e.step}.${e.outcome}`;
 const pathOf = (e: { step: string; outcome: string }) => `/steps/${e.step}/outcomes/${e.outcome}`;
@@ -93,8 +98,9 @@ export function deriveEdgeCounters(doc: unknown): DerivedCounting {
 function writtenEdges(steps: Obj): WrittenEdge[] {
   const out: WrittenEdge[] = [];
   for (const [step, s] of Object.entries(steps)) {
-    if (!isObj(s) || !isObj(s.outcomes)) continue;
+    if (!isObj(s) || !isObj(s.outcomes) || !STEP_NAME.test(step)) continue;
     for (const [outcome, route] of Object.entries(s.outcomes)) {
+      if (!OUTCOME_NAME.test(outcome)) continue;
       if (typeof route === "string") out.push({ step, outcome, to: route });
       else if (isObj(route) && typeof route.to === "string")
         out.push({ step, outcome, to: route.to, ...(route.counter !== undefined && { counter: route.counter }), ...(route.max !== undefined && { max: route.max }) });
@@ -107,7 +113,7 @@ function writtenEdges(steps: Obj): WrittenEdge[] {
 function kindDefault(step: Obj, e: WrittenEdge): CounterSpec | null {
   if (e.outcome === "stale") return { max: STALE };
   if (e.outcome === "conflict") {
-    const others = Object.entries(step.outcomes as Obj).filter(([o, r]) => o !== e.outcome && r !== undefined).map(([o]) => `${e.step}.${o}`);
+    const others = Object.entries(step.outcomes as Obj).filter(([o, r]) => o !== e.outcome && r !== undefined && OUTCOME_NAME.test(o)).map(([o]) => `${e.step}.${o}`);
     return { max: CONFLICT, ...(others.length && { reset_on: others.length === 1 ? (others[0] as string) : others }) };
   }
   if (step.type === "check") {

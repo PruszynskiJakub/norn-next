@@ -2,7 +2,7 @@
 An edge with no `counter:` gets a counter `<step>.<outcome>` at load, with its default max (and a conflict's reset). `max:` on the edge changes only the bound. Dotted names validate where they are stored.
 
 ### Proof
-Review #1 asked for changes. One blocking bug: a dotted step name crashes the loader (see Not proven yet). `bun run test` (2099 pass) and `bun run typecheck` are green.
+Review #1's blocking finding (a dotted step name crashed the loader) is fixed and tested. `bun run test` (2100 pass) and `bun run typecheck` are green.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -17,6 +17,7 @@ Review #1 asked for changes. One blocking bug: a dotted step name crashes the lo
 | AC9 | a loop still uncounted after derivation is refused as `cycle without a counter` | test | `packages/store/test/unit/derived-counters.test.ts` › "a loop no edge counts even after derivation…" (through validateWorkflowDefinition, as doctor and the tick run it) |
 | AC10 | a non-deriving workflow keeps its pin byte for byte; a deriving one pins the derived text | test | `packages/store/test/unit/derived-counters.test.ts` › "a workflow that derives nothing keeps its pinned text…"; `packages/store/test/unit/shipped-workflow-counting.test.ts` › "each … workflow as it was loads to the same source and hash" |
 | AC11 | dotted names validate in state, the exhausted park, a reset list and the pinned workflow; as-written forms still refuse them | test | `packages/schema/test/unit/records.test.ts` › "a counter derived from its edge, named <step>.<outcome>"; `packages/schema/test/unit/workflow.test.ts` › "counters derived from their edge, and max on an edge" |
+| F1 | a dotted step or outcome name in a file is refused as corrupt, never thrown | test | `packages/store/test/unit/derived-counters.test.ts` › "a dotted step or outcome name in a file is refused as corrupt, never thrown, and derives nothing" |
 | AC12 | doctor passes a workflow with every default unwritten and reports each `max:` refusal with its edge | test | `packages/cli/test/integration/derived-counters.test.ts` (integration tier; not run locally, CI runs it) |
 
 ### Easy to miss
@@ -25,10 +26,9 @@ Review #1 asked for changes. One blocking bug: a dotted step name crashes the lo
 - TypeBox `Record` keys are not pattern-checked without `additionalProperties: false`, so `state.counters` keys were never validated. The stored-name refusal is pinned on the reset list instead.
 - The agent row uses reachability (u→v lies on a cycle of the uncounted edges iff v reaches u through them) rather than enumerating `elementaryCycles`. That is equivalent and simpler.
 - Until slice 03, an included edge derives per edge. A use route's `max:` is copied onto each flat edge by the flattener's `leave()`.
-- Edge keys `<step>.<outcome>` are built before the schema checks names, so re-splitting them on `.` breaks on a malformed name (finding F1).
+- Edge keys `<step>.<outcome>` are built before the schema checks names. `writtenEdges` in core therefore skips any step or outcome whose name fails `STEP_NAME_PATTERN`/`OUTCOME_NAME_PATTERN` (and a conflict's reset list skips such siblings), so the store's `edge.split(".")` only ever sees names without dots, and the schema check refuses the file.
 
 ### Not proven yet
-- Blocking finding F1 (in `review-findings.json`): a workflow file with a dotted step name (for example `a.b`) makes `loadWorkflowText` throw a TypeError at `packages/store/src/derived-counters.ts:40-41` (`edge.split(".")`) instead of returning the file as corrupt. `loadWorkflows` promises to report invalid files, not throw them. Fix: carry step and outcome separately, or skip derivation when a name is invalid. Add a test that such a file is refused as corrupt.
 - AC12 runs only in CI (integration tier).
 - Integration and e2e fixtures whose inline workflows have an uncounted check fail, reject, conflict or stale edge now pin derived text. Some may move in CI.
 
@@ -38,4 +38,4 @@ Review #1 asked for changes. One blocking bug: a dotted step name crashes the lo
 - Review #1: the agent row counts every agent send-back on a loop made only of agent edges (for example `fix.rethink` and `fixed.again` both count). The test pins this and the spec allows it.
 
 ### Resume
-Rework F1 in `packages/store/src/derived-counters.ts` and add the corrupt-refusal test, then report.
+Nothing open in this slice: the next step is review of the fix for the dotted-name crash.

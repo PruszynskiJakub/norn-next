@@ -199,6 +199,26 @@ describe("a counter derived per edge at load", () => {
     expect(refusal(workflow(steps))).toEqual(["/steps/test/outcomes/fail counter 'test.fail' is not declared in counters"]);
   });
 
+  test("a dotted step or outcome name in a file is refused as corrupt, never thrown, and derives nothing", () => {
+    const dottedStep = workflow(`  implement:
+    agent: Build it.
+    outcomes: { done: a.b }
+  a.b:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: $done, fail: implement }
+`);
+    expect(refusal(dottedStep)).toContain("/steps unknown property 'a.b'");
+    expect(refusal(dottedStep).join("\n")).not.toContain("a.b.fail");
+    const dottedOutcome = workflow(`${IMPLEMENT}  test:
+    check: bun test
+    timeout: 5m
+    exits: { "3": x.y }
+    outcomes: { pass: $done, fail: implement, x.y: implement }
+`);
+    expect(refusal(dottedOutcome).join("\n")).not.toContain("test.x.y");
+  });
+
   test("a loop no edge counts even after derivation is refused as a cycle without a counter", () => {
     const wf = loaded(
       workflow(`  implement:
