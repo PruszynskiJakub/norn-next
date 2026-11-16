@@ -2,7 +2,7 @@
 norn loads a workflow written in the new wording (one head key, optional `skills:`, `by:`, `outcomes:` with sibling `means:` / `verdict:`) to the same `type`-tagged model as today, refuses malformed shapes naming the step, and still loads old-wording files everywhere through the translation.
 
 ### Proof
-`bun run test` (2033 pass) and `bun run typecheck` green after the scalar-prose rework. Golden decisions match the base exactly across all 139 cases; only the embedded facts moved.
+Review #2 approved: `bun run test` (2033 pass) and `bun run typecheck` pass on HEAD. The golden decisions were compared case by case with the base: all 139 are identical, and only the embedded facts moved. Each row below was read against its test.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -37,4 +37,4 @@ norn loads a workflow written in the new wording (one head key, optional `skills
 - Friction: none.
 
 ### Resume
-Review the slice again: the review#1 finding (a scalar `means:`/`verdict:` on an agent step was dropped silently) is fixed in `proseErrors` (`packages/store/src/step-wording.ts`), which now refuses it at `/steps/<name>/<key>`.
+Review #2 approved the slice: the review #1 finding (a scalar `means:`/`verdict:` was dropped silently) is fixed at `packages/store/src/step-wording.ts:80`. Next is QA against AC1–AC13.
