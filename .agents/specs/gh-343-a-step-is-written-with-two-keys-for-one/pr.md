@@ -1,6 +1,6 @@
 ## Summary
 
-Workflow authors now write each step with one head key that says what happens. An agent step's skills become an optional list. Meanings and verdicts move out of the routes into sibling maps, and `by:` picks the agent. Old-wording files in the main checkout are refused and `norn upgrade` rewrites them without losing anything. Old pins and story-branch files still load through the same translation, and decide makes the same decisions.
+Workflow authors now write each step with one head key that says what happens. An agent step's skills become an optional list. Meanings and verdicts move out of the routes into sibling maps, and `by:` picks the agent. Old-wording files in the main checkout are refused, and `norn upgrade` rewrites them without losing anything. Old pins and story-branch files still load through the same translation, and decide makes the same decisions.
 
 ```diff
  implement:
@@ -29,119 +29,111 @@ Workflow authors now write each step with one head key that says what happens. A
 ```
 
 ```
-load workflow text
-  main checkout .agents/workflows/ ─ old wording? → refuse, do_instead: norn upgrade
-  pin / story-branch file ─ old wording? → translate (the same code as norn upgrade) → load
+load workflow text (read kind)
+  checkout: main checkout .agents/workflows/ ─ old wording? → refuse, do_instead: norn upgrade
+  copy:     pin / story-branch file          ─ old wording? → translate (the same code as norn upgrade) → load
 ```
 
 ## Evidence
 
-QA #1 ran on the whole story: 47 criteria pass, 0 fail, 1 is for a person to judge and 5 are unverified (listed below). Full table: [report.md](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/report.md).
+QA #2 ran on the whole story at 3af53e1, after the CI fix and review #2: 46 criteria pass, 0 fail, 1 is for a person to judge and 6 are unverified because they need a remote or CI (listed at the end). Full table: [report.md](evidence/_story/01M7JPBT006V69R487APS2FRV7/report.md). Since 3af53e1 only norn's own commits and the handoff have moved.
 
 **Writing a step**
 
 - **Agent step headed `agent: <orientation>`, other keys beside it**
-  **Before:** `type: agent` + `skill:` + `instructions:`. **After:** the step loads with every sibling key ([04.AC1](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC1.md)).
-- **Check step headed `check: <command>`**
-  **Before:** `type: check` + `run:`. **After:** loads with `timeout`, `exits` and `outcomes` ([04.AC1](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC1.md), [05.AC1](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/05.AC1.md)).
-- **Gate headed `gate: <what the person decides>`**
-  **Before:** `type: gate` + `prompt:`. **After:** shipped gates load in this form ([05.AC1](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/05.AC1.md)).
-- **Built-in steps as value-less verbs**
-  **Before:** `type`/`action` pairs. **After:** each of the six verbs loads to the same kind with the same outcomes ([04.AC2](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC2.md)).
-- **`use:` unchanged**
-  **After:** shared steps load as written, and their `{ exit: … }` routes still route ([04.AC11](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC11.md)).
+  **Before:** `type: agent` + `skill:` + `instructions:`. **After:** the step loads with every sibling key ([04.AC1](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC1.md)).
+- **Check step headed `check: <command>`; gate headed `gate: <what the person decides>`**
+  **Before:** `type: check` + `run:`, `type: gate` + `prompt:`. **After:** both load, and the shipped files use them ([04.AC1](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC1.md), [05.AC1](evidence/_story/01M7JPBT006V69R487APS2FRV7/05.AC1.md)).
+- **Built-in steps as value-less verbs; a verb with a value refused**
+  **Before:** `type`/`action` pairs. **After:** all six verbs load to the same kind with the same outcomes, and `open-pr: now` is refused ("`open-pr:` takes no value") ([04.AC2](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC2.md)).
 - **Two head keys or none refused, naming the step**
-  **Before:** did not exist. **After:** refused at load ([04.AC3](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC3.md)).
-- **A verb with a value refused**
-  **After:** `open-pr: now` is refused at load ([04.AC2](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC2.md)).
+  **Before:** did not exist. **After:** refused at load ([04.AC3](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC3.md)).
 - **`like` inherits the head key; a different one is refused**
-  **After:** both cases observed ([04.AC4](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC4.md)).
+  **After:** both cases observed ([04.AC4](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC4.md)).
+- **`use:` and shared `{ exit: … }` routes unchanged**
+  **After:** shared steps load as written and their exits still route ([04.AC11](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC11.md)).
 
-**Agent steps: orientation and skills**
+**Agent steps: orientation, skills, agent**
 
 - **Missing or empty orientation refused**
-  **After:** refused, naming the step ([04.AC5](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC5.md)).
-- **`skills:` optional**
-  **Before:** exactly one skill was required. **After:** a step without `skills:` loads ([04.AC6](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC6.md)).
+  **After:** refused, naming the step ([04.AC5](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC5.md)).
+- **`skills:` optional; a skill named twice refused**
+  **Before:** exactly one skill was required. **After:** a step without `skills:` loads; a duplicate is refused ([04.AC6](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC6.md)).
 - **`unknown_skill` for each listed skill**
-  **After:** the same refusal as before, once for each missing or invisible skill ([02.AC4](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/02.AC4.md)).
-- **A skill named twice refused**
-  **After:** refused at load ([04.AC6](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC6.md)).
-- **Brief: one, several or no skills**
-  **Before:** the brief always said "Use the `X` skill.". **After:** "Use the `norn-implement` skill.", "… `norn-implement` and `norn-tdd` skills.", "…, `norn-tdd` and `norn-codebase-design` skills.", and with no skills only the orientation ([02.AC1-3](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/02.AC1-3.md), [output](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/02.AC1-3-brief-output.txt)). These are three user stories.
+  **After:** the same refusal as before, once for each missing or invisible skill ([02.AC4](evidence/_story/01M7JPBT006V69R487APS2FRV7/02.AC4.md)).
+- **Brief with one, two or no skills**
+  **Before:** always "Use the `X` skill.". **After:** "Use the `norn-implement` skill.", "Use the `norn-implement` and `norn-tdd` skills.", and with none only the orientation ([02.AC1](evidence/_story/01M7JPBT006V69R487APS2FRV7/02.AC1.md), [02.AC2](evidence/_story/01M7JPBT006V69R487APS2FRV7/02.AC2.md), [02.AC3](evidence/_story/01M7JPBT006V69R487APS2FRV7/02.AC3.md)).
+- **Refine step still recognised by its skills**
+  **After:** decide finds the refine step from its `skills` list ([02.AC5](evidence/_story/01M7JPBT006V69R487APS2FRV7/02.AC5.md)).
 - **`by:` picks the configured agent, falling back to the default**
-  **Before:** a per-step `agent: <name>`. **After:** both the named agent and the fallback observed ([04.AC7](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC7.md)).
+  **Before:** a per-step `agent: <name>`. **After:** both the named agent and the fallback observed ([04.AC7](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC7.md)).
 
 **Outcomes, meanings and verdicts**
 
-- **`outcomes:` as a plain map; `means:` / `verdict:` beside it**
-  **After:** `outcome: target` and `{ to, counter }` load with the sibling maps ([04.AC8](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC8.md)).
-- **Brief finish lines unchanged**
-  **After:** each outcome's meaning and verdict render as before ([04.AC8](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC8.md), [04.AC12](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC12.md)).
+- **`outcomes:` as a plain map; `means:` / `verdict:` beside it; brief finish lines unchanged**
+  **After:** `outcome: target` and `{ to, counter }` load with the sibling maps, and each finish line renders its meaning as before ([04.AC8](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC8.md)).
 - **A routed reportable outcome with no meaning refused; overridable routes exempt**
-  **After:** refused, naming the step and outcome. `silent`/`died`/`timeout`/`stalled`/`ask`/`stuck` need no meaning ([04.AC9](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC9.md)).
+  **After:** refused, naming the step and outcome; `silent`/`died`/`timeout`/`stalled`/`ask`/`stuck` need none ([04.AC9](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC9.md)).
 - **Stale or misplaced `means`/`verdict` refused**
-  **After:** refused for an unrouted outcome, on a non-agent step, and inside an edge ([04.AC10](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC10.md)).
-- **Shared `{ exit: … }` routes keep working**
-  **After:** they load and route ([04.AC11](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC11.md)).
+  **After:** refused for an unrouted outcome, on a non-agent step, and inside an edge ([04.AC10](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC10.md)).
 
 **The old wording**
 
+- **Every reader names its read kind; today's file loads the same**
+  **After:** checkout readers ask for `checkout`, pin/branch/trace/record readers for `copy` ([01.AC2](evidence/_story/01M7JPBT006V69R487APS2FRV7/01.AC2.md)); an old file read as a copy loads equal to its translation ([04.AC12](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC12.md), [04.AC13](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC13.md)). The trace, record and restart integration tests are unverified until CI ([01.AC1](evidence/_story/01M7JPBT006V69R487APS2FRV7/01.AC1.md)).
 - **Main-checkout old wording refused, `do_instead` names `norn upgrade`; mixed steps too**
-  **Before:** loaded. **After:** e.g. ``written in the old wording: step 'a' (action); run `norn upgrade` to rewrite it and commit``, exit 3 ([09.AC1](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/09.AC1.md), [09.AC2](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/09.AC2.md)).
-- **doctor: one issue per file; treated like an invalid workflow**
-  **After:** two old files give two FAIL lines, each naming `norn upgrade`, and no new round starts from them ([09.AC3](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/09.AC3.md), [09.AC4](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/09.AC4.md)).
-- **Story in flight on an old pin keeps running; past records stay readable**
-  **After:** in a harness repo, an old-wording pin ran to `$done` with its bytes and hash untouched and its record readable. A past round's trace was not replayed, so this is unverified ([09.AC5](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/09.AC5.md)).
-- **Restart from an old-wording branch file**
-  **After:** the shipped integration test passes (pin verbatim, hash equal). No restart was driven by hand, so this is unverified ([09.AC6](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/09.AC6.md)).
+  **Before:** loaded. **After:** ``written in the old wording: step 'reproduce' (type, skill, instructions, means inside an edge); run `norn upgrade` to rewrite it and commit``, exit 3 ([09.AC1](evidence/_story/01M7JPBT006V69R487APS2FRV7/09.AC1.md), [09.AC2](evidence/_story/01M7JPBT006V69R487APS2FRV7/09.AC2.md)).
+- **doctor: one issue per old file**
+  **After:** each old workflow gets one FAIL line naming `norn upgrade` ([09.AC3](evidence/_story/01M7JPBT006V69R487APS2FRV7/09.AC3.md)).
+- **No new round from an old file; the inbox names it**
+  **After:** `norn story create --workflow <old>` is refused before anything is created. `story edit` and intake need a remote: unverified, check `integration/old-wording.test.ts` in CI ([09.AC4](evidence/_story/01M7JPBT006V69R487APS2FRV7/09.AC4.md)).
+- **Story in flight on an old pin finishes untouched**
+  **After:** a copy read loads the old text with its bytes and hash kept. Driving a round to its end needs a remote: unverified, check `old-wording.test.ts` › "the pin loads, its text and hash stay…" in CI ([09.AC5](evidence/_story/01M7JPBT006V69R487APS2FRV7/09.AC5.md)).
+- **Lost-record restart pins the old branch file verbatim**
+  **After:** the copy read keeps source and hash (the same text read as `checkout` is refused). `norn story checkout` not driven: unverified, check `takeover-record-lost.test.ts` › "an old-wording workflow file on the branch…" in CI ([09.AC6](evidence/_story/01M7JPBT006V69R487APS2FRV7/09.AC6.md)).
 - **New units pin the new wording**
-  **After:** observed ([09.AC7](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/09.AC7.md)).
+  **After:** observed ([09.AC7](evidence/_story/01M7JPBT006V69R487APS2FRV7/09.AC7.md)).
 - **Same decisions in either wording**
-  **After:** all 139 golden cases' `decisions` are byte-identical to origin/main, and each shipped file loads equal in both wordings ([02.AC6](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/02.AC6.md), [04.AC12](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC12.md)).
+  **After:** all 139 golden cases' `decisions` are byte-identical to origin/main (files renamed because the embedded workflow moved) ([02.AC6](evidence/_story/01M7JPBT006V69R487APS2FRV7/02.AC6.md)).
 
 **norn upgrade**
 
-- **Rewrites and stages old files in workflows/ and shared/**
-  **After:** 12 files rewritten and staged with the config, exit 0 ([08.AC1](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/08.AC1.md)).
-- **Rewrite loads to the same workflow**
-  **After:** before and after loads are equal ([08.AC1](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/08.AC1.md), [04.AC12](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/04.AC12.md)).
+- **Rewrites and stages old files in workflows/ and shared/; each loads to the same workflow**
+  **After:** 9 files rewritten and staged with the config, exit 0; old file and its rewrite load deep-equal ([08.AC1](evidence/_story/01M7JPBT006V69R487APS2FRV7/08.AC1.md), [04.AC12](evidence/_story/01M7JPBT006V69R487APS2FRV7/04.AC12.md)).
 - **Comments, key order and scalar styles kept; edge comments stay on the outcome's line**
-  **After:** the 9 shipped files and release.yaml translate byte for byte to the expected files ([03.AC1](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/03.AC1.md), [03.AC2](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/03.AC2.md), [03.AC5](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/03.AC5.md)).
+  **After:** the shipped files and release.yaml translate byte for byte to the expected files ([03.AC1](evidence/_story/01M7JPBT006V69R487APS2FRV7/03.AC1.md), [03.AC2](evidence/_story/01M7JPBT006V69R487APS2FRV7/03.AC2.md), [03.AC5](evidence/_story/01M7JPBT006V69R487APS2FRV7/03.AC5.md)). A rewrite that would load differently is refused at its step: store test `wording.test.ts` › "a rewrite that would load differently… is refused at its step" (added after review #1).
 - **An unplaceable comment refuses only that file**
-  **After:** the file and the comment's line are named, the other files are rewritten, exit 0 ([03.AC7](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/03.AC7.md), [08.AC2](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/08.AC2.md)).
-- **`skill:` → `skills: [X]`, instructions become the orientation word for word**
-  **After:** observed ([03.AC3](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/03.AC3.md)).
+  **After:** `odd.yaml:5: this comment has no line to sit on…`, the file byte-identical, the other 9 rewritten, exit 0 ([03.AC7](evidence/_story/01M7JPBT006V69R487APS2FRV7/03.AC7.md), [08.AC2](evidence/_story/01M7JPBT006V69R487APS2FRV7/08.AC2.md)).
+- **`skill:` → `skills: [X]`, instructions become the orientation word for word; `agent: <name>` → `by:`**
+  **After:** observed ([03.AC3](evidence/_story/01M7JPBT006V69R487APS2FRV7/03.AC3.md), [03.AC6](evidence/_story/01M7JPBT006V69R487APS2FRV7/03.AC6.md)).
 - **Fallbacks: no instructions → description or "Use the `X` skill."; no gate prompt → description or `approve or reject <step>`**
-  **After:** observed ([03.AC4](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/03.AC4.md)). These are two user stories.
-- **`agent: <name>` → `by: <name>`**
-  **After:** observed ([03.AC6](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/03.AC6.md)).
-- **A second run changes nothing**
-  **After:** idempotent ([03.AC8](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/03.AC8.md), [08.AC3](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/08.AC3.md)).
+  **After:** observed, a blank orientation counting as missing ([03.AC4](evidence/_story/01M7JPBT006V69R487APS2FRV7/03.AC4.md)).
+- **A second run changes nothing; all-new files untouched**
+  **After:** idempotent, and nothing rewritten or reported for a new-wording repo ([03.AC8](evidence/_story/01M7JPBT006V69R487APS2FRV7/03.AC8.md), [08.AC3](evidence/_story/01M7JPBT006V69R487APS2FRV7/08.AC3.md), [08.AC4](evidence/_story/01M7JPBT006V69R487APS2FRV7/08.AC4.md)).
 - **JSON stays JSON**
-  **After:** output is JSON with a two-space indent and the key order kept ([03.AC9](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/03.AC9.md)).
-- **Machine dir untouched**
-  **After:** the machine dir's hash is equal before and after ([08.AC5](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/08.AC5.md)).
-- **Files already in the new wording: no workflow change**
-  **After:** nothing rewritten or reported ([08.AC4](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/08.AC4.md)).
+  **After:** two-space indent, key order kept ([03.AC9](evidence/_story/01M7JPBT006V69R487APS2FRV7/03.AC9.md)).
+- **Run state untouched**
+  **After:** machine dir hash equal before and after, but that dir held no units; unverified with real units, check `upgrade-wording.test.ts` › "units with pins, receipts and state…" in CI ([08.AC5](evidence/_story/01M7JPBT006V69R487APS2FRV7/08.AC5.md)).
 - **doctor → upgrade → doctor ends clean**
-  **After:** "norn doctor: every check passes" ([09.AC8](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/09.AC8.md)).
+  **After:** 7 failing checks, then `norn upgrade`, then "norn doctor: every check passes" ([09.AC8](evidence/_story/01M7JPBT006V69R487APS2FRV7/09.AC8.md)).
 
-**Shipped workflows and docs**
+**Shipped workflows, schemas and docs**
 
-- **`norn init` writes the new wording with hand-written orientations**
-  **After:** every shipped file loads in the new wording ([05.AC1](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/05.AC1.md)). Whether each orientation steers well is for a person to judge, using the table in [05.AC4](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/05.AC4.md). The fsd gate approved it, so please confirm it on this head.
-- **This repo's copies, `release.yaml` included, in the new wording**
-  **After:** all load ([05.AC2](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/05.AC2.md)).
+- **`norn init` writes the new wording; this repo's copies too**
+  **After:** every shipped file and this repo's `.agents/workflows/` (with `release.yaml`) load in the new wording ([05.AC1](evidence/_story/01M7JPBT006V69R487APS2FRV7/05.AC1.md), [05.AC2](evidence/_story/01M7JPBT006V69R487APS2FRV7/05.AC2.md)).
+- **Orientations tell the agent what the step is for**
+  For a person: read the `agent:` lines in `packages/cli/assets/workflows/*.yaml`. Approved at human-qa#1 (ebc79fa); the workflow text has not moved since ([05.AC4](evidence/_story/01M7JPBT006V69R487APS2FRV7/05.AC4.md)).
 - **Emitted JSON Schema describes the new wording only**
-  **After:** the schema emit check is clean and old keys are rejected ([05.AC3](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/05.AC3.md)).
+  **After:** schema emit check clean, old keys rejected ([05.AC3](evidence/_story/01M7JPBT006V69R487APS2FRV7/05.AC3.md)).
 - **Docs and the generated reference show the new wording**
-  **After:** the concepts page, recipes and reference are updated, and the docs emit check is up to date ([10.AC1](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/10.AC1.md), [10.AC2](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/10.AC2.md)).
+  **After:** concepts page, recipes and reference updated; docs emit check up to date ([10.AC1](evidence/_story/01M7JPBT006V69R487APS2FRV7/10.AC1.md), [10.AC2](evidence/_story/01M7JPBT006V69R487APS2FRV7/10.AC2.md)).
+- **Tests migrated, asserting the same; transcripts move only in wording**
+  **After:** unit tier green (check test#2) and e2e green locally (one light-path harness flake on `git clone`, then 5/5 twice) ([06.AC2](evidence/_story/01M7JPBT006V69R487APS2FRV7/06.AC2.md), [07.AC1](evidence/_story/01M7JPBT006V69R487APS2FRV7/07.AC1.md), [07.AC2](evidence/_story/01M7JPBT006V69R487APS2FRV7/07.AC2.md)).
 
-Unverified until CI runs on this PR: the cli integration tier (including the restart and record read tests) and the e2e tier must be green on the final head. The unit tier passed in test#1 ([06.AC1-07.AC1](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/06.AC1-07.AC1.md)). The migrated tests assert the same behaviour, and the transcripts and snapshots moved only in fixture wording ([06.AC2](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/06.AC2.md), [07.AC2](evidence/_story/01M7JMBBE3469ZP7AM4GP7466T/07.AC2.md)).
+Unverified until CI runs on this head: the cli integration suite ([06.AC1](evidence/_story/01M7JPBT006V69R487APS2FRV7/06.AC1.md)), which red-lit 3 of 4 shards at d01b9d7 and whose three stale tests were fixed since; it carries the checks for the read kinds' integration tests, no round from an old file, the old pin in flight, the lost-record restart and run state under upgrade. All four `integration` shards must be green before ready.
 
 ## Merge danger
 
-**Door:** one-way. Repos that run `norn upgrade` commit new-wording workflow files, and an older norn cannot read them. Reverting the code does not rewrite those files back.
+**Door:** one-way: repos that run `norn upgrade` commit new-wording workflow files an older norn cannot read, and a revert does not rewrite them back.
 
-**Blast radius:** every norn repo. On release, any main checkout still holding old-wording workflows refuses to start new rounds until `norn upgrade` runs. Stories in flight continue because old pins and branch files are translated. The workflow hash moves for every shipped workflow, but decisions do not (the golden cases are byte-identical).
+**Blast radius:** every norn repo: on release, a main checkout still holding old-wording workflows starts no new round until `norn upgrade` runs; stories in flight carry on through the translated pins. The workflow hash moves for every shipped workflow, though decisions do not. `norn brief --json` renames `work.skill` (string) to `work.skills` (array), a breaking change for any script reading it.

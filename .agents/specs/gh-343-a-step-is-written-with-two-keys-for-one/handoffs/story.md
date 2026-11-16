@@ -86,8 +86,8 @@ Each needs a remote with stories, or CI on a pushed head:
 - Review #1's F1/F2 are fixed (review #2); its minor findings stay as notes in the review #1 receipt.
 - QA #2: the e2e tier flaked once locally (light-path.test.ts: 3 fail after a harness `git clone` "failed to copy file"), then passed 5/5 twice. Watch the CI e2e shards.
 - QA #2 nits for the person: core's message for a wrong outcome on a verb still uses old words ("…base update only (action: update), not of action: open-pr"); the upgrade's commit hint reads "Refresh norn's skills (norn upgrade)" when only workflows were rewritten.
-- Merge danger for the PR: `norn brief --json` renames `work.skill` to `work.skills`.
+- Merge danger for the PR: `norn brief --json` renames `work.skill` to `work.skills`. pr.md names it, along with the one-way door (upgraded files cannot be read by an older norn).
 
 ## Resume
 
-CI must go green on this head (all integration and e2e shards) before ready is approved. The criteria marked unverified in QA #2 are checked there.
+describe #2 rewrote `pr.md` from the current diff and QA #2 (evidence run 01M7JPBT006V69R487APS2FRV7). Next, norn pushes this head and updates PR #353. CI must then be green on this head, every integration and e2e shard, before ready is approved: that run checks the criteria QA #2 left unverified. A red shard sends the work back to implement with the failing test.
