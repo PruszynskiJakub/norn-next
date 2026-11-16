@@ -23,9 +23,10 @@ Workflows bring in steps from shared files (`use:` with named exits) and copy st
 
 ## Notes
 
+- Slicing: 03 (`use:`) does not wait for 02; it lands in today's `loadFile`, and whichever of 02/03 merges second wires the call through the other. 07 needs both. 05/06 need 04 (anchors give way to `like:`) and 01 (hashes). S2/init criteria are integration tests, which CI runs; slice checks name only `bun run test` / `typecheck`.
 - Plan decisions agreed with the person: strict `workflow` schema kept + new `workflow-source` and `workflow-shared` (both emitted); shared routes name own steps, `$done`/`$stuck` or `{ exit, means?, verdict? }`, never a workflow step; `like:` is shallow (a written top-level key replaces the copied value whole).
 - Prefactors first: (1) tests load workflows through the store and pin today's `workflowHash` per rewritten workflow; (2) one store function turns workflow text into a loaded workflow, shared by the listing and the lost-record restart.
 
 ## Resume
 
-Next step: slice the Plan in `spec.md` (prefactors first).
+Next step: the person approves the slices; then 01, 02 and 03 start in parallel (critical path 03 → 04 → 05/06).

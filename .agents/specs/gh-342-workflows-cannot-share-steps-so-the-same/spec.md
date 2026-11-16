@@ -17,6 +17,37 @@ status: active
 intake_at: 2026-11-16T13:07:56.445Z
 body_hash: 051566a83f8f299b5c04600b803b4dd57821f8234a3a399096d9f6ec5e729496
 refined_body_hash: 051566a83f8f299b5c04600b803b4dd57821f8234a3a399096d9f6ec5e729496
+criteria:
+  - { id: "01.AC1", verifier: test }
+  - { id: "01.AC2", verifier: test }
+  - { id: "02.AC1", verifier: test }
+  - { id: "02.AC2", verifier: test }
+  - { id: "03.AC1", verifier: test }
+  - { id: "03.AC2", verifier: test }
+  - { id: "03.AC3", verifier: test }
+  - { id: "03.AC4", verifier: test }
+  - { id: "03.AC5", verifier: test }
+  - { id: "03.AC6", verifier: test }
+  - { id: "03.AC7", verifier: test }
+  - { id: "03.AC8", verifier: test }
+  - { id: "03.AC9", verifier: test }
+  - { id: "03.AC10", verifier: test }
+  - { id: "04.AC1", verifier: test }
+  - { id: "04.AC2", verifier: test }
+  - { id: "04.AC3", verifier: test }
+  - { id: "04.AC4", verifier: test }
+  - { id: "05.AC1", verifier: test }
+  - { id: "05.AC2", verifier: test }
+  - { id: "05.AC3", verifier: test }
+  - { id: "05.AC4", verifier: test }
+  - { id: "06.AC1", verifier: test }
+  - { id: "06.AC2", verifier: test }
+  - { id: "07.AC1", verifier: test }
+  - { id: "07.AC2", verifier: test }
+  - { id: "07.AC3", verifier: test }
+  - { id: "07.AC4", verifier: test }
+  - { id: "07.AC5", verifier: test }
+  - { id: "08.AC1", verifier: agent }
 ---
 
 # Workflows cannot share steps, so the same steps are copied into quick, story and release
