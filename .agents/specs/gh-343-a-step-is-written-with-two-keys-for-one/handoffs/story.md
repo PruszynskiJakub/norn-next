@@ -2,11 +2,11 @@
 
 ## Goal
 
-A step opens with one head key; skills become an optional `skills:` list; meanings and verdicts move to sibling `means:` / `verdict:` maps; `by:` picks the agent. `norn upgrade` rewrites old files losslessly, and old pins keep loading. All 10 slices are integrated and QA #1 is done. Review #1's two blocking findings are fixed.
+A step opens with one head key; skills become an optional `skills:` list; meanings and verdicts move to sibling `means:` / `verdict:` maps; `by:` picks the agent. `norn upgrade` rewrites old files losslessly, and old pins keep loading. All 10 slices are integrated, QA #1 is done, and review #2 approved.
 
 ## Proof
 
-QA #1 report: 47 pass, 0 fail. Golden decisions are identical to origin/main in all 139 cases. Unit tier and typecheck are green at 43d704d. Paths: store = `packages/store/test/unit/`, cli = `packages/cli/test/`.
+QA #1 report: 47 pass, 0 fail. Golden decisions are identical to origin/main in all 139 cases. Unit tier (2067 pass) and typecheck are green at 8e65cf1 (review #2). Paths: store = `packages/store/test/unit/`, cli = `packages/cli/test/`.
 
 | Criterion | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -19,7 +19,7 @@ QA #1 report: 47 pass, 0 fail. Golden decisions are identical to origin/main in 
 | 02.AC5 | refine step found by its skills | test | core `decide.test.ts` › "GR8: a refine step is the one whose skills include…" |
 | 02.AC6 | golden decisions and finish lines unchanged | test | `golden.test.ts` |
 | 03.AC1 | shipped files translate byte for byte | test | store `wording` › "<f> translates byte for byte…" |
-| 03.AC2 | scalars kept, or the file refused with its line | test | `wording` › "folded, block and quoted scalars…" |
+| 03.AC2 | scalars kept, or the file refused with its line | test | `wording` › "folded, block and quoted scalars…", "a skill written as a block scalar is refused…", "a rewrite that would load differently… is refused at its step" |
 | 03.AC3 | skill + instructions → `agent:` + `skills:` | test | `wording` › "an agent step's skill and instructions…" |
 | 03.AC4 | fallback texts | test | `wording` › "fallbacks" |
 | 03.AC5 | long edge split, comment kept | test | `wording` › "a long edge keeps to/counter…" |
@@ -73,14 +73,13 @@ QA #1 report: 47 pass, 0 fail. Golden decisions are identical to origin/main in 
 ## Not proven yet
 
 - 06.AC1, 07.AC1, 01.AC1: integration CI has not yet run green on this head.
-- Review #1's minor and nit findings stay as notes (review receipt).
 
 ## Notes
 
-- Review #1 F1 (an old copy with a blank instructions or prompt loaded as corrupt) is fixed in `packages/store/src/wording.ts`. A blank `instructions`, `prompt` or `description` counts as missing on both paths and falls back to today's text. Tests: store `new-wording.test.ts` › "blank %s loads with today's fallback text"; `wording.test.ts` › "a blank instructions or prompt takes today's fallback text".
-- Review #1 F2 (upgrade could stage broken YAML) is fixed. `translateYaml` re-parses its splice and requires it to deep-equal `translateWordingValue`; otherwise it refuses at the step that differs. Flow-edge prose is removed one run at a time, so removals never overlap. A multi-line `skill:` is refused. Tests: `wording.test.ts` › "a flow edge with uneven spacing…", "a skill written as a block scalar is refused…", "a rewrite that would load differently… is refused at its step".
-- The check refuses minor #3's input (a copy repeating `type: agent`) rather than fixing it.
+- Review #2 approved: review #1's blocking F1 (an old copy with a blank instructions/prompt loaded as corrupt) and F2 (upgrade could stage broken YAML) are fixed; both repros now load or are refused, never written broken. `translateYaml` checks its splice against `translateWordingValue` and refuses the step that differs.
+- Review #1's minor and nit findings stay as notes for the person (review #1 receipt); only the `apply` comment nit is fixed.
+- Merge danger for the PR: `norn brief --json` renames `work.skill` to `work.skills`.
 
 ## Resume
 
-Review this head for review #1's F1 and F2. CI must go green on it.
+CI must go green on this head (integration and e2e tiers) before ready is approved.
