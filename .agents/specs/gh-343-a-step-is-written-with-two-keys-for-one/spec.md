@@ -17,6 +17,60 @@ status: active
 intake_at: 2026-11-16T15:23:54.534Z
 body_hash: 7fbc55d648d29da4c82b1f01627eee670941563520c70a99287cf49a8e7474ca
 refined_body_hash: 7fbc55d648d29da4c82b1f01627eee670941563520c70a99287cf49a8e7474ca
+criteria:
+  - { id: 01.AC1, verifier: test }
+  - { id: 01.AC2, verifier: test }
+  - { id: 02.AC1, verifier: test }
+  - { id: 02.AC2, verifier: test }
+  - { id: 02.AC3, verifier: test }
+  - { id: 02.AC4, verifier: test }
+  - { id: 02.AC5, verifier: test }
+  - { id: 02.AC6, verifier: test }
+  - { id: 03.AC1, verifier: test }
+  - { id: 03.AC2, verifier: test }
+  - { id: 03.AC3, verifier: test }
+  - { id: 03.AC4, verifier: test }
+  - { id: 03.AC5, verifier: test }
+  - { id: 03.AC6, verifier: test }
+  - { id: 03.AC7, verifier: test }
+  - { id: 03.AC8, verifier: test }
+  - { id: 03.AC9, verifier: test }
+  - { id: 04.AC1, verifier: test }
+  - { id: 04.AC2, verifier: test }
+  - { id: 04.AC3, verifier: test }
+  - { id: 04.AC4, verifier: test }
+  - { id: 04.AC5, verifier: test }
+  - { id: 04.AC6, verifier: test }
+  - { id: 04.AC7, verifier: test }
+  - { id: 04.AC8, verifier: test }
+  - { id: 04.AC9, verifier: test }
+  - { id: 04.AC10, verifier: test }
+  - { id: 04.AC11, verifier: test }
+  - { id: 04.AC12, verifier: test }
+  - { id: 04.AC13, verifier: test }
+  - { id: 05.AC1, verifier: test }
+  - { id: 05.AC2, verifier: test }
+  - { id: 05.AC3, verifier: test }
+  - { id: 05.AC4, verifier: person }
+  - { id: 06.AC1, verifier: test }
+  - { id: 06.AC2, verifier: test }
+  - { id: 07.AC1, verifier: test }
+  - { id: 07.AC2, verifier: test }
+  - { id: 08.AC1, verifier: test }
+  - { id: 08.AC2, verifier: test }
+  - { id: 08.AC3, verifier: test }
+  - { id: 08.AC4, verifier: test }
+  - { id: 08.AC5, verifier: test }
+  - { id: 09.AC1, verifier: test }
+  - { id: 09.AC2, verifier: test }
+  - { id: 09.AC3, verifier: test }
+  - { id: 09.AC4, verifier: test }
+  - { id: 09.AC5, verifier: test }
+  - { id: 09.AC6, verifier: test }
+  - { id: 09.AC7, verifier: test }
+  - { id: 09.AC8, verifier: agent }
+  - { id: 10.AC1, verifier: agent }
+  - { id: 10.AC2, verifier: test }
 ---
 
 # A step is written with two keys for one fact, and an agent step must name a skill
