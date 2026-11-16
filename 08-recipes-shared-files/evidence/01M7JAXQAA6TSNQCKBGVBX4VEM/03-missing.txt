@@ -1,0 +1,1 @@
+[{'name': 'docs', 'file': '.agents/workflows/docs.yaml', 'ok': False, 'issues': [{'code': 'schema', 'path': '/steps/ship/use', 'message': 'shared file `shared/shp.yaml` not found in `.agents/workflows/shared/`'}]}]

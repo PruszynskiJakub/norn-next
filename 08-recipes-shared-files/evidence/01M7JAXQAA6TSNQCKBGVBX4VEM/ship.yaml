@@ -1,0 +1,17 @@
+# .agents/workflows/shared/ship.yaml
+description: Open or update the PR, then wait for its CI.
+start: open-pr
+steps:
+  open-pr:
+    type: git
+    action: open-pr
+    outcomes: { done: ci }
+  ci:
+    type: check
+    run: ./scripts/wait-for-ci.sh
+    timeout: 30m
+    exits: { 3: stale }
+    outcomes:
+      pass:  { exit: green }
+      fail:  { exit: red }
+      stale: { exit: behind }

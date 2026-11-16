@@ -1,0 +1,1 @@
+[{'name': 'docs', 'file': '.agents/workflows/docs.yaml', 'ok': False, 'issues': [{'code': 'schema', 'path': '/steps/test-merge/like', 'message': 'a step cannot be like itself'}, {'code': 'schema', 'path': '/steps/test-resolution/like', 'message': '`test-merge` is a like step: name the step it copies, `test-merge`'}]}]

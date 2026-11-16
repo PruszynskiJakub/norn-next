@@ -1,0 +1,1 @@
+[{'name': 'docs', 'file': '.agents/workflows/docs.yaml', 'ok': False, 'issues': [{'code': 'schema', 'path': '/counters', 'message': 'shared/ship.yaml: `counters` belongs in the workflow'}]}]

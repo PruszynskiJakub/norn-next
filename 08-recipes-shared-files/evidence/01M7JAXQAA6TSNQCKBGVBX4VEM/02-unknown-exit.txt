@@ -1,0 +1,1 @@
+[{'name': 'docs', 'file': '.agents/workflows/docs.yaml', 'ok': False, 'issues': [{'code': 'schema', 'path': '/steps/ship/outcomes/behnd', 'message': '`behnd` is not an exit of shared/ship.yaml (its exits: green, red, behind)'}]}]
