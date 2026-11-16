@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Finding, Receipt, UnitState, Workflow } from "@norn/schema";
+import type { AgentStep, Finding, Receipt, UnitState, Workflow } from "@norn/schema";
 import { applyReceipts } from "../../src/apply.ts";
 import { type BriefInput, renderBrief, storyRulings } from "../../src/brief.ts";
 import { HARD_RULES } from "../../src/hard-rules.ts";
@@ -60,7 +60,7 @@ describe("renderBrief", () => {
     });
     const b = renderBrief(input(stateFor(SLICE, wf), [], { workflow: wf }));
     expect(b.json.work).toEqual({
-      skill: "implement",
+      skills: ["implement"],
       description: "Build the slice test-first.",
       instructions: "Base mode: merge the base commit named in Rework; never rebase.\n",
     });
@@ -68,6 +68,23 @@ describe("renderBrief", () => {
       "## Your work\n\nUse the `implement` skill.\n\nBuild the slice test-first.\n\nBase mode: merge the base commit named in Rework; never rebase.\n\n## Finish with exactly one of",
     );
     expect(b.markdown).toMatchSnapshot();
+  });
+
+  test.each([
+    [["norn-implement"], "Use the `norn-implement` skill.\n\nBuild it."],
+    [["norn-implement", "norn-tdd"], "Use the `norn-implement` and `norn-tdd` skills.\n\nBuild it."],
+    [["norn-implement", "norn-tdd", "norn-codebase-design"], "Use the `norn-implement`, `norn-tdd` and `norn-codebase-design` skills.\n\nBuild it."],
+    [[], "Build it."],
+    [undefined, "Build it."],
+  ])("Your work names the step's skills %j, in the order listed, then the instructions", (skills, work) => {
+    const wf = structuredClone(SLICE_WF);
+    const step = wf.steps.implement as AgentStep;
+    if (skills === undefined) delete step.skills;
+    else step.skills = skills;
+    step.instructions = "Build it.";
+    const b = renderBrief(input(stateFor(SLICE, wf), [], { workflow: wf }));
+    expect(b.json.work.skills).toEqual(skills ?? []);
+    expect(b.markdown).toContain(`## Your work\n\n${work}\n\n## Finish with exactly one of`);
   });
 
   test("rework after a failing check shows the output tail and log", () => {
@@ -443,9 +460,18 @@ describe("Re-entry, fresh sessions, handoff and criteria", () => {
 
 const FIX = join(import.meta.dir, "..", "fixtures", "sandbox");
 
+/** A pinned file names one `skill` per agent step, as store's loader reads it into the model's `skills`. */
+function loaded(file: Workflow): Workflow {
+  const steps = Object.entries(file.steps).map(([name, step]) => {
+    const { skill, ...rest } = step as typeof step & { skill?: string };
+    return [name, skill === undefined ? step : { ...rest, skills: [skill] }];
+  });
+  return { ...file, steps: Object.fromEntries(steps) };
+}
+
 /** Replay a copied unit (pinned workflow + receipts) through apply, then brief the cursor. */
 function replay(dir: string, unit: UnitRef, paths: BriefInput["paths"]) {
-  const wf = Bun.YAML.parse(readFileSync(join(FIX, dir, "workflow.yaml"), "utf8")) as Workflow;
+  const wf = loaded(Bun.YAML.parse(readFileSync(join(FIX, dir, "workflow.yaml"), "utf8")) as Workflow);
   const receipts = readdirSync(join(FIX, dir, "receipts"))
     .sort()
     .map((file) => numbered(Number(file.slice(0, 4)), JSON.parse(readFileSync(join(FIX, dir, "receipts", file), "utf8")) as Receipt));
@@ -845,7 +871,7 @@ describe("the resolution input: what the resolver did, as one remerge-diff per m
     start: "update",
     steps: {
       update: { type: "git", action: "update", outcomes: { done: "$done", resolved: "resolution-review", conflict: "$stuck" } },
-      "resolution-review": { type: "agent", skill: "norn-review", inputs: ["spec", "resolution"], outcomes: { approve: { to: "$done", means: "ok" } } },
+      "resolution-review": { type: "agent", skills: ["norn-review"], inputs: ["spec", "resolution"], outcomes: { approve: { to: "$done", means: "ok" } } },
     },
   };
   const classify = (commits: unknown[]) => (s: UnitState) =>

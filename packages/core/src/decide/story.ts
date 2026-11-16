@@ -318,7 +318,7 @@ function refineFinished(uf: UnitFacts | null): boolean {
   const st = uf?.state;
   const wf = uf?.workflow;
   if (!st || !wf) return false;
-  return Object.entries(wf.steps).some(([name, step]) => step.type === "agent" && REFINE_SKILLS.has(step.skill) && ((st.visits[name] ?? 0) >= 2 || ((st.visits[name] ?? 0) >= 1 && st.step !== name)));
+  return Object.entries(wf.steps).some(([name, step]) => step.type === "agent" && (step.skills ?? []).some((k) => REFINE_SKILLS.has(k)) && ((st.visits[name] ?? 0) >= 2 || ((st.visits[name] ?? 0) >= 1 && st.step !== name)));
 }
 
 function mirror(ctx: Ctx, story: StoryFacts, fm: StoryFrontmatter, su: UnitFacts | null, issue: RemoteIssue): void {

@@ -86,7 +86,7 @@ describe.each(COPIES)("%s workflow routes the light path", (_name, dir, name) =>
   });
 
   test("the resolution review is norn-review over the spec and the resolution", () => {
-    expect(wf.steps["resolution-review"]).toMatchObject({ type: "agent", skill: "norn-review", inputs: ["spec", "resolution"] });
+    expect(wf.steps["resolution-review"]).toMatchObject({ type: "agent", skills: ["norn-review"], inputs: ["spec", "resolution"] });
     expect(edges(wf, "resolution-review")).toMatchObject({
       approve: { to: "open-pr" },
       redescribe: { to: "describe" },

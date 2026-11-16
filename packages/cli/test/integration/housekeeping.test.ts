@@ -420,11 +420,11 @@ steps:
       const r = await runChecked(["doctor", "--json"], { ...h.deps, env: env() });
       expect(r.exit).toBe(1);
       expect(r.value).toMatchObject({
-        repo: { ok: false, workflows: expect.arrayContaining([{ name: "nope", file: relWorkflow("nope"), ok: false, issues: [expect.objectContaining({ code: "unknown_skill", path: "/steps/implement/skill", message: expect.stringContaining(reason) })] }]) },
+        repo: { ok: false, workflows: expect.arrayContaining([{ name: "nope", file: relWorkflow("nope"), ok: false, issues: [expect.objectContaining({ code: "unknown_skill", path: "/steps/implement/skills/0", message: expect.stringContaining(reason) })] }]) },
       });
       const text = await runChecked(["doctor"], { ...h.deps, env: env() });
       expect(text.stdout).toMatch(/FAIL workflow nope +\.agents\/workflows\/nope\.yaml/);
-      expect(text.stdout).toContain(`! /steps/implement/skill: ${reason}`);
+      expect(text.stdout).toContain(`! /steps/implement/skills/0: ${reason}`);
 
       // the same validator: a tick refuses to start a story on that workflow, naming the same skill
       h.remote.issues = [issue(7, "Nope", ["norn", "norn:wf:nope"])];

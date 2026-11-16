@@ -21,7 +21,7 @@ const QA_WF: Workflow = {
   steps: {
     qa: {
       type: "agent",
-      skill: "qa",
+      skills: ["qa"],
       criteria: "required",
       outcomes: {
         pass: { to: "ready", verdict: "pass", means: "every criterion observed with evidence" },
@@ -92,7 +92,7 @@ describe("criteria report checks", () => {
     expect(check("pass", null)).toMatchObject({ ok: false, refusal: { code: "criteria_required", do_instead: expect.stringContaining("--criteria <file>") } });
     const optional: AgentStep = { ...QA, criteria: undefined };
     expect(check("pass", null, CRITERIA, [], optional)).toMatchObject({ ok: false, refusal: { code: "criteria_required", error: expect.stringContaining("gated by verdict 'pass'") } });
-    const ungated: AgentStep = { type: "agent", skill: "implement", outcomes: { done: { to: "$done", means: "built" } } };
+    const ungated: AgentStep = { type: "agent", skills: ["implement"], outcomes: { done: { to: "$done", means: "built" } } };
     expect(check("done", null, null, [], ungated)).toEqual({ ok: true, worst: null, coverage: null });
     // an ungated outcome takes any report
     expect(check("done", [UNVERIFIED], null, [], ungated)).toMatchObject({ ok: true, worst: "unverified" });

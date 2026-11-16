@@ -67,8 +67,8 @@ const routeCount = (wf: Workflow) => Object.values(wf.steps).reduce((n, step) =>
  * route, counter or instruction changes the hash, formatting and key order never do.
  */
 const PINNED_HASHES: Record<string, string> = {
-  quick: "78142b725e014c435e790c83c50f68c3186f0cc4c317873a1ff6c73bbcf749e9",
-  story: "887efb653b1edd5cb7513b215b816fc140c01154167c2b778bc91538cd2b7159",
+  quick: "93bfd20fb0fe8a1289f06e83dd5b1f72bf4aa0a8ca63738afa0177f8f34a9e8c",
+  story: "dc3f574a5043806ce7e952cb8bae1430da3d6fa4f7e35775c8a9e7f559a9d952",
 };
 
 /** Splits a SKILL.md into its YAML frontmatter and body. */
@@ -220,7 +220,7 @@ describe("workflow templates", () => {
 
     test("every referenced skill exists in assets/skills", () => {
       for (const step of Object.values(wf.steps))
-        if (step.type === "agent") expect({ skill: step.skill, exists: existsSync(join(SKILLS_DIR, step.skill, "SKILL.md")) }).toEqual({ skill: step.skill, exists: true });
+        if (step.type === "agent") for (const skill of step.skills ?? []) expect({ skill, exists: existsSync(join(SKILLS_DIR, skill, "SKILL.md")) }).toEqual({ skill, exists: true });
     });
 
     // TODO: core's validator exists in packages/core/src/workflow.ts but is not yet exported from
@@ -243,13 +243,13 @@ describe("single-purpose workflows (#136)", () => {
   test("triage is one norn-triage step that ends the round with done: the recommendation is only in its comment", () => {
     expect(wf("triage").start).toBe("explore");
     expect(Object.keys(wf("triage").steps)).toEqual(["explore"]);
-    expect(wf("triage").steps.explore).toMatchObject({ type: "agent", skill: "norn-triage" });
+    expect(wf("triage").steps.explore).toMatchObject({ type: "agent", skills: ["norn-triage"] });
     expect(targets("triage", "explore")).toEqual({ done: "$done" });
   });
 
   test("reproduce is one norn-diagnose step that changes no code and ends the round either way", () => {
     expect(Object.keys(wf("reproduce").steps)).toEqual(["reproduce"]);
-    expect(wf("reproduce").steps.reproduce).toMatchObject({ type: "agent", skill: "norn-diagnose" });
+    expect(wf("reproduce").steps.reproduce).toMatchObject({ type: "agent", skills: ["norn-diagnose"] });
     expect(targets("reproduce", "reproduce")).toEqual({ reproduced: "$done", cannot_reproduce: "$done" });
   });
 
@@ -271,14 +271,14 @@ describe("single-purpose workflows (#136)", () => {
   });
 
   test("story's describe step reads the record, not runs/ in the worktree, here and in this repo's copy (B28)", () => {
-    for (const w of [wf("story"), repoWorkflow("story")]) expect(w.steps.describe).toMatchObject({ skill: "norn-pr", inputs: ["spec", "diff", "record"] });
+    for (const w of [wf("story"), repoWorkflow("story")]) expect(w.steps.describe).toMatchObject({ skills: ["norn-pr"], inputs: ["spec", "diff", "record"] });
     expect(readSkill("norn-pr")).toContain("`evidence/<unit>/<run_id>/<file>`");
   });
 
   // Slices are reviewed before they integrate, so only story-level rework would reach the PR unreviewed
   test("story reviews its rework before the check, and a round without rework never reaches review", () => {
     expect(targets("story", "implement")).toEqual({ done: "review" });
-    expect(wf("story").steps.review).toMatchObject({ type: "agent", skill: "norn-review", inputs: ["spec", "diff", "last_findings"] });
+    expect(wf("story").steps.review).toMatchObject({ type: "agent", skills: ["norn-review"], inputs: ["spec", "diff", "last_findings"] });
     expect(wf("story").steps.review?.outcomes).toMatchObject({ changes_requested: { counter: "review_loop" } });
     expect(targets("story", "review")).toEqual({ approve: "test", changes_requested: "implement" });
     const into = (step: string) =>

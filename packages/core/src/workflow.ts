@@ -166,16 +166,18 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
 
   for (const [name, step] of Object.entries(wf.steps)) {
     if (step.type === "agent") {
-      if (skills && !skills.has(step.skill))
-        issues.push({ code: "unknown_skill", path: `/steps/${name}/skill`, message: `skill '${step.skill}' is not installed` });
       const agent = step.agent ?? opts.agentSkills?.agent;
       const seen = agent === undefined ? undefined : visible?.get(agent);
-      if (seen && !seen.has(step.skill))
-        issues.push({
-          code: "unknown_skill",
-          path: `/steps/${name}/skill`,
-          message: `skill '${step.skill}' is not installed for agent '${agent}' (run ${cmd.init()}, or add it to that agent's skill folder)`,
-        });
+      for (const [i, skill] of (step.skills ?? []).entries()) {
+        const path = `/steps/${name}/skills/${i}`;
+        if (skills && !skills.has(skill)) issues.push({ code: "unknown_skill", path, message: `skill '${skill}' is not installed` });
+        if (seen && !seen.has(skill))
+          issues.push({
+            code: "unknown_skill",
+            path,
+            message: `skill '${skill}' is not installed for agent '${agent}' (run ${cmd.init()}, or add it to that agent's skill folder)`,
+          });
+      }
       if ("exhausted" in step.outcomes)
         issues.push({
           code: "reserved_outcome",

@@ -3,8 +3,15 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { validateWorkflowDefinition } from "@norn/core";
 import { parse as parseYaml } from "yaml";
-import { loadWorkflow, loadWorkflows, sha256, workflowsDir } from "../../src/index.ts";
+import { loadWorkflow, loadWorkflows, parseWorkflowText, sha256, workflowsDir } from "../../src/index.ts";
 import { tmp, WORKFLOW_YAML } from "../helpers.ts";
+
+/** The loaded text as norn reads it back from a pin: parsed, each `skill` read into the model's `skills`. */
+const asLoaded = (source: string) => {
+  const r = parseWorkflowText(source, "pin.yaml");
+  if (!r.ok) throw new Error(JSON.stringify(r));
+  return r.value;
+};
 
 const BASE_UPDATE = `description: merge the base in and test it
 start: update
@@ -124,7 +131,7 @@ describe("use: brings in a shared file's steps", () => {
   test("the workflow's defaults cover included steps: they carry no limits of their own", () => {
     const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE });
     expect(wf.workflow.defaults).toEqual({ deadline: "30m", nudges: 1 });
-    expect(Object.keys(wf.workflow.steps.resolve ?? {})).toEqual(["type", "skill", "outcomes"]);
+    expect(Object.keys(wf.workflow.steps.resolve ?? {})).toEqual(["type", "skills", "outcomes"]);
   });
 });
 
@@ -186,7 +193,7 @@ describe("shared files and the loaded text", () => {
     const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE });
     expect(wf.source).not.toContain("use:");
     expect(wf.hash).toBe(sha256(wf.source));
-    expect(parseYaml(wf.source)).toEqual(wf.workflow);
+    expect(asLoaded(wf.source)).toEqual(wf.workflow);
   });
 });
 
@@ -230,7 +237,7 @@ describe("like: copies a step of its own file", () => {
     const wf = loaded({ "story.yaml": LIKE });
     expect(wf.source).not.toContain("like:");
     expect(wf.hash).toBe(sha256(wf.source));
-    expect(parseYaml(wf.source)).toEqual(wf.workflow);
+    expect(asLoaded(wf.source)).toEqual(wf.workflow);
     expect(wf.workflow.steps["test-merge"]).toMatchObject({ run: "bun test --merge", timeout: "10m" });
     expect(wf.included).toBeUndefined();
   });
@@ -239,7 +246,7 @@ describe("like: copies a step of its own file", () => {
     const keeps = LIKE.replace("    outcomes: { pass: $done, fail: review }\n", "");
     const wf = loaded({ "story.yaml": keeps });
     expect(wf.source).not.toMatch(/[&*]a\d/);
-    expect(parseYaml(wf.source)).toEqual(wf.workflow);
+    expect(asLoaded(wf.source)).toEqual(wf.workflow);
     expect(wf.workflow.steps["test-merge"]?.outcomes).toEqual({ pass: "review", fail: "implement" });
   });
 

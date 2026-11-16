@@ -84,7 +84,39 @@ export function parseWorkflowText(text: string, path: string, read: WorkflowRead
   // The step-level keys that belong to the workflow get their own message
   const misplaced = workflowLevelKeysOnSteps(value);
   if (misplaced.length) return { ok: false, reason: "corrupt", error: fileError(path, misplaced, root) };
-  return validated("workflow", value, path, text, root);
+  const loaded = validated("workflow", withSkillLists(value), path, text, root);
+  if (!loaded.ok) return loaded;
+  const wording = fileSkillWording(value);
+  return wording.length ? { ok: false, reason: "corrupt", error: fileError(path, wording, root) } : loaded;
+}
+
+/** The model's `skills` is optional and a list, so a file's own wording, exactly one `skill` per agent step, is checked as written. */
+function fileSkillWording(value: unknown): Array<{ path: string; message: string }> {
+  const steps = (value as { steps: Record<string, Record<string, unknown>> }).steps;
+  const out: Array<{ path: string; message: string }> = [];
+  for (const [name, step] of Object.entries(steps)) {
+    if (step.type !== "agent") continue;
+    if (!("skill" in step)) out.push({ path: `/steps/${name}`, message: "must have required property 'skill'" });
+    if ("skills" in step) out.push({ path: `/steps/${name}`, message: "unknown property 'skills'" });
+  }
+  return out;
+}
+
+/**
+ * A file names one `skill` per agent step; the loaded workflow holds a list. Renamed in place so the
+ * step keeps its key order, and anything not a one-skill agent step is left for the schema to judge.
+ */
+function withSkillLists(value: unknown): unknown {
+  const steps = (value as { steps?: unknown } | null)?.steps;
+  if (typeof steps !== "object" || steps === null) return value;
+  const mapped = Object.fromEntries(
+    Object.entries(steps).map(([name, step]) => {
+      const s = step as Record<string, unknown> | null;
+      if (typeof s !== "object" || s === null || s.type !== "agent" || typeof s.skill !== "string" || "skills" in s) return [name, step];
+      return [name, Object.fromEntries(Object.entries(s).map(([k, v]) => (k === "skill" ? ["skills", [v]] : [k, v])))];
+    }),
+  );
+  return { ...(value as object), steps: mapped };
 }
 
 const WORKFLOW_LEVEL: Record<string, string> = {

@@ -81,7 +81,7 @@ describe("light path: only base merges and spec-folder bookkeeping since the las
 describe("the anchor is the head at the latest approve in the round, once the PR holds it", () => {
   let n = 0;
   const num = (receipt: Partial<Receipt> & { kind: Receipt["kind"] }): NumberedReceipt => ({ n: ++n, file: "", receipt: { receipt_id: "01J", run_id: null, step: "x", at: "2026-01-01T00:00:00Z", by: "agent", ...receipt } as unknown as Receipt });
-  const step = (to: string) => ({ type: "agent", skill: "s", outcomes: { done: to, approve: to } }) as never;
+  const step = (to: string) => ({ type: "agent", skills: ["s"], outcomes: { done: to, approve: to } }) as never;
   // review → human-qa → describe → open-pr → ci → ready → merge, with human-qa going stale to update
   const WF = {
     name: "anchor",

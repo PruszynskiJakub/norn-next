@@ -24,7 +24,7 @@ const WF: Workflow = {
     update: { type: "git", action: "update", outcomes: { done: "implement", clean: "test-merge", resolved: "test-resolution", conflict: "implement" } },
     "test-merge": { type: "check", run: "true", timeout: "1m", outcomes: { pass: "open-pr", fail: "implement" } },
     "test-resolution": { type: "check", run: "true", timeout: "1m", outcomes: { pass: "open-pr", fail: "implement" } },
-    implement: { type: "agent", skill: "norn-implement", outcomes: { done: { to: "open-pr", means: "done" } } },
+    implement: { type: "agent", skills: ["norn-implement"], outcomes: { done: { to: "open-pr", means: "done" } } },
     "open-pr": { type: "git", action: "open-pr", outcomes: { done: "ci" } },
     ci: { type: "check", run: "true", timeout: "1m", outcomes: { pass: "ready", fail: "implement", stale: "update" } },
     ready: { type: "gate", outcomes: { approve: "merge", reject: "implement", stale: "update" } },

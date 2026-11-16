@@ -85,7 +85,7 @@ function stepTypes<S extends TSchema>(outcome: S) {
     {
       type: Type.Literal("agent"),
       ...common,
-      skill: NonEmpty,
+      skills: Type.Optional(Type.Array(NonEmpty, { uniqueItems: true, description: "Skills the agent uses, in the order the brief names them" })),
       instructions: Type.Optional(Type.String()),
       inputs: Type.Optional(Type.Array(StepInput, { uniqueItems: true })),
       agent: Type.Optional(Type.String({ minLength: 1, description: "Name from config.agents; default config.agent" })),
@@ -173,6 +173,13 @@ function stepTypes<S extends TSchema>(outcome: S) {
     { additionalProperties: false },
   );
   return { AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep };
+}
+
+/** The step types as a file writes them: an agent step names one `skill`, which the loader reads into the model's `skills`. */
+function fileStepTypes<S extends TSchema>(outcome: S) {
+  const steps = stepTypes(outcome);
+  const { type, description, skills: _, ...rest } = steps.AgentStep.properties;
+  return { ...steps, AgentStep: Type.Object({ type, description, skill: NonEmpty, ...rest }, { additionalProperties: false }) };
 }
 
 export const { AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep } = stepTypes(OutcomeSpec);
@@ -264,7 +271,9 @@ export const ExitEdge = Type.Object(
 );
 export type ExitEdge = Static<typeof ExitEdge>;
 
-const SharedSteps = stepTypes(Type.Union([Target, OutcomeEdge, ExitEdge]));
+const FileSteps = fileStepTypes(OutcomeSpec);
+const FileStep = TaggedUnion("type", [FileSteps.AgentStep, FileSteps.CheckStep, FileSteps.GateStep, FileSteps.GitStep, FileSteps.SlicesStep, FileSteps.MergeStep]);
+const SharedSteps = fileStepTypes(Type.Union([Target, OutcomeEdge, ExitEdge]));
 const SharedStep = TaggedUnion("type", [SharedSteps.AgentStep, SharedSteps.CheckStep, SharedSteps.GateStep, SharedSteps.GitStep, SharedSteps.SlicesStep, SharedSteps.MergeStep]);
 
 /**
@@ -280,7 +289,7 @@ function likeStep(variants: TObject[]) {
     { additionalProperties: false },
   );
 }
-const LikeStep = likeStep([AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep]);
+const LikeStep = likeStep([FileSteps.AgentStep, FileSteps.CheckStep, FileSteps.GateStep, FileSteps.GitStep, FileSteps.SlicesStep, FileSteps.MergeStep]);
 
 export const SharedName = Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "A file in `.agents/workflows/shared/`, without `.yaml`" });
 
@@ -302,7 +311,7 @@ export type UseStep = Static<typeof UseStep>;
 export const WorkflowSource = Type.Object(
   {
     ...Workflow.properties,
-    steps: Type.Record(StepName, Type.Union([Step, UseStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
+    steps: Type.Record(StepName, Type.Union([FileStep, UseStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
   },
   {
     $id: "https://norn.dev/schema/workflow-source.json",

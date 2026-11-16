@@ -73,7 +73,6 @@
               "type": "object",
               "required": [
                 "type",
-                "skill",
                 "outcomes"
               ],
               "properties": {
@@ -84,9 +83,14 @@
                 "description": {
                   "type": "string"
                 },
-                "skill": {
-                  "minLength": 1,
-                  "type": "string"
+                "skills": {
+                  "uniqueItems": true,
+                  "description": "Skills the agent uses, in the order the brief names them",
+                  "type": "array",
+                  "items": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
                 },
                 "instructions": {
                   "type": "string"

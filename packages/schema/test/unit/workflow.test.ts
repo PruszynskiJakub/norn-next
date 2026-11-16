@@ -44,14 +44,19 @@ counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, qa_loop: { max: 2 },
 `;
 
 const example = () => parse(SLICE_EXAMPLE) as Record<string, any>;
+/** The example is a file as written: it names one `skill` per agent step, which the loaded model holds as `skills`. */
 const errorsOf = (v: unknown) => {
+  const r = validate("workflow-source", v);
+  return r.ok ? [] : r.errors;
+};
+const modelErrorsOf = (v: unknown) => {
   const r = validate("workflow", v);
   return r.ok ? [] : r.errors;
 };
 
 describe("workflow schema", () => {
   test("§11 slice example of the rules validates", () => {
-    const r = validate("workflow", example());
+    const r = validate("workflow-source", example());
     if (!r.ok) console.error(r.errors);
     expect(r.ok).toBe(true);
   });
@@ -63,15 +68,15 @@ describe("workflow schema", () => {
       steps: {
         refine: {
           type: "agent",
-          skill: "refine",
+          skills: ["refine"],
           attended: true,
           inputs: ["spec", "handoff"],
           outcomes: { done: "plan", questions: "clarify" },
         },
-        clarify: { type: "agent", skill: "clarify", attended: true, outcomes: { done: "plan" } },
+        clarify: { type: "agent", skills: ["clarify", "norn-interview"], attended: true, outcomes: { done: "plan" } },
         plan: {
           type: "agent",
-          skill: "plan",
+          skills: ["plan"],
           agent: "codex",
           model: "gpt-5",
           deadline: "1h30m",
@@ -88,7 +93,17 @@ describe("workflow schema", () => {
       },
       counters: { plan_loop: { max: 2 } },
     };
-    expect(errorsOf(wf)).toEqual([]);
+    expect(modelErrorsOf(wf)).toEqual([]);
+  });
+
+  test("a loaded agent step holds a list of skills, maybe none; a single `skill` is the file's wording, not the model's", () => {
+    const wf = (step: Record<string, unknown>) => ({ name: "x", start: "a", steps: { a: { type: "agent", ...step, outcomes: { done: "$done" } } } });
+    expect(modelErrorsOf(wf({}))).toEqual([]);
+    expect(modelErrorsOf(wf({ skills: [] }))).toEqual([]);
+    expect(modelErrorsOf(wf({ skills: ["a", "b", "c"] }))).toEqual([]);
+    expect(modelErrorsOf(wf({ skills: ["a", "a"] })).length).toBeGreaterThan(0);
+    expect(modelErrorsOf(wf({ skills: [""] })).length).toBeGreaterThan(0);
+    expect(modelErrorsOf(wf({ skill: "a" })).length).toBeGreaterThan(0);
   });
 
   test.each([

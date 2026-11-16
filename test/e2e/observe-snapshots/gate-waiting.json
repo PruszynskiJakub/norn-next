@@ -210,7 +210,9 @@
                     "to": "slices"
                   }
                 },
-                "skill": "norn-plan",
+                "skills": [
+                  "norn-plan"
+                ],
                 "type": "agent"
               },
               "slices": {
@@ -349,7 +351,9 @@
                     "to": "test"
                   }
                 },
-                "skill": "norn-implement",
+                "skills": [
+                  "norn-implement"
+                ],
                 "type": "agent"
               },
               "integrate": {

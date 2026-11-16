@@ -22,7 +22,7 @@ const BASE_WF: Workflow = {
   start: "update",
   steps: {
     update: { type: "git", action: "update", outcomes: { done: "test", conflict: { to: "resolve", counter: "base_conflict_loop" } } },
-    resolve: { type: "agent", skill: "merge", inputs: ["spec", "handoff"], outcomes: { done: { to: "update", means: "base merged into the story branch, conflicts resolved and committed" } } },
+    resolve: { type: "agent", skills: ["merge"], inputs: ["spec", "handoff"], outcomes: { done: { to: "update", means: "base merged into the story branch, conflicts resolved and committed" } } },
     test: { type: "check", run: "bun test", timeout: "5m", outcomes: { pass: "ready", fail: "$stuck" } },
     ready: { type: "gate", outcomes: { approve: "$done", reject: "$stuck", stale: { to: "update", counter: "stale_loop" } } },
   },
@@ -620,7 +620,7 @@ describe("base sync replay", () => {
       start: "update",
       steps: {
         update: { type: "git", action: "update", outcomes: { done: "test", clean: "test", resolved: "test", conflict: { to: "resolve", counter: "base_conflict_loop" } } },
-        resolve: { type: "agent", skill: "norn-merge", outcomes: { done: { to: "update", means: "merged" } } },
+        resolve: { type: "agent", skills: ["norn-merge"], outcomes: { done: { to: "update", means: "merged" } } },
         test: { type: "check", run: "true", timeout: "1m", outcomes: { pass: "$done", fail: "$stuck" } },
       },
       counters: { base_conflict_loop: { max: 2, reset_on: ["update.done", "update.clean", "update.resolved"] } },

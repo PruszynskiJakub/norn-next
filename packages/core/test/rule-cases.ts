@@ -36,8 +36,8 @@ const ROUTED_WF: Workflow = {
   name: "routed",
   start: "implement",
   steps: {
-    implement: { type: "agent", skill: "implement", outcomes: { done: "$done", stalled: "review" } },
-    review: { type: "agent", skill: "review", outcomes: { approve: "$done" } },
+    implement: { type: "agent", skills: ["implement"], outcomes: { done: "$done", stalled: "review" } },
+    review: { type: "agent", skills: ["review"], outcomes: { approve: "$done" } },
   },
 };
 /** A gate with a `stale` route, stale when merely behind (as `release` is). */
