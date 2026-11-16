@@ -2,6 +2,11 @@
 Every workflow the cli integration tests write into a test repo is in the new wording (head key, `skills:`, `by:`, sibling `means:`/`verdict:`), so slice 09's old-wording refusal leaves the suite green. No behaviour change.
 
 ### Proof
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | the cli integration suite passes in CI and writes no old-wording workflow or shared file into a main checkout unless the test is about the old wording | test | the `packages/cli/test/integration/` suite itself (CI, on the PR); review grep for `type: agent|check|gate|git|merge|slices`, `skill:` and step-level `action:` finds no fixture left (only a `run view` JSON field in `inbox-why.test.ts:152` and `human.test.ts:524`) |
+| AC2 | each migrated test asserts the same behaviour, only the fixture's wording changed | test | `eq.ts` in implement#1's evidence, rerun by review against the story base: 107 changed workflow literals load deep-equal (0 different); the 18 changed `.replace(...)` target strings were read by hand and still hit their fixture (config-runtime, housekeeping, shared-workflows, takeover-record-lost); no command or expected output changed |
+
 - AC1 (suite passes in CI; no old-wording file written into a main checkout unless the test is about the old wording): no integration test is about the old wording (none existed before this story). A grep for `type: agent|check|gate|git|merge|slices`, `skill:`, `action:` and `"type": "..."` across `packages/cli/test/integration/` now finds only `human.test.ts:524`, a `run view` JSON field (`type: "gate"`), which is not a fixture. The integration tier itself runs only in CI, once the PR is open.
 - AC2 (same behaviour, only the fixture's wording changed): `equivalence.txt` in the evidence pairs each changed string literal before and after, with interpolations replaced by tokens. Each pair loads to a deep-equal workflow (`parseWorkflowText`, old as a copy, new from the checkout), or, for fragments and shared files, to an equal translated value: 107 checked, 107 equal, 0 different. No command or expected output changed. The only non-fixture edits are `.replace(...)` calls that edit a fixture by its text, retargeted to the new keys (`skills: [x]`, `by:`, `done: "built"`).
 - `bun run test` (2033 pass) and `bun run typecheck` pass.
