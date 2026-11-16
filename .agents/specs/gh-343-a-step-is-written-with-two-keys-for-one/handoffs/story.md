@@ -2,36 +2,43 @@
 
 ## Goal
 
-A workflow step opens with one head key (`agent:`, `check:`, `gate:`, a value-less verb, `use:`); agent skills become an optional `skills:` list; meanings and verdicts move to sibling `means:` / `verdict:` maps; `by:` picks the agent; `norn upgrade` rewrites old-wording files losslessly while old pins keep loading. Refined, planned and sliced.
+A workflow step opens with one head key (`agent:`, `check:`, `gate:`, a value-less verb, `use:`); agent skills become an optional `skills:` list; meanings and verdicts move to sibling `means:` / `verdict:` maps; `by:` picks the agent; `norn upgrade` rewrites old-wording files losslessly while old pins keep loading. All 10 slices are integrated; QA #1 is done.
 
 ## Proof
 
-- spec.md User Stories: 50 stories, confirmed by the owner (story 41 amended in plan: gate fallback `approve or reject <step>`).
-- spec.md Plan: seams S1–S8, coverage for every story, prefactors, decisions D1–D9, risks. Checked against this base (c1f69852cc7a): the named reads, `validateWorkflowDefinition`, shipped workflows and golden cases are as the plan describes.
-- slices/01–10: every user story is cited by some slice's acceptance; slice criteria copied into spec.md's frontmatter `criteria` as `NN.ACk`.
+- QA #1 criteria report (this run's evidence, `report.md`): 47 pass, 1 person, 5 unverified, 0 fail.
+- Golden decisions: all 139 cases re-decided by the current decide are identical, and every case's `decisions` is byte-identical to origin/main, matched by source and tick (the cases are renamed because their embedded workflows changed).
+- Translator (slice 03): the 9 shipped files and release.yaml at origin/main translate byte for byte to the expected files, and a second translation changes nothing. Folded, block and quoted scalars are kept; an orphaned comment refuses the file with its line.
+- Loader (slice 04), checked by script and with the dev CLI `doctor` in throwaway repos: head keys, verbs, `like`, orientation, `skills`, `by:`, means and verdict refusals, shared `exit` routes, and old-wording copies load equal to the new wording.
+- Upgrade and refusal (slices 08 and 09), checked with the dev CLI in throwaway repos:
+  - `upgrade` rewrites and stages the old files, lists refused files, exits 0, is idempotent and leaves the machine dir hash unchanged.
+  - An old main-checkout file is refused (exit 3, `do_instead` names `norn upgrade`), and `doctor` reports one issue per file.
+  - doctor → upgrade → doctor ends clean.
+- Brief: 1, 2, 3 and 0 skills render as specified.
 
 ## Easy to miss
 
-- **The loaded model stays the `type`-tagged union** (D1). Only the file format changes; the loader normalises new wording into the model.
-- One old→new translator in store (D3) shared by `norn upgrade` and the copy reads. Byte for byte outside what it changes (D3a): no re-wrapped scalar, no padded flow list; a scalar it cannot keep refuses the file.
-- Slicing is expand–contract: slice 04 accepts the new wording while the old still loads everywhere; fixtures and shipped files move (05, 06, 07); only slice 09 refuses old wording in the main checkout. Refusing earlier breaks ~80 test files.
-- Fixtures that are *about* old wording (pins, branch files, upgrade input) stay old.
-- Golden decisions must stay byte-identical (D8); a diff is a bug.
-- `by:` is still a name the owner may change before the build.
+- The loaded model stays the `type`-tagged union. Only the file format changed.
+- Old-wording fixtures that are *about* old wording (pins, branch files, upgrade input) stay old on purpose.
+- The workflow hash moves whenever a workflow's text moves; decisions must not.
 
 ## Not proven yet
 
-- Nothing built. Slice 03 must first prove the translator keeps scalar source text (D3a); if the `yaml` library cannot, that is a replan, not a looser criterion.
-- Slice 04 is the largest; the person may split it (head keys vs routes) at the gate.
+- 06.AC1 (the cli integration suite passes) and 07.AC1 (the unit and e2e tiers pass): the integration and e2e tiers run only in CI, and no PR or CI run exists yet.
+- 01.AC1 (every read loads the same workflow as before): its restart and record tests are in the integration tier, so the same CI gap applies.
+- 09.AC5 (a story in flight on an old-wording pin): the old pin was observed running to `$done` untouched with its record readable. A past round's trace was not replayed.
+- 09.AC6 (record lost, old-wording file on the branch): only the shipped integration test was run (it passes). No restart was driven by hand.
+- 05.AC4 (person): whether each agent step's orientation steers well. The table is in `05.AC4.md`. QA's view: the new orientations read well; story `qa`, refinement `plan`/`refine` and `describe` kept terse or mechanical text.
 
 ## Notes
 
-- Slices: 01 two reads (prefactor) · 02 skills list + brief lines · 03 translator · 04 new-wording loader (expand; deps 02, 03) · 05 shipped workflows, repo copies, schema (dep 04) · 06 cli integration fixtures (dep 04) · 07 other fixtures (dep 04) · 08 `norn upgrade` rewrite (deps 03, 04) · 09 refuse old wording in main checkout (contract; deps 01, 05, 06, 07, 08) · 10 docs (dep 05).
-- Critical path 4 slices: 03 → 04 → 05 → 09 (or 03 → 04 → 08 → 09, 02 → 04 …). Startable at once: 01, 02, 03.
-- The cli integration and e2e tiers run only in CI; slices whose tests live there (06, 08, 09) name `bun run test` + typecheck locally and rely on CI.
-- Owner decisions from the plan interview: internal tagged model; missing meaning filled with the fallback; branch text pinned verbatim at restart (D4); one gate fallback text everywhere.
-- Design record gist (`quick.yaml`) shows the target wording.
+- Seen during QA, not failures of this story:
+  - `norn status` shows a story on an invalid workflow as "taken in — the next tick starts it" without naming the problem (same as before this change).
+  - An upgrade that only rewrote workflows suggests the commit message "Refresh norn's skills".
+  - `story create --workflow X` with a schema-invalid new-wording X says "no workflow 'X'".
+- 05.AC2 "shared copies match": the repo copies keep their own check commands and exit names and split ship into ci/land; assets.test checks the same steps and head keys, which is what QA judged.
+- Evidence scripts (`brief-skills.ts`, `refine-decide.ts`, `tr.ts`, `scripts/`, `tools/`) are in the QA evidence folder.
 
 ## Resume
 
-Person reviews the Plan and slices/01–10 at approve-plan; then slices 01, 02, 03 start in parallel.
+A person judges 05.AC4 (orientations) and the unverified items. The integration and e2e tiers get their answer from the PR's CI once norn opens the draft PR.
