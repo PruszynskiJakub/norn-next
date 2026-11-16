@@ -39,8 +39,9 @@ Unit tier; review #1 read each test and saw it assert its criterion; the three b
 - `means` on a step that is not an agent step (e.g. `{ exit: tested, means: … }` on a check, as in the store `shared-workflows.test.ts` fixture) is dropped. Nothing ever read it, and story 23 would refuse it in a `means:` map. This is a judgement call to confirm in review.
 - Refused, rather than guessed at: a step written as a flow map that needs a change, a multi-line flow edge, a comment inside a block edge being split, a step that already has a `means:`/`verdict:` map next to old in-edge prose, and a git `action` with no verb.
 - Review #1 (round 1 rework done): the comment-on-outcome-key, `#`-line-in-block-scalar and like-copy `agent:` findings are fixed with tests. Dropping `means` on a step that is not an agent step is accepted. Minor, not rework: a YAML parse error comes back `ok`/unchanged (wording.ts:148; slice 08 may want to refuse it), and the comment on `apply()` says insertions go first, but the code applies removals first (the order is right).
+- Review #2: approve. All three blocking findings from review #1 are fixed (wording.ts `edgeEdits` keeps the outcome key's comment after the bare target, `spanIn` takes `#` lines as comments only below the previous pair's value, `byEdit` renames a `like` copy's `agent:` in YAML and JSON). Each was tried on extra inputs: a map or list value above a removed key, a `:` in the outcome key's comment, a quoted outcome key holding `:`, and a second run being a no-op. The two minor notes (the parse error comes back `ok`, the `apply()` comment) are still open, left for the person.
 - Fixture loop: `bun test packages/store/test/unit/wording.test.ts`. To regenerate an expected file, run the translator on the shipped file and review the diff before committing it.
 
 ## Resume
 
-Nothing open in this slice: review the rework diff (wording.ts `spanIn`, `byEdit`, `edgeEdits` comment) against the three findings.
+Nothing open in this slice: it goes on to QA against the Proof table.
