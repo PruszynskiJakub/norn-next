@@ -2,7 +2,7 @@
 An edge with no `counter:` gets a counter `<step>.<outcome>` at load, with its default max (and a conflict's reset). `max:` on the edge changes only the bound. Dotted names validate where they are stored.
 
 ### Proof
-Review #2: every criterion is traced to a test that was read and seen to assert it. `bun run test` (2100 pass) and `bun run typecheck` are green. Review #1's dotted-name crash is fixed. Two blocking loader bugs remain (see Not proven yet).
+Review #2: every criterion is traced to a test that was read and seen to assert it. Implement #3 fixed review #2's two blocking loader bugs, each behind a test in `packages/store/test/unit/derived-counters.test.ts`: "a counters: that is not a map is refused as corrupt whether or not the workflow derives a counter" and "steps sharing one outcomes map through a YAML alias each count their own edge". `bun run test` (2102 pass) and `bun run typecheck` are green.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -21,14 +21,12 @@ Review #2: every criterion is traced to a test that was read and seen to assert 
 
 ### Easy to miss
 - The derivation is `deriveEdgeCounters` in `packages/core/src/derive-counters.ts` (pure). The store writes it into the text in `packages/store/src/derived-counters.ts` (`withDerivedCounters`), called from `loadWorkflowText` after flattening and before parsing.
-- `withDerivedCounters` runs on raw parsed YAML **before** the schema check. Any shape it assumes, rewrites or drops has to be either valid already or left for the schema to refuse. Both open bugs come from this.
+- `withDerivedCounters` runs on raw parsed YAML **before** the schema check. Any shape it assumes, rewrites or drops has to be either valid already or left for the schema to refuse: a `counters:` that is no map derives nothing, so the schema refuses it. It copies each step and its outcomes before writing a counter in, because a YAML alias makes steps share one parsed object.
 - A derived pin cannot go through `loadWorkflowText` again (its dotted `counters:` keys are refused there). Pins are read with `parseWorkflowText`. Every reader of a workflow *file* goes through the loader (checked in review #2).
 - `writtenEdges` skips step and outcome names that fail their patterns, so `edge.split(".")` only sees names without dots.
 
 ### Not proven yet
-- **Blocking, a malformed `counters:` is dropped:** a deriving workflow with `counters: hello` (or `null`, or `[1]`) loads, and the bad value is silently replaced (`derived-counters.ts:46`). The same file with no deriving edge is refused `/counters must be object`. Repro and fix: findings file of review #2 (F1).
-- **Blocking, wrong counting through a YAML alias:** two steps sharing an `outcomes:` map via `&o`/`*o` share the in-place write-back (`derived-counters.ts:38-44`). In the pin, `a.fail` names `counter: b.fail`. Repro and fix: findings file of review #2 (F2).
-- AC12 runs only in CI.
+- AC12 (doctor) runs only in the integration tier, in CI.
 
 ### Notes
 - Review #2 minor (not rework): AC3 has no fixture where an agent send-back sits on a loop another edge already counts. AC12's `defaults` fixture writes `reject: { to: implement, max: 3 }`. A use route's `max:` is refused at the inner shared step's pointer until slice 03 moves it to the exit. The agent row uses reachability rather than `elementaryCycles`, which is equivalent.
@@ -36,8 +34,4 @@ Review #2: every criterion is traced to a test that was read and seen to assert 
 - Earlier fixture edits (old-wording-refusal, shared-workflows, housekeeping) only keep each test's case intact under derivation.
 
 ### Resume
-Fix F1 and F2 in `packages/store/src/derived-counters.ts`:
-- F1: return `source: null` when `doc.counters` is present but not a map, so the schema refuses it.
-- F2: `structuredClone` the doc before the write-back, or rebuild each `outcomes` map.
-
-Add a test for each in `packages/store/test/unit/derived-counters.test.ts`, then run `bun run test` and `bun run typecheck`.
+Review the slice again (review #3): the two blocking findings of review #2 are fixed; the minor notes stay as notes.

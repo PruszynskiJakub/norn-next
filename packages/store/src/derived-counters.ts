@@ -24,7 +24,9 @@ export function withDerivedCounters(source: string, included: Record<string, str
   } catch {
     return { ok: true, source: null };
   }
-  if (!isObj(doc) || !isObj(doc.steps) || stepWordingErrors(doc.steps).length) return { ok: true, source: null };
+  // A counters: that is no map is left for the schema to refuse: merging into it would drop it.
+  if (!isObj(doc) || !isObj(doc.steps) || stepWordingErrors(doc.steps).length || (doc.counters !== undefined && !isObj(doc.counters)))
+    return { ok: true, source: null };
   const derived = deriveEdgeCounters({ ...doc, steps: toModelSteps(doc.steps) });
   if (derived.errors.length)
     return {
@@ -35,14 +37,17 @@ export function withDerivedCounters(source: string, included: Record<string, str
       }),
     };
   if (!Object.keys(derived.edges).length) return { ok: true, source: null };
-  const steps = doc.steps;
+  // Each step and its outcomes are copied before the write-back: a YAML alias makes steps share
+  // one parsed object, and writing into it would hand one step another step's counter.
+  const steps: Obj = { ...doc.steps };
   for (const [edge, counter] of Object.entries(derived.edges)) {
     const [step, outcome] = edge.split(".") as [string, string];
-    const routes = (steps[step] as Obj).outcomes as Obj;
+    const s = steps[step] as Obj;
+    const routes = s.outcomes as Obj;
     const route = routes[outcome];
     const { max: _max, ...rest } = isObj(route) ? route : { to: route };
-    routes[outcome] = { ...rest, counter };
+    steps[step] = { ...s, outcomes: { ...routes, [outcome]: { ...rest, counter } } };
   }
-  const flat: Obj = { ...doc, counters: { ...(isObj(doc.counters) ? doc.counters : {}), ...derived.counters } };
+  const flat: Obj = { ...doc, steps, counters: { ...(doc.counters as Obj | undefined), ...derived.counters } };
   return { ok: true, source: stringifyYaml(flat, FLAT_YAML) };
 }

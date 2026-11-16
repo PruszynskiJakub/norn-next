@@ -219,6 +219,36 @@ describe("a counter derived per edge at load", () => {
     expect(refusal(dottedOutcome).join("\n")).not.toContain("test.x.y");
   });
 
+  test("a counters: that is not a map is refused as corrupt whether or not the workflow derives a counter", () => {
+    for (const bad of ["hello", "null", "[1]"]) {
+      const deriving = workflow(`${IMPLEMENT}  test:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: $done, fail: implement }
+`, `counters: ${bad}\n`);
+      expect(refusal(deriving)).toContain("/counters must be object");
+    }
+  });
+
+  test("steps sharing one outcomes map through a YAML alias each count their own edge", () => {
+    const wf = loaded(`name: w
+start: a
+steps:
+  a:
+    check: x
+    timeout: 5m
+    outcomes: &o { pass: $done, fail: b }
+  b:
+    check: y
+    timeout: 5m
+    outcomes: *o
+`);
+    expect(counting(wf.workflow)).toEqual({
+      "a.fail": { counter: "a.fail", max: 5 },
+      "b.fail": { counter: "b.fail", max: 5 },
+    });
+  });
+
   test("a loop no edge counts even after derivation is refused as a cycle without a counter", () => {
     const wf = loaded(
       workflow(`  implement:
