@@ -17,15 +17,19 @@ const RR = `name: rr
 start: first
 steps:
   first:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     deadline: 1m
-    outcomes: { done: { to: second, means: "implemented" } }
+    outcomes: { done: second }
+    means:
+      done: "implemented"
   second:
-    type: agent
-    skill: norn-merge
+    agent: Use the \`norn-merge\` skill.
+    skills: [norn-merge]
     deadline: 1h
-    outcomes: { done: { to: $done, means: "merged" } }
+    outcomes: { done: $done }
+    means:
+      done: "merged"
 `;
 
 const CONFIG = `provider: gh

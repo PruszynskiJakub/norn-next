@@ -14,18 +14,19 @@ const MERGING = `name: merging
 start: work
 steps:
   work:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: ready, means: "the change is ready to look at" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: ready }
+    means:
+      done: "the change is ready to look at"
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes: { approve: merge, reject: { to: work, counter: loop } }
   merge:
-    type: merge
+    await-merge:
     outcomes: { stale: { to: update, counter: stale_loop } }
   update:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: ready, conflict: $stuck }
 counters: { loop: { max: 2 }, stale_loop: { max: 3 } }
 `;

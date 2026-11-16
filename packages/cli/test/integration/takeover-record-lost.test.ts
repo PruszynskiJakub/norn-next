@@ -23,30 +23,40 @@ const RV = `name: rv
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: review, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means:
+      done: "built"
   review:
-    type: agent
-    skill: norn-review
+    agent: Use the \`norn-review\` skill.
+    skills: [norn-review]
     outcomes:
-      approve: { to: $done, means: "good" }
-      rework: { to: implement, counter: review_loop, means: "fix it" }
+      approve: $done
+      rework: { to: implement, counter: review_loop }
+    means:
+      approve: "good"
+      rework: "fix it"
 counters: { review_loop: { max: 3 } }
 `;
 /** rv's steps in a shared file, and rv bringing them in with `use:`. */
 const RV_CORE = `start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: review, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means:
+      done: "built"
   review:
-    type: agent
-    skill: norn-review
+    agent: Use the \`norn-review\` skill.
+    skills: [norn-review]
     outcomes:
-      approve: { to: $done, means: "good" }
-      rework: { to: implement, counter: review_loop, means: "fix it" }
+      approve: $done
+      rework: { to: implement, counter: review_loop }
+    means:
+      approve: "good"
+      rework: "fix it"
 `;
 const RV_USING = `name: rv
 start: core
@@ -138,7 +148,7 @@ describe("checkout with the record lost starts a new round from the branch (B25,
   test("AC1, AC2: A died at implement#2 under local; after expiry B's checkout restarts implement as a fresh round, the take says record_lost, the brief says to check the branch", async () => {
     const s = await heldThenSilent(9, "parser", 1);
     // the branch's workflow changed since A pinned it: the new round pins the branch's
-    const fresh = RV.replace('means: "built"', 'means: "built and committed"');
+    const fresh = RV.replace('done: "built"', 'done: "built and committed"');
     h.write(join(workflowsDir(s.wt(h.root)), "rv.yaml"), fresh);
     sh(s.wt(h.root), ["add", "-A"]);
     sh(s.wt(h.root), ["commit", "-q", "-m", "tune rv"]);
@@ -385,7 +395,7 @@ describe("a lost-record checkout that cannot start the round takes nothing (revi
 
   test("the restart flattens the shared file on the branch, not the one in the work tree", async () => {
     const s = await heldThenSilent(27, "shared-wf", 0);
-    const branchCore = RV_CORE.replace('means: "built"', 'means: "built on the branch"');
+    const branchCore = RV_CORE.replace('done: "built"', 'done: "built on the branch"');
     onBranch(s, (wt) => {
       writeFileSync(join(workflowsDir(wt), "rv.yaml"), RV_USING);
       mkdirSync(join(workflowsDir(wt), "shared"), { recursive: true });
@@ -395,7 +405,7 @@ describe("a lost-record checkout that cannot start the round takes nothing (revi
     const B = cloneOf(h, "b-sharedwf", "bob");
     // B's work tree holds another text of the shared file: the branch's wins
     mkdirSync(join(workflowsDir(B.root), "shared"), { recursive: true });
-    writeFileSync(join(workflowsDir(B.root), "shared/rvcore.yaml"), RV_CORE.replace('means: "built"', 'means: "built in the work tree"'));
+    writeFileSync(join(workflowsDir(B.root), "shared/rvcore.yaml"), RV_CORE.replace('done: "built"', 'done: "built in the work tree"'));
     expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
     const pinned = readFileSync(join(s.runs(B.root), "workflow.yaml"), "utf8");
     expect(pinned).toContain("built on the branch");

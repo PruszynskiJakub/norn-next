@@ -18,9 +18,11 @@ const SOLO = `name: solo
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "the change is made" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means:
+      done: "the change is made"
 `;
 
 let h: Harness;

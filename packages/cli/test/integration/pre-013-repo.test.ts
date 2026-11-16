@@ -19,7 +19,7 @@ const oldFilesOf = (root: string): Record<string, string> => {
   const old = layoutPlaces(root);
   return {
     [old.config.old]: "provider: gh\nworkflow: duo\nmode: manual\n",
-    [join(old.workflows.old, "duo.yaml")]: "name: duo\nstart: implement\nsteps:\n  implement:\n    type: agent\n    skill: norn-implement\n    outcomes: { done: $done }\n",
+    [join(old.workflows.old, "duo.yaml")]: "name: duo\nstart: implement\nsteps:\n  implement:\n    agent: Use the `norn-implement` skill.\n    skills: [norn-implement]\n    outcomes: { done: $done }\n    means:\n      done: step finished with outcome done\n",
     [join(old["machine files"].old, "2026-01-01.jsonl")]: '{"type":"tick"}\n',
   };
 };

@@ -18,9 +18,11 @@ const SOLO = `name: solo
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means:
+      done: "built"
 `;
 
 const acts = (r: TickReport) => r.decisions.map((d) => d.kind);

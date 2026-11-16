@@ -17,9 +17,11 @@ const SOLO = `name: solo
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     outcomes: { done: $done }
+    means:
+      done: step finished with outcome done
 `;
 
 type Item = { id: string; story: string; slice: string | null; title: string; command: string };
@@ -39,7 +41,7 @@ describe("mode, agent and workflow over ticks (B10, B13, B24, B25, B33)", () => 
     // A workflow's own mode
     h.write(join(workflowsDir(h.root), "careful.yaml"), `mode: manual\n${SOLO.replace("name: solo", "name: careful")}`);
     // A step naming a built-in agent that has no entry and is not `agent`
-    h.write(join(workflowsDir(h.root), "gem.yaml"), SOLO.replace("name: solo", "name: gem").replace("skill: norn-implement", "skill: norn-implement\n    agent: gemini"));
+    h.write(join(workflowsDir(h.root), "gem.yaml"), SOLO.replace("name: solo", "name: gem").replace("skills: [norn-implement]", "skills: [norn-implement]\n    by: gemini"));
     // The team's entry workflow; B10, B13: my mode and agent, no agents entry
     h.config("workflow: solo\nmode: auto\nagent: codex\n");
     // A team file with no version is an older norn's repo to init: this one was set up with this norn
@@ -226,7 +228,7 @@ describe("norn init sets up the agents in use only (B13)", () => {
     const h = await createHarness();
     try {
       h.write(join(h.root, ".agents", "norn.config.local.yaml"), "agent: codex\n");
-      h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO.replace("type: agent\n", "type: agent\n    agent: gemini\n"));
+      h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO.replace("skills: [norn-implement]", "skills: [norn-implement]\n    by: gemini"));
       expect((await h.norn("init")).exit).toBe(0);
       expect(present(h)).toEqual([".codex", ".gemini"]);
     } finally {

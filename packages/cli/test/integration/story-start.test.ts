@@ -24,13 +24,14 @@ const STORY = `name: story
 start: refine
 steps:
   refine:
-    type: agent
-    skill: norn-refine
+    agent: Use the \`norn-refine\` skill.
+    skills: [norn-refine]
     attended: true
-    outcomes: { done: { to: approve, means: "spec written" } }
+    outcomes: { done: approve }
+    means:
+      done: "spec written"
   approve:
-    type: gate
-    prompt: "Approve the spec"
+    gate: "Approve the spec"
     outcomes: { approve: $done, reject: { to: refine, counter: spec_loop } }
 counters: { spec_loop: { max: 2 } }
 `;
@@ -39,8 +40,7 @@ const GATE_FIRST = `name: gatefirst
 start: approve
 steps:
   approve:
-    type: gate
-    prompt: "Approve it"
+    gate: "Approve it"
     outcomes: { approve: $done, reject: $stuck }
 `;
 
@@ -48,8 +48,7 @@ const CHECK_FIRST = `name: checkfirst
 start: test
 steps:
   test:
-    type: check
-    run: "true"
+    check: "true"
     timeout: 1m
     outcomes: { pass: $done, fail: $stuck }
 `;

@@ -22,19 +22,29 @@ const QAFLOW = `name: qaflow
 start: qa
 steps:
   qa:
-    type: agent
-    skill: norn-qa
+    agent: Use the \`norn-qa\` skill.
+    skills: [norn-qa]
     criteria: required
     outcomes:
-      pass:       { to: ready, verdict: pass, means: "every criterion observed with evidence" }
-      fail:       { to: $stuck, verdict: fail, means: "a criterion fails; repro in findings" }
-      partial:    { to: human-qa, verdict: person, means: "criteria only a person can judge, evidence prepared" }
-      unverified: { to: human-qa, verdict: unverified, means: "criteria this session could not check; how to check each one is in the report" }
+      pass:       ready
+      fail:       $stuck
+      partial:    human-qa
+      unverified: human-qa
+    means:
+      pass: "every criterion observed with evidence"
+      fail: "a criterion fails; repro in findings"
+      partial: "criteria only a person can judge, evidence prepared"
+      unverified: "criteria this session could not check; how to check each one is in the report"
+    verdict:
+      pass: pass
+      fail: fail
+      partial: person
+      unverified: unverified
   human-qa:
-    type: gate
+    gate: approve or reject human-qa
     outcomes: { approve: ready, reject: { to: qa, counter: qa_loop } }
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes: { approve: $done, reject: { to: qa, counter: qa_loop } }
 counters: { qa_loop: { max: 3 } }
 `;

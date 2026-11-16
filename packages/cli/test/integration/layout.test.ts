@@ -25,8 +25,7 @@ const gateFirst = (name: string, prompt: string) => `name: ${name}
 start: approve
 steps:
   approve:
-    type: gate
-    prompt: "${prompt}"
+    gate: "${prompt}"
     outcomes: { approve: $done, reject: $stuck }
 `;
 

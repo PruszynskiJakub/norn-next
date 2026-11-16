@@ -20,9 +20,11 @@ const WORKFLOW = `name: one
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     outcomes: { done: $done }
+    means:
+      done: step finished with outcome done
 `;
 
 describe("gh-78: a tick records where it spent its time", () => {

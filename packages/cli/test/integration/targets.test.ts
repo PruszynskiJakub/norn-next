@@ -17,12 +17,13 @@ const GATED = `name: gated
 start: work
 steps:
   work:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: review, means: "the change is ready to look at" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means:
+      done: "the change is ready to look at"
   review:
-    type: gate
-    prompt: "Look at it"
+    gate: "Look at it"
     outcomes: { approve: $done, reject: { to: work, counter: loop } }
 counters: { loop: { max: 2 } }
 `;
@@ -31,11 +32,13 @@ const SLICED = `name: sliced
 start: plan
 steps:
   plan:
-    type: agent
-    skill: norn-plan
-    outcomes: { done: { to: slices, means: "slice files written" } }
+    agent: Use the \`norn-plan\` skill.
+    skills: [norn-plan]
+    outcomes: { done: slices }
+    means:
+      done: "slice files written"
   slices:
-    type: slices
+    slices:
     outcomes: { done: $done, stuck: $stuck }
 `;
 
@@ -43,8 +46,7 @@ const SLICE_QA = `name: sliceqa
 start: qa
 steps:
   qa:
-    type: gate
-    prompt: "Try the slice"
+    gate: "Try the slice"
     outcomes: { approve: $done, reject: $stuck }
 `;
 

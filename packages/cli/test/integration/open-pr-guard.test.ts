@@ -26,27 +26,26 @@ const guarded = (ciLog: string) => `name: guarded
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: open-pr, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: open-pr }
+    means:
+      done: "built"
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: ci }
   ci:
-    type: check
-    run: git ls-remote origin refs/heads/${SLUG} | cut -f1 >> ${ciLog}
+    check: git ls-remote origin refs/heads/${SLUG} | cut -f1 >> ${ciLog}
     timeout: 1m
     outcomes: { pass: ready, fail: { to: implement, counter: ci_loop } }
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes: { approve: merge, reject: { to: implement, counter: ci_loop } }
   merge:
-    type: merge
+    await-merge:
     outcomes: { stale: { to: update, counter: stale_loop } }
   update:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: open-pr, conflict: $stuck }
 counters: { ci_loop: { max: 3 }, stale_loop: { max: 3 } }
 `;

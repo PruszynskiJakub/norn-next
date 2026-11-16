@@ -19,29 +19,31 @@ const LOOP = `name: loop
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: update, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: update }
+    means:
+      done: "built"
   update:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: open-pr, conflict: $stuck }
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: review }
   review:
-    type: agent
-    skill: norn-review
+    agent: Use the \`norn-review\` skill.
+    skills: [norn-review]
     outcomes:
-      approve: { to: ready, means: "good" }
-      rework: { to: implement, counter: review_loop, means: "fix it" }
+      approve: ready
+      rework: { to: implement, counter: review_loop }
+    means:
+      approve: "good"
+      rework: "fix it"
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes: { approve: fin, reject: { to: implement, counter: review_loop } }
   fin:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: $done }
 counters: { review_loop: { max: 5 } }
 `;

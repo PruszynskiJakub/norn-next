@@ -17,10 +17,12 @@ const STORY = `name: story
 start: refine
 steps:
   refine:
-    type: agent
-    skill: norn-refine
+    agent: Use the \`norn-refine\` skill.
+    skills: [norn-refine]
     attended: true
     outcomes: { done: $done }
+    means:
+      done: step finished with outcome done
 `;
 
 let h: Harness;

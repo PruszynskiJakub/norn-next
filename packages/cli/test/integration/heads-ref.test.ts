@@ -21,15 +21,20 @@ const RV = `name: rv
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: review, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means:
+      done: "built"
   review:
-    type: agent
-    skill: norn-review
+    agent: Use the \`norn-review\` skill.
+    skills: [norn-review]
     outcomes:
-      approve: { to: $done, means: "good" }
-      rework: { to: implement, counter: review_loop, means: "fix it" }
+      approve: $done
+      rework: { to: implement, counter: review_loop }
+    means:
+      approve: "good"
+      rework: "fix it"
 counters: { review_loop: { max: 3 } }
 `;
 // the PR opens before review, so a rework boundary moves the heads ref alone
@@ -37,19 +42,23 @@ const PR = `name: pr
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: open-pr, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: open-pr }
+    means:
+      done: "built"
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: review }
   review:
-    type: agent
-    skill: norn-review
+    agent: Use the \`norn-review\` skill.
+    skills: [norn-review]
     outcomes:
-      approve: { to: $done, means: "good" }
-      rework: { to: implement, counter: review_loop, means: "fix it" }
+      approve: $done
+      rework: { to: implement, counter: review_loop }
+    means:
+      approve: "good"
+      rework: "fix it"
 counters: { review_loop: { max: 3 } }
 `;
 const CONFIG = "provider: gh\nworkflow: rv\nmode: auto\n";

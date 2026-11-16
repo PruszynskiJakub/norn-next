@@ -22,20 +22,23 @@ const SHIP = `name: ship
 start: qa
 steps:
   qa:
-    type: agent
-    skill: norn-qa
-    outcomes: { pass: { to: describe, means: "every criterion observed" } }
+    agent: Use the \`norn-qa\` skill.
+    skills: [norn-qa]
+    outcomes: { pass: describe }
+    means:
+      pass: "every criterion observed"
   describe:
-    type: agent
-    skill: norn-pr
+    agent: Use the \`norn-pr\` skill.
+    skills: [norn-pr]
     inputs: [spec, diff, record]
-    outcomes: { done: { to: open-pr, means: "PR body written" } }
+    outcomes: { done: open-pr }
+    means:
+      done: "PR body written"
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: ready }
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes: { approve: $done, reject: { to: qa, counter: loop } }
 counters: { loop: { max: 3 } }
 `;

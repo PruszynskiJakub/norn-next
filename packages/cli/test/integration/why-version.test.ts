@@ -17,9 +17,11 @@ const WORKFLOW = `name: ship
 start: work
 steps:
   work:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     outcomes: { done: $done }
+    means:
+      done: step finished with outcome done
 `;
 
 const CONFIG = `provider: gh

@@ -28,9 +28,11 @@ const SOLO = `name: solo
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     outcomes: { done: $done }
+    means:
+      done: step finished with outcome done
 `;
 
 const CONFIG = `provider: gh
@@ -346,10 +348,10 @@ describe("norn doctor: the repo group (B7–B10, D7)", () => {
   const LOOP = `name: loop
 start: a
 steps:
-  a: { type: agent, skill: norn-implement, outcomes: { done: b } }
-  b: { type: agent, skill: norn-review, outcomes: { again: a, ok: $done } }
+  a: { agent: "Use the \`norn-implement\` skill.", skills: [norn-implement], outcomes: { done: b }, means: { done: step finished with outcome done } }
+  b: { agent: "Use the \`norn-review\` skill.", skills: [norn-review], outcomes: { again: a, ok: $done }, means: { again: step finished with outcome again, ok: step finished with outcome ok } }
 `;
-  const NOPE = SOLO.replace("name: solo", "name: nope").replace("skill: norn-implement", "skill: norn-nope");
+  const NOPE = SOLO.replace("name: solo", "name: nope").replace("skills: [norn-implement]", "skills: [norn-nope]");
   // the machine group passes too: an agent binary on PATH and hooks that fire through this norn
   const env = () => ({ ...h.deps.env, PATH: `${bin}:${h.deps.env?.PATH ?? process.env.PATH}`, NORN_HOOK_COMMAND: `${process.execPath} ${main} hook` });
   const status = () => h.git(["status", "--porcelain"]);
@@ -402,7 +404,7 @@ steps:
     const plain = await runChecked(["doctor", "--json"], { ...h.deps, env: env() });
     expect((plain.value as { agents: Array<{ name: string }> }).agents.map((a) => a.name)).toEqual(["claude"]);
     const file = join(workflowsDir(h.root), "other.yaml");
-    h.write(file, SOLO.replace("name: solo", "name: other").replace("skill: norn-implement", "skill: norn-implement\n    agent: codex"));
+    h.write(file, SOLO.replace("name: solo", "name: other").replace("skills: [norn-implement]", "skills: [norn-implement]\n    by: codex"));
     try {
       const r = await runChecked(["doctor", "--json"], { ...h.deps, env: env() });
       expect((r.value as { agents: Array<{ name: string }> }).agents.map((a) => a.name).sort()).toEqual(["claude", "codex"]);

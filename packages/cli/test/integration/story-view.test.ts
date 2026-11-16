@@ -22,11 +22,13 @@ const SLICED = `name: sliced
 start: plan
 steps:
   plan:
-    type: agent
-    skill: norn-plan
-    outcomes: { done: { to: slices, means: "slice files written" } }
+    agent: Use the \`norn-plan\` skill.
+    skills: [norn-plan]
+    outcomes: { done: slices }
+    means:
+      done: "slice files written"
   slices:
-    type: slices
+    slices:
     outcomes: { done: $done, stuck: $stuck }
 `;
 
@@ -34,8 +36,7 @@ const SLICE_QA = `name: sliceqa
 start: qa
 steps:
   qa:
-    type: gate
-    prompt: "Try the slice"
+    gate: "Try the slice"
     outcomes: { approve: $done, reject: $stuck }
 `;
 

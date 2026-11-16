@@ -43,13 +43,14 @@ const ATTENDED = `name: story
 start: refine
 steps:
   refine:
-    type: agent
-    skill: norn-refine
+    agent: Use the \`norn-refine\` skill.
+    skills: [norn-refine]
     attended: true
-    outcomes: { done: { to: approve, means: "spec written" } }
+    outcomes: { done: approve }
+    means:
+      done: "spec written"
   approve:
-    type: gate
-    prompt: "Approve the spec"
+    gate: "Approve the spec"
     outcomes: { approve: $done, reject: { to: refine, counter: spec_loop } }
 counters: { spec_loop: { max: 2 } }
 `;
@@ -127,20 +128,24 @@ const SLICED = `name: sliced
 start: plan
 steps:
   plan:
-    type: agent
-    skill: norn-plan
-    outcomes: { done: { to: slices, means: "slice files written" } }
+    agent: Use the \`norn-plan\` skill.
+    skills: [norn-plan]
+    outcomes: { done: slices }
+    means:
+      done: "slice files written"
   slices:
-    type: slices
+    slices:
     outcomes: { done: $done, stuck: $stuck }
 `;
 const BUILD = `name: build
 start: build
 steps:
   build:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means:
+      done: "built"
 `;
 
 describe("a slice worktree beside its story's; norn status shows each unit's worktree", () => {

@@ -20,12 +20,13 @@ const FLOW = `name: flow
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: review, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means:
+      done: "built"
   review:
-    type: gate
-    prompt: "Look at it"
+    gate: "Look at it"
     outcomes: { approve: $done, reject: { to: implement, counter: loop } }
 counters: { loop: { max: 2 } }
 `;

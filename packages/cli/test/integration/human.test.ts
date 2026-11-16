@@ -21,12 +21,13 @@ const GATED = `name: gated
 start: work
 steps:
   work:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: review, means: "the change is ready to look at" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means:
+      done: "the change is ready to look at"
   review:
-    type: gate
-    prompt: "Look at it"
+    gate: "Look at it"
     outcomes: { approve: $done, reject: { to: work, counter: loop } }
 counters: { loop: { max: 2 } }
 `;
@@ -35,20 +36,24 @@ const ALT = `name: alt
 start: draft
 steps:
   draft:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "drafted" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means:
+      done: "drafted"
 `;
 
 const SLICED = `name: sliced
 start: plan
 steps:
   plan:
-    type: agent
-    skill: norn-plan
-    outcomes: { done: { to: slices, means: "slice files written" } }
+    agent: Use the \`norn-plan\` skill.
+    skills: [norn-plan]
+    outcomes: { done: slices }
+    means:
+      done: "slice files written"
   slices:
-    type: slices
+    slices:
     outcomes: { done: $done, stuck: $stuck }
 `;
 
@@ -56,8 +61,7 @@ const SLICE_QA = `name: sliceqa
 start: qa
 steps:
   qa:
-    type: gate
-    prompt: "Try the slice"
+    gate: "Try the slice"
     outcomes: { approve: $done, reject: $stuck }
 `;
 
@@ -600,12 +604,14 @@ describe("gh-71 B2, B25: approving triage's confirm gate finishes the round, not
 start: explore
 steps:
   explore:
-    type: agent
-    skill: norn-qa
-    outcomes: { story: { to: confirm, means: "deliver it as a story" }, close: { to: confirm, means: "close it" } }
+    agent: Use the \`norn-qa\` skill.
+    skills: [norn-qa]
+    outcomes: { story: confirm, close: confirm }
+    means:
+      story: "deliver it as a story"
+      close: "close it"
   confirm:
-    type: gate
-    prompt: "Confirm the triage"
+    gate: "Confirm the triage"
     outcomes: { approve: $done, reject: { to: explore, counter: loop } }
 counters: { loop: { max: 2 } }
 `;
@@ -671,12 +677,13 @@ const ROUND_TRIAGE = `name: triage
 start: explore
 steps:
   explore:
-    type: agent
-    skill: norn-qa
-    outcomes: { story: { to: confirm, means: "deliver it as a story" } }
+    agent: Use the \`norn-qa\` skill.
+    skills: [norn-qa]
+    outcomes: { story: confirm }
+    means:
+      story: "deliver it as a story"
   confirm:
-    type: gate
-    prompt: "Confirm the triage"
+    gate: "Confirm the triage"
     outcomes: { approve: $done, reject: { to: explore, counter: loop } }
 counters: { loop: { max: 2 } }
 `;
@@ -684,30 +691,35 @@ const ROUND_STORY = `name: story
 start: refine
 steps:
   refine:
-    type: agent
-    skill: norn-refine
+    agent: Use the \`norn-refine\` skill.
+    skills: [norn-refine]
     attended: true
-    outcomes: { done: { to: build, means: "spec written" } }
+    outcomes: { done: build }
+    means:
+      done: "spec written"
   build:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "built" }, again: { to: refine, counter: fix, means: "refine again" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done, again: { to: refine, counter: fix } }
+    means:
+      done: "built"
+      again: "refine again"
 counters: { fix: { max: 3 } }
 `;
 const ROUND_QUICK = `name: quick
 start: work
 steps:
   work:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: open-pr, means: "changed" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: open-pr }
+    means:
+      done: "changed"
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: ready }
   ready:
-    type: gate
-    prompt: "Merge the PR"
+    gate: "Merge the PR"
     outcomes: { approve: $done, reject: { to: work, counter: back } }
 counters: { back: { max: 2 } }
 `;

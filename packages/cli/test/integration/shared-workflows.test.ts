@@ -17,16 +17,20 @@ const ALT = `name: alt
 start: draft
 steps:
   draft:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "drafted" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means:
+      done: "drafted"
 `;
 const SHIP = `start: build
 steps:
   build:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means:
+      done: "built"
 `;
 const SHIPPER = `name: shipper
 start: ship
@@ -62,22 +66,30 @@ describe("a broken shared file shows wherever a broken workflow shows", () => {
       "shared/cycle.yaml": `start: build
 steps:
   build:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: check, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: check }
+    means:
+      done: "built"
   check:
-    type: agent
-    skill: norn-review
-    outcomes: { approve: { to: $done, means: "good" }, rework: { to: build, means: "again" } }
+    agent: Use the \`norn-review\` skill.
+    skills: [norn-review]
+    outcomes: { approve: $done, rework: build }
+    means:
+      approve: "good"
+      rework: "again"
 `,
       // an included step naming a counter the workflow does not declare
       "counted.yaml": "name: counted\nstart: core\nsteps:\n  core: { use: undeclared }\n",
       "shared/undeclared.yaml": `start: work
 steps:
   work:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "done" }, again: { to: work, counter: nope, means: "again" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done, again: { to: work, counter: nope } }
+    means:
+      done: "done"
+      again: "again"
 `,
       // a shared file that is not there, beside a workflow broken as one could be before shared files
       "gone.yaml": "name: gone\nstart: core\nsteps:\n  core: { use: missing }\n",
@@ -156,7 +168,7 @@ describe("a shared file is never startable; a round pins the flattened workflow"
 
     expect((await t.norn("story", "edit", "gh-41", "--workflow", "shipper")).exit).toBe(0);
     // the shared file changes between the edit and the tick
-    const edited = SHIP.replace('means: "built"', 'means: "built and shipped"');
+    const edited = SHIP.replace('done: "built"', 'done: "built and shipped"');
     t.write(shipFile(), edited);
     const rejected = await next();
     expect(rejected.decisions.filter((d) => d.unit === "gh-41").map((d) => d.rule)).toEqual(["round.workflow_changed"]);
@@ -176,7 +188,7 @@ describe("a shared file is never startable; a round pins the flattened workflow"
     expect(t.state(runs())?.workflow_hash).toBe(sha256(pin));
 
     // edited mid-round: the running round keeps its pin
-    t.write(shipFile(), SHIP.replace('means: "built"', 'means: "built mid-round"'));
+    t.write(shipFile(), SHIP.replace('done: "built"', 'done: "built mid-round"'));
     await next();
     expect(t.state(runs())).toMatchObject({ workflow: "shipper", round: 2 });
     expect(pinned()).toBe(pin);

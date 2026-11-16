@@ -21,12 +21,13 @@ const READY = `name: ready
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     outcomes: { done: ready }
+    means:
+      done: step finished with outcome done
   ready:
-    type: gate
-    prompt: "Read the PR"
+    gate: "Read the PR"
     outcomes: { approve: $done, reject: { to: implement, counter: ready_loop } }
 counters:
   ready_loop: { max: 2 }
@@ -252,12 +253,13 @@ describe("rounds in the views: status, story view, the handoff header, run list"
 start: explore
 steps:
   explore:
-    type: agent
-    skill: norn-qa
-    outcomes: { story: { to: confirm, means: "deliver it as a story" } }
+    agent: Use the \`norn-qa\` skill.
+    skills: [norn-qa]
+    outcomes: { story: confirm }
+    means:
+      story: "deliver it as a story"
   confirm:
-    type: gate
-    prompt: "Confirm the triage"
+    gate: "Confirm the triage"
     outcomes: { approve: $done, reject: { to: explore, counter: loop } }
 counters: { loop: { max: 2 } }
 `;
@@ -265,22 +267,28 @@ counters: { loop: { max: 2 } }
 start: refine
 steps:
   refine:
-    type: agent
-    skill: norn-refine
+    agent: Use the \`norn-refine\` skill.
+    skills: [norn-refine]
     attended: true
-    outcomes: { done: { to: build, means: "spec written" } }
+    outcomes: { done: build }
+    means:
+      done: "spec written"
   build:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means:
+      done: "built"
 `;
   const QUICK = `name: quick
 start: work
 steps:
   work:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "changed" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means:
+      done: "changed"
 `;
   type Item = { story: string; step: string | null; round?: { n: number; workflow: string } };
   type Inbox = { groups: Record<string, Item[]> };

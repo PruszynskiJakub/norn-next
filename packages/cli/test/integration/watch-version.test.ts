@@ -16,9 +16,11 @@ const WORKFLOW = `name: ship
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     outcomes: { done: $done }
+    means:
+      done: step finished with outcome done
 `;
 
 /** set `norn_version` in the main checkout's team file, as a pull or a hand edit would */

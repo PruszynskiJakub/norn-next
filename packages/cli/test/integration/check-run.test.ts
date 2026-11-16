@@ -19,8 +19,7 @@ const workflow = (run: string, timeout: string) => `name: slow
 start: test
 steps:
   test:
-    type: check
-    run: ${run}
+    check: ${run}
     timeout: ${timeout}
     outcomes: { pass: $done, fail: $stuck }
 `;
