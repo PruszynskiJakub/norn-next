@@ -1,10 +1,11 @@
 /** Content installed by `norn init`: workflow templates, skills, repo config template. */
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { protocolLines } from "@norn/core";
+import { protocolLines, workflowHash } from "@norn/core";
 import { DEFAULT_CONFIG, type Workflow, outcomeEdge, validate } from "@norn/schema";
+import { loadWorkflows, workflowsDir } from "@norn/store";
 import { parseWaitCondition } from "@norn/view";
 import { parse } from "yaml";
 import { type AssetsSources, assetsDir, resolveAssetsDir } from "../../src/runtime/assets.ts";
@@ -42,7 +43,26 @@ const CRAFT = SKILLS.filter((s) => s !== "norn" && !SUPERVISOR.includes(s));
 
 const readSkill = (name: string) => readFileSync(join(SKILLS_DIR, name, "SKILL.md"), "utf8");
 const workflowFiles = readdirSync(WORKFLOWS_DIR).filter((f) => /\.(ya?ml|json)$/.test(f));
-const loadWorkflow = (f: string) => parse(readFileSync(join(WORKFLOWS_DIR, f), "utf8")) as Workflow;
+/** The templates as norn loads them once `norn init` has copied them into a repo: through the store's loader. */
+const TEMPLATES_ROOT = mkdtempSync(join(tmpdir(), "norn-templates-"));
+cpSync(WORKFLOWS_DIR, workflowsDir(TEMPLATES_ROOT), { recursive: true });
+afterAll(() => rmSync(TEMPLATES_ROOT, { recursive: true, force: true }));
+const templates = loadWorkflows(TEMPLATES_ROOT);
+const loadWorkflow = (f: string): Workflow => {
+  const loaded = templates.workflows[f.replace(/\.(ya?ml|json)$/, "")];
+  if (!loaded) throw new Error(`${f} did not load: ${JSON.stringify(templates.errors)}`);
+  return loaded.workflow;
+};
+const routeCount = (wf: Workflow) => Object.values(wf.steps).reduce((n, step) => n + Object.keys(step.outcomes ?? {}).length, 0);
+
+/**
+ * The meaning of each template a rewrite must keep, taken from the loader on the base before it: a changed
+ * route, counter or instruction changes the hash, formatting and key order never do.
+ */
+const PINNED_HASHES: Record<string, string> = {
+  quick: "78142b725e014c435e790c83c50f68c3186f0cc4c317873a1ff6c73bbcf749e9",
+  story: "887efb653b1edd5cb7513b215b816fc140c01154167c2b778bc91538cd2b7159",
+};
 
 /** Splits a SKILL.md into its YAML frontmatter and body. */
 function splitSkill(text: string): { meta: Record<string, unknown>; body: string } {
@@ -107,6 +127,22 @@ function uncountedCycle(wf: Workflow): string[] | null {
 }
 
 describe("workflow templates", () => {
+  test("load through the store's loader without errors", () => {
+    expect(templates.errors).toEqual([]);
+  });
+
+  test.each(Object.keys(PINNED_HASHES))("%s keeps its pinned meaning", (name) => {
+    expect(workflowHash(loadWorkflow(`${name}.yaml`))).toBe(PINNED_HASHES[name] as string);
+  });
+
+  test("quick has 29 routes and 8 counters, story 42 routes and 10 counters", () => {
+    const shape = (name: string) => {
+      const wf = loadWorkflow(`${name}.yaml`);
+      return { routes: routeCount(wf), counters: Object.keys(wf.counters ?? {}).length };
+    };
+    expect({ quick: shape("quick"), story: shape("story") }).toEqual({ quick: { routes: 29, counters: 8 }, story: { routes: 42, counters: 10 } });
+  });
+
   test("triage, reproduce, refinement, story, slice and quick are shipped", () => {
     expect(workflowFiles.sort()).toEqual(["quick.yaml", "refinement.yaml", "reproduce.yaml", "slice.yaml", "story.yaml", "triage.yaml"]);
   });
