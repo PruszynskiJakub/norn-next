@@ -13,7 +13,7 @@ labels:
   - norn:risk:high
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-11-16T13:07:56.445Z
 body_hash: 051566a83f8f299b5c04600b803b4dd57821f8234a3a399096d9f6ec5e729496
 refined_body_hash: 051566a83f8f299b5c04600b803b4dd57821f8234a3a399096d9f6ec5e729496
@@ -48,6 +48,13 @@ criteria:
   - { id: "07.AC4", verifier: test }
   - { id: "07.AC5", verifier: test }
   - { id: "08.AC1", verifier: agent }
+merge:
+  pr: 352
+  url: https://github.com/PruszynskiJakub/norn-next/pull/352
+  head_sha: cb0edbf42c7ba2f171152ba85d1d3383b0a089d0
+  merge_commit_sha: 3c0ccd5c82e520e61a04fcc3523e1a751b3d8ee6
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-16T15:17:00.000Z
 ---
 
 # Workflows cannot share steps, so the same steps are copied into quick, story and release
