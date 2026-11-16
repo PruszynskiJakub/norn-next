@@ -1,8 +1,8 @@
 ---
 id: gh-343/04
 title: Load workflows written in the new wording (old wording still accepted)
-depends_on: [gh-343/02, gh-343/03]
-status: planned
+depends_on: [ gh-343/02, gh-343/03 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
