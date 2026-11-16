@@ -1,0 +1,81 @@
+--- two head keys
+{
+ "file": ".agents/workflows/wf.yaml",
+ "errors": [
+  {
+   "path": "/steps/s",
+   "message": "a step has one head key, this one has 2: `agent`, `check`"
+  }
+ ]
+}
+--- no head key
+{
+ "file": ".agents/workflows/wf.yaml",
+ "errors": [
+  {
+   "path": "/steps/s",
+   "message": "a step opens with one head key: `agent`, `check`, `gate`, `update-branch`, `open-pr`, `integrate`, `push`, `await-merge`, `slices`, or `use`"
+  }
+ ]
+}
+--- two verbs
+{
+ "file": ".agents/workflows/wf.yaml",
+ "errors": [
+  {
+   "path": "/steps/s",
+   "message": "a step has one head key, this one has 2: `open-pr`, `push`"
+  }
+ ]
+}
+use-step quick.yaml head(checkout) ok: true issues [] | origin/main(copy) ok: true
+use-step workflow models equal: false
+steps brought in by use: sync,sync-resolve,implement,update,resolve,test,test-merge,test-resolution,resolution-review,review,describe,open-pr,ci,ready,merge
+--- new wording with use: (checkout)
+{
+ "ok": true,
+ "issues": [],
+ "steps": {
+  "b": {
+   "type": "agent",
+   "instructions": "Build.",
+   "outcomes": {
+    "done": {
+     "to": "rv",
+     "means": "built"
+    }
+   }
+  },
+  "rv": {
+   "type": "agent",
+   "instructions": "Review it.",
+   "skills": [
+    "norn-review"
+   ],
+   "outcomes": {
+    "approve": {
+     "to": "$done",
+     "means": "fine"
+    },
+    "changes_requested": {
+     "to": "b",
+     "counter": "c",
+     "means": "findings"
+    }
+   }
+  },
+  "t": {
+   "type": "check",
+   "run": "bun test",
+   "timeout": "5m",
+   "outcomes": {
+    "pass": "$done",
+    "fail": {
+     "to": "b",
+     "counter": "c"
+    }
+   }
+  }
+ }
+}
+old wording with use: (copy) ok: true | models equal: true

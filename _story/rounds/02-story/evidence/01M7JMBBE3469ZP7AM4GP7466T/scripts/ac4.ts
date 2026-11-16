@@ -1,0 +1,12 @@
+import { load, show } from "./lib.ts";
+const base = (copy: string) => `name: wf\nstart: t\nsteps:\n  t:\n    check: bun test\n    timeout: 5m\n    outcomes: { pass: t2, fail: $done }\n  t2:\n    like: t\n${copy}    outcomes: { pass: $done, fail: $done }\n`;
+const ok = load(base(""));
+show("like copy, no head key written", { ok: ok.ok, issues: ok.issues, t2: ok.workflow?.steps.t2 });
+const same = load(base("    check: bun test --bail\n"));
+show("like copy overriding the same head key (check:)", { ok: same.ok, t2: same.workflow?.steps.t2, refused: same.refused });
+const diff = load(base("    agent: do it\n"));
+show("like copy writing a different head key (agent:)", diff.refused ?? diff);
+const diff2 = load(base("    open-pr:\n"));
+show("like copy writing a different head key (open-pr:)", diff2.refused ?? diff2);
+const useLike = `name: wf\nstart: s\nsteps:\n  s:\n    use: x\n    agent: hi\n    outcomes: {}\n`;
+show("use step also writing agent:", load(useLike, "checkout", { x: "start: a\nsteps:\n  a:\n    open-pr:\n    outcomes: { done: { exit: e } }\n" }).refused);

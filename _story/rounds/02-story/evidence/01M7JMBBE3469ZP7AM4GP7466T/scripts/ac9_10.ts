@@ -1,0 +1,17 @@
+import { load } from "./lib.ts";
+const p = (l: string, r: any) => console.log(`${l} -> ok=${r.ok} ${JSON.stringify(r.refused ?? r.issues)}`);
+const ag = (outs: string, prose = "") => `name: wf\nstart: s\nsteps:\n  s:\n    agent: do it\n    outcomes: ${outs}\n${prose}  t:\n    gate: ok?\n    outcomes: { approve: $done }\n`;
+console.log("# AC9");
+p("done routed, no means:", load(ag("{ done: t }")));
+p("done+blocked routed, means only for done", load(ag("{ done: t, blocked: t }", "    means: { done: ok }\n")));
+p("overridables silent/died/timeout/stalled/ask/stuck without meaning", load(ag("{ done: t, silent: t, died: t, timeout: t, stalled: t, ask: t, stuck: t }", "    means: { done: ok }\n")));
+console.log("# AC10");
+p("means for unrouted outcome", load(ag("{ done: t }", "    means: { done: ok, extra: nope }\n")));
+p("verdict for unrouted outcome", load(ag("{ done: t }", "    means: { done: ok }\n    verdict: { other: pass }\n")));
+const nonagent = (head: string, prose: string, outs = "{ pass: $done, fail: $done }") => `name: wf\nstart: s\nsteps:\n  s:\n    ${head}\n    outcomes: ${outs}\n${prose}`;
+p("means: on check step", load(nonagent("check: bun test\n    timeout: 1m", "    means: { pass: ok }\n")));
+p("verdict: on check step", load(nonagent("check: bun test\n    timeout: 1m", "    verdict: { pass: pass }\n")));
+p("means: on gate step", load(nonagent("gate: ok?", "    means: { approve: ok }\n", "{ approve: $done }")));
+p("means: on open-pr step", load(nonagent("open-pr:", "    means: { done: ok }\n", "{ done: $done }")));
+p("verdict: on update-branch step", load(nonagent("update-branch:", "    verdict: { done: pass }\n", "{ done: $done }")));
+p("means: scalar on agent", load(ag("{ done: t }", "    means: ok\n")));

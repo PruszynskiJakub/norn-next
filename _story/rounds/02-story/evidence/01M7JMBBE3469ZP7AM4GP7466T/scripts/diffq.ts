@@ -1,0 +1,10 @@
+import { load, R } from "./lib.ts";
+import { readFileSync, writeFileSync } from "node:fs";
+const A = `${R}/packages/cli/assets/workflows`, M = process.argv[2], name = process.argv[3];
+const sh = (d: string) => Object.fromEntries(["sync", "base-update", "ship"].map((n) => [n, readFileSync(`${d}/shared/${n}.yaml`, "utf8")]));
+const wf = (t: string) => t.replace(/^name: \S+/m, "name: wf");
+const h = load(wf(readFileSync(`${A}/${name}.yaml`, "utf8")), "checkout", sh(A));
+const m = load(wf(readFileSync(`${M}/${name}.yaml`, "utf8")), "copy", sh(M));
+writeFileSync("/dev/stdout", "");
+const s = (v: any) => JSON.stringify(v, (k, x) => x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x, 1);
+writeFileSync(`../tmp-h.json`, s(h.workflow)); writeFileSync(`../tmp-m.json`, s(m.workflow));

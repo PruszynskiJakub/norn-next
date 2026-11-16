@@ -1,0 +1,57 @@
+--- like copy, no head key written
+{
+ "ok": true,
+ "issues": [],
+ "t2": {
+  "type": "check",
+  "run": "bun test",
+  "timeout": "5m",
+  "outcomes": {
+   "pass": "$done",
+   "fail": "$done"
+  }
+ }
+}
+--- like copy overriding the same head key (check:)
+{
+ "ok": true,
+ "t2": {
+  "type": "check",
+  "run": "bun test --bail",
+  "timeout": "5m",
+  "outcomes": {
+   "pass": "$done",
+   "fail": "$done"
+  }
+ }
+}
+--- like copy writing a different head key (agent:)
+{
+ "file": ".agents/workflows/wf.yaml",
+ "errors": [
+  {
+   "path": "/steps/t2",
+   "message": "a step has one head key, this one has 2: `agent`, `check`"
+  }
+ ]
+}
+--- like copy writing a different head key (open-pr:)
+{
+ "file": ".agents/workflows/wf.yaml",
+ "errors": [
+  {
+   "path": "/steps/t2",
+   "message": "a step has one head key, this one has 2: `check`, `open-pr`"
+  }
+ ]
+}
+--- use step also writing agent:
+{
+ "file": ".agents/workflows/wf.yaml",
+ "errors": [
+  {
+   "path": "/steps/s",
+   "message": "unknown property 'agent'"
+  }
+ ]
+}

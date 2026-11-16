@@ -1,0 +1,5 @@
+golden cases re-decided: 139 identical, 0 different
+skills ["norn-refine"] -> [ "remote.mirror.refined" ]
+skills ["norn-interview","norn-refine"] -> [ "remote.mirror.refined" ]
+skills ["norn-implement"] -> [ "agent.start" ]
+skills [] -> [ "agent.start" ]

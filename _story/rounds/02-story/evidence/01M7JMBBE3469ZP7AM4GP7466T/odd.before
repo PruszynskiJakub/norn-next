@@ -1,0 +1,10 @@
+name: odd
+start: a
+steps:
+  a:
+    type: agent
+    skill: norn-implement
+    outcomes:
+      done:
+        to: $done # where it goes
+        means: "m"

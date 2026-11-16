@@ -1,0 +1,1 @@
+{"kind":"classify","receipt_id":"01M7JMNDQCK381F6XYCCYVQPS7","run_id":"01M7JMBBE3469ZP7AM4GP7466T","step":"qa","attempt":1,"at":"2026-11-16T16:57:21.389Z","by":"norn","who":"jakubpruszynski@mac","tick_id":"01M7JMNDQCQA3V65YGQGFBYQYP","outcome":"silent","rule":"agent.silent","route":"nudge","detail":"turn ended without a receipt","counter":{"name":"nudges","value":1,"max":2}}

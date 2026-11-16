@@ -1,0 +1,30 @@
+skills=["norn-implement"]
+## Your work
+
+Use the `norn-implement` skill.
+
+Build the login form test-first.
+
+----
+skills=["norn-implement","norn-tdd"]
+## Your work
+
+Use the `norn-implement` and `norn-tdd` skills.
+
+Build the login form test-first.
+
+----
+skills=["norn-implement","norn-tdd","norn-codebase-design"]
+## Your work
+
+Use the `norn-implement`, `norn-tdd` and `norn-codebase-design` skills.
+
+Build the login form test-first.
+
+----
+skills=[]
+## Your work
+
+Build the login form test-first.
+
+----

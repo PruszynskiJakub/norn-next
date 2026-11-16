@@ -1,0 +1,60 @@
+=== blockEdgeComment
+steps:
+  qa:
+    agent: Check it.
+    skills: [s]
+    outcomes:
+      pass: describe
+    means:
+      pass: ok
+
+=== flowProseFirst
+steps:
+  qa:
+    agent: Check it.
+    skills: [s]
+    outcomes:
+      pass: describe
+    means:
+      pass: ok
+    verdict:
+      pass: pass
+
+=== likeAgentName
+steps:
+  review:
+    agent: Review.
+    skills: [s]
+    outcomes: { approve: $done }
+    means:
+      approve: fine
+  review-codex:
+    like: review
+    agent: codex
+
+=== hashInBlock
+steps:
+  a:
+      # not a comment
+    check: bun test
+    description: |
+      text
+    outcomes: { pass: $done }
+
+=== parseError
+steps:
+  a:
+    type: agent
+   bad: [
+
+steps:
+  qa:
+    agent: Check it.
+    skills: [s]
+    outcomes:
+      pass: { to: describe, counter: c }
+    means:
+      pass: ok
+    verdict:
+      pass: pass
+

@@ -1,0 +1,2 @@
+by: codex -> model.agent="codex" config.agent=claude | action=start_run launch.agent=codex started.agent=codex
+(no by:) -> model.agent=undefined config.agent=claude | action=start_run launch.agent=claude started.agent=claude

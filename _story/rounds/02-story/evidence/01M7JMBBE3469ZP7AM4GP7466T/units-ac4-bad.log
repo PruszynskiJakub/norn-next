@@ -1,0 +1,36 @@
+bun test v1.3.13 (bf2e2cec)
+
+units.test.ts:
+>>> gh-31 round 1: {"step":"$done","status":"done","workflow":"alt"}
+>>> story edit exit: 3
+>>> story edit value: {"error":"workflow 'oldy' cannot run on a story: .agents/workflows/oldy.yaml: the agent may report `done`: say what it means in `means:`","do_instead":"fix the workflow file","code":"invalid_workflow","details":[{"code":"schema","path":"/steps/a/outcomes/done","message":".agents/workflows/oldy.yaml: the agent may report `done`: say what it means in `means:`"}]}
+>>> gh-31 after edit + tick: {"step":"$done","status":"done","workflow":"alt"}
+>>> gh-7 tick rules: []
+>>> gh-7 worktree exists: false
+>>> gh-7 notifier: []
+>>> sync exit: 0
+>>> sync value: {"tick_id":"03PGFN52X013YQC6D5T3T2JWJQ","at":"2099-01-15T10:01:40.000Z","duration_ms":451,"sync":{"ran":true,"ok":true},"decisions":[{"unit":"gh-31","rule":"story.round_done","kind":"noop","ok":true},{"unit":"gh-7","rule":"remote.intake","kind":"intake_story","ok":true,"story":"gh-7"}],"notified":[],"trace":"2099-01-15.jsonl","failed":0,"slowest":{"phase":"act intake_story gh-7","ms":218},"follow_up":true,"intake":[{"rule":"remote.intake","ok":true}]}
+>>> sync md: {"tick_id":"03PGFN52X013YQC6D5T3T2JWJR","at":"2099-01-15T10:01:40.000Z","duration_ms":413,"sync":{"ran":true,"ok":true},"decisions":[{"unit":"gh-31","rule":"story.round_done","kind":"noop","ok":true},{"unit":"gh-7","rule":"claim.acquire.intake","kind":"claim","ok":true}],"notified":[],"trace":"2099-01-15.jsonl","failed":0,"slowest":{"phase":"act claim gh-7","ms":121},"follow_up":true,"intake":[]}
+
+>>> status json gh-7: ["\"id\":\"not-started:gh-7\",\"story\":\"gh-7\",\"slice\":null,\"step\":null,\"since\":\"2099-01-15T10:01:40.000Z\",\"url\":\"https://github.com/o/r/issues/7\",\"group\":\"running\",\"title\":\"taken in — the next tick starts it\",\"command\":\"norn story view gh-7\",\"age\":\"0s\""]
+>>> gh-7 later tick rules: ["start.workflow_invalid:notify","start.workflow_invalid:notify","start.workflow_invalid:notify","start.workflow_invalid:notify"]
+>>> gh-7 worktree exists later: true
+>>> gh-7 notifier later: ["workflow 'oldy' is invalid: .agents/workflows/oldy.yaml: the agent may report `done`: say what it means in `means:`"]
+>>> sync2 value: {"tick_id":"03PGFN69Z0TKNB567G507QYCCJ","at":"2099-01-15T10:02:20.000Z","duration_ms":223,"sync":{"ran":true,"ok":true},"decisions":[{"unit":"gh-31","rule":"story.round_done","kind":"noop","ok":true},{"unit":"gh-7","rule":"start.workflow_invalid","kind":"notify","ok":true}],"notified":[],"trace":"2099-01-15.jsonl","failed":0,"slowest":{"phase":"observe.local","ms":44},"intake":[]}
+>>> sync2 md: {"tick_id":"03PGFN69Z0TKNB567G507QYCCK","at":"2099-01-15T10:02:20.000Z","duration_ms":228,"sync":{"ran":true,"ok":true},"decisions":[{"unit":"gh-31","rule":"story.round_done","kind":"noop","ok":true},{"unit":"gh-7","rule":"start.workflow_invalid","kind":"notify","ok":true}],"notified":[],"trace":"2099-01-15.jsonl","failed":0,"slowest":{"phase":"observe.local","ms":46},"intake":[]}
+
+>>> status2 json gh-7: ["\"id\":\"not-started:gh-7\",\"story\":\"gh-7\",\"slice\":null,\"step\":null,\"since\":\"2099-01-15T10:01:40.000Z\",\"url\":\"https://github.com/o/r/issues/7\",\"group\":\"running\",\"title\":\"taken in — the next tick starts it\",\"command\":\"norn story view gh-7\",\"age\":\"40s\""]
+>>> status md: Your turn (1) · work only you can do
+  gh-31      round 1 · alt · $done: gh-31: alt round done, no PR · 1m
+      or close the issue
+      $ norn story edit gh-31 --workflow <name>
+
+Running (1) · agents and checks at work
+  gh-7       taken in — the next tick starts it · 40s
+      $ norn story view gh-7
+
+
+ 1 pass
+ 2 skip
+ 0 fail
+Ran 3 tests across 1 file. [6.41s]

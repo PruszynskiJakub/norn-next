@@ -1,0 +1,12 @@
+# AC5 orientation
+agent: (no value) -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/build/agent","message":"`agent:` needs an orientation: what the step is for"}]}
+agent: "" -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/build/agent","message":"`agent:` needs an orientation: what the step is for"}]}
+agent: "   " -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/build/agent","message":"`agent:` needs an orientation: what the step is for"}]}
+agent: [a] -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/build/agent","message":"`agent:` needs an orientation: what the step is for"}]}
+check: (no value) -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/build/check","message":"`check:` needs the command to run"}]}
+gate: (no value) -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/build/gate","message":"`gate:` needs what the person decides"}]}
+# AC6 skills
+no skills: -> ok=true []
+skills: [] -> ok=true []
+skills: [norn-tdd, norn-implement, norn-tdd] -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/build/skills","message":"names the skill `norn-tdd` twice"}]}
+skills: [a, a, a] -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/build/skills","message":"names the skill `a` twice"},{"path":"/steps/build/skills","message":"names the skill `a` twice"}]}

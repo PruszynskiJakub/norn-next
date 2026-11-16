@@ -1,0 +1,34 @@
+[
+ {
+  "name": "probe",
+  "file": ".agents/workflows/probe.yaml",
+  "ok": false,
+  "issues": [
+   {
+    "code": "unknown_skill",
+    "path": "/steps/a/skills/1",
+    "message": "skill 'ghost-one' is not installed for agent 'claude' (run norn init, or add it to that agent's skill folder)"
+   },
+   {
+    "code": "unknown_skill",
+    "path": "/steps/a/skills/3",
+    "message": "skill 'ghost-two' is not installed for agent 'claude' (run norn init, or add it to that agent's skill folder)"
+   },
+   {
+    "code": "unknown_skill",
+    "path": "/steps/a/skills/4",
+    "message": "skill 'only-codex' is not installed for agent 'claude' (run norn init, or add it to that agent's skill folder)"
+   },
+   {
+    "code": "unknown_skill",
+    "path": "/steps/b/skills/0",
+    "message": "skill 'ghost-three' is not installed for agent 'codex' (run norn init, or add it to that agent's skill folder)"
+   },
+   {
+    "code": "unknown_skill",
+    "path": "/steps/b/skills/1",
+    "message": "skill 'only-claude' is not installed for agent 'codex' (run norn init, or add it to that agent's skill folder)"
+   }
+  ]
+ }
+]

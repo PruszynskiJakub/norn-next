@@ -1,0 +1,13 @@
+VALID   packages/cli/assets/workflows/quick.yaml 
+VALID   packages/cli/assets/workflows/story.yaml 
+VALID   .agents/workflows/release.yaml 
+VALID   packages/cli/assets/workflows/shared/base-update.yaml 
+INVALID qa/old/quick.yaml (origin/main) (240 errors, e.g. /steps/implement extra type; /steps/implement extra skill; /steps/implement extra instructions; /steps/implement/outcomes/done extra means)
+INVALID qa/old/sync.yaml (origin/main shared) (138 errors, e.g. /steps/sync extra type; /steps/sync extra action; /steps/sync extra type; /steps/sync extra action)
+type          rejected
+skill         rejected
+instructions  rejected
+run           rejected
+prompt        rejected
+action        rejected
+edge means    rejected

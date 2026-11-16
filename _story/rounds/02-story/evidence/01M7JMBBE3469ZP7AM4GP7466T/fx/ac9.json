@@ -1,0 +1,1 @@
+{"name":"j","start":"a","steps":{"a":{"inputs":["spec"],"type":"agent","skill":"s","agent":"codex","instructions":"Do it.","outcomes":{"done":{"to":"b","counter":"c1","means":"m","verdict":"pass"},"again":"a"}},"b":{"type":"git","action":"push","outcomes":{"done":"$done"}}},"counters":{"c1":{"max":2}}}

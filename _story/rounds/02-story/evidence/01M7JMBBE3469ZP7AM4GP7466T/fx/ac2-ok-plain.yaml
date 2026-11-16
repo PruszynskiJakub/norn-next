@@ -1,0 +1,8 @@
+steps:
+  a:
+    type: agent
+    skill: s
+    description: a plain description
+      continued on a second line
+    outcomes: { done: { to: $done, means: plain meaning
+          continued deeper } }

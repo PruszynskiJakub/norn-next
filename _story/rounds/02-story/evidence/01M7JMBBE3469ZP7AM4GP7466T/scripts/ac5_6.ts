@@ -1,0 +1,15 @@
+import { load } from "./lib.ts";
+const wf = (head: string, extra = "") => `name: wf\nstart: build\nsteps:\n  build:\n    ${head}\n${extra}    outcomes: { done: $done }\n    means: { done: ok }\n`;
+const p = (l: string, r: any) => console.log(`${l} -> ok=${r.ok} ${JSON.stringify(r.refused ?? r.issues)}`);
+console.log("# AC5 orientation");
+p("agent: (no value)", load(wf("agent:")));
+p('agent: ""', load(wf('agent: ""')));
+p('agent: "   "', load(wf('agent: "   "')));
+p("agent: [a]", load(wf("agent: [a]")));
+p("check: (no value)", load(wf("check:", "    timeout: 1m\n").replace("    means: { done: ok }\n", "")));
+p("gate: (no value)", load(wf("gate:").replace("    means: { done: ok }\n", "")));
+console.log("# AC6 skills");
+p("no skills:", load(wf("agent: do it")));
+p("skills: []", load(wf("agent: do it", "    skills: []\n")));
+p("skills: [norn-tdd, norn-implement, norn-tdd]", load(wf("agent: do it", "    skills: [norn-tdd, norn-implement, norn-tdd]\n")));
+p("skills: [a, a, a]", load(wf("agent: do it", "    skills: [a, a, a]\n")));

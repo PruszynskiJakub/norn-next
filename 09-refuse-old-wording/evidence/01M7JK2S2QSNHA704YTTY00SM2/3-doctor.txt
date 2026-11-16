@@ -1,0 +1,7 @@
+$ norn doctor --repo
+norn doctor: every check passes
+
+  ok   norn           0.33.0 matches this repo's norn version 0.33.0
+  ok   workflows      hello, legacy, quick, refinement, reproduce, slice, story, triage valid (.agents/workflows/)
+  ok   config         .agents/norn.config.yaml
+exit 0

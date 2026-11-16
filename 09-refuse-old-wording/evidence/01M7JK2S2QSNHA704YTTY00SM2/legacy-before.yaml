@@ -1,0 +1,14 @@
+# a workflow from before the new wording
+name: legacy
+start: build
+steps:
+  build:
+    type: agent
+    skill: norn-implement   # the skill it runs
+    outcomes: { done: { to: check, means: "built" } }
+  check:
+    type: check
+    run: bun test
+    timeout: 5m
+    outcomes: { pass: $done, fail: { to: build, counter: loop } }
+counters: { loop: { max: 2 } }

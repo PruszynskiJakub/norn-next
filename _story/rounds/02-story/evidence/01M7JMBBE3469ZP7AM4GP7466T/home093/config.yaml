@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=config.schema.json
+# norn user config: ~/.norn/config.yaml (this machine, and your defaults for every repo)
+#
+# Run `norn config` in a repo to see every setting in effect and where it came from.
+# A repo's .agents/norn.config.local.yaml overrides your keys (mode, agent, agents) for that repo.
+#
+# Every key is optional. A commented value is the built-in default.
+
+# ---------------------------------------------------------------- This machine
+
+# Agent sessions (and checks) running at once on this machine, across every repo: 1–9.
+# max_agents: 9
+
+# How you are told about new inbox items. OS notifications are on unless os: false;
+# ntfy and webhook take a URL. Inside Herdr, Herdr notifies too.
+# notify:
+#   os: true
+#   ntfy: https://ntfy.sh/<topic>
+#   webhook: https://example.com/hook
+
+# How much local trace `norn tidy` keeps (at least 14d).
+# trace:
+#   retain: 14d
+
+# ---------------------------------------------------------------- You
+
+# Who starts the unattended agent steps of a story: manual (you, with `norn story start`) or auto
+# (the tick). A workflow's own `mode`, and `norn story edit <story> --auto|--manual`, win over this.
+# mode: manual
+
+# The coding agent for steps that name none: claude | codex | opencode | gemini.
+# agent: claude
+
+# Per agent: the model and extra args. An entry merges over the built-in one field by field;
+# args replaces the built-in list (claude's is ["--permission-mode", "auto"]).
+# agents:
+#   claude:
+#     model: <model id>
+#     args: ["--permission-mode", "auto"]

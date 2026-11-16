@@ -1,0 +1,17 @@
+steps:
+  q:
+    type: agent
+    skill: norn-qa
+    instructions: Check it.
+    agent: codex
+    outcomes:
+      pass: { to: $done, verdict: pass, means: "all observed" } # pass comment
+      fail: { to: q, counter: qa_loop, means: "a criterion fails", verdict: fail }  # fail comment
+      partial:
+        to: g
+        verdict: person
+        means: "only a person can judge"
+  g:
+    type: gate
+    prompt: ok?
+    outcomes: { approve: $done, reject: q }

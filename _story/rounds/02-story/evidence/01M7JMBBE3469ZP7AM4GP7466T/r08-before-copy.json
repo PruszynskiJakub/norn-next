@@ -1,0 +1,949 @@
+{
+ "quick": {
+  "name": "quick",
+  "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
+  "start": "sync",
+  "steps": {
+   "sync": {
+    "type": "git",
+    "action": "update",
+    "outcomes": {
+     "done": "implement",
+     "conflict": {
+      "to": "sync-resolve",
+      "counter": "sync_conflict_loop"
+     }
+    }
+   },
+   "sync-resolve": {
+    "type": "agent",
+    "instructions": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+    "skills": [
+     "norn-merge"
+    ],
+    "inputs": [
+     "spec",
+     "handoff"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "sync",
+      "means": "base merged into the story branch, conflicts resolved and committed"
+     }
+    }
+   },
+   "implement": {
+    "type": "agent",
+    "instructions": "Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one, otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask. A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Notes and the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before changing any code, then fix the cause.",
+    "skills": [
+     "norn-implement"
+    ],
+    "inputs": [
+     "spec",
+     "handoff",
+     "last_check",
+     "last_findings"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "update",
+      "means": "the change is made; each behaviour change and rework point has a passing test"
+     }
+    }
+   },
+   "update": {
+    "type": "git",
+    "action": "update",
+    "outcomes": {
+     "done": "test",
+     "clean": "test-merge",
+     "resolved": "test-resolution",
+     "conflict": {
+      "to": "resolve",
+      "counter": "base_conflict_loop"
+     }
+    }
+   },
+   "resolve": {
+    "type": "agent",
+    "instructions": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+    "skills": [
+     "norn-merge"
+    ],
+    "inputs": [
+     "spec",
+     "handoff",
+     "base_side"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "update",
+      "means": "base merged into the story branch, conflicts resolved and committed"
+     }
+    }
+   },
+   "test": {
+    "type": "check",
+    "run": "bun test",
+    "timeout": "15m",
+    "outcomes": {
+     "pass": "review",
+     "fail": {
+      "to": "implement",
+      "counter": "test_loop"
+     }
+    }
+   },
+   "test-merge": {
+    "type": "check",
+    "run": "bun test",
+    "timeout": "15m",
+    "outcomes": {
+     "pass": "open-pr",
+     "fail": {
+      "to": "implement",
+      "counter": "test_loop"
+     }
+    }
+   },
+   "test-resolution": {
+    "type": "check",
+    "run": "bun test",
+    "timeout": "15m",
+    "outcomes": {
+     "pass": "resolution-review",
+     "fail": {
+      "to": "implement",
+      "counter": "test_loop"
+     }
+    }
+   },
+   "resolution-review": {
+    "type": "agent",
+    "instructions": "Review only the resolution: each remerge-diff under Inputs is where a merge differs from git's own merge of its parents, a base change the resolver dropped included. Judge whether it keeps the intent of both sides. Report `redescribe` when the merge danger pr.md describes no longer holds.",
+    "skills": [
+     "norn-review"
+    ],
+    "inputs": [
+     "spec",
+     "resolution"
+    ],
+    "outcomes": {
+     "approve": {
+      "to": "open-pr",
+      "means": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger"
+     },
+     "redescribe": {
+      "to": "describe",
+      "means": "the resolution is sound, but the merge danger pr.md describes changed"
+     },
+     "changes_requested": {
+      "to": "resolve",
+      "counter": "resolution_loop",
+      "means": "blocking findings on the resolution in the receipt"
+     }
+    }
+   },
+   "review": {
+    "type": "agent",
+    "instructions": "Use the `norn-review` skill.",
+    "skills": [
+     "norn-review"
+    ],
+    "inputs": [
+     "spec",
+     "diff",
+     "last_findings"
+    ],
+    "outcomes": {
+     "approve": {
+      "to": "describe",
+      "means": "the change does what the story asks and nothing else, no blocking findings"
+     },
+     "changes_requested": {
+      "to": "implement",
+      "counter": "review_loop",
+      "means": "blocking findings in the receipt"
+     }
+    }
+   },
+   "describe": {
+    "type": "agent",
+    "instructions": "Write the PR body to pr.md in the spec folder; norn puts the issue link under it.",
+    "skills": [
+     "norn-pr"
+    ],
+    "inputs": [
+     "spec",
+     "diff",
+     "handoff"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "open-pr",
+      "means": "pr.md describes the branch as it is now: summary, evidence, merge danger"
+     }
+    }
+   },
+   "open-pr": {
+    "type": "git",
+    "action": "open-pr",
+    "outcomes": {
+     "done": "ci"
+    }
+   },
+   "ci": {
+    "type": "check",
+    "run": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+    "timeout": "30m",
+    "exits": {
+     "3": "stale"
+    },
+    "outcomes": {
+     "pass": "ready",
+     "fail": {
+      "to": "implement",
+      "counter": "ci_loop"
+     },
+     "stale": {
+      "to": "update",
+      "counter": "stale_loop"
+     }
+    }
+   },
+   "ready": {
+    "type": "gate",
+    "prompt": "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change.",
+    "outcomes": {
+     "approve": "merge",
+     "reject": {
+      "to": "implement",
+      "counter": "ready_loop"
+     },
+     "stale": {
+      "to": "update",
+      "counter": "stale_loop"
+     }
+    }
+   },
+   "merge": {
+    "type": "merge",
+    "outcomes": {
+     "stale": {
+      "to": "update",
+      "counter": "stale_loop"
+     }
+    }
+   }
+  },
+  "counters": {
+   "test_loop": {
+    "max": 5
+   },
+   "ci_loop": {
+    "max": 3
+   },
+   "review_loop": {
+    "max": 3
+   },
+   "ready_loop": {
+    "max": 2
+   },
+   "sync_conflict_loop": {
+    "max": 2,
+    "reset_on": "sync.done"
+   },
+   "base_conflict_loop": {
+    "max": 2,
+    "reset_on": [
+     "update.done",
+     "update.clean",
+     "update.resolved"
+    ]
+   },
+   "resolution_loop": {
+    "max": 2
+   },
+   "stale_loop": {
+    "max": 10
+   }
+  },
+  "base": {
+   "stale": "conflict",
+   "step": "update",
+   "verify": "test"
+  }
+ },
+ "refinement": {
+  "name": "refinement",
+  "description": "Agree a story's spec and plan with a person, against the current base; no code.",
+  "start": "sync",
+  "steps": {
+   "sync": {
+    "type": "git",
+    "action": "update",
+    "outcomes": {
+     "done": "refine",
+     "conflict": {
+      "to": "sync-resolve",
+      "counter": "sync_conflict_loop"
+     }
+    }
+   },
+   "sync-resolve": {
+    "type": "agent",
+    "instructions": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+    "skills": [
+     "norn-merge"
+    ],
+    "inputs": [
+     "spec",
+     "handoff"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "sync",
+      "means": "base merged into the story branch, conflicts resolved and committed"
+     }
+    }
+   },
+   "refine": {
+    "type": "agent",
+    "instructions": "Write the spec into the body of spec.md; keep its frontmatter unchanged.",
+    "skills": [
+     "norn-refine"
+    ],
+    "attended": true,
+    "inputs": [
+     "spec",
+     "handoff"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "plan",
+      "means": "spec complete: problem statement, solution, numbered user stories, out of scope; no open questions"
+     },
+     "questions": {
+      "to": "clarify",
+      "means": "spec written, but open questions are listed that need the person's answers"
+     }
+    }
+   },
+   "clarify": {
+    "type": "agent",
+    "instructions": "Use the `norn-clarify` skill.",
+    "skills": [
+     "norn-clarify"
+    ],
+    "attended": true,
+    "inputs": [
+     "spec",
+     "handoff"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "plan",
+      "means": "every open question is answered and folded into the spec"
+     }
+    }
+   },
+   "plan": {
+    "type": "agent",
+    "instructions": "Write the Plan section of spec.md.",
+    "skills": [
+     "norn-plan"
+    ],
+    "attended": true,
+    "inputs": [
+     "spec",
+     "handoff"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "$done",
+      "means": "spec.md's Plan section has seams, a coverage table for every user story, prefactoring, decisions and risks"
+     }
+    }
+   }
+  },
+  "counters": {
+   "sync_conflict_loop": {
+    "max": 2,
+    "reset_on": "sync.done"
+   }
+  }
+ },
+ "reproduce": {
+  "name": "reproduce",
+  "description": "Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.",
+  "start": "reproduce",
+  "steps": {
+   "reproduce": {
+    "type": "agent",
+    "instructions": "The issue is mirrored in spec.md; read its comments too. First follow the report as a user, through the real interface (the UI, the command, the request), and record what you saw. Then build a loop that goes red on that exact symptom, minimise it and confirm the cause. You are told not to fix: change no file, spec.md included, but the handoff. Post the findings as an issue comment that starts with `## Reproduce` (`## Reproduce (updated)` on a rerun): the loop command, the minimised repro, what it prints, the confirmed cause (`file:line`, or the ranked hypotheses left) and the seam for a regression test. That one comment is the only remote write this step allows, an exception to the brief's rule on remote writes; never edit the issue, label, assign or close. Write the same under Notes in the handoff (the next agent does not see your Resume); a long loop output goes in evidence, with a pointer.",
+    "skills": [
+     "norn-diagnose"
+    ],
+    "inputs": [
+     "spec",
+     "handoff"
+    ],
+    "outcomes": {
+     "reproduced": {
+      "to": "$done",
+      "means": "the bug was observed as a user and a loop goes red on it; loop, repro, cause and seam posted and in the handoff"
+     },
+     "cannot_reproduce": {
+      "to": "$done",
+      "means": "followed the report faithfully and the bug did not occur, nor in any loop tried; what was tried posted and in the handoff"
+     }
+    }
+   }
+  }
+ },
+ "slice": {
+  "name": "slice",
+  "description": "Build one slice test-first, check and review it, and integrate it into the story branch.",
+  "start": "implement",
+  "steps": {
+   "implement": {
+    "type": "agent",
+    "instructions": "Use the `norn-implement` skill.",
+    "skills": [
+     "norn-implement"
+    ],
+    "inputs": [
+     "slice",
+     "spec",
+     "handoff",
+     "last_check",
+     "last_findings"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "test",
+      "means": "every acceptance criterion (or rework point) has a passing test"
+     }
+    }
+   },
+   "test": {
+    "type": "check",
+    "run": "bun test",
+    "timeout": "10m",
+    "outcomes": {
+     "pass": "review",
+     "fail": {
+      "to": "implement",
+      "counter": "test_loop"
+     }
+    }
+   },
+   "review": {
+    "type": "agent",
+    "instructions": "Use the `norn-review` skill.",
+    "skills": [
+     "norn-review"
+    ],
+    "inputs": [
+     "slice",
+     "spec",
+     "diff",
+     "last_findings"
+    ],
+    "outcomes": {
+     "approve": {
+      "to": "integrate",
+      "means": "all criteria met, no blocking findings"
+     },
+     "changes_requested": {
+      "to": "implement",
+      "counter": "review_loop",
+      "means": "blocking findings in the receipt"
+     }
+    }
+   },
+   "integrate": {
+    "type": "git",
+    "action": "integrate",
+    "outcomes": {
+     "done": "$done",
+     "conflict": {
+      "to": "merge",
+      "counter": "conflict_loop"
+     }
+    }
+   },
+   "merge": {
+    "type": "agent",
+    "instructions": "Use the `norn-merge` skill.",
+    "skills": [
+     "norn-merge"
+    ],
+    "inputs": [
+     "slice",
+     "spec"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "integrate",
+      "means": "conflicts resolved keeping the intent of both sides; tests pass"
+     }
+    }
+   }
+  },
+  "counters": {
+   "test_loop": {
+    "max": 5
+   },
+   "review_loop": {
+    "max": 3
+   },
+   "conflict_loop": {
+    "max": 2
+   }
+  }
+ },
+ "solo": {
+  "name": "solo",
+  "start": "implement",
+  "steps": {
+   "implement": {
+    "type": "agent",
+    "instructions": "Build it.\n",
+    "skills": [
+     "norn-implement"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "$done",
+      "means": "built",
+      "verdict": "pass"
+     }
+    }
+   }
+  }
+ },
+ "story": {
+  "name": "story",
+  "description": "Slice a planned story against the current base, run the slices, verify the story, open the draft PR, wait for CI.",
+  "start": "sync",
+  "steps": {
+   "sync": {
+    "type": "git",
+    "action": "update",
+    "outcomes": {
+     "done": "slice",
+     "conflict": {
+      "to": "sync-resolve",
+      "counter": "sync_conflict_loop"
+     }
+    }
+   },
+   "sync-resolve": {
+    "type": "agent",
+    "instructions": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+    "skills": [
+     "norn-merge"
+    ],
+    "inputs": [
+     "spec",
+     "handoff"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "sync",
+      "means": "base merged into the story branch, conflicts resolved and committed"
+     }
+    }
+   },
+   "slice": {
+    "type": "agent",
+    "instructions": "Write slice files to slices/<nn>-<slug>.md in the spec folder. A slice has no QA of its own: list every slice's criteria in spec.md's frontmatter `criteria` too, each id prefixed with its slice number (`01.AC1`), next to the story's own, so the story's QA gives each one a verdict. First check the Plan section of spec.md against the code on this base: when spec.md has no Plan section, or the base changed what the plan relies on so that it no longer holds, write no slice files, say what no longer holds in the handoff's Notes and report `replan`.",
+    "skills": [
+     "norn-slice"
+    ],
+    "inputs": [
+     "spec",
+     "slices"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "approve-slices",
+      "means": "slice files written against the current base; every user story is covered by some slice's acceptance"
+     },
+     "replan": {
+      "to": "$stuck",
+      "means": "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans with `norn story edit <story> --workflow refinement --at plan`"
+     }
+    }
+   },
+   "approve-slices": {
+    "type": "gate",
+    "prompt": "Review the slice files in the spec folder (edit them if needed). Approve to start the slices, or reject with what to change.",
+    "outcomes": {
+     "approve": "slices",
+     "reject": {
+      "to": "slice",
+      "counter": "slice_loop"
+     }
+    }
+   },
+   "slices": {
+    "type": "slices",
+    "outcomes": {
+     "done": "update",
+     "stuck": "$stuck"
+    }
+   },
+   "update": {
+    "type": "git",
+    "action": "update",
+    "outcomes": {
+     "done": "test",
+     "clean": "test-merge",
+     "resolved": "test-resolution",
+     "conflict": {
+      "to": "resolve",
+      "counter": "base_conflict_loop"
+     }
+    }
+   },
+   "resolve": {
+    "type": "agent",
+    "instructions": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+    "skills": [
+     "norn-merge"
+    ],
+    "inputs": [
+     "spec",
+     "handoff",
+     "base_side"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "update",
+      "means": "base merged into the story branch, conflicts resolved and committed"
+     }
+    }
+   },
+   "test": {
+    "type": "check",
+    "run": "bun test",
+    "timeout": "15m",
+    "outcomes": {
+     "pass": "qa",
+     "fail": {
+      "to": "implement",
+      "counter": "test_loop"
+     }
+    }
+   },
+   "test-merge": {
+    "type": "check",
+    "run": "bun test",
+    "timeout": "15m",
+    "outcomes": {
+     "pass": "open-pr",
+     "fail": {
+      "to": "implement",
+      "counter": "test_loop"
+     }
+    }
+   },
+   "test-resolution": {
+    "type": "check",
+    "run": "bun test",
+    "timeout": "15m",
+    "outcomes": {
+     "pass": "resolution-review",
+     "fail": {
+      "to": "implement",
+      "counter": "test_loop"
+     }
+    }
+   },
+   "resolution-review": {
+    "type": "agent",
+    "instructions": "Review only the resolution: each remerge-diff under Inputs is where a merge differs from git's own merge of its parents, a base change the resolver dropped included. Judge whether it keeps the intent of both sides. Report `redescribe` when the merge danger pr.md describes no longer holds.",
+    "skills": [
+     "norn-review"
+    ],
+    "inputs": [
+     "spec",
+     "resolution"
+    ],
+    "outcomes": {
+     "approve": {
+      "to": "open-pr",
+      "means": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger"
+     },
+     "redescribe": {
+      "to": "describe",
+      "means": "the resolution is sound, but the merge danger pr.md describes changed"
+     },
+     "changes_requested": {
+      "to": "resolve",
+      "counter": "resolution_loop",
+      "means": "blocking findings on the resolution in the receipt"
+     }
+    }
+   },
+   "qa": {
+    "type": "agent",
+    "instructions": "The criteria are spec.md's frontmatter `criteria`; an id `<nn>.<id>` is criterion `<id>` of slice file `<nn>-*.md`, which says what it means.",
+    "skills": [
+     "norn-qa"
+    ],
+    "inputs": [
+     "spec",
+     "slices",
+     "diff"
+    ],
+    "criteria": "required",
+    "outcomes": {
+     "pass": {
+      "to": "describe",
+      "means": "every acceptance criterion of the story and its slices observed with evidence",
+      "verdict": "pass"
+     },
+     "fail": {
+      "to": "implement",
+      "counter": "qa_loop",
+      "means": "a criterion fails; repro in findings",
+      "verdict": "fail"
+     },
+     "partial": {
+      "to": "human-qa",
+      "means": "criteria only a person can judge, evidence prepared",
+      "verdict": "person"
+     },
+     "unverified": {
+      "to": "human-qa",
+      "means": "criteria this session could not check; how to check each one is in the report",
+      "verdict": "unverified"
+     }
+    }
+   },
+   "human-qa": {
+    "type": "gate",
+    "prompt": "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed.",
+    "outcomes": {
+     "approve": "describe",
+     "reject": {
+      "to": "implement",
+      "counter": "qa_loop"
+     },
+     "stale": {
+      "to": "update",
+      "counter": "stale_loop"
+     }
+    }
+   },
+   "implement": {
+    "type": "agent",
+    "instructions": "Use the `norn-implement` skill.",
+    "skills": [
+     "norn-implement"
+    ],
+    "inputs": [
+     "spec",
+     "handoff",
+     "last_check",
+     "last_findings"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "review",
+      "means": "every rework point has a passing test"
+     }
+    }
+   },
+   "review": {
+    "type": "agent",
+    "instructions": "Use the `norn-review` skill.",
+    "skills": [
+     "norn-review"
+    ],
+    "inputs": [
+     "spec",
+     "diff",
+     "last_findings"
+    ],
+    "outcomes": {
+     "approve": {
+      "to": "test",
+      "means": "the rework does what the findings and the story ask and nothing else, no blocking findings"
+     },
+     "changes_requested": {
+      "to": "implement",
+      "counter": "review_loop",
+      "means": "blocking findings in the receipt"
+     }
+    }
+   },
+   "describe": {
+    "type": "agent",
+    "instructions": "Write the PR body to pr.md in the spec folder; norn puts the issue link under it.",
+    "skills": [
+     "norn-pr"
+    ],
+    "inputs": [
+     "spec",
+     "diff",
+     "record"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "open-pr",
+      "means": "pr.md describes the branch as it is now: summary, evidence, merge danger"
+     }
+    }
+   },
+   "open-pr": {
+    "type": "git",
+    "action": "open-pr",
+    "outcomes": {
+     "done": "ci"
+    }
+   },
+   "ci": {
+    "type": "check",
+    "run": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+    "timeout": "30m",
+    "exits": {
+     "3": "stale"
+    },
+    "outcomes": {
+     "pass": "ready",
+     "fail": {
+      "to": "implement",
+      "counter": "ci_loop"
+     },
+     "stale": {
+      "to": "update",
+      "counter": "stale_loop"
+     }
+    }
+   },
+   "ready": {
+    "type": "gate",
+    "prompt": "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change.",
+    "outcomes": {
+     "approve": "merge",
+     "reject": {
+      "to": "implement",
+      "counter": "ready_loop"
+     },
+     "stale": {
+      "to": "update",
+      "counter": "stale_loop"
+     }
+    }
+   },
+   "merge": {
+    "type": "merge",
+    "outcomes": {
+     "stale": {
+      "to": "update",
+      "counter": "stale_loop"
+     }
+    }
+   }
+  },
+  "counters": {
+   "slice_loop": {
+    "max": 3
+   },
+   "test_loop": {
+    "max": 5
+   },
+   "ci_loop": {
+    "max": 3
+   },
+   "qa_loop": {
+    "max": 2
+   },
+   "ready_loop": {
+    "max": 2
+   },
+   "review_loop": {
+    "max": 3
+   },
+   "sync_conflict_loop": {
+    "max": 2,
+    "reset_on": "sync.done"
+   },
+   "base_conflict_loop": {
+    "max": 2,
+    "reset_on": [
+     "update.done",
+     "update.clean",
+     "update.resolved"
+    ]
+   },
+   "resolution_loop": {
+    "max": 2
+   },
+   "stale_loop": {
+    "max": 10
+   }
+  },
+  "base": {
+   "stale": "conflict",
+   "step": "update",
+   "verify": "test"
+  }
+ },
+ "triage": {
+  "name": "triage",
+  "description": "Check an issue still holds, add its context, and recommend what comes next (refinement, quick, reproduce) or closing it.",
+  "start": "explore",
+  "steps": {
+   "explore": {
+    "type": "agent",
+    "instructions": "The issue is mirrored in spec.md. Post the `## Triage` comment on it and add the kind, risk and priority labels: `norn:kind:bug|feature|security|chore|docs`, `norn:risk:low|medium|high`, `norn:priority:low|medium|high|extreme`; a label missing on the remote is named in the comment with \"norn upgrade creates it\". That comment and those labels are the only remote writes this step allows, an exception to the brief's rule on remote writes; never remove a label, the intake label `norn` included. Change no file, spec.md included, but the handoff. The recommendation lives only in that comment: report `norn done done --handoff \"<recommendation>: <reason>\"`.",
+    "skills": [
+     "norn-triage"
+    ],
+    "inputs": [
+     "spec",
+     "handoff"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "$done",
+      "means": "the ## Triage comment is posted, with one recommendation (refinement, quick, reproduce or close) and its reason, and the kind, risk and priority labels that could be set are on the issue"
+     }
+    }
+   }
+  }
+ },
+ "uses": {
+  "name": "uses",
+  "start": "greet",
+  "steps": {
+   "greet": {
+    "type": "agent",
+    "instructions": "Say hello.",
+    "skills": [
+     "norn-implement"
+    ],
+    "outcomes": {
+     "done": {
+      "to": "test",
+      "means": "said hello"
+     }
+    }
+   },
+   "test": {
+    "type": "check",
+    "run": "bun test",
+    "timeout": "5m",
+    "outcomes": {
+     "pass": "$done",
+     "fail": "$done"
+    }
+   }
+  }
+ }
+}

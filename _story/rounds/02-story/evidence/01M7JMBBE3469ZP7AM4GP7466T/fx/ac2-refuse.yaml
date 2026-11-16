@@ -1,0 +1,11 @@
+name: r
+start: a
+steps:
+  a:
+    type: agent
+    skill: s
+    instructions: Do it.
+    outcomes:
+      done: $done
+      again: { to: a, means: 'first part
+        second part' }

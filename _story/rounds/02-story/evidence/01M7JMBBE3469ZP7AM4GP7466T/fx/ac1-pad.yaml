@@ -1,0 +1,7 @@
+steps:
+  a:
+    type: agent
+    skill: s
+    inputs: [ spec, handoff ]
+    instructions: Go.
+    outcomes: { done: $done }

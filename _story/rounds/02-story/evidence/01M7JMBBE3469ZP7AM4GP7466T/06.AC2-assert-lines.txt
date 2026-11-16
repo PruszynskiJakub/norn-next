@@ -1,0 +1,14 @@
+-      expect(text.stdout).toContain(`! /steps/implement/skill: ${reason}`);
++      expect(text.stdout).toContain(`! /steps/implement/skills/0: ${reason}`);
+-    expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
++      expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
++    expect(reads.filter((r) => r.path === ".agents/workflows/rv.yaml").map((r) => r.read)).toEqual(["copy"]);
++    expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
++    expect(readFileSync(join(s.runs(B.root), "workflow.yaml"), "utf8")).toBe(RV_OLD);
++    expect(state(s.runs(B.root))?.workflow_hash).toBe(sha256(RV_OLD));
++    expect(state(s.runs(B.root))).toMatchObject({ step: "implement", attempt: 1 });
++  expect(rewriteWorkflowWording(h.root).refused).toEqual([]);
+-      expect(json.value).toEqual({ norn_version: { from: "0.31.0", to: "0.31.0", changed: false }, skills: { updated: [], linked: [] }, staged: [], commit: null, labels: expect.objectContaining({ checked: true, created: [] }) });
++      expect(json.value).toEqual({ norn_version: { from: "0.31.0", to: "0.31.0", changed: false }, skills: { updated: [], linked: [] }, workflows: { rewritten: [], refused: [] }, staged: [], commit: null, labels: expect.objectContaining({ checked: true, created: [] }) });
+-      expect(Object.keys(v).sort()).toEqual(["commit", "labels", "norn_version", "skills", "staged"]);
++      expect(Object.keys(v).sort()).toEqual(["commit", "labels", "norn_version", "skills", "staged", "workflows"]);

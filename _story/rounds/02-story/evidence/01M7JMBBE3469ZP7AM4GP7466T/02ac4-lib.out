@@ -1,0 +1,12 @@
+validateWorkflowDefinition({skills: installed list}): [
+ {
+  "code": "unknown_skill",
+  "path": "/steps/a/skills/1",
+  "message": "skill 'ghost-one' is not installed"
+ },
+ {
+  "code": "unknown_skill",
+  "path": "/steps/a/skills/2",
+  "message": "skill 'ghost-two' is not installed"
+ }
+]

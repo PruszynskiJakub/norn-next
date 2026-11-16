@@ -1,0 +1,25 @@
+name: probe
+start: a
+steps:
+  a:
+    agent: Do the work.
+    skills: [only-codex]
+    by: codex
+    outcomes: { done: b }
+    means: { done: "done" }
+  b:
+    agent: Review it.
+    skills: [only-claude]
+    outcomes: { done: c }
+    means: { done: "reviewed" }
+  c:
+    agent: Codex-only skill on the default (claude) agent.
+    skills: [only-codex]
+    outcomes: { done: d }
+    means: { done: "x" }
+  d:
+    agent: Claude-only skill on by codex.
+    skills: [only-claude]
+    by: codex
+    outcomes: { done: $done }
+    means: { done: "x" }

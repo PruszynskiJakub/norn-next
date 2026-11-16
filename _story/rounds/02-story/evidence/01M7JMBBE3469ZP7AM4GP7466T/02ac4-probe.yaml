@@ -1,0 +1,14 @@
+name: probe
+start: a
+steps:
+  a:
+    agent: Do the work.
+    skills: [norn-implement, ghost-one, norn-tdd, ghost-two, only-codex]
+    outcomes: { done: b }
+    means: { done: "done" }
+  b:
+    agent: Codex step.
+    by: codex
+    skills: [ghost-three, only-claude, norn-review]
+    outcomes: { done: $done }
+    means: { done: "x" }

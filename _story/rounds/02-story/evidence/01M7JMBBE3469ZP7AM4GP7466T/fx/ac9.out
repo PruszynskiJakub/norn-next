@@ -1,0 +1,41 @@
+{
+  "name": "j",
+  "start": "a",
+  "steps": {
+    "a": {
+      "agent": "Do it.",
+      "inputs": [
+        "spec"
+      ],
+      "skills": [
+        "s"
+      ],
+      "by": "codex",
+      "outcomes": {
+        "done": {
+          "to": "b",
+          "counter": "c1"
+        },
+        "again": "a"
+      },
+      "means": {
+        "done": "m",
+        "again": "step finished with outcome again"
+      },
+      "verdict": {
+        "done": "pass"
+      }
+    },
+    "b": {
+      "push": null,
+      "outcomes": {
+        "done": "$done"
+      }
+    }
+  },
+  "counters": {
+    "c1": {
+      "max": 2
+    }
+  }
+}

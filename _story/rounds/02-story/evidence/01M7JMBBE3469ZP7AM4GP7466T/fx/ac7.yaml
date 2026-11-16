@@ -1,0 +1,11 @@
+name: s
+steps:
+  a:
+    type: agent
+    skill: s
+    instructions: Do it.
+    outcomes: { done: $done }
+  b:
+    type: check # kind of step
+    run: bun test # the command
+    outcomes: { pass: $done }

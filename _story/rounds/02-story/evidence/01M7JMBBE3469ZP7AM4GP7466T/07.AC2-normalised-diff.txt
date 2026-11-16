@@ -1,0 +1,71 @@
+== test/e2e/observe-snapshots/gate-waiting.json
+206a207
+>                 "instructions": "Use the `norn-plan` skill.",
+213c214,216
+<                 "skill": "norn-plan",
+---
+>                 "skills": [
+>                   "norn-plan"
+>                 ],
+345a349
+>                 "instructions": "Use the `norn-implement` skill.",
+352c356,358
+<                 "skill": "norn-implement",
+---
+>                 "skills": [
+>                   "norn-implement"
+>                 ],
+== test/e2e/observe-snapshots/merged.json
+143a144
+>                 "instructions": "Use the `norn-plan` skill.",
+150c151,153
+<                 "skill": "norn-plan",
+---
+>                 "skills": [
+>                   "norn-plan"
+>                 ],
+236a240
+>                 "instructions": "Use the `norn-implement` skill.",
+243c247,249
+<                 "skill": "norn-implement",
+---
+>                 "skills": [
+>                   "norn-implement"
+>                 ],
+== test/e2e/observe-snapshots/parked-ask.json
+206a207
+>                 "instructions": "Use the `norn-plan` skill.",
+213c214,216
+<                 "skill": "norn-plan",
+---
+>                 "skills": [
+>                   "norn-plan"
+>                 ],
+362a366
+>                 "instructions": "Use the `norn-implement` skill.",
+369c373,375
+<                 "skill": "norn-implement",
+---
+>                 "skills": [
+>                   "norn-implement"
+>                 ],
+== test/e2e/observe-snapshots/running-slice.json
+220a221
+>                 "instructions": "Use the `norn-plan` skill.",
+227c228,230
+<                 "skill": "norn-plan",
+---
+>                 "skills": [
+>                   "norn-plan"
+>                 ],
+378a382
+>                 "instructions": "Use the `norn-implement` skill.",
+385c389,391
+<                 "skill": "norn-implement",
+---
+>                 "skills": [
+>                   "norn-implement"
+>                 ],
+== test/e2e/transcripts/base-sync.txt
+== test/e2e/transcripts/e2e-slice-workflow.txt
+== test/e2e/transcripts/recovery-claim-lost.txt

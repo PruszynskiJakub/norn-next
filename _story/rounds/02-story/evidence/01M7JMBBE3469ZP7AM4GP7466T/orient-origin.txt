@@ -1,0 +1,17 @@
+quick       implement     same as old instructions
+quick       review        NEW (no old instructions)
+quick       describe      same as old instructions
+story       slice         same as old instructions
+story       qa            same as old instructions
+story       implement     NEW (no old instructions)
+story       review        NEW (no old instructions)
+story       describe      same as old instructions
+slice       implement     NEW (no old instructions)
+slice       review        NEW (no old instructions)
+slice       merge         NEW (no old instructions)
+refinement  sync-resolve  same as old instructions
+refinement  refine        same as old instructions
+refinement  clarify       NEW (no old instructions)
+refinement  plan          same as old instructions
+reproduce   reproduce     same as old instructions
+triage      explore       same as old instructions

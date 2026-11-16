@@ -1,0 +1,12 @@
+shared/base-update.yaml: translated ok, changed=true
+shared/sync.yaml: translated ok, changed=true
+shared/ship.yaml: translated ok, changed=true
+  shared/base-update: old-wording steps before=4 after=0
+  shared/sync: old-wording steps before=2 after=0
+  shared/ship: old-wording steps before=4 after=0
+reproduce.yaml: origin/main as copy ok=true (0 issues) | translateWording text in checkout ok=true (0 issues) | EQUAL=true | steps=1
+triage.yaml: origin/main as copy ok=true (0 issues) | translateWording text in checkout ok=true (0 issues) | EQUAL=true | steps=1
+slice.yaml: origin/main as copy ok=true (0 issues) | translateWording text in checkout ok=true (0 issues) | EQUAL=true | steps=5
+story.yaml: origin/main as copy ok=true (0 issues) | translateWording text in checkout ok=true (0 issues) | EQUAL=true | steps=20
+quick.yaml: origin/main as copy ok=true (0 issues) | translateWording text in checkout ok=true (0 issues) | EQUAL=true | steps=15
+refinement.yaml: origin/main as copy ok=true (0 issues) | translateWording text in checkout ok=true (0 issues) | EQUAL=true | steps=5

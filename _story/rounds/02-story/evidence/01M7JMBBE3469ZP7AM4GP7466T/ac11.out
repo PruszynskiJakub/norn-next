@@ -1,0 +1,64 @@
+--- shared new wording, exit routes
+{
+ "ok": true,
+ "issues": [],
+ "rv": {
+  "approve": {
+   "to": "$done",
+   "means": "fine"
+  },
+  "changes_requested": {
+   "to": "r2",
+   "counter": "c",
+   "means": "findings"
+  },
+  "redo": {
+   "to": "rv2",
+   "means": "again"
+  }
+ },
+ "rv2": {
+  "approve": {
+   "to": "$done",
+   "means": "fine"
+  },
+  "changes_requested": {
+   "to": "r2",
+   "counter": "c",
+   "means": "findings"
+  },
+  "redo": {
+   "to": "r2",
+   "counter": "c",
+   "means": "again"
+  }
+ }
+}
+--- shared file agent step missing a meaning for an exit route
+{
+ "file": ".agents/workflows/wf.yaml",
+ "errors": [
+  {
+   "path": "/steps/rv/outcomes/changes_requested",
+   "message": "shared/rev.yaml: the agent may report `changes_requested`: say what it means in `means:`"
+  },
+  {
+   "path": "/steps/rv2/outcomes/changes_requested",
+   "message": "shared/rev.yaml: the agent may report `changes_requested`: say what it means in `means:`"
+  }
+ ]
+}
+--- shared file verdict for unrouted outcome
+{
+ "file": ".agents/workflows/wf.yaml",
+ "errors": [
+  {
+   "path": "/steps/rv/verdict/nope",
+   "message": "shared/rev.yaml: `nope` is not an outcome this step routes"
+  },
+  {
+   "path": "/steps/rv2/verdict/nope",
+   "message": "shared/rev.yaml: `nope` is not an outcome this step routes"
+  }
+ ]
+}

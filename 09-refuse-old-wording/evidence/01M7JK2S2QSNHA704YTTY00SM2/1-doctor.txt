@@ -1,0 +1,11 @@
+$ norn doctor --repo
+norn doctor: 2 checks failed (workflow hello, workflow legacy)
+
+  ok   norn           0.33.0 matches this repo's norn version 0.33.0
+  ok   workflows      quick, refinement, reproduce, slice, story, triage valid (.agents/workflows/)
+  FAIL workflow hello .agents/workflows/hello.yaml
+                      ! /: written in the old wording: shared/greet.yaml: step 'greet' (type, skill, instructions, means inside an edge); run `norn upgrade` to rewrite it and commit
+  FAIL workflow legacy .agents/workflows/legacy.yaml
+                      ! /: written in the old wording: step 'build' (type, skill, means inside an edge), step 'check' (type, run); run `norn upgrade` to rewrite it and commit
+  ok   config         .agents/norn.config.yaml
+exit 1

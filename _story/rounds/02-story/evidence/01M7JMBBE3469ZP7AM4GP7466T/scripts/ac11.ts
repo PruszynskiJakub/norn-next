@@ -1,0 +1,10 @@
+import { load, show } from "./lib.ts";
+const WF = `name: wf\nstart: r\nsteps:\n  r:\n    use: rev\n    outcomes: { ok: $done, bad: { to: r2, counter: c } }\n  r2:\n    gate: fix?\n    outcomes: { approve: r }\ncounters: { c: { max: 2 } }\n`;
+const SH = (means: string) => `description: d\nstart: rv\nsteps:\n  rv:\n    agent: Review it.\n    skills: [norn-review]\n    outcomes: { approve: { exit: ok }, changes_requested: { exit: bad }, redo: rv2 }\n${means}  rv2:\n    like: rv\n    outcomes: { approve: { exit: ok }, changes_requested: { exit: bad }, redo: { exit: bad } }\n`;
+const MEANS = `    means: { approve: "fine", changes_requested: "findings", redo: "again" }\n`;
+const n = load(WF, "checkout", { rev: SH(MEANS) });
+show("shared new wording, exit routes", { ok: n.ok, issues: n.issues, rv: n.workflow?.steps.rv.outcomes, rv2: n.workflow?.steps.rv2.outcomes });
+const m = load(WF, "checkout", { rev: SH(`    means: { approve: "fine", redo: "again" }\n`) });
+show("shared file agent step missing a meaning for an exit route", m.refused ?? m);
+const v = load(WF, "checkout", { rev: SH(MEANS + `    verdict: { nope: pass }\n`) });
+show("shared file verdict for unrouted outcome", v.refused ?? v);

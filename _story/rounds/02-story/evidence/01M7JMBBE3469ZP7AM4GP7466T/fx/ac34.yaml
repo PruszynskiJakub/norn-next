@@ -1,0 +1,28 @@
+name: f
+start: a
+steps:
+  a:
+    type: agent
+    skill: X
+    instructions: Fix the thing, then   report `done` — word for word.
+    outcomes: { done: b }
+  b:
+    type: agent
+    skill: Y
+    description: Review the change against the spec.
+    outcomes: { approve: c, changes: a, stuck: $stuck, died: a, timeout: a }
+  c:
+    type: agent
+    skill: Z
+    outcomes: { done: g1 }
+  g1:
+    type: gate
+    description: Person checks the release notes.
+    outcomes: { approve: g2, reject: a }
+  g2:
+    type: gate
+    outcomes: { approve: k, reject: a }
+  k:
+    type: check
+    run: bun test
+    outcomes: { pass: $done, fail: a }

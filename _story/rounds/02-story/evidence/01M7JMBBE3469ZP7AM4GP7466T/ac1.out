@@ -1,0 +1,73 @@
+--- new (checkout)
+{
+ "ok": true,
+ "issues": [],
+ "build": {
+  "type": "agent",
+  "instructions": "Build the thing; orientation text.",
+  "description": "Build step.",
+  "skills": [
+   "norn-implement",
+   "norn-tdd"
+  ],
+  "inputs": [
+   "spec",
+   "handoff"
+  ],
+  "agent": "codex",
+  "model": "gpt-5",
+  "attended": true,
+  "deadline": "30m",
+  "nudges": 2,
+  "retries": 1,
+  "criteria": "required",
+  "outcomes": {
+   "done": {
+    "to": "test",
+    "means": "built",
+    "verdict": "pass"
+   },
+   "blocked": {
+    "to": "build",
+    "counter": "loop",
+    "means": "try again"
+   }
+  }
+ },
+ "test": {
+  "type": "check",
+  "run": "bun test",
+  "timeout": "15m",
+  "exits": {
+   "3": "flaky"
+  },
+  "outcomes": {
+   "pass": "ready",
+   "fail": {
+    "to": "build",
+    "counter": "loop"
+   },
+   "flaky": {
+    "to": "test",
+    "counter": "loop"
+   }
+  }
+ },
+ "ready": {
+  "type": "gate",
+  "prompt": "Approve the change?",
+  "outcomes": {
+   "approve": "$done",
+   "reject": {
+    "to": "build",
+    "counter": "loop"
+   }
+  }
+ }
+}
+--- old (copy, translated)
+{
+ "ok": true,
+ "issues": []
+}
+MODELS EQUAL: true

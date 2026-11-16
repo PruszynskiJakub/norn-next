@@ -1,0 +1,34 @@
+name: ac2
+start: a
+steps:
+  a:
+    type: agent
+    skill: s1
+    description: 'single-quoted description, it''s kept'
+    instructions: >
+      Folded text that is long and must not be
+      re-wrapped at all, even    with odd   spacing,
+      and a very very very very very very very very very very very very very very very very very very very long line.
+    outcomes:
+      done: { to: b, means: "a quoted meaning with \"escapes\" and a # hash" }
+  b:
+    type: agent
+    skill: s2
+    instructions: |
+      Literal block
+        indented line
+      last line
+    outcomes:
+      done:
+        to: c
+        means: >-
+          a folded meaning
+          on two lines
+  c:
+    type: check
+    run: 'echo "single quoted run that is very very very very very very very very very very very very very very long"'
+    outcomes: { pass: d, fail: $stuck }
+  d:
+    type: gate
+    prompt: plain prompt text with plain   spaced   text and a long tail tail tail tail tail tail tail tail tail tail tail tail tail
+    outcomes: { approve: $done, reject: a }

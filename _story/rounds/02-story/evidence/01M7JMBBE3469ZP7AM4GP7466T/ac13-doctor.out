@@ -1,0 +1,38 @@
+[
+ {
+  "name": "quick",
+  "file": ".agents/workflows/quick.yaml",
+  "ok": false,
+  "issues": [
+   {
+    "code": "old_wording",
+    "path": "",
+    "message": "written in the old wording: shared/ship.yaml: step 'open-pr' (type, action), step 'ci' (type, run), step 'ready' (type, prompt), step 'merge' (type); run `norn upgrade` to rewrite it and commit"
+   }
+  ]
+ },
+ {
+  "name": "story",
+  "file": ".agents/workflows/story.yaml",
+  "ok": false,
+  "issues": [
+   {
+    "code": "old_wording",
+    "path": "",
+    "message": "written in the old wording: shared/ship.yaml: step 'open-pr' (type, action), step 'ci' (type, run), step 'ready' (type, prompt), step 'merge' (type); run `norn upgrade` to rewrite it and commit"
+   }
+  ]
+ },
+ {
+  "name": "triage",
+  "file": ".agents/workflows/triage.yaml",
+  "ok": false,
+  "issues": [
+   {
+    "code": "old_wording",
+    "path": "",
+    "message": "written in the old wording: step 'explore' (type, skill, instructions, means inside an edge); run `norn upgrade` to rewrite it and commit"
+   }
+  ]
+ }
+]

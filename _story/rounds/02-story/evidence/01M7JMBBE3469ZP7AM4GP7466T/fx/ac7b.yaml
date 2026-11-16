@@ -1,0 +1,9 @@
+steps:
+  a:
+    type: agent
+    skill: s
+    instructions: Do it.
+    outcomes:
+      done:
+        to: $done # where it goes
+        means: "m"

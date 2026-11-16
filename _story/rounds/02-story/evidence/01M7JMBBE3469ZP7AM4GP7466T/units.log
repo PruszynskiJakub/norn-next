@@ -1,0 +1,68 @@
+bun test v1.3.13 (bf2e2cec)
+
+units.test.ts:
+>>> state after start: {"version":1,"story":"gh-51","slice":null,"unit_dir":"_story","workflow":"alt","workflow_hash":"9b98702ccd2f3c2840e7a6c66eb559864c878d62cc997d7701449c4d4e90be51","step":"draft","attempt":1,"visits":{"draft":1},"step_entered_at":"2099-01-15T10:00:30.000Z","status":"running","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":2,"run":{"run_id":"03PGFN38A0XHK3N7W3BDABGZV9","step":"draft","attempt":1,"started_at":"2099-01-15T10:00:40.000Z","how":"auto","agent":"claude","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"},"machine":"tester@box","heartbeat_id":"03PGFN2B0GKKF6KK0WS0N52NPP"},"last_outcome":null,"created_at":"2099-01-15T10:00:30.000Z","updated_at":"2099-01-15T10:00:40.000Z","last_tick_id":"03PGFN38A09TSDSD9WA2HVP9GB","mode":"auto"}
+>>> 09.AC5 state after done: {"step":"review","status":"ready","workflow_hash_is_old":true}
+>>> machine dir: /private/tmp/claude-501/-Users-jakubpruszynski--norn-repos-norn-b68fe828-worktrees-gh-343-a-step-is-written-with-two-keys-for-one/26f879fb-29ed-468d-aba8-6f306806ce15/scratchpad/qa/tmp/norn-cli-HSQ1I7/home/repos/repo-bf591c4b
+>>> machine dir entries: ["heartbeat.json","checkout.json","inbox.json","wake","hooks","worktrees","remote.json","base.json","2099-01-15.jsonl","2099-01-15.chunks.jsonl","runs"]
+>>> runs files: ["gh-51/_story/rounds/01-alt/workflow.yaml","gh-51/_story/rounds/01-alt/state.json","gh-51/_story/rounds/01-alt/receipts/0002-started.json","gh-51/_story/rounds/01-alt/receipts/0003-done.json","gh-51/_story/rounds/01-alt/receipts/0001-started.json"]
+>>> 08.AC5 upgrade exit: 0
+>>> 08.AC5 upgrade workflows: {"rewritten":[".agents/workflows/oldy.yaml"],"refused":[]}
+>>> 08.AC5 runs hash before: {"hash":"1b380e3ac08b60b4fdb18187307b67ea81380ffa3a064515cc7a27ac40be9481","files":5}
+>>> 08.AC5 runs hash after: {"hash":"1b380e3ac08b60b4fdb18187307b67ea81380ffa3a064515cc7a27ac40be9481","files":5}
+>>> 08.AC5 runs same: true
+>>> 08.AC5 whole machine dir same: true
+>>> 09.AC5 final state: {"step":"$done","status":"done","hash_is_old":true}
+>>> 09.AC5 pin verbatim old: true
+>>> 09.AC5 recordErrors: []
+>>> 09.AC5 story view exit: 0
+>>> 09.AC5 story view: {"key":"gh-51","story":"gh-51","title":"In flight","url":"https://github.com/o/r/issues/51","story_status":"active","claim":"held here","mode":"auto","unit":{"key":"gh-51","title":"In flight","status":"done","workflow":"alt","round":1,"step":"$done","attempt":1,"last_outcome":{"step":"review","outcome":"ok","at":"2099-01-15T10:00:50.000Z"},"next":null,"integrated":false},"slices":[],"root":"/private/tmp/claude-501/-Users-jakubpruszynski--norn-repos-norn-b68fe828-worktrees-gh-343-a-step-is-written-with-two-keys-for-one/26f879fb-29ed-468d-aba8-6f306806ce15/scratchpad/qa/tmp/norn-cli-HSQ1I7/home/
+>>> 09.AC5 run list exit: 2
+>>> 09.AC5 run list: {"error":"norn run list: name the unit (no terminal to ask in)","do_instead":"norn run list gh-51","code":"target_required"}
+>>> gh-31 round 1: {"step":"$done","status":"done","workflow":"alt"}
+>>> story edit exit: 3
+>>> story edit value: {"error":"workflow 'oldy' cannot run on a story: .agents/workflows/oldy.yaml: written in the old wording: step 'a' (type, run); run `norn upgrade` to rewrite it and commit","do_instead":"run `norn upgrade` to rewrite it in the new wording and commit","code":"invalid_workflow","details":[{"code":"old_wording","path":"","message":".agents/workflows/oldy.yaml: written in the old wording: step 'a' (type, run); run `norn upgrade` to rewrite it and commit"}]}
+>>> gh-31 after edit + tick: {"step":"$done","status":"done","workflow":"alt"}
+>>> gh-7 tick rules: []
+>>> gh-7 worktree exists: false
+>>> gh-7 notifier: []
+>>> sync exit: 0
+>>> sync value: {"tick_id":"03PGFN52X0A4W7H1MZNJRD4Z4H","at":"2099-01-15T10:01:40.000Z","duration_ms":453,"sync":{"ran":true,"ok":true},"decisions":[{"unit":"gh-31","rule":"story.round_done","kind":"noop","ok":true},{"unit":"gh-7","rule":"remote.intake","kind":"intake_story","ok":true,"story":"gh-7"}],"notified":[],"trace":"2099-01-15.jsonl","failed":0,"slowest":{"phase":"act intake_story gh-7","ms":218},"follow_up":true,"intake":[{"rule":"remote.intake","ok":true}]}
+>>> sync md: {"tick_id":"03PGFN52X0A4W7H1MZNJRD4Z4J","at":"2099-01-15T10:01:40.000Z","duration_ms":404,"sync":{"ran":true,"ok":true},"decisions":[{"unit":"gh-31","rule":"story.round_done","kind":"noop","ok":true},{"unit":"gh-7","rule":"claim.acquire.intake","kind":"claim","ok":true}],"notified":[],"trace":"2099-01-15.jsonl","failed":0,"slowest":{"phase":"act claim gh-7","ms":116},"follow_up":true,"intake":[]}
+
+>>> status json gh-7: ["\"id\":\"not-started:gh-7\",\"story\":\"gh-7\",\"slice\":null,\"step\":null,\"since\":\"2099-01-15T10:01:40.000Z\",\"url\":\"https://github.com/o/r/issues/7\",\"group\":\"running\",\"title\":\"taken in — the next tick starts it\",\"command\":\"norn story view gh-7\",\"age\":\"0s\""]
+>>> status md: Your turn (1) · work only you can do
+  gh-31      round 1 · alt · $done: gh-31: alt round done, no PR · 40s
+      or close the issue
+      $ norn story edit gh-31 --workflow <name>
+
+Running (1) · agents and checks at work
+  gh-7       taken in — the next tick starts it · 0s
+      $ norn story view gh-7
+
+>>> 09.AC7 state: {"step":"build","status":"running"}
+>>> 09.AC7 pin: name: uses
+start: build
+steps:
+  build:
+    agent: Build it.
+    skills:
+      - norn-implement
+    outcomes:
+      done: after
+    means:
+      done: built
+  after:
+    gate: Ok?
+    outcomes:
+      approve: $done
+      reject: $done
+
+>>> 09.AC7 pin has use:: false
+>>> 09.AC7 translateWording ok/changed: {"ok":true,"changed":false}
+>>> 09.AC7 checkout-parse ok: true
+>>> 09.AC7 hash matches: true
+
+ 3 pass
+ 0 fail
+Ran 3 tests across 1 file. [10.57s]

@@ -1,0 +1,13 @@
+# AC9
+done routed, no means: -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/s/outcomes/done","message":"the agent may report `done`: say what it means in `means:`"}]}
+done+blocked routed, means only for done -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/s/outcomes/blocked","message":"the agent may report `blocked`: say what it means in `means:`"}]}
+overridables silent/died/timeout/stalled/ask/stuck without meaning -> ok=true []
+# AC10
+means for unrouted outcome -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/s/means/extra","message":"`extra` is not an outcome this step routes"}]}
+verdict for unrouted outcome -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/s/verdict/other","message":"`other` is not an outcome this step routes"}]}
+means: on check step -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/s/means","message":"only an agent step has `means:`"}]}
+verdict: on check step -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/s/verdict","message":"only an agent step has `verdict:`"}]}
+means: on gate step -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/s/means","message":"only an agent step has `means:`"}]}
+means: on open-pr step -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/s/means","message":"only an agent step has `means:`"}]}
+verdict: on update-branch step -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/s/verdict","message":"only an agent step has `verdict:`"}]}
+means: scalar on agent -> ok=false {"file":".agents/workflows/wf.yaml","errors":[{"path":"/steps/s/means","message":"`means:` is a map from outcome to meaning"},{"path":"/steps/s/outcomes/done","message":"the agent may report `done`: say what it means in `means:`"}]}

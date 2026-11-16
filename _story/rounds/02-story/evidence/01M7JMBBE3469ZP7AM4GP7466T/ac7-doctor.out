@@ -1,0 +1,19 @@
+[
+ {
+  "name": "probe",
+  "file": ".agents/workflows/probe.yaml",
+  "ok": false,
+  "issues": [
+   {
+    "code": "unknown_skill",
+    "path": "/steps/c/skills/0",
+    "message": "skill 'only-codex' is not installed for agent 'claude' (run norn init, or add it to that agent's skill folder)"
+   },
+   {
+    "code": "unknown_skill",
+    "path": "/steps/d/skills/0",
+    "message": "skill 'only-claude' is not installed for agent 'codex' (run norn init, or add it to that agent's skill folder)"
+   }
+  ]
+ }
+]

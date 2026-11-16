@@ -1,0 +1,11 @@
+$ norn upgrade
+# norn upgrade
+
+norn version 0.33.0; workflows rewritten: 2
+
+Workflows rewritten to the new wording (staged): .agents/workflows/legacy.yaml, .agents/workflows/shared/greet.yaml
+
+labels: not checked — no git remote
+
+Review the staged changes with `git diff --staged`, then commit them: `git commit -m "Refresh norn's skills (norn upgrade)"`
+exit 0
