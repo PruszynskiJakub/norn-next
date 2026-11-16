@@ -90,3 +90,75 @@ A workflow can bring in steps from a shared file, and a step can copy another st
 ## Open questions
 
 None.
+
+## Plan
+
+### Seams
+- **S1 the store's workflow loader, through `loadWorkflows` / `loadWorkflow` on a repo folder.** Observes `use:` bringing in a shared file's steps under their own names, routes, `start`, `base.step` and `base.verify` naming included steps or the `use` step, named exits routed with counters, an unrouted exit going to `$stuck`, `$done`/`$stuck` inside a shared file, the workflow's counters and `defaults:` covering included steps (they are ordinary steps of the loaded workflow), `like:`, every load-time refusal (missing shared file, clash, double use, unknown exit, nesting, keys a shared file may not hold, every bad `like:`), shared files never listed, and the loaded `source`/`hash` being the flattened text, or the file's text byte for byte when it has neither `use` nor `like`.
+  Prior art: the store unit tests' "workflows" block (yaml/json loading, misplaced `mode`/`stalled` refused with the step named), which write files into a temp repo and call the loader.
+- **S2 the cli, through the cli harness (`norn doctor --json`, `norn story create`, `norn story edit --workflow`, a tick, `norn story checkout` of a lost record).** Observes a shared-file refusal shown wherever a broken workflow shows today, a validation issue on an included step naming its shared file and step, a shared file never startable, an edit to a shared file after `norn story edit` making the round start refuse with `round.workflow_changed` (the pin's fingerprint is the flattened text), and a lost record restarted with the flattened workflow read from the branch.
+  Prior art: the story-create, story-edit-update-branch, human (`workflow_changed`) and takeover-record-lost integration tests.
+- **S3 the shipped and repo workflow sets, through the store's loader, plus `norn init` through the cli harness.** Observes the rewritten bundled `quick`/`story` and this repo's `quick`/`story`/`release` loading to exactly today's workflows, the CI wait written once per set, and `norn init` copying `shared/` (keeping existing files) with the detected test command written into the shared file that holds the test check.
+  Prior art: the cli asset tests' "workflow templates" block, the repo process tests' "repo workflows" block, the init-version and init-review integration tests, the `withTestCommand` unit tests.
+- **S4 the schema package, through the emitted JSON schemas.** Observes the shared-file schema (and the workflow-as-written schema) emitted next to the workflow schema.
+  Prior art: the schema test that every emitted schema equals its rendered form.
+- **S5 the recipes doc.** Observes "Write your own workflow" showing a shared file, `use:`, exits and `like:` and what is refused. Checked by review and the docs lints; no behaviour test.
+
+### Coverage
+| User story | Seam | Test kind | Notes |
+|---|---|---|---|
+| 1 `use: base-update` brings in the shared file's steps | S1 | unit | |
+| 2 included steps keep their names | S1 | unit | loaded step names equal the shared file's |
+| 3 routes, `base.step`, `base.verify` name an included step | S1 | unit | |
+| 4 a route to the `use` step enters at the shared `start` | S1 | unit | also `start:` and `base.step` naming the `use` step |
+| 5 a shared route leaves through a named exit the `use` step routes | S1 | unit | exit's `means`/`verdict` kept, `to` from the `use` step |
+| 6 the `use` step's exit route takes a counter | S1 | unit | |
+| 7 an unrouted exit goes to `$stuck` | S1 | unit | |
+| 8 a shared route goes straight to `$done`/`$stuck` | S1 | unit | |
+| 9 a shared route names a counter the workflow declares | S1 | unit | an undeclared one is refused by validation with S2's naming (19) |
+| 10 the workflow's `defaults:` apply to included steps | S1 | unit | included steps are plain steps of the loaded workflow, so decide applies defaults unchanged |
+| 11 `like: test` copies and replaces only the written keys | S1 | unit | shallow (D6) |
+| 12 `like:` in a workflow and in a shared file | S1 | unit | |
+| 13 a bad `like:` refused with its reason | S1 | unit | missing, itself, a `like` step, a `use` step, another file |
+| 14 a missing shared file refused, naming file and folder | S1 | unit | |
+| 15 a step name clash or a double use refused, naming both places | S1 | unit | includes the `use` step's own name |
+| 16 a routed exit the shared file lacks refused | S1 | unit | |
+| 17 `use:` inside a shared file refused | S1 | unit | |
+| 18 a shared file key that belongs in the workflow refused | S1 | unit | `name`, `counters`, `defaults`, `mode`, `base` |
+| 19 a validation issue on an included step names the shared file and step | S2 | integration | `norn doctor --json` issue message |
+| 20 a shared-file refusal shows in doctor, the listing, story create, story edit | S2 | integration | |
+| 21 a shared file is never listed, labelled or startable | S1 + S2 | unit + integration | listing in S1; `story edit --workflow <shared>` refused in S2; labels come from the listing |
+| 22 a unit pins the flattened workflow, fingerprint over that file | S2 | integration | `round.workflow_changed` after a shared edit; pin text has no `use`/`like` |
+| 23 a workflow without `use`/`like` pins byte for byte | S1 | unit | `source` equals the file text, `hash` its sha256 |
+| 24 a shared file edited mid-round takes effect next round | S2 | integration | same test as 22: the running pin is unchanged, the next `story edit` takes the new text |
+| 25 bundled `quick`/`story` load to today's workflows | S3 | unit | equal to `workflowHash` recorded before the rewrite, plus 29/8 and 42/10 routes/counters |
+| 26 this repo's `quick`/`story`/`release` load to today's | S3 | unit | recorded `workflowHash`; `gh run watch` in exactly one file of the repo set |
+| 27 `norn init` copies `shared/`, keeping existing files | S3 | integration | |
+| 28 a JSON Schema for shared files is emitted | S4 | unit | |
+| 29 the recipes show shared files, `use:`, exits, `like:`, refusals | S5 | review | docs lints run in the unit tier |
+
+### Prefactoring
+1. Record today's meaning of every rewritten workflow: the cli asset tests and the repo process tests load workflows through the store's loader instead of parsing YAML themselves, and assert each of bundled `quick`/`story` and repo `quick`/`story`/`release` against its `workflowHash` taken on this base. Green today; it makes 25 and 26 provable, because the rewrite must leave the hashes unchanged.
+2. One store function turns a workflow file's text into a loaded workflow (parse, the name check, `source`, `hash`), used by both the listing and the lost-record restart in `norn story checkout`, which today parses and checks the name on its own. Flattening then lands in one place, and the lost-record restart pins the flattened workflow too (22).
+
+### Implementation decisions
+- D1 Flattening lives in the store, in one new module beside the workflow loader, before core validation; core, decide, receipts and golden cases see only flat workflows. It is synchronous over a reader of shared-file texts by name, and a helper names the shared files a workflow text uses, so the lost-record restart (async `git show` on the branch) reads those first and passes them in. A shared file is read from the same place as its workflow: the work tree for the listing, the branch for a lost record.
+- D2 A loaded workflow's `source` is the flattened text and `hash` is that text's sha256; everything downstream (pin, `workflow_hash`, the round start's hash comparison, `norn story edit`) already reads `source`, so it changes nothing else. With neither `use` nor `like`, `source` is the file text unchanged (23). Otherwise it is the `yaml` package's serialization of the flattened document: the workflow's keys in written order, included steps in place of the `use` step in the shared file's order, and a `like` copy's keys in its target's order followed by its own new keys. No comments survive and no generated header is added.
+- D3 Schemas: `workflow` stays the strict, flat schema that pins and core validation use. Two schemas are added and emitted: `workflow-source` (a workflow file as written, whose steps may be `use` or `like` steps) and `workflow-shared` (`start`, `steps`, optional `description`; steps may be `like` steps; routes may be exits). A `like` step allows the known step keys loosely; the full check runs on the copy. (Agreed with the person.)
+- D4 A `use` step holds only `use: <name>` and an optional `outcomes` map from exit to a target or `{ to, counter }`. Its name must not equal any included step's name. `start`, routes and `base.step` naming it go to the shared file's `start`; `reset_on` or `base.verify` naming it is refused with a message to name the included step.
+- D5 Inside a shared file a route names one of the file's own steps, `$done`/`$stuck`, or `{ exit: <name>, means?, verdict? }`. A shared file's exits are the names its exit routes use; there is no separate list. The flattened route takes `to` and `counter` from the `use` step's route for that exit and `means`/`verdict` from the shared side, or goes to `$stuck` when the exit is unrouted. A route naming a step outside the file is refused ("a shared file leaves through an exit"). (Agreed.)
+- D6 `like:` is shallow: each top-level key the copy writes replaces the copied value whole. It names a step in the same file, never itself, a `like` step or a `use` step, and a `use` step cannot carry `like`. `like` is resolved within each file before `use` is flattened. (Agreed.)
+- D7 Flattening errors are reported against the workflow file, so the listing still names the workflow and shows it broken wherever a broken workflow shows today. Each message names the shared file (`shared/<name>.yaml`) and the step. Paths are step pointers, which read the same in the shared file and the flattened workflow because names are kept. The loader returns which steps came from which shared file. The cli's workflow check (the shared check that observe and `norn doctor` use) prefixes a core validation issue on an included step with that file and step (19).
+- D8 A shared file holding `name`, `counters`, `defaults`, `mode` or `base` is refused with "`<key>` belongs in the workflow", ahead of the schema's generic message, as misplaced step keys are today. A shared file's `description` is documentation only and does not flatten. A shared file no workflow uses is never read or validated.
+- D9 The listing already reads only files directly in the workflows folder, so `shared/` is never listed, labelled or startable; S1 and S2 pin that behaviour. `norn init` copies each `shared/` file it lacks and keeps the ones it has, reporting them as `shared/<file>` under created/kept; its test command rewrite applies to every copied file, so it reaches the shared file holding the test check.
+- D10 The rewrite: each set gets its own shared files (bundled and repo), following the prototype's split (sync, base update, shipping), with the CI wait in exactly one file per set. Which steps a workflow takes from a shared file, and which stay inline because they differ (`release`'s update and open-pr), is settled by the recorded `workflowHash`: a split that changes it is wrong. YAML anchors (`*test-run`) give way to `like:`. Both copies change together, and `bun run docs:emit` runs after the shipped workflows change.
+
+### Testing decisions
+A good test writes workflow and shared files and observes what the loader returns (the flat workflow, its `source` and `hash`, the listing's errors) or what a command prints with `--json`. It never calls flattening internals or checks intermediate shapes. The S1 tests use the store's loader over a temp repo; flattening needs no fakes because it is pure over files on disk. The S2 tests use the cli harness and its fake remote as the existing integration tests do; the only fakes are those system boundaries. Equivalence of the rewrite is pinned by `workflowHash`, the canonical meaning hash, so formatting or key order in the rewritten files never matters but any change of meaning does. Golden cases and transcripts must not change; a diff in them means the rewrite changed meaning.
+
+### Risks
+- The rewrite silently changes a route, counter or instruction. Prefactor 1 records the hashes first, so every rewritten file is proven against today's.
+- The serialized flattened text depends on the `yaml` package's output: a dependency upgrade that changes it changes the fingerprint of workflows that use `use`/`like`. Pins already written are unaffected (they are read as they are). Only a round staged by `norn story edit` before the upgrade and started after it hits `round.workflow_changed`, which asks the person to run the edit again. Accepted.
+- `norn init`'s test command rewrite finds the template's test line by pattern. Once the test check moves into a shared file, the rewrite must reach it there; S3 covers it with an init test in a repo whose build files name a test command.
+- "Exit" now means two things: a check's `exits` (exit code → outcome) and a shared file's named exit. The recipes keep them apart in wording; the `{ exit: <name> }` notation stays as the spec agreed.
+- `release` in this repo may share less than `quick`/`story` (its update and open-pr differ). D10 lets the hash decide what is shared rather than forcing it, but the CI wait must still be in one file.
