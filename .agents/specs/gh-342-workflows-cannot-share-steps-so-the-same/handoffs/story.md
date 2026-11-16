@@ -5,7 +5,8 @@ Workflows bring in steps from shared files (`use:` with named exits) and copy st
 ## Proof
 
 - Spec and Plan in `spec.md`: 29 user stories, each mapped to a seam (S1 store loader, S2 cli harness, S3 shipped/repo workflow sets + init, S4 schema emit, S5 recipes doc). Proof per story is the coverage table.
-- Eight slices in `slices/` (30 criteria, mirrored as `01.AC1`… in spec.md's `criteria`): 01 pin today's `workflowHash`; 02 one workflow-text loader (listing + lost-record restart); 03 `use:` + exits + refusals + schemas; 04 `like:`; 05 bundled set rewrite + `norn init` copying `shared/`; 06 repo set rewrite; 07 cli surfacing, pins, lost-record restart from the branch; 08 recipes.
+- Eight slices in `slices/` (30 criteria, mirrored as `01.AC1`… in spec.md's `criteria`): 01 pin today's `workflowHash`; 02 one workflow-text loader (listing + lost-record restart); 03 `use:` + exits + refusals + schemas; 04 `like:`; 05 bundled set rewrite + `norn init` copying `shared/`; 06 repo set rewrite; 07 cli surfacing, pins, lost-record restart from the branch; 08 recipes. All integrated.
+- qa#1: all 30 criteria `pass` at cee73aaa7 (evidence in this run's evidence folder, `report.md` one line per criterion). Unchanged meaning: every workflow in both sets has the same `workflowHash` on origin/main and at HEAD (`workflow-hashes.md`); `bun run golden -- --update` changed 0 of 139 golden cases and no e2e transcript changed. `use:`/`like:` behaviour and every refusal seen through the store's `loadWorkflows` on hand-written fixtures (`loader-run.md`); `norn init` and `norn doctor` run as a dev build in throwaway repos; the recipe followed to a workflow that loads (`08.AC1.md`).
 
 ## Easy to miss
 
@@ -19,7 +20,7 @@ Workflows bring in steps from shared files (`use:` with named exits) and copy st
 
 ## Not proven yet
 
-- Everything: no code yet. That the rewritten workflows flatten to today's is proven by slice 01's recorded `workflowHash`.
+- Story create/edit, round start pins and the lost-record checkout (02.AC2, 07.AC2 create/edit part, 07.AC3–AC5) were observed only through the cli integration harness (runCli in-process with a fake remote; 23 pass), since they need a remote; not against a real GitHub repo.
 
 ## Notes
 
@@ -29,4 +30,4 @@ Workflows bring in steps from shared files (`use:` with named exits) and copy st
 
 ## Resume
 
-Next step: the person approves the slices; then 01, 02 and 03 start in parallel (critical path 03 → 04 → 05/06).
+Next step: the step after qa in the story workflow (QA passed all 30 criteria).
