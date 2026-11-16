@@ -2,7 +2,7 @@
 id: gh-343/05
 title: Shipped workflows, this repo's copies and the schema in the new wording
 depends_on: [ gh-343/04 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
