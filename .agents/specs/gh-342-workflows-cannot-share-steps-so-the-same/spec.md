@@ -13,7 +13,7 @@ labels:
   - norn:risk:high
   - norn:wf:story
 workflow: story
-status: new
+status: active
 intake_at: 2026-11-16T13:07:56.445Z
 body_hash: 051566a83f8f299b5c04600b803b4dd57821f8234a3a399096d9f6ec5e729496
 ---
