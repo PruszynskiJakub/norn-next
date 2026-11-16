@@ -2,7 +2,7 @@
 An edge with no `counter:` gets a counter `<step>.<outcome>` at load, with its default max (and a conflict's reset). `max:` on the edge changes only the bound. Dotted names validate where they are stored.
 
 ### Proof
-Review #2: every criterion is traced to a test that was read and seen to assert it. Implement #3 fixed review #2's two blocking loader bugs, each behind a test in `packages/store/test/unit/derived-counters.test.ts`: "a counters: that is not a map is refused as corrupt whether or not the workflow derives a counter" and "steps sharing one outcomes map through a YAML alias each count their own edge". `bun run test` (2102 pass) and `bun run typecheck` are green.
+Review #3 (approve): review #2's two blocking loader bugs are fixed, each behind a test in `packages/store/test/unit/derived-counters.test.ts` that was read: "a counters: that is not a map is refused as corrupt whether or not the workflow derives a counter" (derived-counters.ts:28) and "steps sharing one outcomes map through a YAML alias each count their own edge" (steps and outcomes copied, derived-counters.ts:42-49). Every criterion stays traced to a test that asserts it. `bun run test` (2102 pass, 0 fail) and `bun run typecheck` green on HEAD 7a9dc55.
 
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -34,4 +34,4 @@ Review #2: every criterion is traced to a test that was read and seen to assert 
 - Earlier fixture edits (old-wording-refusal, shared-workflows, housekeeping) only keep each test's case intact under derivation.
 
 ### Resume
-Review the slice again (review #3): the two blocking findings of review #2 are fixed; the minor notes stay as notes.
+Review #3 approved: the slice integrates into the story branch; the next step is QA or integration, as the workflow says.
