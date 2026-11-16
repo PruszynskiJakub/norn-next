@@ -2,7 +2,7 @@
 id: gh-342/03
 title: Workflows bring in steps from shared files with `use:` and named exits
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
