@@ -1,7 +1,8 @@
 /**
  * Honest QA and notes through the CLI:
  * a manual-mode story whose qa step requires a criteria report. `norn done` refuses a report that
- * misses a frontmatter criterion, an outcome the worst verdict contradicts, a missing report; an
+ * misses a frontmatter criterion, an outcome the worst verdict contradicts, a missing report, a `fail`
+ * without the findings it hands back; an
  * `unverified` report goes to human-qa, whose inbox item says how to check; notes become Check items
  * that a `ready` reject leaves open and a `ready` approve acknowledges.
  */
@@ -25,6 +26,7 @@ steps:
     agent: Use the \`norn-qa\` skill.
     skills: [norn-qa]
     criteria: required
+    hand_back: { fail: findings }
     outcomes:
       pass:       ready
       fail:       $stuck
@@ -117,7 +119,7 @@ beforeAll(async () => {
 afterAll(() => h.cleanup());
 
 describe("criteria reports and notes through norn done", () => {
-  test("refusals: no report, an invalid file, a missing criterion (9), an unknown note criterion", async () => {
+  test("refusals: no report, an invalid file, a missing criterion (9), an unknown note criterion, a fail without findings", async () => {
     await startQa();
     expect((await inWt("brief", "--json")).value).toMatchObject({ markdown: expect.stringContaining('`norn done unverified --criteria <file> --handoff "…"`') });
 
@@ -136,6 +138,13 @@ describe("criteria reports and notes through norn done", () => {
     const note = await inWt("done", "pass", "--handoff", "x", "--criteria", all, "--note", "hm", "--note-criterion", "AC9");
     expect(note.value).toMatchObject({ code: "invalid_criteria", details: { unknown: ["AC9"] } });
     expect((await inWt("done", "pass", "--handoff", "x", "--criteria", all, "--note-criterion", "AC1")).exit).toBe(2);
+
+    // fail hands back findings (hand_back): a report without them is refused, the brief shows the flag
+    expect((await inWt("brief", "--json")).value).toMatchObject({ markdown: expect.stringContaining('`norn done fail --criteria <file> --findings <file> --handoff "…"`') });
+    const failed = report("failed", [PASS("AC1"), PASS("AC2"), { id: "AC3", verdict: "fail", repro: "open /today: the flag is grey" }]);
+    const bare = await inWt("done", "fail", "--handoff", "AC3 fails", "--criteria", failed);
+    expect(bare.exit).toBe(3);
+    expect(bare.value).toMatchObject({ code: "hand_back_required", do_instead: expect.stringContaining('norn done fail --criteria <file> --findings <file> --handoff "…"') });
     expect(readdirSync(join(runs(), "receipts")).filter((f) => f.endsWith("-done.json"))).toEqual([]);
   });
 

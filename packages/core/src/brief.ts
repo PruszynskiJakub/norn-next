@@ -731,8 +731,9 @@ function finish(step: AgentStep): BriefJson["finish"] {
     const edge = outcomeEdge(step.outcomes[o] as OutcomeSpec);
     // A step requiring criteria, or an outcome gated by a verdict, takes the report file
     const criteria = step.criteria === "required" || edge.verdict !== undefined;
+    const handBack = step.hand_back?.[o];
     return {
-      command: cmd.done(o, { criteria }),
+      command: cmd.done(o, { criteria, findings: handBack === "findings", evidence: handBack === "evidence" }),
       means: edge.means ?? `step finished with outcome ${o}`,
       ...(edge.verdict ? { verdict: edge.verdict } : {}),
     };

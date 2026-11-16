@@ -55,6 +55,7 @@ steps:
     skills: [norn-qa]
     inputs: [spec, slices, diff]
     criteria: required
+    hand_back: { fail: findings }
     outcomes:
       pass:       describe
       fail:       { to: implement, counter: qa_loop }
@@ -90,6 +91,7 @@ steps:
     agent: "Review the story-level rework against the findings it answers and the spec: it fixes what they ask and nothing else."
     skills: [norn-review]
     inputs: [spec, diff, last_findings]
+    hand_back: { changes_requested: findings }
     outcomes:
       approve:           test
       changes_requested: { to: implement, counter: review_loop }

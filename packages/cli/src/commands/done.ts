@@ -7,7 +7,7 @@
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { cmd, checkReport, cursorStep, enteringReceipt, HANDOFF_MAX_BYTES, HANDOFF_SECTIONS, handoffBytes, reportableOutcomes, verdictCounts } from "@norn/core";
+import { cmd, checkHandBack, checkReport, cursorStep, enteringReceipt, HANDOFF_MAX_BYTES, HANDOFF_SECTIONS, handoffBytes, reportableOutcomes, verdictCounts } from "@norn/core";
 import { type AgentStep, type CriterionVerdict, type Finding, type Note, type ReceiptOf, validate } from "@norn/schema";
 import { appendTrace, ensureEvidenceDir, handoffProse, readText, traceEvent } from "@norn/store";
 import { defineCommand, type ParsedArgs, opt } from "../command.ts";
@@ -184,6 +184,8 @@ export const doneCommand = defineCommand({
     const evidencePath = evidenceSrc ? abs(ctx, evidenceSrc) : null;
     if (evidencePath && !(existsSync(evidencePath) && statSync(evidencePath).isDirectory()))
       throw refuse(`evidence directory not found: ${evidenceSrc}`, "pass the directory your skill wrote evidence to, then report again", "bad_evidence");
+    const handBack = checkHandBack({ step, step_name: t.s.state.step, outcome, findings: findings ? findings.length : null, evidence: evidencePath !== null });
+    if (handBack) throw refuse(handBack.error, handBack.do_instead, handBack.code, handBack.details);
 
     // The report and notes, checked against the step and the unit's frontmatter criteria
     const notes = parseNotes(args);

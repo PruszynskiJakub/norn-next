@@ -86,7 +86,8 @@ export const cmd = {
   ask: () => norn("ask", `"<question>"`),
   brief: () => norn("brief"),
   doctor: (o: { json?: boolean } = {}) => norn("doctor", o.json && "--json"),
-  done: (outcome: string, o: { criteria?: boolean } = {}) => norn("done", outcome, o.criteria && "--criteria <file>", `--handoff "…"`),
+  done: (outcome: string, o: { criteria?: boolean; findings?: boolean; evidence?: boolean } = {}) =>
+    norn("done", outcome, o.criteria && "--criteria <file>", o.findings && "--findings <file>", o.evidence && "--evidence <dir>", `--handoff "…"`),
   help: () => norn("help"),
   init: () => norn("init"),
   upgrade: () => norn("upgrade"),

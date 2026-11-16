@@ -179,6 +179,15 @@ function graphIssues(wf: Workflow, opts: ValidateOptions): WorkflowIssue[] {
             message: `skill '${skill}' is not installed for agent '${agent}' (run ${cmd.init()}, or add it to that agent's skill folder)`,
           });
       }
+      for (const outcome of Object.keys(step.hand_back ?? {}))
+        if (!reportableOutcomes(step).includes(outcome))
+          issues.push({
+            code: "unknown_outcome",
+            path: `/steps/${name}/hand_back/${outcome}`,
+            message: (OVERRIDABLE_ROUTES as readonly string[]).includes(outcome)
+              ? `hand_back names '${outcome}', a route norn takes, never one an agent reports with norn done`
+              : `hand_back names outcome '${outcome}', but ${name} declares no route for it in outcomes`,
+          });
       if ("exhausted" in step.outcomes)
         issues.push({
           code: "reserved_outcome",

@@ -10,6 +10,7 @@ export * from "./apply.ts";
 export * from "./brief.ts";
 export * from "./commands.ts";
 export * from "./criteria.ts";
+export * from "./hand-back.ts";
 export * from "./decide/index.ts";
 export * from "./follow-up.ts";
 export * from "./handoff.ts";
