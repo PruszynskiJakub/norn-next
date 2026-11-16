@@ -9,7 +9,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { stepWordingErrors, toModelSteps } from "./step-wording.ts";
 
 // The flattened text is pinned and hashed: its bytes must follow from content alone, never from which values share an object
-const FLAT_YAML = { lineWidth: 0, aliasDuplicateObjects: false } as const;
+export const FLAT_YAML = { lineWidth: 0, aliasDuplicateObjects: false } as const;
 
 /** The folder of shared files, inside the workflows folder. */
 export const SHARED_DIR = "shared";

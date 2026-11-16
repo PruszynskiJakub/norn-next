@@ -259,3 +259,33 @@ describe("like steps in the workflow-source and workflow-shared schemas", () => 
     expect(validate("workflow-shared", shared).ok).toBe(true);
   });
 });
+
+describe("counters derived from their edge, and max on an edge", () => {
+  const loaded = (counter: string) => ({
+    name: "slice",
+    start: "review",
+    steps: { review: { type: "agent", instructions: "Review.", outcomes: { approve: "$done", changes_requested: { to: "review", counter } } } },
+    counters: { [counter]: { max: 3 } },
+  });
+  test("the pinned workflow holds a dotted counter name on its edge and under counters", () => {
+    expect(modelErrorsOf(loaded("review.changes_requested"))).toEqual([]);
+  });
+  test("a workflow file as written refuses a dotted name under counters and on counter:", () => {
+    const wf = { name: "slice", start: "review", steps: { review: { agent: "Review.", outcomes: { approve: "$done", changes_requested: { to: "review", counter: "review.changes_requested" } } } }, counters: { "review.changes_requested": { max: 3 } } };
+    const paths = errorsOf(wf).map((e) => e.path);
+    expect(paths).toContainEqual(expect.stringContaining("/counters"));
+    expect(paths).toContainEqual(expect.stringContaining("/steps/review/outcomes/changes_requested"));
+    const shared = { start: "review", steps: { review: { agent: "Review.", outcomes: { approve: { exit: "ok" }, changes_requested: { to: "review", counter: "review.changes_requested" } } } } };
+    expect(validate("workflow-shared", shared).ok).toBe(false);
+  });
+  test("max: on an edge is written in a file, never in the pinned workflow", () => {
+    const wf = { name: "slice", start: "review", steps: { review: { agent: "Review.", outcomes: { approve: "$done", changes_requested: { to: "review", max: 4 } } } } };
+    expect(errorsOf(wf)).toEqual([]);
+    expect(errorsOf({ ...wf, steps: { review: { ...wf.steps.review, outcomes: { approve: "$done", changes_requested: { to: "review", max: 0 } } } } })).not.toEqual([]);
+    const use = { name: "story", start: "base", steps: { base: { use: "base-update", outcomes: { broken: { to: "base", max: 3 } } } } };
+    expect(errorsOf(use)).toEqual([]);
+    const model = loaded("review_loop") as any;
+    model.steps.review.outcomes.changes_requested.max = 4;
+    expect(modelErrorsOf(model)).not.toEqual([]);
+  });
+});

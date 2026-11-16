@@ -256,3 +256,16 @@ describe("claim, lease, trace, hook, cli-error", () => {
     }
   });
 });
+
+describe("a counter derived from its edge, named <step>.<outcome>", () => {
+  const exhausted = { kind: "exhausted", reason: "review.changes_requested ran out", since: AT, counter: { name: "review.changes_requested", max: 3, outcome: "changes_requested", to: "implement" } };
+  test("validates in state.json's counters and the exhausted park", () => {
+    expect(validate("state", { ...STATE, counters: { "review.changes_requested": 3 }, status: "stuck", park: exhausted }).ok).toBe(true);
+  });
+  test("validates in a receipt's reset list", () => {
+    expect(validate("receipt", { ...receipts.unstick, reset: ["review.changes_requested"] }).ok).toBe(true);
+  });
+  test.each([["two dots", "a.b.c"], ["a trailing dot", "review."], ["a capital", "Review.x"]])("a stored name with %s is still refused", (_n, name) => {
+    expect(validate("receipt", { ...receipts.unstick, reset: [name] }).ok).toBe(false);
+  });
+});

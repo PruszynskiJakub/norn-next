@@ -20,6 +20,7 @@ import {
   toJsonSchema,
 } from "@norn/schema";
 import { type Document, isCollection, isMap, isScalar, parseDocument, parse as parseYaml, stringify as stringifyYaml } from "yaml";
+import { withDerivedCounters } from "./derived-counters.ts";
 import { atomicWrite, fileError, isErrno, readText, type ReadResult } from "./fsx.ts";
 import { recordedInterval } from "./heartbeat.ts";
 import { checkoutOf, LOCAL_CONFIG_FILE, LOCAL_CONFIG_SCHEMA_FILE, nornHome, REPO_CONFIG_SCHEMA_FILE, REPO_CONFIG_FILE, repoConfigPath, USER_CONFIG_SCHEMA_FILE, userConfigPath, workflowsDir } from "./paths.ts";
@@ -374,8 +375,10 @@ export function loadWorkflowText(
   }
   const flat = flattenWorkflowText(own, (n) => { const t = shared.get(n); return t == null ? null : read === "copy" ? inNewWording(t) : t; });
   if (flat && !flat.ok) return { ok: false, reason: "corrupt", error: fileError(file, flat.errors, root) };
-  // A workflow without `use` loads as written, so its pin and fingerprint stay byte for byte
-  const source = flat ? flat.source : text;
+  // A workflow without `use` that derives no counter loads as written, so its pin and fingerprint stay byte for byte
+  const derived = withDerivedCounters(flat ? flat.source : own, flat?.included);
+  if (!derived.ok) return { ok: false, reason: "corrupt", error: fileError(file, derived.errors, root) };
+  const source = derived.source ?? (flat ? flat.source : text);
   const r = parseWorkflowText(source, file, read, root);
   if (!r.ok) return r;
   if (r.value.name !== name)

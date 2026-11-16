@@ -1,6 +1,5 @@
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
 import {
-  CounterName,
   IsoTime,
   Mode,
   NonEmpty,
@@ -11,6 +10,7 @@ import {
   PromptChoice,
   SliceKey,
   StepName,
+  StoredCounterName,
   StoryKey,
   TaggedUnion,
   Ulid,
@@ -87,7 +87,7 @@ const parkFields = {
      * is read from state, never parsed from `reason`
      */
     counter: Type.Optional(
-      Type.Object({ name: CounterName, max: NonNegInt, outcome: OutcomeName, to: NonEmpty }, { additionalProperties: false }),
+      Type.Object({ name: StoredCounterName, max: NonNegInt, outcome: OutcomeName, to: NonEmpty }, { additionalProperties: false }),
     ),
 };
 
@@ -159,7 +159,7 @@ const stateFields = <S extends TSchema, C extends TSchema, P extends TSchema, R 
   status,
   park,
   /** Workflow counters: name → times its edge was taken. Live only here. */
-  counters: Type.Record(CounterName, NonNegInt),
+  counters: Type.Record(StoredCounterName, NonNegInt),
   /** Within-step limits used since step entry; reset on entry. */
   nudges_used: NonNegInt,
   retries_used: NonNegInt,

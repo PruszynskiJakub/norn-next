@@ -61,7 +61,7 @@ describe("a broken shared file shows wherever a broken workflow shows", () => {
   };
   beforeAll(async () => {
     t = await setUp({
-      // an included step routing back with no counter
+      // an included step routing back with no counter, on edges that derive none
       "loopy.yaml": "name: loopy\nstart: core\nsteps:\n  core: { use: cycle }\n",
       "shared/cycle.yaml": `start: build
 steps:
@@ -74,10 +74,10 @@ steps:
   check:
     agent: Use the \`norn-review\` skill.
     skills: [norn-review]
-    outcomes: { approve: $done, rework: build }
+    outcomes: { approve: $done, done: build }
     means:
       approve: "good"
-      rework: "again"
+      done: "again"
 `,
       // an included step naming a counter the workflow does not declare
       "counted.yaml": "name: counted\nstart: core\nsteps:\n  core: { use: undeclared }\n",

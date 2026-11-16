@@ -349,7 +349,7 @@ describe("norn doctor: the repo group (B7–B10, D7)", () => {
 start: a
 steps:
   a: { agent: "Use the \`norn-implement\` skill.", skills: [norn-implement], outcomes: { done: b }, means: { done: step finished with outcome done } }
-  b: { agent: "Use the \`norn-review\` skill.", skills: [norn-review], outcomes: { again: a, ok: $done }, means: { again: step finished with outcome again, ok: step finished with outcome ok } }
+  b: { agent: "Use the \`norn-review\` skill.", skills: [norn-review], outcomes: { done: a, ok: $done }, means: { done: step finished with outcome done, ok: step finished with outcome ok } }
 `;
   const NOPE = SOLO.replace("name: solo", "name: nope").replace("skills: [norn-implement]", "skills: [norn-nope]");
   // the machine group passes too: an agent binary on PATH and hooks that fire through this norn
@@ -394,7 +394,7 @@ steps:
       });
       expect(r.stdout).toMatch(/^norn doctor: 1 check failed \(workflow loop\)/);
       expect(r.stdout).toMatch(/FAIL workflow loop +\.agents\/workflows\/loop\.yaml/);
-      expect(r.stdout).toContain("! /steps/a: cycle without a counter: a.done → b.again → a");
+      expect(r.stdout).toContain("! /steps/a: cycle without a counter: a.done → b.done → a");
     } finally {
       rmSync(file);
     }

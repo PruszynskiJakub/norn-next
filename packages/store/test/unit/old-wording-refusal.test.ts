@@ -18,7 +18,7 @@ const NEW_STEPS = `  a:
     means: { done: built }
   g:
     gate: Approve?
-    outcomes: { approve: $done, reject: a }
+    outcomes: { approve: $done, reject: $stuck }
 `;
 
 const OLD_STEPS = `  a:
@@ -29,7 +29,7 @@ const OLD_STEPS = `  a:
   g:
     type: gate
     prompt: Approve?
-    outcomes: { approve: $done, reject: a }
+    outcomes: { approve: $done, reject: $stuck }
 `;
 
 // one step in the new wording that still carries one old key, and an edge with an old verdict
@@ -40,7 +40,7 @@ const MIXED_STEPS = `  a:
     means: { done: built }
   g:
     gate: Approve?
-    outcomes: { approve: $done, reject: a }
+    outcomes: { approve: $done, reject: $stuck }
 `;
 
 function repo(files: Record<string, string>): string {

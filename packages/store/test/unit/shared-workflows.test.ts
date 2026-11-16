@@ -86,7 +86,7 @@ describe("use: brings in a shared file's steps", () => {
     const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE });
     expect(Object.keys(wf.workflow.steps)).toEqual(["implement", "update", "resolve", "test", "qa"]);
     expect(wf.workflow.steps.base).toBeUndefined();
-    expect(wf.workflow.steps.update).toEqual({ type: "git", action: "update", outcomes: { done: "test", conflict: "resolve" } });
+    expect(wf.workflow.steps.update).toEqual({ type: "git", action: "update", outcomes: { done: "test", conflict: { to: "resolve", counter: "update.conflict" } } });
     expect(wf.included).toEqual({ update: "base-update", resolve: "base-update", test: "base-update" });
   });
 
@@ -203,7 +203,8 @@ describe("shared files and the loaded text", () => {
   });
 
   test("each flat edge that left through a shared exit reports the use step's exit and that route's counter; the pinned text is unchanged", () => {
-    const files = { "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE };
+    // every route back names a counter, so the pin is the flat text with nothing derived into it
+    const files = { "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE.replace("conflict: resolve", "conflict: { to: resolve, counter: test_loop }") };
     const wf = loaded(files);
     expect(wf.exits).toEqual({
       "resolve.gave_up": { exit: "base.broken", counter: "test_loop" },
@@ -248,7 +249,7 @@ describe("like: copies a step of its own file", () => {
       description: "the suite",
       run: "bun test",
       timeout: "10m",
-      outcomes: { pass: "$done", fail: "review" },
+      outcomes: { pass: "$done", fail: { to: "review", counter: "test-merge.fail" } },
       exits: { "3": "flaky" },
     } as never);
     expect(Object.keys(parseYaml(wf.source).steps["test-merge"])).toEqual(["check", "description", "timeout", "outcomes", "exits"]);
@@ -268,7 +269,7 @@ describe("like: copies a step of its own file", () => {
     const wf = loaded({ "story.yaml": keeps });
     expect(wf.source).not.toMatch(/[&*]a\d/);
     expect(asLoaded(wf.source)).toEqual(wf.workflow);
-    expect(wf.workflow.steps["test-merge"]?.outcomes).toEqual({ pass: "review", fail: "implement" });
+    expect(wf.workflow.steps["test-merge"]?.outcomes).toEqual({ pass: "review", fail: { to: "implement", counter: "test-merge.fail" } });
   });
 
   test("a like in a shared file is resolved within the shared file before its steps come in", () => {
