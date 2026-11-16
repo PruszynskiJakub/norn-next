@@ -2,7 +2,7 @@
 id: gh-342/01
 title: Pin today's meaning of every workflow the story rewrites
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
