@@ -1,29 +1,35 @@
+# gh-343 handoff
+
 ## Goal
 
-A workflow step opens with one head key (`agent:`, `check:`, `gate:`, a value-less verb, `use:`); agent skills become an optional `skills:` list; meanings and verdicts move to sibling `means:` / `verdict:` maps; `norn upgrade` rewrites old-wording files losslessly while old pins keep loading. The spec (spec.md) is refined and confirmed by the owner, no open questions.
+A workflow step opens with one head key (`agent:`, `check:`, `gate:`, a value-less verb, `use:`); agent skills become an optional `skills:` list; meanings and verdicts move to sibling `means:` / `verdict:` maps; `by:` picks the agent; `norn upgrade` rewrites old-wording files losslessly while old pins keep loading. The spec is refined and planned.
 
 ## Proof
 
-- spec.md User Stories: 50 stories in six groups (writing a step; orientation and skills; outcomes, meanings and verdicts; the old wording; norn upgrade; shipped workflows and docs). Owner confirmed the interview summary in session.
+- spec.md User Stories: 50 stories in six groups, confirmed by the owner. Story 41 amended in plan: the gate text fallback is `approve or reject <step>` (today's text), not the line agreed in refine.
+- spec.md Plan: seams S1–S8, a coverage row for every story, two prefactors, decisions D1–D9, risks. Owner settled the open decisions in session (see Notes).
 
 ## Easy to miss
 
-- The per-step key picking the configured agent becomes `by:` (not `runner:`, which in norn means Herdr/headless). Owner may still rename it before the build.
-- Old wording is refused only for the main checkout's `.agents/workflows/` (doctor, sync, new round, upgrade). Pins and a workflow file read from a story branch (lost-record restart in `norn story checkout`) load through the same old→new translation upgrade uses; their text and hash on disk are never touched.
-- One parser reads both repo files and pins today (`parseWorkflowText`, store `unit.ts`); the two reads must be told apart.
-- decide reads `step.skill` in the re-refined-story check (core `decide/story.ts`, `REFINE_SKILLS`): becomes "skills include the refine skill". Golden cases embed workflows: rewrite their embedded workflows, decisions must not change.
-- Lossless upgrade: comments, key order, scalar styles kept (yaml Document API); an unplaceable comment refuses only that file (naming file and line), others still rewritten; idempotent; JSON stays JSON.
-- Orientation fallback in upgrade: instructions word for word → description → ``Use the `X` skill.``; gate text fallback: prompt → description → "Approve to go on, or reject with what to change." Shipped workflows and this repo's copies (incl. `release.yaml`, no shipped copy) get hand-written orientations instead.
+- **The loaded model stays the `type`-tagged union** (D1, owner's choice). Only the file format changes; the loader normalises new wording into the model. Model changes: `skills?: string[]`, `instructions` required (the orientation), gate `prompt` required. Edges keep `means`/`verdict` internally.
+- One old→new translator in store over the `yaml` Document, shared by `norn upgrade` and the copy reads (pins, trace, record, branch files), so they always agree (D3).
+- The old wording is refused only by the main-checkout reads (`loadWorkflows`, `loadWorkflow`); copy reads translate. Prefactor 1 makes the two reads explicit.
+- Fallbacks in the translator: orientation = instructions → description → ``Use the `X` skill.``; gate text = prompt → description → `approve or reject <step>`; a routed reportable outcome without a meaning gets `step finished with outcome <o>` (today's brief fallback), so story 20 holds and the brief reads the same.
+- A lost-record restart pins the branch file text verbatim (D4).
+- Golden cases: rewritten once (skill → skills, fallbacks filled); decisions must stay byte-identical (D8).
+- `by:` is still a name the owner may change before the build.
 
 ## Not proven yet
 
-- Nothing built. Plan not written.
+- Nothing built. The slices are not cut yet.
 
 ## Notes
 
-- Decisions and their reasons are in spec.md Further Notes; the design record gist (`quick.yaml`) shows the target wording.
-- Owner defaults confirmed: a `like` step inherits its target's head key (writing a different one is refused as two head keys); `norn doctor` reports one issue per old-wording file naming `norn upgrade`.
+- Owner decisions from the plan interview: keep the internal tagged model; fill in a missing meaning with the fallback; pin the branch text verbatim at restart; one gate fallback text everywhere (`approve or reject <step>`), story 41 amended.
+- Spike (thrown away): the `yaml` Document API can rename keys in place, swap `type` for the head key in position, split a flow edge into `outcomes`/`means`/`verdict` and keep its trailing comment. Caveats: flow sequences come out padded (`[ X ]`) unless that option is off; a folded scalar keeps its style but gets re-wrapped.
+- `norn upgrade` lists a refused file (unplaceable comment) in a new `workflows` report field and still exits 0 (D9).
+- Design record gist (`quick.yaml`) shows the target wording.
 
 ## Resume
 
-Next step plans spec.md (norn-plan): seams for the old→new translation (shared by upgrade and the pin/branch reader), the schema change, the brief's skill line, and the upgrade rewrite.
+Slice the planned spec (norn-slice): prefactors first (the two reads, skill → skills in the model), then the translator against the shipped workflows as fixtures.
