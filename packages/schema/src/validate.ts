@@ -28,13 +28,16 @@ import {
 import { Receipt } from "./receipt.ts";
 import { UnitState, UnitStateRecord } from "./state.ts";
 import { HookFact, TraceEvent } from "./trace.ts";
-import { Workflow } from "./workflow.ts";
+import { Workflow, WorkflowShared, WorkflowSource } from "./workflow.ts";
 
 export { check, type SchemaError, type ValidationResult } from "./check.ts";
 
 /** Every published schema, by short name. JSON files are emitted as `json/<name>.schema.json`. */
 export const SCHEMAS = {
   workflow: Workflow,
+  // a workflow file as written, and a shared file it brings in with `use:`; both flatten to `workflow`
+  "workflow-source": WorkflowSource,
+  "workflow-shared": WorkflowShared,
   story: StoryFrontmatter,
   slice: SliceFrontmatter,
   state: UnitState,

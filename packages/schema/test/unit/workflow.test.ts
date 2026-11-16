@@ -140,3 +140,19 @@ describe("workflow schema", () => {
     expect(outcomeEdge({ to: "implement", counter: "c" })).toEqual({ to: "implement", counter: "c" });
   });
 });
+
+describe("workflow-source and workflow-shared schemas", () => {
+  const gate = { type: "gate", outcomes: { approve: "$done" } };
+  test("a workflow file as written may hold a `use` step; the strict workflow schema refuses it", () => {
+    const wf = { name: "story", start: "review", steps: { review: gate, base: { use: "base-update", outcomes: { tested: "review", broken: { to: "review", counter: "loop" } } } } };
+    expect(validate("workflow-source", wf).ok).toBe(true);
+    expect(validate("workflow", wf).ok).toBe(false);
+    expect(validate("workflow-source", { ...wf, steps: { ...wf.steps, base: { use: "base-update", skill: "x" } } }).ok).toBe(false);
+  });
+  test("a shared file holds start, steps and a description, and its routes may leave through an exit", () => {
+    const shared = { description: "d", start: "test", steps: { test: { type: "check", run: "bun test", timeout: "5m", outcomes: { pass: { exit: "tested", means: "green" }, fail: "$stuck" } } } };
+    expect(validate("workflow-shared", shared).ok).toBe(true);
+    for (const key of ["name", "counters", "defaults", "mode", "base"]) expect(validate("workflow-shared", { ...shared, [key]: {} }).ok).toBe(false);
+    expect(validate("workflow", { name: "x", ...shared }).ok).toBe(false);
+  });
+});
