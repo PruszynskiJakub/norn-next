@@ -1,8 +1,8 @@
 ---
 id: gh-345/02
 title: Derive a counter per edge at load, with max on the edge
-depends_on: [gh-345/01]
-status: planned
+depends_on: [ gh-345/01 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
