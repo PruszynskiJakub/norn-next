@@ -2,7 +2,7 @@
 id: gh-342/07
 title: Shared-file errors, pins and lost-record restarts through the cli
 depends_on: [ gh-342/02, gh-342/03 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
