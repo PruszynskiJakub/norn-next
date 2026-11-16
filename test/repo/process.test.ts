@@ -4,7 +4,7 @@ import { cpSync, existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parse } from "yaml";
-import { checkWorkflowLevel, validateWorkflowDefinition } from "../../packages/core/src/index.ts";
+import { checkWorkflowLevel, validateWorkflowDefinition, workflowHash } from "../../packages/core/src/index.ts";
 import { loadConfig, loadWorkflows, repoConfigPath, visibleSkills, workflowsDir } from "../../packages/store/src/index.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
@@ -28,6 +28,15 @@ const CLAUDE_SKILLS = join(ROOT, ".claude", "skills");
 /** Workflows that end in `integrate` run on slices; every other one is a story workflow. */
 const SLICE_WORKFLOWS = new Set(["slice"]);
 const PERSON_ONLY_SKILLS = ["issue", "release-start"];
+/**
+ * The meaning of each repo workflow a rewrite must keep, taken from the loader on the base before it: a
+ * changed route, counter or instruction changes the hash, formatting and key order never do.
+ */
+const PINNED_HASHES: Record<string, string> = {
+  quick: "aff5dfec53f0ecfb90692a81e383afd173a62758e90dd6c663cbe8079701f1f0",
+  story: "df2f31a1aff914571cfdca77102c73ea42317aa33a3d46c2ed476e2f5d40cf39",
+  release: "36ef29618e748de8a7c3f8c6be5b159f40aec95611262fc3e929ae280a41e758",
+};
 
 function frontmatter(skill: string): Record<string, unknown> {
   const text = readFileSync(join(AGENTS_SKILLS, skill, "SKILL.md"), "utf8");
@@ -49,6 +58,9 @@ describe("repo workflows", () => {
 
   test("load without errors", () => {
     expect(listing.errors).toEqual([]);
+  });
+  test.each(Object.keys(PINNED_HASHES))("%s keeps its pinned meaning", (name) => {
+    expect(workflowHash(listing.workflows[name]!.workflow)).toBe(PINNED_HASHES[name] as string);
   });
   test("are the six shipped workflows plus release, and no bug, fix or spec", () => {
     expect(Object.keys(listing.workflows).sort()).toEqual(["quick", "refinement", "release", "reproduce", "slice", "story", "triage"]);
