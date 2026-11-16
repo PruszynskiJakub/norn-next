@@ -30,4 +30,4 @@ Workflows bring in steps from shared files (`use:` with named exits) and copy st
 
 ## Resume
 
-Next step: the step after qa in the story workflow (QA passed all 30 criteria).
+pr.md (spec folder) written by describe#3 for the branch at b447cace2: one evidence entry per user story, linking the _story QA evidence. Next: the step after describe opens the draft PR.
