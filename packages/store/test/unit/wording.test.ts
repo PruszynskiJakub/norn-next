@@ -143,6 +143,38 @@ describe("translateWording: a step's head key", () => {
 `);
   });
 
+  test("a `like` copy's `agent: <name>` becomes `by: <name>` in a file in the old wording", () => {
+    const text = `steps:
+  review:
+    type: agent
+    skill: s
+    instructions: Review.
+    outcomes: { approve: { to: $done, means: fine } }
+  review-codex:
+    like: review
+    agent: codex
+  review-gemini:
+    like: review
+    skill: t
+    agent: gemini
+`;
+    expect(ok(text)).toBe(`steps:
+  review:
+    agent: Review.
+    skills: [s]
+    outcomes: { approve: $done }
+    means:
+      approve: fine
+  review-codex:
+    like: review
+    by: codex
+  review-gemini:
+    like: review
+    skills: [t]
+    by: gemini
+`);
+  });
+
   test("a `like` copy keeps its place and renames the keys it overrides", () => {
     const text = `steps:
   test:
@@ -301,6 +333,28 @@ describe("translateWording: outcomes, meanings and verdicts", () => {
 `);
   });
 
+  test("a comment on a block edge's outcome key stays on that line when the edge becomes its bare target", () => {
+    const text = `steps:
+  qa:
+    type: agent
+    skill: s
+    instructions: Check it.
+    outcomes:
+      pass: # the happy path: all green
+        to: describe
+        means: ok
+`;
+    expect(ok(text)).toBe(`steps:
+  qa:
+    agent: Check it.
+    skills: [s]
+    outcomes:
+      pass: describe # the happy path: all green
+    means:
+      pass: ok
+`);
+  });
+
   test("a meaning on a step that is not an agent step is dropped: nothing ever read it", () => {
     const text = `steps:
   test:
@@ -367,6 +421,30 @@ steps:
     check: |
       echo "${long}"
       exit 0
+    outcomes: { pass: $done }
+`);
+  });
+
+  test("a block scalar ending in a `#` line just above a removed key keeps that line", () => {
+    const text = `steps:
+  a:
+    description: |
+      text
+      # not a comment
+    type: check
+    run: |
+      set -e
+      # also not a comment
+    outcomes: { pass: $done }
+`;
+    expect(ok(text)).toBe(`steps:
+  a:
+    check: |
+      set -e
+      # also not a comment
+    description: |
+      text
+      # not a comment
     outcomes: { pass: $done }
 `);
   });
@@ -504,5 +582,10 @@ describe("translateWording: JSON stays JSON", () => {
       2,
     )}\n`);
     expect(ok(out, "j.json")).toBe(out);
+  });
+
+  test("a JSON `like` copy's `agent: <name>` becomes `by: <name>`", () => {
+    const text = `{"steps":{"a":{"type":"check","run":"x","outcomes":{"pass":"$done"}},"b":{"like":"a","agent":"codex"}}}`;
+    expect(JSON.parse(ok(text, "j.json")).steps.b).toEqual({ like: "a", by: "codex" });
   });
 });

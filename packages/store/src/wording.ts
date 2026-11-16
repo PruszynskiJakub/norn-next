@@ -82,7 +82,8 @@ function translateStepObj(name: string, s: Obj, steps: Obj): Obj {
   for (const [k, v] of Object.entries(s)) {
     if (kind !== undefined && (k === "type" || k === "action" || k === CONTENT_KEY[kind])) continue;
     if (k === "skill") out.skills = [v];
-    else if (k === "agent" && kind !== undefined) out.by = v;
+    // in a file in the old wording a copy's `agent:` is the agent's name too, never an orientation
+    else if (k === "agent" && (kind !== undefined || typeof s.like === "string")) out.by = v;
     else if (kind === undefined && COPY_RENAME[k]) out[COPY_RENAME[k] as string] = v;
     else if (k === "outcomes" && isObj(v)) {
       const routes: Obj = {};
@@ -154,7 +155,10 @@ function translateYaml(text: string): string {
   if (!stepPairs.some((s) => isOldStepNode(s.map))) return text;
   const byName = new Map(stepPairs.map((s) => [s.name, s.map]));
   const edits: Edit[] = [];
-  for (const s of stepPairs) if (isOldStepNode(s.map)) edits.push(...stepEdits(text, s.name, s.map, byName));
+  for (const s of stepPairs) {
+    if (isOldStepNode(s.map)) edits.push(...stepEdits(text, s.name, s.map, byName));
+    else if (pairOf(s.map, "like")) edits.push(...byEdit(s.map));
+  }
   return apply(text, edits);
 }
 
@@ -190,6 +194,12 @@ const lineEnd = (text: string, pos: number) => {
 };
 const column = (text: string, pos: number) => pos - lineStart(text, pos);
 const range = (n: Node): [number, number, number] => n.range as [number, number, number];
+/** spanOf for an item of `m`, its leading comments taken only below the item before it */
+function spanIn(text: string, m: YAMLMap, p: Pair<Node, Node>): Span {
+  const i = m.items.indexOf(p);
+  const before = i > 0 ? (m.items[i - 1] as Pair<Node, Node>) : undefined;
+  return spanOf(text, p, before ? range(before.value ?? before.key)[1] : 0);
+}
 
 interface Span {
   /** first leading comment line, or the key's line */
@@ -206,7 +216,8 @@ interface Span {
   lead: string;
 }
 
-function spanOf(text: string, p: Pair<Node, Node>): Span {
+// `floor` is where the pair before this one ends: a `#` line above it is that pair's value (a block scalar's text), never a comment
+function spanOf(text: string, p: Pair<Node, Node>, floor = 0): Span {
   const key = range(p.key);
   const keyLine = lineStart(text, key[0]);
   const v: [number, number, number] = p.value ? range(p.value) : [key[1], key[1], key[1]];
@@ -214,10 +225,10 @@ function spanOf(text: string, p: Pair<Node, Node>): Span {
   const lastLineEnd = lineEnd(text, Math.max(valueEnd, key[1]));
   let from = keyLine;
   const indent = column(text, key[0]);
-  while (from > 0) {
+  while (from > floor) {
     const prev = lineStart(text, from - 1);
     const line = text.slice(prev, from - 1);
-    if (!line.trim().startsWith("#") || line.length - line.trimStart().length < indent) break;
+    if (prev < floor || !line.trim().startsWith("#") || line.length - line.trimStart().length < indent) break;
     from = prev;
   }
   const value = p.value ? text.slice(v[0], valueEnd) : "";
@@ -241,7 +252,7 @@ function stepEdits(text: string, name: string, m: YAMLMap, steps: Map<string, YA
     let tail = "";
     let tailAt = -1;
     for (const p of removed) {
-      const s = spanOf(text, p);
+      const s = spanIn(text, m, p);
       edits.push({ start: s.from, end: s.end, text: "" });
       lead += s.lead;
       if (!s.tail) continue;
@@ -268,11 +279,16 @@ function stepEdits(text: string, name: string, m: YAMLMap, steps: Map<string, YA
     edits.push({ start: range(skill.key)[0], end: range(skill.key)[1], text: "skills" });
     edits.push({ start: v[0], end: v[1], text: `[${text.slice(v[0], v[1])}]` });
   }
-  const agentName = pairOf(m, "agent");
-  if (typePair && agentName) edits.push({ start: range(agentName.key)[0], end: range(agentName.key)[1], text: "by" });
+  if (typePair || pairOf(m, "like")) edits.push(...byEdit(m));
 
   edits.push(...outcomeEdits(text, name, m, isAgentNode(m, steps, new Set()), indent));
   return edits;
+}
+
+// In a file in the old wording a step's or a copy's `agent:` names the agent that runs it
+function byEdit(m: YAMLMap): Edit[] {
+  const p = pairOf(m, "agent");
+  return p ? [{ start: range(p.key)[0], end: range(p.key)[1], text: "by" }] : [];
 }
 
 // A comment that sat on a removed key's line goes on the head's line: after a single-line value, after a block scalar's header
@@ -314,7 +330,7 @@ function outcomeEdits(text: string, name: string, m: YAMLMap, agent: boolean, in
     const edge = e.value;
     const meansNode = isMap(edge) ? pairOf(edge, "means") : undefined;
     const verdictNode = isMap(edge) ? pairOf(edge, "verdict") : undefined;
-    if (isMap(edge) && (meansNode || verdictNode)) edits.push(...edgeEdits(text, edge));
+    if (isMap(edge) && (meansNode || verdictNode)) edits.push(...edgeEdits(text, e.key, edge));
     if (!agent) continue;
     if (meansNode?.value) means.push(`${keyText}: ${movedScalar(text, meansNode.value, childCol)}`);
     else if (!OVERRIDABLE.has(outcome)) means.push(`${keyText}: ${plain(`step finished with outcome ${outcome}`)}`);
@@ -346,7 +362,7 @@ function movedScalar(text: string, n: Node, keyCol: number): string {
 }
 
 // Remove `means`/`verdict` from one edge; an edge left with only `to` becomes its bare target
-function edgeEdits(text: string, edge: YAMLMap): Edit[] {
+function edgeEdits(text: string, outcomeKey: Node, edge: YAMLMap): Edit[] {
   const items = edge.items as Pair<Node, Node>[];
   const kept = items.filter((p) => !EDGE_PROSE.includes(keyName(p)));
   const r = range(edge);
@@ -367,15 +383,19 @@ function edgeEdits(text: string, edge: YAMLMap): Edit[] {
     });
     return out;
   }
-  if (items.some((p) => spanOf(text, p).lead || spanOf(text, p).tail))
+  if (items.some((p) => spanIn(text, edge, p).lead || spanIn(text, edge, p).tail))
     throw new Refusal(r[0], "a comment inside a block edge has no line to sit on once the edge is split");
   if (onlyTo) {
-    const first = spanOf(text, items[0] as Pair<Node, Node>);
     const last = spanOf(text, items[items.length - 1] as Pair<Node, Node>);
-    const keyEnd = text.lastIndexOf(":", first.from);
-    return [{ start: keyEnd + 1, end: last.end - 1, text: ` ${spanOf(text, kept[0] as Pair<Node, Node>).value}` }];
+    const colon = text.indexOf(":", range(outcomeKey)[1]);
+    // a comment on the outcome key's line stays on it, after the bare target
+    const comment = text.slice(colon + 1, lineEnd(text, colon)).trimEnd();
+    return [{ start: colon + 1, end: last.end - 1, text: ` ${spanOf(text, kept[0] as Pair<Node, Node>).value}${comment}` }];
   }
-  return items.filter((p) => EDGE_PROSE.includes(keyName(p))).map((p) => ({ start: spanOf(text, p).from, end: spanOf(text, p).end, text: "" }));
+  return items.filter((p) => EDGE_PROSE.includes(keyName(p))).map((p) => {
+    const s = spanIn(text, edge, p);
+    return { start: s.from, end: s.end, text: "" };
+  });
 }
 
 // Edits never overlap but an insertion may sit at the start of a removal: insertions go first
