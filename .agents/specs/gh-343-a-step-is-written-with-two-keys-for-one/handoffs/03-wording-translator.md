@@ -4,17 +4,19 @@ One store function, `translateWording(text, file)` in `packages/store/src/wordin
 
 ## Proof
 
-All in `packages/store/test/unit/wording.test.ts` (unit tier):
-- AC1 shipped files byte for byte: "<file> translates byte for byte to its expected file" for all 9 files in `packages/cli/assets/workflows/` and `shared/`; the expected files are in `packages/store/test/fixtures/wording/`. They were generated, then each diff against its source was checked by hand: only head keys, `skills: [X]`, split edges and `means:`/`verdict:` maps changed.
-- AC2 scalars kept as written: "folded, block and quoted scalars and long lines are neither re-wrapped nor restyled"; "a multi-line meaning that would have to move to a shallower indent is refused, never reflowed".
-- AC3 skill and instructions: "an agent step's skill and instructions become `agent:` (word for word) and `skills: [X]`".
-- AC4 fallbacks: "…takes its description as its orientation", "with no description either, the orientation names the skill", "a gate with no prompt takes its description, or `approve or reject <step>`", "a routed outcome an agent may report with no meaning gets today's brief text; route overrides get none".
-- AC5 long edges: "a long edge keeps to/counter in outcomes, means and verdict follow, its comment stays on the outcome's line"; "a block edge splits the same way".
-- AC6 `agent: <name>` becomes `by:`: "a step's `agent: <name>` becomes `by: <name>`".
-- AC7 unplaceable comment: "a comment left with no line to sit on refuses the file, naming the file and the comment's line".
-- AC8 idempotent: "<file>'s translation translates to itself" ×9; "a translated text comes back unchanged"; "a text in the new wording comes back unchanged".
-- AC9 JSON: "a JSON workflow is written back as JSON with two-space indent in its key order".
-- `bun run test` and `bun run typecheck` green.
+Unit tier; review #1 read each test and saw it assert its criterion. `bun run test` and `bun run typecheck` are green.
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | each shipped workflow and shared file translates byte for byte to a hand-checked expected file (`packages/store/test/fixtures/wording/`) | test | `packages/store/test/unit/wording.test.ts` › "<file> translates byte for byte to its expected file" ×9 |
+| AC2 | folded, block and quoted scalars and long lines are not re-wrapped or restyled, whether moved or not; a scalar that cannot be kept is refused | test | `packages/store/test/unit/wording.test.ts` › "folded, block and quoted scalars and long lines are neither re-wrapped nor restyled", "a multi-line meaning that would have to move to a shallower indent is refused, never reflowed" (gap: F2) |
+| AC3 | `skill` + `instructions` become `agent: <instructions word for word>` + `skills: [X]` | test | `packages/store/test/unit/wording.test.ts` › "an agent step's skill and instructions become `agent:` (word for word) and `skills: [X]`" |
+| AC4 | fallbacks: orientation from description, else "Use the `X` skill."; gate text from description, else `approve or reject <step>`; a reportable outcome with no meaning gets `step finished with outcome <o>` | test | `packages/store/test/unit/wording.test.ts` › the four "fallbacks" tests |
+| AC5 | a long edge keeps `to`/`counter` in `outcomes:`, `means:`/`verdict:` maps follow, its comment stays on the outcome's line | test | `packages/store/test/unit/wording.test.ts` › "a long edge keeps to/counter in outcomes…", "a block edge splits the same way" (gap: F1) |
+| AC6 | a step's `agent: <name>` becomes `by: <name>` | test | `packages/store/test/unit/wording.test.ts` › "a step's `agent: <name>` becomes `by: <name>`" (gap: F3, `like` copies) |
+| AC7 | a comment left with no line to sit on refuses the file, naming the file and line | test | `packages/store/test/unit/wording.test.ts` › "a comment left with no line to sit on refuses the file…" (gap: F1) |
+| AC8 | a translated text, or one already in the new wording, comes back unchanged | test | `packages/store/test/unit/wording.test.ts` › "<file>'s translation translates to itself" ×9, "a translated text comes back unchanged", "a text in the new wording comes back unchanged" |
+| AC9 | a JSON workflow stays JSON, two-space indent, in its key order | test | `packages/store/test/unit/wording.test.ts` › "a JSON workflow is written back as JSON with two-space indent in its key order" |
 
 ## Easy to miss
 
@@ -25,6 +27,11 @@ All in `packages/store/test/unit/wording.test.ts` (unit tier):
 
 ## Not proven yet
 
+- Review #1 asked for changes, with 3 blocking findings, each reproduced by the probe in the review evidence (`probe.ts`, `probe-output.txt`):
+  - F1: a comment on a block edge's outcome key line (`pass: # c` with `to`/`means` below it) is dropped when the edge collapses to its bare target (`edgeEdits`, wording.ts:375).
+  - F2: a `#` line at the end of a block scalar just above `type:`/`run:`/… is taken as a leading comment and moved out of the scalar (`spanOf`, wording.ts:217).
+  - F3: a `like` copy's `agent: <name>` is not renamed to `by:`. In the new wording it would read as an orientation (wording.ts:272, and the JSON path).
+
 - That the output loads to the same workflow: slice 04 owns that, since no loader for the new wording exists yet.
 - `like` copies: an old copy's `instructions`/`run`/`prompt` keys are renamed in place (no first-position move, no fallbacks). An old copy of an agent step that writes `outcomes:` gets a `means:` map with fallbacks. Its target's `verdict:` map is still inherited under the new wording's shallow merge. Slice 04 should decide whether that is right.
 
@@ -32,8 +39,9 @@ All in `packages/store/test/unit/wording.test.ts` (unit tier):
 
 - `means` on a step that is not an agent step (e.g. `{ exit: tested, means: … }` on a check, as in the store `shared-workflows.test.ts` fixture) is dropped. Nothing ever read it, and story 23 would refuse it in a `means:` map. This is a judgement call to confirm in review.
 - Refused, rather than guessed at: a step written as a flow map that needs a change, a multi-line flow edge, a comment inside a block edge being split, a step that already has a `means:`/`verdict:` map next to old in-edge prose, and a git `action` with no verb.
+- Review #1: dropping `means` on a step that is not an agent step is accepted. Minor, not rework: a YAML parse error comes back `ok`/unchanged (wording.ts:148; slice 08 may want to refuse it), and the comment on `apply()` says insertions go first, but the code applies removals first (the order is right).
 - Fixture loop: `bun test packages/store/test/unit/wording.test.ts`. To regenerate an expected file, run the translator on the shipped file and review the diff before committing it.
 
 ## Resume
 
-Review of slice 03 (the translator in `packages/store/src/wording.ts` and its tests). Slice 04 calls `translateWording` for copy reads (`toJS` of the text it returns), and slice 08 writes the text out.
+Rework for review #1: fix F1, F2 and F3 in `packages/store/src/wording.ts` (keep or refuse each case, never lose it silently), each with a test in `packages/store/test/unit/wording.test.ts`. Then check that the 9 fixture tests still pass unchanged.
