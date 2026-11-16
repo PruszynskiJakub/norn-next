@@ -1,7 +1,7 @@
 ---
 id: gh-343/09
 title: The main checkout accepts only the new wording; copies still load
-depends_on: [gh-343/01, gh-343/05, gh-343/06, gh-343/07]
+depends_on: [gh-343/01, gh-343/05, gh-343/06, gh-343/07, gh-343/08]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
@@ -35,4 +35,4 @@ User stories: old wording refused with `do_instead` naming `norn upgrade`; mixed
 - `bun run typecheck`
 
 ## Notes
-D4, D5. Only the main-checkout reads refuse; the copy reads from slice 01 translate. The doctor, sync, story edit and checkout tests are in the integration tier (CI). AC8 is the user's path end to end and needs slice 08 merged by the time it is checked; it is not a build dependency.
+D4, D5. Only the main-checkout reads refuse; the copy reads from slice 01 translate. The doctor, sync, story edit and checkout tests are in the integration tier (CI). AC8 is the user's path end to end, so slice 08 (the rewrite) is a dependency.

@@ -26,8 +26,8 @@ A workflow step opens with one head key (`agent:`, `check:`, `gate:`, a value-le
 
 ## Notes
 
-- Slices: 01 two reads (prefactor) · 02 skills list + brief lines · 03 translator · 04 new-wording loader (expand; deps 02, 03) · 05 shipped workflows, repo copies, schema (dep 04) · 06 cli integration fixtures (dep 04) · 07 other fixtures (dep 04) · 08 `norn upgrade` rewrite (deps 03, 04) · 09 refuse old wording in main checkout (contract; deps 01, 05, 06, 07) · 10 docs (dep 05).
-- Critical path 4 slices: 03 → 04 → 05 → 09 (or 02 → 04 …). Startable at once: 01, 02, 03.
+- Slices: 01 two reads (prefactor) · 02 skills list + brief lines · 03 translator · 04 new-wording loader (expand; deps 02, 03) · 05 shipped workflows, repo copies, schema (dep 04) · 06 cli integration fixtures (dep 04) · 07 other fixtures (dep 04) · 08 `norn upgrade` rewrite (deps 03, 04) · 09 refuse old wording in main checkout (contract; deps 01, 05, 06, 07, 08) · 10 docs (dep 05).
+- Critical path 4 slices: 03 → 04 → 05 → 09 (or 03 → 04 → 08 → 09, 02 → 04 …). Startable at once: 01, 02, 03.
 - The cli integration and e2e tiers run only in CI; slices whose tests live there (06, 08, 09) name `bun run test` + typecheck locally and rely on CI.
 - Owner decisions from the plan interview: internal tagged model; missing meaning filled with the fallback; branch text pinned verbatim at restart (D4); one gate fallback text everywhere.
 - Design record gist (`quick.yaml`) shows the target wording.
