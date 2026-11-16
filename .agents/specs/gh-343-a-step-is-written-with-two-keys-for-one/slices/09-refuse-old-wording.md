@@ -1,8 +1,8 @@
 ---
 id: gh-343/09
 title: The main checkout accepts only the new wording; copies still load
-depends_on: [gh-343/01, gh-343/05, gh-343/06, gh-343/07, gh-343/08]
-status: planned
+depends_on: [ gh-343/01, gh-343/05, gh-343/06, gh-343/07, gh-343/08 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
