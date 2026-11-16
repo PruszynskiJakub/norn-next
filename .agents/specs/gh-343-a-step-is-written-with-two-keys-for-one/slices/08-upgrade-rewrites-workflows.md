@@ -2,7 +2,7 @@
 id: gh-343/08
 title: norn upgrade rewrites old-wording workflow files
 depends_on: [ gh-343/03, gh-343/04 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
