@@ -25,8 +25,22 @@ export type Flattened =
       source: string;
       /** included step → the shared file (name) it came from; only when the workflow uses one */
       included?: Record<string, string>;
+      /** flat edge (`<step>.<outcome>`) → the shared exit it left by; only when the workflow uses a shared file */
+      exits?: Record<string, SharedExit>;
     }
   | { ok: false; errors: SchemaError[] };
+
+/**
+ * Where a flat edge left a shared file: once flattened, the exit an edge took is gone from the text,
+ * yet edges that left through one exit share that exit's route (and its bound).
+ */
+export interface SharedExit {
+  /** `<use step>.<exit>` */
+  exit: string;
+  /** the use step's route for the exit, as written there */
+  counter?: string;
+  max?: number;
+}
 
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -116,6 +130,7 @@ export function flattenWorkflowText(text: string, read: SharedReader): Flattened
 
   const steps: Obj = {};
   const from: Record<string, string> = {};
+  const exits: Record<string, SharedExit> = {};
   for (const [name, step] of Object.entries(doc.steps as Obj)) {
     const inc = byUse.get(name);
     if (!inc) {
@@ -124,6 +139,8 @@ export function flattenWorkflowText(text: string, read: SharedReader): Flattened
     }
     for (const [inner, s] of Object.entries(inc.steps)) {
       from[inner] = inc.name;
+      if (isObj(s) && isObj(s.outcomes))
+        for (const [o, route] of Object.entries(s.outcomes)) if (isObj(route) && typeof route.exit === "string") exits[`${inner}.${o}`] = exitOf(inc, route.exit);
       steps[inner] = isObj(s) && isObj(s.outcomes) ? { ...s, outcomes: mapValues(s.outcomes, (o) => leave(o, inc.routes, enter)) } : s;
     }
   }
@@ -134,7 +151,16 @@ export function flattenWorkflowText(text: string, read: SharedReader): Flattened
     else if (k === "base" && isObj(v) && "step" in v) flat[k] = { ...v, step: enter(v.step) };
     else flat[k] = v;
   }
-  return { ok: true, source: stringifyYaml(flat, FLAT_YAML), included: from };
+  return { ok: true, source: stringifyYaml(flat, FLAT_YAML), included: from, exits };
+}
+
+function exitOf(inc: Included, exit: string): SharedExit {
+  const r = inc.routes[exit];
+  return {
+    exit: `${inc.by}.${exit}`,
+    ...(isObj(r) && typeof r.counter === "string" && { counter: r.counter }),
+    ...(isObj(r) && typeof r.max === "number" && { max: r.max }),
+  };
 }
 
 function readShared(name: string, by: string, routes: Obj, read: SharedReader, elsewhere: Map<string, string>): Included | { errors: SchemaError[] } {

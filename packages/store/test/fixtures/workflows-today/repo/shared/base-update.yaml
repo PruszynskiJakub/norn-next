@@ -1,0 +1,55 @@
+# Merges the base into the story branch and checks the merged tree. The light path: when the story
+# holds only base merges and spec-folder bookkeeping (never spec.md) since the round's latest approve,
+# a merge git made alone (clean) or one a resolver finished (resolved) skips implement and the full
+# review and describe; anything else is done, the full path (only an approve the PR already holds
+# counts: open-pr ran after it, or it is at ready or merge; so a base move before the PR is out never
+# skips a gate or describe).
+# Exits: `tested` (the full path's check passed), `failed` (any check red: implement's work, which then
+# takes the full path), `merged` (the light path is through: open the PR), `redescribe` (the merge
+# danger pr.md describes changed).
+description: Merge the base into the story branch, check the merged tree, and review a resolver's merge.
+start: update
+steps:
+  update:
+    update-branch:
+    outcomes:
+      done: test
+      clean: test-merge
+      resolved: test-resolution
+      conflict: { to: resolve, counter: base_conflict_loop }
+  resolve:
+    agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase."
+    skills: [norn-merge]
+    inputs: [spec, handoff, base_side]
+    outcomes:
+      done: update
+    means:
+      done: "base merged into the story branch, conflicts resolved and committed"
+  test:
+    check: "bun install --frozen-lockfile && bun run test && bun run typecheck"
+    timeout: 15m
+    outcomes: { pass: { exit: tested }, fail: { exit: failed } }
+  # the light path's tests run the same command
+  test-merge:
+    like: test
+    outcomes: { pass: { exit: merged }, fail: { exit: failed } }
+  test-resolution:
+    like: test
+    outcomes: { pass: resolution-review, fail: { exit: failed } }
+  # reviews only what the resolver changed (each merge's remerge-diff), never the whole story again
+  resolution-review:
+    agent: >-
+      Review only the resolution: each remerge-diff under Inputs is where a merge differs from git's own
+      merge of its parents, a base change the resolver dropped included. Judge whether it keeps the intent
+      of both sides. Report `redescribe` when the merge danger pr.md describes no longer holds.
+    skills: [norn-review]
+    inputs: [spec, resolution]
+    hand_back: { changes_requested: findings }
+    outcomes:
+      approve:           { exit: merged }
+      redescribe:        { exit: redescribe }
+      changes_requested: { to: resolve, counter: resolution_loop }
+    means:
+      approve: "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger"
+      redescribe: "the resolution is sound, but the merge danger pr.md describes changed"
+      changes_requested: "blocking findings on the resolution in the receipt"

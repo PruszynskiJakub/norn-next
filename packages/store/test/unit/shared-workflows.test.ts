@@ -201,6 +201,20 @@ describe("shared files and the loaded text", () => {
     expect(wf.hash).toBe(sha256(wf.source));
     expect(asLoaded(wf.source)).toEqual(wf.workflow);
   });
+
+  test("each flat edge that left through a shared exit reports the use step's exit and that route's counter; the pinned text is unchanged", () => {
+    const files = { "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE };
+    const wf = loaded(files);
+    expect(wf.exits).toEqual({
+      "resolve.gave_up": { exit: "base.broken", counter: "test_loop" },
+      "test.fail": { exit: "base.broken", counter: "test_loop" },
+      "test.pass": { exit: "base.tested" },
+    });
+    const flat = loaded({ "story.yaml": wf.source.replace(/^name: .*$/m, "name: story") });
+    expect(flat.exits).toBeUndefined();
+    expect(wf.source).toBe(flat.source);
+    expect(wf.hash).toBe(sha256(flat.source));
+  });
 });
 
 const LIKE = `name: story

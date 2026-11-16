@@ -6,7 +6,7 @@
 export * from "./base.ts";
 export * from "./cockpit.ts";
 export * from "./config.ts";
-export { type Flattened, flattenWorkflowText, SHARED_DIR, type SharedReader, sharedFile, sharedFilesUsed } from "./shared-workflow.ts";
+export { type Flattened, flattenWorkflowText, SHARED_DIR, type SharedExit, type SharedReader, sharedFile, sharedFilesUsed } from "./shared-workflow.ts";
 export { type Translated, translateWording } from "./wording.ts";
 export { rewriteWorkflowWording, type WordingRewrite } from "./upgrade-wording.ts";
 export * from "./frontmatter.ts";
