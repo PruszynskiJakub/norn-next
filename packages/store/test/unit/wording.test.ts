@@ -530,6 +530,80 @@ steps:
   });
 });
 
+describe("translateWording: what upgrade writes always loads as the same workflow", () => {
+  test("a blank instructions or prompt takes today's fallback text", () => {
+    const text = `steps:
+  a:
+    type: agent
+    skill: s
+    instructions: ""
+    description: "  "
+    outcomes: { done: { to: b, means: "m" } }
+  b:
+    type: gate
+    prompt: ""
+    outcomes: { approve: $done }
+`;
+    const out = ok(text);
+    expect(out).toContain("    agent: Use the `s` skill.\n");
+    expect(out).toContain("    gate: approve or reject b\n");
+  });
+
+  test("a flow edge with uneven spacing loses its meaning and verdict and keeps every other key", () => {
+    const text = `steps:
+  a:
+    type: agent
+    skill: s
+    instructions: Do it.
+    outcomes:
+      done: { means: a,  verdict: pass, to: $done, counter: c }
+`;
+    expect(ok(text)).toContain("      done: { to: $done, counter: c }\n");
+  });
+
+  test("a meaning between kept keys of a flow edge is removed with its own separator", () => {
+    const text = `steps:
+  a:
+    type: agent
+    skill: s
+    instructions: Do it.
+    outcomes:
+      done: { to: $done,  means: a, counter: c,   verdict: pass }
+`;
+    expect(ok(text)).toContain("      done: { to: $done, counter: c }\n");
+  });
+
+  test("a rewrite that would load differently from the copy read's translation is refused at its step", () => {
+    const text = `steps:
+  a:
+    type: agent
+    skill: s
+    instructions: Do it.
+    outcomes: { done: $done }
+  b:
+    like: a
+    type: agent
+    outcomes: { done: $done }
+`;
+    const r = refused(text);
+    expect(r.line).toBe(7);
+    expect(r.message).toContain("same workflow");
+  });
+
+  test("a skill written as a block scalar is refused, never written as a broken file", () => {
+    const text = `steps:
+  a:
+    type: agent
+    skill: >-
+      foo
+    outcomes: { done: { to: $done, means: "m" } }
+`;
+    const r = refused(text);
+    expect(r.line).toBe(4);
+    expect(r.message).toContain("skill");
+  });
+});
+
 describe("translateWording: idempotence and new wording", () => {
   test("a translated text comes back unchanged", () => {
     const text = `steps:

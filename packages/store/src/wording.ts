@@ -9,6 +9,7 @@
  * written. Where that cannot hold (a comment with no line left to sit on, a multi-line scalar that
  * would land at an indent it does not fit), the file is refused naming the line, never reflowed.
  */
+import { isDeepStrictEqual } from "node:util";
 import { isMap, isScalar, type Node, type Pair, parse, parseDocument, stringify, type YAMLMap } from "yaml";
 
 export type Translated = { ok: true; text: string; changed: boolean } | { ok: false; file: string; line: number; message: string };
@@ -129,7 +130,9 @@ function translateStepObj(name: string, s: Obj, steps: Obj): Obj {
     if (k === "skill") out.skills = [v];
     // in a file in the old wording a copy's `agent:` is the agent's name too, never an orientation
     else if (k === "agent" && (kind !== undefined || typeof s.like === "string")) out.by = v;
-    else if (kind === undefined && COPY_RENAME[k]) out[COPY_RENAME[k] as string] = v;
+    else if (kind === undefined && COPY_RENAME[k]) {
+      if (!blank(v)) out[COPY_RENAME[k] as string] = v;
+    }
     else if (k === "outcomes" && isObj(v)) {
       const routes: Obj = {};
       for (const [o, e] of Object.entries(v)) {
@@ -154,12 +157,15 @@ function translateStepObj(name: string, s: Obj, steps: Obj): Obj {
   return out;
 }
 
+// The old wording allowed an empty `instructions`, `prompt` or `description`; the new one refuses a blank orientation
+const blank = (v: unknown) => v === undefined || v === null || (typeof v === "string" && v.trim() === "");
+
 function headValueObj(name: string, kind: string, s: Obj): unknown {
   const own = CONTENT_KEY[kind];
-  if (own && s[own] !== undefined) return s[own];
-  if (kind === "agent") return s.description ?? `Use the \`${String(s.skill)}\` skill.`;
-  if (kind === "gate") return s.description ?? `approve or reject ${name}`;
-  return null;
+  if (own && !blank(s[own])) return s[own];
+  if (kind === "agent") return blank(s.description) ? `Use the \`${String(s.skill)}\` skill.` : s.description;
+  if (kind === "gate") return blank(s.description) ? `approve or reject ${name}` : s.description;
+  return own ? "" : null;
 }
 
 function isAgentObj(s: Obj, steps: Obj, seen: Set<unknown>): boolean {
@@ -204,7 +210,25 @@ function translateYaml(text: string): string {
     if (isOldStepNode(s.map)) edits.push(...stepEdits(text, s.name, s.map, byName));
     else if (pairOf(s.map, "like")) edits.push(...byEdit(s.map));
   }
-  return apply(text, edits);
+  const out = apply(text, edits);
+  checkSplice(text, out, steps);
+  return out;
+}
+
+// The splice is checked against the value translation, so upgrade never writes a file a copy read would load differently
+function checkSplice(text: string, out: string, steps: YAMLMap): void {
+  const want = translateWordingValue(parse(text)) as Obj;
+  let got: Obj | undefined;
+  try {
+    got = parse(out) as Obj;
+  } catch {
+    got = undefined;
+  }
+  if (isObj(got) && isDeepStrictEqual(got, want)) return;
+  const wantSteps = isObj(want.steps) ? want.steps : {};
+  const gotSteps = isObj(got) && isObj(got.steps) ? got.steps : {};
+  const differs = steps.items.find((p) => !isDeepStrictEqual(gotSteps[keyName(p)], wantSteps[keyName(p)]));
+  throw new Refusal(differs ? range(differs.key as Node)[0] : 0, "the rewrite would not load as the same workflow: translate this step by hand");
 }
 
 const keyName = (p: Pair): string => String(isScalar(p.key) ? p.key.value : p.key);
@@ -321,6 +345,8 @@ function stepEdits(text: string, name: string, m: YAMLMap, steps: Map<string, YA
   const skill = pairOf(m, "skill");
   if (skill?.value) {
     const v = range(skill.value);
+    if (/^[|>]/.test(text.slice(v[0], v[1])) || text.slice(v[0], v[1]).trimEnd().includes("\n"))
+      throw new Refusal(range(skill.key)[0], "a skill written over several lines cannot move into a `skills:` list: write it on one line");
     edits.push({ start: range(skill.key)[0], end: range(skill.key)[1], text: "skills" });
     edits.push({ start: v[0], end: v[1], text: `[${text.slice(v[0], v[1])}]` });
   }
@@ -354,7 +380,7 @@ function headValue(text: string, name: string, kind: string, m: YAMLMap): { text
   const from = [own, ...(kind === "agent" || kind === "gate" ? ["description"] : [])];
   for (const k of from) {
     const p = pairOf(m, k);
-    if (p?.value) return { text: spanOf(text, p).value };
+    if (p?.value && !(isScalar(p.value) && blank(p.value.value))) return { text: spanOf(text, p).value };
   }
   if (kind === "agent") return { text: plain(`Use the \`${scalarValue(m, "skill") ?? ""}\` skill.`) };
   if (kind === "gate") return { text: plain(`approve or reject ${name}`) };
@@ -418,14 +444,24 @@ function edgeEdits(text: string, outcomeKey: Node, edge: YAMLMap): Edit[] {
       const v = range((kept[0] as Pair<Node, Node>).value as Node);
       return [{ start: r[0], end: r[1], text: text.slice(v[0], v[1]) }];
     }
+    // each run of prose keys goes as one removal, so removals never overlap: after a kept key the run takes
+    // its separators before it; at the edge's start it takes those up to the next kept key
     const out: Edit[] = [];
-    items.forEach((p, i) => {
-      if (!EDGE_PROSE.includes(keyName(p))) return;
-      const end = range(p.value ?? p.key)[1];
+    const endOf = (p: Pair<Node, Node>) => range(p.value ?? p.key)[1];
+    for (let i = 0; i < items.length; ) {
+      if (!EDGE_PROSE.includes(keyName(items[i] as Pair))) {
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j + 1 < items.length && EDGE_PROSE.includes(keyName(items[j + 1] as Pair))) j++;
       const prev = items[i - 1];
-      if (prev) out.push({ start: range(prev.value ?? prev.key)[1], end, text: "" });
-      else out.push({ start: range(p.key)[0], end: range(items[i + 1]?.key as Node)[0], text: "" });
-    });
+      const next = items[j + 1];
+      if (prev) out.push({ start: endOf(prev), end: endOf(items[j] as Pair<Node, Node>), text: "" });
+      else if (next) out.push({ start: range((items[i] as Pair<Node, Node>).key)[0], end: range(next.key)[0], text: "" });
+      else out.push({ start: range((items[i] as Pair<Node, Node>).key)[0], end: endOf(items[j] as Pair<Node, Node>), text: "" });
+      i = j + 1;
+    }
     return out;
   }
   if (items.some((p) => spanIn(text, edge, p).lead || spanIn(text, edge, p).tail))

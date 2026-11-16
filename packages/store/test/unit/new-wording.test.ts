@@ -246,3 +246,15 @@ describe("either wording loads to the same workflow", () => {
     expect(!r.ok && r.reason === "corrupt" && r.error.code).toBe("old_wording");
   });
 });
+
+describe("a copy in today's wording with a blank orientation", () => {
+  test.each([
+    ["instructions", 'type: agent\n    skill: s\n    instructions: ""\n', "Use the `s` skill.", "done"],
+    ["instructions and description", 'type: agent\n    skill: s\n    instructions: "  "\n    description: ""\n', "Use the `s` skill.", "done"],
+    ["instructions, with a description", 'type: agent\n    skill: s\n    instructions: ""\n    description: Check it.\n', "Check it.", "done"],
+    ["prompt", 'type: gate\n    prompt: ""\n', "approve or reject a", "approve"],
+  ])("blank %s loads with today's fallback text", (_what, head, orientation, outcome) => {
+    const step = asCopy(wf(`  a:\n    ${head}    outcomes:\n      ${outcome}: $done\n`)).steps.a as Record<string, unknown>;
+    expect(step[step.type === "gate" ? "prompt" : "instructions"]).toBe(orientation);
+  });
+});
