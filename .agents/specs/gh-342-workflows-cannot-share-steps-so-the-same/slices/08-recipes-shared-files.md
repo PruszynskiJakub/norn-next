@@ -1,8 +1,8 @@
 ---
 id: gh-342/08
 title: The recipes show shared files, `use:`, exits and `like:`
-depends_on: [gh-342/04]
-status: planned
+depends_on: [ gh-342/04 ]
+status: active
 criteria:
   - { id: AC1, verifier: agent }
 ---
