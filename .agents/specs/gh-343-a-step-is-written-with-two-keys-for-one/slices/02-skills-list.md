@@ -2,7 +2,7 @@
 id: gh-343/02
 title: An agent step carries a list of skills, and the brief names each
 depends_on: []
-status: planned
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
