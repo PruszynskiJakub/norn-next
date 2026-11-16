@@ -189,6 +189,26 @@
                   "const": "required",
                   "type": "string"
                 },
+                "hand_back": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "description": "Outcome → what its norn done must come with",
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_-]*$": {
+                      "anyOf": [
+                        {
+                          "const": "findings",
+                          "type": "string"
+                        },
+                        {
+                          "const": "evidence",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
+                },
                 "by": {
                   "minLength": 1,
                   "description": "Name from config.agents; default config.agent",
@@ -969,6 +989,7 @@
                 "nudges": {},
                 "retries": {},
                 "criteria": {},
+                "hand_back": {},
                 "by": {},
                 "outcomes": {},
                 "means": {},

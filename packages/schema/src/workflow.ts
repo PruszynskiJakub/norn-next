@@ -12,6 +12,10 @@ import {
 } from "./common.ts";
 import { Verdict } from "./criteria.ts";
 
+/** What an agent's report of an outcome must come with: a findings file or an evidence folder. */
+export const HandBack = Type.Union([Type.Literal("findings"), Type.Literal("evidence")]);
+export type HandBack = Static<typeof HandBack>;
+
 /** Full outcome edge: `{ to, counter?, means? }`. */
 export const OutcomeEdge = Type.Object(
   {
@@ -96,6 +100,13 @@ function stepTypes<S extends TSchema>(outcome: S) {
       retries: Type.Optional(Type.Integer({ minimum: 0, description: "Max fresh-session retries after died" })),
       /** `required` makes `norn done --criteria <file>` mandatory */
       criteria: Type.Optional(Type.Literal("required")),
+      /**
+       * Outcome → what `norn done <outcome>` must come with: `findings` (`--findings <file>`) or
+       * `evidence` (`--evidence <dir>`). Each key is an outcome the agent reports, never a route override.
+       */
+      hand_back: Type.Optional(
+        Type.Record(OutcomeName, HandBack, { minProperties: 1, additionalProperties: false, description: "Outcome → what its norn done must come with" }),
+      ),
       /**
        * Declared outcomes. May also override classified routes by naming
        * `silent`, `died`, `timeout`, `stalled`, `ask`, `stuck`.

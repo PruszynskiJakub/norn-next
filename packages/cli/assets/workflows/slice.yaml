@@ -21,6 +21,7 @@ steps:
     agent: "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch."
     skills: [norn-review]
     inputs: [slice, spec, diff, last_findings]
+    hand_back: { changes_requested: findings }
     outcomes:
       approve:           integrate
       changes_requested: { to: implement, counter: review_loop }

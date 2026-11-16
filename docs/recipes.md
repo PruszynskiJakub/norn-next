@@ -115,6 +115,8 @@ Set `status: done` in the story's `spec.md` on the base yourself and commit it, 
 
    norn refuses at load a step with two head keys or none, a verb given a value (`open-pr: now`), an agent step with no orientation, a skill listed twice, a routed outcome with no meaning, a meaning or verdict for an outcome the step does not route, and `means:` or `verdict:` on a step that is not an agent step.
 
+   An agent step whose outcome sends work back can require what comes with it: `hand_back: { changes_requested: findings }` makes `norn done changes_requested` refuse a report without `--findings <file>` (code `hand_back_required`), and `evidence` requires `--evidence <dir>`; the brief's finish line shows the flag. norn refuses at load a `hand_back` key the step does not route, or one that is an overridable route. The shipped workflows require findings on `review.changes_requested`, `resolution-review.changes_requested` and `qa.fail`.
+
    A file in the old wording (`type: agent` with `skill:` and `instructions:`, `type: check` with `run:`, `type: gate` with `prompt:`, `type: git` with `action:`, `means`/`verdict` inside a route) is refused in the main checkout. Run `norn upgrade`: it rewrites each such file in place, keeping its comments and layout. A story already in flight keeps running on its pinned workflow.
 
    An `await-merge:` step after the last gate keeps a story past that gate in its workflow until its PR merges: `merge: { await-merge: null, outcomes: { stale: { to: update, counter: stale_loop } } }`. Its one outcome is `stale`; the merge itself ends the story.

@@ -42,6 +42,7 @@ steps:
     agent: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
     skills: [norn-review]
     inputs: [spec, diff, last_findings]
+    hand_back: { changes_requested: findings }
     outcomes:
       approve:           describe
       changes_requested: { to: implement, counter: review_loop }

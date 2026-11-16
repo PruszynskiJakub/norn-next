@@ -47,6 +47,7 @@ steps:
       of both sides. Report `redescribe` when the merge danger pr.md describes no longer holds.
     skills: [norn-review]
     inputs: [spec, resolution]
+    hand_back: { changes_requested: findings }
     outcomes:
       approve:           { exit: ship }
       redescribe:        { exit: redescribe }
