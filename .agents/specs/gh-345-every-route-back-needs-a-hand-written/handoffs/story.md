@@ -1,26 +1,35 @@
 ## Goal
 
-Triage gh-345 (derived default counters for workflow edges): done; recommendation is refinement.
+Refine gh-345 (derived default counters for workflow edges): spec written in spec.md, every decision made by the person, no open questions.
 
 ## Proof
 
-- `## Triage` comment: https://github.com/PruszynskiJakub/norn-next/issues/345#issuecomment-6925701113
-- Labels added: norn:kind:feature, norn:risk:medium, norn:priority:medium (intake label `norn` kept)
-- Repro: in a throwaway repo, `init`, drop `counter: review_loop` from quick.yaml's `review.changes_requested`; `doctor` reports `cycle without a counter`.
+- spec.md: Problem Statement, Solution (with the table of defaults), 32 user stories, Out of Scope, Further Notes; Open questions: none.
+- Every decision confirmed by the person in the refine session (summary under Notes).
 
 ## Easy to miss
 
-- `CounterName` (`packages/schema/src/common.ts:30`) forbids `.`; it is used in `state.json` `counters` and the exhausted park (`packages/schema/src/state.ts:90,162`), so the derived-name format is a persisted, one-way choice.
-- #342 is closed (PR #352), so the issue's precondition is met.
+- A dotted counter name becomes valid in stored formats (`state.json` counters, the exhausted park): this is a one-way choice. An older norn reading such a state marks the unit corrupt, so it belongs in the PR's merge danger. Names declared under `counters:` stay dotless.
+- A shared exit's counter is `<use step>.<exit>`, shared by every inner edge that leaves through it. Its default comes from the kind of those inner edges, not a fixed "exit" row. Edges of mixed kinds behind one exit are refused unless the route gives `max:`.
+- "an outcome named by exits" in the issue's table means a check's own `exits:` code map (max 5), not a shared file's exits.
+- `norn status`, `story view` and the watch take a counter's max from the pinned workflow's `counters:`. Derived counters must show their max there too, as must the brief's at_limit and `rerun --reset`.
+- Shipped overrides needed: `ship.ci-failed` max 3, `resolution-review.changes_requested` max 2, story's `slice.reject` max 3. `qa_loop` stays a shared name (a check fail plus a gate reject share 2).
 
 ## Not proven yet
 
-- Nothing for triage. Design questions (name format, agent-outcome derivation rule) are for refinement.
+- Nothing for refinement. The invariant (shipped workflows keep the same edges, maxima, sharing and resets) is for the plan and build to prove, with a test for slice's `merge.conflict` exception.
 
 ## Notes
 
-- Base checked: 0edbb1a7c. Ran the dev build only under $TMPDIR.
+Decisions by the person:
+- Name `<step>.<outcome>`, the dot allowed in stored names only; one-way format, listed in the merge danger.
+- A check's `exits:`-named outcome other than `stale`: 5, never resets.
+- A shared exit: `<use step>.<exit>`, with the default from the kind of the inner edges; mixed kinds refused unless `max:` is given (names the exit and the kinds).
+- `max:` together with `counter:`: refused. `max:` on an edge that derives nothing: counts it as `<step>.<outcome>`, with no reset. `max:` on an edge to `$done`/`$stuck`: refused.
+- slice's `conflict_loop` is dropped and derived. The added reset on `merge.done` (to `$done`) is the one stated exception to "reset edges unchanged", with a test showing the bound is the same.
+- Listing derived counters before a run (doctor): out of scope, belongs with #341.
+- Derived counters show with their max in status, story view and the watch: in scope.
 
 ## Resume
 
-A person picks the next round (refinement recommended).
+Next round: planning (`norn-plan`) against spec.md, started by a person.
