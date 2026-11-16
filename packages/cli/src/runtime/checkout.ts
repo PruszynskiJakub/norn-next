@@ -64,6 +64,8 @@ import {
   listReceipts,
   loadStory,
   loadWorkflowText,
+  sharedFile,
+  sharedFilesUsed,
   parseStoryFile,
   pinWorkflow,
   newClaimBlob,
@@ -263,7 +265,10 @@ async function lostRecord(git: GitPort, root: string, story: RunStory, branch: s
     }
   }
   if (!found) throw refuse(`the record of ${key} is lost and ${branch} has no workflow '${name}' to restart it with; nothing was taken`, `add ${WORKFLOWS_DIR}/${name}.yaml to ${branch}, then ${again} again`, "workflow_invalid");
-  const loaded = loadWorkflowText(name, found.source, found.path);
+  // A shared file is read from where its workflow is: the branch, never the work tree
+  const shared = new Map<string, string | null>();
+  for (const n of sharedFilesUsed(found.source)) shared.set(n, await git.show(root, head, `${WORKFLOWS_DIR}/${sharedFile(n)}`));
+  const loaded = loadWorkflowText(name, found.source, found.path, undefined, (n) => shared.get(n) ?? null);
   const issues = loaded.ok ? checkWorkflowLevel(loaded.value.workflow, "story").map((i) => i.message) : [loaded.reason === "corrupt" ? loaded.error.errors.map((e) => e.message).join(", ") : loaded.reason];
   if (!loaded.ok || issues.length)
     throw refuse(
