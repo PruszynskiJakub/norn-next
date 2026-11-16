@@ -1,9 +1,10 @@
 /** Repo-wide rules: dependency direction and banned glossary synonyms. */
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { protocolLines } from "@norn/core";
+import { loadWorkflows, workflowsDir } from "../../packages/store/src/index.ts";
 import { allDocs, CODE_SPAN, textFiles, URL } from "../support/docs.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
@@ -655,7 +656,11 @@ describe("intake by kind", () => {
   });
 
   test("the repo's copies of the shipped workflows have the same steps and edges", () => {
-    const shipped = (wf: string) => Bun.YAML.parse(readFileSync(join(PKGS, "cli", "assets", "workflows", `${wf}.yaml`), "utf8")) as Wf;
+    // as norn loads them once `norn init` copied them: their shared files flattened in
+    const root = mkdtempSync(join(tmpdir(), "norn-shipped-"));
+    cpSync(join(PKGS, "cli", "assets", "workflows"), workflowsDir(root), { recursive: true });
+    const listing = loadWorkflows(root);
+    const shipped = (wf: string) => listing.workflows[wf]?.workflow as unknown as Wf;
     const shape = (w: Wf) => ({ start: w.start, steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { type: step.type, skill: step.skill, outcomes: step.outcomes }])) });
     for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(workflow(wf)) }).toEqual({ wf, ...shape(shipped(wf)) });
   });

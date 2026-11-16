@@ -7,7 +7,7 @@ import { protocolLines, workflowHash } from "@norn/core";
 import { DEFAULT_CONFIG, type Workflow, outcomeEdge, validate } from "@norn/schema";
 import { loadWorkflows, workflowsDir } from "@norn/store";
 import { parseWaitCondition } from "@norn/view";
-import { parse } from "yaml";
+import { parse, parseDocument, visit } from "yaml";
 import { type AssetsSources, assetsDir, resolveAssetsDir } from "../../src/runtime/assets.ts";
 
 const ASSETS = join(import.meta.dir, "..", "..", "assets");
@@ -43,6 +43,7 @@ const CRAFT = SKILLS.filter((s) => s !== "norn" && !SUPERVISOR.includes(s));
 
 const readSkill = (name: string) => readFileSync(join(SKILLS_DIR, name, "SKILL.md"), "utf8");
 const workflowFiles = readdirSync(WORKFLOWS_DIR).filter((f) => /\.(ya?ml|json)$/.test(f));
+const sharedFiles = readdirSync(join(WORKFLOWS_DIR, "shared"));
 /** The templates as norn loads them once `norn init` has copied them into a repo: through the store's loader. */
 const TEMPLATES_ROOT = mkdtempSync(join(tmpdir(), "norn-templates-"));
 cpSync(WORKFLOWS_DIR, workflowsDir(TEMPLATES_ROOT), { recursive: true });
@@ -141,6 +142,24 @@ describe("workflow templates", () => {
       return { routes: routeCount(wf), counters: Object.keys(wf.counters ?? {}).length };
     };
     expect({ quick: shape("quick"), story: shape("story") }).toEqual({ quick: { routes: 29, counters: 8 }, story: { routes: 42, counters: 10 } });
+  });
+
+  test("the CI wait is written in exactly one bundled file, and copies are `like:` steps, never YAML anchors", () => {
+    const texts = Object.fromEntries([...workflowFiles, ...sharedFiles.map((f) => `shared/${f}`)].map((f) => [f, readFileSync(join(WORKFLOWS_DIR, f), "utf8")]));
+    expect(Object.keys(texts).filter((f) => texts[f]?.includes("gh pr checks") && texts[f]?.includes("--watch"))).toEqual(["shared/ship.yaml"]);
+    const anchored = (text: string) => {
+      let found = false;
+      visit(parseDocument(text), { Alias: () => void (found = true), Node: (_k, n) => void (n.anchor && (found = true)) });
+      return found;
+    };
+    expect(Object.keys(texts).filter((f) => anchored(texts[f] as string))).toEqual([]);
+    expect(Object.keys(texts).filter((f) => /^\s+like: /m.test(texts[f] as string))).toEqual(["shared/base-update.yaml"]);
+  });
+
+  test("quick and story take sync, base update and shipping from the shipped shared files", () => {
+    expect(sharedFiles.sort()).toEqual(["base-update.yaml", "ship.yaml", "sync.yaml"]);
+    const uses = (name: string) => Object.values(parse(readFileSync(join(WORKFLOWS_DIR, `${name}.yaml`), "utf8")).steps as Record<string, { use?: string }>).flatMap((s) => (s.use ? [s.use] : []));
+    expect({ quick: uses("quick"), story: uses("story") }).toEqual({ quick: ["sync", "base-update", "ship"], story: ["sync", "base-update", "ship"] });
   });
 
   test("triage, reproduce, refinement, story, slice and quick are shipped", () => {

@@ -55,7 +55,7 @@ cd your-repo
 norn init
 ```
 
-`norn init` writes the team config (`.agents/norn.config.yaml`, with the norn version the repo now needs), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/`, the agent skills and hooks, a starter `REVIEW.md` (what a review ignores, counts as failure and does not report) when the repo has none, a JSON schema next to each config file for your editor, and its `.gitignore` lines. On the remote it creates the labels norn uses (see [Concepts: Labels](docs/concepts.md#labels)); when it cannot, it says why and what to run. It reads your test command from your build files and ends with the next steps:
+`norn init` writes the team config (`.agents/norn.config.yaml`, with the norn version the repo now needs), a commented user config (`~/.norn/config.yaml`) on a machine's first init, six workflows in `.agents/workflows/` with the shared steps they use in `.agents/workflows/shared/`, the agent skills and hooks, a starter `REVIEW.md` (what a review ignores, counts as failure and does not report) when the repo has none, a JSON schema next to each config file for your editor, and its `.gitignore` lines. On the remote it creates the labels norn uses (see [Concepts: Labels](docs/concepts.md#labels)); when it cannot, it says why and what to run. It reads your test command from your build files and ends with the next steps:
 
 ```console
 Next steps

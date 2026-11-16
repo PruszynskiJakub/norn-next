@@ -20,7 +20,7 @@ A **unit** is a story or a slice: anything that runs a workflow. Commands that a
 
 ## Workflows, rounds and steps
 
-**Workflows are data.** A workflow is a YAML file in `.agents/workflows/`: its steps, and for each step the outcomes it may end with and where each one leads. `norn init` writes six of them, and you can edit them or add your own (see [Recipes](recipes.md#write-your-own-workflow)). A unit pins its workflow when it starts, so editing a file never changes a story already in flight.
+**Workflows are data.** A workflow is a YAML file in `.agents/workflows/`: its steps, and for each step the outcomes it may end with and where each one leads. `norn init` writes six of them (`quick` and `story` take their sync, base update and shipping steps from shared files in `.agents/workflows/shared/`), and you can edit them or add your own (see [Recipes](recipes.md#write-your-own-workflow)). A unit pins its workflow when it starts, so editing a file never changes a story already in flight.
 
 Each workflow does one thing, and a story goes through them as **rounds**, one after another on the same branch. A new story starts with the default workflow (`triage`), or the one its issue label names (`norn:wf:<name>`). A round ends at `$done`; only a person starts the next one, with `norn story edit <story> --workflow <name>`. The usual paths are a feature `triage → refinement → story`, a small change `triage → quick`, and a bug `reproduce → quick`.
 
