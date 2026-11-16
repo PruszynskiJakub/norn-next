@@ -19,11 +19,13 @@ const MINI = `name: mini
 start: plan
 steps:
   plan:
-    type: agent
-    skill: norn-plan
-    outcomes: { done: { to: slices, means: "slice files written" } }
+    agent: Use the \`norn-plan\` skill.
+    skills: [norn-plan]
+    outcomes: { done: slices }
+    means:
+      done: "slice files written"
   slices:
-    type: slices
+    slices:
     outcomes: { done: $done, stuck: $stuck }
 `;
 
@@ -31,16 +33,16 @@ const SLICE = `name: slice
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: review, means: "tests pass" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means:
+      done: "tests pass"
   review:
-    type: gate
-    prompt: "Look at it"
+    gate: "Look at it"
     outcomes: { approve: integrate, reject: { to: implement, counter: loop } }
   integrate:
-    type: git
-    action: integrate
+    integrate:
     outcomes: { done: $done, conflict: { to: implement, counter: loop } }
 counters: { loop: { max: 3 } }
 `;
@@ -255,9 +257,11 @@ describe("gh-71 B22, B23 (GR6b): a closed issue with no PR ends a finished story
 start: explore
 steps:
   explore:
-    type: agent
-    skill: norn-plan
-    outcomes: { done: { to: $done, means: "triage posted" } }
+    agent: Use the \`norn-plan\` skill.
+    skills: [norn-plan]
+    outcomes: { done: $done }
+    means:
+      done: "triage posted"
 `;
   const STORY = MINI.replace("name: mini", "name: story");
   const TCONFIG = CONFIG.replace("workflow: mini", "workflow: tri");

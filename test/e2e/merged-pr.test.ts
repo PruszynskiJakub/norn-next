@@ -19,15 +19,13 @@ const REL = `name: rel
 start: update
 steps:
   update:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: open-pr, conflict: $stuck }
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: ready }
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes:
       approve: $done
       reject: { to: open-pr, counter: loop }

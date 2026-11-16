@@ -20,20 +20,21 @@ const HELD = `name: held
 start: ready
 steps:
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes:
       approve: $done
       reject: $stuck
       stale: { to: update, counter: stale_loop }
   update:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: ready, conflict: { to: resolve, counter: base_conflict_loop } }
   resolve:
-    type: agent
-    skill: norn-merge
+    agent: Use the \`norn-merge\` skill.
+    skills: [norn-merge]
     inputs: [spec, handoff, base_side]
-    outcomes: { done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" } }
+    outcomes: { done: update }
+    means:
+      done: "base merged into the story branch, conflicts resolved and committed"
 counters: { base_conflict_loop: { max: 2 }, stale_loop: { max: 3 } }
 `;
 

@@ -804,7 +804,7 @@ describe("audit fixes", () => {
       name: "solo",
       start: "implement",
       steps: {
-        implement: { type: "agent", skill: "implement", outcomes: { done: "test" } },
+        implement: { type: "agent", instructions: "Use the `implement` skill.", skills: ["implement"], outcomes: { done: "test" } },
         test: { type: "check", run: "bun test", timeout: "5m", outcomes: { pass: "$done", fail: { to: "implement", counter: "loop" } } },
       },
       counters: { loop: { max: 3 } },
@@ -906,7 +906,7 @@ describe("audit fixes", () => {
 
   test("GR8: a refine step on the bundled skill `norn-refine` records refined_body_hash too", () => {
     // every shipped workflow names the skill `norn-refine` (refinement.yaml), never bare `refine`
-    const wf: Workflow = { ...STORY_WF, steps: { ...STORY_WF.steps, refine: { ...(STORY_WF.steps.refine as AgentStep), skill: "norn-refine" } } };
+    const wf: Workflow = { ...STORY_WF, steps: { ...STORY_WF.steps, refine: { ...(STORY_WF.steps.refine as AgentStep), skills: ["norn-refine"] } } };
     const f = storyAt("slices", {}, [{ nn: "01", state: { status: "running" } }]);
     f.units[0]!.workflow = wf;
     f.units[0]!.state = { ...f.units[0]!.state!, visits: { refine: 1, slices: 1 } };
@@ -917,6 +917,22 @@ describe("audit fixes", () => {
     later.units[0]!.workflow = { ...wf, steps: Object.fromEntries(Object.entries(wf.steps).filter(([n]) => n !== "refine")), start: "slices" };
     later.frontmatter = { ...later.frontmatter!, refined_body_hash: sha256("body") };
     expect(only(facts([later]))).toMatchObject({ kind: "update_story_mirror", fields: { body_hash: sha256("new body") }, notify: { title: "issue body changed since refine" } });
+  });
+
+  test("GR8: a refine step is the one whose skills include the refine skill, wherever it sits in the list", () => {
+    const withSkills = (skills: string[] | undefined): Workflow => {
+      const { skills: _, ...refine } = STORY_WF.steps.refine as AgentStep;
+      return { ...STORY_WF, steps: { ...STORY_WF.steps, refine: skills ? { ...refine, skills } : refine } };
+    };
+    const decided = (wf: Workflow) => {
+      const f = storyAt("slices", {}, [{ nn: "01", state: { status: "running" } }]);
+      f.units[0]!.workflow = wf;
+      f.units[0]!.state = { ...f.units[0]!.state!, visits: { refine: 1, slices: 1 } };
+      return only(facts([f]));
+    };
+    expect(decided(withSkills(["norn-interview", "norn-refine"]))).toMatchObject({ kind: "update_story_mirror", rule: "remote.mirror.refined" });
+    expect(decided(withSkills(["norn-interview"]))).not.toMatchObject({ rule: "remote.mirror.refined" });
+    expect(decided(withSkills(undefined))).not.toMatchObject({ rule: "remote.mirror.refined" });
   });
 });
 

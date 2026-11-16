@@ -20,12 +20,13 @@ const READY = `name: ready
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     outcomes: { done: ready }
+    means:
+      done: step finished with outcome done
   ready:
-    type: gate
-    prompt: "Read the PR"
+    gate: "Read the PR"
     outcomes: { approve: $done, reject: { to: implement, counter: ready_loop } }
 counters:
   ready_loop: { max: 2 }

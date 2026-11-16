@@ -7,16 +7,14 @@ description: Open the draft PR, wait for its CI, wait for a person at ready and 
 start: open-pr
 steps:
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: ci }
   # waits for the checks on the PR's head commit (a detached check run, so the tick is not blocked):
   # up to 5m for a first check to appear, none means the repo has no CI and passes; a red check's
   # failures' whereabouts become last_check for implement, whose rework goes back through open-pr to the new head.
   # GitHub (gh) only: on GitLab replace the script, or route open-pr's done straight to ready.
   ci:
-    type: check
-    run: |
+    check: |
       command -v gh >/dev/null || { echo "gh not found: no CI to wait for"; exit 0; }
       pr=$(gh pr view --json number -q .number) || exit 1
       sha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1
@@ -57,8 +55,7 @@ steps:
     exits: { 3: stale }
     outcomes: { pass: ready, fail: { exit: ci-failed }, stale: { exit: stale } }
   ready:
-    type: gate
-    prompt: "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change."
+    gate: "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change."
     outcomes:
       approve: merge
       reject:  { exit: rejected }
@@ -66,6 +63,6 @@ steps:
   # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
   # move it counts as stale (base.stale) leaves through `stale` by itself
   merge:
-    type: merge
+    await-merge:
     outcomes:
       stale: { exit: stale }

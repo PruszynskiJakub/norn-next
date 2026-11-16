@@ -529,7 +529,7 @@ export async function readRecordObjects(root: string, story: string, sha: string
       continue;
     }
     const wfText = texts.get(`${dir}/workflow.yaml`);
-    const wf = wfText === undefined ? null : parseWorkflowText(wfText, name(`${dir}/workflow.yaml`));
+    const wf = wfText === undefined ? null : parseWorkflowText(wfText, name(`${dir}/workflow.yaml`), "copy");
     if (wf && !wf.ok && wf.reason === "corrupt") errors.push(wf.error);
     const nn = unit === STORY_UNIT_DIR ? null : (parseSliceDirName(unit, { loose: true })?.nn as string);
     const slice = nn === null ? null : sliceKey(story, nn);

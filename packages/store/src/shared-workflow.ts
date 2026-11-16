@@ -4,8 +4,9 @@
  * flat workflow: core, decide and receipts never see a shared file. Pure over a reader of shared
  * texts, so a caller reading them from a branch reads first (`sharedFilesUsed`) and passes them in.
  */
-import { check, type SchemaError, UseStep, validate } from "@norn/schema";
+import { check, type SchemaError, UseStep, WorkflowSharedModel } from "@norn/schema";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
+import { stepWordingErrors, toModelSteps } from "./step-wording.ts";
 
 // The flattened text is pinned and hashed: its bytes must follow from content alone, never from which values share an object
 const FLAT_YAML = { lineWidth: 0, aliasDuplicateObjects: false } as const;
@@ -156,11 +157,18 @@ function readShared(name: string, by: string, routes: Obj, read: SharedReader, e
     if ("errors" in own) return { errors: own.errors.map(inFile) };
     resolved = { ...value, steps: own.steps };
   }
-  const r = validate("workflow-shared", resolved);
+  if (isObj(resolved) && isObj(resolved.steps)) {
+    const wording = stepWordingErrors(resolved.steps);
+    if (wording.length) return { errors: wording.map(inFile) };
+  }
+  const model = isObj(resolved) && isObj(resolved.steps) ? { ...resolved, steps: toModelSteps(resolved.steps) } : resolved;
+  const r = check(WorkflowSharedModel, model);
   if (!r.ok) return { errors: r.errors.map(inFile) };
-  const steps = r.value.steps as Obj;
+  // the steps go into the flat workflow as written; the model's form was only for checking them
+  const steps = (resolved as { steps: Obj }).steps;
+  const start = r.value.start;
   const errors: SchemaError[] = [];
-  if (!Object.hasOwn(steps, r.value.start)) errors.push(inFile({ path: "/start", message: `\`${r.value.start}\` is not a step of this file` }));
+  if (!Object.hasOwn(steps, start)) errors.push(inFile({ path: "/start", message: `\`${start}\` is not a step of this file` }));
   const exits: string[] = [];
   for (const [s, step] of Object.entries(steps))
     for (const [o, route] of Object.entries((step as { outcomes: Obj }).outcomes)) {
@@ -172,7 +180,7 @@ function readShared(name: string, by: string, routes: Obj, read: SharedReader, e
       if (!isReserved(to) && !Object.hasOwn(steps, to))
         errors.push(inFile({ path: `/steps/${s}/outcomes/${o}`, message: `\`${to}\` is not a step of this file; a shared file leaves through an exit (\`{ exit: <name> }\`)` }));
     }
-  return errors.length ? { errors } : { name, file, by, routes, start: r.value.start, steps, exits };
+  return errors.length ? { errors } : { name, file, by, routes, start, steps, exits };
 }
 
 function likeSteps(steps: Obj): Array<[string, Obj]> {
@@ -264,7 +272,7 @@ function retarget(route: unknown, enter: (t: unknown) => unknown): unknown {
   return isObj(route) && "to" in route ? { ...route, to: enter(route.to) } : route;
 }
 
-/** A shared route as the workflow sees it: an exit takes `to` and `counter` from the use step, `means` and `verdict` from the shared side. */
+/** A shared route as the workflow sees it: an exit takes `to` and `counter` from the use step; its meaning stays in the shared step's `means:`. */
 function leave(route: unknown, routes: Obj, enter: (t: unknown) => unknown): unknown {
   if (!isObj(route) || typeof route.exit !== "string") return route;
   const { exit, ...rest } = route;

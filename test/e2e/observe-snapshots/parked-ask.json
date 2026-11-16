@@ -181,7 +181,7 @@
               "slices": 1
             },
             "workflow": "mini",
-            "workflow_hash": "acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd"
+            "workflow_hash": "e5d5c01ca5a093b9702a0a088325a5bb9e7df7c7fd8935c6baaf98b422b87999"
           },
           "step_runs": [],
           "unapplied": [],
@@ -204,13 +204,16 @@
                 "type": "git"
               },
               "plan": {
+                "instructions": "Use the `norn-plan` skill.",
                 "outcomes": {
                   "done": {
                     "means": "slice files written",
                     "to": "slices"
                   }
                 },
-                "skill": "norn-plan",
+                "skills": [
+                  "norn-plan"
+                ],
                 "type": "agent"
               },
               "slices": {
@@ -222,7 +225,7 @@
               }
             }
           },
-          "workflow_hash": "acbccdf2a34a664138468f747c2f929076ba05cb88f312703c206a6fe42b57cd",
+          "workflow_hash": "e5d5c01ca5a093b9702a0a088325a5bb9e7df7c7fd8935c6baaf98b422b87999",
           "worktree": {
             "exists": true,
             "in_progress": {
@@ -322,7 +325,7 @@
               "implement": 1
             },
             "workflow": "slice",
-            "workflow_hash": "47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a"
+            "workflow_hash": "2996e79ff062c4c4849b0fa2aa833ba214837682306a37cde6e3a0348be81659"
           },
           "step_runs": [
             {
@@ -360,13 +363,16 @@
                 "type": "gate"
               },
               "implement": {
+                "instructions": "Use the `norn-implement` skill.",
                 "outcomes": {
                   "done": {
                     "means": "tests pass",
                     "to": "test"
                   }
                 },
-                "skill": "norn-implement",
+                "skills": [
+                  "norn-implement"
+                ],
                 "type": "agent"
               },
               "integrate": {
@@ -394,7 +400,7 @@
               }
             }
           },
-          "workflow_hash": "47f8698e52c6920a2b18cac3fbbf902cc8044f1ede2597fb32d6ce86e12d8a8a",
+          "workflow_hash": "2996e79ff062c4c4849b0fa2aa833ba214837682306a37cde6e3a0348be81659",
           "worktree": {
             "exists": true,
             "in_progress": {

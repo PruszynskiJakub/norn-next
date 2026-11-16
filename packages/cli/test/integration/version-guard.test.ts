@@ -20,12 +20,13 @@ const WORKFLOW = `name: ship
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     outcomes: { done: test }
+    means:
+      done: step finished with outcome done
   test:
-    type: check
-    run: CHECK
+    check: CHECK
     timeout: 1m
     outcomes: { pass: $done, fail: $stuck }
 `;

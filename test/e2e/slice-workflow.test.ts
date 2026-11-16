@@ -21,15 +21,16 @@ const MINI = `name: mini
 start: plan
 steps:
   plan:
-    type: agent
-    skill: norn-plan
-    outcomes: { done: { to: slices, means: "slice files written" } }
+    agent: Use the \`norn-plan\` skill.
+    skills: [norn-plan]
+    outcomes: { done: slices }
+    means:
+      done: "slice files written"
   slices:
-    type: slices
+    slices:
     outcomes: { done: open-pr, stuck: $stuck }
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: $done }
 `;
 
@@ -37,21 +38,20 @@ const SLICE = `name: slice
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: test, means: "tests pass" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: test }
+    means:
+      done: "tests pass"
   test:
-    type: check
-    run: test -f pass.flag && echo checked
+    check: test -f pass.flag && echo checked
     timeout: 1m
     outcomes: { pass: human-qa, fail: { to: implement, counter: test_loop } }
   human-qa:
-    type: gate
-    prompt: "Try it"
+    gate: "Try it"
     outcomes: { approve: integrate, reject: { to: implement, counter: test_loop } }
   integrate:
-    type: git
-    action: integrate
+    integrate:
     outcomes: { done: $done, conflict: { to: implement, counter: test_loop } }
 counters: { test_loop: { max: 3 } }
 `;
@@ -465,8 +465,8 @@ describe("norn init in a repository with a test command and no remote", () => {
     expect(r.exit).toBe(0);
     expect(r.value).toMatchObject({ remote: { url: null }, test_command: { command: "npm ci && npm test", detected_from: "package.json", set_in: ["slice.yaml", "shared/base-update.yaml"] } });
     const shared = readFileSync(join(workflowsDir(f.root), "shared", "base-update.yaml"), "utf8");
-    expect(shared).toContain('run: "npm ci && npm test"');
-    expect(shared).not.toContain("run: bun test");
+    expect(shared).toContain('check: "npm ci && npm test"');
+    expect(shared).not.toContain("check: bun test");
     expect(r.stdout).toContain("remote          no git remote named origin");
     expect(r.stdout).toContain("Next steps\n  1. Add the remote norn syncs issues from and pushes branches to: `git remote add origin <url>`.\n  2. Check the test command `npm ci && npm test`");
     // the edited templates still validate, with the command as the test check's run

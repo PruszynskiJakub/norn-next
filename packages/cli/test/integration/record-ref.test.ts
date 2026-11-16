@@ -18,19 +18,26 @@ const TRIO = `name: trio
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: review, means: "every criterion has a passing test" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means:
+      done: "every criterion has a passing test"
   review:
-    type: agent
-    skill: norn-review
+    agent: Use the \`norn-review\` skill.
+    skills: [norn-review]
     outcomes:
-      approve: { to: qa, means: "no blocking findings" }
-      changes_requested: { to: implement, counter: review_loop, means: "blocking findings" }
+      approve: qa
+      changes_requested: { to: implement, counter: review_loop }
+    means:
+      approve: "no blocking findings"
+      changes_requested: "blocking findings"
   qa:
-    type: agent
-    skill: norn-qa
-    outcomes: { pass: { to: $done, means: "every criterion observed" } }
+    agent: Use the \`norn-qa\` skill.
+    skills: [norn-qa]
+    outcomes: { pass: $done }
+    means:
+      pass: "every criterion observed"
 counters: { review_loop: { max: 3 } }
 `;
 const BASE_CONFIG = "provider: gh\nworkflow: trio\nmode: manual\n";

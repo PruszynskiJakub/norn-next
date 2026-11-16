@@ -24,25 +24,24 @@ const BASED = `name: based
 start: update
 steps:
   update:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: test, conflict: { to: resolve, counter: base_conflict_loop } }
   resolve:
-    type: agent
-    skill: norn-merge
+    agent: Use the \`norn-merge\` skill.
+    skills: [norn-merge]
     inputs: [spec, handoff]
-    outcomes: { done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" } }
+    outcomes: { done: update }
+    means:
+      done: "base merged into the story branch, conflicts resolved and committed"
   test:
-    type: check
-    run: "true"
+    check: "true"
     timeout: 1m
     outcomes: { pass: open-pr, fail: $stuck }
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: ready }
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes:
       approve: $done
       reject: $stuck
@@ -646,15 +645,16 @@ describe("gh-252: a story in flight keeps running on its worktree's skills after
 start: work
 steps:
   work:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     outcomes: { done: ready }
+    means:
+      done: step finished with outcome done
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes: { approve: $done, reject: { to: work, counter: reject_loop }, stale: { to: update, counter: stale_loop } }
   update:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: work, conflict: $stuck }
 counters: { reject_loop: { max: 3 }, stale_loop: { max: 3 } }
 `;

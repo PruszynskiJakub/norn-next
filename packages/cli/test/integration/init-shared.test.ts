@@ -57,7 +57,7 @@ describe("norn init copies the bundled shared files", () => {
       const v = (await h.norn("init", "--json")).value as Init;
       expect(v.test_command).toMatchObject({ command: "npm ci && npm test" });
       expect(v.test_command?.set_in).toContain(`${SHARED_DIR}/base-update.yaml`);
-      expect(readFileSync(join(workflowsDir(h.root), SHARED_DIR, "base-update.yaml"), "utf8")).toContain('run: "npm ci && npm test"');
+      expect(readFileSync(join(workflowsDir(h.root), SHARED_DIR, "base-update.yaml"), "utf8")).toContain('check: "npm ci && npm test"');
       const listing = loadWorkflows(h.root);
       expect(listing.errors).toEqual([]);
       for (const wf of ["quick", "story"])

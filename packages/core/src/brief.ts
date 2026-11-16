@@ -179,7 +179,8 @@ export interface BriefJson {
     /** A takeover found no record and started this round from the branch */
     record_lost?: { holder: string | null; line: string } | null;
   } | null;
-  work: { skill: string; instructions: string | null; description: string | null };
+  /** `skills` in the order the step lists them; empty when the step names none */
+  work: { skills: string[]; instructions: string | null; description: string | null };
   /** `purpose`: what to read the input for */
   inputs: Array<{ kind: string; label: string; ref: string; purpose?: string }>;
   rework: {
@@ -267,7 +268,7 @@ export function renderBrief(input: BriefInput): Briefing {
   const json: BriefJson = {
     where: where(input, step),
     history: hist,
-    work: { skill: step.skill, instructions: step.instructions ?? null, description: step.description ?? null },
+    work: { skills: step.skills ?? [], instructions: step.instructions ?? null, description: step.description ?? null },
     inputs: inputs(input, step, rw, hist),
     rework: rw,
     checks: checksSince(input, step),
@@ -852,6 +853,13 @@ function whereYouRun(w: BriefJson["where"]): string[] {
   return out;
 }
 
+/** "Use the `a` skill." / "Use the `a` and `b` skills." / "Use the `a`, `b` and `c` skills." */
+function skillLine(skills: string[]): string {
+  const named = skills.map((s) => `\`${s}\``);
+  const list = named.length === 1 ? named[0] : `${named.slice(0, -1).join(", ")} and ${named.at(-1)}`;
+  return `Use the ${list} skill${named.length === 1 ? "" : "s"}.`;
+}
+
 /**
  * The brief, ordered for the reader: what to do and why this attempt, how to finish, then what to read
  * and the state behind it, the protocol, and only the limits that matter.
@@ -866,9 +874,12 @@ function markdown(b: BriefJson): string {
   for (const c of w.at_limit) out.push(`**Last round on \`${c.name}\` (${c.value}/${c.max}):** if the work is sent back along it once more, the unit goes stuck.`, "");
 
   out.push("## Your work", "");
-  out.push(`Use the \`${b.work.skill}\` skill.`);
-  if (b.work.description) out.push("", b.work.description);
-  if (b.work.instructions) out.push("", b.work.instructions.trim());
+  const skills = b.work.skills.length ? skillLine(b.work.skills) : null;
+  // An orientation filled in from the description or the skill line (a file in the old wording) would say the same thing twice
+  const orientation = b.work.instructions?.trim();
+  const body = [b.work.description, orientation === b.work.description?.trim() || orientation === skills ? null : orientation].filter((t): t is string => !!t);
+  if (skills) out.push(skills);
+  for (const [i, t] of body.entries()) out.push(...(i || b.work.skills.length ? [""] : []), t);
   out.push("");
 
   const h = b.history;

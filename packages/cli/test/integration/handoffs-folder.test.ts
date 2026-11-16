@@ -18,35 +18,44 @@ const DUO = `name: duo
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: review, means: "every criterion has a passing test" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means:
+      done: "every criterion has a passing test"
   review:
-    type: agent
-    skill: norn-review
+    agent: Use the \`norn-review\` skill.
+    skills: [norn-review]
     outcomes:
-      approve: { to: $done, means: "no blocking findings" }
-      changes_requested: { to: implement, counter: review_loop, means: "blocking findings" }
+      approve: $done
+      changes_requested: { to: implement, counter: review_loop }
+    means:
+      approve: "no blocking findings"
+      changes_requested: "blocking findings"
 counters: { review_loop: { max: 3 } }
 `;
 const SPLIT = `name: split
 start: plan
 steps:
   plan:
-    type: agent
-    skill: norn-plan
-    outcomes: { done: { to: slices, means: "slice files written" } }
+    agent: Use the \`norn-plan\` skill.
+    skills: [norn-plan]
+    outcomes: { done: slices }
+    means:
+      done: "slice files written"
   slices:
-    type: slices
+    slices:
     outcomes: { done: $done, stuck: $stuck }
 `;
 const PART = `name: part
 start: build
 steps:
   build:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means:
+      done: "built"
 `;
 
 let h: Harness;

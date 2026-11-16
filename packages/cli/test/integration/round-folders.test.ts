@@ -19,15 +19,20 @@ const DUO = `name: duo
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: review, means: "every criterion has a passing test" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means:
+      done: "every criterion has a passing test"
   review:
-    type: agent
-    skill: norn-review
+    agent: Use the \`norn-review\` skill.
+    skills: [norn-review]
     outcomes:
-      approve: { to: $done, means: "no blocking findings" }
-      changes_requested: { to: implement, counter: review_loop, means: "blocking findings" }
+      approve: $done
+      changes_requested: { to: implement, counter: review_loop }
+    means:
+      approve: "no blocking findings"
+      changes_requested: "blocking findings"
 counters: { review_loop: { max: 3 } }
 `;
 const CONFIG = `provider: gh

@@ -21,13 +21,17 @@ const PAIR = `name: pair
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     outcomes: { done: review }
+    means:
+      done: step finished with outcome done
   review:
-    type: agent
-    skill: norn-review
+    agent: Use the \`norn-review\` skill.
+    skills: [norn-review]
     outcomes: { approve: $done }
+    means:
+      approve: step finished with outcome approve
 `;
 
 interface Line {

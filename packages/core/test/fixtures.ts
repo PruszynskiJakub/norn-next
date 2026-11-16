@@ -18,11 +18,12 @@ export const SLICE_WF: Workflow = {
   name: "slice",
   start: "implement",
   steps: {
-    implement: { type: "agent", skill: "implement", outcomes: { done: { to: "test", means: "every acceptance criterion (or rework point) has a passing test" } } },
+    implement: { type: "agent", instructions: "Use the `implement` skill.", skills: ["implement"], outcomes: { done: { to: "test", means: "every acceptance criterion (or rework point) has a passing test" } } },
     test: { type: "check", run: "bun test", timeout: "10m", outcomes: { pass: "review", fail: { to: "implement", counter: "test_loop" } } },
     review: {
       type: "agent",
-      skill: "review",
+      instructions: "Use the `review` skill.",
+      skills: ["review"],
       outcomes: {
         approve: { to: "qa", means: "all criteria met, no blocking findings" },
         changes_requested: { to: "implement", counter: "review_loop", means: "blocking findings in the receipt" },
@@ -30,16 +31,17 @@ export const SLICE_WF: Workflow = {
     },
     qa: {
       type: "agent",
-      skill: "qa",
+      instructions: "Use the `qa` skill.",
+      skills: ["qa"],
       outcomes: {
         pass: { to: "integrate", means: "every criterion verified with evidence" },
         fail: { to: "implement", counter: "qa_loop", means: "a criterion fails; repro in the receipt" },
         partial: { to: "human-qa", means: "criteria only a person can check are listed with prepared evidence" },
       },
     },
-    "human-qa": { type: "gate", outcomes: { approve: "integrate", reject: { to: "implement", counter: "qa_loop" } } },
+    "human-qa": { type: "gate", prompt: "approve or reject human-qa", outcomes: { approve: "integrate", reject: { to: "implement", counter: "qa_loop" } } },
     integrate: { type: "git", action: "integrate", outcomes: { done: "$done", conflict: { to: "merge", counter: "conflict_loop" } } },
-    merge: { type: "agent", skill: "merge", outcomes: { done: "integrate" } },
+    merge: { type: "agent", instructions: "Use the `merge` skill.", skills: ["merge"], outcomes: { done: "integrate" } },
   },
   counters: { test_loop: { max: 5 }, review_loop: { max: 3 }, qa_loop: { max: 2 }, conflict_loop: { max: 2 } },
 };
@@ -49,10 +51,10 @@ export const STORY_WF: Workflow = {
   name: "story",
   start: "refine",
   steps: {
-    refine: { type: "agent", skill: "refine", attended: true, outcomes: { done: "slices" } },
+    refine: { type: "agent", instructions: "Use the `refine` skill.", skills: ["refine"], attended: true, outcomes: { done: "slices" } },
     slices: { type: "slices", outcomes: { done: "test", stuck: "$stuck" } },
     test: { type: "check", run: "bun test", timeout: "5m", outcomes: { pass: "open-pr", fail: { to: "fix", counter: "fix_loop" } } },
-    fix: { type: "agent", skill: "implement", outcomes: { done: "test" } },
+    fix: { type: "agent", instructions: "Use the `implement` skill.", skills: ["implement"], outcomes: { done: "test" } },
     "open-pr": { type: "git", action: "open-pr", outcomes: { done: "ready" } },
     ready: { type: "gate", prompt: "PR ready for review?", outcomes: { approve: "$done" } },
   },
@@ -63,7 +65,7 @@ export const STORY_WF: Workflow = {
 export const SOLO_WF: Workflow = {
   name: "solo",
   start: "implement",
-  steps: { implement: { type: "agent", skill: "implement", nudges: 2, retries: 1, outcomes: { done: "$done" } } },
+  steps: { implement: { type: "agent", instructions: "Use the `implement` skill.", skills: ["implement"], nudges: 2, retries: 1, outcomes: { done: "$done" } } },
 };
 
 export const loaded = (wf: Workflow): LoadedWorkflow => ({ name: wf.name, workflow: wf, source: JSON.stringify(wf), issues: [] });

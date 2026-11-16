@@ -86,7 +86,7 @@ describe.each(COPIES)("%s workflow routes the light path", (_name, dir, name) =>
   });
 
   test("the resolution review is norn-review over the spec and the resolution", () => {
-    expect(wf.steps["resolution-review"]).toMatchObject({ type: "agent", skill: "norn-review", inputs: ["spec", "resolution"] });
+    expect(wf.steps["resolution-review"]).toMatchObject({ type: "agent", skills: ["norn-review"], inputs: ["spec", "resolution"] });
     expect(edges(wf, "resolution-review")).toMatchObject({
       approve: { to: "open-pr" },
       redescribe: { to: "describe" },
@@ -162,10 +162,10 @@ describe("the workflow loader resolves YAML anchors", () => {
       "name: anchors",
       "start: a",
       "steps:",
-      "  a: { type: check, run: &cmd 'bun run test && bun run typecheck', timeout: 1m, outcomes: { pass: b, fail: $stuck } }",
-      "  b: { type: check, run: *cmd, timeout: 1m, outcomes: { pass: $done, fail: $stuck } }",
+      "  a: { check: &cmd 'bun run test && bun run typecheck', timeout: 1m, outcomes: { pass: b, fail: $stuck } }",
+      "  b: { check: *cmd, timeout: 1m, outcomes: { pass: $done, fail: $stuck } }",
     ].join("\n");
-    const r = parseWorkflowText(text, "anchors.yaml");
+    const r = parseWorkflowText(text, "anchors.yaml", "checkout");
     expect(r.ok).toBe(true);
     const wf = (r as { value: Workflow }).value;
     expect([(wf.steps.a as { run: string }).run, (wf.steps.b as { run: string }).run]).toEqual(["bun run test && bun run typecheck", "bun run test && bun run typecheck"]);

@@ -23,8 +23,9 @@ import { type Document, isCollection, isMap, isScalar, parseDocument, parse as p
 import { atomicWrite, fileError, isErrno, readText, type ReadResult } from "./fsx.ts";
 import { recordedInterval } from "./heartbeat.ts";
 import { checkoutOf, LOCAL_CONFIG_FILE, LOCAL_CONFIG_SCHEMA_FILE, nornHome, REPO_CONFIG_SCHEMA_FILE, REPO_CONFIG_FILE, repoConfigPath, USER_CONFIG_SCHEMA_FILE, userConfigPath, workflowsDir } from "./paths.ts";
-import { flattenWorkflowText, SHARED_DIR, sharedFilesUsed } from "./shared-workflow.ts";
-import { type PinnedWorkflow, parseWorkflowText, sha256 } from "./unit.ts";
+import { flattenWorkflowText, SHARED_DIR, sharedFile, sharedFilesUsed } from "./shared-workflow.ts";
+import { inNewWording, oldWordingSteps } from "./wording.ts";
+import { oldWordingError, type PinnedWorkflow, parseWorkflowText, sha256, type WorkflowRead } from "./unit.ts";
 
 /** A missing or empty file sets nothing; a file that is not YAML is `config_invalid`. */
 function readConfigFile(kind: ConfigFileKind, path: string): { value: unknown; problems: ConfigProblem[] } {
@@ -348,20 +349,32 @@ function listWorkflowFiles(root: string): Array<{ name: string; file: string }> 
  * The text of the workflow file `file`, named `name` by its file name, as the workflow a unit pins:
  * its shared files (read through `readShared`, by name) flattened in, parsed, its `name` checked
  * against `name`, with the `source` to pin and its `hash`. Every reader of a workflow file (the
- * listing, a lost record's restart from its branch) goes through here so they pin the same thing.
+ * listing, a lost record's restart from its branch) goes through here so they pin the same thing;
+ * `read` says whether the text is the main checkout's file or a copy (a story branch's).
  */
 export function loadWorkflowText(
   name: string,
   text: string,
   file: string,
+  read: WorkflowRead,
   root?: string,
   readShared: (shared: string) => string | null = () => null,
 ): ReadResult<PinnedWorkflow & Pick<WorkflowFile, "included">> {
-  const flat = flattenWorkflowText(text, readShared);
+  // The main checkout takes only the new wording, in the file and in every shared file it uses; a copy
+  // is translated first, since flattening works on the new wording
+  const own = read === "copy" ? inNewWording(text) : text;
+  const shared = new Map(sharedFilesUsed(own).map((n) => [n, readShared(n)] as const));
+  if (read === "checkout") {
+    const inFile = { steps: oldWordingSteps(parseOrNull(text)) };
+    const inShared = [...shared].map(([n, t]) => ({ shared: sharedFile(n), steps: oldWordingSteps(t == null ? null : parseOrNull(t)) }));
+    const old = [inFile, ...inShared].filter((p) => p.steps.length);
+    if (old.length) return { ok: false, reason: "corrupt", error: oldWordingError(file, old, root) };
+  }
+  const flat = flattenWorkflowText(own, (n) => { const t = shared.get(n); return t == null ? null : read === "copy" ? inNewWording(t) : t; });
   if (flat && !flat.ok) return { ok: false, reason: "corrupt", error: fileError(file, flat.errors, root) };
   // A workflow without `use` loads as written, so its pin and fingerprint stay byte for byte
   const source = flat ? flat.source : text;
-  const r = parseWorkflowText(source, file, root);
+  const r = parseWorkflowText(source, file, read, root);
   if (!r.ok) return r;
   if (r.value.name !== name)
     return {
@@ -372,11 +385,20 @@ export function loadWorkflowText(
   return { ok: true, raw: text, value: { workflow: r.value, hash: sha256(source), source, ...(flat?.included && { included: flat.included }) } };
 }
 
+// A text that is not YAML has no steps to find old wording in; the parse that follows reports it
+function parseOrNull(text: string): unknown {
+  try {
+    return parseYaml(text);
+  } catch {
+    return null;
+  }
+}
+
 function loadFile(name: string, file: string, root: string): ReadResult<WorkflowFile> {
   const raw = readText(file);
   if (raw === null) return { ok: false, reason: "missing" };
   const shared = new Map(sharedFilesUsed(raw).map((n) => [n, readText(join(workflowsDir(root), SHARED_DIR, `${n}.yaml`))]));
-  const r = loadWorkflowText(name, raw, file, root, (n) => shared.get(n) ?? null);
+  const r = loadWorkflowText(name, raw, file, "checkout", root, (n) => shared.get(n) ?? null);
   return r.ok ? { ok: true, raw, value: { name, file, ...r.value } } : r;
 }
 

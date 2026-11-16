@@ -3,11 +3,13 @@
  * workflow, logs, evidence and handoff.md.
  */
 import { existsSync, mkdirSync } from "node:fs";
-import { HANDOFF_SKELETON, normalizeUnitState } from "@norn/core";
+import { cmd, type FileError, HANDOFF_SKELETON, normalizeUnitState } from "@norn/core";
 import type { UnitState, Workflow } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { parse as parseYaml } from "yaml";
 import { atomicCopyDir, atomicWrite, createExclusive, fileError, jsonLine, readJsonFile, readText, type ReadResult, safeUnlink, validated } from "./fsx.ts";
+import { stepWordingErrors, toModelSteps } from "./step-wording.ts";
+import { oldWordingSteps, translateWordingValue } from "./wording.ts";
 import { evidenceDir, legacyHandoffFile, logPath, pinnedWorkflowPath, statePath } from "./paths.ts";
 
 /** state.json as the `UnitState` it stands for: older shapes read normalised, never corrupt. */
@@ -31,18 +33,79 @@ export function sha256(text: string): string {
   return new Bun.CryptoHasher("sha256").update(text).digest("hex");
 }
 
-/** Parse workflow text (YAML or JSON — JSON is valid YAML) and validate it. */
-export function parseWorkflowText(text: string, path: string, root?: string): ReadResult<Workflow> {
+/**
+ * Where a workflow text comes from. `checkout`: the main checkout's own files, the ones a person
+ * edits and `norn upgrade` rewrites. `copy`: a text norn kept or found elsewhere (a unit's pin, a
+ * past round's trace or record, a story branch's file at a lost-record restart), which must keep
+ * loading as written whatever the main checkout's wording rules become.
+ */
+export type WorkflowRead = "checkout" | "copy";
+
+export interface WorkflowTextRead {
+  /** the path the text is reported under */
+  path: string;
+  read: WorkflowRead;
+}
+
+export type WorkflowReadObserver = (read: WorkflowTextRead) => void;
+
+let workflowReadObserver: WorkflowReadObserver | null = null;
+
+/**
+ * Test hook, modelled on `setTraceReadObserver`: call `fn` with each workflow text parsed and the read
+ * kind its reader asked for. `null` (the default) turns it off. Returns the observer it replaced. It only
+ * watches; one that throws is ignored.
+ */
+export function setWorkflowReadObserver(fn: WorkflowReadObserver | null): WorkflowReadObserver | null {
+  const prev = workflowReadObserver;
+  workflowReadObserver = fn;
+  return prev;
+}
+
+function observeWorkflowRead(read: WorkflowTextRead): void {
+  if (!workflowReadObserver) return;
+  try {
+    workflowReadObserver(read);
+  } catch {
+    // an observer never changes what norn does
+  }
+}
+
+/**
+ * Parse workflow text (YAML or JSON — JSON is valid YAML) and validate it. `read` is passed by every
+ * reader, never guessed from the path: a copy can sit at any path, a pin included.
+ */
+export function parseWorkflowText(text: string, path: string, read: WorkflowRead, root?: string): ReadResult<Workflow> {
+  observeWorkflowRead({ path, read });
   let value: unknown;
   try {
     value = parseYaml(text);
   } catch (e) {
     return { ok: false, reason: "corrupt", error: fileError(path, [{ path: "", message: `YAML: ${(e as Error).message}` }], root) };
   }
+  if (read === "checkout") {
+    const old = oldWordingSteps(value);
+    if (old.length) return { ok: false, reason: "corrupt", error: oldWordingError(path, [{ steps: old }], root) };
+  } else value = translateWordingValue(value);
   // The step-level keys that belong to the workflow get their own message
   const misplaced = workflowLevelKeysOnSteps(value);
   if (misplaced.length) return { ok: false, reason: "corrupt", error: fileError(path, misplaced, root) };
-  return validated("workflow", value, path, text, root);
+  const steps = (value as { steps?: unknown } | null)?.steps;
+  if (typeof steps !== "object" || steps === null || Array.isArray(steps)) return validated("workflow", value, path, text, root);
+  const wording = stepWordingErrors(steps as Record<string, unknown>);
+  if (wording.length) return { ok: false, reason: "corrupt", error: fileError(path, wording, root) };
+  return validated("workflow", { ...(value as object), steps: toModelSteps(steps as Record<string, unknown>) }, path, text, root);
+}
+
+/**
+ * The one error a main-checkout workflow file in the old wording is refused with: every old step and
+ * key, of the file itself and of each shared file it uses (named, since that is the file to fix), so
+ * doctor shows one issue per file.
+ */
+export function oldWordingError(path: string, parts: Array<{ shared?: string; steps: ReturnType<typeof oldWordingSteps> }>, root?: string): FileError {
+  const where = parts.map((p) => `${p.shared ? `${p.shared}: ` : ""}${p.steps.map((s) => `step '${s.step}' (${s.keys.join(", ")})`).join(", ")}`);
+  const message = `written in the old wording: ${where.join("; ")}; run \`${cmd.upgrade()}\` to rewrite it and commit`;
+  return { ...fileError(path, [{ path: "", message }], root), code: "old_wording" };
 }
 
 const WORKFLOW_LEVEL: Record<string, string> = {
@@ -70,7 +133,7 @@ export function readPinnedWorkflow(unitDir: string, root?: string): ReadResult<P
   const path = pinnedWorkflowPath(unitDir);
   const raw = readText(path);
   if (raw === null) return { ok: false, reason: "missing" };
-  const r = parseWorkflowText(raw, path, root);
+  const r = parseWorkflowText(raw, path, "copy", root);
   return r.ok ? { ok: true, raw, value: { workflow: r.value, hash: sha256(raw), source: raw } } : r;
 }
 
@@ -85,7 +148,7 @@ export function pinWorkflow(
   opts: { replace?: boolean } = {},
 ): { ok: true; hash: string } | { ok: false; reason: "pinned"; hash: string } {
   const path = pinnedWorkflowPath(unitDir);
-  const parsed = parseWorkflowText(source, path);
+  const parsed = parseWorkflowText(source, path, "copy");
   if (!parsed.ok) throw new Error(`refusing to pin an invalid workflow: ${JSON.stringify(parsed.reason === "corrupt" ? parsed.error.errors : parsed.reason)}`);
   const hash = sha256(source);
   if (opts.replace) {

@@ -14,9 +14,9 @@ const WF: Workflow = {
   name: "loop",
   start: "implement",
   steps: {
-    implement: { type: "agent", skill: "implement", nudges: 1, retries: 1, outcomes: { done: "test" } },
+    implement: { type: "agent", instructions: "Use the `implement` skill.", skills: ["implement"], nudges: 1, retries: 1, outcomes: { done: "test" } },
     test: { type: "check", run: "bun test", timeout: "1m", outcomes: { pass: "review", fail: { to: "implement", counter: "test_loop" } } },
-    review: { type: "agent", skill: "review", outcomes: { approve: "$done", changes_requested: { to: "implement", counter: "review_loop" } } },
+    review: { type: "agent", instructions: "Use the `review` skill.", skills: ["review"], outcomes: { approve: "$done", changes_requested: { to: "implement", counter: "review_loop" } } },
   },
   counters: { test_loop: { max: 2 }, review_loop: { max: 3 } },
 };

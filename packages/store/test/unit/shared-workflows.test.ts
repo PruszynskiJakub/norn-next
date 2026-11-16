@@ -3,26 +3,36 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { validateWorkflowDefinition } from "@norn/core";
 import { parse as parseYaml } from "yaml";
-import { loadWorkflow, loadWorkflows, sha256, workflowsDir } from "../../src/index.ts";
+import { loadWorkflow, loadWorkflows, parseWorkflowText, sha256, workflowsDir } from "../../src/index.ts";
 import { tmp, WORKFLOW_YAML } from "../helpers.ts";
+
+/** The loaded text as norn reads it back from a pin: parsed, each `skill` read into the model's `skills`. */
+const asLoaded = (source: string) => {
+  const r = parseWorkflowText(source, "pin.yaml", "copy");
+  if (!r.ok) throw new Error(JSON.stringify(r));
+  return r.value;
+};
 
 const BASE_UPDATE = `description: merge the base in and test it
 start: update
 steps:
   update:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: test, conflict: resolve }
   resolve:
-    type: agent
-    skill: merge
-    outcomes: { done: test, stuck: $stuck, gave_up: { exit: broken, means: "cannot resolve", verdict: fail } }
+    agent: Use the \`merge\` skill.
+    skills: [merge]
+    outcomes: { done: test, stuck: $stuck, gave_up: { exit: broken } }
+    means:
+      done: step finished with outcome done
+      gave_up: "cannot resolve"
+    verdict:
+      gave_up: fail
   test:
-    type: check
-    run: bun test
+    check: bun test
     timeout: 10m
     outcomes:
-      pass: { exit: tested, means: "the suite is green" }
+      pass: { exit: tested }
       fail: { exit: broken }
 `;
 
@@ -31,14 +41,17 @@ defaults: { deadline: 30m, nudges: 1 }
 start: implement
 steps:
   implement:
-    type: agent
-    skill: implement
+    agent: Use the \`implement\` skill.
+    skills: [implement]
     outcomes: { done: base, quick: test }
+    means:
+      done: step finished with outcome done
+      quick: step finished with outcome quick
   base:
     use: base-update
     outcomes: { tested: qa, broken: { to: implement, counter: test_loop } }
   qa:
-    type: gate
+    gate: approve or reject qa
     outcomes: { approve: $done, reject: { to: implement, counter: test_loop } }
 counters: { test_loop: { max: 3 } }
 base: { step: base, verify: test }
@@ -80,7 +93,7 @@ describe("use: brings in a shared file's steps", () => {
   test("routes, start and base.step naming the use step enter at the shared start; an included step is named directly", () => {
     const wf = loaded({ "story.yaml": STORY.replace("start: implement", "start: base"), "shared/base-update.yaml": BASE_UPDATE });
     expect(wf.workflow.start).toBe("update");
-    expect(wf.workflow.steps.implement?.outcomes).toEqual({ done: "update", quick: "test" });
+    expect(wf.workflow.steps.implement?.outcomes).toMatchObject({ done: { to: "update" }, quick: { to: "test" } });
     expect(wf.workflow.base).toEqual({ step: "update", verify: "test" });
   });
 
@@ -94,21 +107,21 @@ describe("use: brings in a shared file's steps", () => {
     ]);
   });
 
-  test("an exit takes its target and counter from the use step and its means and verdict from the shared side; an unrouted exit goes to $stuck", () => {
+  test("an exit takes its target and counter from the use step and an agent step's means and verdict from the shared side; an unrouted exit goes to $stuck", () => {
     const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE });
     expect(wf.workflow.steps.test?.outcomes).toEqual({
-      pass: { to: "qa", means: "the suite is green" },
+      pass: "qa",
       fail: { to: "implement", counter: "test_loop" },
     });
     expect((wf.workflow.steps.resolve?.outcomes as Record<string, unknown>).gave_up).toEqual({ to: "implement", counter: "test_loop", means: "cannot resolve", verdict: "fail" });
     const unrouted = loaded({ "story.yaml": STORY.replace(", broken: { to: implement, counter: test_loop }", ""), "shared/base-update.yaml": BASE_UPDATE });
-    expect(unrouted.workflow.steps.test?.outcomes).toEqual({ pass: { to: "qa", means: "the suite is green" }, fail: "$stuck" });
+    expect(unrouted.workflow.steps.test?.outcomes).toEqual({ pass: "qa", fail: "$stuck" });
   });
 
   test("shared routes to $done and $stuck and to a workflow counter stay as written, and the loaded workflow validates", () => {
-    const shared = BASE_UPDATE.replace("done: test, stuck: $stuck,", "done: { to: test, counter: test_loop }, stuck: $stuck, skip: $done,");
+    const shared = BASE_UPDATE.replace("done: test, stuck: $stuck,", "done: { to: test, counter: test_loop }, stuck: $stuck, skip: $done,").replace('      gave_up: "cannot resolve"\n', '      gave_up: "cannot resolve"\n      skip: step finished with outcome skip\n');
     const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": shared });
-    expect(wf.workflow.steps.resolve?.outcomes).toMatchObject({ done: { to: "test", counter: "test_loop" }, stuck: "$stuck", skip: "$done" });
+    expect(wf.workflow.steps.resolve?.outcomes).toMatchObject({ done: { to: "test", counter: "test_loop" }, stuck: "$stuck", skip: { to: "$done" } });
     expect(validateWorkflowDefinition(wf.workflow).issues).toEqual([]);
   });
 
@@ -124,7 +137,7 @@ describe("use: brings in a shared file's steps", () => {
   test("the workflow's defaults cover included steps: they carry no limits of their own", () => {
     const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE });
     expect(wf.workflow.defaults).toEqual({ deadline: "30m", nudges: 1 });
-    expect(Object.keys(wf.workflow.steps.resolve ?? {})).toEqual(["type", "skill", "outcomes"]);
+    expect(Object.keys(wf.workflow.steps.resolve ?? {})).toEqual(["type", "instructions", "skills", "outcomes"]);
   });
 });
 
@@ -137,13 +150,13 @@ describe("use: refusals", () => {
 
   test("an included step named like a workflow step, a use step or another shared file's step, or a shared file used twice, names both places", () => {
     const files = { "shared/base-update.yaml": BASE_UPDATE };
-    expect(refusal({ ...files, "story.yaml": STORY.replace("  qa:\n", "  resolve:\n    type: gate\n    outcomes: { approve: qa }\n  qa:\n") })).toEqual([
+    expect(refusal({ ...files, "story.yaml": STORY.replace("  qa:\n", "  resolve:\n    gate: approve or reject resolve\n    outcomes: { approve: qa }\n  qa:\n") })).toEqual([
       "/steps/resolve step `resolve` comes from shared/base-update.yaml and from the workflow",
     ]);
     expect(refusal({ ...files, "story.yaml": STORY.replace(/\bbase:\n    use/, "test:\n    use").replace("done: base, quick: test", "done: test") })).toEqual([
       "/steps/test step `test` comes from shared/base-update.yaml and is the name of the use step that brings it in",
     ]);
-    const ship = "start: test\nsteps:\n  test:\n    type: gate\n    outcomes: { approve: $done }\n";
+    const ship = "start: test\nsteps:\n  test:\n    gate: approve or reject test\n    outcomes: { approve: $done }\n";
     expect(refusal({ ...files, "shared/ship.yaml": ship, "story.yaml": STORY.replace("  qa:\n", "  ship:\n    use: ship\n  qa:\n") })).toEqual([
       "/steps/test step `test` comes from shared/base-update.yaml and from shared/ship.yaml",
     ]);
@@ -167,7 +180,7 @@ describe("use: refusals", () => {
   });
 
   test("a shared file's own schema error names the file and the step", () => {
-    expect(refusal({ "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE.replace("skill: merge", "skil: merge") })[0]).toStartWith("/steps/resolve shared/base-update.yaml: ");
+    expect(refusal({ "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE.replace("skills: [merge]", "skils: [merge]") })[0]).toStartWith("/steps/resolve shared/base-update.yaml: ");
   });
 });
 
@@ -186,7 +199,7 @@ describe("shared files and the loaded text", () => {
     const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE });
     expect(wf.source).not.toContain("use:");
     expect(wf.hash).toBe(sha256(wf.source));
-    expect(parseYaml(wf.source)).toEqual(wf.workflow);
+    expect(asLoaded(wf.source)).toEqual(wf.workflow);
   });
 });
 
@@ -194,27 +207,28 @@ const LIKE = `name: story
 start: implement
 steps:
   implement:
-    type: agent
-    skill: implement
+    agent: Use the \`implement\` skill.
+    skills: [implement]
     outcomes: { done: test }
+    means:
+      done: step finished with outcome done
   test:
-    type: check
+    check: bun test
     description: the suite
-    run: bun test
     timeout: 10m
     outcomes: { pass: review, fail: implement }
   review:
-    type: gate
+    gate: approve or reject review
     outcomes: { approve: test-merge }
   test-merge:
     like: test
     outcomes: { pass: $done, fail: review }
-    run: bun test --merge
+    check: bun test --merge
 `;
 
 describe("like: copies a step of its own file", () => {
   test("a copy keeps the target's keys and replaces only those it writes, whole; its text lists the target's keys then its own", () => {
-    const wf = loaded({ "story.yaml": LIKE.replace("    run: bun test --merge\n", "    exits: { '3': flaky }\n") });
+    const wf = loaded({ "story.yaml": LIKE.replace("    check: bun test --merge\n", "    exits: { '3': flaky }\n") });
     expect(wf.workflow.steps["test-merge"]).toEqual({
       type: "check",
       description: "the suite",
@@ -223,14 +237,14 @@ describe("like: copies a step of its own file", () => {
       outcomes: { pass: "$done", fail: "review" },
       exits: { "3": "flaky" },
     } as never);
-    expect(Object.keys(parseYaml(wf.source).steps["test-merge"])).toEqual(["type", "description", "run", "timeout", "outcomes", "exits"]);
+    expect(Object.keys(parseYaml(wf.source).steps["test-merge"])).toEqual(["check", "description", "timeout", "outcomes", "exits"]);
   });
 
   test("a workflow with like but no use loads as its flattened text, with no like left", () => {
     const wf = loaded({ "story.yaml": LIKE });
     expect(wf.source).not.toContain("like:");
     expect(wf.hash).toBe(sha256(wf.source));
-    expect(parseYaml(wf.source)).toEqual(wf.workflow);
+    expect(asLoaded(wf.source)).toEqual(wf.workflow);
     expect(wf.workflow.steps["test-merge"]).toMatchObject({ run: "bun test --merge", timeout: "10m" });
     expect(wf.included).toBeUndefined();
   });
@@ -239,7 +253,7 @@ describe("like: copies a step of its own file", () => {
     const keeps = LIKE.replace("    outcomes: { pass: $done, fail: review }\n", "");
     const wf = loaded({ "story.yaml": keeps });
     expect(wf.source).not.toMatch(/[&*]a\d/);
-    expect(parseYaml(wf.source)).toEqual(wf.workflow);
+    expect(asLoaded(wf.source)).toEqual(wf.workflow);
     expect(wf.workflow.steps["test-merge"]?.outcomes).toEqual({ pass: "review", fail: "implement" });
   });
 

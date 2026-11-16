@@ -21,9 +21,11 @@ const SOLO = `name: solo
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     outcomes: { done: $done }
+    means:
+      done: step finished with outcome done
 `;
 const DIFFER = "skills differ from norn 0.31.0 (norn): runs use this worktree's copies until the base is merged in, or until this branch's edit to them is reverted";
 

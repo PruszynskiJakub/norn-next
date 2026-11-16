@@ -15,16 +15,16 @@ const GUARD_WF: Workflow = {
   name: "guarded",
   start: "implement",
   steps: {
-    implement: { type: "agent", skill: "impl", inputs: ["spec"], outcomes: { done: { to: "open-pr", means: "built" } } },
+    implement: { type: "agent", instructions: "Use the `impl` skill.", skills: ["impl"], inputs: ["spec"], outcomes: { done: { to: "open-pr", means: "built" } } },
     "open-pr": { type: "git", action: "open-pr", outcomes: { done: "ci" } },
     ci: { type: "check", run: "true", timeout: "5m", outcomes: { pass: "ready", fail: { to: "fix", counter: "ci_loop" } } },
     // a gate past rework that still goes through open-pr before the round can end
-    fix: { type: "agent", skill: "impl", inputs: ["spec"], outcomes: { done: { to: "check-fix", means: "fixed" } } },
-    "check-fix": { type: "gate", outcomes: { approve: "open-pr", reject: { to: "fix", counter: "fix_loop" } } },
-    ready: { type: "gate", outcomes: { approve: "merge", reject: { to: "implement", counter: "ready_loop" }, stale: { to: "update", counter: "stale_loop" } } },
+    fix: { type: "agent", instructions: "Use the `impl` skill.", skills: ["impl"], inputs: ["spec"], outcomes: { done: { to: "check-fix", means: "fixed" } } },
+    "check-fix": { type: "gate", prompt: "approve or reject check-fix", outcomes: { approve: "open-pr", reject: { to: "fix", counter: "fix_loop" } } },
+    ready: { type: "gate", prompt: "approve or reject ready", outcomes: { approve: "merge", reject: { to: "implement", counter: "ready_loop" }, stale: { to: "update", counter: "stale_loop" } } },
     merge: { type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } },
     update: { type: "git", action: "update", outcomes: { done: "open-pr", conflict: { to: "resolve", counter: "conflict_loop" } } },
-    resolve: { type: "agent", skill: "impl", inputs: ["spec"], outcomes: { done: { to: "update", means: "resolved" } } },
+    resolve: { type: "agent", instructions: "Use the `impl` skill.", skills: ["impl"], inputs: ["spec"], outcomes: { done: { to: "update", means: "resolved" } } },
   },
   counters: { ci_loop: { max: 3 }, fix_loop: { max: 3 }, ready_loop: { max: 2 }, stale_loop: { max: 5 }, conflict_loop: { max: 2 } },
 };
@@ -53,7 +53,7 @@ describe("open-pr guard: workflow validation", () => {
   });
 
   test("an agent step between open-pr and a gate that lets the round end is refused with the path", () => {
-    const wf = { ...GUARD_WF, steps: { ...GUARD_WF.steps, ready: { type: "gate", outcomes: { approve: "merge", reject: { to: "rework", counter: "ready_loop" } } }, rework: { type: "agent", skill: "impl", inputs: ["spec"], outcomes: { done: { to: "ready", means: "reworked" } } } } };
+    const wf = { ...GUARD_WF, steps: { ...GUARD_WF.steps, ready: { type: "gate", prompt: "approve or reject ready", outcomes: { approve: "merge", reject: { to: "rework", counter: "ready_loop" } } }, rework: { type: "agent", instructions: "Use the `impl` skill.", skills: ["impl"], inputs: ["spec"], outcomes: { done: { to: "ready", means: "reworked" } } } } };
     const check = validateWorkflowDefinition(wf);
     expect(check.ok).toBe(false);
     const issue = check.issues.find((i) => i.code === "open_pr_bypass");

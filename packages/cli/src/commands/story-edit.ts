@@ -125,7 +125,12 @@ async function editWorkflow(ctx: Context, raw: string, name: string, at: string 
     const level = t.slice ? "slice" : "story";
     const issues = loaded.workflow ? [...loaded.issues, ...checkWorkflowLevel(loaded.workflow, level)] : loaded.issues;
     if (!loaded.workflow || issues.length)
-      throw refuse(`workflow '${name}' cannot run on a ${level}: ${issues.map((i) => i.message).join("; ") || "invalid"}`, "fix the workflow file", "invalid_workflow", issues);
+      throw refuse(
+        `workflow '${name}' cannot run on a ${level}: ${issues.map((i) => i.message).join("; ") || "invalid"}`,
+        issues.some((i) => i.code === "old_wording") ? `run \`${cmd.upgrade()}\` to rewrite it in the new wording and commit` : "fix the workflow file",
+        "invalid_workflow",
+        issues,
+      );
     const wf = loaded.workflow;
     const loc = obs.stories[t.story];
     const sliceFile = t.slice ? sf.slices.find((s) => s.key === t.slice) : null;

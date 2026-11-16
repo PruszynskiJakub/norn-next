@@ -16,70 +16,84 @@ steps:
     use: sync
     outcomes: { synced: slice }
   slice:
-    type: agent
-    skill: norn-slice
-    inputs: [spec, slices]
-    instructions: >-
+    agent: >-
       Write slice files to slices/<nn>-<slug>.md in the spec folder. A slice has no QA of its own: list every
       slice's criteria in spec.md's frontmatter `criteria` too, each id prefixed with its slice number
       (`01.AC1`), next to the story's own, so the story's QA gives each one a verdict. First check the Plan section of spec.md
       against the code on this base: when spec.md has no Plan section, or the base changed what the plan
       relies on so that it no longer holds, write no slice files, say what no longer holds in the handoff's
       Notes and report `replan`.
+    skills: [norn-slice]
+    inputs: [spec, slices]
     outcomes:
-      done:   { to: approve-slices, means: "slice files written against the current base; every user story is covered by some slice's acceptance" }
-      replan: { to: $stuck, means: "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans with `norn story edit <story> --workflow refinement --at plan`" }
+      done:   approve-slices
+      replan: $stuck
+    means:
+      done: "slice files written against the current base; every user story is covered by some slice's acceptance"
+      replan: "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans with `norn story edit <story> --workflow refinement --at plan`"
   approve-slices:
-    type: gate
-    prompt: "Review the slice files in the spec folder (edit them if needed). Approve to start the slices, or reject with what to change."
+    gate: "Review the slice files in the spec folder (edit them if needed). Approve to start the slices, or reject with what to change."
     outcomes: { approve: slices, reject: { to: slice, counter: slice_loop } }
   slices:
-    type: slices
+    slices:
     outcomes: { done: update, stuck: $stuck }
   base-update:
     use: base-update
     outcomes: { tested: qa, failed: { to: implement, counter: test_loop }, merged: open-pr, redescribe: describe }
   qa:
-    type: agent
-    skill: norn-qa
+    agent: "The criteria are spec.md's frontmatter `criteria`; an id `<nn>.<id>` is criterion `<id>` of slice file `<nn>-*.md`, which says what it means."
+    skills: [norn-qa]
     inputs: [spec, slices, diff]
     criteria: required
-    instructions: "The criteria are spec.md's frontmatter `criteria`; an id `<nn>.<id>` is criterion `<id>` of slice file `<nn>-*.md`, which says what it means."
     outcomes:
-      pass:       { to: describe, verdict: pass, means: "every acceptance criterion of the story and its slices observed with evidence" }
-      fail:       { to: implement, counter: qa_loop, verdict: fail, means: "a criterion fails; repro in findings" }
-      partial:    { to: human-qa, verdict: person, means: "criteria only a person can judge, evidence prepared" }
-      unverified: { to: human-qa, verdict: unverified, means: "criteria this session could not check; how to check each one is in the report" }
+      pass:       describe
+      fail:       { to: implement, counter: qa_loop }
+      partial:    human-qa
+      unverified: human-qa
+    means:
+      pass: "every acceptance criterion of the story and its slices observed with evidence"
+      fail: "a criterion fails; repro in findings"
+      partial: "criteria only a person can judge, evidence prepared"
+      unverified: "criteria this session could not check; how to check each one is in the report"
+    verdict:
+      pass: pass
+      fail: fail
+      partial: person
+      unverified: unverified
   human-qa:
-    type: gate
-    prompt: "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed."
+    gate: "Check the criteria QA could not settle (listed with how to check each). Approve, or reject with what failed."
     outcomes:
       approve: describe
       reject:  { to: implement, counter: qa_loop }
       stale:   { to: update, counter: stale_loop }
   implement:
-    type: agent
-    skill: norn-implement
+    agent: "Run `bun run test` (the unit tier) after each change, and the type check; the integration and e2e tiers run in CI, which the `ci` check waits for, so do not run them before handing back."
+    skills: [norn-implement]
     inputs: [spec, handoff, last_check, last_findings]
-    instructions: "Run `bun run test` (the unit tier) after each change, and the type check; the integration and e2e tiers run in CI, which the `ci` check waits for, so do not run them before handing back."
     outcomes:
-      done: { to: review, means: "every rework point has a passing test" }
+      done: review
+    means:
+      done: "every rework point has a passing test"
   # only rework reaches implement, and slices are reviewed before they integrate: this reviews the
   # story-level rework, so a round without rework never runs it
   review:
-    type: agent
-    skill: norn-review
+    agent: "Review the story-level rework against the findings it answers and the spec: it fixes what they ask and nothing else."
+    skills: [norn-review]
     inputs: [spec, diff, last_findings]
     outcomes:
-      approve:           { to: test, means: "the rework does what the findings and the story ask and nothing else, no blocking findings" }
-      changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
+      approve:           test
+      changes_requested: { to: implement, counter: review_loop }
+    means:
+      approve: "the rework does what the findings and the story ask and nothing else, no blocking findings"
+      changes_requested: "blocking findings in the receipt"
   describe:
-    type: agent
-    skill: norn-pr
+    agent: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
+    skills: [norn-pr]
     inputs: [spec, diff, record]
-    instructions: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
     outcomes:
-      done: { to: open-pr, means: "pr.md describes the branch as it is now: summary, evidence, merge danger" }
+      done: open-pr
+    means:
+      done: "pr.md describes the branch as it is now: summary, evidence, merge danger"
   # a red run's failures become last_check for implement, whose rework goes back through open-pr to the new head
   ship:
     use: ci

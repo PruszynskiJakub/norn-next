@@ -9,40 +9,45 @@ description: Agree a story's spec and plan with a person, against the current ba
 start: sync
 steps:
   sync:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: refine, conflict: { to: sync-resolve, counter: sync_conflict_loop } }
   sync-resolve:
-    type: agent
-    skill: norn-merge
+    agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
+    skills: [norn-merge]
     inputs: [spec, handoff]
-    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
     outcomes:
-      done: { to: sync, means: "base merged into the story branch, conflicts resolved and committed" }
+      done: sync
+    means:
+      done: "base merged into the story branch, conflicts resolved and committed"
   refine:
-    type: agent
-    skill: norn-refine
+    agent: "Write the spec into the body of spec.md; keep its frontmatter unchanged."
+    skills: [norn-refine]
     attended: true
     inputs: [spec, handoff]
-    instructions: "Write the spec into the body of spec.md; keep its frontmatter unchanged."
     outcomes:
-      done:      { to: plan, means: "spec complete: problem statement, solution, numbered user stories, out of scope; no open questions" }
-      questions: { to: clarify, means: "spec written, but open questions are listed that need the person's answers" }
+      done:      plan
+      questions: clarify
+    means:
+      done: "spec complete: problem statement, solution, numbered user stories, out of scope; no open questions"
+      questions: "spec written, but open questions are listed that need the person's answers"
   clarify:
-    type: agent
-    skill: norn-clarify
+    agent: "Settle the spec's open questions with the person, one question at a time, folding each answer into the section it changes."
+    skills: [norn-clarify]
     attended: true
     inputs: [spec, handoff]
     outcomes:
-      done: { to: plan, means: "every open question is answered and folded into the spec" }
+      done: plan
+    means:
+      done: "every open question is answered and folded into the spec"
   plan:
-    type: agent
-    skill: norn-plan
+    agent: "Write the Plan section of spec.md."
+    skills: [norn-plan]
     attended: true
     inputs: [spec, handoff]
-    instructions: "Write the Plan section of spec.md."
     outcomes:
-      done: { to: $done, means: "spec.md's Plan section has seams, a coverage table for every user story, prefactoring, decisions and risks" }
+      done: $done
+    means:
+      done: "spec.md's Plan section has seams, a coverage table for every user story, prefactoring, decisions and risks"
 counters:
   # resets each time sync merges cleanly: only repeated conflicts on one base move count
   sync_conflict_loop: { max: 2, reset_on: sync.done }

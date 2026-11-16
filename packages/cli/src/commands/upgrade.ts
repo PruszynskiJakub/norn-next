@@ -1,19 +1,21 @@
 /**
- * `norn upgrade [--json]`: move a repo from norn 0.30 on to the running norn — the bundled skills
- * rewritten and relinked, then `norn_version` — staging every change for the person to commit;
- * never commits, pushes or touches a unit worktree.
+ * `norn upgrade [--json]`: move a repo from norn 0.30 on to the running norn — the workflow and shared
+ * files rewritten to the new wording, the bundled skills rewritten and relinked, then `norn_version` —
+ * staging every change for the person to commit; never commits, pushes or touches a unit worktree.
  *
  * Every check runs before any write, and a refusal (exit 3) changes nothing: the main checkout only,
  * the 0.30 baseline (a repo with no or an older `norn_version` goes through the 0.30.x binary first),
  * a binary older than the recorded `norn_version` (no override), a config that loads, the tick lock free.
  * Every step can run again, so a rerun finishes an interrupted run; there is no rollback.
- * `norn_version` is written last. Labels are created where missing, never edited or deleted, and a
- * remote it cannot reach or write is reported, never a refusal or a changed exit code.
+ * `norn_version` is written last. A workflow file the rewrite refuses is listed and left as written,
+ * never a refusal or a changed exit code: one stray comment must not hold back the rest of the repo.
+ * Labels are created where missing, never edited or deleted, and a remote it cannot reach or write
+ * is reported, never a refusal or a changed exit code.
  */
 import { join, relative } from "node:path";
 import { cmd, upgradeBackward, versionBaseline } from "@norn/core";
 import { versionMatch } from "@norn/schema";
-import { acquireTickLock, gitRemoteUrl, installSkills, linkSkills, loadWorkflows, REPO_CONFIG_FILE, recordedNornVersion, repoConfigPath, SKILLS_DIR, writeNornVersion } from "@norn/store";
+import { acquireTickLock, gitRemoteUrl, installSkills, linkSkills, loadWorkflows, REPO_CONFIG_FILE, recordedNornVersion, repoConfigPath, rewriteWorkflowWording, SKILLS_DIR, writeNornVersion } from "@norn/store";
 import { defineCommand } from "../command.ts";
 import { type Context, safeRealpath } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
@@ -28,6 +30,8 @@ export interface UpgradeReport {
   norn_version: { from: string | null; to: string | null; changed: boolean };
   /** Bundled skills rewritten in `.agents/skills/`, and those an agent's skill folder was relinked to */
   skills: { updated: string[]; linked: string[] };
+  /** Workflow and shared files rewritten to the new wording, and those left as written (file, line, why) */
+  workflows: { rewritten: string[]; refused: Array<{ file: string; line: number; message: string }> };
   /** paths staged by this run, relative to the main checkout */
   staged: string[];
   /** the commit the person makes; null when nothing was staged */
@@ -73,11 +77,11 @@ async function tickLock(ctx: Context, root: string) {
   return lock;
 }
 
-/** The bundled skills rewritten from this norn's copies and relinked, then `norn_version` last; all staged. */
-async function skillsAndVersion(ctx: Context, root: string, v: { from: string; to: string | null }): Promise<UpgradeReport> {
+/** The bundled skills rewritten from this norn's copies and relinked, then `norn_version` last; all staged with the rewritten workflow files. */
+async function skillsAndVersion(ctx: Context, root: string, v: { from: string; to: string | null }, workflows: UpgradeReport["workflows"]): Promise<UpgradeReport> {
   const names = bundledSkills(ctx.env);
   const installed = installSkills(root, join(assetsDir(ctx.env), "skills"), names);
-  const stage = installed.updated.map((n) => `${SKILLS_DIR}/${n}`);
+  const stage = [...workflows.rewritten, ...installed.updated.map((n) => `${SKILLS_DIR}/${n}`)];
   const linked = new Set<string>();
   const links: string[] = [];
   const seen = new Set<string>();
@@ -102,7 +106,7 @@ async function skillsAndVersion(ctx: Context, root: string, v: { from: string; t
   }
   if (stage.length) await ctx.git.stage(root, stage);
   const commit = changed ? versionCommit(v.to as string) : stage.length ? SKILLS_COMMIT : null;
-  return { norn_version: { ...v, changed }, skills: { updated: installed.updated, linked: [...linked].sort() }, staged: [...new Set(stage)], commit };
+  return { norn_version: { ...v, changed }, skills: { updated: installed.updated, linked: [...linked].sort() }, workflows, staged: [...new Set(stage)], commit };
 }
 
 async function labelsPart(ctx: Context, root: string, report: UpgradeReport): Promise<UpgradeReport> {
@@ -118,16 +122,22 @@ function summary(r: UpgradeReport): string {
   const parts = [v.changed ? `norn version ${v.from} → ${v.to}` : `norn version ${v.from}`];
   if (r.skills.updated.length) parts.push(`skills updated: ${r.skills.updated.join(", ")}`);
   if (r.skills.linked.length) parts.push(`skills relinked: ${r.skills.linked.join(", ")}`);
+  if (r.workflows.rewritten.length) parts.push(`workflows rewritten: ${r.workflows.rewritten.length}`);
   return parts.join("; ");
 }
 
 function markdown(r: UpgradeReport): string {
   const labels = r.labels ? ["", ...labelsLines(r.labels)] : [];
+  const refused = r.workflows.refused.length
+    ? ["", "Workflow files left as written (the rewrite cannot keep their layout; edit each by hand into the new wording):", ...r.workflows.refused.map((f) => `- ${f.file}:${f.line}: ${f.message}`)]
+    : [];
   // The labels lines still show what upgrade did on the remote
   if (!r.staged.length && !r.skills.updated.length && !r.skills.linked.length && !r.norn_version.changed)
-    return [`# norn upgrade\n\nalready on norn ${r.norn_version.from}: nothing to upgrade`, ...labels].join("\n");
+    return [`# norn upgrade\n\nalready on norn ${r.norn_version.from}: nothing to upgrade`, ...refused, ...labels].join("\n");
   const out = ["# norn upgrade", "", summary(r)];
   if (r.skills.updated.length) out.push("", `Skills rewritten from norn ${r.norn_version.to}'s copies (\`git diff --staged ${SKILLS_DIR}/\` shows how): ${r.skills.updated.join(", ")}`);
+  if (r.workflows.rewritten.length) out.push("", `Workflows rewritten to the new wording (staged): ${r.workflows.rewritten.join(", ")}`);
+  out.push(...refused);
   if (r.norn_version.changed) out.push("", `${REPO_CONFIG_FILE}: \`norn_version: ${r.norn_version.to}\` (staged)`);
   out.push(...labels);
   out.push("", r.commit ? `Review the staged changes with \`git diff --staged\`, then commit them: \`${r.commit}\`` : "Nothing to commit: only links in an ignored folder changed.");
@@ -142,7 +152,9 @@ async function upgrade(ctx: Context) {
   void ctx.resolved;
   const tick = await tickLock(ctx, root);
   try {
-    const report = await labelsPart(ctx, root, await skillsAndVersion(ctx, root, v));
+    // after every check, before `norn_version`: a rerun finds the files already moved
+    const workflows = rewriteWorkflowWording(root);
+    const report = await labelsPart(ctx, root, await skillsAndVersion(ctx, root, v, workflows));
     return rendered(report, markdown(report));
   } finally {
     tick.release();
@@ -152,7 +164,7 @@ async function upgrade(ctx: Context) {
 export const upgradeCommand = defineCommand({
   name: "upgrade",
   version: "exempt",
-  summary: "Move this repo's norn_version and bundled skills to this norn, from norn 0.30 on, staged for you to commit",
+  summary: "Move this repo's norn_version, bundled skills and workflow wording to this norn, from norn 0.30 on, staged for you to commit",
   usage: "norn upgrade [--json]",
   markdown: true,
   run: (ctx) => upgrade(ctx),

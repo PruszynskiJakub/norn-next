@@ -7,6 +7,7 @@
  * failure stops before any local write. `--web` opens the remote's new-issue page instead.
  */
 import { readFileSync } from "node:fs";
+import { basename, extname } from "node:path";
 import { cmd, WF_LABEL } from "@norn/core";
 import { storyKey } from "@norn/schema";
 import { loadWorkflows, WORKFLOWS_DIR } from "@norn/store";
@@ -40,7 +41,10 @@ export const storyCreateCommand = defineCommand({
     const workflow = opt.str(args, "workflow");
     if (workflow !== undefined) {
       // Before anything is created
-      const listed = Object.keys(loadWorkflows(ctx.root).workflows).sort();
+      const listing = loadWorkflows(ctx.root);
+      const listed = Object.keys(listing.workflows).sort();
+      const old = listing.errors.find((e) => e.code === "old_wording" && basename(e.file, extname(e.file)) === workflow);
+      if (old) throw refuse(`workflow '${workflow}' cannot be used: ${old.file}: ${old.errors[0]?.message ?? "old wording"}`, `run \`${cmd.upgrade()}\` to rewrite it in the new wording and commit`, "unknown_workflow", { workflows: listed });
       if (!listed.includes(workflow))
         throw refuse(`no workflow '${workflow}' in ${WORKFLOWS_DIR}/ (available: ${listed.join(", ") || "none"})`, cmd.storyCreate({ workflow: `<${listed.join("|")}>` }), "unknown_workflow", { workflows: listed });
     }

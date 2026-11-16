@@ -4,9 +4,9 @@
  * rest of the record as it is: the `cat-file --batch` stream stays aligned past a `missing` reply.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { readRecordObjects } from "../../src/index.ts";
+import { readRecordObjects, setWorkflowReadObserver, type WorkflowTextRead } from "../../src/index.ts";
 import { gitOk } from "../../src/git.ts";
-import { tmp } from "../helpers.ts";
+import { tmp, WORKFLOW_YAML } from "../helpers.ts";
 
 const ISOLATED = { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_AUTHOR_NAME: "norn test", GIT_AUTHOR_EMAIL: "test@norn.invalid", GIT_COMMITTER_NAME: "norn test", GIT_COMMITTER_EMAIL: "test@norn.invalid" } as const;
 const saved: Record<string, string | undefined> = {};
@@ -85,5 +85,26 @@ describe("readRecordObjects", () => {
     const r = await readRecordObjects(root, "gh-9", sha);
     expect(r.errors).toEqual([]);
     expect(r.units.map((u) => [u.key, u.state.step, u.state.status])).toEqual([["gh-9", "$done", "done"]]);
+  });
+
+  test("a unit's pinned workflow in the record is read as a copy and loads", async () => {
+    const root = tmp();
+    await gitOk(root, ["init", "-q"]);
+    const blob = async (text: string) => (await gitOk(root, ["hash-object", "-w", "--stdin"], text)).trim();
+    const tree = async (lines: string[]) => (await gitOk(root, ["mktree"], `${lines.join("\n")}\n`)).trim();
+    const story = await tree([`100644 blob ${await blob(state("_story", null, "review"))}\tstate.json`, `100644 blob ${await blob(WORKFLOW_YAML)}\tworkflow.yaml`]);
+    const top = await tree([`040000 tree ${story}\t_story`]);
+    const sha = (await gitOk(root, ["commit-tree", top, "-m", "record"])).trim();
+
+    const reads: WorkflowTextRead[] = [];
+    const prev = setWorkflowReadObserver((r) => reads.push(r));
+    try {
+      const r = await readRecordObjects(root, "gh-9", sha);
+      expect(r.errors).toEqual([]);
+      expect(r.units[0]?.workflow).toMatchObject({ name: "slice", start: "implement" });
+    } finally {
+      setWorkflowReadObserver(prev);
+    }
+    expect(reads).toEqual([{ path: "refs/norn/runs/gh-9:_story/workflow.yaml", read: "copy" }]);
   });
 });

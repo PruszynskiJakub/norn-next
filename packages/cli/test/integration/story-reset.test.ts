@@ -19,9 +19,11 @@ const MINI = `name: mini
 start: plan
 steps:
   plan:
-    type: agent
-    skill: norn-plan
+    agent: Use the \`norn-plan\` skill.
+    skills: [norn-plan]
     outcomes: { done: $done }
+    means:
+      done: step finished with outcome done
 `;
 
 const CONFIG = `provider: gh

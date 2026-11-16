@@ -20,28 +20,34 @@ const MINI = `name: mini
 start: plan
 steps:
   plan:
-    type: agent
-    skill: norn-plan
-    outcomes: { done: { to: slices, means: "slice files written" } }
+    agent: Use the \`norn-plan\` skill.
+    skills: [norn-plan]
+    outcomes: { done: slices }
+    means:
+      done: "slice files written"
   slices:
-    type: slices
+    slices:
     outcomes: { done: $done, stuck: $stuck }
 `;
 const SLICE = `name: slice
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "tests pass" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means:
+      done: "tests pass"
 `;
 const SOLO = `name: solo
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means:
+      done: "built"
 `;
 const CONFIG = "provider: gh\nworkflow: mini\nmode: auto\n";
 

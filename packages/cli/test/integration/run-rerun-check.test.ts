@@ -21,12 +21,13 @@ const FLOW = `name: flow
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: test, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: test }
+    means:
+      done: "built"
   test:
-    type: check
-    run: test -e ${glitch}/once || { touch ${glitch}/once; exit 1; }
+    check: test -e ${glitch}/once || { touch ${glitch}/once; exit 1; }
     timeout: 1m
     outcomes: { pass: $done, fail: { to: implement, counter: test_loop } }
 counters: { test_loop: { max: 3 } }

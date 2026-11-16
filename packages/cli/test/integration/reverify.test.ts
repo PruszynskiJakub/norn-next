@@ -19,18 +19,16 @@ const HELD = `name: held
 start: ready
 steps:
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes:
       approve: $done
       reject: $stuck
       stale: { to: update, counter: stale_loop }
   update:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: test, conflict: $stuck }
   test:
-    type: check
-    run: 'pwd > "$NORN_HOME/verify-cwd"; ls; if [ -e breaks.txt ]; then echo "breaks.txt is on the base"; exit 1; fi'
+    check: 'pwd > "$NORN_HOME/verify-cwd"; ls; if [ -e breaks.txt ]; then echo "breaks.txt is on the base"; exit 1; fi'
     timeout: 1m
     outcomes: { pass: ready, fail: $stuck }
 counters: { stale_loop: { max: 3 } }

@@ -67,8 +67,8 @@ const routeCount = (wf: Workflow) => Object.values(wf.steps).reduce((n, step) =>
  * route, counter or instruction changes the hash, formatting and key order never do.
  */
 const PINNED_HASHES: Record<string, string> = {
-  quick: "78142b725e014c435e790c83c50f68c3186f0cc4c317873a1ff6c73bbcf749e9",
-  story: "887efb653b1edd5cb7513b215b816fc140c01154167c2b778bc91538cd2b7159",
+  quick: "2122ed85165f59700571d04a4237c24a995480aabddfa5feef6c97fcd29eeced",
+  story: "a6e95b266e84d789ac20549ff3be785cb50ad3b23417db24389091cc5d308316",
 };
 
 /** Splits a SKILL.md into its YAML frontmatter and body. */
@@ -220,13 +220,74 @@ describe("workflow templates", () => {
 
     test("every referenced skill exists in assets/skills", () => {
       for (const step of Object.values(wf.steps))
-        if (step.type === "agent") expect({ skill: step.skill, exists: existsSync(join(SKILLS_DIR, step.skill, "SKILL.md")) }).toEqual({ skill: step.skill, exists: true });
+        if (step.type === "agent") for (const skill of step.skills ?? []) expect({ skill, exists: existsSync(join(SKILLS_DIR, skill, "SKILL.md")) }).toEqual({ skill, exists: true });
     });
 
     // TODO: core's validator exists in packages/core/src/workflow.ts but is not yet exported from
     // @norn/core. Once it is, also assert:
     // validateWorkflowDefinition(wf, { skills: SKILLS }).issues → []
     // checkWorkflowLevel(wf, file === "story.yaml" ? "story": "slice") → []
+  });
+});
+
+/** The keys of the old wording, none of which a step written now holds. */
+const OLD_STEP_KEYS = ["type", "skill", "instructions", "run", "prompt", "action"];
+const REPO_WORKFLOWS_DIR = join(ASSETS, "..", "..", "..", ".agents", "workflows");
+/** Every workflow and shared file in a workflows folder, as `name.yaml` and `shared/name.yaml`. */
+const filesIn = (dir: string) => [
+  ...readdirSync(dir).filter((f) => /\.(ya?ml|json)$/.test(f)),
+  ...readdirSync(join(dir, "shared")).map((f) => `shared/${f}`),
+];
+
+/** What in a file, as written, is not the new wording, or is a translator's fallback where a hand-written text belongs. */
+function wordingProblems(dir: string, file: string): string[] {
+  const text = readFileSync(join(dir, file), "utf8");
+  const doc = parse(text) as { $schema?: string; steps: Record<string, Record<string, unknown>> };
+  const shared = file.startsWith("shared/");
+  const out: string[] = [];
+  const schema = validate(shared ? "workflow-shared" : "workflow-source", doc);
+  if (!schema.ok) out.push(...schema.errors.map((e) => `${e.path} ${e.message}`));
+  // A file that names its schema names the one it is written in
+  const named = doc.$schema ?? /^# yaml-language-server: \$schema=(\S+)$/m.exec(text)?.[1];
+  if (named !== undefined && !named.endsWith(shared ? "workflow-shared.schema.json" : "workflow-source.schema.json")) out.push(`$schema ${named}`);
+  for (const [name, step] of Object.entries(doc.steps)) {
+    for (const key of OLD_STEP_KEYS) if (key in step) out.push(`${name}: old key \`${key}\``);
+    for (const [o, route] of Object.entries((step.outcomes ?? {}) as Record<string, unknown>))
+      if (route !== null && typeof route === "object" && ("means" in route || "verdict" in route)) out.push(`${name}.${o}: means or verdict inside the route`);
+    if ("like" in step || "use" in step) continue;
+    const skills = (step.skills ?? []) as string[];
+    if ("agent" in step) {
+      const orientation = String(step.agent ?? "").trim();
+      if (orientation === "" || orientation === step.description || skills.some((x) => orientation === `Use the \`${x}\` skill.`)) out.push(`${name}: no hand-written orientation`);
+    }
+    if ("gate" in step && (step.gate === `approve or reject ${name}` || step.gate === step.description)) out.push(`${name}: no hand-written gate text`);
+    for (const [o, m] of Object.entries((step.means ?? {}) as Record<string, string>)) if (m === `step finished with outcome ${o}`) out.push(`${name}.${o}: no hand-written meaning`);
+  }
+  return out;
+}
+
+describe("the new wording", () => {
+  test("norn init writes every workflow and shared file in the new wording, each agent step with a hand-written orientation", () => {
+    const written = filesIn(workflowsDir(TEMPLATES_ROOT));
+    expect(written.sort()).toEqual([...workflowFiles, ...sharedFiles.map((f) => `shared/${f}`)].sort());
+    expect(Object.fromEntries(written.map((f) => [f, wordingProblems(workflowsDir(TEMPLATES_ROOT), f)]))).toEqual(Object.fromEntries(written.map((f) => [f, []])));
+  });
+
+  test("this repo's workflows, with release.yaml and shared/, are in the new wording and load", () => {
+    const files = filesIn(REPO_WORKFLOWS_DIR);
+    expect(files).toContain("release.yaml");
+    expect(Object.fromEntries(files.map((f) => [f, wordingProblems(REPO_WORKFLOWS_DIR, f)]))).toEqual(Object.fromEntries(files.map((f) => [f, []])));
+    const repo = loadWorkflows(join(REPO_WORKFLOWS_DIR, "..", ".."));
+    expect(repo.errors).toEqual([]);
+    expect(Object.keys(repo.workflows).sort()).toEqual(files.filter((f) => !f.startsWith("shared/")).map((f) => f.replace(/\.ya?ml$/, "")).sort());
+  });
+
+  test("this repo's shared copies have the shipped ones' steps, each with the same head key", () => {
+    const heads = (dir: string, files: string[]) =>
+      Object.fromEntries(files.flatMap((f) => Object.entries((parse(readFileSync(join(dir, "shared", f), "utf8")) as { steps: Record<string, object> }).steps).map(([n, step]) => [n, Object.keys(step)[0]])));
+    // this repo splits shipping in two: its own CI wait (ci.yaml) and the person's part (land.yaml)
+    const repo = { "base-update.yaml": ["base-update.yaml"], "sync.yaml": ["sync.yaml"], "ship.yaml": ["ci.yaml", "land.yaml"] };
+    for (const [shipped, copies] of Object.entries(repo)) expect({ shipped, heads: heads(REPO_WORKFLOWS_DIR, copies) }).toEqual({ shipped, heads: heads(WORKFLOWS_DIR, [shipped]) });
   });
 });
 
@@ -243,13 +304,13 @@ describe("single-purpose workflows (#136)", () => {
   test("triage is one norn-triage step that ends the round with done: the recommendation is only in its comment", () => {
     expect(wf("triage").start).toBe("explore");
     expect(Object.keys(wf("triage").steps)).toEqual(["explore"]);
-    expect(wf("triage").steps.explore).toMatchObject({ type: "agent", skill: "norn-triage" });
+    expect(wf("triage").steps.explore).toMatchObject({ type: "agent", skills: ["norn-triage"] });
     expect(targets("triage", "explore")).toEqual({ done: "$done" });
   });
 
   test("reproduce is one norn-diagnose step that changes no code and ends the round either way", () => {
     expect(Object.keys(wf("reproduce").steps)).toEqual(["reproduce"]);
-    expect(wf("reproduce").steps.reproduce).toMatchObject({ type: "agent", skill: "norn-diagnose" });
+    expect(wf("reproduce").steps.reproduce).toMatchObject({ type: "agent", skills: ["norn-diagnose"] });
     expect(targets("reproduce", "reproduce")).toEqual({ reproduced: "$done", cannot_reproduce: "$done" });
   });
 
@@ -271,14 +332,14 @@ describe("single-purpose workflows (#136)", () => {
   });
 
   test("story's describe step reads the record, not runs/ in the worktree, here and in this repo's copy (B28)", () => {
-    for (const w of [wf("story"), repoWorkflow("story")]) expect(w.steps.describe).toMatchObject({ skill: "norn-pr", inputs: ["spec", "diff", "record"] });
+    for (const w of [wf("story"), repoWorkflow("story")]) expect(w.steps.describe).toMatchObject({ skills: ["norn-pr"], inputs: ["spec", "diff", "record"] });
     expect(readSkill("norn-pr")).toContain("`evidence/<unit>/<run_id>/<file>`");
   });
 
   // Slices are reviewed before they integrate, so only story-level rework would reach the PR unreviewed
   test("story reviews its rework before the check, and a round without rework never reaches review", () => {
     expect(targets("story", "implement")).toEqual({ done: "review" });
-    expect(wf("story").steps.review).toMatchObject({ type: "agent", skill: "norn-review", inputs: ["spec", "diff", "last_findings"] });
+    expect(wf("story").steps.review).toMatchObject({ type: "agent", skills: ["norn-review"], inputs: ["spec", "diff", "last_findings"] });
     expect(wf("story").steps.review?.outcomes).toMatchObject({ changes_requested: { counter: "review_loop" } });
     expect(targets("story", "review")).toEqual({ approve: "test", changes_requested: "implement" });
     const into = (step: string) =>

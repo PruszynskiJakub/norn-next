@@ -317,7 +317,7 @@ norn init [--json] [--hook-command <cmd>]
 
 ##### `norn upgrade`
 
-Move this repo's norn_version and bundled skills to this norn, from norn 0.30 on, staged for you to commit
+Move this repo's norn_version, bundled skills and workflow wording to this norn, from norn 0.30 on, staged for you to commit
 
 ```sh
 norn upgrade [--json]

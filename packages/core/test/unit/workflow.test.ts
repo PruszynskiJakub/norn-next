@@ -33,8 +33,8 @@ describe("validateWorkflowDefinition", () => {
       name: "x",
       start: "a",
       steps: {
-        a: { type: "agent", skill: "s", outcomes: { done: "$done", retry: { to: "b", counter: "c" }, again: "b" } },
-        b: { type: "agent", skill: "s", outcomes: { done: "a" } },
+        a: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { done: "$done", retry: { to: "b", counter: "c" }, again: "b" } },
+        b: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { done: "a" } },
       },
       counters: { c: { max: 1 } },
     };
@@ -43,23 +43,23 @@ describe("validateWorkflowDefinition", () => {
   });
 
   test("self-loop without counter is a cycle", () => {
-    const wf = { name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { done: "$done", more: "a" } } } };
+    const wf = { name: "x", start: "a", steps: { a: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { done: "$done", more: "a" } } } };
     expect(validateWorkflowDefinition(wf).issues.map((i) => [i.code, i.cycle])).toEqual([["uncounted_cycle", ["a"]]]);
   });
 
   test("steps that cannot reach $done", () => {
-    const wf = { name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { done: "b", out: "$done" } }, b: { type: "agent", skill: "s", outcomes: { done: "$stuck" } } } };
+    const wf = { name: "x", start: "a", steps: { a: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { done: "b", out: "$done" } }, b: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { done: "$stuck" } } } };
     expect(validateWorkflowDefinition(wf).issues).toEqual([{ code: "cannot_reach_done", path: "/steps/b", message: "step 'b' cannot reach $done" }]);
   });
 
   test("reserved step names, unknown targets/counters/start, unknown skills, declared exhausted", () => {
-    expect(codes({ name: "x", start: "done", steps: { done: { type: "agent", skill: "s", outcomes: { ok: "$done" } } } })).toContain("reserved_name");
-    expect(codes({ name: "x", start: "a", steps: { $a: { type: "agent", skill: "s", outcomes: { ok: "$done" } } } })).toContain("reserved_name");
-    expect(codes({ name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { ok: "$done", no: "nowhere" } } } })).toEqual(["unknown_target"]);
-    expect(codes({ name: "x", start: "zz", steps: { a: { type: "agent", skill: "s", outcomes: { ok: "$done" } } } })).toEqual(["unknown_start"]);
-    expect(codes({ name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { ok: "$done", r: { to: "a", counter: "nope" } } } } })).toEqual(["unknown_counter"]);
+    expect(codes({ name: "x", start: "done", steps: { done: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { ok: "$done" } } } })).toContain("reserved_name");
+    expect(codes({ name: "x", start: "a", steps: { $a: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { ok: "$done" } } } })).toContain("reserved_name");
+    expect(codes({ name: "x", start: "a", steps: { a: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { ok: "$done", no: "nowhere" } } } })).toEqual(["unknown_target"]);
+    expect(codes({ name: "x", start: "zz", steps: { a: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { ok: "$done" } } } })).toEqual(["unknown_start"]);
+    expect(codes({ name: "x", start: "a", steps: { a: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { ok: "$done", r: { to: "a", counter: "nope" } } } } })).toEqual(["unknown_counter"]);
     expect(codes(SLICE_WF, ["implement", "review"])).toEqual(["unknown_skill", "unknown_skill"]);
-    expect(codes({ name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { ok: "$done", exhausted: "$done" } } } })).toEqual(["reserved_outcome"]);
+    expect(codes({ name: "x", start: "a", steps: { a: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { ok: "$done", exhausted: "$done" } } } })).toEqual(["reserved_outcome"]);
   });
 
   test("the light-path outcomes clean and resolved are declared only on a git update step", () => {
@@ -72,7 +72,7 @@ describe("validateWorkflowDefinition", () => {
     const wf = (check: Record<string, unknown>) => ({
       name: "x",
       start: "c",
-      steps: { c: { type: "check", run: "true", timeout: "1m", ...check }, u: { type: "gate", outcomes: { approve: "c" } } },
+      steps: { c: { type: "check", run: "true", timeout: "1m", ...check }, u: { type: "gate", prompt: "approve or reject u", outcomes: { approve: "c" } } },
     });
     const pass = { pass: "$done", fail: "$stuck" };
     expect(codes(wf({ exits: { 3: "stale" }, outcomes: { ...pass, stale: { to: "u", counter: "n" } } }))).toEqual(["unknown_counter"]);
@@ -84,14 +84,29 @@ describe("validateWorkflowDefinition", () => {
   });
 
   test("a step's skill must be installed for the agent that runs it", () => {
-    const wf = { name: "x", start: "a", steps: { a: { type: "agent", skill: "s", outcomes: { ok: "b" } }, b: { type: "agent", skill: "t", agent: "codex", outcomes: { ok: "$done" } } } };
+    const wf = { name: "x", start: "a", steps: { a: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { ok: "b" } }, b: { type: "agent", instructions: "Use the `t` skill.", skills: ["t"], agent: "codex", outcomes: { ok: "$done" } } } };
     const check = (visible: Record<string, string[]>) => validateWorkflowDefinition(wf, { agentSkills: { agent: "claude", visible } }).issues.map((i) => i.path);
     expect(check({ claude: ["s"], codex: ["t"] })).toEqual([]);
-    expect(check({ claude: ["t"], codex: ["s"] })).toEqual(["/steps/a/skill", "/steps/b/skill"]);
+    expect(check({ claude: ["t"], codex: ["s"] })).toEqual(["/steps/a/skills/0", "/steps/b/skills/0"]);
     expect(check({})).toEqual([]); // agents without a skill folder are not checked
     expect(validateWorkflowDefinition(wf, { agentSkills: { agent: "claude", visible: { claude: [] } } }).issues[0]?.message).toBe(
       "skill 's' is not installed for agent 'claude' (run norn init, or add it to that agent's skill folder)",
     );
+  });
+
+  test("each skill in a step's list is checked: one unknown_skill per skill not installed, or not visible to the agent that runs it", () => {
+    const wf = { name: "x", start: "a", steps: { a: { type: "agent", instructions: "Use the `s` skill.", skills: ["s", "gone", "t", "lost"], agent: "codex", outcomes: { ok: "b" } }, b: { type: "agent", instructions: "close", outcomes: { ok: "$done" } } } };
+    const installed = validateWorkflowDefinition(wf, { skills: ["s", "t"] }).issues;
+    expect(installed.map((i) => [i.code, i.path, i.message])).toEqual([
+      ["unknown_skill", "/steps/a/skills/1", "skill 'gone' is not installed"],
+      ["unknown_skill", "/steps/a/skills/3", "skill 'lost' is not installed"],
+    ]);
+    const visible = validateWorkflowDefinition(wf, { agentSkills: { agent: "claude", visible: { claude: ["s", "gone", "t", "lost"], codex: ["s", "t", "lost"] } } }).issues;
+    expect(visible.map((i) => [i.code, i.path, i.message])).toEqual([
+      ["unknown_skill", "/steps/a/skills/1", "skill 'gone' is not installed for agent 'codex' (run norn init, or add it to that agent's skill folder)"],
+    ]);
+    // a step that names no skill has none to miss
+    expect(validateWorkflowDefinition(wf, { skills: ["s", "gone", "t", "lost"] }).ok).toBe(true);
   });
 
   test("schema errors are reported with paths", () => {

@@ -79,9 +79,9 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:5>
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"update","attempt":1,"visits":{"update":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:2>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"update","attempt":1,"visits":{"update":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:2>","mode":"auto"}
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/workflow.yaml
-      text 29 lines, normalised sha256 9c6be770cc71
+      text 28 lines, normalised sha256 805c40f2e211
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -150,7 +150,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:7>
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"test","attempt":1,"visits":{"update":1,"test":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":1,"run":null,"last_outcome":{"step":"update","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:4>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:6>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"test","attempt":1,"visits":{"update":1,"test":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":1,"run":null,"last_outcome":{"step":"update","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:4>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:6>","mode":"auto"}
 > norn status
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
@@ -220,7 +220,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:8>
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"open-pr","attempt":1,"visits":{"update":1,"test":1,"open-pr":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":2,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:8>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:10>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"open-pr","attempt":1,"visits":{"update":1,"test":1,"open-pr":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":2,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:8>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:10>","mode":"auto"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -281,7 +281,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:11>
   A.notifier.notify approve:gh-7:ready#1
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"ready","attempt":1,"visits":{"update":1,"test":1,"open-pr":1,"ready":1},"step_entered_at":"<time>","status":"parked","park":{"kind":"gate","reason":"approve or reject ready","since":"<time>"},"counters":{"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":3,"run":null,"last_outcome":{"step":"open-pr","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:11>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:14>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"ready","attempt":1,"visits":{"update":1,"test":1,"open-pr":1,"ready":1},"step_entered_at":"<time>","status":"parked","park":{"kind":"gate","reason":"approve or reject ready","since":"<time>"},"counters":{"base_conflict_loop":0,"stale_loop":0},"nudges_used":0,"retries_used":0,"applied_through":3,"run":null,"last_outcome":{"step":"open-pr","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:11>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:14>","mode":"auto"}
 > norn tick --sync
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -322,7 +322,7 @@
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/receipts/0004-classify.json
       {"kind":"classify","receipt_id":"<ulid:16>","run_id":null,"step":"ready","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:15>","outcome":"stale","rule":"base moved","detail":"1 behind, conflicts: a.txt","route":"update","base":{"ref":"refs/remotes/origin/main","sha":"<sha:13>","behind":1,"conflicts":["a.txt"]}}
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"update","attempt":2,"visits":{"update":2,"test":1,"open-pr":1,"ready":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":0,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":4,"run":null,"last_outcome":{"step":"ready","outcome":"stale","source":"classified","at":"<time>","receipt_id":"<ulid:16>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:15>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"update","attempt":2,"visits":{"update":2,"test":1,"open-pr":1,"ready":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":0,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":4,"run":null,"last_outcome":{"step":"ready","outcome":"stale","source":"classified","at":"<time>","receipt_id":"<ulid:16>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:15>","mode":"auto"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -398,7 +398,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:15>
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"resolve","attempt":1,"visits":{"update":2,"test":1,"open-pr":1,"ready":1,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":5,"run":null,"last_outcome":{"step":"update","outcome":"conflict","source":"classified","at":"<time>","receipt_id":"<ulid:17>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:20>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"resolve","attempt":1,"visits":{"update":2,"test":1,"open-pr":1,"ready":1,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":5,"run":null,"last_outcome":{"step":"update","outcome":"conflict","source":"classified","at":"<time>","receipt_id":"<ulid:17>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:20>","mode":"auto"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -433,7 +433,7 @@
   + home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/receipts/0007-started.json
       {"kind":"started","receipt_id":"<ulid:25>","run_id":"<ulid:21>","step":"resolve","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:23>","how":"auto","agent":"claude","worktree":"<dir>/home/repos/repo-<id>/worktrees/gh-7-add-login-form","machine":"tester@box","heartbeat_id":"<ulid:24>","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"}}
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"resolve","attempt":1,"visits":{"update":2,"test":1,"open-pr":1,"ready":1,"resolve":1},"step_entered_at":"<time>","status":"running","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":7,"run":{"run_id":"<ulid:21>","step":"resolve","attempt":1,"started_at":"<time>","how":"auto","agent":"claude","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"},"machine":"tester@box","heartbeat_id":"<ulid:24>"},"last_outcome":{"step":"update","outcome":"conflict","source":"classified","at":"<time>","receipt_id":"<ulid:17>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:23>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"resolve","attempt":1,"visits":{"update":2,"test":1,"open-pr":1,"ready":1,"resolve":1},"step_entered_at":"<time>","status":"running","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":7,"run":{"run_id":"<ulid:21>","step":"resolve","attempt":1,"started_at":"<time>","how":"auto","agent":"claude","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"},"machine":"tester@box","heartbeat_id":"<ulid:24>"},"last_outcome":{"step":"update","outcome":"conflict","source":"classified","at":"<time>","receipt_id":"<ulid:17>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:23>","mode":"auto"}
 > (outside a command)
   spawn repo $ git rev-parse --verify --quiet refs/remotes/origin/main
 > norn tick
@@ -466,7 +466,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:17>
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"update","attempt":3,"visits":{"update":3,"test":1,"open-pr":1,"ready":1,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":8,"run":null,"last_outcome":{"step":"resolve","outcome":"done","source":"reported","at":"<time>","receipt_id":"<ulid:27>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:26>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"update","attempt":3,"visits":{"update":3,"test":1,"open-pr":1,"ready":1,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":8,"run":null,"last_outcome":{"step":"resolve","outcome":"done","source":"reported","at":"<time>","receipt_id":"<ulid:27>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:26>","mode":"auto"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -525,7 +525,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:18>
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"test","attempt":2,"visits":{"update":3,"test":2,"open-pr":1,"ready":1,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":9,"run":null,"last_outcome":{"step":"update","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:28>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:31>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"test","attempt":2,"visits":{"update":3,"test":2,"open-pr":1,"ready":1,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":9,"run":null,"last_outcome":{"step":"update","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:28>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:31>","mode":"auto"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -574,7 +574,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:19>
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"open-pr","attempt":2,"visits":{"update":3,"test":2,"open-pr":2,"ready":1,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":10,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:33>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:35>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"open-pr","attempt":2,"visits":{"update":3,"test":2,"open-pr":2,"ready":1,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":10,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:33>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:35>","mode":"auto"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -640,7 +640,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:22>
   A.notifier.notify approve:gh-7:ready#2
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"ready","attempt":2,"visits":{"update":3,"test":2,"open-pr":2,"ready":2,"resolve":1},"step_entered_at":"<time>","status":"parked","park":{"kind":"gate","reason":"approve or reject ready","since":"<time>"},"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":11,"run":null,"last_outcome":{"step":"open-pr","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:36>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:39>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"ready","attempt":2,"visits":{"update":3,"test":2,"open-pr":2,"ready":2,"resolve":1},"step_entered_at":"<time>","status":"parked","park":{"kind":"gate","reason":"approve or reject ready","since":"<time>"},"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":11,"run":null,"last_outcome":{"step":"open-pr","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:36>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:39>","mode":"auto"}
 > norn story approve gh-7
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -697,7 +697,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:23>
   A.notifier.notify merge:gh-7:100
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"$done","attempt":2,"visits":{"update":3,"test":2,"open-pr":2,"ready":2,"resolve":1},"step_entered_at":"<time>","status":"done","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":12,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:40>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:41>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"$done","attempt":2,"visits":{"update":3,"test":2,"open-pr":2,"ready":2,"resolve":1},"step_entered_at":"<time>","status":"done","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":12,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:40>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:41>","mode":"auto"}
 > norn story update-branch gh-7
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -770,7 +770,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:23>
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"update","attempt":4,"visits":{"update":4,"test":2,"open-pr":2,"ready":2,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":13,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:40>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:43>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"update","attempt":4,"visits":{"update":4,"test":2,"open-pr":2,"ready":2,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":13,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:40>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:43>","mode":"auto"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -825,7 +825,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:25>
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"test","attempt":3,"visits":{"update":4,"test":3,"open-pr":2,"ready":2,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":14,"run":null,"last_outcome":{"step":"update","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:44>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:47>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"test","attempt":3,"visits":{"update":4,"test":3,"open-pr":2,"ready":2,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":14,"run":null,"last_outcome":{"step":"update","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:44>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:47>","mode":"auto"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -873,7 +873,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:26>
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"open-pr","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":2,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":15,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:49>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:51>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"open-pr","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":2,"resolve":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":15,"run":null,"last_outcome":{"step":"test","outcome":"pass","source":"classified","at":"<time>","receipt_id":"<ulid:49>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:51>","mode":"auto"}
 > norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -938,7 +938,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:29>
   A.notifier.notify approve:gh-7:ready#3
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"ready","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":3,"resolve":1},"step_entered_at":"<time>","status":"parked","park":{"kind":"gate","reason":"approve or reject ready","since":"<time>"},"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":16,"run":null,"last_outcome":{"step":"open-pr","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:52>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:55>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"ready","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":3,"resolve":1},"step_entered_at":"<time>","status":"parked","park":{"kind":"gate","reason":"approve or reject ready","since":"<time>"},"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":16,"run":null,"last_outcome":{"step":"open-pr","outcome":"done","source":"classified","at":"<time>","receipt_id":"<ulid:52>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:55>","mode":"auto"}
 > norn story approve gh-7
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -994,7 +994,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:30>
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"$done","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":3,"resolve":1},"step_entered_at":"<time>","status":"done","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":17,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:56>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:57>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"$done","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":3,"resolve":1},"step_entered_at":"<time>","status":"done","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":17,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:56>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:57>","mode":"auto"}
 > norn story handoff gh-7
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -1142,7 +1142,7 @@
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-7-add-login-form
   spawn home/repos/repo-<id>/worktrees/gh-7-add-login-form $ git update-ref refs/norn/heads/gh-7 <sha:30>
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"$done","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":3,"resolve":1},"step_entered_at":"<time>","status":"stuck","park":{"kind":"remote","reason":"remote: PR merged into release, not main","since":"<time>"},"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":17,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:56>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:59>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"$done","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":3,"resolve":1},"step_entered_at":"<time>","status":"stuck","park":{"kind":"remote","reason":"remote: PR merged into release, not main","since":"<time>"},"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":17,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:56>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:59>","mode":"auto"}
 > norn tick --sync
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -1203,7 +1203,7 @@
   spawn repo $ git worktree remove --force <tmp>/norn-record-<rand>/wt
   spawn repo $ git worktree prune
   ~ home/repos/repo-<id>/runs/gh-7/_story/rounds/01-based/state.json
-      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"9c6be770cc71fdadc0b3f339526a0743b1d866b3b5bd0f7369b93cf6ec943d90","step":"$done","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":3,"resolve":1},"step_entered_at":"<time>","status":"done","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":17,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:56>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:60>","mode":"auto"}
+      {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"based","workflow_hash":"805c40f2e211bf36462fab1cf88f9e6a5f527297e99fd5f3e92f859d1a920cec","step":"$done","attempt":3,"visits":{"update":4,"test":3,"open-pr":3,"ready":3,"resolve":1},"step_entered_at":"<time>","status":"done","park":null,"counters":{"base_conflict_loop":1,"stale_loop":1},"nudges_used":0,"retries_used":0,"applied_through":17,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"<time>","receipt_id":"<ulid:56>"},"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:60>","mode":"auto"}
 > norn story update-branch gh-7
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote

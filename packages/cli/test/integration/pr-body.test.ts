@@ -17,15 +17,16 @@ const SHIP = `name: ship
 start: describe
 steps:
   describe:
-    type: agent
-    skill: norn-pr
-    outcomes: { done: { to: open-pr, means: "PR body written" } }
+    agent: Use the \`norn-pr\` skill.
+    skills: [norn-pr]
+    outcomes: { done: open-pr }
+    means:
+      done: "PR body written"
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: ready }
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes: { approve: $done, reject: { to: describe, counter: loop } }
 counters: { loop: { max: 2 } }
 `;

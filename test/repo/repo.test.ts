@@ -642,7 +642,7 @@ describe("the ci check waits for the ci.yml run of the PR's head commit (#125)",
 });
 
 describe("intake by kind", () => {
-  type Wf = { start: string; steps: Record<string, { type: string; skill?: string; instructions?: string; outcomes: Record<string, unknown> }> };
+  type Wf = { start: string; steps: Record<string, { type: string; skills?: string[]; instructions?: string; outcomes: Record<string, unknown> }> };
   const workflow = (wf: string) => repoWorkflow<Wf>(wf);
 
   const targets = (wf: string, step: string) => Object.fromEntries(Object.entries(workflow(wf).steps[step]?.outcomes ?? {}).map(([k, v]) => [k, (v as { to: string }).to]));
@@ -650,7 +650,7 @@ describe("intake by kind", () => {
   test("triage is one norn-triage step that ends the round with done: the recommendation is only in its comment", () => {
     const { steps } = workflow("triage");
     expect(Object.keys(steps)).toEqual(["explore"]);
-    expect(steps.explore?.skill).toBe("norn-triage");
+    expect(steps.explore?.skills).toEqual(["norn-triage"]);
     expect(targets("triage", "explore")).toEqual({ done: "$done" });
   });
 
@@ -658,7 +658,7 @@ describe("intake by kind", () => {
     const { start, steps } = workflow("reproduce");
     expect(start).toBe("reproduce");
     expect(Object.keys(steps)).toEqual(["reproduce"]);
-    expect(steps.reproduce?.skill).toBe("norn-diagnose");
+    expect(steps.reproduce?.skills).toEqual(["norn-diagnose"]);
     expect(targets("reproduce", "reproduce")).toEqual({ reproduced: "$done", cannot_reproduce: "$done" });
   });
 
@@ -668,7 +668,7 @@ describe("intake by kind", () => {
     cpSync(join(PKGS, "cli", "assets", "workflows"), workflowsDir(root), { recursive: true });
     const listing = loadWorkflows(root);
     const shipped = (wf: string) => listing.workflows[wf]?.workflow as unknown as Wf;
-    const shape = (w: Wf) => ({ start: w.start, steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { type: step.type, skill: step.skill, outcomes: step.outcomes }])) });
+    const shape = (w: Wf) => ({ start: w.start, steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { type: step.type, skills: step.skills, outcomes: step.outcomes }])) });
     for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(workflow(wf)) }).toEqual({ wf, ...shape(shipped(wf)) });
   });
 

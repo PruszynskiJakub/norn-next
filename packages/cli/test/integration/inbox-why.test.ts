@@ -19,26 +19,28 @@ const SHIP = `name: ship
 start: work
 steps:
   work:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: qa, means: "built" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: qa }
+    means:
+      done: "built"
   qa:
-    type: agent
-    skill: norn-qa
+    agent: Use the \`norn-qa\` skill.
+    skills: [norn-qa]
     outcomes:
-      pass: { to: open-pr, means: "verified" }
-      partial: { to: human-qa, means: "a person must check some criteria; evidence prepared" }
+      pass: open-pr
+      partial: human-qa
+    means:
+      pass: "verified"
+      partial: "a person must check some criteria; evidence prepared"
   human-qa:
-    type: gate
-    prompt: "evidence attached"
+    gate: "evidence attached"
     outcomes: { approve: open-pr, reject: { to: work, counter: loop } }
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: ready }
   ready:
-    type: gate
-    prompt: "PR ready for review?"
+    gate: "PR ready for review?"
     outcomes: { approve: $done }
 counters: { loop: { max: 2 } }
 `;

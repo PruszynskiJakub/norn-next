@@ -18,12 +18,13 @@ const GATED = `name: gated
 start: work
 steps:
   work:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: review, means: "the change is ready to look at" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means:
+      done: "the change is ready to look at"
   review:
-    type: gate
-    prompt: "Look at it"
+    gate: "Look at it"
     outcomes: { approve: $done, reject: $stuck }
 `;
 

@@ -85,8 +85,8 @@ function stepTypes<S extends TSchema>(outcome: S) {
     {
       type: Type.Literal("agent"),
       ...common,
-      skill: NonEmpty,
-      instructions: Type.Optional(Type.String()),
+      skills: Type.Optional(Type.Array(NonEmpty, { uniqueItems: true, description: "Skills the agent uses, in the order the brief names them" })),
+      instructions: Type.String({ minLength: 1, description: "The orientation: what the step is for" }),
       inputs: Type.Optional(Type.Array(StepInput, { uniqueItems: true })),
       agent: Type.Optional(Type.String({ minLength: 1, description: "Name from config.agents; default config.agent" })),
       model: Type.Optional(NonEmpty),
@@ -132,7 +132,7 @@ function stepTypes<S extends TSchema>(outcome: S) {
     {
       type: Type.Literal("gate"),
       ...common,
-      prompt: Type.Optional(Type.String({ description: "What the person decides; shown in inbox" })),
+      prompt: Type.String({ minLength: 1, description: "What the person decides; shown in inbox" }),
       /** `stale`: tick-classified on a story gate when the base moved under the story */
       outcomes: fixedOutcomes(["approve", "reject", "stale"] as const, outcome),
     },
@@ -173,6 +173,57 @@ function stepTypes<S extends TSchema>(outcome: S) {
     { additionalProperties: false },
   );
   return { AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep };
+}
+
+/**
+ * The step shapes as a file writes them: one head key says what happens (`agent: <orientation>`,
+ * `check: <command>`, `gate: <decision>`, or a verb with no value), the loader reads each into the
+ * model's `type`-tagged step. `outcomes:` holds only routes; an agent step's meanings and verdicts sit
+ * beside it in `means:` and `verdict:`.
+ */
+function fileStepTypes<R extends TSchema>(route: R) {
+  const routes = openOutcomes(route);
+  const model = stepTypes(route);
+  const { type: _t, instructions: _i, agent: _a, outcomes: _o, ...agentKeys } = model.AgentStep.properties;
+  const AgentStep = Type.Object(
+    {
+      agent: Type.String({ minLength: 1, pattern: "\\S", description: "The orientation: what the step is for" }),
+      ...agentKeys,
+      by: Type.Optional(Type.String({ minLength: 1, description: "Name from config.agents; default config.agent" })),
+      outcomes: routes,
+      means: Type.Optional(Type.Record(OutcomeName, Type.String({ minLength: 1 }), { additionalProperties: false, description: "Outcome → what it means, shown to the agent in the brief" })),
+      verdict: Type.Optional(Type.Record(OutcomeName, Verdict, { additionalProperties: false, description: "Outcome → the worst criteria verdict it may be reported with" })),
+    },
+    { additionalProperties: false },
+  );
+  const CheckStep = Type.Object(
+    { check: NonEmpty, ...common, timeout: Duration, exits: model.CheckStep.properties.exits, outcomes: routes },
+    { additionalProperties: false },
+  );
+  const GateStep = Type.Object(
+    {
+      gate: Type.String({ minLength: 1, pattern: "\\S", description: "What the person decides; shown in inbox" }),
+      ...common,
+      outcomes: fixedOutcomes(["approve", "reject", "stale"] as const, route),
+    },
+    { additionalProperties: false },
+  );
+  const verb = <K extends string>(head: K, outcomes: readonly string[]) =>
+    Type.Object(
+      { [head]: Type.Null({ description: "Takes no value" }), ...common, outcomes: fixedOutcomes(outcomes, route) } as { [P in K]: ReturnType<typeof Type.Null> } & typeof common & { outcomes: TSchema },
+      { additionalProperties: false },
+    );
+  return {
+    AgentStep,
+    CheckStep,
+    GateStep,
+    UpdateBranchStep: verb("update-branch", ["done", "conflict", "clean", "resolved"]),
+    OpenPrStep: verb("open-pr", ["done", "conflict"]),
+    IntegrateStep: verb("integrate", ["done", "conflict"]),
+    PushStep: verb("push", ["done", "conflict"]),
+    AwaitMergeStep: verb("await-merge", ["stale"]),
+    SlicesStep: verb("slices", ["done", "stuck"]),
+  };
 }
 
 export const { AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep } = stepTypes(OutcomeSpec);
@@ -264,23 +315,40 @@ export const ExitEdge = Type.Object(
 );
 export type ExitEdge = Static<typeof ExitEdge>;
 
-const SharedSteps = stepTypes(Type.Union([Target, OutcomeEdge, ExitEdge]));
-const SharedStep = TaggedUnion("type", [SharedSteps.AgentStep, SharedSteps.CheckStep, SharedSteps.GateStep, SharedSteps.GitStep, SharedSteps.SlicesStep, SharedSteps.MergeStep]);
+/** A route as a file writes it: a bare target or `{ to, counter }`; its meaning and verdict sit in the step's sibling maps. */
+const FileRoute = Type.Union([Target, Type.Object({ to: Target, counter: Type.Optional(CounterName) }, { additionalProperties: false })]);
+const fileSteps = (route: TSchema) => Object.values(fileStepTypes(route)) as TObject[];
+const FileSteps = fileSteps(FileRoute);
+// A shared file's route may also leave it through an exit, which its `use` step routes by name
+const SharedSteps = fileSteps(Type.Union([FileRoute, Type.Object({ exit: OutcomeName }, { additionalProperties: false })]));
+
+const SharedModelSteps = stepTypes(Type.Union([Target, OutcomeEdge, ExitEdge]));
+
+/** A shared file's steps in the loaded model's form, the way the loader checks them before flattening; never published. */
+export const WorkflowSharedModel = Type.Object(
+  {
+    $schema: Type.Optional(Type.String()),
+    description: Type.Optional(Type.String()),
+    start: StepName,
+    steps: Type.Record(
+      StepName,
+      TaggedUnion("type", [SharedModelSteps.AgentStep, SharedModelSteps.CheckStep, SharedModelSteps.GateStep, SharedModelSteps.GitStep, SharedModelSteps.SlicesStep, SharedModelSteps.MergeStep]),
+      { minProperties: 1, additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false },
+);
 
 /**
  * `like: <step>` copies a step of the same file; each key it writes replaces the copied value whole.
  * Its keys are checked loosely here: the full check runs on the copy, once the target fills it in.
  */
 function likeStep(variants: TObject[]) {
-  const keys = [...new Set(variants.flatMap((v) => Object.keys(v.properties)))].filter((k) => k !== "type");
+  const keys = [...new Set(variants.flatMap((v) => Object.keys(v.properties)))];
   const loose = Object.fromEntries(keys.map((k) => [k, Type.Optional(Type.Unknown())])) as Record<string, TOptional<TUnknown>>;
-  const types = variants.map((v) => v.properties.type as TSchema);
-  return Type.Object(
-    { like: StepName, type: Type.Optional(Type.Union(types)), ...loose },
-    { additionalProperties: false },
-  );
+  return Type.Object({ like: StepName, ...loose }, { additionalProperties: false });
 }
-const LikeStep = likeStep([AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep]);
+const LikeStep = likeStep(FileSteps);
 
 export const SharedName = Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "A file in `.agents/workflows/shared/`, without `.yaml`" });
 
@@ -298,11 +366,11 @@ export const UseStep = Type.Object(
 );
 export type UseStep = Static<typeof UseStep>;
 
-/** A workflow file as written, before its `use` and `like` steps are filled in; `workflow` is the loaded, flat form. */
+/** A workflow file as written, before its `use` and `like` steps are filled in; the loaded, flat form is `Workflow`. */
 export const WorkflowSource = Type.Object(
   {
     ...Workflow.properties,
-    steps: Type.Record(StepName, Type.Union([Step, UseStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
+    steps: Type.Record(StepName, Type.Union([...FileSteps, UseStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
   },
   {
     $id: "https://norn.dev/schema/workflow-source.json",
@@ -318,7 +386,7 @@ export const WorkflowShared = Type.Object(
     $schema: Type.Optional(Type.String()),
     description: Type.Optional(Type.String()),
     start: StepName,
-    steps: Type.Record(StepName, Type.Union([SharedStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
+    steps: Type.Record(StepName, Type.Union([...SharedSteps, LikeStep]), { minProperties: 1, additionalProperties: false }),
   },
   {
     $id: "https://norn.dev/schema/workflow-shared.json",

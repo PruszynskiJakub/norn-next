@@ -23,18 +23,23 @@ const DUO = `name: duo
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
     inputs: [spec, diff, handoff, last_findings]
-    outcomes: { done: { to: review, means: "every criterion has a passing test" } }
+    outcomes: { done: review }
+    means:
+      done: "every criterion has a passing test"
   review:
-    type: agent
-    skill: norn-review
+    agent: Use the \`norn-review\` skill.
+    skills: [norn-review]
     outcomes:
-      approve: { to: sign-off, means: "no blocking findings" }
-      changes_requested: { to: implement, counter: review_loop, means: "blocking findings in the receipt" }
+      approve: sign-off
+      changes_requested: { to: implement, counter: review_loop }
+    means:
+      approve: "no blocking findings"
+      changes_requested: "blocking findings in the receipt"
   sign-off:
-    type: gate
+    gate: approve or reject sign-off
     outcomes: { approve: $done, reject: { to: implement, counter: review_loop } }
 counters: { review_loop: { max: 3 } }
 `;
@@ -43,10 +48,12 @@ const PAIR = `name: pair
 start: refine
 steps:
   refine:
-    type: agent
-    skill: norn-refine
+    agent: Use the \`norn-refine\` skill.
+    skills: [norn-refine]
     attended: true
-    outcomes: { done: { to: $done, means: "the person agrees the spec is ready" } }
+    outcomes: { done: $done }
+    means:
+      done: "the person agrees the spec is ready"
 `;
 
 const CONFIG = `provider: gh

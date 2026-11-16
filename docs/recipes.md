@@ -93,19 +93,33 @@ Set `status: done` in the story's `spec.md` on the base yourself and commit it, 
 ## Write your own workflow
 
 1. Copy one of the workflows in `.agents/workflows/` under a new name, for example `docs.yaml`, and change its `name:`.
-2. Edit the steps: each names its type, its skill or command, and where each outcome goes. A route back needs a counter.
+2. Edit the steps. Each opens with one head key that says what happens (`agent:`, `check:`, `gate:` or a verb with no value such as `open-pr:`), then says where each outcome goes in `outcomes:`. A route back needs a counter. An agent step's head is its orientation, what the step is for; `skills:` (optional) lists the skills it uses, `by:` picks a configured agent, and `means:` says what each routed outcome means (with `verdict:` beside it when the outcome judges the criteria):
 
 ```yaml
+  implement:
+    agent: Build the change the spec asks for, test-first.
+    skills: [norn-implement]
+    inputs: [spec, handoff, last_check]
+    outcomes:
+      done: test
+    means:
+      done: "every criterion has a passing test"
   test:
-    type: check
-    run: npm ci && npm test
+    check: npm ci && npm test
     timeout: 15m
     outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
+  ready:
+    gate: Read the draft PR. Approve to wait for the merge, or reject with what to change.
+    outcomes: { approve: merge, reject: { to: implement, counter: ready_loop } }
 ```
 
-   A `merge` step after the last gate keeps a story past that gate in its workflow until its PR merges: `merge: { type: merge, outcomes: { stale: { to: update, counter: stale_loop } } }`. Its one outcome is `stale`; the merge itself ends the story.
+   norn refuses at load a step with two head keys or none, a verb given a value (`open-pr: now`), an agent step with no orientation, a skill listed twice, a routed outcome with no meaning, a meaning or verdict for an outcome the step does not route, and `means:` or `verdict:` on a step that is not an agent step.
 
-   Once `open-pr` has run, every route from a step that changes code (an agent step or `git: update`) to a gate or merge step the round can end from must pass `open-pr` again: then the PR head a person merges is the commit CI checked. norn refuses a workflow that skips it and names the path. At run time, a story waiting at such a gate or merge step whose local head changes a path outside its spec folder that the PR lacks goes back to `open-pr` on its own. Changes inside the spec folder stay local.
+   A file in the old wording (`type: agent` with `skill:` and `instructions:`, `type: check` with `run:`, `type: gate` with `prompt:`, `type: git` with `action:`, `means`/`verdict` inside a route) is refused in the main checkout. Run `norn upgrade`: it rewrites each such file in place, keeping its comments and layout. A story already in flight keeps running on its pinned workflow.
+
+   An `await-merge:` step after the last gate keeps a story past that gate in its workflow until its PR merges: `merge: { await-merge: null, outcomes: { stale: { to: update, counter: stale_loop } } }`. Its one outcome is `stale`; the merge itself ends the story.
+
+   Once `open-pr` has run, every route from a step that changes code (an agent step or `update-branch:`) to a gate or merge step the round can end from must pass `open-pr` again: then the PR head a person merges is the commit CI checked. norn refuses a workflow that skips it and names the path. At run time, a story waiting at such a gate or merge step whose local head changes a path outside its spec folder that the PR lacks goes back to `open-pr` on its own. Changes inside the spec folder stay local.
 
    A check ends in `pass` (exit 0) or `fail` (any other exit). One that can end another way names the outcome per exit code in `exits` and routes it like any other: the shipped `ci` check exits 3 on a PR that conflicts with its base, and `exits: { 3: stale }` with `stale: { to: update, counter: stale_loop }` sends the story to take the base instead of to `implement`.
 
@@ -127,12 +141,10 @@ description: Open or update the PR, then wait for its CI.
 start: open-pr
 steps:
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: ci }
   ci:
-    type: check
-    run: ./scripts/wait-for-ci.sh
+    check: ./scripts/wait-for-ci.sh
     timeout: 30m
     exits: { 3: stale }
     outcomes:
@@ -145,9 +157,10 @@ A workflow brings the file in with a step that holds only `use: <name>` and the 
 
 ```yaml
   describe:
-    type: agent
-    skill: norn-pr
+    agent: Write the PR body to pr.md in the spec folder.
+    skills: [norn-pr]
     outcomes: { done: ship }
+    means: { done: "pr.md describes the branch as it is now" }
   ship:
     use: ship
     outcomes:
@@ -164,8 +177,7 @@ A step written `like: <step>` copies that step of the same file and replaces eac
 
 ```yaml
   test:
-    type: check
-    run: npm ci && npm test
+    check: npm ci && npm test
     timeout: 15m
     outcomes: { pass: qa, fail: { to: implement, counter: test_loop } }
   test-merge:
@@ -173,7 +185,7 @@ A step written `like: <step>` copies that step of the same file and replaces eac
     outcomes: { pass: open-pr, fail: { to: implement, counter: test_loop } }
 ```
 
-`test-merge` runs the same command with the same timeout; only its `outcomes` differ. A key is replaced whole, never merged: `test-merge` above writes both of its routes.
+`test-merge` runs the same command with the same timeout; only its `outcomes` differ. A key is replaced whole, never merged: `test-merge` above writes both of its routes. A copy inherits its target's head key and may not write another one (that is two head keys). The same holds for `means:` and `verdict:`: a copy that writes `means:` replaces the whole map, so it must give a meaning for every outcome it routes, inherited ones included, or it is refused.
 
 ### What norn refuses
 
@@ -189,6 +201,10 @@ norn refuses the workflow when it loads, naming the file and the step, and shows
 - a `like:` naming a step that does not exist, the step itself, another `like` step, a `use` step or a step of another file, and a `use` step that carries `like`.
 
 An included step that breaks an ordinary rule (an unknown counter, a route back without a counter) is refused with a message that names its shared file and the step in it.
+
+## Name your own skill in a step
+
+Write the skill under a name without the `norn-` prefix in `.agents/skills/<name>/SKILL.md`, link it into each agent's skill folder, and list it in the step: `skills: [my-review]`. A step may list several (`skills: [my-review, norn-tdd]`); the brief then says "Use the `my-review` and `norn-tdd` skills." above the step's orientation. A step with no `skills:` gets only its orientation. A skill that is not installed, or not visible to the agent `by:` picks, is refused at load (`unknown_skill`), and `norn doctor` reports it.
 
 ## Hand a story over
 
@@ -238,7 +254,7 @@ The repo's norn version (`norn_version` in `.agents/norn.config.yaml`, see [Conc
 
 1. Install the new norn ([README: Install](../README.md#install)) and check it with `norn --version`.
 2. Stop `norn watch` (and any cron tick) on this checkout: `norn upgrade` refuses while a tick runs.
-3. Run `norn upgrade`. It rewrites the bundled `norn*` skills in `.agents/skills/` to its copies and relinks them into each configured agent's skill folder, then moves `norn_version` to the running binary's version, last, so a run cut short leaves the old version and a rerun finishes it. Everything is staged and nothing committed; it ends with the commit to make, which names the new version (or says only the skills were refreshed). It also creates any label norn uses that is missing on the remote, and a remote it cannot reach is reported without failing the upgrade. With nothing to do it prints `already on norn <version>: nothing to upgrade` and stages nothing.
+3. Run `norn upgrade`. It rewrites each workflow and shared file in `.agents/workflows/` still in the old wording to the new one, keeping its comments and layout; a file holding a comment the rewrite cannot place is left as written and listed with its line, for you to edit by hand, and the rest still move. It rewrites the bundled `norn*` skills in `.agents/skills/` to its copies and relinks them into each configured agent's skill folder, then moves `norn_version` to the running binary's version, last, so a run cut short leaves the old version and a rerun finishes it. Everything is staged and nothing committed; it ends with the commit to make, which names the new version (or says only the skills were refreshed). It also creates any label norn uses that is missing on the remote, and a remote it cannot reach is reported without failing the upgrade. With nothing to do it prints `already on norn <version>: nothing to upgrade` and stages nothing.
 4. Review `git diff --staged`, commit it and push it to the base branch (through a PR if your base branch takes only PRs).
 
 `norn upgrade` never moves the version backward: a binary older than the repo's version is refused with the norn to install. To really go back, edit the key in the team file by hand, where review sees it.

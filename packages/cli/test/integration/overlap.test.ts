@@ -19,7 +19,7 @@ const HELD = `name: held
 start: ready
 steps:
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes: { approve: $done, reject: $stuck }
 `;
 

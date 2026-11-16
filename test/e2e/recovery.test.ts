@@ -25,9 +25,11 @@ const SOLO = `name: solo
 start: implement
 steps:
   implement:
-    type: agent
-    skill: norn-implement
-    outcomes: { done: { to: $done, means: "implemented" } }
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means:
+      done: "implemented"
 `;
 
 const CONFIG = `provider: gh

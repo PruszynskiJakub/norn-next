@@ -10,6 +10,7 @@ import {
   parseHandoff,
   patchSliceFile,
   patchStoryFile,
+  parseWorkflowText,
   pinWorkflow,
   readHandoff,
   readLog,
@@ -119,6 +120,13 @@ describe("unit files", () => {
     expect(r.ok && r.value.hash).toBe(sha256(changed));
     expect(r.ok && r.value.workflow.counters?.test_loop?.max).toBe(4);
     expect(() => pinWorkflow(tmp(), "name: x\n")).toThrow(/invalid workflow/);
+  });
+  test("a file's one `skill` on an agent step loads as a one-item `skills` list, its description as the orientation", () => {
+    const u = tmp();
+    pinWorkflow(u, "name: x\nstart: a\nsteps:\n  a:\n    type: agent\n    description: d\n    skill: norn-implement\n    outcomes: { done: $done }\n");
+    const r = readPinnedWorkflow(u);
+    const step = r.ok ? r.value.workflow.steps.a : null;
+    expect(step).toEqual({ type: "agent", instructions: "d", description: "d", skills: ["norn-implement"], outcomes: { done: { to: "$done", means: "step finished with outcome done" } } });
   });
   test("logs and evidence", () => {
     const u = tmp();

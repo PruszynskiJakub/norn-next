@@ -51,7 +51,7 @@ describe("Reference render (B13)", () => {
 
   test("the repo's norn version key and norn upgrade are listed, with upgrade's 0.30 starting point; no norn migrate", () => {
     expect(fresh).toContain("| `norn_version` | team | string | `null` |");
-    expect(fresh).toContain("##### `norn upgrade`\n\nMove this repo's norn_version and bundled skills to this norn, from norn 0.30 on");
+    expect(fresh).toContain("##### `norn upgrade`\n\nMove this repo's norn_version, bundled skills and workflow wording to this norn, from norn 0.30 on");
     expect(fresh).not.toContain("migrate");
   });
 

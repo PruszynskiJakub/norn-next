@@ -19,35 +19,32 @@ const LIGHT = `name: light
 start: update
 steps:
   update:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: test, clean: test-merge, resolved: test-resolution, conflict: { to: resolve, counter: base_conflict_loop } }
   resolve:
-    type: agent
-    skill: norn-merge
+    agent: Use the \`norn-merge\` skill.
+    skills: [norn-merge]
     inputs: [spec, handoff]
-    outcomes: { done: { to: update, means: "base merged, conflicts resolved and committed" } }
+    outcomes: { done: update }
+    means:
+      done: "base merged, conflicts resolved and committed"
   test:
-    type: check
-    run: "true"
+    check: "true"
     timeout: 1m
     outcomes: { pass: open-pr, fail: $stuck }
   test-merge:
-    type: check
-    run: "true"
+    check: "true"
     timeout: 1m
     outcomes: { pass: open-pr, fail: $stuck }
   test-resolution:
-    type: check
-    run: "true"
+    check: "true"
     timeout: 1m
     outcomes: { pass: open-pr, fail: $stuck }
   open-pr:
-    type: git
-    action: open-pr
+    open-pr:
     outcomes: { done: ready }
   ready:
-    type: gate
+    gate: approve or reject ready
     outcomes: { approve: $done, reject: $stuck }
 counters: { base_conflict_loop: { max: 2 } }
 `;
