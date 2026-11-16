@@ -1,7 +1,7 @@
 ---
 id: gh-345/06
 title: Docs for derived counters and max on an edge
-depends_on: []
+depends_on: [gh-345/05]
 status: planned
 criteria:
   - { id: AC1, verifier: agent }
@@ -23,4 +23,4 @@ User stories: the workflow docs (recipes and concepts) giving the defaults table
 - `bun run test`
 
 ## Notes
-D11. No dependencies: the docs can be written from the spec, but they must match the rules slices 02 and 03 implement (D4, D5, D7). If either changes a rule while being built, its review should flag the docs. Examples in the docs should follow the design record's `quick.yaml` shape (`fail: { to: implement, max: 3 }`, a bare `reject: implement`).
+D11. Depends on slice 05 (and through it on 02 and 03): the docs are written against the rules as built (D4, D5, D7), and `docs:emit` emits the reference from the final shipped workflows. Examples in the docs should follow the design record's `quick.yaml` shape (`fail: { to: implement, max: 3 }`, a bare `reject: implement`).

@@ -8,7 +8,7 @@ criteria:
   - { id: AC2, verifier: test }
   - { id: AC3, verifier: test }
   - { id: AC4, verifier: test }
-  - { id: AC5, verifier: agent }
+  - { id: AC5, verifier: test }
 ---
 
 ## Goal
@@ -22,7 +22,7 @@ User stories: a shared exit counted once as `<use step>.<exit>`; its default fro
 - AC2 Given a shared exit fed only by a gate's `reject` (or only by `stale`), when loaded, then its counter `<use step>.<exit>` has max 2 (or 10). Given `max: 3` on the use step's route, then it has max 3. A feeder that derives nothing stays uncounted, and a use route to `$done`/`$stuck` derives nothing. — verifier: test
 - AC3 Given a shared exit fed by a `conflict` edge, when loaded, then its counter has max 2 and resets on every other outcome of every feeder step. — verifier: test
 - AC4 Given a shared exit fed by a check's `fail` and a gate's `reject` with no `max:` on the use route, when loaded, then the load is refused with an error naming the exit, its use step, and each kind with its edge (check fail: `test.fail`; gate reject: `ready.reject`), pointing at the use route. With `max:` on that route, the feeders share that max with no reset. — verifier: test
-- AC5 Given a throwaway repo with such a mixed-kind exit and no `max:`, when `norn doctor` runs (the dev build), then it reports the refusal prefixed with the shared file and naming the exit. — verifier: agent
+- AC5 Given a repo through the cli harness with such a mixed-kind exit and no `max:`, when `norn doctor` runs, then it reports the refusal prefixed with the shared file and naming the exit. — verifier: test (a cli integration test over `norn doctor`, seam S4)
 
 ## Checks
 - `bun run test`

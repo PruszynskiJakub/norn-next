@@ -26,6 +26,7 @@ User stories: the shipped files holding only what differs from the defaults; eve
 - `bun run test`
 - `bun run typecheck`
 - `bun run golden -- --update` (review the diff before committing)
+- `bun run docs:emit` (the emitted reference in `docs/reference.md` is generated from the shipped workflows; commit what it writes)
 
 ## Notes
 D8. Edit every shipped workflow in both `packages/cli/assets/workflows/` and `.agents/workflows/`; release lives only in `.agents/`. Shipped quick derives `ship.stale`. The shared `stale_loop` stays in shipped story, release, and this repo's quick and story. Slice drops `conflict_loop`. If the invariant table shows any other difference, the derivation or the edit is wrong, not the table.

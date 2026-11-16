@@ -32,12 +32,12 @@ criteria:
   - { id: 02.AC9, verifier: test }
   - { id: 02.AC10, verifier: test }
   - { id: 02.AC11, verifier: test }
-  - { id: 02.AC12, verifier: agent }
+  - { id: 02.AC12, verifier: test }
   - { id: 03.AC1, verifier: test }
   - { id: 03.AC2, verifier: test }
   - { id: 03.AC3, verifier: test }
   - { id: 03.AC4, verifier: test }
-  - { id: 03.AC5, verifier: agent }
+  - { id: 03.AC5, verifier: test }
   - { id: 04.AC1, verifier: test }
   - { id: 04.AC2, verifier: test }
   - { id: 04.AC3, verifier: test }

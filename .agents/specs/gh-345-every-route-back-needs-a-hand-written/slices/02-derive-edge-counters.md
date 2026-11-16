@@ -1,7 +1,7 @@
 ---
 id: gh-345/02
 title: Derive a counter per edge at load, with max on the edge
-depends_on: []
+depends_on: [gh-345/01]
 status: planned
 criteria:
   - { id: AC1, verifier: test }
@@ -15,7 +15,7 @@ criteria:
   - { id: AC9, verifier: test }
   - { id: AC10, verifier: test }
   - { id: AC11, verifier: test }
-  - { id: AC12, verifier: agent }
+  - { id: AC12, verifier: test }
 ---
 
 ## Goal
@@ -36,7 +36,7 @@ User stories: a check's fail and exits-named outcomes bounded at 5; a gate's rej
 - AC9 Given a loop that no edge counts even after derivation (only agent `done` edges, say), when loaded, then it is refused with the `cycle without a counter` message naming its edges, as today. — verifier: test
 - AC10 Given a workflow in which every route back already names a counter (today's bundled and repo files), when loaded, then its pinned source and hash are unchanged byte for byte. A workflow that derives at least one counter is pinned as the derived text. — verifier: test
 - AC11 Given a `state.json`, an exhausted park, a receipt's reset list and a pinned workflow that hold a dotted counter name like `review.changes_requested`, when validated, then they pass. A written workflow's `counters:` key or `counter:` with a dot is still refused. — verifier: test
-- AC12 Given a throwaway repo with a workflow that leaves every default unwritten, and others with `max:` plus `counter:` on one edge and `max:` on an edge to `$done`, when `norn doctor` runs (the dev build), then the first passes and each of the others is reported with the edge it is about. — verifier: agent
+- AC12 Given a repo through the cli harness with a workflow that leaves every default unwritten, and others with `max:` plus `counter:` on one edge and `max:` on an edge to `$done`, when `norn doctor` runs, then the first passes and each of the others is reported with the edge it is about. — verifier: test (a cli integration test over `norn doctor`, seam S4)
 
 ## Checks
 - `bun run test`
@@ -44,6 +44,7 @@ User stories: a check's fail and exits-named outcomes bounded at 5; a gate's rej
 - `bun run schema:emit` (after the schema change; commit the emitted files)
 
 ## Notes
+- Depends on slice 01: the Plan builds the prefactor first, and its top risk asks that the invariant table of today's counting exist before any derivation, so every later change is checked against it.
 - D1, D2, D3, D4, D6 and D7. The derivation is one pure function in core. The store writes its result into the text inside `loadWorkflowText`, after flattening and before pinning.
 - Risk from the Plan: list every caller of `parseWorkflowText` and the flattener (record-ref restart, story edit, upgrade wording, tick trace). Make sure each one that reads a *workflow file* (not a pin) goes through the loader. Otherwise `max:` is refused as a schema error there, or an underived text gets pinned. A pin is read as written and never derived again.
 - The agent row reuses `elementaryCycles` over the edges still uncounted after the other rows and the named counters. Rows 1–4 count their edge even off a loop (the person's decision).
