@@ -2,7 +2,7 @@
 id: gh-345/06
 title: Docs for derived counters and max on an edge
 depends_on: [ gh-345/05 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: agent }
   - { id: AC2, verifier: test }
