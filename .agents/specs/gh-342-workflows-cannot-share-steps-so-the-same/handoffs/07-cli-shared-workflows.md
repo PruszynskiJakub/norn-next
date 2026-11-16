@@ -4,12 +4,17 @@ A person meets a broken shared file wherever a broken workflow shows, with messa
 
 ## Proof
 
-- AC1 (doctor names `shared/<name>.yaml` and the step for an included step routing back without a counter, or naming an undeclared counter): `packages/cli/test/integration/shared-workflows.test.ts` › "AC1: doctor names the shared file and the step of an issue on an included step". Code: `inSharedFile` in `packages/cli/src/runtime/workflows.ts` (the shared validator observe and doctor use) prefixes `shared/<file>.yaml, step '<step>': ` using the loader's `included` map; an uncounted cycle takes the first included step of its cycle when its path step is not included.
-- AC2 (a missing shared file shows broken in doctor and the listing, story create and story edit refuse it as a broken workflow): same file › "AC2: a missing shared file is broken…", compared side by side with a schema-broken `bad.yaml`. No code change needed: the loader reports it as a listing error.
-- AC3 (`story edit --workflow ship` with only `shared/ship.yaml` → `unknown_workflow`): same file › "AC3: story edit --workflow naming a shared file is refused as an unknown workflow". No code change needed (listing reads only the workflows folder's own files).
-- AC4 (round pins flattened text, no `use`/`like`, hash = sha256 of it; shared edit after `story edit` → `round.workflow_changed`; next edit takes the new text; running round keeps its pin): same file › "AC4: the round pins the flattened text…". No code change needed (pin reads `source`).
-- AC5 (lost-record restart flattens the branch's shared file, not the work tree's; missing on the branch → `workflow_invalid`): `packages/cli/test/integration/takeover-record-lost.test.ts` › "the restart flattens the shared file on the branch, not the one in the work tree" (red before the change in `lostRecord`, `packages/cli/src/runtime/checkout.ts`) and "a shared file missing on the branch: refused workflow_invalid naming it, nothing taken".
-- `bun run test` (1938 pass) and `bun run typecheck` green. The new integration tests were run once locally by file and name filter (all pass); the full integration tier runs in CI.
+Review #1: approve, no findings. Traceability (each test read and seen to assert its item):
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | doctor names `shared/<name>.yaml` and the step for an included step routing back without a counter or naming an undeclared counter | test | `packages/cli/test/integration/shared-workflows.test.ts` › "AC1: doctor names the shared file and the step of an issue on an included step" |
+| AC2 | a missing shared file shows broken in doctor and the listing; story create and story edit refuse it as a broken workflow | test | `packages/cli/test/integration/shared-workflows.test.ts` › "AC2: a missing shared file is broken in doctor and the listing, and refused by story create and story edit as a broken workflow is" |
+| AC3 | `story edit --workflow ship` with only `shared/ship.yaml` refuses as an unknown workflow | test | `packages/cli/test/integration/shared-workflows.test.ts` › "AC3: story edit --workflow naming a shared file is refused as an unknown workflow" |
+| AC4 | the round pins the flattened text (no `use`/`like`, hash over it); a shared edit after story edit refuses the start with `round.workflow_changed`; the next edit takes it; a running round keeps its pin | test | `packages/cli/test/integration/shared-workflows.test.ts` › "AC4: the round pins the flattened text; a shared edit after story edit refuses the start, the next edit takes it, a running round keeps its pin" |
+| AC5 | a lost-record restart flattens the branch's shared file, not the work tree's; missing on the branch refuses `workflow_invalid` | test | `packages/cli/test/integration/takeover-record-lost.test.ts` › "the restart flattens the shared file on the branch, not the one in the work tree" and "a shared file missing on the branch: refused workflow_invalid naming it, nothing taken" |
+
+Code: `inSharedFile` in `packages/cli/src/runtime/workflows.ts` prefixes an issue on an included step with `shared/<file>.yaml, step '<step>': ` from the loader's `included` map; `lostRecord` in `packages/cli/src/runtime/checkout.ts` reads each used shared file with `git show` on the branch head, as `loadFile` does from disk. `bun run test` and `bun run typecheck` green (test#1).
 
 ## Easy to miss
 
@@ -26,4 +31,4 @@ A person meets a broken shared file wherever a broken workflow shows, with messa
 
 ## Resume
 
-Implementation done; next is review of this slice.
+Review approved; next is the slice's following step (QA / CI integration tier).
