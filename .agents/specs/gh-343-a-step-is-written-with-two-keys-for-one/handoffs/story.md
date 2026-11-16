@@ -2,7 +2,7 @@
 
 ## Goal
 
-A step opens with one head key; skills become an optional `skills:` list; meanings and verdicts move to sibling `means:` / `verdict:` maps; `by:` picks the agent. `norn upgrade` rewrites old files losslessly, and old pins keep loading. All 10 slices are integrated and QA #1 is done. Review #1 sent the translator back (Not proven yet).
+A step opens with one head key; skills become an optional `skills:` list; meanings and verdicts move to sibling `means:` / `verdict:` maps; `by:` picks the agent. `norn upgrade` rewrites old files losslessly, and old pins keep loading. All 10 slices are integrated and QA #1 is done. Review #1's two blocking findings are fixed.
 
 ## Proof
 
@@ -19,7 +19,7 @@ QA #1 report: 47 pass, 0 fail. Golden decisions are identical to origin/main in 
 | 02.AC5 | refine step found by its skills | test | core `decide.test.ts` › "GR8: a refine step is the one whose skills include…" |
 | 02.AC6 | golden decisions and finish lines unchanged | test | `golden.test.ts` |
 | 03.AC1 | shipped files translate byte for byte | test | store `wording` › "<f> translates byte for byte…" |
-| 03.AC2 | scalars kept, or the file refused with its line | test | `wording` › "folded, block and quoted scalars…" (but see F2) |
+| 03.AC2 | scalars kept, or the file refused with its line | test | `wording` › "folded, block and quoted scalars…" |
 | 03.AC3 | skill + instructions → `agent:` + `skills:` | test | `wording` › "an agent step's skill and instructions…" |
 | 03.AC4 | fallback texts | test | `wording` › "fallbacks" |
 | 03.AC5 | long edge split, comment kept | test | `wording` › "a long edge keeps to/counter…" |
@@ -72,18 +72,15 @@ QA #1 report: 47 pass, 0 fail. Golden decisions are identical to origin/main in 
 
 ## Not proven yet
 
-- Review #1, F1 (blocking): an old copy with `instructions: ""` or `prompt: ""` (valid on main) is now corrupt. `headValueObj` (`packages/store/src/wording.ts:157`) carries the empty string over. Treat blank as missing and use the fallback.
-- Review #1, F2 (blocking): `norn upgrade` can stage a broken file.
-  - The flow edge `{ means: a,  verdict: pass, to: $done, counter: c }` (two spaces after the comma) becomes `{ o: $done, … }`: the removals overlap in `edgeEdits` (`wording.ts:420-428`).
-  - A folded `skill: >-` becomes `skills: [>-` …, which does not parse (`wording.ts:324`).
-  - Fix: re-parse the spliced text and compare it with `translateWordingValue`; refuse when they differ.
-- The rest of the findings (minor and nit) are in the review receipt.
-- 06.AC1, 07.AC1, 01.AC1: integration CI has not run green on the current head.
+- 06.AC1, 07.AC1, 01.AC1: integration CI has not yet run green on this head.
+- Review #1's minor and nit findings are left as notes in the review receipt, as the brief asked.
 
 ## Notes
 
-- The CI fix (three stale integration tests) was right; CI had failed only those three, and they pass locally.
+- Review #1 F1 (an old copy with a blank instructions or prompt loaded as corrupt) is fixed in `packages/store/src/wording.ts`. A blank `instructions`, `prompt` or `description` counts as missing on both paths and falls back to today's text. A `like` copy's blank override is dropped. Tests: store `new-wording.test.ts` › "blank %s loads with today's fallback text"; `wording.test.ts` › "a blank instructions or prompt takes today's fallback text".
+- Review #1 F2 (upgrade could stage broken YAML) is fixed. `translateYaml` re-parses its splice and requires it to deep-equal `translateWordingValue`; otherwise it refuses at the step that differs. Flow-edge prose is removed one run at a time, so removals never overlap. A multi-line `skill:` is refused. Tests: `wording.test.ts` › "a flow edge with uneven spacing…", "a skill written as a block scalar is refused…", "a rewrite that would load differently… is refused at its step".
+- That check now refuses minor #3's input (a `like` copy that repeats `type: agent`). It does not translate it.
 
 ## Resume
 
-Fix F1 and F2 test-first in `packages/store/src/wording.ts`, with translator tests for the repro inputs above and a copy-read test for an empty `instructions:`. Then run `bun run test` and `bun run typecheck`.
+Review this head for review #1's F1 and F2. CI must go green on it.
