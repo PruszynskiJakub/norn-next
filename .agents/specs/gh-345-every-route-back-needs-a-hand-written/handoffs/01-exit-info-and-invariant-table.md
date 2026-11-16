@@ -2,10 +2,13 @@
 Groundwork, no behaviour change: the loader reports which shared-file exit each flat edge left by (with that use route's counter and max), and tests pin today's pins and today's counting of every shipped workflow.
 
 ### Proof
-- AC1 (today's pins kept): `packages/store/test/unit/shipped-workflow-counting.test.ts` › "workflows installed before derived counters keep their pin" — loads copies of today's bundled and repo workflows (`packages/store/test/fixtures/workflows-today/{bundled,repo}/`, release included) and compares each hash to a pinned literal.
-- AC2 (shared-exit info): `packages/store/test/unit/shared-workflows.test.ts` › "each flat edge that left through a shared exit reports the use step's exit and that route's counter; the pinned text is unchanged" — went red before the loader change.
-- AC3 (invariant table): same counting test file › "every shipped workflow keeps its counting" — loads the live `packages/cli/assets/workflows/` and `.agents/workflows/` and compares a name-free table (per counted edge: max, reset edges; groups sharing a counter). Checked that changing slice's `test_loop` max to 4 fails it.
-- `bun run test` (2081 pass) and `bun run typecheck` green.
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | every bundled and repo workflow (release included) loads to today's pinned source and hash | test | `packages/store/test/unit/shipped-workflow-counting.test.ts` › "workflows installed before derived counters keep their pin" (frozen copies in `packages/store/test/fixtures/workflows-today/`, byte-identical to the base's live files; hash literals) |
+| AC2 | each flat edge that left through a shared exit reports `<use step>.<exit>` with that route's counter and max; pinned text unchanged | test | `packages/store/test/unit/shared-workflows.test.ts` › "each flat edge that left through a shared exit reports the use step's exit and that route's counter; the pinned text is unchanged" (counter observed; max not yet observable, schema refuses `max:` on a use route until slice 02) |
+| AC3 | a name-free invariant table of every shipped workflow's counting (max, resets, shared groups) holds for the live files | test | `packages/store/test/unit/shipped-workflow-counting.test.ts` › "every shipped workflow keeps its counting" |
+
+- `bun run test` and `bun run typecheck` green (test#1 pass); review re-ran the two test files: 26 pass.
 
 ### Easy to miss
 - The exit info lives on the loader's result: `WorkflowFile.exits` / `loadWorkflowText(...).value.exits`, next to `included`: flat edge `<step>.<outcome>` → `{ exit: "<use step>.<exit>", counter?, max? }`. Present only when the workflow uses a shared file; an unrouted exit is reported without counter.
@@ -20,4 +23,4 @@ Groundwork, no behaviour change: the loader reports which shared-file exit each 
 - Bundled and repo tables are equal for quick, story, slice, refinement; release is repo only. This repo's quick names its CI fail edge `ci.fail` once loaded.
 
 ### Resume
-Slice done; next is slice 02 (derive a counter per edge), building on `exits` from the loader.
+Review approved; slice integrates. Next is slice 02 (derive a counter per edge), building on `exits` from the loader.
