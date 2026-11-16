@@ -2,6 +2,17 @@
 The shipped workflows (bundled `packages/cli/assets/workflows/` and this repo's `.agents/workflows/`, release included) write only the counters and maxima that differ from the defaults, and once loaded bound every edge exactly as before.
 
 ### Proof
+Review #1 traceability (approve, no findings):
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | the edited shipped files, loaded, keep slice 01's invariant table; `integrate.conflict` resetting on `integrate.done` is the one difference | test | `packages/store/test/unit/shipped-workflow-counting.test.ts` (unchanged on this branch, green on the edited files) |
+| AC2 | no `counters:` entry matches the defaults; only the listed overrides and shared names remain; the workflow templates test asserts the counter counts | test | `packages/cli/test/unit/assets.test.ts` › "the shipped files, bundled and this repo's, write a counter only to share it and a max only where it differs from the default" and › "quick has 29 routes and 8 counters, none written; story 42 routes and 10 counters, 2 written" |
+| AC3 | the golden tier passes after `bun run golden -- --update` | test | `packages/core/test/unit/golden.test.ts`; the reviewer re-ran `--update`: 0 of 139 cases changed, no diff |
+| AC4 | the golden diff changes counter names only, no decision, target or outcome | agent | QA (agent); the reviewer saw an empty golden diff |
+| user story | the shipped files hold only what differs from the defaults | test | as AC2 |
+| user story | every shipped workflow keeps its counting, `integrate.conflict` the exception | test | as AC1 |
+
 - AC1, the invariant table still holds (`integrate.conflict` resetting on `integrate.done` the one listed difference): `packages/store/test/unit/shipped-workflow-counting.test.ts` › "each bundled/repo workflow bounds the same edges by the same max, resets and sharing". Unchanged and green against the edited files.
 - AC2, no `counters:` entry left that matches the defaults: `packages/cli/test/unit/assets.test.ts` › "the shipped files, bundled and this repo's, write a counter only to share it and a max only where it differs from the default" (went red first). It pins what is still written: `qa_loop`/`stale_loop` declared, plus the overrides `ship.ci-failed`/`ship.failed` set to 3, `resolution-review.changes_requested` set to 2 and `approve-slices.reject` set to 3. It also checks that every name still declared is shared by more than one edge. The counter-count test now also asserts what is written: quick 8 loaded / 0 written, story 10 loaded / 2 written.
 - AC3, golden cases: `bun run golden -- --update` reported "0 of 139 golden case(s) decide differently now" and left no diff.
