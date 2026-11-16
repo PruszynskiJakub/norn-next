@@ -2,19 +2,67 @@
 
 ## Goal
 
-A workflow step opens with one head key (`agent:`, `check:`, `gate:`, a value-less verb, `use:`); agent skills become an optional `skills:` list; meanings and verdicts move to sibling `means:` / `verdict:` maps; `by:` picks the agent; `norn upgrade` rewrites old-wording files losslessly while old pins keep loading. All 10 slices are integrated; QA #1 is done; pr.md (the PR body) is written.
+A step opens with one head key; skills become an optional `skills:` list; meanings and verdicts move to sibling `means:` / `verdict:` maps; `by:` picks the agent. `norn upgrade` rewrites old files losslessly, and old pins keep loading. All 10 slices are integrated and QA #1 is done. Review #1 sent the translator back (Not proven yet).
 
 ## Proof
 
-- QA #1 criteria report (this run's evidence, `report.md`): 47 pass, 1 person, 5 unverified, 0 fail.
-- Golden decisions: all 139 cases re-decided by the current decide are identical, and every case's `decisions` is byte-identical to origin/main, matched by source and tick (the cases are renamed because their embedded workflows changed).
-- Translator (slice 03): the 9 shipped files and release.yaml at origin/main translate byte for byte to the expected files, and a second translation changes nothing. Folded, block and quoted scalars are kept; an orphaned comment refuses the file with its line.
-- Loader (slice 04), checked by script and with the dev CLI `doctor` in throwaway repos: head keys, verbs, `like`, orientation, `skills`, `by:`, means and verdict refusals, shared `exit` routes, and old-wording copies load equal to the new wording.
-- Upgrade and refusal (slices 08 and 09), checked with the dev CLI in throwaway repos:
-  - `upgrade` rewrites and stages the old files, lists refused files, exits 0, is idempotent and leaves the machine dir hash unchanged.
-  - An old main-checkout file is refused (exit 3, `do_instead` names `norn upgrade`), and `doctor` reports one issue per file.
-  - doctor → upgrade → doctor ends clean.
-- Brief: 1, 2, 3 and 0 skills render as specified.
+QA #1 report: 47 pass, 0 fail. Golden decisions are identical to origin/main in all 139 cases. Unit tier and typecheck are green at 43d704d. Paths: store = `packages/store/test/unit/`, cli = `packages/cli/test/`.
+
+| Criterion | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| 01.AC1 | every reader loads today's file the same | test | store `workflow-reads.test.ts`; cli `integration/takeover-record-lost.test.ts` (CI pending) |
+| 01.AC2 | each reader names its read kind | test | store `workflow-reads.test.ts` |
+| 02.AC1 | one skill: "Use the `X` skill." | test | core `brief.test.ts` › "Your work names the step's skills…" |
+| 02.AC2 | two or three skills, in order | test | same test.each |
+| 02.AC3 | no skills: instructions only | test | same test.each |
+| 02.AC4 | `unknown_skill` per missing skill | test | core `workflow.test.ts` › "each skill in a step's list is checked…" |
+| 02.AC5 | refine step found by its skills | test | core `decide.test.ts` › "GR8: a refine step is the one whose skills include…" |
+| 02.AC6 | golden decisions and finish lines unchanged | test | `golden.test.ts` |
+| 03.AC1 | shipped files translate byte for byte | test | store `wording` › "<f> translates byte for byte…" |
+| 03.AC2 | scalars kept, or the file refused with its line | test | `wording` › "folded, block and quoted scalars…" (but see F2) |
+| 03.AC3 | skill + instructions → `agent:` + `skills:` | test | `wording` › "an agent step's skill and instructions…" |
+| 03.AC4 | fallback texts | test | `wording` › "fallbacks" |
+| 03.AC5 | long edge split, comment kept | test | `wording` › "a long edge keeps to/counter…" |
+| 03.AC6 | `agent: <name>` → `by:` | test | `wording` › "a step's `agent: <name>` becomes `by:`" |
+| 03.AC7 | orphaned comment refuses the file | test | `wording` › "a comment left with no line to sit on…" |
+| 03.AC8 | translating twice changes nothing | test | `wording` › "…translates to itself" |
+| 03.AC9 | JSON stays JSON | test | `wording` › "a JSON workflow is written back as JSON…" |
+| 04.AC1 | head keys load to the same model | test | store `new-wording` › "agent, check and gate steps load…" |
+| 04.AC2 | value-less verbs; a verb with a value is refused | test | `new-wording` › "`%s:` with no value…", "a verb given a value…" |
+| 04.AC3 | two head keys or none refused | test | `new-wording` › "a step with two head keys, or none…" |
+| 04.AC4 | `like` inherits the head key | test | `new-wording` › "a like copy has its target's head key…" |
+| 04.AC5 | empty orientation refused | test | `new-wording` › "an orientation that is missing or empty…" |
+| 04.AC6 | `skills` optional, no duplicates | test | `new-wording` › "skills are optional and a set…" |
+| 04.AC7 | `by:` picks the agent | test | `new-wording` › "`by:` picks the configured agent…" |
+| 04.AC8 | sibling means/verdict land on edges | test | `new-wording` › "each route carries the meaning and verdict…" |
+| 04.AC9 | reportable outcome needs a meaning | test | `new-wording` › "a routed outcome the agent may report with no meaning…" |
+| 04.AC10 | stale or misplaced meaning refused | test | `new-wording` › "a meaning or verdict for an outcome the step does not route…" |
+| 04.AC11 | shared exit routes keep working | test | `new-wording` › "a shared file's exits leave through the use step's routes…" |
+| 04.AC12 | shipped file and its translation load equal | test | `new-wording` › "each shipped workflow and shared file, read as a copy…" |
+| 04.AC13 | old wording loads as a copy | test | `new-wording` › "a file in today's wording loads as a copy…" |
+| 05.AC1 | init writes new wording with orientations | test | cli `unit/assets.test.ts` › "norn init writes every workflow…" |
+| 05.AC2 | repo copies are new wording | test | `assets.test.ts` › "this repo's workflows…", "this repo's shared copies…" |
+| 05.AC3 | schemas: one shape per head key | test | schema `workflow.test.ts`; `ids-config.test.ts` |
+| 05.AC4 | orientations steer well | person | QA (person): human-qa approved |
+| 06.AC1 | cli integration suite passes | test | the suite in CI, not yet green on this head |
+| 06.AC2 | migrated tests assert the same | test | diff review: only wording changed |
+| 07.AC1 | unit and e2e tiers pass | test | CI on d01b9d7; unit green locally at 43d704d |
+| 07.AC2 | transcripts change only in wording | test | e2e transcript tests (normalised diff in handoff 07) |
+| 08.AC1 | upgrade rewrites, stages, reports | test | cli `integration/upgrade-wording.test.ts` › "each old file is rewritten…" |
+| 08.AC2 | one refused file, the rest rewritten, exit 0 | test | `upgrade-wording` › "that file is left as written and listed…" |
+| 08.AC3 | a second run changes nothing | test | `upgrade-wording` › "a second run changes no workflow file…" |
+| 08.AC4 | an all-new repo is untouched | test | `upgrade-wording` › "a repo whose files are all in the new wording…" |
+| 08.AC5 | run state hash unchanged | test | `upgrade-wording` › "units with pins, receipts and state…" |
+| 09.AC1 | old keys refused, `do_instead` names upgrade | test | store `old-wording-refusal.test.ts`; cli `integration/old-wording.test.ts` |
+| 09.AC2 | a mixed step is refused as old | test | `old-wording-refusal.test.ts` › "a step mixing both wordings…" |
+| 09.AC3 | doctor: one issue per old file | test | `old-wording` › "doctor reports one issue per old file…" |
+| 09.AC4 | no round from an old file; inbox names it | test | `old-wording` › "a tick starts no story on an old file…" |
+| 09.AC5 | old pin in flight finishes untouched | test | `old-wording` › "the pin loads, its text and hash stay…" |
+| 09.AC6 | lost-record restart pins the old branch file | test | `takeover-record-lost.test.ts` › "an old-wording workflow file on the branch…" |
+| 09.AC7 | new unit pins new wording, flattened | test | `old-wording` › "a workflow using a shared file is pinned flattened…" |
+| 09.AC8 | doctor → upgrade → doctor is clean | agent | QA (agent): QA #1 |
+| 10.AC1 | docs teach the new wording | agent | QA (agent): QA #1 |
+| 10.AC2 | reference current, glossary lint | test | cli `unit/reference.test.ts`; `test/repo/repo.test.ts` |
 
 ## Easy to miss
 
@@ -24,26 +72,18 @@ A workflow step opens with one head key (`agent:`, `check:`, `gate:`, a value-le
 
 ## Not proven yet
 
-- 06.AC1 (the cli integration suite passes) and 07.AC1 (the unit and e2e tiers pass): CI run 43915279125 on PR #353 failed three integration tests (below, fixed); e2e and the other shard passed. Green CI on the new head is still to come.
-- 01.AC1 (every read loads the same workflow as before): its restart and record tests are in the integration tier, so the same CI gap applies.
-- 09.AC5 (a story in flight on an old-wording pin): the old pin was observed running to `$done` untouched with its record readable. A past round's trace was not replayed.
-- 09.AC6 (record lost, old-wording file on the branch): only the shipped integration test was run (it passes). No restart was driven by hand.
-- 05.AC4 (person): whether each agent step's orientation steers well. The table is in `05.AC4.md`. QA's view: the new orientations read well; story `qa`, refinement `plan`/`refine` and `describe` kept terse or mechanical text.
+- Review #1, F1 (blocking): an old copy with `instructions: ""` or `prompt: ""` (valid on main) is now corrupt. `headValueObj` (`packages/store/src/wording.ts:157`) carries the empty string over. Treat blank as missing and use the fallback.
+- Review #1, F2 (blocking): `norn upgrade` can stage a broken file.
+  - The flow edge `{ means: a,  verdict: pass, to: $done, counter: c }` (two spaces after the comma) becomes `{ o: $done, … }`: the removals overlap in `edgeEdits` (`wording.ts:420-428`).
+  - A folded `skill: >-` becomes `skills: [>-` …, which does not parse (`wording.ts:324`).
+  - Fix: re-parse the spliced text and compare it with `translateWordingValue`; refuse when they differ.
+- The rest of the findings (minor and nit) are in the review receipt.
+- 06.AC1, 07.AC1, 01.AC1: integration CI has not run green on the current head.
 
 ## Notes
 
-- CI fix round 1 (three integration tests the slices had left stale; all three files pass locally, unit tier and typecheck green):
-  - `init-shared.test.ts` "the detected test command is written into the shared file": expected `run: "npm ci && npm test"`; the shared file now says `check:`.
-  - `old-wording.test.ts` "a tick starts no story on an old file": the remote sync is throttled (`sync_interval`) and the file's earlier test had already synced, so gh-7 was never taken in; the first tick now runs with `--sync`.
-  - `upgrade-wording.test.ts` "norn upgrade never touches run state": the old-wording `solo.yaml` was refused in the main checkout, so no unit started and no pin existed; the unit now starts on solo's translated new wording, then the old text is committed before `norn upgrade`.
-
-- Seen during QA, not failures of this story:
-  - `norn status` shows a story on an invalid workflow as "taken in — the next tick starts it" without naming the problem (same as before this change).
-  - An upgrade that only rewrote workflows suggests the commit message "Refresh norn's skills".
-  - `story create --workflow X` with a schema-invalid new-wording X says "no workflow 'X'".
-- 05.AC2 "shared copies match": the repo copies keep their own check commands and exit names and split ship into ci/land; assets.test checks the same steps and head keys, which is what QA judged.
-- Evidence scripts (`brief-skills.ts`, `refine-decide.ts`, `tr.ts`, `scripts/`, `tools/`) are in the QA evidence folder.
+- The CI fix (three stale integration tests) was right; CI had failed only those three, and they pass locally.
 
 ## Resume
 
-Wait for the `ci` check on the new head; if it fails, read the job annotations (the command is in the ci check's output) and fix the named tests.
+Fix F1 and F2 test-first in `packages/store/src/wording.ts`, with translator tests for the repro inputs above and a copy-read test for an empty `instructions:`. Then run `bun run test` and `bun run typecheck`.
