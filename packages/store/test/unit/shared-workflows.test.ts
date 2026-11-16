@@ -17,19 +17,22 @@ const BASE_UPDATE = `description: merge the base in and test it
 start: update
 steps:
   update:
-    type: git
-    action: update
+    update-branch:
     outcomes: { done: test, conflict: resolve }
   resolve:
-    type: agent
-    skill: merge
-    outcomes: { done: test, stuck: $stuck, gave_up: { exit: broken, means: "cannot resolve", verdict: fail } }
+    agent: Use the \`merge\` skill.
+    skills: [merge]
+    outcomes: { done: test, stuck: $stuck, gave_up: { exit: broken } }
+    means:
+      done: step finished with outcome done
+      gave_up: "cannot resolve"
+    verdict:
+      gave_up: fail
   test:
-    type: check
-    run: bun test
+    check: bun test
     timeout: 10m
     outcomes:
-      pass: { exit: tested, means: "the suite is green" }
+      pass: { exit: tested }
       fail: { exit: broken }
 `;
 
@@ -38,14 +41,17 @@ defaults: { deadline: 30m, nudges: 1 }
 start: implement
 steps:
   implement:
-    type: agent
-    skill: implement
+    agent: Use the \`implement\` skill.
+    skills: [implement]
     outcomes: { done: base, quick: test }
+    means:
+      done: step finished with outcome done
+      quick: step finished with outcome quick
   base:
     use: base-update
     outcomes: { tested: qa, broken: { to: implement, counter: test_loop } }
   qa:
-    type: gate
+    gate: approve or reject qa
     outcomes: { approve: $done, reject: { to: implement, counter: test_loop } }
 counters: { test_loop: { max: 3 } }
 base: { step: base, verify: test }
@@ -113,7 +119,7 @@ describe("use: brings in a shared file's steps", () => {
   });
 
   test("shared routes to $done and $stuck and to a workflow counter stay as written, and the loaded workflow validates", () => {
-    const shared = BASE_UPDATE.replace("done: test, stuck: $stuck,", "done: { to: test, counter: test_loop }, stuck: $stuck, skip: $done,");
+    const shared = BASE_UPDATE.replace("done: test, stuck: $stuck,", "done: { to: test, counter: test_loop }, stuck: $stuck, skip: $done,").replace('      gave_up: "cannot resolve"\n', '      gave_up: "cannot resolve"\n      skip: step finished with outcome skip\n');
     const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": shared });
     expect(wf.workflow.steps.resolve?.outcomes).toMatchObject({ done: { to: "test", counter: "test_loop" }, stuck: "$stuck", skip: { to: "$done" } });
     expect(validateWorkflowDefinition(wf.workflow).issues).toEqual([]);
@@ -144,13 +150,13 @@ describe("use: refusals", () => {
 
   test("an included step named like a workflow step, a use step or another shared file's step, or a shared file used twice, names both places", () => {
     const files = { "shared/base-update.yaml": BASE_UPDATE };
-    expect(refusal({ ...files, "story.yaml": STORY.replace("  qa:\n", "  resolve:\n    type: gate\n    outcomes: { approve: qa }\n  qa:\n") })).toEqual([
+    expect(refusal({ ...files, "story.yaml": STORY.replace("  qa:\n", "  resolve:\n    gate: approve or reject resolve\n    outcomes: { approve: qa }\n  qa:\n") })).toEqual([
       "/steps/resolve step `resolve` comes from shared/base-update.yaml and from the workflow",
     ]);
     expect(refusal({ ...files, "story.yaml": STORY.replace(/\bbase:\n    use/, "test:\n    use").replace("done: base, quick: test", "done: test") })).toEqual([
       "/steps/test step `test` comes from shared/base-update.yaml and is the name of the use step that brings it in",
     ]);
-    const ship = "start: test\nsteps:\n  test:\n    type: gate\n    outcomes: { approve: $done }\n";
+    const ship = "start: test\nsteps:\n  test:\n    gate: approve or reject test\n    outcomes: { approve: $done }\n";
     expect(refusal({ ...files, "shared/ship.yaml": ship, "story.yaml": STORY.replace("  qa:\n", "  ship:\n    use: ship\n  qa:\n") })).toEqual([
       "/steps/test step `test` comes from shared/base-update.yaml and from shared/ship.yaml",
     ]);
@@ -174,7 +180,7 @@ describe("use: refusals", () => {
   });
 
   test("a shared file's own schema error names the file and the step", () => {
-    expect(refusal({ "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE.replace("skill: merge", "skil: merge") })[0]).toStartWith("/steps/resolve shared/base-update.yaml: ");
+    expect(refusal({ "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE.replace("skills: [merge]", "skils: [merge]") })[0]).toStartWith("/steps/resolve shared/base-update.yaml: ");
   });
 });
 
@@ -201,27 +207,28 @@ const LIKE = `name: story
 start: implement
 steps:
   implement:
-    type: agent
-    skill: implement
+    agent: Use the \`implement\` skill.
+    skills: [implement]
     outcomes: { done: test }
+    means:
+      done: step finished with outcome done
   test:
-    type: check
+    check: bun test
     description: the suite
-    run: bun test
     timeout: 10m
     outcomes: { pass: review, fail: implement }
   review:
-    type: gate
+    gate: approve or reject review
     outcomes: { approve: test-merge }
   test-merge:
     like: test
     outcomes: { pass: $done, fail: review }
-    run: bun test --merge
+    check: bun test --merge
 `;
 
 describe("like: copies a step of its own file", () => {
   test("a copy keeps the target's keys and replaces only those it writes, whole; its text lists the target's keys then its own", () => {
-    const wf = loaded({ "story.yaml": LIKE.replace("    run: bun test --merge\n", "    exits: { '3': flaky }\n") });
+    const wf = loaded({ "story.yaml": LIKE.replace("    check: bun test --merge\n", "    exits: { '3': flaky }\n") });
     expect(wf.workflow.steps["test-merge"]).toEqual({
       type: "check",
       description: "the suite",

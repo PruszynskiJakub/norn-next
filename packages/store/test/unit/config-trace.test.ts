@@ -61,7 +61,7 @@ describe("workflows", () => {
     const dir = workflowsDir(repo);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "slice.yaml"), WORKFLOW_YAML);
-    writeFileSync(join(dir, "bug.json"), JSON.stringify({ name: "bug", start: "fix", steps: { fix: { type: "gate", outcomes: { approve: "$done" } } } }));
+    writeFileSync(join(dir, "bug.json"), JSON.stringify({ name: "bug", start: "fix", steps: { fix: { gate: "approve or reject fix", outcomes: { approve: "$done" } } } }));
     writeFileSync(join(dir, "story.yaml"), "name: other\nstart: a\nsteps: {}\n");
     writeFileSync(join(dir, "README.md"), "ignored");
     const l = loadWorkflows(repo);
@@ -109,7 +109,7 @@ describe("workflows", () => {
   test("B11, D17: mode and stalled on a step are refused at load, the step named", () => {
     const repo = tmp();
     mkdirSync(workflowsDir(repo), { recursive: true });
-    writeFileSync(join(workflowsDir(repo), "slice.yaml"), WORKFLOW_YAML.replace("    skill: implement\n", "    skill: implement\n    mode: auto\n    stalled: 20m\n"));
+    writeFileSync(join(workflowsDir(repo), "slice.yaml"), WORKFLOW_YAML.replace("    skills: [implement]\n", "    skills: [implement]\n    mode: auto\n    stalled: 20m\n"));
     const l = loadWorkflows(repo);
     expect(l.workflows.slice).toBeUndefined();
     expect(l.errors[0]?.errors).toEqual([

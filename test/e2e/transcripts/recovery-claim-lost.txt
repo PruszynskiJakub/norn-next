@@ -77,9 +77,9 @@
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git rev-parse --verify --quiet --end-of-options refs/heads/gh-9-add-search
   spawn home/repos/repo-<id>/worktrees/gh-9-add-search $ git update-ref refs/norn/heads/gh-9 <sha:4>
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/state.json
-      {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"51d9743b83bdefcffc2af22c467294a98d957b6a7fca5a1ede44a62a468c618e","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:2>","mode":"auto"}
+      {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"7a1c77205e3ff50e9d7c438785ff9b7fed46868ebbec7a19c956a5766f887ca9","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:2>","mode":"auto"}
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/workflow.yaml
-      text 8 lines, normalised sha256 51d9743b83bd
+      text 10 lines, normalised sha256 7a1c77205e3f
 > [A] norn tick
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote
@@ -111,7 +111,7 @@
   + home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0002-started.json
       {"kind":"started","receipt_id":"<ulid:7>","run_id":"<ulid:3>","step":"implement","attempt":1,"at":"<time>","by":"norn","who":"tester@box","tick_id":"<ulid:5>","how":"auto","agent":"claude","worktree":"<dir>/home/repos/repo-<id>/worktrees/gh-9-add-search","machine":"tester@box","heartbeat_id":"<ulid:6>","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"}}
   ~ home/repos/repo-<id>/runs/gh-9/_story/rounds/01-solo/state.json
-      {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"51d9743b83bdefcffc2af22c467294a98d957b6a7fca5a1ede44a62a468c618e","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"running","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":2,"run":{"run_id":"<ulid:3>","step":"implement","attempt":1,"started_at":"<time>","how":"auto","agent":"claude","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"},"machine":"tester@box","heartbeat_id":"<ulid:6>"},"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:5>","mode":"auto"}
+      {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"7a1c77205e3ff50e9d7c438785ff9b7fed46868ebbec7a19c956a5766f887ca9","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"running","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":2,"run":{"run_id":"<ulid:3>","step":"implement","attempt":1,"started_at":"<time>","how":"auto","agent":"claude","session":{"runner":"fake","session_id":"s-1","pane_id":"p-1","reach":"fake attach p-1"},"machine":"tester@box","heartbeat_id":"<ulid:6>"},"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":"<ulid:5>","mode":"auto"}
 > [repo-b] norn story checkout gh-9 --force
   spawn repo-b $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo-b $ git remote
@@ -148,9 +148,9 @@
   + home-repo-b/repos/repo-b-<id>/runs/gh-9/_story/rounds/01-solo/receipts/0001-take.json
       {"kind":"take","receipt_id":"<ulid:8>","run_id":null,"step":"implement","attempt":1,"at":"<time>","by":"human","who":"bob@repo-b","previous_holder":"tester@box","previous_heartbeat_id":"<ulid:6>","expired":false,"forced":true,"record_lost":true}
   + home-repo-b/repos/repo-b-<id>/runs/gh-9/_story/rounds/01-solo/state.json
-      {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"51d9743b83bdefcffc2af22c467294a98d957b6a7fca5a1ede44a62a468c618e","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":null}
+      {"version":1,"story":"gh-9","slice":null,"unit_dir":"_story","workflow":"solo","workflow_hash":"7a1c77205e3ff50e9d7c438785ff9b7fed46868ebbec7a19c956a5766f887ca9","step":"implement","attempt":1,"visits":{"implement":1},"step_entered_at":"<time>","status":"ready","park":null,"counters":{},"nudges_used":0,"retries_used":0,"applied_through":0,"run":null,"last_outcome":null,"created_at":"<time>","updated_at":"<time>","last_tick_id":null}
   + home-repo-b/repos/repo-b-<id>/runs/gh-9/_story/rounds/01-solo/workflow.yaml
-      text 8 lines, normalised sha256 51d9743b83bd
+      text 10 lines, normalised sha256 7a1c77205e3f
 > [A] norn tick --offline
   spawn repo $ git rev-parse --path-format=absolute --git-common-dir
   spawn repo $ git remote

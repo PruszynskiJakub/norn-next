@@ -22,12 +22,13 @@ export const WORKFLOW_YAML = `name: slice
 start: implement
 steps:
   implement:
-    type: agent
-    skill: implement
-    outcomes: { done: { to: test, means: "tests pass" } }
+    agent: Use the \`implement\` skill.
+    skills: [implement]
+    outcomes: { done: test }
+    means:
+      done: "tests pass"
   test:
-    type: check
-    run: bun test
+    check: bun test
     timeout: 10m
     outcomes: { pass: $done, fail: { to: implement, counter: test_loop } }
 counters: { test_loop: { max: 3 } }
