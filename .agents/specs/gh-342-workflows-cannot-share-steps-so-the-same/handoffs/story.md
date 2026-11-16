@@ -4,25 +4,27 @@ Workflows bring in steps from shared files (`use:` with named exits) and copy st
 
 ## Proof
 
-- Spec written and confirmed with the person: `spec.md` (29 user stories, no open questions). Proof per story comes from planning.
+- Spec and Plan in `spec.md`: 29 user stories, each mapped to a seam (S1 store loader, S2 cli harness, S3 shipped/repo workflow sets + init, S4 schema emit, S5 recipes doc). Proof per story is the coverage table.
 
 ## Easy to miss
 
-- Included steps keep their own names (no prefix): receipts, goldens, `--at` and `reset_on` must not change. Hence one use per file per workflow.
-- A workflow with neither `use` nor `like` must pin byte for byte as today (same fingerprint), or running units and receipts drift.
-- Shared files live in `.agents/workflows/shared/`: never listed, labelled or startable.
-- Errors in included steps must name the shared file and the step, not only the flattened path.
-- Bundled copies: both `packages/cli/assets/workflows/` and `.agents/workflows/` get rewritten (this repo's `release` too); `norn init` must copy `shared/`.
+- Included steps keep their own names (no prefix): receipts, goldens, `--at`, `reset_on` unchanged. Hence one use per file per workflow, and the `use` step's name must not clash with an included step.
+- A workflow with neither `use` nor `like` keeps `source` = file text byte for byte (same fingerprint).
+- `source`/`hash` of a loaded workflow become the flattened text; every downstream reader (pin, round start hash compare, story edit) already uses `source`.
+- Flatten errors go on the workflow file's FileError (the listing derives the name from the file); messages name `shared/<name>.yaml` and the step.
+- Lost-record `norn story checkout` reads the workflow via `git show`: it must read the shared files from the same branch (Plan D1, prefactor 2).
+- `norn init` copies `shared/` (today it would `readFileSync` a directory) and its test command rewrite must reach the shared file holding the test check.
+- Both workflow sets are rewritten; `bun run docs:emit` after.
 
 ## Not proven yet
 
-- That the rewritten `quick`/`story` flatten to today's 29/8 and 42/10 routes/counters (only the earlier prototype showed it).
+- Everything: no code yet. That the rewritten `quick`/`story` flatten to today's workflows is proven by prefactor 1's recorded `workflowHash`.
 
 ## Notes
 
-- Decisions (person, refine round): users include repo owners; `shared/` subfolder; names kept; named exits, unrouted exit → `$stuck`; `like:` same file only, no chains, not of a `use` step; pin the flattened workflow; both workflow sets rewritten, repo difference lives in each set's shared files; no nesting (`use` in a shared file refused); shared file holds `start`, `steps`, `description` only; JSON Schema for shared files emitted.
-- Triage: flattening reads files, so it belongs in store before core validation; `roundStart` compares the hash of the loaded source, which must become the flattened text.
+- Plan decisions agreed with the person: strict `workflow` schema kept + new `workflow-source` and `workflow-shared` (both emitted); shared routes name own steps, `$done`/`$stuck` or `{ exit, means?, verdict? }`, never a workflow step; `like:` is shallow (a written top-level key replaces the copied value whole).
+- Prefactors first: (1) tests load workflows through the store and pin today's `workflowHash` per rewritten workflow; (2) one store function turns workflow text into a loaded workflow, shared by the listing and the lost-record restart.
 
 ## Resume
 
-Plan the spec (`norn-plan`).
+Next step: slice the Plan in `spec.md` (prefactors first).
