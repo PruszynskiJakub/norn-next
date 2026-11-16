@@ -2,7 +2,7 @@
 id: gh-343/01
 title: Tell the main-checkout workflow read from the copy read
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
