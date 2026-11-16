@@ -1,39 +1,36 @@
-# gh-345 — handoff
+#### Goal
 
-## Goal
+Derived default counters for workflow edges (`<step>.<outcome>`, `<use step>.<exit>`, `max:` on the edge). The spec and Plan are agreed. The Plan is now cut into six slices that await the person's approval.
 
-Derived default counters for workflow edges (`<step>.<outcome>`, `<use step>.<exit>`, `max:` on the edge): the spec is refined, and the plan is agreed with the person and written to spec.md's Plan.
+#### Proof
 
-## Proof
+- spec.md: 32 user stories, Plan (seams S1–S4, decisions D1–D11). Its frontmatter `criteria` lists every slice criterion, prefixed `01.AC1` … `06.AC2`.
+- slices/: six slice files. Every user story is cited by some slice's acceptance:
+  1. `01` Shared-exit routes kept after flattening, plus the invariant table of today's shipped counting. Prefactor, no behaviour change. Depends on nothing.
+  2. `02` Derive a counter per edge at load: defaults, `max:` on the edge, its refusals, dotted names valid where stored, doctor. Depends on nothing.
+  3. `03` One derived counter per shared-file exit, and the mixed-kind refusal. Depends on 01 and 02.
+  4. `04` Derived counters in the park, brief, status, story view and rerun, plus the `integrate.conflict` bound. Depends on 02.
+  5. `05` Shipped workflows drop default counters, and the golden cases are updated. Depends on 01 and 03.
+  6. `06` Docs for derived counters. Depends on nothing.
+- Critical path: 02 → 03 → 05 (3 slices). Startable at once: 01, 02, 06.
 
-- spec.md: 32 user stories. Stories 27 and 28 were corrected in the plan session (`approve-slices.reject`, `integrate.conflict`/`integrate.done`, `stale_loop` kept shared).
-- spec.md › Plan: seams S1–S4, coverage for all 32 stories, one prefactor, decisions D1–D11, risks. Each seam and decision was agreed with the person.
+#### Easy to miss
 
-## Easy to miss
+- Derivation happens once, in the store's `loadWorkflowText`, before pinning (D1). A pin is never derived again. A file that derives nothing keeps its pin byte for byte (D2).
+- Dotted names become valid in state.json, receipts **and the pinned workflow.yaml**. This is one-way and goes in the PR's merge danger.
+- `stale_loop` stays shared wherever more than one edge shares it, and `qa_loop` stays too. A shared exit's counter covers only the feeders that derive a counter (D5). Rows 1–4 count an edge even when it lies on no loop (D4).
+- The invariant table (slice 01) is taken from today's files before any workflow file is edited. Shipped workflow edits go into both `packages/cli/assets/workflows/` and `.agents/workflows/` (release only in `.agents/`).
 
-- Derivation happens once, in the store's `loadWorkflowText`, before pinning (D1). The pinned workflow.yaml writes every counter out, and apply, brief, rerun and view don't change. A pin is never derived again.
-- A file that derives nothing keeps its pin byte for byte (D2).
-- Dotted names become valid in state.json, receipts **and the pinned workflow.yaml**: one-way, in the PR's merge danger.
-- `stale_loop` stays a shared name wherever more than one edge shares it (shipped story, release, this repo's quick and story); `qa_loop` stays too.
-- A shared exit's counter covers only the feeders that derive a counter; forward feeders stay uncounted (D5).
-- Rows 1–4 of the defaults count an edge to a step even when it lies on no loop; only the agent row needs one (D4).
-- Shipped workflow edits go into both `packages/cli/assets/workflows/` and `.agents/workflows/` (release only in `.agents/`).
+#### Not proven yet
 
-## Not proven yet
+- All of it: nothing is built yet.
 
-- All of it: nothing is built. The invariant table (D9) must be taken from today's files before any workflow file is edited.
+#### Notes
 
-## Notes
+- I checked the Plan against this base, and it holds: `loadWorkflowText` and `flattenWorkflowText` in store, `elementaryCycles` and `validateWorkflowDefinition` in core, the dotless `CounterName` in schema. `reproduce` and `triage` declare no counters, so slice 05 leaves them alone.
+- The schema change (dotted stored names, `max:` on an edge) is folded into slice 02, not cut as its own slice. This keeps the critical path at 3, and the change is small.
+- Slice 06 (docs) has no dependency on purpose. It must match the rules slices 02 and 03 implement.
 
-Decisions by the person in the plan session:
-- Derive at load into the pin, not on every read in core.
-- Keep `stale_loop` shared where more than one edge shares it.
-- Correct the step names in stories 27 and 28.
-- An exit counter covers only feeders that derive; the mixed-kinds refusal applies only among those.
-- Rows 1–4 follow the table as written, with no loop condition.
+#### Resume
 
-The prefactor: the flattener (store, shared-workflow) also hands back, per flat edge, the `<use>.<exit>` it left by and that route's counter/max.
-
-## Resume
-
-Next step: slice the Plan (prefactor first; the invariant table before any shipped-workflow edit).
+Next step: the person approves the slices. Then slices 01, 02 and 06 start in parallel.
