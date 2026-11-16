@@ -2,7 +2,7 @@
 id: gh-345/01
 title: Shared-exit routes kept after flattening, and today's counting pinned
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
