@@ -2,7 +2,7 @@
  * Writing the counters core derives from each route back into the workflow text a unit pins, so
  * every reader of counters (advance, park, brief, rerun, view) sees them through the pin alone.
  */
-import { deriveEdgeCounters } from "@norn/core";
+import { deriveEdgeCounters, type ExitLeft } from "@norn/core";
 import type { SchemaError } from "@norn/schema";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { FLAT_YAML, sharedFile } from "./shared-workflow.ts";
@@ -14,10 +14,15 @@ const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !
 /**
  * The flat workflow text `source` with its derived counters written in: `null` when it derives
  * nothing (it is pinned as is), else the text to pin. `included` names the shared file of an
- * included step, so a refusal says which file to fix. A text that does not parse, or a step in no
+ * included step, so a refusal says which file to fix; `exits` names the shared exit each flat edge
+ * left by, so the edges leaving through one exit share its counter. A text that does not parse, or a step in no
  * known wording, derives nothing here: the parse that follows reports it.
  */
-export function withDerivedCounters(source: string, included: Record<string, string> = {}): { ok: true; source: string | null } | { ok: false; errors: SchemaError[] } {
+export function withDerivedCounters(
+  source: string,
+  included: Record<string, string> = {},
+  exits: Record<string, ExitLeft> = {},
+): { ok: true; source: string | null } | { ok: false; errors: SchemaError[] } {
   let doc: unknown;
   try {
     doc = parseYaml(source);
@@ -27,13 +32,14 @@ export function withDerivedCounters(source: string, included: Record<string, str
   // A counters: that is no map is left for the schema to refuse: merging into it would drop it.
   if (!isObj(doc) || !isObj(doc.steps) || stepWordingErrors(doc.steps).length || (doc.counters !== undefined && !isObj(doc.counters)))
     return { ok: true, source: null };
-  const derived = deriveEdgeCounters({ ...doc, steps: toModelSteps(doc.steps) });
+  const derived = deriveEdgeCounters({ ...doc, steps: toModelSteps(doc.steps) }, exits);
   if (derived.errors.length)
     return {
       ok: false,
       errors: derived.errors.map((e) => {
-        const from = included[e.path.split("/")[2] ?? ""];
-        return from && e.path.startsWith("/steps/") ? { ...e, message: `${sharedFile(from)}: ${e.message}` } : e;
+        const from = included[e.step ?? e.path.split("/")[2] ?? ""];
+        const error = { path: e.path, message: e.message };
+        return from && e.path.startsWith("/steps/") ? { ...error, message: `${sharedFile(from)}: ${e.message}` } : error;
       }),
     };
   if (!Object.keys(derived.edges).length) return { ok: true, source: null };

@@ -376,7 +376,7 @@ export function loadWorkflowText(
   const flat = flattenWorkflowText(own, (n) => { const t = shared.get(n); return t == null ? null : read === "copy" ? inNewWording(t) : t; });
   if (flat && !flat.ok) return { ok: false, reason: "corrupt", error: fileError(file, flat.errors, root) };
   // A workflow without `use` that derives no counter loads as written, so its pin and fingerprint stay byte for byte
-  const derived = withDerivedCounters(flat ? flat.source : own, flat?.included);
+  const derived = withDerivedCounters(flat ? flat.source : own, flat?.included, flat?.exits);
   if (!derived.ok) return { ok: false, reason: "corrupt", error: fileError(file, derived.errors, root) };
   const source = derived.source ?? (flat ? flat.source : text);
   const r = parseWorkflowText(source, file, read, root);

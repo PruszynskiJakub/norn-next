@@ -34,6 +34,29 @@ steps:
 const BOTH = DEFAULTS.replace("name: defaults", "name: both")
   .replace("fail: implement }", "fail: { to: implement, counter: test_loop, max: 3 } }")
   .concat("counters: { test_loop: { max: 5 } }\n");
+// a check's fail and a gate's reject leaving a shared file through one exit, routed with no max:
+const MIXED_SHARED = `start: test
+steps:
+  test:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: ready, fail: { exit: broken } }
+  ready:
+    gate: Ship it?
+    outcomes: { approve: { exit: ok }, reject: { exit: broken } }
+`;
+const MIXED = `name: mixed
+start: implement
+steps:
+  implement:
+    agent: Use the \`norn-implement\` skill.
+    skills: [norn-implement]
+    outcomes: { done: base }
+    means: { done: "built" }
+  base:
+    use: checked
+    outcomes: { ok: $done, broken: implement }
+`;
 const TO_DONE = DEFAULTS.replace("name: defaults", "name: todone").replace("approve: $done,", "approve: { to: $done, max: 2 },");
 
 type DoctorWorkflow = { name: string; ok: boolean; issues: Array<{ path: string; message: string }> };
@@ -47,7 +70,7 @@ describe("norn doctor over counters derived from their edge", () => {
     expect((await t.norn("init")).exit).toBe(0);
     t.config("provider: gh\nworkflow: defaults\nmode: auto\n");
     t.recordVersion();
-    for (const [file, text] of Object.entries({ "defaults.yaml": DEFAULTS, "both.yaml": BOTH, "todone.yaml": TO_DONE })) t.write(join(workflowsDir(t.root), file), text);
+    for (const [file, text] of Object.entries({ "defaults.yaml": DEFAULTS, "both.yaml": BOTH, "todone.yaml": TO_DONE, "mixed.yaml": MIXED, "shared/checked.yaml": MIXED_SHARED })) t.write(join(workflowsDir(t.root), file), text);
     const r = await t.norn("doctor", "--repo", "--json");
     workflows = (r.value as { repo: { workflows: DoctorWorkflow[] } }).repo.workflows;
   });
@@ -68,6 +91,16 @@ describe("norn doctor over counters derived from their edge", () => {
     expect(byName("todone")?.ok).toBe(false);
     expect(byName("todone")?.issues).toEqual([
       expect.objectContaining({ path: "/steps/qa/outcomes/approve", message: expect.stringContaining("`qa.approve` → `$done` sets max, but there is no loop to bound") }),
+    ]);
+  });
+
+  test("a shared exit fed by edges of different kinds, with no max: on its route, is reported prefixed with the shared file and naming the exit", () => {
+    expect(byName("mixed")?.ok).toBe(false);
+    expect(byName("mixed")?.issues).toEqual([
+      expect.objectContaining({
+        path: "/steps/base/outcomes/broken",
+        message: expect.stringContaining("shared/checked.yaml: exit `broken` of `base` is fed by edges of different kinds (check fail: `test.fail`; gate reject: `ready.reject`)"),
+      }),
     ]);
   });
 });

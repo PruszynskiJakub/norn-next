@@ -288,3 +288,141 @@ steps:
     expect(derived.workflow.counters).toEqual({ "test.fail": { max: 5 } });
   });
 });
+
+/** A workflow text with shared files (by name, without `.yaml`), loaded the way the listing loads it. */
+const loadUsing = (text: string, shared: Record<string, string>) =>
+  loadWorkflowText("w", text, "/repo/.agents/workflows/w.yaml", "checkout", "/repo", (n) => shared[n] ?? null);
+const loadedUsing = (text: string, shared: Record<string, string>) => {
+  const r = loadUsing(text, shared);
+  if (!r.ok) throw new Error(JSON.stringify(r));
+  return r.value;
+};
+const refusalUsing = (text: string, shared: Record<string, string>): string[] => {
+  const r = loadUsing(text, shared);
+  if (r.ok || r.reason !== "corrupt") throw new Error(`expected a refusal, got ${JSON.stringify(r)}`);
+  return r.error.errors.map((e) => `${e.path} ${e.message}`);
+};
+
+/** A workflow whose `implement` hands to use step `use`, which brings in shared file `file` and routes its exits by `routes`. */
+const using = (use: string, file: string, routes: string) => `name: w
+start: implement
+steps:
+  implement:
+    agent: Build it.
+    outcomes: { done: ${use} }
+    means: { done: built }
+  ${use}:
+    use: ${file}
+    outcomes: { ${routes} }
+`;
+
+// three test steps leaving through one exit, as the shipped base update does
+const BASE_UPDATE = `start: update
+steps:
+  update:
+    update-branch:
+    outcomes: { done: test, clean: test-merge, resolved: test-resolution }
+  test:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: { exit: tested }, fail: { exit: broken } }
+  test-merge:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: { exit: tested }, fail: { exit: broken } }
+  test-resolution:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: { exit: tested }, fail: { exit: broken } }
+`;
+
+/** A shared gate whose `back` exit is fed by the outcome `feeder`. */
+const GATE_BACK = (feeder: string) => `start: ready
+steps:
+  ready:
+    gate: Ship it?
+    outcomes: { approve: { exit: ok }, ${feeder}: { exit: back } }
+`;
+
+// a check's fail and a gate's reject behind one exit
+const MIXED = `start: test
+steps:
+  test:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: ready, fail: { exit: broken } }
+  ready:
+    gate: Ship it?
+    outcomes: { approve: { exit: ok }, reject: { exit: broken } }
+`;
+
+describe("one counter per shared-file exit", () => {
+  test("three check fail edges leaving through one exit share the counter `<use step>.<exit>` at 5", () => {
+    const wf = loadedUsing(using("base-update", "base-update", "tested: $done, broken: implement"), { "base-update": BASE_UPDATE });
+    expect(counting(wf.workflow)).toEqual({
+      "test.fail": { counter: "base-update.broken", max: 5 },
+      "test-merge.fail": { counter: "base-update.broken", max: 5 },
+      "test-resolution.fail": { counter: "base-update.broken", max: 5 },
+    });
+    expect(wf.workflow.counters).toEqual({ "base-update.broken": { max: 5 } });
+    expect(validateWorkflowDefinition(wf.workflow).issues).toEqual([]);
+  });
+
+  test("an exit fed only by a gate's reject counts at 2, only by stale at 10; max: on the use route overrides it", () => {
+    const route = "ok: $done, back: implement";
+    expect(counting(loadedUsing(using("ship", "gate", route), { gate: GATE_BACK("reject") }).workflow)).toEqual({ "ready.reject": { counter: "ship.back", max: 2 } });
+    expect(counting(loadedUsing(using("ship", "gate", route), { gate: GATE_BACK("stale") }).workflow)).toEqual({ "ready.stale": { counter: "ship.back", max: 10 } });
+    const overridden = loadedUsing(using("ship", "gate", "ok: $done, back: { to: implement, max: 3 }"), { gate: GATE_BACK("reject") });
+    expect(counting(overridden.workflow)).toEqual({ "ready.reject": { counter: "ship.back", max: 3 } });
+    expect(overridden.source).not.toContain("max: 3\n      ");
+  });
+
+  test("a feeder that derives nothing stays uncounted; a use route to $done or $stuck derives nothing", () => {
+    const shared = `start: test
+steps:
+  test:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: fix, fail: { exit: broken } }
+  fix:
+    agent: Fix it.
+    outcomes: { done: { exit: broken } }
+    means: { done: fixed }
+`;
+    expect(counting(loadedUsing(using("base", "s", "broken: implement"), { s: shared }).workflow)).toEqual({ "test.fail": { counter: "base.broken", max: 5 } });
+    for (const end of ["$done", "$stuck"])
+      expect(counting(loadedUsing(using("base", "s", `broken: ${end}`), { s: shared }).workflow)).toEqual({});
+  });
+
+  test("max: on a use route to $done is refused at that route: there is no loop to bound", () => {
+    expect(refusalUsing(using("ship", "gate", "ok: $done, back: { to: $done, max: 3 }"), { gate: GATE_BACK("reject") })).toEqual([
+      "/steps/ship/outcomes/back `ship.back` → `$done` sets max, but there is no loop to bound",
+    ]);
+  });
+
+  test("an exit fed by conflict edges counts at 2 and resets on every other outcome of every feeder step", () => {
+    const shared = `start: update
+steps:
+  update:
+    update-branch:
+    outcomes: { done: again, clean: again, conflict: { exit: clash } }
+  again:
+    update-branch:
+    outcomes: { done: { exit: ok }, conflict: { exit: clash } }
+`;
+    const wf = loadedUsing(using("base", "s", "ok: $done, clash: implement"), { s: shared });
+    const spec = { counter: "base.clash", max: 2, reset_on: ["update.done", "update.clean", "again.done"] };
+    expect(counting(wf.workflow)).toEqual({ "update.conflict": spec, "again.conflict": spec });
+  });
+
+  test("an exit fed by edges of different kinds is refused at the use route without max:, and shares max: with no reset when given", () => {
+    expect(refusalUsing(using("base", "mixed", "ok: $done, broken: implement"), { mixed: MIXED })).toEqual([
+      "/steps/base/outcomes/broken shared/mixed.yaml: exit `broken` of `base` is fed by edges of different kinds (check fail: `test.fail`; gate reject: `ready.reject`): give max: on `base`'s route",
+    ]);
+    const wf = loadedUsing(using("base", "mixed", "ok: $done, broken: { to: implement, max: 4 }"), { mixed: MIXED });
+    expect(counting(wf.workflow)).toEqual({
+      "test.fail": { counter: "base.broken", max: 4 },
+      "ready.reject": { counter: "base.broken", max: 4 },
+    });
+  });
+});
