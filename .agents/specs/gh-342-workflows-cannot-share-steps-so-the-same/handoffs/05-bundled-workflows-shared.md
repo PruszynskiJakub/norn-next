@@ -2,10 +2,16 @@
 The shipped `quick` and `story` take sync, base update and shipping from bundled shared files (CI wait written once, `like:` instead of anchors) and load to exactly today's workflows; `norn init` copies the bundled `shared/` folder.
 
 ### Proof
-- AC1 bundled quick/story load to the recorded meaning: `packages/cli/test/unit/assets.test.ts` › "workflow templates" › "%s keeps its pinned meaning" (unchanged hashes from slice 01, green after the rewrite), "quick has 29 routes and 8 counters, story 42 routes and 10 counters", and the new "the CI wait is written in exactly one bundled file, and copies are `like:` steps, never YAML anchors" (red on the old files: anchors found by the YAML node walk) and "quick and story take sync, base update and shipping from the shipped shared files".
-- AC2 golden cases and transcripts unchanged: `packages/core/test/unit/golden.test.ts` green in `bun run test`; the corpus and transcripts embed their own workflows, and no pinned file changed.
-- AC3 / AC4 `norn init`: `packages/cli/test/integration/init-shared.test.ts` (all 3 went red first: init threw on the `shared/` folder): copies every shared file reported as `shared/<file>` under created and every bundled workflow loads; a shared file already there is kept and reported under kept; a detected test command (`npm ci && npm test`) lands in `shared/base-update.yaml` and the loaded `test`, `test-merge`, `test-resolution` of quick and story run it.
-- `bun run test` 1948 pass, `bun run typecheck` clean, `bun run docs:emit` no diff in docs/reference.md.
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | bundled quick/story with `shared/` load to slice 01's recorded `workflowHash` (29/8, 42/10); the CI wait is in exactly one bundled file; anchors gone for `like:` | test | `packages/cli/test/unit/assets.test.ts` › "workflow templates" › "%s keeps its pinned meaning", "quick has 29 routes and 8 counters, story 42 routes and 10 counters", "the CI wait is written in exactly one bundled file, and copies are `like:` steps, never YAML anchors", "quick and story take sync, base update and shipping from the shipped shared files" |
+| AC2 | golden cases and transcripts do not change | test | `packages/core/test/unit/golden.test.ts` (green in `bun run test`); the diff touches no file under `packages/core/test/golden/` or `test/e2e/transcripts/` |
+| AC3 | `norn init` copies every `shared/` file, reported as `shared/<file>` under created, keeps an existing one under kept, and every bundled workflow loads | test | `packages/cli/test/integration/init-shared.test.ts` › "a new repo gets every shared file, reported under created, and every bundled workflow loads", "a shared file the repo already has is kept as it is, reported under kept" |
+| AC4 | a detected test command is written into the shared file holding the test check and the loaded test checks run it | test | `packages/cli/test/integration/init-shared.test.ts` › "the detected test command is written into the shared file with the test check, and the loaded test steps run it"; `test/e2e/slice-workflow.test.ts` › init with `npm ci && npm test` |
+| (story) bundled quick/story rewritten with shared files load to today's workflows | — | test | as AC1 |
+| (story) `norn init` copies `shared/`, keeping existing shared files | — | test | as AC3 |
+
+Review #1: `bun run test` 1954 pass, `bun run typecheck` clean, `bun run docs:emit` no diff. Implement's evidence for these lines is in its receipt.
 
 ### Easy to miss
 - A `use` step's name cannot equal an included step, so the sync is brought in by `sync-base: { use: sync }` (the step stays `sync`; `start: sync` names it directly).
@@ -13,7 +19,7 @@ The shipped `quick` and `story` take sync, base update and shipping from bundled
 - `describe` stays inline in each workflow (quick reads `handoff`, story `record`).
 
 ### Not proven yet
-- The integration and e2e tiers run in CI. Locally I ran only the files I touched there: init-shared, ci-check, and slice-workflow's init tests. All green.
+- The integration and e2e tiers (init-shared, ci-check, slice-workflow) run in CI. The reviewer read them and did not run them locally: the integration tier is never a local check.
 
 ### Notes
 - Shared files: `packages/cli/assets/workflows/shared/{sync,base-update,ship}.yaml`. base-update exits: `tested`, `broken`, `ship` (light path → open-pr), `redescribe`.
@@ -23,4 +29,4 @@ The shipped `quick` and `story` take sync, base update and shipping from bundled
 - Friction: `bun run golden` with no arguments is the harvest mode (it runs the slow tiers). I started it by mistake to check AC2 and stopped it; it had written nothing.
 
 ### Resume
-Review the diff against slice 05's criteria.
+Review #1 approved with one minor note (repo.test.ts imports store by a relative src path, not `@norn/store`). Next: the story continues per its workflow.
