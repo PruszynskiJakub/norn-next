@@ -2,7 +2,7 @@
 id: gh-342/06
 title: This repo's workflows rewritten with its own shared files
 depends_on: [ gh-342/01, gh-342/04 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
