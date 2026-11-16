@@ -2,6 +2,11 @@
 Every workflow fixture the unit tier (core, store, view, cli) and the e2e tier write into a main checkout is in the new wording, so slice 09's old-wording refusal leaves both tiers green. Pinned outputs move only in wording-derived values, never in an effect or a decision.
 
 ### Proof
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | unit and e2e tiers pass; no test writes an old-wording workflow into a main checkout unless it is about the old wording | test | `bun run test` (review #1: 2039 tests, 0 fail) and `bun run typecheck` green; the changed e2e files pass (`base-sync`, `recovery`, `slice-workflow`, `observe-snapshots`, `team`, `light-path`, `merged-pr`, `auto-recovery`). The no-old-wording half is enforced only once slice 09 refuses old wording |
+| AC2 | transcripts and observe snapshots change only in the fixtures' wording, never an effect or a decision | test | `test/e2e/transcripts/*.txt` diff is empty once hashes, pin `sha256` prefix and `text N lines` are normalised (review #1 re-checked); `test/e2e/observe-snapshots/*.json` move only in `workflow_hash` and the loaded `instructions` |
+
 - AC1 (unit and e2e tiers pass; no test writes old wording into a main checkout unless it is about the old wording): `bun run test` 2033 pass, `bun run typecheck` clean. The changed e2e files were run once locally and pass: base-sync, recovery, slice-workflow, observe-snapshots (48 pass, transcripts rewritten) and team, light-path, merged-pr, auto-recovery (31 pass).
 - AC2 (transcripts and snapshots change only in the fixtures' wording): each of `test/e2e/transcripts/{base-sync,e2e-slice-workflow,recovery-claim-lost}.txt` is identical to HEAD~1 once 64-hex hashes, the pin's `sha256 <12>` and `text N lines` are normalised. The four `test/e2e/observe-snapshots/*.json` diffs hold only `workflow_hash` and a loaded `"instructions": "Use the \`X\` skill."` per agent step.
 - Migrated fixtures: `packages/store/test/helpers.ts` `WORKFLOW_YAML`; `packages/store/test/unit/shared-workflows.test.ts` (BASE_UPDATE, STORY, LIKE and the inline gate steps); `packages/store/test/unit/config-trace.test.ts` (the `bug.json` gate); `packages/cli/test/unit/light-route.test.ts` (anchor test, flow-map `check:`); the e2e constants MINI, SLICE, BASED, HELD, LIGHT, REL, SOLO.
@@ -23,4 +28,4 @@ Every workflow fixture the unit tier (core, store, view, cli) and the e2e tier w
 - Friction: the worktree had no `node_modules`, and the first `bun run test` failed until `bun install`.
 
 ### Resume
-Review the commit `test: write the unit and e2e workflow fixtures in the new wording` against AC1 and AC2. CI runs the full e2e tier once the PR is open.
+Review #1 approved with no blocking findings; next is this slice's QA step against AC1 and AC2 as in the table above.
