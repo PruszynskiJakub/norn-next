@@ -1,8 +1,8 @@
 ---
 id: gh-342/04
 title: A step copies another step in its file with `like:`
-depends_on: [gh-342/03]
-status: planned
+depends_on: [ gh-342/03 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
