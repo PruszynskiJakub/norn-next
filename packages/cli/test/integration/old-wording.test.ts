@@ -123,7 +123,10 @@ describe("a main-checkout file in the old wording is an invalid workflow whose w
   test("a tick starts no story on an old file and the inbox names it with norn upgrade", async () => {
     t.remote.issues = [...t.remote.issues, issue(7, "Old", ["norn", "norn:wf:oldy"])];
     const rules: string[] = [];
-    for (let i = 0; i < 3; i++) rules.push(...(await next()).decisions.filter((d) => d.unit === "gh-7").map((d) => d.rule));
+    // the remote sync is throttled and an earlier test's tick already ran it: the first tick forces one
+    t.clock.advance(10_000);
+    rules.push(...(await t.tick("--sync")).decisions.filter((d) => d.unit === "gh-7").map((d) => d.rule));
+    for (let i = 0; i < 2; i++) rules.push(...(await next()).decisions.filter((d) => d.unit === "gh-7").map((d) => d.rule));
     expect(rules).toContain("start.workflow_invalid");
     const title = t.notifier.items.find((i) => i.story === "gh-7")?.title ?? "";
     expect(title).toContain("workflow 'oldy' is invalid");

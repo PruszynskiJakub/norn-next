@@ -268,7 +268,10 @@ describe("norn upgrade never touches run state", () => {
     try {
       expect((await h.norn("init")).exit).toBe(0);
       h.config("provider: gh\nworkflow: solo\nmode: manual\n");
-      h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
+      // the main checkout refuses the old wording, so the unit starts on solo's new wording and the old file comes after
+      const translated = translateWording(SOLO, "solo.yaml");
+      if (!translated.ok) throw new Error("SOLO does not translate");
+      h.write(join(workflowsDir(h.root), "solo.yaml"), translated.text);
       h.git(["add", "-A"]);
       h.git(["commit", "-q", "-m", "norn"]);
       h.git(["push", "-q", "origin", "main"]);
@@ -279,6 +282,8 @@ describe("norn upgrade never touches run state", () => {
       }
       const pinned = (readdirSync(h.home, { recursive: true }) as string[]).filter((p) => p.endsWith("/workflow.yaml") && p.split("/").includes("runs"));
       expect(pinned.length).toBeGreaterThan(0);
+      h.write(join(workflowsDir(h.root), "solo.yaml"), SOLO);
+      h.git(["commit", "-q", "-am", "solo in the old wording"]);
       const before = runStateHash(h);
 
       const r = await h.norn("upgrade", "--json");

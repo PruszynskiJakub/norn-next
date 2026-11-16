@@ -24,13 +24,18 @@ A workflow step opens with one head key (`agent:`, `check:`, `gate:`, a value-le
 
 ## Not proven yet
 
-- 06.AC1 (the cli integration suite passes) and 07.AC1 (the unit and e2e tiers pass): the integration and e2e tiers run only in CI, and no PR or CI run exists yet.
+- 06.AC1 (the cli integration suite passes) and 07.AC1 (the unit and e2e tiers pass): CI run 43915279125 on PR #353 failed three integration tests (below, fixed); e2e and the other shard passed. Green CI on the new head is still to come.
 - 01.AC1 (every read loads the same workflow as before): its restart and record tests are in the integration tier, so the same CI gap applies.
 - 09.AC5 (a story in flight on an old-wording pin): the old pin was observed running to `$done` untouched with its record readable. A past round's trace was not replayed.
 - 09.AC6 (record lost, old-wording file on the branch): only the shipped integration test was run (it passes). No restart was driven by hand.
 - 05.AC4 (person): whether each agent step's orientation steers well. The table is in `05.AC4.md`. QA's view: the new orientations read well; story `qa`, refinement `plan`/`refine` and `describe` kept terse or mechanical text.
 
 ## Notes
+
+- CI fix round 1 (three integration tests the slices had left stale; all three files pass locally, unit tier and typecheck green):
+  - `init-shared.test.ts` "the detected test command is written into the shared file": expected `run: "npm ci && npm test"`; the shared file now says `check:`.
+  - `old-wording.test.ts` "a tick starts no story on an old file": the remote sync is throttled (`sync_interval`) and the file's earlier test had already synced, so gh-7 was never taken in; the first tick now runs with `--sync`.
+  - `upgrade-wording.test.ts` "norn upgrade never touches run state": the old-wording `solo.yaml` was refused in the main checkout, so no unit started and no pin existed; the unit now starts on solo's translated new wording, then the old text is committed before `norn upgrade`.
 
 - Seen during QA, not failures of this story:
   - `norn status` shows a story on an invalid workflow as "taken in — the next tick starts it" without naming the problem (same as before this change).
@@ -41,4 +46,4 @@ A workflow step opens with one head key (`agent:`, `check:`, `gate:`, a value-le
 
 ## Resume
 
-A person judges 05.AC4 (orientations) and the unverified items. The integration and e2e tiers get their answer from the PR's CI once norn opens the draft PR.
+Wait for the `ci` check on the new head; if it fails, read the job annotations (the command is in the ci check's output) and fix the named tests.
