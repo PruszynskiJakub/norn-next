@@ -2,7 +2,7 @@
 id: gh-345/05
 title: Shipped workflows drop the counters the defaults now give
 depends_on: [ gh-345/01, gh-345/03 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
