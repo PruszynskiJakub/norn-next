@@ -11,6 +11,7 @@ labels:
   - norn:kind:feature
   - norn:priority:medium
   - norn:risk:medium
+  - norn:wf:refinement
 workflow: refinement
 status: active
 intake_at: 2026-11-16T18:42:38.834Z
