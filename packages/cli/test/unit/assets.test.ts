@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { protocolLines, workflowHash } from "@norn/core";
 import { DEFAULT_CONFIG, type Workflow, outcomeEdge, validate } from "@norn/schema";
-import { loadWorkflows, workflowsDir } from "@norn/store";
+import { loadWorkflow as loadRepoFile, loadWorkflows, workflowsDir } from "@norn/store";
 import { parseWaitCondition } from "@norn/view";
 import { parse, parseDocument, visit } from "yaml";
 import { type AssetsSources, assetsDir, resolveAssetsDir } from "../../src/runtime/assets.ts";
@@ -53,6 +53,12 @@ const loadWorkflow = (f: string): Workflow => {
   const loaded = templates.workflows[f.replace(/\.(ya?ml|json)$/, "")];
   if (!loaded) throw new Error(`${f} did not load: ${JSON.stringify(templates.errors)}`);
   return loaded.workflow;
+};
+/** This repo's own copy of a workflow, as norn runs it: through the store's loader, its shared files brought in. */
+const repoWorkflow = (name: string): Workflow => {
+  const r = loadRepoFile(join(ASSETS, "..", "..", ".."), name);
+  if (!r.ok) throw new Error(`.agents/workflows/${name}.yaml did not load: ${JSON.stringify(r)}`);
+  return r.value.workflow;
 };
 const routeCount = (wf: Workflow) => Object.values(wf.steps).reduce((n, step) => n + Object.keys(step.outcomes ?? {}).length, 0);
 
@@ -265,8 +271,7 @@ describe("single-purpose workflows (#136)", () => {
   });
 
   test("story's describe step reads the record, not runs/ in the worktree, here and in this repo's copy (B28)", () => {
-    const local = parse(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "workflows", "story.yaml"), "utf8")) as Workflow;
-    for (const w of [wf("story"), local]) expect(w.steps.describe).toMatchObject({ skill: "norn-pr", inputs: ["spec", "diff", "record"] });
+    for (const w of [wf("story"), repoWorkflow("story")]) expect(w.steps.describe).toMatchObject({ skill: "norn-pr", inputs: ["spec", "diff", "record"] });
     expect(readSkill("norn-pr")).toContain("`evidence/<unit>/<run_id>/<file>`");
   });
 
@@ -297,7 +302,7 @@ describe("single-purpose workflows (#136)", () => {
   });
 
   test("story, quick and release approve at ready into a merge step that goes back to update when stale, in both copies", () => {
-    const local = (name: string) => parse(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "workflows", `${name}.yaml`), "utf8")) as Workflow;
+    const local = repoWorkflow;
     const all = [wf("story"), wf("quick"), local("story"), local("quick"), local("release")];
     for (const w of all) {
       const ready = Object.fromEntries(Object.entries(w.steps.ready?.outcomes ?? {}).map(([o, e]) => [o, outcomeEdge(e as Parameters<typeof outcomeEdge>[0]).to]));
@@ -310,7 +315,7 @@ describe("single-purpose workflows (#136)", () => {
     const run = (name: string) => (wf(name).steps.ci as { run?: string }).run;
     expect(run("story")).toContain("gh pr checks");
     expect(run("quick")).toBe(run("story"));
-    const local = (name: string) => parse(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "workflows", `${name}.yaml`), "utf8")) as Workflow;
+    const local = repoWorkflow;
     for (const w of [wf("story"), wf("quick"), local("story"), local("quick")]) {
       expect({ name: w.name, base: w.base }).toEqual({ name: w.name, base: { stale: "conflict", step: "update", verify: "test" } });
       expect({ name: w.name, verify: w.steps.test?.type }).toEqual({ name: w.name, verify: "check" });

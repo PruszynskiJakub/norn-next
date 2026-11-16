@@ -24,9 +24,9 @@ Review #1: `bun run test` 1954 pass, `bun run typecheck` clean, `bun run docs:em
 ### Notes
 - Shared files: `packages/cli/assets/workflows/shared/{sync,base-update,ship}.yaml`. base-update exits: `tested`, `broken`, `ship` (light path → open-pr), `redescribe`.
 - Tests that parsed the bundled YAML directly now load it through the store's loader on a temp copy: `light-route.test.ts`, `test/repo/repo.test.ts` (shipped vs repo shape), `ci-check.test.ts`. `test/e2e/slice-workflow.test.ts`'s init expectations now include `shared/*` files, and `set_in` is `["slice.yaml", "shared/base-update.yaml"]`.
-- The repo's own `.agents/workflows/` is not rewritten here (slice 06). The light-route "written once" check accepts either an anchor and its aliases or one step and its `like` copies, so it stays green until 06 lands.
+- Merged the story branch in (slices 06 and 08 had landed). Both sides had moved the same tests to load workflows through the store's loader; the merge keeps the story branch's folder-based helpers (`ciStep(dir, wf)`, light-route `load(dir, name)` + `writtenText`) and points this slice's shipped-template uses at `packages/cli/assets/workflows`. With 06's repo workflows on `like:`, the light-route "written once" check is the strict one-occurrence form again. development.md keeps both sentences: the shipped `shared/` folder and the repo's `.agents/workflows/shared/`.
 - README, concepts and development docs mention `.agents/workflows/shared/`. The recipes are slice 08.
 - Friction: `bun run golden` with no arguments is the harvest mode (it runs the slow tiers). I started it by mistake to check AC2 and stopped it; it had written nothing.
 
 ### Resume
-Review #1 approved with one minor note (repo.test.ts imports store by a relative src path, not `@norn/store`). Next: the story continues per its workflow.
+Merge #1 resolved the integrate conflicts; `bun run test` 1949 pass, typecheck clean, docs:emit no diff. Next: integrate again, per the workflow.

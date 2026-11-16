@@ -4,34 +4,36 @@
  * update → (resolve) → test → resolution review → open-pr, never through implement, QA or describe
  * unless something asks for it.
  */
-import { afterAll, describe, expect, test } from "bun:test";
-import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { describe, expect, test } from "bun:test";
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyReceipts, initialState, lightAnchor, type NumberedReceipt, validateWorkflowDefinition } from "@norn/core";
 import { deriveUlid, outcomeEdge, type Receipt, type UnitState, type Workflow } from "@norn/schema";
-import { loadWorkflow, parseWorkflowText, sharedFile, sharedFilesUsed, workflowsDir } from "@norn/store";
+import { loadWorkflow, parseWorkflowText, workflowsDir } from "@norn/store";
 
 const ROOT = join(import.meta.dir, "..", "..", "..", "..");
-/** The shipped templates as a repo holds them once `norn init` copied them, shared files included. */
-const SHIPPED_ROOT = mkdtempSync(join(tmpdir(), "norn-light-route-"));
-cpSync(join(ROOT, "packages", "cli", "assets", "workflows"), workflowsDir(SHIPPED_ROOT), { recursive: true });
-afterAll(() => rmSync(SHIPPED_ROOT, { recursive: true, force: true }));
+const SHIPPED = join(ROOT, "packages", "cli", "assets", "workflows");
 const COPIES = [
-  ["shipped story", SHIPPED_ROOT, "story"],
-  ["shipped quick", SHIPPED_ROOT, "quick"],
-  ["repo story", ROOT, "story"],
-  ["repo quick", ROOT, "quick"],
+  ["shipped story", SHIPPED, "story"],
+  ["shipped quick", SHIPPED, "quick"],
+  ["repo story", workflowsDir(ROOT), "story"],
+  ["repo quick", workflowsDir(ROOT), "quick"],
 ] as const;
 
-/** A workflow as norn loads it: through the store's loader, its shared files flattened in. */
-function load(root: string, name: string): { wf: Workflow; text: string } {
+/** A workflow as norn loads it from a workflows folder: through the store's loader, its shared files brought in. */
+function load(dir: string, name: string): Workflow {
+  const root = mkdtempSync(join(tmpdir(), "norn-light-"));
+  cpSync(dir, workflowsDir(root), { recursive: true });
   const r = loadWorkflow(root, name);
-  if (!r.ok) throw new Error(`${root} ${name}: ${JSON.stringify(r)}`);
-  const dir = workflowsDir(root);
-  // the files a person edits: the workflow and every shared file it uses
-  const text = [readFileSync(join(dir, `${name}.yaml`), "utf8"), ...sharedFilesUsed(readFileSync(join(dir, `${name}.yaml`), "utf8")).map((f) => readFileSync(join(dir, sharedFile(f)), "utf8"))].join("\n");
-  return { wf: r.value.workflow, text };
+  if (!r.ok) throw new Error(`${name} in ${dir}: ${JSON.stringify(r)}`);
+  return r.value.workflow;
+}
+/** The text of a workflow file and of every shared file in its folder. */
+function writtenText(dir: string, name: string): string {
+  const shared = join(dir, "shared");
+  const files = existsSync(shared) ? readdirSync(shared).map((f) => join(shared, f)) : [];
+  return [join(dir, `${name}.yaml`), ...files].map((f) => readFileSync(f, "utf8")).join("\n");
 }
 const edges = (wf: Workflow, step: string) =>
   Object.fromEntries(Object.entries(wf.steps[step]?.outcomes ?? {}).map(([o, e]) => [o, outcomeEdge(e as Parameters<typeof outcomeEdge>[0])]));
@@ -62,8 +64,9 @@ function walk(wf: Workflow, at: string, outcomes: string[], counters: Record<str
   return seen;
 }
 
-describe.each(COPIES)("%s workflow routes the light path", (_name, root, name) => {
-  const { wf, text } = load(root, name);
+describe.each(COPIES)("%s workflow routes the light path", (_name, dir, name) => {
+  const wf = load(dir, name);
+  const text = writtenText(dir, name);
 
   test("it validates, and git: update routes done → test, clean → test-merge, resolved → test-resolution", () => {
     expect(validateWorkflowDefinition(wf).issues).toEqual([]);
@@ -79,10 +82,7 @@ describe.each(COPIES)("%s workflow routes the light path", (_name, root, name) =
     const run = (s: string) => (wf.steps[s] as { run?: string }).run;
     expect(run("test")).toBeTruthy();
     expect([run("test-merge"), run("test-resolution")]).toEqual([run("test"), run("test")]);
-    // written once: a YAML anchor and its aliases, or one step and its `like` copies
-    const anchored = [text.match(/run: &test-run\b/g)?.length, text.match(/run: \*test-run\b/g)?.length];
-    const liked = [text.split("\n").filter((l) => l.trim() === `run: ${run("test")}`).length, text.match(/^\s+like: test$/gm)?.length];
-    expect([anchored, liked]).toContainEqual([1, 2]);
+    expect(text.split(run("test") as string).length - 1).toBe(1);
   });
 
   test("the resolution review is norn-review over the spec and the resolution", () => {

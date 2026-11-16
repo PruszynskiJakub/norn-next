@@ -109,10 +109,86 @@ Set `status: done` in the story's `spec.md` on the base yourself and commit it, 
 
    A check ends in `pass` (exit 0) or `fail` (any other exit). One that can end another way names the outcome per exit code in `exits` and routes it like any other: the shipped `ci` check exits 3 on a PR that conflicts with its base, and `exits: { 3: stale }` with `stale: { to: update, counter: stale_loop }` sends the story to take the base instead of to `implement`.
 
-3. Commit it. norn validates a workflow before a unit uses it and refuses one that does not hold together, naming what is wrong.
-4. Run `norn upgrade` once: it creates the `norn:wf:docs` label on the remote. Then use it: label an issue `norn:wf:docs`, or start the next round of a story with `norn story edit gh-12 --workflow docs`.
+3. Write a step once and reuse it, when the same steps appear in several workflows or a step differs from another only in its routes (below).
+4. Commit it. norn validates a workflow before a unit uses it and refuses one that does not hold together, naming what is wrong.
+5. Run `norn upgrade` once: it creates the `norn:wf:docs` label on the remote. Then use it: label an issue `norn:wf:docs`, or start the next round of a story with `norn story edit gh-12 --workflow docs`.
 
-A unit pins its workflow when it starts, so your edit applies to rounds that start after it.
+A unit pins its workflow when it starts, with every `use` and `like` already filled in, so your edit, to a shared file too, applies to rounds that start after it.
+
+### Share steps between workflows
+
+Steps that several workflows run the same way (the CI wait, the base update, opening the PR) go in a shared file, `.agents/workflows/shared/<name>.yaml`. It holds `start` (its first step), `steps` and an optional `description`, and nothing else. A shared file is never a workflow: it is not listed, gets no label and cannot be started.
+
+A route inside a shared file names one of the file's own steps, `$done` or `$stuck`, or leaves the file through a named exit, `{ exit: <name> }`; the file's named exits are the names its routes give. A named exit is not a check's `exits`, which turns an exit code into an outcome: below, the `ci` check's `exits: { 3: stale }` makes exit code 3 the outcome `stale`, and the route for `stale` leaves the shared file through its named exit `behind`.
+
+```yaml
+# .agents/workflows/shared/ship.yaml
+description: Open or update the PR, then wait for its CI.
+start: open-pr
+steps:
+  open-pr:
+    type: git
+    action: open-pr
+    outcomes: { done: ci }
+  ci:
+    type: check
+    run: ./scripts/wait-for-ci.sh
+    timeout: 30m
+    exits: { 3: stale }
+    outcomes:
+      pass:  { exit: green }
+      fail:  { exit: red }
+      stale: { exit: behind }
+```
+
+A workflow brings the file in with a step that holds only `use: <name>` and the routes for the file's named exits. The `use` step routes each named exit like an outcome, counters included:
+
+```yaml
+  describe:
+    type: agent
+    skill: norn-pr
+    outcomes: { done: ship }
+  ship:
+    use: ship
+    outcomes:
+      green:  ready
+      red:    { to: implement, counter: ci_loop }
+      behind: { to: update, counter: stale_loop }
+```
+
+The shared steps keep their own names, so the brief, receipts, history and `--at` show `open-pr` and `ci`, never `ship`. A route, `start` or `base.step` that names the `use` step enters the file at its `start`; any route, `base.step` or `base.verify` can name an included step to enter the file in the middle. A named exit the `use` step does not route goes to `$stuck`. A route inside the shared file can name a counter the workflow declares, and the workflow's `defaults:` apply to the included steps as to its own.
+
+### Copy a step with `like:`
+
+A step written `like: <step>` copies that step of the same file and replaces each key it writes, whole. It works in a workflow and in a shared file alike:
+
+```yaml
+  test:
+    type: check
+    run: npm ci && npm test
+    timeout: 15m
+    outcomes: { pass: qa, fail: { to: implement, counter: test_loop } }
+  test-merge:
+    like: test
+    outcomes: { pass: open-pr, fail: { to: implement, counter: test_loop } }
+```
+
+`test-merge` runs the same command with the same timeout; only its `outcomes` differ. A key is replaced whole, never merged: `test-merge` above writes both of its routes.
+
+### What norn refuses
+
+norn refuses the workflow when it loads, naming the file and the step, and shows it as broken wherever a broken workflow shows (`norn doctor`, the workflow listing, `norn story create`, `norn story edit --workflow`):
+
+- a `use:` naming a shared file that does not exist: the message names the file and the folder it looked in, `.agents/workflows/shared/`;
+- an included step with the same name as a workflow step, a step of another shared file or the `use` step itself, and a shared file used twice in one workflow: the message names the step and both places it comes from;
+- a `use` step routing a named exit the shared file does not have, a misspelt one included: the message names it and lists the file's named exits;
+- a `use:` inside a shared file: a shared file cannot use another shared file;
+- `name`, `counters`, `defaults`, `mode` or `base` in a shared file: that key belongs in the workflow;
+- a route in a shared file naming a step outside it: a shared file leaves through a named exit (`{ exit: <name> }`);
+- `reset_on` or `base.verify` naming a `use` step: name the included step instead;
+- a `like:` naming a step that does not exist, the step itself, another `like` step, a `use` step or a step of another file, and a `use` step that carries `like`.
+
+An included step that breaks an ordinary rule (an unknown counter, a route back without a counter) is refused with a message that names its shared file and the step in it.
 
 ## Hand a story over
 

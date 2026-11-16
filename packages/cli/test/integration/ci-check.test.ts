@@ -6,21 +6,21 @@ import { join } from "node:path";
 import { loadWorkflow, spawnSyncCaptured, workflowsDir } from "@norn/store";
 import { REPO_ROOT as ROOT } from "../../../../test/support/repo-root.ts";
 
-/** The shipped templates as a repo holds them once `norn init` copied them, shared files included. */
-const SHIPPED_ROOT = mkdtempSync(join(tmpdir(), "norn-ci-shipped-"));
-cpSync(join(ROOT, "packages", "cli", "assets", "workflows"), workflowsDir(SHIPPED_ROOT), { recursive: true });
+/** The shipped templates as `norn init` copies them, shared files included. */
+const SHIPPED_DIR = join(ROOT, "packages", "cli", "assets", "workflows");
 
-/** The `ci` step of a repo's workflow as norn loads it: through the store's loader, shared files flattened in. */
-function ciStep(root: string, wf: string): { run?: string } | undefined {
+/** The `ci` step of the workflow `wf` in the workflows folder `dir`, as norn loads it: its shared files brought in. */
+function ciStep(dir: string, wf: string): unknown {
+  const root = mkdtempSync(join(tmpdir(), "norn-ci-wf-"));
+  cpSync(dir, workflowsDir(root), { recursive: true });
   const r = loadWorkflow(root, wf);
-  if (!r.ok) throw new Error(`${root} ${wf}: ${JSON.stringify(r)}`);
-  return r.value.workflow.steps.ci as { run?: string } | undefined;
+  if (!r.ok) throw new Error(`${wf} in ${dir}: ${JSON.stringify(r)}`);
+  return r.value.workflow.steps.ci;
 }
 
 /** The `ci` check script of a repo workflow, as norn runs it (`sh -c`, packages/cli/src/runtime/shell.ts). */
 function ciScript(wf: string): string {
-  const { steps } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as { steps: Record<string, { run?: string }> };
-  return steps.ci?.run ?? "";
+  return (ciStep(workflowsDir(ROOT), wf) as { run?: string } | undefined)?.run ?? "";
 }
 
 describe("the ci check waits for the ci.yml run of the PR's head commit (#125)", () => {
@@ -132,13 +132,13 @@ esac
 
   test("story runs the same script as quick, declaring exit 3 as stale → update", () => {
     expect(ciScript("story")).toBe(ciScript("quick"));
-    for (const wf of ["story", "quick"]) expect(ciStep(ROOT, wf)).toMatchObject({ exits: { 3: "stale" }, outcomes: { stale: { to: "update", counter: "stale_loop" } } });
+    for (const wf of ["story", "quick"]) expect(ciStep(workflowsDir(ROOT), wf)).toMatchObject({ exits: { 3: "stale" }, outcomes: { stale: { to: "update", counter: "stale_loop" } } });
   });
 });
 
 /** The `ci` check script of a workflow `norn init` ships (packages/cli/assets/workflows/). */
 function bundledCiScript(wf: string): string {
-  return ciStep(SHIPPED_ROOT, wf)?.run ?? "";
+  return (ciStep(SHIPPED_DIR, wf) as { run?: string } | undefined)?.run ?? "";
 }
 
 describe("the shipped ci check waits for the checks on the PR (#136)", () => {
@@ -229,6 +229,6 @@ esac
   test("story runs the same script as quick, declaring exit 3 as stale → update", () => {
     expect(bundledCiScript("story")).toBe(bundledCiScript("quick"));
     for (const wf of ["story", "quick"])
-      expect(ciStep(SHIPPED_ROOT, wf)).toMatchObject({ exits: { 3: "stale" }, outcomes: { stale: { to: "update", counter: "stale_loop" } } });
+      expect(ciStep(SHIPPED_DIR, wf)).toMatchObject({ exits: { 3: "stale" }, outcomes: { stale: { to: "update", counter: "stale_loop" } } });
   });
 });
