@@ -1,0 +1,213 @@
+name: quick
+description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
+start: sync
+steps:
+  sync:
+    update-branch: null
+    outcomes:
+      done: implement
+      conflict:
+        to: sync-resolve
+        counter: sync_conflict_loop
+  sync-resolve:
+    agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
+    skills:
+      - norn-merge
+    inputs:
+      - spec
+      - handoff
+    outcomes:
+      done: sync
+    means:
+      done: base merged into the story branch, conflicts resolved and committed
+  implement:
+    agent: "Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one, otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask. A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Notes and the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before changing any code, then fix the cause. Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`. Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (its .norn-unit marker) and a dev build run there would act on its claim and on its run state (state.json, receipts) in the checkout's machine dir. Run `bun run test` (the unit tier) after each change, and the type check; the integration and e2e tiers run in CI, which the `ci` check waits for, so do not run them before handing back."
+    skills:
+      - norn-implement
+    inputs:
+      - spec
+      - handoff
+      - last_check
+      - last_findings
+    outcomes:
+      done: update
+    means:
+      done: the change is made; each behaviour change and rework point has a passing test
+  update:
+    update-branch: null
+    outcomes:
+      done: test
+      clean: test-merge
+      resolved: test-resolution
+      conflict:
+        to: resolve
+        counter: base_conflict_loop
+  resolve:
+    agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase."
+    skills:
+      - norn-merge
+    inputs:
+      - spec
+      - handoff
+      - base_side
+    outcomes:
+      done: update
+    means:
+      done: base merged into the story branch, conflicts resolved and committed
+  test:
+    check: bun install --frozen-lockfile && bun run test && bun run typecheck
+    timeout: 15m
+    outcomes:
+      pass: review
+      fail:
+        to: implement
+        counter: test_loop
+  test-merge:
+    check: bun install --frozen-lockfile && bun run test && bun run typecheck
+    timeout: 15m
+    outcomes:
+      pass: open-pr
+      fail:
+        to: implement
+        counter: test_loop
+  test-resolution:
+    check: bun install --frozen-lockfile && bun run test && bun run typecheck
+    timeout: 15m
+    outcomes:
+      pass: resolution-review
+      fail:
+        to: implement
+        counter: test_loop
+  resolution-review:
+    agent: "Review only the resolution: each remerge-diff under Inputs is where a merge differs from git's own merge of its parents, a base change the resolver dropped included. Judge whether it keeps the intent of both sides. Report `redescribe` when the merge danger pr.md describes no longer holds."
+    skills:
+      - norn-review
+    inputs:
+      - spec
+      - resolution
+    outcomes:
+      approve: open-pr
+      redescribe: describe
+      changes_requested:
+        to: resolve
+        counter: resolution_loop
+    means:
+      approve: the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger
+      redescribe: the resolution is sound, but the merge danger pr.md describes changed
+      changes_requested: blocking findings on the resolution in the receipt
+  review:
+    agent: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
+    skills:
+      - norn-review
+    inputs:
+      - spec
+      - diff
+      - last_findings
+    outcomes:
+      approve: describe
+      changes_requested:
+        to: implement
+        counter: review_loop
+    means:
+      approve: the change does what the story asks and nothing else, no blocking findings
+      changes_requested: blocking findings in the receipt
+  describe:
+    agent: Write the PR body to pr.md in the spec folder; norn puts the issue link under it.
+    skills:
+      - norn-pr
+    inputs:
+      - spec
+      - diff
+      - handoff
+    outcomes:
+      done: open-pr
+    means:
+      done: "pr.md describes the branch as it is now: summary, evidence, merge danger"
+  open-pr:
+    open-pr: null
+    outcomes:
+      done: ci
+  ci:
+    check: |
+      sha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1
+      # GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story
+      # updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.
+      mergeable() {
+        m=UNKNOWN
+        for i in 1 2 3 4 5 6; do
+          m=$(gh pr view --json mergeable -q .mergeable) || return 1
+          [ "$m" != UNKNOWN ] && return 0
+          sleep 5
+        done
+      }
+      conflicting() { [ "$m" = CONFLICTING ] && echo "PR conflicts with its base: no CI runs on it until the branch takes the base"; }
+      mergeable || exit 1
+      conflicting && exit 3
+      run=
+      for i in $(seq 1 30); do
+        run=$(gh run list --workflow ci.yml --commit "$sha" --event pull_request --limit 1 --json databaseId -q '.[0].databaseId')
+        [ -n "$run" ] && break
+        sleep 10
+      done
+      if [ -z "$run" ]; then
+        mergeable || exit 1
+        conflicting && exit 3
+        echo "no ci.yml run for $sha after 5m (PR mergeable: $m)"
+        exit 1
+      fi
+      gh run watch "$run" --exit-status --interval 30 >/dev/null && exit 0
+      sh .agents/scripts/ci-failures.sh "$run"
+      exit 1
+    timeout: 30m
+    exits:
+      "3": stale
+    outcomes:
+      pass: ready
+      fail:
+        to: implement
+        counter: ci_loop
+      stale:
+        to: update
+        counter: stale_loop
+  ready:
+    gate: Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change.
+    outcomes:
+      approve: merge
+      reject:
+        to: implement
+        counter: ready_loop
+      stale:
+        to: update
+        counter: stale_loop
+  merge:
+    await-merge: null
+    outcomes:
+      stale:
+        to: update
+        counter: stale_loop
+counters:
+  test_loop:
+    max: 5
+  ci_loop:
+    max: 3
+  review_loop:
+    max: 3
+  ready_loop:
+    max: 2
+  sync_conflict_loop:
+    max: 2
+    reset_on: sync.done
+  base_conflict_loop:
+    max: 2
+    reset_on:
+      - update.done
+      - update.clean
+      - update.resolved
+  resolution_loop:
+    max: 2
+  stale_loop:
+    max: 10
+base:
+  stale: conflict
+  step: update
+  verify: test
