@@ -2,7 +2,7 @@
 `norn init` writes the workflows and shared files in the new wording, each agent step with a hand-written orientation. This repo's copies (with `release.yaml`) match. The emitted JSON Schemas describe only the new wording, and the model schema is no longer published.
 
 ### Proof
-`bun run test` (2051 pass) and `bun run typecheck` are green. Each test below failed before its change (checked against HEAD's workflow files or HEAD's `workflow.ts`).
+`bun run test` (2051 pass) and `bun run typecheck` are green (review#1 re-ran both). Review#1 read each test below and saw it assert its criterion. Each test failed before its change (checked against HEAD's workflow files or HEAD's `workflow.ts`).
 
 | Criterion | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -27,6 +27,7 @@
 - The header comments in shipped `slice.yaml` and `shared/base-update.yaml` now say "Change the `test` step's `check:`".
 - `bun run docs:emit` produced no change.
 - Friction: none.
+- Review #1 approved with 1 finding, none blocking. Minor: the AC1 test checks a plain copy of the assets (`assets.test.ts:48`), not the files init writes after its `check: bun test` rewrite. That rewrite is covered only by the e2e init test.
 
 ### Resume
-Implementation is done and committed. Next is review against AC1–AC4.
+Review #1 approved. Next: QA. AC1–AC3 are proven by the tests in the Proof table. AC4 goes to a person: read the orientations listed in its row.
