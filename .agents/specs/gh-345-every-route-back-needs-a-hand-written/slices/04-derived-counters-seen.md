@@ -1,8 +1,8 @@
 ---
 id: gh-345/04
 title: Derived counters in the park, brief, status and rerun
-depends_on: [gh-345/02]
-status: planned
+depends_on: [ gh-345/02 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
