@@ -1,4 +1,4 @@
-import { type Static, type TOptional, type TSchema, Type } from "@sinclair/typebox";
+import { type Static, type TObject, type TOptional, type TSchema, type TUnknown, Type } from "@sinclair/typebox";
 import {
   CounterName,
   Duration,
@@ -267,6 +267,21 @@ export type ExitEdge = Static<typeof ExitEdge>;
 const SharedSteps = stepTypes(Type.Union([Target, OutcomeEdge, ExitEdge]));
 const SharedStep = TaggedUnion("type", [SharedSteps.AgentStep, SharedSteps.CheckStep, SharedSteps.GateStep, SharedSteps.GitStep, SharedSteps.SlicesStep, SharedSteps.MergeStep]);
 
+/**
+ * `like: <step>` copies a step of the same file; each key it writes replaces the copied value whole.
+ * Its keys are checked loosely here: the full check runs on the copy, once the target fills it in.
+ */
+function likeStep(variants: TObject[]) {
+  const keys = [...new Set(variants.flatMap((v) => Object.keys(v.properties)))].filter((k) => k !== "type");
+  const loose = Object.fromEntries(keys.map((k) => [k, Type.Optional(Type.Unknown())])) as Record<string, TOptional<TUnknown>>;
+  const types = variants.map((v) => v.properties.type as TSchema);
+  return Type.Object(
+    { like: StepName, type: Type.Optional(Type.Union(types)), ...loose },
+    { additionalProperties: false },
+  );
+}
+const LikeStep = likeStep([AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep]);
+
 export const SharedName = Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "A file in `.agents/workflows/shared/`, without `.yaml`" });
 
 /** `use: <name>` brings in the steps of `shared/<name>.yaml`; `outcomes` routes each of its exits. */
@@ -283,11 +298,11 @@ export const UseStep = Type.Object(
 );
 export type UseStep = Static<typeof UseStep>;
 
-/** A workflow file as written, before its `use` steps are filled in; `workflow` is the loaded, flat form. */
+/** A workflow file as written, before its `use` and `like` steps are filled in; `workflow` is the loaded, flat form. */
 export const WorkflowSource = Type.Object(
   {
     ...Workflow.properties,
-    steps: Type.Record(StepName, Type.Union([Step, UseStep]), { minProperties: 1, additionalProperties: false }),
+    steps: Type.Record(StepName, Type.Union([Step, UseStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
   },
   {
     $id: "https://norn.dev/schema/workflow-source.json",
@@ -303,7 +318,7 @@ export const WorkflowShared = Type.Object(
     $schema: Type.Optional(Type.String()),
     description: Type.Optional(Type.String()),
     start: StepName,
-    steps: Type.Record(StepName, SharedStep, { minProperties: 1, additionalProperties: false }),
+    steps: Type.Record(StepName, Type.Union([SharedStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
   },
   {
     $id: "https://norn.dev/schema/workflow-shared.json",

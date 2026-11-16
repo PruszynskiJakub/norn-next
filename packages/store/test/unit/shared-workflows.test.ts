@@ -189,3 +189,87 @@ describe("shared files and the loaded text", () => {
     expect(parseYaml(wf.source)).toEqual(wf.workflow);
   });
 });
+
+const LIKE = `name: story
+start: implement
+steps:
+  implement:
+    type: agent
+    skill: implement
+    outcomes: { done: test }
+  test:
+    type: check
+    description: the suite
+    run: bun test
+    timeout: 10m
+    outcomes: { pass: review, fail: implement }
+  review:
+    type: gate
+    outcomes: { approve: test-merge }
+  test-merge:
+    like: test
+    outcomes: { pass: $done, fail: review }
+    run: bun test --merge
+`;
+
+describe("like: copies a step of its own file", () => {
+  test("a copy keeps the target's keys and replaces only those it writes, whole; its text lists the target's keys then its own", () => {
+    const wf = loaded({ "story.yaml": LIKE.replace("    run: bun test --merge\n", "    exits: { '3': flaky }\n") });
+    expect(wf.workflow.steps["test-merge"]).toEqual({
+      type: "check",
+      description: "the suite",
+      run: "bun test",
+      timeout: "10m",
+      outcomes: { pass: "$done", fail: "review" },
+      exits: { "3": "flaky" },
+    } as never);
+    expect(Object.keys(parseYaml(wf.source).steps["test-merge"])).toEqual(["type", "description", "run", "timeout", "outcomes", "exits"]);
+  });
+
+  test("a workflow with like but no use loads as its flattened text, with no like left", () => {
+    const wf = loaded({ "story.yaml": LIKE });
+    expect(wf.source).not.toContain("like:");
+    expect(wf.hash).toBe(sha256(wf.source));
+    expect(parseYaml(wf.source)).toEqual(wf.workflow);
+    expect(wf.workflow.steps["test-merge"]).toMatchObject({ run: "bun test --merge", timeout: "10m" });
+    expect(wf.included).toBeUndefined();
+  });
+
+  test("a like in a shared file is resolved within the shared file before its steps come in", () => {
+    const shared = BASE_UPDATE.replace("  test:\n", "  retest:\n    like: test\n    outcomes: { pass: $done }\n  test:\n");
+    const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": shared });
+    expect(wf.workflow.steps.retest).toEqual({ type: "check", run: "bun test", timeout: "10m", outcomes: { pass: "$done" } } as never);
+    expect(wf.included?.retest).toBe("base-update");
+    expect(wf.source).not.toContain("like:");
+  });
+});
+
+describe("like: refusals", () => {
+  const step = (s: string) => LIKE.replace("    like: test\n", `    like: ${s}\n`);
+  test("a like naming a missing step, itself, a like step or a use step is refused with its reason", () => {
+    expect(refusal({ "story.yaml": step("nope") })).toEqual(["/steps/test-merge/like `nope` is not a step of this file"]);
+    expect(refusal({ "story.yaml": step("test-merge") })).toEqual(["/steps/test-merge/like a step cannot be like itself"]);
+    const chain = `${LIKE}  test-again:\n    like: test-merge\n`;
+    expect(refusal({ "story.yaml": chain })).toEqual(["/steps/test-again/like `test-merge` is a like step: name the step it copies, `test`"]);
+    const onUse = `${STORY}`.replace("  qa:\n", "  qa2:\n    like: base\n  qa:\n");
+    expect(refusal({ "story.yaml": onUse, "shared/base-update.yaml": BASE_UPDATE })).toEqual([
+      "/steps/qa2/like `base` is a use step: like copies a step written in its own file",
+    ]);
+  });
+
+  test("a like naming a step of another file is refused, from the workflow and from the shared file", () => {
+    const fromWorkflow = STORY.replace("  qa:\n", "  test2:\n    like: test\n  qa:\n");
+    expect(refusal({ "story.yaml": fromWorkflow, "shared/base-update.yaml": BASE_UPDATE })).toEqual([
+      "/steps/test2/like `test` is a step of shared/base-update.yaml: like copies a step of its own file",
+    ]);
+    const fromShared = BASE_UPDATE.replace("  test:\n", "  ask:\n    like: qa\n  test:\n");
+    expect(refusal({ "story.yaml": STORY, "shared/base-update.yaml": fromShared })).toEqual([
+      "/steps/ask/like shared/base-update.yaml: `qa` is a step of the workflow: like copies a step of its own file",
+    ]);
+  });
+
+  test("a use step carrying like is refused", () => {
+    const both = STORY.replace("    use: base-update\n", "    use: base-update\n    like: qa\n");
+    expect(refusal({ "story.yaml": both, "shared/base-update.yaml": BASE_UPDATE })).toEqual(["/steps/base/like a use step cannot carry `like`"]);
+  });
+});

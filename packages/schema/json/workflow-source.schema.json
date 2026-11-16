@@ -1020,6 +1020,64 @@
                   }
                 }
               }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "like"
+              ],
+              "properties": {
+                "like": {
+                  "pattern": "^(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*$",
+                  "type": "string"
+                },
+                "type": {
+                  "anyOf": [
+                    {
+                      "const": "agent",
+                      "type": "string"
+                    },
+                    {
+                      "const": "check",
+                      "type": "string"
+                    },
+                    {
+                      "const": "gate",
+                      "type": "string"
+                    },
+                    {
+                      "const": "git",
+                      "type": "string"
+                    },
+                    {
+                      "const": "slices",
+                      "type": "string"
+                    },
+                    {
+                      "const": "merge",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "description": {},
+                "skill": {},
+                "instructions": {},
+                "inputs": {},
+                "agent": {},
+                "model": {},
+                "attended": {},
+                "deadline": {},
+                "nudges": {},
+                "retries": {},
+                "criteria": {},
+                "outcomes": {},
+                "run": {},
+                "timeout": {},
+                "exits": {},
+                "prompt": {},
+                "action": {}
+              }
             }
           ]
         }

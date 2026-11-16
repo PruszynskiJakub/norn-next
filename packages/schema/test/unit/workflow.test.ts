@@ -156,3 +156,15 @@ describe("workflow-source and workflow-shared schemas", () => {
     expect(validate("workflow", { name: "x", ...shared }).ok).toBe(false);
   });
 });
+
+describe("like steps in the workflow-source and workflow-shared schemas", () => {
+  const check = { type: "check", run: "bun test", timeout: "5m", outcomes: { pass: "$done" } };
+  test("a like step holds the known step keys loosely; an unknown key is refused; the strict schema refuses it", () => {
+    const wf = { name: "story", start: "test", steps: { test: check, "test-merge": { like: "test", outcomes: { pass: "test" } } } };
+    expect(validate("workflow-source", wf).ok).toBe(true);
+    expect(validate("workflow", wf).ok).toBe(false);
+    expect(validate("workflow-source", { ...wf, steps: { ...wf.steps, "test-merge": { like: "test", runn: "x" } } }).ok).toBe(false);
+    const shared = { start: "test", steps: { test: check, retest: { like: "test", outcomes: { pass: { exit: "tested" } } } } };
+    expect(validate("workflow-shared", shared).ok).toBe(true);
+  });
+});

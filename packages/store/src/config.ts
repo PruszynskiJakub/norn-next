@@ -369,7 +369,7 @@ export function loadWorkflowText(
       reason: "corrupt",
       error: fileError(file, [{ path: "/name", message: `must equal the file name '${name}'` }], root),
     };
-  return { ok: true, raw: text, value: { workflow: r.value, hash: sha256(source), source, ...(flat && { included: flat.included }) } };
+  return { ok: true, raw: text, value: { workflow: r.value, hash: sha256(source), source, ...(flat?.included && { included: flat.included }) } };
 }
 
 function loadFile(name: string, file: string, root: string): ReadResult<WorkflowFile> {
