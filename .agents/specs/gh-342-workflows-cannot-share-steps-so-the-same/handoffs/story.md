@@ -5,6 +5,7 @@ Workflows bring in steps from shared files (`use:` with named exits) and copy st
 ## Proof
 
 - Spec and Plan in `spec.md`: 29 user stories, each mapped to a seam (S1 store loader, S2 cli harness, S3 shipped/repo workflow sets + init, S4 schema emit, S5 recipes doc). Proof per story is the coverage table.
+- Eight slices in `slices/` (30 criteria, mirrored as `01.AC1`… in spec.md's `criteria`): 01 pin today's `workflowHash`; 02 one workflow-text loader (listing + lost-record restart); 03 `use:` + exits + refusals + schemas; 04 `like:`; 05 bundled set rewrite + `norn init` copying `shared/`; 06 repo set rewrite; 07 cli surfacing, pins, lost-record restart from the branch; 08 recipes.
 
 ## Easy to miss
 
@@ -18,7 +19,7 @@ Workflows bring in steps from shared files (`use:` with named exits) and copy st
 
 ## Not proven yet
 
-- Everything: no code yet. That the rewritten `quick`/`story` flatten to today's workflows is proven by prefactor 1's recorded `workflowHash`.
+- Everything: no code yet. That the rewritten workflows flatten to today's is proven by slice 01's recorded `workflowHash`.
 
 ## Notes
 
