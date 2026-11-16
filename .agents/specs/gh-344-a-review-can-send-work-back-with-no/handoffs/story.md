@@ -43,4 +43,4 @@ Review #1: approve, no blocking findings. `bun run test` (2075 pass) and `bun ru
 
 ### Resume
 
-Review the branch against the issue's Wanted list.
+pr.md in the spec folder describes the branch as it is now (summary, test evidence per Wanted point, merge danger). Next: norn opens the PR with it; a person reviews.
