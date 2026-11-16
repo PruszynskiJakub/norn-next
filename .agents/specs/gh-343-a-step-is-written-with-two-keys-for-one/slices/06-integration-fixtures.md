@@ -1,8 +1,8 @@
 ---
 id: gh-343/06
 title: Move the cli integration tests' workflow fixtures to the new wording
-depends_on: [gh-343/04]
-status: planned
+depends_on: [ gh-343/04 ]
+status: active
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
