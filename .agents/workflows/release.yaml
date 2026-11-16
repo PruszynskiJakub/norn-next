@@ -40,49 +40,11 @@ steps:
     instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. CHANGELOG.md and version conflicts: keep the base side; prepare writes the release section again next."
     outcomes:
       done: { to: update, means: "base merged into the story branch, conflicts resolved and committed" }
-  open-pr:
-    type: git
-    action: open-pr
-    outcomes: { done: ci }
-  # waits for the PR's CI (a detached check run, so the tick is not blocked): the ci.yml run of the
-  # PR's head commit, up to 5m for it to appear, else fail: tests, typecheck, the
-  # npm package and a binary built and smoke-tested; release.yml smokes every binary on its own OS
-  # after the merge, before it pushes the tag
-  ci:
-    type: check
-    run: |
-      sha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1
-      # GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story
-      # updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.
-      mergeable() {
-        m=UNKNOWN
-        for i in 1 2 3 4 5 6; do
-          m=$(gh pr view --json mergeable -q .mergeable) || return 1
-          [ "$m" != UNKNOWN ] && return 0
-          sleep 5
-        done
-      }
-      conflicting() { [ "$m" = CONFLICTING ] && echo "PR conflicts with its base: no CI runs on it until the branch takes the base"; }
-      mergeable || exit 1
-      conflicting && exit 3
-      run=
-      for i in $(seq 1 30); do
-        run=$(gh run list --workflow ci.yml --commit "$sha" --event pull_request --limit 1 --json databaseId -q '.[0].databaseId')
-        [ -n "$run" ] && break
-        sleep 10
-      done
-      if [ -z "$run" ]; then
-        mergeable || exit 1
-        conflicting && exit 3
-        echo "no ci.yml run for $sha after 5m (PR mergeable: $m)"
-        exit 1
-      fi
-      gh run watch "$run" --exit-status --interval 30 >/dev/null && exit 0
-      sh .agents/scripts/ci-failures.sh "$run"
-      exit 1
-    timeout: 30m
-    exits: { 3: stale }
-    outcomes: { pass: ready, fail: $stuck, stale: { to: update, counter: stale_loop } }
+  # release.yml smokes every binary on its own OS after the merge, before it pushes the tag; a red
+  # CI means the base is broken
+  ship:
+    use: ci
+    outcomes: { passed: ready, failed: $stuck, stale: { to: update, counter: stale_loop } }
   ready:
     type: gate
     prompt: >-

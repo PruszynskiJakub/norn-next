@@ -72,6 +72,15 @@ describe("repo workflows", () => {
     expect(result.ok ? [] : result.issues).toEqual([]);
     if (result.ok) expect(checkWorkflowLevel(result.workflow, SLICE_WORKFLOWS.has(name) ? "slice" : "story")).toEqual([]);
   });
+  test("the CI wait is written once, in a shared file, and every workflow in the folder still loads", () => {
+    const dir = workflowsDir(CONFIG_ROOT);
+    const files = [
+      ...readdirSync(dir).filter((f) => f.endsWith(".yaml")),
+      ...readdirSync(join(dir, "shared")).filter((f) => f.endsWith(".yaml")).map((f) => `shared/${f}`),
+    ];
+    expect(files.filter((f) => readFileSync(join(dir, f), "utf8").includes("gh run watch"))).toEqual(["shared/ci.yaml"]);
+    expect(listing.errors).toEqual([]);
+  });
   test("story's and quick's resolve take the base side of each conflict, as the shipped copies do", () => {
     for (const name of ["story", "quick"]) expect((listing.workflows[name]!.workflow.steps.resolve as { inputs?: unknown[] }).inputs).toContain("base_side");
   });

@@ -1,20 +1,23 @@
 /** The `ci` check script of the repo workflows (#125), run through `sh` against a fake gh and sleep on PATH. */
 import { describe, expect, test } from "bun:test";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSyncCaptured } from "@norn/store";
+import { loadWorkflow, spawnSyncCaptured, workflowsDir } from "@norn/store";
 import { REPO_ROOT as ROOT } from "../../../../test/support/repo-root.ts";
 
-/** The `ci` step of the workflow `wf` in `dir`. */
+/** The `ci` step of the workflow `wf` in the workflows folder `dir`, as norn loads it: its shared files brought in. */
 function ciStep(dir: string, wf: string): unknown {
-  return (Bun.YAML.parse(readFileSync(join(dir, `${wf}.yaml`), "utf8")) as { steps: Record<string, unknown> }).steps.ci;
+  const root = mkdtempSync(join(tmpdir(), "norn-ci-wf-"));
+  cpSync(dir, workflowsDir(root), { recursive: true });
+  const r = loadWorkflow(root, wf);
+  if (!r.ok) throw new Error(`${wf} in ${dir}: ${JSON.stringify(r)}`);
+  return r.value.workflow.steps.ci;
 }
 
 /** The `ci` check script of a repo workflow, as norn runs it (`sh -c`, packages/cli/src/runtime/shell.ts). */
 function ciScript(wf: string): string {
-  const { steps } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as { steps: Record<string, { run?: string }> };
-  return steps.ci?.run ?? "";
+  return (ciStep(workflowsDir(ROOT), wf) as { run?: string } | undefined)?.run ?? "";
 }
 
 describe("the ci check waits for the ci.yml run of the PR's head commit (#125)", () => {
