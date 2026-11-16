@@ -11,6 +11,19 @@ A workflow file in the main checkout (`.agents/workflows/`, shared files include
 - Doctor → upgrade → doctor in a throwaway repo (the user's path end to end): evidence `1-doctor.txt` (two FAILs, `old_wording` messages naming `norn upgrade`, one of them via a shared file), `2-upgrade.txt` (two files rewritten, exit 0), `3-doctor.txt` (every check passes).
 - `bun run test` 2058 pass, 0 fail; `bun run typecheck` green.
 
+Traceability (review #1):
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | any old key, or `means`/`verdict` in an edge or exit route, is refused as old wording naming steps and keys; a refusing command's `do_instead` names `norn upgrade` | test | `packages/store/test/unit/old-wording-refusal.test.ts` › "a file in the old wording is one old_wording error…", "each of every old key is enough on its own, and a means inside an exit route too"; `packages/cli/test/integration/old-wording.test.ts` › "story create --workflow refuses an old file…", "story edit --workflow refuses an old or mixed file…" |
+| AC2 | a step mixing both wordings is refused as old, same `do_instead` | test | `old-wording-refusal.test.ts` › "a step mixing both wordings is refused as old"; `old-wording.test.ts` › "story edit --workflow refuses an old or mixed file…" |
+| AC3 | doctor reports one issue per old file, each naming `norn upgrade` | test | `old-wording.test.ts` › "doctor reports one issue per old file…"; `old-wording-refusal.test.ts` › "the listing reports one error per old file…" |
+| AC4 | no round starts from an old file (story edit, sync/tick) and sync and the inbox report it | test | `old-wording.test.ts` › "story edit --workflow refuses…; no round starts", "a tick starts no story on an old file and the inbox names it with norn upgrade" |
+| AC5 | an in-flight story on an old-wording pin finishes its round, pin text and hash untouched; past round's trace and record load | test | `old-wording.test.ts` › "the pin loads, its text and hash stay as they were…"; trace/record reads are copy reads: slice 01 `workflow-reads.test.ts` |
+| AC6 | lost-record restart from an old branch file loads it and pins it verbatim, hash matching | test | `packages/cli/test/integration/takeover-record-lost.test.ts` › "an old-wording workflow file on the branch loads as a copy and is pinned verbatim…" |
+| AC7 | a new unit pins the new wording, flattened when it uses `use`/`like` | test | `old-wording.test.ts` › "a workflow using a shared file is pinned flattened, in the new wording" |
+| AC8 | doctor → `norn upgrade` → doctor in a throwaway repo ends with no workflow issue | agent | QA (agent); implement's evidence `1-doctor.txt`, `2-upgrade.txt`, `3-doctor.txt` |
+
 ## Easy to miss
 - `parseWorkflowText(…, "checkout")` refuses old wording itself; `loadWorkflowText` checks the file and each shared file before flattening, so a shared file's old step is reported against the workflow that uses it, by the shared file's name.
 - `pinWorkflow` parses as a `copy`: it only ever receives a text a checkout read already accepted, or a branch/pin text that must load as written.
