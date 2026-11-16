@@ -2,7 +2,7 @@
 id: gh-343/10
 title: Docs teach the new wording
 depends_on: [ gh-343/05 ]
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: agent }
   - { id: AC2, verifier: test }
