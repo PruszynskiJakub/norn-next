@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { claimRef, recordRef, ulid } from "@norn/schema";
-import { appendReceipt, loadWorkflow, readState, workflowsDir } from "@norn/store";
+import { appendReceipt, loadWorkflow, readState, setWorkflowReadObserver, type WorkflowTextRead, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, sh, worktreeOf } from "../../../../test/support/harness.ts";
 import { type Clone, cloneOf } from "../../../../test/support/clone.ts";
@@ -368,7 +368,15 @@ describe("a lost-record checkout that cannot start the round takes nothing (revi
     const s = await heldThenSilent(26, "same-hash", 0);
     expire(s.key);
     const B = cloneOf(h, "b-samehash", "bob");
-    expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
+    const reads: WorkflowTextRead[] = [];
+    const prev = setWorkflowReadObserver((r) => reads.push(r));
+    try {
+      expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
+    } finally {
+      setWorkflowReadObserver(prev);
+    }
+    // the branch's file is a copy, never the main checkout's file
+    expect(reads.filter((r) => r.path === ".agents/workflows/rv.yaml").map((r) => r.read)).toEqual(["copy"]);
     const listed = loadWorkflow(s.wt(h.root), "rv");
     if (!listed.ok) throw new Error("rv does not load on the branch");
     expect(state(s.runs(B.root))?.workflow_hash).toBe(listed.value.hash);

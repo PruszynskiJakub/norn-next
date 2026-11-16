@@ -268,7 +268,7 @@ async function lostRecord(git: GitPort, root: string, story: RunStory, branch: s
   // A shared file is read from where its workflow is: the branch, never the work tree
   const shared = new Map<string, string | null>();
   for (const n of sharedFilesUsed(found.source)) shared.set(n, await git.show(root, head, `${WORKFLOWS_DIR}/${sharedFile(n)}`));
-  const loaded = loadWorkflowText(name, found.source, found.path, undefined, (n) => shared.get(n) ?? null);
+  const loaded = loadWorkflowText(name, found.source, found.path, "copy", undefined, (n) => shared.get(n) ?? null);
   const issues = loaded.ok ? checkWorkflowLevel(loaded.value.workflow, "story").map((i) => i.message) : [loaded.reason === "corrupt" ? loaded.error.errors.map((e) => e.message).join(", ") : loaded.reason];
   if (!loaded.ok || issues.length)
     throw refuse(

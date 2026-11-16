@@ -246,7 +246,7 @@ export function tickReader(root: string): TickReader {
         // a chunked tick carries the source; a full-facts tick names it in trace/workflows
         const label = ref.hash ? `trace/workflows/${ref.hash}.yaml` : `trace/${chunksFileName(tick.at)}`;
         const source = typeof ref.source === "string" ? ref.source : ref.hash ? (readTraceFile(root, `workflows/${ref.hash}.yaml`) ?? "") : "";
-        const parsed = source ? parseWorkflowText(source, label) : null;
+        const parsed = source ? parseWorkflowText(source, label, "copy") : null;
         workflows[name] = { name, workflow: parsed?.ok ? parsed.value : null, source, issues: ref.issues };
       }
       return { ok: true, inputs: { facts: facts as Facts, workflows, config: legacyConfig(replay.config) } };
