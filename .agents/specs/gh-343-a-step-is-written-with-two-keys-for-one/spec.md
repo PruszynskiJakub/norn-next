@@ -16,6 +16,7 @@ workflow: refinement
 status: active
 intake_at: 2026-11-16T15:23:54.534Z
 body_hash: 7fbc55d648d29da4c82b1f01627eee670941563520c70a99287cf49a8e7474ca
+refined_body_hash: 7fbc55d648d29da4c82b1f01627eee670941563520c70a99287cf49a8e7474ca
 ---
 
 # A step is written with two keys for one fact, and an agent step must name a skill
