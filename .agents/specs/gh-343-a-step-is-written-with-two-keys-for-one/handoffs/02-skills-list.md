@@ -31,4 +31,4 @@ Review #1: approve. `bun run test` (1965 pass) and `bun run typecheck` are green
 - Out of scope, left for slice 04: the file wording `skills:` / `by:`, and making the orientation required.
 
 ## Resume
-Nothing left in this slice; next is its review.
+Review approved; next is QA of the six criteria against the Proof table.
