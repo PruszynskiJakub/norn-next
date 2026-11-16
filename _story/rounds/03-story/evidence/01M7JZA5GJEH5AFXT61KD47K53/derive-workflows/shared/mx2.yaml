@@ -1,0 +1,10 @@
+description: mixed kinds again
+start: test2
+steps:
+  test2:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: ready2, fail: { exit: back } }
+  ready2:
+    gate: ok?
+    outcomes: { approve: { exit: fine }, reject: { exit: back } }

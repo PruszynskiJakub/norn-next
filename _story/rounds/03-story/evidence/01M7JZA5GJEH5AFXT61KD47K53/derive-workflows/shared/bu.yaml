@@ -1,0 +1,15 @@
+description: three checks leave through broken
+start: t1
+steps:
+  t1:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: t2, fail: { exit: broken } }
+  t2:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: t3, fail: { exit: broken } }
+  t3:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: { exit: tested }, fail: { exit: broken } }

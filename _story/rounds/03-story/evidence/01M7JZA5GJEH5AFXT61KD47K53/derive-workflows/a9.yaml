@@ -1,0 +1,13 @@
+name: a9
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means: { done: built }
+  review:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: implement }
+    means: { done: again }

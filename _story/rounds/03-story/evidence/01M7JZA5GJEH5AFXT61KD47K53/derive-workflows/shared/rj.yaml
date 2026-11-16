@@ -1,0 +1,16 @@
+description: gate reject and stale feeders
+start: g
+steps:
+  g:
+    gate: ok?
+    outcomes: { approve: s, reject: { exit: rejected } }
+  s:
+    check: "true"
+    timeout: 5m
+    exits: { 3: stale }
+    outcomes: { pass: d, fail: { exit: gone }, stale: { exit: behind } }
+  d:
+    agent: x
+    skills: [norn-implement]
+    outcomes: { done: { exit: ok }, again: { exit: fwd } }
+    means: { done: ok, again: x }

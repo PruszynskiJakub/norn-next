@@ -1,0 +1,15 @@
+name: a4
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: test }
+    means: { done: built }
+  test:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: ready, fail: { to: implement, max: 3 } }
+  ready:
+    gate: ok?
+    outcomes: { approve: { to: implement, max: 4 }, reject: $stuck }

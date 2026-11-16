@@ -1,0 +1,12 @@
+today (base files) | conflict #1 | step=merge status=ready counters={"test_loop":0,"review_loop":0,"conflict_loop":1} park=-
+today (base files) | merge done #1 | step=integrate status=ready counters={"test_loop":0,"review_loop":0,"conflict_loop":1} park=-
+today (base files) | conflict #2 | step=merge status=ready counters={"test_loop":0,"review_loop":0,"conflict_loop":2} park=-
+today (base files) | merge done #2 | step=integrate status=ready counters={"test_loop":0,"review_loop":0,"conflict_loop":2} park=-
+today (base files) | conflict #3 | step=integrate status=stuck counters={"test_loop":0,"review_loop":0,"conflict_loop":2} park={"name":"conflict_loop","max":2,"outcome":"conflict","to":"merge"}
+today (base files) | conflict, merge, then integrate.done | step=$done status=done counters={"test_loop":0,"review_loop":0,"conflict_loop":1} park=-
+head (edited files) | conflict #1 | step=merge status=ready counters={"test.fail":0,"integrate.conflict":1,"review.changes_requested":0} park=-
+head (edited files) | merge done #1 | step=integrate status=ready counters={"test.fail":0,"integrate.conflict":1,"review.changes_requested":0} park=-
+head (edited files) | conflict #2 | step=merge status=ready counters={"test.fail":0,"integrate.conflict":2,"review.changes_requested":0} park=-
+head (edited files) | merge done #2 | step=integrate status=ready counters={"test.fail":0,"integrate.conflict":2,"review.changes_requested":0} park=-
+head (edited files) | conflict #3 | step=integrate status=stuck counters={"test.fail":0,"integrate.conflict":2,"review.changes_requested":0} park={"name":"integrate.conflict","max":2,"outcome":"conflict","to":"merge"}
+head (edited files) | conflict, merge, then integrate.done | step=$done status=done counters={"test.fail":0,"integrate.conflict":0,"review.changes_requested":0} park=-

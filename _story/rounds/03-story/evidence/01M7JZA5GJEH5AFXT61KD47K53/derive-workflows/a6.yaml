@@ -1,0 +1,12 @@
+name: a6
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: test }
+    means: { done: built }
+  test:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: { to: $done, max: 2 }, fail: implement }

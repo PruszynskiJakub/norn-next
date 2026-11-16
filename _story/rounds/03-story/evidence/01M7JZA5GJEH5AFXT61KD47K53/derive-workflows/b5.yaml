@@ -1,0 +1,11 @@
+name: b5
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: rev, fin: $done }
+    means: { done: built, fin: finished }
+  rev:
+    use: fw
+    outcomes: { back: implement }

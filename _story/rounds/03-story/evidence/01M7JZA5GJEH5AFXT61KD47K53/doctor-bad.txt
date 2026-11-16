@@ -1,0 +1,29 @@
+norn doctor: 6 checks failed (remote, workflow a5, workflow a6, workflow a9, workflow b4, workflow b5)
+
+  ok   git            git version 2.54.0 (Apple Git-157)
+  ok   agent claude   /Users/jakubpruszynski/.local/bin/claude (2.1.325 (Claude Code)) · hooks fire
+  FAIL remote         gh
+                      ! gh api user failed (exit 4): To get started with GitHub CLI, please run: gh auth login Alternatively, populate the GH_TOKEN environment variable with a GitHub API authentication token.
+                      → gh auth login
+  ok   runner         herdr available · sessions run this norn
+                      · cockpit plugin linked
+  ok   skills         installed and linked
+       machine        jakubpruszynski@mac
+  ok   norn           0.33.0 matches this repo's norn version 0.33.0
+  ok   workflows      quick, refinement, reproduce, slice, story, triage valid (.agents/workflows/)
+  FAIL workflow a5    .agents/workflows/a5.yaml
+                      ! /steps/test/outcomes/fail: `test.fail` sets both max and counter: a named counter's max goes under counters
+  FAIL workflow a6    .agents/workflows/a6.yaml
+                      ! /steps/test/outcomes/pass: `test.pass` → `$done` sets max, but there is no loop to bound
+  FAIL workflow a9    .agents/workflows/a9.yaml
+                      ! /steps/implement: step 'implement' cannot reach $done
+                      ! /steps/review: step 'review' cannot reach $done
+                      ! /steps/implement: cycle without a counter: implement.done → review.done → implement
+  FAIL workflow b4    .agents/workflows/b4.yaml
+                      ! /steps/verify/outcomes/back: shared/mx.yaml: exit `back` of `verify` is fed by edges of different kinds (check fail: `test.fail`; gate reject: `ready.reject`): give max: on `verify`'s route
+  FAIL workflow b5    .agents/workflows/b5.yaml
+                      ! /steps/implement: shared/fw.yaml, step 'g5': cycle without a counter: implement.done → g5.approve → a5.done → implement
+  ok   config         .agents/norn.config.yaml
+
+Warnings
+  ! labels not checked: no git remote

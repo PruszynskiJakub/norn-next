@@ -1,0 +1,16 @@
+name: b3
+start: sync
+steps:
+  sync:
+    use: cf
+    outcomes: { synced: implement, clash: fix }
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means: { done: built }
+  fix:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: sync }
+    means: { done: fixed }

@@ -1,0 +1,16 @@
+name: a7
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: test }
+    means: { done: built }
+  test:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: ready, fail: { to: implement, counter: shared_loop } }
+  ready:
+    gate: ok?
+    outcomes: { approve: $done, reject: { to: implement, counter: shared_loop } }
+counters: { shared_loop: { max: 2, reset_on: ready.approve } }

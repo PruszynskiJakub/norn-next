@@ -1,0 +1,6 @@
+description: conflict feeder
+start: up
+steps:
+  up:
+    update-branch:
+    outcomes: { done: { exit: synced }, clean: { exit: synced }, conflict: { exit: clash } }

@@ -1,0 +1,11 @@
+name: a10
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: integrate }
+    means: { done: built }
+  integrate:
+    integrate:
+    outcomes: { done: $done, conflict: { to: implement, max: 5 } }

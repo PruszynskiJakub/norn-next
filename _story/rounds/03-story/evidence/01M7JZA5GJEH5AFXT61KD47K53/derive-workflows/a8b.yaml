@@ -1,0 +1,13 @@
+name: a8b
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means: { done: built }
+  review:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { approve: $done, changes_requested: { to: implement, counter: review.changes_requested } }
+    means: { approve: ok, changes_requested: redo }

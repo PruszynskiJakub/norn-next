@@ -1,0 +1,11 @@
+name: b2
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: gate }
+    means: { done: built }
+  gate:
+    use: rj
+    outcomes: { rejected: implement, behind: { to: implement, max: 3 }, gone: $stuck, ok: $done, fwd: implement }

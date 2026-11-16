@@ -1,0 +1,28 @@
+bun test v1.3.13 (bf2e2cec)
+
+packages/store/test/unit/shipped-workflow-counting.test.ts:
+161 | describe("every shipped workflow keeps its counting", () => {
+162 |   for (const [kind, dir] of [["bundled", BUNDLED_DIR], ["repo", REPO_DIR]] as const)
+163 |     test(`each ${kind} workflow bounds the same edges by the same max, resets and sharing`, () => {
+164 |       const loaded = loadFolder(dir);
+165 |       const actual = Object.fromEntries(Object.entries(loaded).map(([n, w]) => [n, withoutAccepted(n, counting(w.workflow))]));
+166 |       expect(actual).toEqual(TABLE[kind]);
+                           ^
+error: expect(received).toEqual(expected)
+
+@@ -96,3 +96,3 @@
+        "ci.fail": {
+-         "max": 3,
++         "max": 4,
+        },
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-345-every-route-back-needs-a-hand-written/packages/store/test/unit/shipped-workflow-counting.test.ts:166:22)
+(fail) every shipped workflow keeps its counting > each bundled workflow bounds the same edges by the same max, resets and sharing [38.44ms]
+
+ 4 pass
+ 1 fail
+ 10 expect() calls
+Ran 5 tests across 1 file. [404.00ms]

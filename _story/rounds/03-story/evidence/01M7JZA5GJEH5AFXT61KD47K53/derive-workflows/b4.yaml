@@ -1,0 +1,11 @@
+name: b4
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: verify }
+    means: { done: built }
+  verify:
+    use: mx
+    outcomes: { fine: $done, back: implement }

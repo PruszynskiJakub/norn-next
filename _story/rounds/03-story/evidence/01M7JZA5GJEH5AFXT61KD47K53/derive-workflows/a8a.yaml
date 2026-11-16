@@ -1,0 +1,13 @@
+name: a8a
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: test }
+    means: { done: built }
+  test:
+    check: bun test
+    timeout: 5m
+    outcomes: { pass: $done, fail: { to: implement, counter: test.fail } }
+counters: { test.fail: { max: 3 } }

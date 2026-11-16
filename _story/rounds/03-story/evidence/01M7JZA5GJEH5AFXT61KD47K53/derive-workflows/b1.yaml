@@ -1,0 +1,11 @@
+name: b1
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: base-update }
+    means: { done: built }
+  base-update:
+    use: bu
+    outcomes: { tested: $done, broken: implement }

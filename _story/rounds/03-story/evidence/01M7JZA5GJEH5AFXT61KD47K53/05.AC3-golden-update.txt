@@ -1,0 +1,7 @@
+$ bun scripts/golden.ts --update
+
+0 of 139 golden case(s) decide differently now; only their decisions were rewritten
+ 350 pass
+ 0 fail
+ 224 expect() calls
+Ran 350 tests across 1 file. [206.00ms]

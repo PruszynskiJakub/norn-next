@@ -1,0 +1,13 @@
+name: a1
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: test }
+    means: { done: built }
+  test:
+    check: bun test
+    timeout: 5m
+    exits: { 4: flaky, 3: stale }
+    outcomes: { pass: $done, fail: implement, flaky: implement, stale: implement }

@@ -1,0 +1,23 @@
+name: a3
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: review }
+    means: { done: built }
+  review:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { approve: report, changes_requested: implement }
+    means: { approve: ok, changes_requested: redo }
+  report:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: $done, blocked: $stuck, more: other }
+    means: { done: ok, blocked: no, more: x }
+  other:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: $done }
+    means: { done: ok }

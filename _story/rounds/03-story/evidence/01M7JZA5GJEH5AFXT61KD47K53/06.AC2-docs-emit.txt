@@ -1,0 +1,6 @@
+$ bun packages/cli/scripts/docs-emit.ts
+{"emitted":"docs/reference.md"}
+ 87 pass
+ 0 fail
+ 616 expect() calls
+Ran 87 tests across 2 files. [1285.00ms]

@@ -1,0 +1,11 @@
+description: a reject and a forward done share an exit
+start: g5
+steps:
+  g5:
+    gate: ok?
+    outcomes: { approve: a5, reject: { exit: back } }
+  a5:
+    agent: x
+    skills: [norn-implement]
+    outcomes: { done: { exit: back } }
+    means: { done: ok }

@@ -1,0 +1,27 @@
+name: a2
+start: implement
+steps:
+  implement:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: ready }
+    means: { done: built }
+  ready:
+    gate: ok?
+    outcomes: { approve: integrate, reject: implement, stale: implement }
+  integrate:
+    integrate:
+    outcomes: { done: wait, conflict: fix }
+  fix:
+    agent: do it
+    skills: [norn-implement]
+    outcomes: { done: integrate }
+    means: { done: fixed }
+  wait:
+    check: "true"
+    timeout: 5m
+    exits: { 3: stale }
+    outcomes: { pass: merge, fail: $stuck, stale: implement }
+  merge:
+    await-merge:
+    outcomes: { stale: implement }

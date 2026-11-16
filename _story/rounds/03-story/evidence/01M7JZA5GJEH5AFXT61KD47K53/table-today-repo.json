@@ -1,0 +1,245 @@
+{
+ "quick": {
+  "edges": {
+   "ci.fail": {
+    "to": "implement",
+    "max": 3,
+    "reset": []
+   },
+   "ci.stale": {
+    "to": "update",
+    "max": 10,
+    "reset": []
+   },
+   "merge.stale": {
+    "to": "update",
+    "max": 10,
+    "reset": []
+   },
+   "ready.reject": {
+    "to": "implement",
+    "max": 2,
+    "reset": []
+   },
+   "ready.stale": {
+    "to": "update",
+    "max": 10,
+    "reset": []
+   },
+   "resolution-review.changes_requested": {
+    "to": "resolve",
+    "max": 2,
+    "reset": []
+   },
+   "review.changes_requested": {
+    "to": "implement",
+    "max": 3,
+    "reset": []
+   },
+   "sync.conflict": {
+    "to": "sync-resolve",
+    "max": 2,
+    "reset": [
+     "sync.done"
+    ]
+   },
+   "test-merge.fail": {
+    "to": "implement",
+    "max": 5,
+    "reset": []
+   },
+   "test-resolution.fail": {
+    "to": "implement",
+    "max": 5,
+    "reset": []
+   },
+   "test.fail": {
+    "to": "implement",
+    "max": 5,
+    "reset": []
+   },
+   "update.conflict": {
+    "to": "resolve",
+    "max": 2,
+    "reset": [
+     "update.clean",
+     "update.done",
+     "update.resolved"
+    ]
+   }
+  },
+  "sharedGroups": [
+   "ci.stale + merge.stale + ready.stale",
+   "test-merge.fail + test-resolution.fail + test.fail"
+  ]
+ },
+ "refinement": {
+  "edges": {
+   "sync.conflict": {
+    "to": "sync-resolve",
+    "max": 2,
+    "reset": [
+     "sync.done"
+    ]
+   }
+  },
+  "sharedGroups": []
+ },
+ "release": {
+  "edges": {
+   "ci.stale": {
+    "to": "update",
+    "max": 10,
+    "reset": []
+   },
+   "merge.stale": {
+    "to": "update",
+    "max": 10,
+    "reset": []
+   },
+   "ready.reject": {
+    "to": "prepare",
+    "max": 2,
+    "reset": []
+   },
+   "ready.stale": {
+    "to": "update",
+    "max": 10,
+    "reset": []
+   },
+   "update.conflict": {
+    "to": "resolve",
+    "max": 2,
+    "reset": [
+     "update.done"
+    ]
+   }
+  },
+  "sharedGroups": [
+   "ci.stale + merge.stale + ready.stale"
+  ]
+ },
+ "reproduce": {
+  "edges": {},
+  "sharedGroups": []
+ },
+ "slice": {
+  "edges": {
+   "integrate.conflict": {
+    "to": "merge",
+    "max": 2,
+    "reset": []
+   },
+   "review.changes_requested": {
+    "to": "implement",
+    "max": 3,
+    "reset": []
+   },
+   "test.fail": {
+    "to": "implement",
+    "max": 5,
+    "reset": []
+   }
+  },
+  "sharedGroups": []
+ },
+ "story": {
+  "edges": {
+   "approve-slices.reject": {
+    "to": "slice",
+    "max": 3,
+    "reset": []
+   },
+   "ci.fail": {
+    "to": "implement",
+    "max": 3,
+    "reset": []
+   },
+   "ci.stale": {
+    "to": "update",
+    "max": 10,
+    "reset": []
+   },
+   "human-qa.reject": {
+    "to": "implement",
+    "max": 2,
+    "reset": []
+   },
+   "human-qa.stale": {
+    "to": "update",
+    "max": 10,
+    "reset": []
+   },
+   "merge.stale": {
+    "to": "update",
+    "max": 10,
+    "reset": []
+   },
+   "qa.fail": {
+    "to": "implement",
+    "max": 2,
+    "reset": []
+   },
+   "ready.reject": {
+    "to": "implement",
+    "max": 2,
+    "reset": []
+   },
+   "ready.stale": {
+    "to": "update",
+    "max": 10,
+    "reset": []
+   },
+   "resolution-review.changes_requested": {
+    "to": "resolve",
+    "max": 2,
+    "reset": []
+   },
+   "review.changes_requested": {
+    "to": "implement",
+    "max": 3,
+    "reset": []
+   },
+   "sync.conflict": {
+    "to": "sync-resolve",
+    "max": 2,
+    "reset": [
+     "sync.done"
+    ]
+   },
+   "test-merge.fail": {
+    "to": "implement",
+    "max": 5,
+    "reset": []
+   },
+   "test-resolution.fail": {
+    "to": "implement",
+    "max": 5,
+    "reset": []
+   },
+   "test.fail": {
+    "to": "implement",
+    "max": 5,
+    "reset": []
+   },
+   "update.conflict": {
+    "to": "resolve",
+    "max": 2,
+    "reset": [
+     "update.clean",
+     "update.done",
+     "update.resolved"
+    ]
+   }
+  },
+  "sharedGroups": [
+   "ci.stale + human-qa.stale + merge.stale + ready.stale",
+   "human-qa.reject + qa.fail",
+   "test-merge.fail + test-resolution.fail + test.fail"
+  ]
+ },
+ "triage": {
+  "edges": {},
+  "sharedGroups": []
+ }
+}

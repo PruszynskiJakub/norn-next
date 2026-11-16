@@ -1,0 +1,269 @@
+{
+ "errors": [
+  {
+   "file": ".agents/workflows/a5.yaml",
+   "errors": [
+    {
+     "path": "/steps/test/outcomes/fail",
+     "message": "`test.fail` sets both max and counter: a named counter's max goes under counters"
+    }
+   ]
+  },
+  {
+   "file": ".agents/workflows/a6.yaml",
+   "errors": [
+    {
+     "path": "/steps/test/outcomes/pass",
+     "message": "`test.pass` → `$done` sets max, but there is no loop to bound"
+    }
+   ]
+  },
+  {
+   "file": ".agents/workflows/a8a.yaml",
+   "errors": [
+    {
+     "path": "/counters/test.fail",
+     "message": "counter name 'test.fail' is not a valid name: a dotted name is derived from its edge, never declared"
+    }
+   ]
+  },
+  {
+   "file": ".agents/workflows/a8b.yaml",
+   "errors": [
+    {
+     "path": "/steps/review/outcomes/changes_requested",
+     "message": "counter 'review.changes_requested' is not declared in counters"
+    }
+   ]
+  },
+  {
+   "file": ".agents/workflows/b4.yaml",
+   "errors": [
+    {
+     "path": "/steps/verify/outcomes/back",
+     "message": "shared/mx.yaml: exit `back` of `verify` is fed by edges of different kinds (check fail: `test.fail`; gate reject: `ready.reject`): give max: on `verify`'s route"
+    }
+   ]
+  },
+  {
+   "file": ".agents/workflows/b6.yaml",
+   "errors": [
+    {
+     "path": "/steps/rev2/outcomes/rejected",
+     "message": "`rev2.rejected` → `$stuck` sets max, but there is no loop to bound"
+    }
+   ]
+  }
+ ],
+ "out": {
+  "a1": {
+   "hash": "cc6f9feb340e3af41547425fb3a4b5e5d870ea650e8fe982e4f18075dc82cad9",
+   "source": "name: a1\nstart: implement\nsteps:\n  implement:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: test\n    means:\n      done: built\n  test:\n    check: bun test\n    timeout: 5m\n    exits:\n      \"3\": stale\n      \"4\": flaky\n    outcomes:\n      pass: $done\n      fail:\n        to: implement\n        counter: test.fail\n      flaky:\n        to: implement\n        counter: test.flaky\n      stale:\n        to: implement\n        counter: test.stale\ncounters:\n  test.fail:\n    max: 5\n  test.flaky:\n    max: 5\n  test.stale:\n    max: 10\n",
+   "exits": null,
+   "counters": {
+    "test.fail": {
+     "max": 5
+    },
+    "test.flaky": {
+     "max": 5
+    },
+    "test.stale": {
+     "max": 10
+    }
+   }
+  },
+  "a10": {
+   "hash": "97c038a58b9137d3bfbca68ce7ac469ada63d4257a902c17e9faedd4f302b1e9",
+   "source": "name: a10\nstart: implement\nsteps:\n  implement:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: integrate\n    means:\n      done: built\n  integrate:\n    integrate: null\n    outcomes:\n      done: $done\n      conflict:\n        to: implement\n        counter: integrate.conflict\ncounters:\n  integrate.conflict:\n    max: 5\n    reset_on: integrate.done\n",
+   "exits": null,
+   "counters": {
+    "integrate.conflict": {
+     "max": 5,
+     "reset_on": "integrate.done"
+    }
+   }
+  },
+  "a2": {
+   "hash": "4449a90c09264267cb4c24b9ca81719d735fa87249e2b3359f8c48c8fb1f5f59",
+   "source": "name: a2\nstart: implement\nsteps:\n  implement:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: ready\n    means:\n      done: built\n  ready:\n    gate: ok?\n    outcomes:\n      approve: integrate\n      reject:\n        to: implement\n        counter: ready.reject\n      stale:\n        to: implement\n        counter: ready.stale\n  integrate:\n    integrate: null\n    outcomes:\n      done: wait\n      conflict:\n        to: fix\n        counter: integrate.conflict\n  fix:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: integrate\n    means:\n      done: fixed\n  wait:\n    check: \"true\"\n    timeout: 5m\n    exits:\n      \"3\": stale\n    outcomes:\n      pass: merge\n      fail: $stuck\n      stale:\n        to: implement\n        counter: wait.stale\n  merge:\n    await-merge: null\n    outcomes:\n      stale:\n        to: implement\n        counter: merge.stale\ncounters:\n  ready.reject:\n    max: 2\n  ready.stale:\n    max: 10\n  integrate.conflict:\n    max: 2\n    reset_on: integrate.done\n  wait.stale:\n    max: 10\n  merge.stale:\n    max: 10\n",
+   "exits": null,
+   "counters": {
+    "ready.reject": {
+     "max": 2
+    },
+    "ready.stale": {
+     "max": 10
+    },
+    "integrate.conflict": {
+     "max": 2,
+     "reset_on": "integrate.done"
+    },
+    "wait.stale": {
+     "max": 10
+    },
+    "merge.stale": {
+     "max": 10
+    }
+   }
+  },
+  "a3": {
+   "hash": "37581489d0554ece048d2e0f0aed5fb0956d8eb5fdc3e2dc178923a0a93c321a",
+   "source": "name: a3\nstart: implement\nsteps:\n  implement:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: review\n    means:\n      done: built\n  review:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      approve: report\n      changes_requested:\n        to: implement\n        counter: review.changes_requested\n    means:\n      approve: ok\n      changes_requested: redo\n  report:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: $done\n      blocked: $stuck\n      more: other\n    means:\n      done: ok\n      blocked: no\n      more: x\n  other:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: $done\n    means:\n      done: ok\ncounters:\n  review.changes_requested:\n    max: 3\n",
+   "exits": null,
+   "counters": {
+    "review.changes_requested": {
+     "max": 3
+    }
+   }
+  },
+  "a4": {
+   "hash": "5084392c7119056830e37c06b8dd197fa47fc6e15c1d157ce0e0ac5cd714d04e",
+   "source": "name: a4\nstart: implement\nsteps:\n  implement:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: test\n    means:\n      done: built\n  test:\n    check: bun test\n    timeout: 5m\n    outcomes:\n      pass: ready\n      fail:\n        to: implement\n        counter: test.fail\n  ready:\n    gate: ok?\n    outcomes:\n      approve:\n        to: implement\n        counter: ready.approve\n      reject: $stuck\ncounters:\n  test.fail:\n    max: 3\n  ready.approve:\n    max: 4\n",
+   "exits": null,
+   "counters": {
+    "test.fail": {
+     "max": 3
+    },
+    "ready.approve": {
+     "max": 4
+    }
+   }
+  },
+  "a7": {
+   "hash": "ba5090ac022d0b51dbadd10854ab7ff0961da600a07e8ad4d430d48382d2bc30",
+   "source": "name: a7\nstart: implement\nsteps:\n  implement:\n    agent: do it\n    skills: [norn-implement]\n    outcomes: { done: test }\n    means: { done: built }\n  test:\n    check: bun test\n    timeout: 5m\n    outcomes: { pass: ready, fail: { to: implement, counter: shared_loop } }\n  ready:\n    gate: ok?\n    outcomes: { approve: $done, reject: { to: implement, counter: shared_loop } }\ncounters: { shared_loop: { max: 2, reset_on: ready.approve } }\n",
+   "exits": null,
+   "counters": {
+    "shared_loop": {
+     "max": 2,
+     "reset_on": "ready.approve"
+    }
+   }
+  },
+  "a9": {
+   "hash": "607168463fa921e22ccf8a4c722dc84525dbe7dcedcd93726447a80b12a3b010",
+   "source": "name: a9\nstart: implement\nsteps:\n  implement:\n    agent: do it\n    skills: [norn-implement]\n    outcomes: { done: review }\n    means: { done: built }\n  review:\n    agent: do it\n    skills: [norn-implement]\n    outcomes: { done: implement }\n    means: { done: again }\n",
+   "exits": null,
+   "counters": null
+  },
+  "b1": {
+   "hash": "f96ba32e7a93fd0d5fa2ec6e7da4be547b2b4e8dd00cf638222b28102aed14ef",
+   "source": "name: b1\nstart: implement\nsteps:\n  implement:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: t1\n    means:\n      done: built\n  t1:\n    check: bun test\n    timeout: 5m\n    outcomes:\n      pass: t2\n      fail:\n        to: implement\n        counter: base-update.broken\n  t2:\n    check: bun test\n    timeout: 5m\n    outcomes:\n      pass: t3\n      fail:\n        to: implement\n        counter: base-update.broken\n  t3:\n    check: bun test\n    timeout: 5m\n    outcomes:\n      pass: $done\n      fail:\n        to: implement\n        counter: base-update.broken\ncounters:\n  base-update.broken:\n    max: 5\n",
+   "exits": {
+    "t1.fail": {
+     "exit": "base-update.broken"
+    },
+    "t2.fail": {
+     "exit": "base-update.broken"
+    },
+    "t3.pass": {
+     "exit": "base-update.tested"
+    },
+    "t3.fail": {
+     "exit": "base-update.broken"
+    }
+   },
+   "counters": {
+    "base-update.broken": {
+     "max": 5
+    }
+   }
+  },
+  "b2": {
+   "hash": "f2f958fe9f6eb1acd405c533e2fe4a21102694f26b6a1b6721efef4f58e96743",
+   "source": "name: b2\nstart: implement\nsteps:\n  implement:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: g\n    means:\n      done: built\n  g:\n    gate: ok?\n    outcomes:\n      approve: s\n      reject:\n        to: implement\n        counter: gate.rejected\n  s:\n    check: \"true\"\n    timeout: 5m\n    exits:\n      \"3\": stale\n    outcomes:\n      pass: d\n      fail: $stuck\n      stale:\n        to: implement\n        counter: gate.behind\n  d:\n    agent: x\n    skills:\n      - norn-implement\n    outcomes:\n      done: $done\n      again:\n        to: implement\n        counter: gate.fwd\n    means:\n      done: ok\n      again: x\ncounters:\n  gate.rejected:\n    max: 2\n  gate.behind:\n    max: 3\n  gate.fwd:\n    max: 3\n",
+   "exits": {
+    "g.reject": {
+     "exit": "gate.rejected"
+    },
+    "s.fail": {
+     "exit": "gate.gone"
+    },
+    "s.stale": {
+     "exit": "gate.behind",
+     "max": 3
+    },
+    "d.done": {
+     "exit": "gate.ok"
+    },
+    "d.again": {
+     "exit": "gate.fwd"
+    }
+   },
+   "counters": {
+    "gate.rejected": {
+     "max": 2
+    },
+    "gate.behind": {
+     "max": 3
+    },
+    "gate.fwd": {
+     "max": 3
+    }
+   }
+  },
+  "b3": {
+   "hash": "75f74c1ae29980e4e1e32e9aed112f6993f042d3e7668ffe51b78090f73f8837",
+   "source": "name: b3\nstart: up\nsteps:\n  up:\n    update-branch: null\n    outcomes:\n      done: implement\n      clean: implement\n      conflict:\n        to: fix\n        counter: sync.clash\n  implement:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: $done\n    means:\n      done: built\n  fix:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: up\n    means:\n      done: fixed\ncounters:\n  sync.clash:\n    max: 2\n    reset_on:\n      - up.done\n      - up.clean\n",
+   "exits": {
+    "up.done": {
+     "exit": "sync.synced"
+    },
+    "up.clean": {
+     "exit": "sync.synced"
+    },
+    "up.conflict": {
+     "exit": "sync.clash"
+    }
+   },
+   "counters": {
+    "sync.clash": {
+     "max": 2,
+     "reset_on": [
+      "up.done",
+      "up.clean"
+     ]
+    }
+   }
+  },
+  "b4m": {
+   "hash": "b8b14e00fdcdba533a338d1fef65ba1b39541aaa477d316f59382f9a18dd2bfd",
+   "source": "name: b4m\nstart: implement\nsteps:\n  implement:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: test2\n    means:\n      done: built\n  test2:\n    check: bun test\n    timeout: 5m\n    outcomes:\n      pass: ready2\n      fail:\n        to: implement\n        counter: verify.back\n  ready2:\n    gate: ok?\n    outcomes:\n      approve: $done\n      reject:\n        to: implement\n        counter: verify.back\ncounters:\n  verify.back:\n    max: 4\n",
+   "exits": {
+    "test2.fail": {
+     "exit": "verify.back",
+     "max": 4
+    },
+    "ready2.approve": {
+     "exit": "verify.fine"
+    },
+    "ready2.reject": {
+     "exit": "verify.back",
+     "max": 4
+    }
+   },
+   "counters": {
+    "verify.back": {
+     "max": 4
+    }
+   }
+  },
+  "b5": {
+   "hash": "961ae9c2f61fb5b2064508321a3067c112e7eae3e53e47411e76e51c4a1c62b5",
+   "source": "name: b5\nstart: implement\nsteps:\n  implement:\n    agent: do it\n    skills:\n      - norn-implement\n    outcomes:\n      done: g5\n      fin: $done\n    means:\n      done: built\n      fin: finished\n  g5:\n    gate: ok?\n    outcomes:\n      approve: a5\n      reject:\n        to: implement\n        counter: rev.back\n  a5:\n    agent: x\n    skills:\n      - norn-implement\n    outcomes:\n      done: implement\n    means:\n      done: ok\ncounters:\n  rev.back:\n    max: 2\n",
+   "exits": {
+    "g5.reject": {
+     "exit": "rev.back"
+    },
+    "a5.done": {
+     "exit": "rev.back"
+    }
+   },
+   "counters": {
+    "rev.back": {
+     "max": 2
+    }
+   }
+  }
+ }
+}
