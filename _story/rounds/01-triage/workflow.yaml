@@ -1,0 +1,27 @@
+# Triage workflow — repo-local copy of the shipped one, norn's own default (config
+# `workflow`: triage), for stories and features; a bug starts in `reproduce` instead (label
+# norn:wf:reproduce). An unattended agent checks the issue still holds, posts its findings as an issue
+# comment (spec.md stays as intake wrote it): the recommendation lives only there, the outcome is plain
+# `done`. That ends the round ($done): the person starts the next one (`norn story edit gh-N --workflow
+# refinement|quick|reproduce`) or closes the issue. Agents never run it.
+name: triage
+description: Check an issue still holds, add its context, and recommend what comes next (refinement, quick, reproduce) or closing it.
+start: explore
+steps:
+  explore:
+    type: agent
+    skill: norn-triage
+    inputs: [spec, handoff]
+    instructions: >-
+      The issue is mirrored in spec.md. Run norn's behaviour from this checkout's code, `bun packages/cli/src/main.ts …`
+      after `bun install --frozen-lockfile`, never the installed `norn`, and only in a throwaway git repo under $TMPDIR:
+      this worktree is a live norn unit. A change to norn's
+      documented behaviour is a `refinement`, unless the change is small and settled. Post the `## Triage` comment on it and add the kind, risk and priority
+      labels: `norn:kind:bug|feature|security|chore|docs`, `norn:risk:low|medium|high`,
+      `norn:priority:low|medium|high|extreme`; a label missing on the remote is named in the comment with
+      "norn upgrade creates it". That comment and those labels are the only remote writes this step allows,
+      an exception to the brief's rule on remote writes; never remove a label, the intake label `norn` included. Change no file, spec.md included,
+      but the handoff. The recommendation lives only in that comment:
+      report `norn done done --handoff "<recommendation>: <reason>"`.
+    outcomes:
+      done: { to: $done, means: "the ## Triage comment is posted, with one recommendation (refinement, quick, reproduce or close) and its reason, and the kind, risk and priority labels that could be set are on the issue" }
