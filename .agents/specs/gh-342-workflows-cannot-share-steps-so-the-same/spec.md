@@ -11,7 +11,7 @@ labels:
   - norn:kind:feature
   - norn:priority:medium
   - norn:risk:high
-  - norn:wf:refinement
+  - norn:wf:story
 workflow: story
 status: active
 intake_at: 2026-11-16T13:07:56.445Z
