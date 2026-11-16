@@ -8,7 +8,7 @@ import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { appendFileSync, lstatSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { validate } from "@norn/schema";
-import { REPO_CONFIG_FILE, repoConfigPath } from "@norn/store";
+import { REPO_CONFIG_FILE, repoConfigPath, rewriteWorkflowWording } from "@norn/store";
 import { createHarness, type Harness, runChecked, sh } from "../../../../test/support/harness.ts";
 
 setDefaultTimeout(60_000);
@@ -20,10 +20,11 @@ const porcelain = (h: Harness) => sh(h.root, ["status", "--porcelain", "--untrac
 const head = (h: Harness) => sh(h.root, ["rev-parse", "HEAD"]).trim();
 const upgradeAs = (h: Harness, version: string, ...args: string[]) => runChecked(["upgrade", ...args], { ...h.deps, version });
 
-/** A repo set up by norn `version` and committed; the binary under test is `running`. */
+/** A repo set up by norn `version` and committed, its workflows in the new wording (upgrade-wording.test.ts covers their rewrite); the binary under test is `running`. */
 async function setUpAt(version: string, running: string): Promise<Harness> {
   const h = await createHarness({ version: running });
   expect((await runChecked(["init"], { ...h.deps, version })).exit).toBe(0);
+  expect(rewriteWorkflowWording(h.root).refused).toEqual([]);
   sh(h.root, ["add", "-A"]);
   sh(h.root, ["commit", "-q", "-m", "Set up norn"]);
   return h;
@@ -140,7 +141,7 @@ describe("norn upgrade with nothing to do changes nothing", () => {
       expect(porcelain(h)).toBe("");
       expect(snapshot(h, true)).toEqual(before);
       const json = await upgradeAs(h, "0.31.0", "--json");
-      expect(json.value).toEqual({ norn_version: { from: "0.31.0", to: "0.31.0", changed: false }, skills: { updated: [], linked: [] }, staged: [], commit: null, labels: expect.objectContaining({ checked: true, created: [] }) });
+      expect(json.value).toEqual({ norn_version: { from: "0.31.0", to: "0.31.0", changed: false }, skills: { updated: [], linked: [] }, workflows: { rewritten: [], refused: [] }, staged: [], commit: null, labels: expect.objectContaining({ checked: true, created: [] }) });
       expect(porcelain(h)).toBe("");
     } finally {
       h.cleanup();

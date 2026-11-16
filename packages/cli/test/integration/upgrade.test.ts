@@ -143,13 +143,13 @@ describe("norn upgrade refuses before any write", () => {
 });
 
 describe("norn upgrade --json", () => {
-  test("holds exactly norn_version {from, to, changed}, skills {updated, linked}, staged, commit and labels", async () => {
+  test("holds exactly norn_version {from, to, changed}, skills {updated, linked}, workflows {rewritten, refused}, staged, commit and labels", async () => {
     const h = await repoAt030();
     try {
       const r = await h.norn("upgrade", "--json");
       expect(r.exit).toBe(0);
       const v = r.value as Record<string, unknown>;
-      expect(Object.keys(v).sort()).toEqual(["commit", "labels", "norn_version", "skills", "staged"]);
+      expect(Object.keys(v).sort()).toEqual(["commit", "labels", "norn_version", "skills", "staged", "workflows"]);
       for (const gone of ["moves", "config", "run_state", "gitattributes"]) expect(v).not.toHaveProperty(gone);
       expect(Object.keys(v.norn_version as object).sort()).toEqual(["changed", "from", "to"]);
       expect(Object.keys(v.skills as object).sort()).toEqual(["linked", "updated"]);
