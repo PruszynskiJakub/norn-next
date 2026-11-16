@@ -2,11 +2,11 @@
 
 ## Goal
 
-A step opens with one head key; skills become an optional `skills:` list; meanings and verdicts move to sibling `means:` / `verdict:` maps; `by:` picks the agent. `norn upgrade` rewrites old files losslessly, and old pins keep loading. All 10 slices are integrated, QA #1 is done, and review #2 approved.
+A step opens with one head key; skills become an optional `skills:` list; meanings and verdicts move to sibling `means:` / `verdict:` maps; `by:` picks the agent. `norn upgrade` rewrites old files losslessly, and old pins keep loading. All 10 slices are integrated, review #2 approved, and QA #2 ran on 3af53e1.
 
 ## Proof
 
-QA #1 report: 47 pass, 0 fail. Golden decisions are identical to origin/main in all 139 cases. Unit tier (2067 pass) and typecheck are green at 8e65cf1 (review #2). Paths: store = `packages/store/test/unit/`, cli = `packages/cli/test/`.
+QA #2 (on 3af53e1): 46 pass, 1 person, 6 unverified, 0 fail. The pass and person verdicts were observed through the dev CLI in throwaway repos (init, doctor, story create refusal, upgrade) and through the store/core entry points; the run's evidence holds the files. Golden decisions are identical to origin/main in all 139 cases. Unit tier (2067 pass) and typecheck are green at 8e65cf1 (review #2). Paths: store = `packages/store/test/unit/`, cli = `packages/cli/test/`.
 
 | Criterion | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
@@ -72,12 +72,21 @@ QA #1 report: 47 pass, 0 fail. Golden decisions are identical to origin/main in 
 
 ## Not proven yet
 
-- 06.AC1, 07.AC1, 01.AC1: integration CI has not yet run green on this head.
+Each of these needs a remote with stories, or CI on a pushed head:
+- 06.AC1 the cli integration suite in CI. PR #353's last CI ran at d01b9d7, where 3 of 4 integration shards were red; this head has not been pushed.
+- 01.AC1 today's file loads the same through trace, record and restart: the integration tests are not run on this head.
+- 08.AC5 the run-state hash with real units: observed only on a machine dir with no units.
+- 09.AC4 story edit / intake from an old file; the inbox names it.
+- 09.AC5 an old pin driven to the end of its round.
+- 09.AC6 the lost-record restart pinning the old branch file: a copy read keeps the bytes and hash (library), but `norn story checkout` was not driven.
+- 05.AC4 the orientations are the person's call. The workflow text is unchanged since human-qa#1 approved it at ebc79fa.
 
 ## Notes
 
 - Review #2 approved: review #1's blocking F1 (an old copy with a blank instructions/prompt loaded as corrupt) and F2 (upgrade could stage broken YAML) are fixed; both repros now load or are refused, never written broken. `translateYaml` checks its splice against `translateWordingValue` and refuses the step that differs.
 - Review #1's minor and nit findings stay as notes for the person (review #1 receipt); only the `apply` comment nit is fixed.
+- QA #2: the e2e tier flaked once locally (light-path.test.ts › "light path after a base update": 3 fail after a harness `git clone` "failed to copy file"), then passed 5/5 twice. Watch the CI e2e shards.
+- QA #2 nits for the person: core's message for a wrong outcome on a verb still uses old words ("…base update only (action: update), not of action: open-pr"); the upgrade's commit hint reads "Refresh norn's skills (norn upgrade)" when only workflows were rewritten.
 - Merge danger for the PR: `norn brief --json` renames `work.skill` to `work.skills`.
 
 ## Resume
