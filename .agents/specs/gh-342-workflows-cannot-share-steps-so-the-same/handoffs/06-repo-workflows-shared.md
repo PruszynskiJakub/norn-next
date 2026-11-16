@@ -4,6 +4,12 @@ This repo's `quick`, `story` and `release` take their common steps from `.agents
 
 ## Proof
 
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | the rewritten quick, story and release, loaded through the store's loader with their shared files, equal the `workflowHash` slice 01 recorded | test | `test/repo/process.test.ts` › "repo workflows" › "%s keeps its pinned meaning" (`PINNED_HASHES` untouched by this diff) |
+| AC2 | `gh run watch` appears in exactly one file of the repo set, a shared file, and every other workflow in the folder still loads | test | `test/repo/process.test.ts` › "repo workflows" › "the CI wait is written once, in a shared file, and every workflow in the folder still loads" |
+| User story: this repo's quick/story/release rewritten with its own shared files, loading to today's | covered by AC1 and AC2 | test | as AC1 and AC2 |
+
 - AC1 (quick/story/release equal the `workflowHash` recorded by slice 01): `test/repo/process.test.ts` › "repo workflows" › "%s keeps its pinned meaning" (quick `aff5dfec…`, story `df2f31a1…`, release `36ef2961…`, all unchanged after the rewrite; `PINNED_HASHES` untouched).
 - AC2 (`gh run watch` in exactly one file of the set, a shared file; every other workflow still loads): `test/repo/process.test.ts` › "the CI wait is written once, in a shared file, and every workflow in the folder still loads" — went red first (no `shared/`), green after; plus the existing "load without errors" and "%s is valid for claude with the linked skills".
 - `bun run test` (1953 tests, 0 fail; the 6 skips are quick's human-qa cases in light-route, as before) and `bun run typecheck` green.
@@ -26,4 +32,4 @@ This repo's `quick`, `story` and `release` take their common steps from `.agents
 
 ## Resume
 
-Implement done; next is the slice's review.
+Review #1 approved (no findings; `bun run test` 1947 pass / 0 fail, typecheck green). Next: the slice's next step per the workflow.
