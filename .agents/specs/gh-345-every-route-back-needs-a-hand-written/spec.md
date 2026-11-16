@@ -8,6 +8,9 @@ title: Every route back needs a hand-written named counter
 assignee: PruszynskiJakub
 labels:
   - norn
+  - norn:kind:feature
+  - norn:priority:medium
+  - norn:risk:medium
 workflow: triage
 status: active
 intake_at: 2026-11-16T18:42:38.834Z
