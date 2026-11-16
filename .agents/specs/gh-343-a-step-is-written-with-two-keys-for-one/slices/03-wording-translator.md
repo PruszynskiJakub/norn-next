@@ -2,7 +2,7 @@
 id: gh-343/03
 title: Translate a workflow file from the old wording to the new, losslessly
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
