@@ -14,6 +14,7 @@ import { LIGHT_OUTCOMES } from "./update-outcome.ts";
 
 export type WorkflowIssueCode =
   | "schema"
+  | "old_wording"
   | "reserved_name"
   | "reserved_outcome"
   | "unknown_start"

@@ -1,23 +1,30 @@
-### Goal
-A workflow file in the main checkout (`.agents/workflows/`, shared files included) written in the old or a mixed wording is refused (`old_wording`, `do_instead` names `norn upgrade`) and treated as an invalid workflow. Copies (pins, past rounds, branch file at a lost-record restart) keep loading through the translator. New units pin the new wording.
+# Handoff — gh-343/09 refuse old wording
 
-### Proof
-Nothing built yet. Baseline: `bun run test` 2051 pass, 0 fail (after `bun install`).
+## Goal
+A workflow file in the main checkout (`.agents/workflows/`, shared files included) written in the old or a mixed wording is refused (`old_wording`, `norn upgrade` named) and treated as an invalid workflow. Copies (pins, past rounds, branch file at a lost-record restart) keep loading through the translator. New units pin the new wording.
 
-### Easy to miss
-- Today both reads translate: `parseWorkflowText` (`packages/store/src/unit.ts:78`) calls `translateWordingValue` for every read, and `loadWorkflowText` (`packages/store/src/config.ts:355`) runs `inNewWording` on the workflow and on each shared file before flattening. The checkout read must skip both and refuse instead. The copy read stays as it is.
-- Old-wording detection (D5) already exists as `isOldStep` in `packages/store/src/wording.ts:95` (`OLD_STEP_KEYS` plus `means`/`verdict` inside an edge). Export a detector from there that names the steps and keys, so the translator and the refusal agree.
-- One error per file (D5), so doctor reports one issue per file. A shared file in the old wording refuses every checkout workflow that uses it: name the shared file in the message.
-- Existing tests that write old wording into a main checkout will start failing. Fixtures were moved to the new wording in slices 06 and 07, so check each failure before changing it.
+## Proof
+- Refusal at the read (S1): `packages/store/test/unit/old-wording-refusal.test.ts` (old file → one `old_wording` error naming steps, keys and `norn upgrade`; mixed step refused as old; each old key alone, and `means` inside an exit route; a shared file in the old wording refuses the workflow that uses it, naming the shared file; the listing has one error per old file; a copy of the same text still loads, text kept). All went red before the change (6 of 7; the 7th was a copy-read regression guard).
+- Old wording at the cli (S7, integration tier, runs in CI): `packages/cli/test/integration/old-wording.test.ts` — doctor gives one issue per old file with code `old_wording` naming `norn upgrade` (old wording refused, mixed refused, one doctor issue per file); story create and story edit `--workflow` refuse it with `norn upgrade` in `do_instead`, story edit as `invalid_workflow`; a tick starts nothing (`start.workflow_invalid`) and the inbox names it (old file treated as an invalid workflow); a story running on an old-wording pin finishes its round, pin text and `workflow_hash` unchanged, `recordErrors` empty (in-flight pin keeps loading); a new unit from a workflow using a shared file pins flattened text that a checkout read accepts (new units pin the new wording).
+- Lost-record restart from an old branch file: `takeover-record-lost.test.ts` › "an old-wording workflow file on the branch loads as a copy and is pinned verbatim, its hash the branch file's".
+- Past rounds and traces stay copy reads: slice 01's `workflow-reads.test.ts` (trace reader, `recordErrors`, pin read are all `copy`).
+- Doctor → upgrade → doctor in a throwaway repo (the user's path end to end): evidence `1-doctor.txt` (two FAILs, `old_wording` messages naming `norn upgrade`, one of them via a shared file), `2-upgrade.txt` (two files rewritten, exit 0), `3-doctor.txt` (every check passes).
+- `bun run test` 2058 pass, 0 fail; `bun run typecheck` green.
 
-### Not proven yet
-AC1–AC8: all open.
+## Easy to miss
+- `parseWorkflowText(…, "checkout")` refuses old wording itself; `loadWorkflowText` checks the file and each shared file before flattening, so a shared file's old step is reported against the workflow that uses it, by the shared file's name.
+- `pinWorkflow` parses as a `copy`: it only ever receives a text a checkout read already accepted, or a branch/pin text that must load as written.
+- The detector is `oldWordingSteps` in `packages/store/src/wording.ts`, sharing `oldKeys` with the translator's `isOldStep`, so the refusal and `norn upgrade` agree on what is old.
 
-### Notes
-- Planned seam (S1): in `loadWorkflowText`, when `read === "checkout"`, check the own text and every shared text for old steps and return one `fileError` (code `old_wording`, message naming the steps and keys). In `parseWorkflowText`, translate only when `read === "copy"`. Then find where cli turns an invalid-workflow refusal into a `CliError` (story edit `--workflow`, story start, sync, doctor) and put `norn upgrade` in `do_instead` for `old_wording`.
-- AC7 already holds once the refusal exists: a checkout file with no `use`/`like` pins as written, and the flattened text is new wording.
-- The previous session stopped after reading the code because its usage limit was reached.
-- Friction: the worktree had no `node_modules`, and the first `bun run test` failed until `bun install`.
+## Not proven yet
+- The integration tests (`old-wording.test.ts`, the new case in `takeover-record-lost.test.ts`, the adjusted `upgrade-wording.test.ts`) were written but not run locally (CI only, per the brief). Brittle points to check if CI fails: the inbox item's title containing `norn upgrade` (it comes from decide's `workflow 'oldy' is invalid: …` problem line) and the in-flight test's hand-replaced pin plus `writeState` with its hash.
 
-### Resume
-Build the refusal above test-first in `packages/store/test/unit/` (refused in the checkout, loads from a copy, mixed wording counts as old). Then the cli `do_instead` and the doctor, sync and story edit tests (integration tier).
+## Notes
+- Contract tests changed on purpose: `new-wording.test.ts` now loads the old shipped fixtures as copies (via `loadWorkflowText(…, "copy")`) and asserts that the main checkout refuses `OLD`; `upgrade-wording.test.ts` reads its "before" workflows as copies, since `loadWorkflows` now refuses them.
+- `story create --workflow <old file>` keeps code `unknown_workflow` (as for any invalid workflow) but names `norn upgrade` in `do_instead` (D5: every command refusing an invalid workflow names it).
+- A mixed-wording step read as a copy does not translate to the same workflow (e.g. `agent:` orientation plus `skill:` and an edge `means`): the translator treats a step with no `type` as non-agent. That is the translator's own behaviour (slice 03), outside this slice; noted, not changed.
+- Seen in passing, not changed: `norn upgrade`'s suggested commit message reads "Refresh norn's skills" when only workflows were rewritten (slice 08's report), and `agentsInUse` in upgrade reads `loadWorkflows` before the rewrite, so an agent named only in an old file is not relinked on that run.
+- Friction: the worktree had no `node_modules`; `bun install` first.
+
+## Resume
+Done: report `norn done done`. If CI's integration tier fails, start from the test named under Not proven yet.

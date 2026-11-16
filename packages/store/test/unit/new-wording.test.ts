@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { cpSync, mkdirSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { validateWorkflowDefinition } from "@norn/core";
 import type { Workflow } from "@norn/schema";
-import { loadWorkflow, loadWorkflows, parseWorkflowText, workflowsDir } from "../../src/index.ts";
+import { loadWorkflow, loadWorkflows, loadWorkflowText, parseWorkflowText, sharedFile, workflowsDir } from "../../src/index.ts";
 import { tmp } from "../helpers.ts";
 
 /** The shipped workflows and shared files as they were written in the old wording, and their translations. */
@@ -14,6 +14,13 @@ const wf = (steps: string, rest = "") => `name: x\nstart: a\n${rest}steps:\n${st
 
 function loads(text: string): Workflow {
   const r = parseWorkflowText(text, "x.yaml", "checkout");
+  if (!r.ok) throw new Error(`refused: ${JSON.stringify(r)}`);
+  return r.value;
+}
+
+/** A text read as a copy (a pin, a branch file): the old wording still loads, translated. */
+function asCopy(text: string): Workflow {
+  const r = parseWorkflowText(text, "pin.yaml", "copy");
   if (!r.ok) throw new Error(`refused: ${JSON.stringify(r)}`);
   return r.value;
 }
@@ -99,7 +106,7 @@ const NEW = wf(`  a:
 describe("a step written by its head key", () => {
   test("agent, check and gate steps load to the same workflow as today's wording", () => {
     const loaded = loads(NEW);
-    expect(loaded).toEqual(loads(OLD));
+    expect(loaded).toEqual(asCopy(OLD));
     expect(loaded.steps.a).toMatchObject({ type: "agent", instructions: "Build what the spec asks.", skills: ["norn-implement"], agent: "codex" });
     expect(loaded.steps.t).toMatchObject({ type: "check", run: "bun test", timeout: "10m" });
     expect(loaded.steps.g).toMatchObject({ type: "gate", prompt: "Approve the build?" });
@@ -209,24 +216,33 @@ describe("outcomes, meanings and verdicts", () => {
 });
 
 describe("either wording loads to the same workflow", () => {
-  /** The listing of a repo holding the given folder as its `.agents/workflows/`. */
-  const listing = (dir: string) => {
+  /** Each workflow of a folder laid out as `.agents/workflows/`, loaded as a copy (a story branch's files), by name. */
+  const copies = (dir: string) => {
     const root = tmp();
     cpSync(dir, workflowsDir(root), { recursive: true });
-    return loadWorkflows(root);
+    const out: Record<string, Workflow> = {};
+    for (const f of readdirSync(workflowsDir(root)).filter((n) => n.endsWith(".yaml"))) {
+      const name = f.slice(0, -".yaml".length);
+      const r = loadWorkflowText(name, readFileSync(join(workflowsDir(root), f), "utf8"), f, "copy", root, (n) => readFileSync(join(workflowsDir(root), sharedFile(n)), "utf8"));
+      if (!r.ok) throw new Error(`${f} refused: ${JSON.stringify(r)}`);
+      out[name] = r.value.workflow;
+    }
+    return out;
   };
 
-  test("each shipped workflow and shared file loads to the same workflow as its translation", () => {
-    const old = listing(SHIPPED);
-    const translated = listing(TRANSLATED);
-    expect([old.errors, translated.errors]).toEqual([[], []]);
-    expect(Object.keys(translated.workflows).sort()).toEqual(Object.keys(old.workflows).sort());
-    for (const [name, w] of Object.entries(old.workflows)) expect(translated.workflows[name]?.workflow).toEqual(w.workflow);
+  test("each shipped workflow and shared file, read as a copy, loads to the same workflow as its translation from the main checkout", () => {
+    const old = copies(SHIPPED);
+    const root = tmp();
+    cpSync(TRANSLATED, workflowsDir(root), { recursive: true });
+    const translated = loadWorkflows(root);
+    expect(translated.errors).toEqual([]);
+    expect(Object.keys(translated.workflows).sort()).toEqual(Object.keys(old).sort());
+    for (const [name, w] of Object.entries(old)) expect(translated.workflows[name]?.workflow).toEqual(w);
   });
 
-  test("a file in today's wording still loads, from the main checkout or a copy", () => {
-    const fromCopy = parseWorkflowText(OLD, "pin.yaml", "copy");
-    expect(fromCopy.ok && fromCopy.value).toEqual(loads(OLD));
-    expect(loads(OLD).steps.a).toMatchObject({ type: "agent", skills: ["norn-implement"], agent: "codex" });
+  test("a file in today's wording loads as a copy and is refused from the main checkout", () => {
+    expect(asCopy(OLD).steps.a).toMatchObject({ type: "agent", skills: ["norn-implement"], agent: "codex" });
+    const r = parseWorkflowText(OLD, "x.yaml", "checkout");
+    expect(!r.ok && r.reason === "corrupt" && r.error.code).toBe("old_wording");
   });
 });

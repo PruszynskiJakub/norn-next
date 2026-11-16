@@ -70,7 +70,7 @@ export function repoWorkflows(listing: WorkflowListing, skills: { agent: string;
       name,
       workflow: null,
       source: "",
-      issues: err.errors.map((e) => ({ code: "schema" as const, path: e.path, message: `${err.file}: ${e.message}` })),
+      issues: err.errors.map((e) => ({ code: err.code === "old_wording" ? ("old_wording" as const) : ("schema" as const), path: e.path, message: `${err.file}: ${e.message}` })),
     };
   }
   return out;

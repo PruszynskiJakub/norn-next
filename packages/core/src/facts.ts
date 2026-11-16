@@ -29,8 +29,11 @@ export interface FileError {
   /** repo-relative path */
   file: string;
   errors: SchemaError[];
-  /** Set when the file failed only because criteria still carry the removed `needs`; the person deletes it */
-  code?: "needs_removed";
+  /**
+   * `needs_removed`: the file failed only because criteria still carry the removed `needs`; the person deletes it.
+   * `old_wording`: a main-checkout workflow file (or a shared file it uses) is in the old wording; `norn upgrade` rewrites it.
+   */
+  code?: "needs_removed" | "old_wording";
 }
 
 /** Identifies a unit everywhere (actions, trace, view). */

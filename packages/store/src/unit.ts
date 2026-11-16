@@ -3,13 +3,13 @@
  * workflow, logs, evidence and handoff.md.
  */
 import { existsSync, mkdirSync } from "node:fs";
-import { HANDOFF_SKELETON, normalizeUnitState } from "@norn/core";
+import { cmd, type FileError, HANDOFF_SKELETON, normalizeUnitState } from "@norn/core";
 import type { UnitState, Workflow } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { parse as parseYaml } from "yaml";
 import { atomicCopyDir, atomicWrite, createExclusive, fileError, jsonLine, readJsonFile, readText, type ReadResult, safeUnlink, validated } from "./fsx.ts";
 import { stepWordingErrors, toModelSteps } from "./step-wording.ts";
-import { translateWordingValue } from "./wording.ts";
+import { oldWordingSteps, translateWordingValue } from "./wording.ts";
 import { evidenceDir, legacyHandoffFile, logPath, pinnedWorkflowPath, statePath } from "./paths.ts";
 
 /** state.json as the `UnitState` it stands for: older shapes read normalised, never corrupt. */
@@ -79,10 +79,14 @@ export function parseWorkflowText(text: string, path: string, read: WorkflowRead
   observeWorkflowRead({ path, read });
   let value: unknown;
   try {
-    value = translateWordingValue(parseYaml(text));
+    value = parseYaml(text);
   } catch (e) {
     return { ok: false, reason: "corrupt", error: fileError(path, [{ path: "", message: `YAML: ${(e as Error).message}` }], root) };
   }
+  if (read === "checkout") {
+    const old = oldWordingSteps(value);
+    if (old.length) return { ok: false, reason: "corrupt", error: oldWordingError(path, [{ steps: old }], root) };
+  } else value = translateWordingValue(value);
   // The step-level keys that belong to the workflow get their own message
   const misplaced = workflowLevelKeysOnSteps(value);
   if (misplaced.length) return { ok: false, reason: "corrupt", error: fileError(path, misplaced, root) };
@@ -91,6 +95,17 @@ export function parseWorkflowText(text: string, path: string, read: WorkflowRead
   const wording = stepWordingErrors(steps as Record<string, unknown>);
   if (wording.length) return { ok: false, reason: "corrupt", error: fileError(path, wording, root) };
   return validated("workflow", { ...(value as object), steps: toModelSteps(steps as Record<string, unknown>) }, path, text, root);
+}
+
+/**
+ * The one error a main-checkout workflow file in the old wording is refused with: every old step and
+ * key, of the file itself and of each shared file it uses (named, since that is the file to fix), so
+ * doctor shows one issue per file.
+ */
+export function oldWordingError(path: string, parts: Array<{ shared?: string; steps: ReturnType<typeof oldWordingSteps> }>, root?: string): FileError {
+  const where = parts.map((p) => `${p.shared ? `${p.shared}: ` : ""}${p.steps.map((s) => `step '${s.step}' (${s.keys.join(", ")})`).join(", ")}`);
+  const message = `written in the old wording: ${where.join("; ")}; run \`${cmd.upgrade()}\` to rewrite it and commit`;
+  return { ...fileError(path, [{ path: "", message }], root), code: "old_wording" };
 }
 
 const WORKFLOW_LEVEL: Record<string, string> = {

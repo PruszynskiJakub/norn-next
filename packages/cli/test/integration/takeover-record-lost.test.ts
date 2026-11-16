@@ -10,6 +10,7 @@
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { sha256 } from "@norn/core";
 import { claimRef, recordRef, ulid } from "@norn/schema";
 import { appendReceipt, loadWorkflow, readState, setWorkflowReadObserver, type WorkflowTextRead, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
@@ -62,6 +63,22 @@ const RV_USING = `name: rv
 start: core
 steps:
   core: { use: rvcore }
+counters: { review_loop: { max: 3 } }
+`;
+/** rv as a person wrote it before the new wording: a story branch from then still holds this text. */
+const RV_OLD = `name: rv
+start: implement
+steps:
+  implement:
+    type: agent
+    skill: norn-implement
+    outcomes: { done: { to: review, means: "built" } }
+  review:
+    type: agent
+    skill: norn-review
+    outcomes:
+      approve: { to: $done, means: "good" }
+      rework: { to: implement, counter: review_loop, means: "fix it" }
 counters: { review_loop: { max: 3 } }
 `;
 const CONFIG = "provider: gh\nworkflow: rv\nmode: auto\n";
@@ -391,6 +408,17 @@ describe("a lost-record checkout that cannot start the round takes nothing (revi
     if (!listed.ok) throw new Error("rv does not load on the branch");
     expect(state(s.runs(B.root))?.workflow_hash).toBe(listed.value.hash);
     expect(readFileSync(join(s.runs(B.root), "workflow.yaml"), "utf8")).toBe(listed.value.source);
+  });
+
+  test("an old-wording workflow file on the branch loads as a copy and is pinned verbatim, its hash the branch file's", async () => {
+    const s = await heldThenSilent(29, "old-branch-wf", 0);
+    onBranch(s, (wt) => writeFileSync(join(workflowsDir(wt), "rv.yaml"), RV_OLD));
+    expire(s.key);
+    const B = cloneOf(h, "b-oldwf", "bob");
+    expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
+    expect(readFileSync(join(s.runs(B.root), "workflow.yaml"), "utf8")).toBe(RV_OLD);
+    expect(state(s.runs(B.root))?.workflow_hash).toBe(sha256(RV_OLD));
+    expect(state(s.runs(B.root))).toMatchObject({ step: "implement", attempt: 1 });
   });
 
   test("the restart flattens the shared file on the branch, not the one in the work tree", async () => {

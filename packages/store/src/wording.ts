@@ -93,8 +93,28 @@ export function inNewWording(text: string): string {
 }
 
 function isOldStep(s: Obj): boolean {
-  if (OLD_STEP_KEYS.some((k) => k in s)) return true;
-  return isObj(s.outcomes) && Object.values(s.outcomes).some((e) => isObj(e) && EDGE_PROSE.some((k) => k in e));
+  return oldKeys(s).length > 0;
+}
+
+/** The old-wording keys of one step: its own, then `means`/`verdict` found inside an edge or an exit route. */
+function oldKeys(s: Obj): string[] {
+  const own = OLD_STEP_KEYS.filter((k) => k in s);
+  const edges = isObj(s.outcomes) ? Object.values(s.outcomes).filter(isObj) : [];
+  const inEdge = EDGE_PROSE.filter((k) => edges.some((e) => k in e)).map((k) => `${k} inside an edge`);
+  return [...own, ...inEdge];
+}
+
+/**
+ * The steps of a parsed workflow or shared file written in the old wording, each with its old keys;
+ * empty for a file in the new wording. The same test the translator uses, so what a main-checkout
+ * read refuses is exactly what `norn upgrade` rewrites.
+ */
+export function oldWordingSteps(doc: unknown): Array<{ step: string; keys: string[] }> {
+  if (!isObj(doc) || !isObj(doc.steps)) return [];
+  return Object.entries(doc.steps).flatMap(([step, s]) => {
+    const keys = isObj(s) ? oldKeys(s) : [];
+    return keys.length ? [{ step, keys }] : [];
+  });
 }
 
 function translateStepObj(name: string, s: Obj, steps: Obj): Obj {

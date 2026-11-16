@@ -23,9 +23,9 @@ import { type Document, isCollection, isMap, isScalar, parseDocument, parse as p
 import { atomicWrite, fileError, isErrno, readText, type ReadResult } from "./fsx.ts";
 import { recordedInterval } from "./heartbeat.ts";
 import { checkoutOf, LOCAL_CONFIG_FILE, LOCAL_CONFIG_SCHEMA_FILE, nornHome, REPO_CONFIG_SCHEMA_FILE, REPO_CONFIG_FILE, repoConfigPath, USER_CONFIG_SCHEMA_FILE, userConfigPath, workflowsDir } from "./paths.ts";
-import { flattenWorkflowText, SHARED_DIR, sharedFilesUsed } from "./shared-workflow.ts";
-import { inNewWording } from "./wording.ts";
-import { type PinnedWorkflow, parseWorkflowText, sha256, type WorkflowRead } from "./unit.ts";
+import { flattenWorkflowText, SHARED_DIR, sharedFile, sharedFilesUsed } from "./shared-workflow.ts";
+import { inNewWording, oldWordingSteps } from "./wording.ts";
+import { oldWordingError, type PinnedWorkflow, parseWorkflowText, sha256, type WorkflowRead } from "./unit.ts";
 
 /** A missing or empty file sets nothing; a file that is not YAML is `config_invalid`. */
 function readConfigFile(kind: ConfigFileKind, path: string): { value: unknown; problems: ConfigProblem[] } {
@@ -360,10 +360,17 @@ export function loadWorkflowText(
   root?: string,
   readShared: (shared: string) => string | null = () => null,
 ): ReadResult<PinnedWorkflow & Pick<WorkflowFile, "included">> {
-  // Flattening works on the new wording: a text in the old one, and each shared file it uses, is translated first
-  const own = inNewWording(text);
+  // The main checkout takes only the new wording, in the file and in every shared file it uses; a copy
+  // is translated first, since flattening works on the new wording
+  const own = read === "copy" ? inNewWording(text) : text;
   const shared = new Map(sharedFilesUsed(own).map((n) => [n, readShared(n)] as const));
-  const flat = flattenWorkflowText(own, (n) => { const t = shared.get(n); return t == null ? null : inNewWording(t); });
+  if (read === "checkout") {
+    const inFile = { steps: oldWordingSteps(parseOrNull(text)) };
+    const inShared = [...shared].map(([n, t]) => ({ shared: sharedFile(n), steps: oldWordingSteps(t == null ? null : parseOrNull(t)) }));
+    const old = [inFile, ...inShared].filter((p) => p.steps.length);
+    if (old.length) return { ok: false, reason: "corrupt", error: oldWordingError(file, old, root) };
+  }
+  const flat = flattenWorkflowText(own, (n) => { const t = shared.get(n); return t == null ? null : read === "copy" ? inNewWording(t) : t; });
   if (flat && !flat.ok) return { ok: false, reason: "corrupt", error: fileError(file, flat.errors, root) };
   // A workflow without `use` loads as written, so its pin and fingerprint stay byte for byte
   const source = flat ? flat.source : text;
@@ -376,6 +383,15 @@ export function loadWorkflowText(
       error: fileError(file, [{ path: "/name", message: `must equal the file name '${name}'` }], root),
     };
   return { ok: true, raw: text, value: { workflow: r.value, hash: sha256(source), source, ...(flat?.included && { included: flat.included }) } };
+}
+
+// A text that is not YAML has no steps to find old wording in; the parse that follows reports it
+function parseOrNull(text: string): unknown {
+  try {
+    return parseYaml(text);
+  } catch {
+    return null;
+  }
 }
 
 function loadFile(name: string, file: string, root: string): ReadResult<WorkflowFile> {

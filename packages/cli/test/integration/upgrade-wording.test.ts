@@ -8,7 +8,8 @@ import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { loadWorkflows, repoConfigPath, rewriteWorkflowWording, translateWording, workflowsDir } from "@norn/store";
+import { loadWorkflows, loadWorkflowText, repoConfigPath, rewriteWorkflowWording, sharedFile, translateWording, workflowsDir } from "@norn/store";
+import type { Workflow } from "@norn/schema";
 import { createHarness, type Harness, issue, runChecked, sh } from "../../../../test/support/harness.ts";
 
 setDefaultTimeout(60_000);
@@ -90,6 +91,18 @@ function loaded(h: Harness) {
   expect(l.errors).toEqual([]);
   return Object.fromEntries(Object.entries(l.workflows).map(([n, w]) => [n, w.workflow]));
 }
+/** The workflows as copies of these texts load them (the main checkout refuses the old wording), by name. */
+function loadedAsCopies(h: Harness) {
+  const dir = workflowsDir(h.root);
+  const out: Record<string, Workflow> = {};
+  for (const f of readdirSync(dir).filter((n) => n.endsWith(".yaml"))) {
+    const name = f.slice(0, -".yaml".length);
+    const r = loadWorkflowText(name, readFileSync(join(dir, f), "utf8"), f, "copy", h.root, (n) => readFileSync(join(dir, sharedFile(n)), "utf8"));
+    if (!r.ok) throw new Error(`${f}: ${JSON.stringify(r)}`);
+    out[name] = r.value.workflow;
+  }
+  return out;
+}
 const stagedFiles = (h: Harness) => sh(h.root, ["diff", "--staged", "--name-only"]).trim().split("\n").filter(Boolean);
 const unstaged = (h: Harness) => sh(h.root, ["diff", "--name-only"]).trim();
 
@@ -100,7 +113,7 @@ describe("norn upgrade rewrites the old-wording workflow and shared files", () =
       const before = workflowTexts(h);
       const old = oldWording(before);
       expect(old).toEqual(OLD_FILES);
-      const workflowsBefore = loaded(h);
+      const workflowsBefore = loadedAsCopies(h);
       expect(Object.keys(workflowsBefore)).toEqual(expect.arrayContaining(["solo", "uses"]));
 
       const r = await h.norn("upgrade", "--json");
