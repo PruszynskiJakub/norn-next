@@ -24,18 +24,18 @@ A **unit** is a story or a slice: anything that runs a workflow. Commands that a
 
 Each workflow does one thing, and a story goes through them as **rounds**, one after another on the same branch. A new story starts with the default workflow (`triage`), or the one its issue label names (`norn:wf:<name>`). A round ends at `$done`; only a person starts the next one, with `norn story edit <story> --workflow <name>`. The usual paths are a feature `triage → refinement → story`, a small change `triage → quick`, and a bug `reproduce → quick`.
 
-A **step** is one node of a workflow. There are six kinds:
+A **step** is one node of a workflow. Its first key says what happens there: `agent: <orientation>`, `check: <command>`, `gate: <what the person decides>`, or a built-in verb with no value (`update-branch:`, `open-pr:`, `integrate:`, `push:`, `await-merge:`, `slices:`); a step written `use:` brings in shared steps. A step has exactly one such head key. The kinds:
 
 | Step | What happens |
 |---|---|
-| agent | an agent does the step with a skill (`norn-implement`, `norn-review`, …) and reports an outcome |
-| check | norn runs a command, such as your tests; the exit code is the outcome (`pass` on 0, else `fail`, unless `exits` names another outcome for that code) |
-| git | norn does a git action: merge the base into the story (`update`), integrate a slice, open the draft PR, wait for CI |
-| gate | a person decides: `approve` or `reject` |
-| slices | the story waits while its slices run, each with its own workflow |
-| merge | the story waits for a person to merge its PR; the merge ends the story. A person gives no `approve` or `reject` there: its one outcome, `stale`, is taken by norn when the base moved under the story (see `base.stale`, and `base.verify` for a base move without a conflict that breaks the merged tree) and routes it back through `update` with a counter |
+| `agent:` | an agent does the step, told what it is for by the orientation and, when the step lists `skills:`, with those skills (`norn-implement`, `norn-review`, …); `by:` picks which configured agent runs it, else the config's default; it reports an outcome |
+| `check:` | norn runs a command, such as your tests; the exit code is the outcome (`pass` on 0, else `fail`, unless `exits` names another outcome for that code) |
+| `update-branch:`, `integrate:`, `open-pr:`, `push:` | norn does a git action: merge the base into the story, integrate a slice into the story branch, open the draft PR (or rewrite its body), push the branch |
+| `gate:` | a person decides: `approve` or `reject` |
+| `slices:` | the story waits while its slices run, each with its own workflow |
+| `await-merge:` | the story waits for a person to merge its PR; the merge ends the story. A person gives no `approve` or `reject` there: its one outcome, `stale`, is taken by norn when the base moved under the story (see `base.stale`, and `base.verify` for a base move without a conflict that breaks the merged tree) and routes it back through `update` with a counter |
 
-An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). The workflow maps each outcome to the next step. A route back (a failed test sends the story back to `implement`) carries a **counter** with a max.
+An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). A step's `outcomes:` maps each outcome to the next step, `outcome: target`, or `{ to, counter }` for a route back (a failed test sends the story back to `implement`), which carries a **counter** with a max. An agent step says what each outcome it routes means in a sibling `means:` map, and may give a criteria `verdict:` per outcome in another, both keyed by outcome; the brief shows them in its finish lines. The overridable routes (`silent`, `died`, `timeout`, `stalled`, `ask`, `stuck`) need no meaning. A workflow in the old wording (`type:`, `skill:`, `instructions:`, `run:`, `prompt:`, `action:`, or `means`/`verdict` inside a route) is refused in the main checkout, naming `norn upgrade`, which rewrites it; see [Recipes: Write your own workflow](recipes.md#write-your-own-workflow).
 
 ## Labels
 
@@ -59,7 +59,7 @@ Three things decide where a person comes in:
 - A **gate** is a step with no agent: a person approves it or rejects it with what to change. The `ready` gate near the end of a delivery workflow is where you look at the PR; after you approve it, the story waits at the `merge` step until you merge the PR.
 - The **mode** of a story says who starts its other agent steps. In **manual** mode (the default) the inbox shows the step as ready and how to start it. In **auto** mode norn starts the agent itself through the runner it detects: Herdr when norn runs inside Herdr or `herdr` is installed, otherwise headless. A story's mode is, nearest first: its own (`norn story edit <story> --auto|--manual` switches it), its workflow's `mode`, `mode` in your local or user config, then `manual`. The mode decides only who starts an agent step: in either mode the heartbeat ([One tick](#one-tick)) moves every step on, so an agent's `norn done` changes nothing until a tick applies it.
 
-`check` and `git` steps always run on their own. Gates, merge steps and attended steps always wait for a person, in either mode.
+Check steps and the git verbs always run on their own. Gates, `await-merge:` steps and attended steps always wait for a person, in either mode.
 
 ## The inbox
 
@@ -101,7 +101,7 @@ When the record has to leave the machine, norn packs the story's whole run state
 
 Under either policy, every push of the story branch also puts the story's head on `refs/norn/heads/<story>`, in the same push. It is neither branch nor tag, so it starts no CI run; the record names its commit (`Norn-Branch-Commit`), and a takeover resumes the story worktree from it, merged with the remote story branch (never rebased), so a holder that crashed after a boundary loses no committed work. It goes when the story merges or closes, and `norn tidy` removes one left behind.
 
-Once the story's PR is open (a draft counts), every push to the story branch starts a CI run, so norn pushes the branch only at the `open-pr` step and at `norn story close`. Every other step boundary, a `git: update` merge of the base, a gate approval, a finished slice and a claim release (`norn story handoff`, a clean `norn watch` exit) put the story's head on `refs/norn/heads/<story>` alone. A rework loop then starts one CI run, the one the `ci` step waits on, and the PR's head stays the commit that run checked. A person's push to the story branch meanwhile is merged with norn's boundaries at the next branch push, never rebased.
+Once the story's PR is open (a draft counts), every push to the story branch starts a CI run, so norn pushes the branch only at the `open-pr` step and at `norn story close`. Every other step boundary, an `update-branch:` merge of the base, a gate approval, a finished slice and a claim release (`norn story handoff`, a clean `norn watch` exit) put the story's head on `refs/norn/heads/<story>` alone. A rework loop then starts one CI run, the one the `ci` step waits on, and the PR's head stays the commit that run checked. A person's push to the story branch meanwhile is merged with norn's boundaries at the next branch push, never rebased.
 
 A finished story's record stays on its ref, so `norn run list` and `norn run view` read it on any machine; the base branch never receives run state. Per-tick detail (the trace, locks and caches) stays in the machine dir too; `norn run view --why` reads it.
 
@@ -111,7 +111,7 @@ How handover and takeover work, with and without a record on the ref, is in [Rec
 
 ## Skills
 
-A step's craft is in a skill: `norn init` copies norn's skills into `.agents/skills/` and links them from each agent's skill folder. The brief carries the protocol every step follows (work in scope, keep the handoff, report once) and names the step's skill; the `norn` skill only sends an agent to the brief, and the others do one kind of step each. To change how a step is done, write your own skill under another name and name it in the step (`skill: my-review`). `norn doctor` reports skills that are missing or not linked, and fails on a bundled skill that differs from the running norn's copy. The `norn-review` skill also reads `REVIEW.md` at the repo root: paths a review ignores, what counts as failure in this repo and what not to report. `norn init` writes a short starter when the repo has none and never changes yours.
+A step's craft is in a skill: `norn init` copies norn's skills into `.agents/skills/` and links them from each agent's skill folder. The brief carries the protocol every step follows (work in scope, keep the handoff, report once) and names the step's skills, if it lists any, above its orientation; the `norn` skill only sends an agent to the brief, and the others do one kind of step each. To change how a step is done, write your own skill under another name and list it in the step (`skills: [my-review]`; see [Recipes: Name your own skill in a step](recipes.md#name-your-own-skill-in-a-step)). A step steered by its orientation alone lists no skill. `norn doctor` reports skills that are missing or not linked, and fails on a bundled skill that differs from the running norn's copy. The `norn-review` skill also reads `REVIEW.md` at the repo root: paths a review ignores, what counts as failure in this repo and what not to report. `norn init` writes a short starter when the repo has none and never changes yours.
 
 A bundled skill (a `norn`-prefixed folder in `.agents/skills/`) that differs from the running norn's copy is **drift**. A unit keeps running on the skills its worktree holds, as it keeps its pinned workflow: its agent steps start, and `norn brief`, `norn story start` and `norn story chat` work there. The inbox shows the difference as a Check item, and the new copies arrive when the story branch merges its base. When the main checkout drifted, the inbox names `norn upgrade` and a commit. Your own skills, without the `norn-` prefix, are never checked.
 
@@ -136,7 +136,7 @@ A repo without the key, or one recording a version below 0.30, is refused the sa
 | unit | A story or a slice: anything that runs a workflow and has its own run state and handoff. |
 | workflow | A YAML (or JSON) graph of steps, in `.agents/workflows/`. |
 | round | One workflow applied to a story, from its start step to `$done`. A story goes through one or more rounds; a slice runs one workflow. |
-| step | One node of a workflow: agent, check, git, gate, merge or slices. |
+| step | One node of a workflow, named by its head key: `agent`, `check`, `gate`, a built-in verb (`update-branch`, `open-pr`, `integrate`, `push`, `await-merge`, `slices`), or `use`. |
 | run | One attempt at a step; it produces receipts. |
 | outcome | How a step ended, spelled as its reporter types it (`done`, `approve`, `stuck`, …). |
 | counter | A named bound on a retry, nudge or loop; past its max the unit is stuck. |
