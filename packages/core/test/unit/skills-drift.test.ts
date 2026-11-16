@@ -61,7 +61,7 @@ describe("drifted skills hold nothing", () => {
       start: "resolve",
       steps: {
         update: { type: "git", action: "update", outcomes: { done: "$done", conflict: { to: "resolve", counter: "loop" } } },
-        resolve: { type: "agent", skills: ["merge"], outcomes: { done: "update" } },
+        resolve: { type: "agent", instructions: "Use the `merge` skill.", skills: ["merge"], outcomes: { done: "update" } },
       },
       counters: { loop: { max: 3 } },
     };
@@ -93,7 +93,7 @@ describe("drifted skills hold nothing", () => {
       start: "update",
       steps: {
         update: { type: "git", action: "update", outcomes: { done: "resolve" } },
-        resolve: { type: "agent", skills: ["merge"], outcomes: { done: "$done" } },
+        resolve: { type: "agent", instructions: "Use the `merge` skill.", skills: ["merge"], outcomes: { done: "$done" } },
       },
     };
     const SHA = (c: string) => c.repeat(40);

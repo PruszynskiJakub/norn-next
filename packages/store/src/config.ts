@@ -24,6 +24,7 @@ import { atomicWrite, fileError, isErrno, readText, type ReadResult } from "./fs
 import { recordedInterval } from "./heartbeat.ts";
 import { checkoutOf, LOCAL_CONFIG_FILE, LOCAL_CONFIG_SCHEMA_FILE, nornHome, REPO_CONFIG_SCHEMA_FILE, REPO_CONFIG_FILE, repoConfigPath, USER_CONFIG_SCHEMA_FILE, userConfigPath, workflowsDir } from "./paths.ts";
 import { flattenWorkflowText, SHARED_DIR, sharedFilesUsed } from "./shared-workflow.ts";
+import { inNewWording } from "./wording.ts";
 import { type PinnedWorkflow, parseWorkflowText, sha256, type WorkflowRead } from "./unit.ts";
 
 /** A missing or empty file sets nothing; a file that is not YAML is `config_invalid`. */
@@ -359,7 +360,10 @@ export function loadWorkflowText(
   root?: string,
   readShared: (shared: string) => string | null = () => null,
 ): ReadResult<PinnedWorkflow & Pick<WorkflowFile, "included">> {
-  const flat = flattenWorkflowText(text, readShared);
+  // Flattening works on the new wording: a text in the old one, and each shared file it uses, is translated first
+  const own = inNewWording(text);
+  const shared = new Map(sharedFilesUsed(own).map((n) => [n, readShared(n)] as const));
+  const flat = flattenWorkflowText(own, (n) => { const t = shared.get(n); return t == null ? null : inNewWording(t); });
   if (flat && !flat.ok) return { ok: false, reason: "corrupt", error: fileError(file, flat.errors, root) };
   // A workflow without `use` loads as written, so its pin and fingerprint stay byte for byte
   const source = flat ? flat.source : text;

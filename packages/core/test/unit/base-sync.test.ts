@@ -22,15 +22,15 @@ const BASE_WF: Workflow = {
   start: "update",
   steps: {
     update: { type: "git", action: "update", outcomes: { done: "test", conflict: { to: "resolve", counter: "base_conflict_loop" } } },
-    resolve: { type: "agent", skills: ["merge"], inputs: ["spec", "handoff"], outcomes: { done: { to: "update", means: "base merged into the story branch, conflicts resolved and committed" } } },
+    resolve: { type: "agent", instructions: "Use the `merge` skill.", skills: ["merge"], inputs: ["spec", "handoff"], outcomes: { done: { to: "update", means: "base merged into the story branch, conflicts resolved and committed" } } },
     test: { type: "check", run: "bun test", timeout: "5m", outcomes: { pass: "ready", fail: "$stuck" } },
-    ready: { type: "gate", outcomes: { approve: "$done", reject: "$stuck", stale: { to: "update", counter: "stale_loop" } } },
+    ready: { type: "gate", prompt: "approve or reject ready", outcomes: { approve: "$done", reject: "$stuck", stale: { to: "update", counter: "stale_loop" } } },
   },
   counters: { base_conflict_loop: { max: 2 }, stale_loop: { max: 3 } },
   base: { stale: "conflict" },
 };
 /** The same without a `stale` route at the gate (BS6: only the inbox item). */
-const NO_ROUTE_WF: Workflow = { ...BASE_WF, name: "noroute", steps: { ...BASE_WF.steps, ready: { type: "gate", outcomes: { approve: "$done", reject: "$stuck" } } } };
+const NO_ROUTE_WF: Workflow = { ...BASE_WF, name: "noroute", steps: { ...BASE_WF.steps, ready: { type: "gate", prompt: "approve or reject ready", outcomes: { approve: "$done", reject: "$stuck" } } } };
 
 const SHA = (c: string) => c.repeat(40);
 const BASE_REF = "refs/remotes/origin/main";
@@ -167,7 +167,7 @@ describe("workflow contract", () => {
     const reserved = validateWorkflowDefinition({ ...BASE_WF, steps: { ...BASE_WF.steps, stale: { type: "check", run: "x", timeout: "1m", outcomes: { pass: "$done" } } } });
     expect(reserved.issues.some((i) => i.code === "reserved_name")).toBe(true);
     // A stale route without a counter is an uncounted cycle
-    const uncounted = validateWorkflowDefinition({ ...BASE_WF, steps: { ...BASE_WF.steps, ready: { type: "gate", outcomes: { approve: "$done", stale: "update" } } } });
+    const uncounted = validateWorkflowDefinition({ ...BASE_WF, steps: { ...BASE_WF.steps, ready: { type: "gate", prompt: "approve or reject ready", outcomes: { approve: "$done", stale: "update" } } } });
     expect(uncounted.issues.some((i) => i.code === "uncounted_cycle")).toBe(true);
   });
 
@@ -620,7 +620,7 @@ describe("base sync replay", () => {
       start: "update",
       steps: {
         update: { type: "git", action: "update", outcomes: { done: "test", clean: "test", resolved: "test", conflict: { to: "resolve", counter: "base_conflict_loop" } } },
-        resolve: { type: "agent", skills: ["norn-merge"], outcomes: { done: { to: "update", means: "merged" } } },
+        resolve: { type: "agent", instructions: "Use the `norn-merge` skill.", skills: ["norn-merge"], outcomes: { done: { to: "update", means: "merged" } } },
         test: { type: "check", run: "true", timeout: "1m", outcomes: { pass: "$done", fail: "$stuck" } },
       },
       counters: { base_conflict_loop: { max: 2, reset_on: ["update.done", "update.clean", "update.resolved"] } },
@@ -649,7 +649,7 @@ const MERGE_WF: Workflow = {
   name: "merging",
   steps: {
     ...BASE_WF.steps,
-    ready: { type: "gate", outcomes: { approve: "merge", reject: "$stuck", stale: { to: "update", counter: "stale_loop" } } },
+    ready: { type: "gate", prompt: "approve or reject ready", outcomes: { approve: "merge", reject: "$stuck", stale: { to: "update", counter: "stale_loop" } } },
     merge: { type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } },
   },
 };

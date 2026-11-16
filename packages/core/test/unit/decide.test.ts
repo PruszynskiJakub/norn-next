@@ -804,7 +804,7 @@ describe("audit fixes", () => {
       name: "solo",
       start: "implement",
       steps: {
-        implement: { type: "agent", skills: ["implement"], outcomes: { done: "test" } },
+        implement: { type: "agent", instructions: "Use the `implement` skill.", skills: ["implement"], outcomes: { done: "test" } },
         test: { type: "check", run: "bun test", timeout: "5m", outcomes: { pass: "$done", fail: { to: "implement", counter: "loop" } } },
       },
       counters: { loop: { max: 3 } },

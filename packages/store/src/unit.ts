@@ -8,6 +8,8 @@ import type { UnitState, Workflow } from "@norn/schema";
 import { assertValid } from "@norn/schema";
 import { parse as parseYaml } from "yaml";
 import { atomicCopyDir, atomicWrite, createExclusive, fileError, jsonLine, readJsonFile, readText, type ReadResult, safeUnlink, validated } from "./fsx.ts";
+import { stepWordingErrors, toModelSteps } from "./step-wording.ts";
+import { translateWordingValue } from "./wording.ts";
 import { evidenceDir, legacyHandoffFile, logPath, pinnedWorkflowPath, statePath } from "./paths.ts";
 
 /** state.json as the `UnitState` it stands for: older shapes read normalised, never corrupt. */
@@ -77,46 +79,18 @@ export function parseWorkflowText(text: string, path: string, read: WorkflowRead
   observeWorkflowRead({ path, read });
   let value: unknown;
   try {
-    value = parseYaml(text);
+    value = translateWordingValue(parseYaml(text));
   } catch (e) {
     return { ok: false, reason: "corrupt", error: fileError(path, [{ path: "", message: `YAML: ${(e as Error).message}` }], root) };
   }
   // The step-level keys that belong to the workflow get their own message
   const misplaced = workflowLevelKeysOnSteps(value);
   if (misplaced.length) return { ok: false, reason: "corrupt", error: fileError(path, misplaced, root) };
-  const loaded = validated("workflow", withSkillLists(value), path, text, root);
-  if (!loaded.ok) return loaded;
-  const wording = fileSkillWording(value);
-  return wording.length ? { ok: false, reason: "corrupt", error: fileError(path, wording, root) } : loaded;
-}
-
-/** The model's `skills` is optional and a list, so a file's own wording, exactly one `skill` per agent step, is checked as written. */
-function fileSkillWording(value: unknown): Array<{ path: string; message: string }> {
-  const steps = (value as { steps: Record<string, Record<string, unknown>> }).steps;
-  const out: Array<{ path: string; message: string }> = [];
-  for (const [name, step] of Object.entries(steps)) {
-    if (step.type !== "agent") continue;
-    if (!("skill" in step)) out.push({ path: `/steps/${name}`, message: "must have required property 'skill'" });
-    if ("skills" in step) out.push({ path: `/steps/${name}`, message: "unknown property 'skills'" });
-  }
-  return out;
-}
-
-/**
- * A file names one `skill` per agent step; the loaded workflow holds a list. Renamed in place so the
- * step keeps its key order, and anything not a one-skill agent step is left for the schema to judge.
- */
-function withSkillLists(value: unknown): unknown {
   const steps = (value as { steps?: unknown } | null)?.steps;
-  if (typeof steps !== "object" || steps === null) return value;
-  const mapped = Object.fromEntries(
-    Object.entries(steps).map(([name, step]) => {
-      const s = step as Record<string, unknown> | null;
-      if (typeof s !== "object" || s === null || s.type !== "agent" || typeof s.skill !== "string" || "skills" in s) return [name, step];
-      return [name, Object.fromEntries(Object.entries(s).map(([k, v]) => (k === "skill" ? ["skills", [v]] : [k, v])))];
-    }),
-  );
-  return { ...(value as object), steps: mapped };
+  if (typeof steps !== "object" || steps === null || Array.isArray(steps)) return validated("workflow", value, path, text, root);
+  const wording = stepWordingErrors(steps as Record<string, unknown>);
+  if (wording.length) return { ok: false, reason: "corrupt", error: fileError(path, wording, root) };
+  return validated("workflow", { ...(value as object), steps: toModelSteps(steps as Record<string, unknown>) }, path, text, root);
 }
 
 const WORKFLOW_LEVEL: Record<string, string> = {

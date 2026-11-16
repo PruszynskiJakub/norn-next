@@ -67,8 +67,8 @@ const routeCount = (wf: Workflow) => Object.values(wf.steps).reduce((n, step) =>
  * route, counter or instruction changes the hash, formatting and key order never do.
  */
 const PINNED_HASHES: Record<string, string> = {
-  quick: "93bfd20fb0fe8a1289f06e83dd5b1f72bf4aa0a8ca63738afa0177f8f34a9e8c",
-  story: "dc3f574a5043806ce7e952cb8bae1430da3d6fa4f7e35775c8a9e7f559a9d952",
+  quick: "54f3e627925209349ee5988e91d0a3e8dfc1d6bbd41376e3dbb8beb59abad602",
+  story: "d8e49347ab520b6226ba30e99b7199a7ac551e20a5c47bcde7d7b4bb892756c9",
 };
 
 /** Splits a SKILL.md into its YAML frontmatter and body. */

@@ -119,7 +119,7 @@ function drawWorkflow(rng: Rng, name: string, level: "story" | "slice"): Workflo
       if (rng.chance(0.3)) outcomes.partial = next;
       // A step may override a classified route
       if (rng.chance(0.2)) outcomes[rng.pick(OVERRIDABLE_ROUTES)] = rng.pick([next, "$stuck"]);
-      const step: Record<string, unknown> = { type: "agent", skills: ["work"], outcomes };
+      const step: Record<string, unknown> = { type: "agent", instructions: "Use the `work` skill.", skills: ["work"], outcomes };
       if (rng.chance(0.5)) step.nudges = rng.range(0, 2);
       if (rng.chance(0.5)) step.retries = rng.range(0, 2);
       if (rng.chance(0.1)) step.attended = true;

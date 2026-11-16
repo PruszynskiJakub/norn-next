@@ -121,23 +121,12 @@ describe("unit files", () => {
     expect(r.ok && r.value.workflow.counters?.test_loop?.max).toBe(4);
     expect(() => pinWorkflow(tmp(), "name: x\n")).toThrow(/invalid workflow/);
   });
-  test("a file's one `skill` on an agent step loads as a one-item `skills` list, in the key's place", () => {
+  test("a file's one `skill` on an agent step loads as a one-item `skills` list, its description as the orientation", () => {
     const u = tmp();
     pinWorkflow(u, "name: x\nstart: a\nsteps:\n  a:\n    type: agent\n    description: d\n    skill: norn-implement\n    outcomes: { done: $done }\n");
     const r = readPinnedWorkflow(u);
     const step = r.ok ? r.value.workflow.steps.a : null;
-    expect(step).toEqual({ type: "agent", description: "d", skills: ["norn-implement"], outcomes: { done: "$done" } });
-    expect(Object.keys(step ?? {})).toEqual(["type", "description", "skills", "outcomes"]);
-  });
-  test("a file's agent step still names exactly one `skill`: none, or the model's `skills`, is refused as written", () => {
-    const file = (keys: string) => `name: x\nstart: a\nsteps:\n  a:\n    type: agent\n${keys}    outcomes: { done: $done }\n`;
-    const errors = (keys: string) => {
-      const r = parseWorkflowText(file(keys), "x.yaml");
-      return r.ok ? [] : r.reason === "corrupt" ? r.error.errors.map((e) => `${e.path}: ${e.message}`) : [r.reason];
-    };
-    expect(errors("    skill: s\n")).toEqual([]);
-    expect(errors("")).toEqual(["/steps/a: must have required property 'skill'"]);
-    expect(errors("    skills: [s]\n")).toEqual(["/steps/a: must have required property 'skill'", "/steps/a: unknown property 'skills'"]);
+    expect(step).toEqual({ type: "agent", instructions: "d", description: "d", skills: ["norn-implement"], outcomes: { done: { to: "$done", means: "step finished with outcome done" } } });
   });
   test("logs and evidence", () => {
     const u = tmp();

@@ -874,8 +874,11 @@ function markdown(b: BriefJson): string {
   for (const c of w.at_limit) out.push(`**Last round on \`${c.name}\` (${c.value}/${c.max}):** if the work is sent back along it once more, the unit goes stuck.`, "");
 
   out.push("## Your work", "");
-  const body = [b.work.description, b.work.instructions?.trim()].filter((t): t is string => !!t);
-  if (b.work.skills.length) out.push(skillLine(b.work.skills));
+  const skills = b.work.skills.length ? skillLine(b.work.skills) : null;
+  // An orientation filled in from the description or the skill line (a file in the old wording) would say the same thing twice
+  const orientation = b.work.instructions?.trim();
+  const body = [b.work.description, orientation === b.work.description?.trim() || orientation === skills ? null : orientation].filter((t): t is string => !!t);
+  if (skills) out.push(skills);
   for (const [i, t] of body.entries()) out.push(...(i || b.work.skills.length ? [""] : []), t);
   out.push("");
 

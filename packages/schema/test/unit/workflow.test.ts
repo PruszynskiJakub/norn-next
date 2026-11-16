@@ -68,12 +68,13 @@ describe("workflow schema", () => {
       steps: {
         refine: {
           type: "agent",
+          instructions: "Refine the story with the person.",
           skills: ["refine"],
           attended: true,
           inputs: ["spec", "handoff"],
           outcomes: { done: "plan", questions: "clarify" },
         },
-        clarify: { type: "agent", skills: ["clarify", "norn-interview"], attended: true, outcomes: { done: "plan" } },
+        clarify: { type: "agent", instructions: "Settle the open questions.", skills: ["clarify", "norn-interview"], attended: true, outcomes: { done: "plan" } },
         plan: {
           type: "agent",
           skills: ["plan"],
@@ -89,7 +90,7 @@ describe("workflow schema", () => {
         "approve-plan": { type: "gate", prompt: "Approve the plan?", outcomes: { approve: "slices", reject: { to: "plan", counter: "plan_loop" } } },
         slices: { type: "slices", outcomes: { done: "open-pr", stuck: "$stuck" } },
         "open-pr": { type: "git", action: "open-pr", outcomes: { done: "ready" } },
-        ready: { type: "gate", outcomes: { approve: "$done" } },
+        ready: { type: "gate", prompt: "approve or reject ready", outcomes: { approve: "$done" } },
       },
       counters: { plan_loop: { max: 2 } },
     };
@@ -97,13 +98,18 @@ describe("workflow schema", () => {
   });
 
   test("a loaded agent step holds a list of skills, maybe none; a single `skill` is the file's wording, not the model's", () => {
-    const wf = (step: Record<string, unknown>) => ({ name: "x", start: "a", steps: { a: { type: "agent", ...step, outcomes: { done: "$done" } } } });
+    const wf = (step: Record<string, unknown>) => ({ name: "x", start: "a", steps: { a: { type: "agent", instructions: "do it", ...step, outcomes: { done: "$done" } } } });
     expect(modelErrorsOf(wf({}))).toEqual([]);
     expect(modelErrorsOf(wf({ skills: [] }))).toEqual([]);
     expect(modelErrorsOf(wf({ skills: ["a", "b", "c"] }))).toEqual([]);
     expect(modelErrorsOf(wf({ skills: ["a", "a"] })).length).toBeGreaterThan(0);
     expect(modelErrorsOf(wf({ skills: [""] })).length).toBeGreaterThan(0);
     expect(modelErrorsOf(wf({ skill: "a" })).length).toBeGreaterThan(0);
+  });
+
+  test("a loaded agent step needs its orientation and a gate the decision it shows", () => {
+    expect(modelErrorsOf({ name: "x", start: "a", steps: { a: { type: "agent", outcomes: { done: "$done" } } } })).toEqual([{ path: "/steps/a", message: "must have required property 'instructions'" }]);
+    expect(modelErrorsOf({ name: "x", start: "a", steps: { a: { type: "gate", outcomes: { approve: "$done" } } } })).toEqual([{ path: "/steps/a", message: "must have required property 'prompt'" }]);
   });
 
   test.each([

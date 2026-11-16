@@ -8,7 +8,7 @@ import { tmp, WORKFLOW_YAML } from "../helpers.ts";
 
 /** The loaded text as norn reads it back from a pin: parsed, each `skill` read into the model's `skills`. */
 const asLoaded = (source: string) => {
-  const r = parseWorkflowText(source, "pin.yaml");
+  const r = parseWorkflowText(source, "pin.yaml", "copy");
   if (!r.ok) throw new Error(JSON.stringify(r));
   return r.value;
 };
@@ -87,7 +87,7 @@ describe("use: brings in a shared file's steps", () => {
   test("routes, start and base.step naming the use step enter at the shared start; an included step is named directly", () => {
     const wf = loaded({ "story.yaml": STORY.replace("start: implement", "start: base"), "shared/base-update.yaml": BASE_UPDATE });
     expect(wf.workflow.start).toBe("update");
-    expect(wf.workflow.steps.implement?.outcomes).toEqual({ done: "update", quick: "test" });
+    expect(wf.workflow.steps.implement?.outcomes).toMatchObject({ done: { to: "update" }, quick: { to: "test" } });
     expect(wf.workflow.base).toEqual({ step: "update", verify: "test" });
   });
 
@@ -101,21 +101,21 @@ describe("use: brings in a shared file's steps", () => {
     ]);
   });
 
-  test("an exit takes its target and counter from the use step and its means and verdict from the shared side; an unrouted exit goes to $stuck", () => {
+  test("an exit takes its target and counter from the use step and an agent step's means and verdict from the shared side; an unrouted exit goes to $stuck", () => {
     const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE });
     expect(wf.workflow.steps.test?.outcomes).toEqual({
-      pass: { to: "qa", means: "the suite is green" },
+      pass: "qa",
       fail: { to: "implement", counter: "test_loop" },
     });
     expect((wf.workflow.steps.resolve?.outcomes as Record<string, unknown>).gave_up).toEqual({ to: "implement", counter: "test_loop", means: "cannot resolve", verdict: "fail" });
     const unrouted = loaded({ "story.yaml": STORY.replace(", broken: { to: implement, counter: test_loop }", ""), "shared/base-update.yaml": BASE_UPDATE });
-    expect(unrouted.workflow.steps.test?.outcomes).toEqual({ pass: { to: "qa", means: "the suite is green" }, fail: "$stuck" });
+    expect(unrouted.workflow.steps.test?.outcomes).toEqual({ pass: "qa", fail: "$stuck" });
   });
 
   test("shared routes to $done and $stuck and to a workflow counter stay as written, and the loaded workflow validates", () => {
     const shared = BASE_UPDATE.replace("done: test, stuck: $stuck,", "done: { to: test, counter: test_loop }, stuck: $stuck, skip: $done,");
     const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": shared });
-    expect(wf.workflow.steps.resolve?.outcomes).toMatchObject({ done: { to: "test", counter: "test_loop" }, stuck: "$stuck", skip: "$done" });
+    expect(wf.workflow.steps.resolve?.outcomes).toMatchObject({ done: { to: "test", counter: "test_loop" }, stuck: "$stuck", skip: { to: "$done" } });
     expect(validateWorkflowDefinition(wf.workflow).issues).toEqual([]);
   });
 
@@ -131,7 +131,7 @@ describe("use: brings in a shared file's steps", () => {
   test("the workflow's defaults cover included steps: they carry no limits of their own", () => {
     const wf = loaded({ "story.yaml": STORY, "shared/base-update.yaml": BASE_UPDATE });
     expect(wf.workflow.defaults).toEqual({ deadline: "30m", nudges: 1 });
-    expect(Object.keys(wf.workflow.steps.resolve ?? {})).toEqual(["type", "skills", "outcomes"]);
+    expect(Object.keys(wf.workflow.steps.resolve ?? {})).toEqual(["type", "instructions", "skills", "outcomes"]);
   });
 });
 
@@ -230,7 +230,7 @@ describe("like: copies a step of its own file", () => {
       outcomes: { pass: "$done", fail: "review" },
       exits: { "3": "flaky" },
     } as never);
-    expect(Object.keys(parseYaml(wf.source).steps["test-merge"])).toEqual(["type", "description", "run", "timeout", "outcomes", "exits"]);
+    expect(Object.keys(parseYaml(wf.source).steps["test-merge"])).toEqual(["check", "description", "timeout", "outcomes", "exits"]);
   });
 
   test("a workflow with like but no use loads as its flattened text, with no like left", () => {

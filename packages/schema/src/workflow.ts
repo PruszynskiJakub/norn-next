@@ -86,7 +86,7 @@ function stepTypes<S extends TSchema>(outcome: S) {
       type: Type.Literal("agent"),
       ...common,
       skills: Type.Optional(Type.Array(NonEmpty, { uniqueItems: true, description: "Skills the agent uses, in the order the brief names them" })),
-      instructions: Type.Optional(Type.String()),
+      instructions: Type.String({ minLength: 1, description: "The orientation: what the step is for" }),
       inputs: Type.Optional(Type.Array(StepInput, { uniqueItems: true })),
       agent: Type.Optional(Type.String({ minLength: 1, description: "Name from config.agents; default config.agent" })),
       model: Type.Optional(NonEmpty),
@@ -132,7 +132,7 @@ function stepTypes<S extends TSchema>(outcome: S) {
     {
       type: Type.Literal("gate"),
       ...common,
-      prompt: Type.Optional(Type.String({ description: "What the person decides; shown in inbox" })),
+      prompt: Type.String({ minLength: 1, description: "What the person decides; shown in inbox" }),
       /** `stale`: tick-classified on a story gate when the base moved under the story */
       outcomes: fixedOutcomes(["approve", "reject", "stale"] as const, outcome),
     },
@@ -178,8 +178,13 @@ function stepTypes<S extends TSchema>(outcome: S) {
 /** The step types as a file writes them: an agent step names one `skill`, which the loader reads into the model's `skills`. */
 function fileStepTypes<S extends TSchema>(outcome: S) {
   const steps = stepTypes(outcome);
-  const { type, description, skills: _, ...rest } = steps.AgentStep.properties;
-  return { ...steps, AgentStep: Type.Object({ type, description, skill: NonEmpty, ...rest }, { additionalProperties: false }) };
+  const { type, description, skills: _, instructions: _i, ...rest } = steps.AgentStep.properties;
+  const { prompt: _p, ...gate } = steps.GateStep.properties;
+  return {
+    ...steps,
+    AgentStep: Type.Object({ type, description, skill: NonEmpty, instructions: Type.Optional(Type.String()), ...rest }, { additionalProperties: false }),
+    GateStep: Type.Object({ ...gate, prompt: Type.Optional(Type.String({ description: "What the person decides; shown in inbox" })) }, { additionalProperties: false }),
+  };
 }
 
 export const { AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep } = stepTypes(OutcomeSpec);
@@ -275,6 +280,23 @@ const FileSteps = fileStepTypes(OutcomeSpec);
 const FileStep = TaggedUnion("type", [FileSteps.AgentStep, FileSteps.CheckStep, FileSteps.GateStep, FileSteps.GitStep, FileSteps.SlicesStep, FileSteps.MergeStep]);
 const SharedSteps = fileStepTypes(Type.Union([Target, OutcomeEdge, ExitEdge]));
 const SharedStep = TaggedUnion("type", [SharedSteps.AgentStep, SharedSteps.CheckStep, SharedSteps.GateStep, SharedSteps.GitStep, SharedSteps.SlicesStep, SharedSteps.MergeStep]);
+
+const SharedModelSteps = stepTypes(Type.Union([Target, OutcomeEdge, ExitEdge]));
+
+/** A shared file's steps in the loaded model's form, the way the loader checks them before flattening; never published. */
+export const WorkflowSharedModel = Type.Object(
+  {
+    $schema: Type.Optional(Type.String()),
+    description: Type.Optional(Type.String()),
+    start: StepName,
+    steps: Type.Record(
+      StepName,
+      TaggedUnion("type", [SharedModelSteps.AgentStep, SharedModelSteps.CheckStep, SharedModelSteps.GateStep, SharedModelSteps.GitStep, SharedModelSteps.SlicesStep, SharedModelSteps.MergeStep]),
+      { minProperties: 1, additionalProperties: false },
+    ),
+  },
+  { additionalProperties: false },
+);
 
 /**
  * `like: <step>` copies a step of the same file; each key it writes replaces the copied value whole.

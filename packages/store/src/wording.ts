@@ -9,7 +9,7 @@
  * written. Where that cannot hold (a comment with no line left to sit on, a multi-line scalar that
  * would land at an indent it does not fit), the file is refused naming the line, never reflowed.
  */
-import { isMap, isScalar, type Node, type Pair, parseDocument, stringify, type YAMLMap } from "yaml";
+import { isMap, isScalar, type Node, type Pair, parse, parseDocument, stringify, type YAMLMap } from "yaml";
 
 export type Translated = { ok: true; text: string; changed: boolean } | { ok: false; file: string; line: number; message: string };
 
@@ -59,12 +59,37 @@ function jsonValue(text: string): unknown {
 }
 
 function translateJson(text: string, doc: unknown): string {
-  if (!isObj(doc) || !isObj(doc.steps)) return text;
+  const out = translateWordingValue(doc);
+  return out === doc ? text : `${JSON.stringify(out, null, 2)}${text.endsWith("\n") ? "\n" : ""}`;
+}
+
+/**
+ * A parsed workflow or shared file in the new wording: the same translation as `translateWording`'s,
+ * on the value, so a copy loads whatever its layout (a flow-map step, an anchor) even where a lossless
+ * rewrite of its text would be refused. A value with no step in the old wording comes back as it is.
+ */
+export function translateWordingValue(doc: unknown): unknown {
+  if (!isObj(doc) || !isObj(doc.steps)) return doc;
   const steps = doc.steps;
-  if (!Object.values(steps).some((s) => isObj(s) && isOldStep(s))) return text;
+  if (!Object.values(steps).some((s) => isObj(s) && isOldStep(s))) return doc;
   const out: Obj = {};
   for (const [name, step] of Object.entries(steps)) out[name] = isObj(step) ? translateStepObj(name, step, steps) : step;
-  return `${JSON.stringify({ ...doc, steps: out }, null, 2)}${text.endsWith("\n") ? "\n" : ""}`;
+  return { ...doc, steps: out };
+}
+
+/**
+ * A text to read, not to keep, in the new wording: a text with no step in the old wording (or one that
+ * is not YAML, left for the reader to refuse) comes back as it is; otherwise its translated value as YAML.
+ */
+export function inNewWording(text: string): string {
+  let value: unknown;
+  try {
+    value = parse(text);
+  } catch {
+    return text;
+  }
+  const out = translateWordingValue(value);
+  return out === value ? text : stringify(out, { lineWidth: 0, aliasDuplicateObjects: false });
 }
 
 function isOldStep(s: Obj): boolean {

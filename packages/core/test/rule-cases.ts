@@ -36,8 +36,8 @@ const ROUTED_WF: Workflow = {
   name: "routed",
   start: "implement",
   steps: {
-    implement: { type: "agent", skills: ["implement"], outcomes: { done: "$done", stalled: "review" } },
-    review: { type: "agent", skills: ["review"], outcomes: { approve: "$done" } },
+    implement: { type: "agent", instructions: "Use the `implement` skill.", skills: ["implement"], outcomes: { done: "$done", stalled: "review" } },
+    review: { type: "agent", instructions: "Use the `review` skill.", skills: ["review"], outcomes: { approve: "$done" } },
   },
 };
 /** A gate with a `stale` route, stale when merely behind (as `release` is). */
@@ -46,7 +46,7 @@ const STALE_WF: Workflow = {
   start: "ready",
   steps: {
     update: { type: "git", action: "update", outcomes: { done: "ready", conflict: "$stuck" } },
-    ready: { type: "gate", outcomes: { approve: "$done", reject: "$stuck", stale: { to: "update", counter: "stale_loop" } } },
+    ready: { type: "gate", prompt: "approve or reject ready", outcomes: { approve: "$done", reject: "$stuck", stale: { to: "update", counter: "stale_loop" } } },
   },
   counters: { stale_loop: { max: 3 } },
   base: { stale: "behind" },
@@ -54,7 +54,7 @@ const STALE_WF: Workflow = {
 const MERGE_WF: Workflow = {
   ...STALE_WF,
   name: "merging",
-  steps: { ...STALE_WF.steps, ready: { type: "gate", outcomes: { approve: "merge", reject: "$stuck" } }, merge: { type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } } },
+  steps: { ...STALE_WF.steps, ready: { type: "gate", prompt: "approve or reject ready", outcomes: { approve: "merge", reject: "$stuck" } }, merge: { type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } } },
 };
 /** Re-verifies a story waiting at its merge step with a check step (`base.verify`). */
 const VERIFY_WF: Workflow = {

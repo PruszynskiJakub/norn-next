@@ -153,7 +153,7 @@ describe("inbox audit fixes", () => {
 
   test("C1: a manual run that ended its turn without reporting is surfaced, once per counted nudge", () => {
     const unit = storyUnit();
-    const wf = { ...STORY_WF, steps: { ...STORY_WF.steps, fix: { type: "agent" as const, skills: ["implement"], outcomes: { done: "test" } } } };
+    const wf = { ...STORY_WF, steps: { ...STORY_WF.steps, fix: { type: "agent" as const, instructions: "Use the `implement` skill.", skills: ["implement"], outcomes: { done: "test" } } } };
     const st = stateFor(unit, wf, {
       step: "fix",
       status: "running",

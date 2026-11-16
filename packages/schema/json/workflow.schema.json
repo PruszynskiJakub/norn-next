@@ -73,6 +73,7 @@
               "type": "object",
               "required": [
                 "type",
+                "instructions",
                 "outcomes"
               ],
               "properties": {
@@ -93,6 +94,8 @@
                   }
                 },
                 "instructions": {
+                  "minLength": 1,
+                  "description": "The orientation: what the step is for",
                   "type": "string"
                 },
                 "inputs": {
@@ -357,6 +360,7 @@
               "type": "object",
               "required": [
                 "type",
+                "prompt",
                 "outcomes"
               ],
               "properties": {
@@ -368,6 +372,7 @@
                   "type": "string"
                 },
                 "prompt": {
+                  "minLength": 1,
                   "description": "What the person decides; shown in inbox",
                   "type": "string"
                 },

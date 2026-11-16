@@ -72,7 +72,7 @@ describe("check outcomes declared by exit code", () => {
       start: "ci",
       steps: {
         ci: { type: "check", run: "x", timeout: "1m", exits: { "3": "stale" }, outcomes: { pass: "$done", fail: { to: "fix", counter: "ci_loop" }, stale: { to: "fix", counter: "stale_loop" } } },
-        fix: { type: "agent", skills: ["s"], outcomes: { done: "ci" } },
+        fix: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { done: "ci" } },
       },
       counters: { ci_loop: { max: 1 }, stale_loop: { max: 3 } },
     };
@@ -227,7 +227,7 @@ describe("classified outcomes", () => {
   });
 
   test("a workflow may override a classified route", () => {
-    const wf: Workflow = { ...SOLO_WF, steps: { implement: { type: "agent", skills: ["s"], outcomes: { done: "$done", silent: "$stuck" } } } };
+    const wf: Workflow = { ...SOLO_WF, steps: { implement: { type: "agent", instructions: "Use the `s` skill.", skills: ["s"], outcomes: { done: "$done", silent: "$stuck" } } } };
     const st = run(stateFor(storyUnit(), wf), wf, started).state;
     expect(run(st, wf, classify("silent")).state).toMatchObject({ status: "stuck", park: { kind: "stuck", reason: "implement.silent → $stuck" } });
   });
@@ -256,8 +256,8 @@ describe("restartStepOf: the step a takeover with the record lost restarts (T5b)
     name: "rv",
     start: "implement",
     steps: {
-      implement: { type: "agent", skills: ["norn-implement"], outcomes: { done: { to: "review", means: "built" } } },
-      review: { type: "agent", skills: ["norn-review"], outcomes: { approve: { to: "$done", means: "good" }, rework: { to: "implement", means: "fix" } } },
+      implement: { type: "agent", instructions: "Use the `norn-implement` skill.", skills: ["norn-implement"], outcomes: { done: { to: "review", means: "built" } } },
+      review: { type: "agent", instructions: "Use the `norn-review` skill.", skills: ["norn-review"], outcomes: { approve: { to: "$done", means: "good" }, rework: { to: "implement", means: "fix" } } },
     },
   } as Workflow;
 

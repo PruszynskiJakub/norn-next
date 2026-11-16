@@ -365,10 +365,6 @@
                     "description": {
                       "type": "string"
                     },
-                    "prompt": {
-                      "description": "What the person decides; shown in inbox",
-                      "type": "string"
-                    },
                     "outcomes": {
                       "minProperties": 1,
                       "additionalProperties": false,
@@ -525,6 +521,10 @@
                           ]
                         }
                       }
+                    },
+                    "prompt": {
+                      "description": "What the person decides; shown in inbox",
+                      "type": "string"
                     }
                   }
                 },

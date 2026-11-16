@@ -871,7 +871,7 @@ describe("the resolution input: what the resolver did, as one remerge-diff per m
     start: "update",
     steps: {
       update: { type: "git", action: "update", outcomes: { done: "$done", resolved: "resolution-review", conflict: "$stuck" } },
-      "resolution-review": { type: "agent", skills: ["norn-review"], inputs: ["spec", "resolution"], outcomes: { approve: { to: "$done", means: "ok" } } },
+      "resolution-review": { type: "agent", instructions: "Use the `norn-review` skill.", skills: ["norn-review"], inputs: ["spec", "resolution"], outcomes: { approve: { to: "$done", means: "ok" } } },
     },
   };
   const classify = (commits: unknown[]) => (s: UnitState) =>
