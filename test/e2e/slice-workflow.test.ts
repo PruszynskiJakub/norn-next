@@ -80,7 +80,7 @@ describe("norn init", () => {
     expect(r.exit).toBe(0);
     const v = r.value as { config: string; workflows: { created: string[] }; skills: { updated: string[]; unchanged: string[]; links: Array<{ agent: string; linked: string[] }> }; hooks: Array<{ changed: string[] }>; gitignore: string[] };
     expect(v.config).toBe("created");
-    expect(v.workflows.created).toEqual(["quick.yaml", "refinement.yaml", "reproduce.yaml", "slice.yaml", "story.yaml", "triage.yaml"]);
+    expect(v.workflows.created).toEqual(["quick.yaml", "refinement.yaml", "reproduce.yaml", "slice.yaml", "story.yaml", "triage.yaml", "shared/base-update.yaml", "shared/ship.yaml", "shared/sync.yaml"]);
     expect(v.skills.updated).toContain("norn");
     expect(v.skills.updated).toContain("norn-implement");
     expect(v.skills.links[0]).toMatchObject({ agent: "claude", linked: v.skills.updated });
@@ -97,7 +97,7 @@ describe("norn init", () => {
     expect(existsSync(join(h.root, ".gitattributes"))).toBe(false);
     expect(r.value).not.toHaveProperty("gitattributes");
     // nothing in the repo names a test command: the templates keep theirs, and init says so
-    expect(r.value).toMatchObject({ remote: { provider: "gh", label: "norn", git_remote: "origin", url: h.remoteDir }, test_command: { command: "bun test", detected_from: null, set_in: ["quick.yaml", "slice.yaml", "story.yaml"] } });
+    expect(r.value).toMatchObject({ remote: { provider: "gh", label: "norn", git_remote: "origin", url: h.remoteDir }, test_command: { command: "bun test", detected_from: null, set_in: ["slice.yaml", "shared/base-update.yaml"] } });
     expect(r.stdout).toContain("Next steps\n  1. Set your test command:");
     expect(r.stdout).toContain('`git add .agents .claude REVIEW.md .gitignore && git commit -m "Set up norn" && git push`');
     expect(r.stdout).toContain("`gh issue create --label norn --assignee @me --title \"…\"`");
@@ -463,10 +463,10 @@ describe("norn init in a repository with a test command and no remote", () => {
     f.git(["remote", "remove", "origin"]);
     const r = await f.norn("init");
     expect(r.exit).toBe(0);
-    expect(r.value).toMatchObject({ remote: { url: null }, test_command: { command: "npm ci && npm test", detected_from: "package.json", set_in: ["quick.yaml", "slice.yaml", "story.yaml"] } });
-    const story = readFileSync(join(workflowsDir(f.root), "story.yaml"), "utf8");
-    expect(story).toContain('run: &test-run "npm ci && npm test"');
-    expect(story).not.toContain("run: bun test");
+    expect(r.value).toMatchObject({ remote: { url: null }, test_command: { command: "npm ci && npm test", detected_from: "package.json", set_in: ["slice.yaml", "shared/base-update.yaml"] } });
+    const shared = readFileSync(join(workflowsDir(f.root), "shared", "base-update.yaml"), "utf8");
+    expect(shared).toContain('run: "npm ci && npm test"');
+    expect(shared).not.toContain("run: bun test");
     expect(r.stdout).toContain("remote          no git remote named origin");
     expect(r.stdout).toContain("Next steps\n  1. Add the remote norn syncs issues from and pushes branches to: `git remote add origin <url>`.\n  2. Check the test command `npm ci && npm test`");
     // the edited templates still validate, with the command as the test check's run

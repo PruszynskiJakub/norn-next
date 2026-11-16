@@ -1,4 +1,4 @@
-import { type Static, type TOptional, Type } from "@sinclair/typebox";
+import { type Static, type TObject, type TOptional, type TSchema, type TUnknown, Type } from "@sinclair/typebox";
 import {
   CounterName,
   Duration,
@@ -30,14 +30,14 @@ export const OutcomeSpec = Type.Union([Target, OutcomeEdge]);
 export type OutcomeSpec = Static<typeof OutcomeSpec>;
 
 /** Open outcome map (agent steps): any outcome name → spec. */
-function openOutcomes() {
-  return Type.Record(OutcomeName, OutcomeSpec, { minProperties: 1, additionalProperties: false });
+function openOutcomes<S extends TSchema>(spec: S) {
+  return Type.Record(OutcomeName, spec, { minProperties: 1, additionalProperties: false });
 }
 
 /** Closed outcome map: only the step type's fixed outcomes; at least one declared. Undeclared ones route to `$stuck`. */
-function fixedOutcomes<const K extends string>(keys: readonly K[]) {
-  const props = Object.fromEntries(keys.map((k) => [k, Type.Optional(OutcomeSpec)])) as {
-    [P in K]: TOptional<typeof OutcomeSpec>;
+function fixedOutcomes<const K extends string, S extends TSchema>(keys: readonly K[], spec: S) {
+  const props = Object.fromEntries(keys.map((k) => [k, Type.Optional(spec)])) as unknown as {
+    [P in K]: TOptional<S>;
   };
   return Type.Object(props, { minProperties: 1, additionalProperties: false });
 }
@@ -73,107 +73,114 @@ const common = {
   description: Type.Optional(Type.String()),
 };
 
-export const AgentStep = Type.Object(
-  {
-    type: Type.Literal("agent"),
-    ...common,
-    skill: NonEmpty,
-    instructions: Type.Optional(Type.String()),
-    inputs: Type.Optional(Type.Array(StepInput, { uniqueItems: true })),
-    agent: Type.Optional(Type.String({ minLength: 1, description: "Name from config.agents; default config.agent" })),
-    model: Type.Optional(NonEmpty),
-    attended: Type.Optional(Type.Boolean({ description: "Worked with a person; always started by a person" })),
-    deadline: Type.Optional(Duration),
-    nudges: Type.Optional(Type.Integer({ minimum: 0, description: "Max nudges in the same session" })),
-    retries: Type.Optional(Type.Integer({ minimum: 0, description: "Max fresh-session retries after died" })),
-    /** `required` makes `norn done --criteria <file>` mandatory */
-    criteria: Type.Optional(Type.Literal("required")),
-    /**
-     * Declared outcomes. May also override classified routes by naming
-     * `silent`, `died`, `timeout`, `stalled`, `ask`, `stuck`.
-     */
-    outcomes: openOutcomes(),
-  },
-  { additionalProperties: false },
-);
-export type AgentStep = Static<typeof AgentStep>;
-
 const EXIT_CODE_PATTERN = "^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
-
-export const CheckStep = Type.Object(
-  {
-    type: Type.Literal("check"),
-    ...common,
-    run: NonEmpty,
-    timeout: Duration,
-    /**
-     * Exit code (1–255) → outcome name, for a check that ends in more than pass or fail; exit 0 is
-     * always `pass` and any other exit `fail`. Each named outcome is declared in `outcomes`.
-     */
-    exits: Type.Optional(
-      Type.Record(Type.String({ pattern: EXIT_CODE_PATTERN }), OutcomeName, {
-        minProperties: 1,
-        additionalProperties: false,
-        description: "Exit code → outcome; exit 0 is pass, an undeclared one fail",
-      }),
-    ),
-    /** `pass`, `fail` and the outcomes `exits` names; load-time validation refuses any other */
-    outcomes: openOutcomes(),
-  },
-  { additionalProperties: false },
-);
-export type CheckStep = Static<typeof CheckStep>;
-
-export const GateStep = Type.Object(
-  {
-    type: Type.Literal("gate"),
-    ...common,
-    prompt: Type.Optional(Type.String({ description: "What the person decides; shown in inbox" })),
-    /** `stale`: tick-classified on a story gate when the base moved under the story */
-    outcomes: fixedOutcomes(["approve", "reject", "stale"] as const),
-  },
-  { additionalProperties: false },
-);
-export type GateStep = Static<typeof GateStep>;
 
 /** `update` merges the base into the story branch; story units only. */
 export const GitAction = Type.Union([Type.Literal("integrate"), Type.Literal("push"), Type.Literal("open-pr"), Type.Literal("update")]);
 export type GitAction = Static<typeof GitAction>;
 
-export const GitStep = Type.Object(
-  {
-    type: Type.Literal("git"),
-    ...common,
-    action: GitAction,
-    /** `clean` and `resolved` (the light path after a base update) only on `action: update` */
-    outcomes: fixedOutcomes(["done", "conflict", "clean", "resolved"] as const),
-  },
-  { additionalProperties: false },
-);
+/** The step types with routes of the given shape: a workflow's routes, or a shared file's, which may leave through an exit. */
+function stepTypes<S extends TSchema>(outcome: S) {
+  const AgentStep = Type.Object(
+    {
+      type: Type.Literal("agent"),
+      ...common,
+      skill: NonEmpty,
+      instructions: Type.Optional(Type.String()),
+      inputs: Type.Optional(Type.Array(StepInput, { uniqueItems: true })),
+      agent: Type.Optional(Type.String({ minLength: 1, description: "Name from config.agents; default config.agent" })),
+      model: Type.Optional(NonEmpty),
+      attended: Type.Optional(Type.Boolean({ description: "Worked with a person; always started by a person" })),
+      deadline: Type.Optional(Duration),
+      nudges: Type.Optional(Type.Integer({ minimum: 0, description: "Max nudges in the same session" })),
+      retries: Type.Optional(Type.Integer({ minimum: 0, description: "Max fresh-session retries after died" })),
+      /** `required` makes `norn done --criteria <file>` mandatory */
+      criteria: Type.Optional(Type.Literal("required")),
+      /**
+       * Declared outcomes. May also override classified routes by naming
+       * `silent`, `died`, `timeout`, `stalled`, `ask`, `stuck`.
+       */
+      outcomes: openOutcomes(outcome),
+    },
+    { additionalProperties: false },
+  );
+
+  const CheckStep = Type.Object(
+    {
+      type: Type.Literal("check"),
+      ...common,
+      run: NonEmpty,
+      timeout: Duration,
+      /**
+       * Exit code (1–255) → outcome name, for a check that ends in more than pass or fail; exit 0 is
+       * always `pass` and any other exit `fail`. Each named outcome is declared in `outcomes`.
+       */
+      exits: Type.Optional(
+        Type.Record(Type.String({ pattern: EXIT_CODE_PATTERN }), OutcomeName, {
+          minProperties: 1,
+          additionalProperties: false,
+          description: "Exit code → outcome; exit 0 is pass, an undeclared one fail",
+        }),
+      ),
+      /** `pass`, `fail` and the outcomes `exits` names; load-time validation refuses any other */
+      outcomes: openOutcomes(outcome),
+    },
+    { additionalProperties: false },
+  );
+
+  const GateStep = Type.Object(
+    {
+      type: Type.Literal("gate"),
+      ...common,
+      prompt: Type.Optional(Type.String({ description: "What the person decides; shown in inbox" })),
+      /** `stale`: tick-classified on a story gate when the base moved under the story */
+      outcomes: fixedOutcomes(["approve", "reject", "stale"] as const, outcome),
+    },
+    { additionalProperties: false },
+  );
+
+
+  const GitStep = Type.Object(
+    {
+      type: Type.Literal("git"),
+      ...common,
+      action: GitAction,
+      /** `clean` and `resolved` (the light path after a base update) only on `action: update` */
+      outcomes: fixedOutcomes(["done", "conflict", "clean", "resolved"] as const, outcome),
+    },
+    { additionalProperties: false },
+  );
+
+  const SlicesStep = Type.Object(
+    {
+      type: Type.Literal("slices"),
+      ...common,
+      outcomes: fixedOutcomes(["done", "stuck"] as const, outcome),
+    },
+    { additionalProperties: false },
+  );
+
+  /**
+   * Waits for the story's PR to merge: entered like a gate, but a person gives no decision there. The merge (or a PR closed unmerged) ends the wait through the story's lifecycle;
+   * `stale` is tick-classified when the base moved under the story.
+   */
+  const MergeStep = Type.Object(
+    {
+      type: Type.Literal("merge"),
+      ...common,
+      outcomes: fixedOutcomes(["stale"] as const, outcome),
+    },
+    { additionalProperties: false },
+  );
+  return { AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep };
+}
+
+export const { AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep } = stepTypes(OutcomeSpec);
+export type AgentStep = Static<typeof AgentStep>;
+export type CheckStep = Static<typeof CheckStep>;
+export type GateStep = Static<typeof GateStep>;
 export type GitStep = Static<typeof GitStep>;
-
-export const SlicesStep = Type.Object(
-  {
-    type: Type.Literal("slices"),
-    ...common,
-    outcomes: fixedOutcomes(["done", "stuck"] as const),
-  },
-  { additionalProperties: false },
-);
 export type SlicesStep = Static<typeof SlicesStep>;
-
-/**
- * Waits for the story's PR to merge: entered like a gate, but a person gives no decision there. The merge (or a PR closed unmerged) ends the wait through the story's lifecycle;
- * `stale` is tick-classified when the base moved under the story.
- */
-export const MergeStep = Type.Object(
-  {
-    type: Type.Literal("merge"),
-    ...common,
-    outcomes: fixedOutcomes(["stale"] as const),
-  },
-  { additionalProperties: false },
-);
 export type MergeStep = Static<typeof MergeStep>;
 
 export const Step = TaggedUnion("type", [AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep]);
@@ -245,6 +252,81 @@ export const Workflow = Type.Object(
   },
 );
 export type Workflow = Static<typeof Workflow>;
+
+/** A route inside a shared file that leaves it: the `use` step routes the exit by name, as it routes an outcome. */
+export const ExitEdge = Type.Object(
+  {
+    exit: OutcomeName,
+    means: Type.Optional(Type.String({ minLength: 1, description: "Shown to the agent in the brief" })),
+    verdict: Type.Optional(Verdict),
+  },
+  { additionalProperties: false },
+);
+export type ExitEdge = Static<typeof ExitEdge>;
+
+const SharedSteps = stepTypes(Type.Union([Target, OutcomeEdge, ExitEdge]));
+const SharedStep = TaggedUnion("type", [SharedSteps.AgentStep, SharedSteps.CheckStep, SharedSteps.GateStep, SharedSteps.GitStep, SharedSteps.SlicesStep, SharedSteps.MergeStep]);
+
+/**
+ * `like: <step>` copies a step of the same file; each key it writes replaces the copied value whole.
+ * Its keys are checked loosely here: the full check runs on the copy, once the target fills it in.
+ */
+function likeStep(variants: TObject[]) {
+  const keys = [...new Set(variants.flatMap((v) => Object.keys(v.properties)))].filter((k) => k !== "type");
+  const loose = Object.fromEntries(keys.map((k) => [k, Type.Optional(Type.Unknown())])) as Record<string, TOptional<TUnknown>>;
+  const types = variants.map((v) => v.properties.type as TSchema);
+  return Type.Object(
+    { like: StepName, type: Type.Optional(Type.Union(types)), ...loose },
+    { additionalProperties: false },
+  );
+}
+const LikeStep = likeStep([AgentStep, CheckStep, GateStep, GitStep, SlicesStep, MergeStep]);
+
+export const SharedName = Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "A file in `.agents/workflows/shared/`, without `.yaml`" });
+
+/** `use: <name>` brings in the steps of `shared/<name>.yaml`; `outcomes` routes each of its exits. */
+export const UseStep = Type.Object(
+  {
+    use: SharedName,
+    outcomes: Type.Optional(
+      Type.Record(OutcomeName, Type.Union([Target, Type.Object({ to: Target, counter: Type.Optional(CounterName) }, { additionalProperties: false })]), {
+        additionalProperties: false,
+      }),
+    ),
+  },
+  { additionalProperties: false },
+);
+export type UseStep = Static<typeof UseStep>;
+
+/** A workflow file as written, before its `use` and `like` steps are filled in; `workflow` is the loaded, flat form. */
+export const WorkflowSource = Type.Object(
+  {
+    ...Workflow.properties,
+    steps: Type.Record(StepName, Type.Union([Step, UseStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
+  },
+  {
+    $id: "https://norn.dev/schema/workflow-source.json",
+    title: "workflow file as written (norn)",
+    additionalProperties: false,
+  },
+);
+export type WorkflowSource = Static<typeof WorkflowSource>;
+
+/** A file in `.agents/workflows/shared/`: steps a workflow brings in with `use:`, entered at `start`. */
+export const WorkflowShared = Type.Object(
+  {
+    $schema: Type.Optional(Type.String()),
+    description: Type.Optional(Type.String()),
+    start: StepName,
+    steps: Type.Record(StepName, Type.Union([SharedStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
+  },
+  {
+    $id: "https://norn.dev/schema/workflow-shared.json",
+    title: "shared workflow steps (norn)",
+    additionalProperties: false,
+  },
+);
+export type WorkflowShared = Static<typeof WorkflowShared>;
 
 /** Classified outcomes the tick may decide per step type. */
 export const CLASSIFIED_OUTCOMES = {

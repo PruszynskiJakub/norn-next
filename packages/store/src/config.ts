@@ -23,6 +23,7 @@ import { type Document, isCollection, isMap, isScalar, parseDocument, parse as p
 import { atomicWrite, fileError, isErrno, readText, type ReadResult } from "./fsx.ts";
 import { recordedInterval } from "./heartbeat.ts";
 import { checkoutOf, LOCAL_CONFIG_FILE, LOCAL_CONFIG_SCHEMA_FILE, nornHome, REPO_CONFIG_SCHEMA_FILE, REPO_CONFIG_FILE, repoConfigPath, USER_CONFIG_SCHEMA_FILE, userConfigPath, workflowsDir } from "./paths.ts";
+import { flattenWorkflowText, SHARED_DIR, sharedFilesUsed } from "./shared-workflow.ts";
 import { type PinnedWorkflow, parseWorkflowText, sha256 } from "./unit.ts";
 
 /** A missing or empty file sets nothing; a file that is not YAML is `config_invalid`. */
@@ -319,6 +320,8 @@ export interface WorkflowFile extends PinnedWorkflow {
   name: string;
   /** absolute path */
   file: string;
+  /** included step → the shared file (name) it came from; absent when the workflow uses none */
+  included?: Record<string, string>;
 }
 
 export interface WorkflowListing {
@@ -341,10 +344,24 @@ function listWorkflowFiles(root: string): Array<{ name: string; file: string }> 
     .map((n) => ({ name: n.slice(0, -extname(n).length), file: join(workflowsDir(root), n) }));
 }
 
-function loadFile(name: string, file: string, root: string): ReadResult<WorkflowFile> {
-  const raw = readText(file);
-  if (raw === null) return { ok: false, reason: "missing" };
-  const r = parseWorkflowText(raw, file, root);
+/**
+ * The text of the workflow file `file`, named `name` by its file name, as the workflow a unit pins:
+ * its shared files (read through `readShared`, by name) flattened in, parsed, its `name` checked
+ * against `name`, with the `source` to pin and its `hash`. Every reader of a workflow file (the
+ * listing, a lost record's restart from its branch) goes through here so they pin the same thing.
+ */
+export function loadWorkflowText(
+  name: string,
+  text: string,
+  file: string,
+  root?: string,
+  readShared: (shared: string) => string | null = () => null,
+): ReadResult<PinnedWorkflow & Pick<WorkflowFile, "included">> {
+  const flat = flattenWorkflowText(text, readShared);
+  if (flat && !flat.ok) return { ok: false, reason: "corrupt", error: fileError(file, flat.errors, root) };
+  // A workflow without `use` loads as written, so its pin and fingerprint stay byte for byte
+  const source = flat ? flat.source : text;
+  const r = parseWorkflowText(source, file, root);
   if (!r.ok) return r;
   if (r.value.name !== name)
     return {
@@ -352,7 +369,15 @@ function loadFile(name: string, file: string, root: string): ReadResult<Workflow
       reason: "corrupt",
       error: fileError(file, [{ path: "/name", message: `must equal the file name '${name}'` }], root),
     };
-  return { ok: true, raw, value: { name, file, workflow: r.value, hash: sha256(raw), source: raw } };
+  return { ok: true, raw: text, value: { workflow: r.value, hash: sha256(source), source, ...(flat?.included && { included: flat.included }) } };
+}
+
+function loadFile(name: string, file: string, root: string): ReadResult<WorkflowFile> {
+  const raw = readText(file);
+  if (raw === null) return { ok: false, reason: "missing" };
+  const shared = new Map(sharedFilesUsed(raw).map((n) => [n, readText(join(workflowsDir(root), SHARED_DIR, `${n}.yaml`))]));
+  const r = loadWorkflowText(name, raw, file, root, (n) => shared.get(n) ?? null);
+  return r.ok ? { ok: true, raw, value: { name, file, ...r.value } } : r;
 }
 
 /** Load and schema-validate every repo workflow; invalid files are reported, not thrown. */

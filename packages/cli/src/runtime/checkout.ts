@@ -63,8 +63,10 @@ import {
   handoffPath,
   listReceipts,
   loadStory,
+  loadWorkflowText,
+  sharedFile,
+  sharedFilesUsed,
   parseStoryFile,
-  parseWorkflowText,
   pinWorkflow,
   newClaimBlob,
   readPinnedWorkflow,
@@ -263,19 +265,22 @@ async function lostRecord(git: GitPort, root: string, story: RunStory, branch: s
     }
   }
   if (!found) throw refuse(`the record of ${key} is lost and ${branch} has no workflow '${name}' to restart it with; nothing was taken`, `add ${WORKFLOWS_DIR}/${name}.yaml to ${branch}, then ${again} again`, "workflow_invalid");
-  const parsed = parseWorkflowText(found.source, found.path);
-  const issues = parsed.ok ? checkWorkflowLevel(parsed.value, "story").map((i) => i.message) : [parsed.reason === "corrupt" ? parsed.error.errors.map((e) => e.message).join(", ") : parsed.reason];
-  if (!parsed.ok || issues.length || parsed.value.name !== name)
+  // A shared file is read from where its workflow is: the branch, never the work tree
+  const shared = new Map<string, string | null>();
+  for (const n of sharedFilesUsed(found.source)) shared.set(n, await git.show(root, head, `${WORKFLOWS_DIR}/${sharedFile(n)}`));
+  const loaded = loadWorkflowText(name, found.source, found.path, undefined, (n) => shared.get(n) ?? null);
+  const issues = loaded.ok ? checkWorkflowLevel(loaded.value.workflow, "story").map((i) => i.message) : [loaded.reason === "corrupt" ? loaded.error.errors.map((e) => e.message).join(", ") : loaded.reason];
+  if (!loaded.ok || issues.length)
     throw refuse(
-      `the record of ${key} is lost and workflow '${name}' on ${branch} is invalid (${issues.join("; ") || `its name is not '${name}'`}); nothing was taken`,
+      `the record of ${key} is lost and workflow '${name}' on ${branch} is invalid (${issues.join("; ")}); nothing was taken`,
       `fix ${found.path} on ${branch}, then ${again} again`,
       "workflow_invalid",
     );
   const last = await lastBoundary(root, headRef, key, null, { strict: true }).catch((e: unknown) => {
     throw failure(`the record of ${key} is lost and ${branch}'s boundaries cannot be read: ${(e as Error).message}; nothing was taken`, `check the repository, then ${again} again`, "git_failed");
   });
-  const step = restartStepOf(parsed.value, last);
-  return { workflow: { name, source: found.source, workflow: parsed.value }, step, holder, line: recordLostLine(key, holder, step) };
+  const step = restartStepOf(loaded.value.workflow, last);
+  return { workflow: { name, source: loaded.value.source, workflow: loaded.value.workflow }, step, holder, line: recordLostLine(key, holder, step) };
 }
 
 /**

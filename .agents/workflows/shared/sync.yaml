@@ -1,0 +1,16 @@
+# Brings the story branch up to date with its base before any work starts, so the work begins from
+# the current base and the update after it merges only what moved meanwhile. Leaves at `synced`.
+description: Merge the base into the story branch before the work starts, resolving conflicts.
+start: sync
+steps:
+  sync:
+    type: git
+    action: update
+    outcomes: { done: { exit: synced }, conflict: { to: sync-resolve, counter: sync_conflict_loop } }
+  sync-resolve:
+    type: agent
+    skill: norn-merge
+    inputs: [spec, handoff]
+    instructions: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
+    outcomes:
+      done: { to: sync, means: "base merged into the story branch, conflicts resolved and committed" }

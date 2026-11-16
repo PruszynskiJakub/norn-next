@@ -15,7 +15,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { atomicWrite, gitRemoteUrl, installSkills, LOCAL_CONFIG_FILE, linkSkills, loadWorkflows, readText, REPO_CONFIG_FILE, repoConfigPath, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, WORKTREE_LOCAL_FILES, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
+import { atomicWrite, gitRemoteUrl, installSkills, LOCAL_CONFIG_FILE, linkSkills, loadWorkflows, readText, REPO_CONFIG_FILE, repoConfigPath, SHARED_DIR, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, WORKTREE_LOCAL_FILES, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
 import { defineCommand, opt } from "../command.ts";
 import type { Context } from "../context.ts";
 import { refuse, rendered } from "../output.ts";
@@ -148,6 +148,9 @@ function nextSteps(r: InitReport, changed: boolean): string[] {
   return steps;
 }
 
+/** The files directly in a folder, sorted; none when it does not exist. */
+const files = (dir: string) => (existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name).sort() : []);
+
 export const initCommand = defineCommand({
   name: "init",
   version: "exempt",
@@ -182,8 +185,10 @@ export const initCommand = defineCommand({
     const testCommand = detected?.command ?? TEMPLATE_TEST_COMMAND;
     const workflows = { created: [] as string[], kept: [] as string[] };
     const setIn: string[] = [];
-    mkdirSync(workflowsDir(root), { recursive: true });
-    for (const f of readdirSync(join(assets, "workflows")).sort()) {
+    mkdirSync(join(workflowsDir(root), SHARED_DIR), { recursive: true });
+    // The shared files come with the workflows: a bundled workflow that uses one does not load without it
+    const templates = [...files(join(assets, "workflows")), ...files(join(assets, "workflows", SHARED_DIR)).map((f) => `${SHARED_DIR}/${f}`)];
+    for (const f of templates) {
       const dest = join(workflowsDir(root), f);
       if (existsSync(dest)) workflows.kept.push(f);
       else {

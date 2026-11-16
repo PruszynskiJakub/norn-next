@@ -1,9 +1,10 @@
 /** Repo-wide rules: dependency direction and banned glossary synonyms. */
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { protocolLines } from "@norn/core";
+import { loadWorkflow, loadWorkflows, workflowsDir } from "../../packages/store/src/index.ts";
 import { allDocs, CODE_SPAN, textFiles, URL } from "../support/docs.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
@@ -395,7 +396,7 @@ describe("test layout (AGENTS.md)", () => {
 
   type Step = { type: string; run?: string; timeout?: string; instructions?: string };
   const workflowSteps = (wf: string) =>
-    (Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as { steps: Record<string, Step> }).steps;
+    repoWorkflow<{ steps: Record<string, Step> }>(wf).steps;
   const DELIVERY = ["quick", "story", "slice"];
 
   const UNIT_ONLY = "bun install --frozen-lockfile && bun run test && bun run typecheck";
@@ -586,10 +587,10 @@ describe("test layout (AGENTS.md)", () => {
 
   test("quick and story wait for the PR's CI after open-pr, send a red run back to implement and a conflicting PR to update", () => {
     for (const wf of ["quick", "story"]) {
-      const { steps, counters } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as {
+      const { steps, counters } = repoWorkflow<{
         steps: Record<string, { type: string; run?: string; outcomes: Record<string, unknown> }>;
         counters: Record<string, unknown>;
-      };
+      }>(wf);
       expect(steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
       expect(steps.ci?.type).toBe("check");
       expect(steps.ci?.run).toBe(ciScript("release"));
@@ -599,12 +600,12 @@ describe("test layout (AGENTS.md)", () => {
   });
 
   test("release goes prepare → open-pr → ci → ready → merge, a red CI goes $stuck, and a base commit or a conflicting PR makes it stale", () => {
-    const { start, steps, counters, base } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", "release.yaml"), "utf8")) as {
+    const { start, steps, counters, base } = repoWorkflow<{
       start: string;
       steps: Record<string, { type: string; run?: string; outcomes: Record<string, unknown> }>;
       counters: Record<string, unknown>;
       base: unknown;
-    };
+    }>("release");
     expect(start).toBe("prepare");
     expect(Object.keys(steps).sort()).toEqual(["ci", "merge", "open-pr", "prepare", "ready", "resolve", "update"]);
     expect(steps.prepare?.outcomes.done).toMatchObject({ to: "open-pr" });
@@ -619,9 +620,16 @@ describe("test layout (AGENTS.md)", () => {
   });
 });
 
+/** A repo workflow as norn runs it: through the store's loader, its shared files brought in. */
+function repoWorkflow<T = Record<string, unknown>>(wf: string): T {
+  const r = loadWorkflow(ROOT, wf);
+  if (!r.ok) throw new Error(`.agents/workflows/${wf}.yaml did not load: ${JSON.stringify(r)}`);
+  return r.value.workflow as T;
+}
+
 /** The `ci` check script of a repo workflow, as norn runs it (`sh -c`, packages/cli/src/runtime/shell .ts). */
 function ciScript(wf: string): string {
-  const { steps } = Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as { steps: Record<string, { run?: string }> };
+  const { steps } = repoWorkflow<{ steps: Record<string, { run?: string }> }>(wf);
   return steps.ci?.run ?? "";
 }
 
@@ -635,7 +643,7 @@ describe("the ci check waits for the ci.yml run of the PR's head commit (#125)",
 
 describe("intake by kind", () => {
   type Wf = { start: string; steps: Record<string, { type: string; skill?: string; instructions?: string; outcomes: Record<string, unknown> }> };
-  const workflow = (wf: string) => Bun.YAML.parse(readFileSync(join(ROOT, ".agents", "workflows", `${wf}.yaml`), "utf8")) as Wf;
+  const workflow = (wf: string) => repoWorkflow<Wf>(wf);
 
   const targets = (wf: string, step: string) => Object.fromEntries(Object.entries(workflow(wf).steps[step]?.outcomes ?? {}).map(([k, v]) => [k, (v as { to: string }).to]));
 
@@ -655,7 +663,11 @@ describe("intake by kind", () => {
   });
 
   test("the repo's copies of the shipped workflows have the same steps and edges", () => {
-    const shipped = (wf: string) => Bun.YAML.parse(readFileSync(join(PKGS, "cli", "assets", "workflows", `${wf}.yaml`), "utf8")) as Wf;
+    // as norn loads them once `norn init` copied them: their shared files flattened in
+    const root = mkdtempSync(join(tmpdir(), "norn-shipped-"));
+    cpSync(join(PKGS, "cli", "assets", "workflows"), workflowsDir(root), { recursive: true });
+    const listing = loadWorkflows(root);
+    const shipped = (wf: string) => listing.workflows[wf]?.workflow as unknown as Wf;
     const shape = (w: Wf) => ({ start: w.start, steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { type: step.type, skill: step.skill, outcomes: step.outcomes }])) });
     for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(workflow(wf)) }).toEqual({ wf, ...shape(shipped(wf)) });
   });

@@ -6,6 +6,7 @@
 export * from "./base.ts";
 export * from "./cockpit.ts";
 export * from "./config.ts";
+export { type Flattened, flattenWorkflowText, SHARED_DIR, type SharedReader, sharedFile, sharedFilesUsed } from "./shared-workflow.ts";
 export * from "./frontmatter.ts";
 export * from "./fsx.ts";
 // raw git (`git`, `gitSync`, blob and ref plumbing) stays inside store: everyone else goes through GitPort

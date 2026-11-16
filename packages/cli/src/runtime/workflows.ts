@@ -4,9 +4,9 @@
  */
 import { readdirSync } from "node:fs";
 import { basename, extname, join } from "node:path";
-import type { AgentAdapter, LoadedWorkflow, RepoWorkflows } from "@norn/core";
+import type { AgentAdapter, LoadedWorkflow, RepoWorkflows, WorkflowIssue } from "@norn/core";
 import { validateWorkflowDefinition } from "@norn/core";
-import { type WorkflowListing, visibleSkills } from "@norn/store";
+import { sharedFile, type WorkflowListing, visibleSkills } from "@norn/store";
 import { assetsDir } from "./assets.ts";
 
 /** Skills shipped with norn, installed by `norn init`. */
@@ -46,11 +46,22 @@ export function checkedRepoWorkflows(listing: WorkflowListing, root: string, con
   return repoWorkflows(listing, { agent: config.agent, visible: agentSkills(agents, root) });
 }
 
+/**
+ * An issue on a step a shared file brought in, prefixed with that file and step: the person fixes
+ * the shared file, which the flattened workflow's path alone does not name.
+ */
+function inSharedFile(issue: WorkflowIssue, included: Record<string, string> | undefined): WorkflowIssue {
+  if (!included) return issue;
+  const at = /^\/steps\/([^/]+)/.exec(issue.path)?.[1];
+  const step = [at, ...(issue.cycle ?? [])].find((s): s is string => s !== undefined && Object.hasOwn(included, s));
+  return step ? { ...issue, message: `${sharedFile(included[step] as string)}, step '${step}': ${issue.message}` } : issue;
+}
+
 export function repoWorkflows(listing: WorkflowListing, skills: { agent: string; visible: Record<string, string[]> }): RepoWorkflows {
   const out: Record<string, LoadedWorkflow> = {};
   for (const [name, wf] of Object.entries(listing.workflows)) {
     const check = validateWorkflowDefinition(wf.workflow, { agentSkills: skills });
-    out[name] = { name, workflow: wf.workflow, source: wf.source, issues: check.ok ? [] : check.issues };
+    out[name] = { name, workflow: wf.workflow, source: wf.source, issues: check.ok ? [] : check.issues.map((i) => inSharedFile(i, wf.included)) };
   }
   for (const err of listing.errors) {
     const name = basename(err.file, extname(err.file));

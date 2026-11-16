@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { claimRef, recordRef, ulid } from "@norn/schema";
-import { appendReceipt, readState, workflowsDir } from "@norn/store";
+import { appendReceipt, loadWorkflow, readState, workflowsDir } from "@norn/store";
 import type { TickReport } from "../../src/index.ts";
 import { createHarness, type Harness, issue, sh, worktreeOf } from "../../../../test/support/harness.ts";
 import { type Clone, cloneOf } from "../../../../test/support/clone.ts";
@@ -32,6 +32,26 @@ steps:
     outcomes:
       approve: { to: $done, means: "good" }
       rework: { to: implement, counter: review_loop, means: "fix it" }
+counters: { review_loop: { max: 3 } }
+`;
+/** rv's steps in a shared file, and rv bringing them in with `use:`. */
+const RV_CORE = `start: implement
+steps:
+  implement:
+    type: agent
+    skill: norn-implement
+    outcomes: { done: { to: review, means: "built" } }
+  review:
+    type: agent
+    skill: norn-review
+    outcomes:
+      approve: { to: $done, means: "good" }
+      rework: { to: implement, counter: review_loop, means: "fix it" }
+`;
+const RV_USING = `name: rv
+start: core
+steps:
+  core: { use: rvcore }
 counters: { review_loop: { max: 3 } }
 `;
 const CONFIG = "provider: gh\nworkflow: rv\nmode: auto\n";
@@ -332,6 +352,63 @@ describe("a lost-record checkout that cannot start the round takes nothing (revi
     expire(s.key);
     const B = cloneOf(h, "b-badwf", "bob");
     nothingTaken(B, s, await B.norn("story", "checkout", s.key), "workflow_invalid");
+  });
+
+  test("a workflow on the branch whose name is not its file name: refused workflow_invalid as the listing reports it, nothing taken", async () => {
+    const s = await heldThenSilent(25, "misnamed-wf", 0);
+    onBranch(s, (wt) => writeFileSync(join(workflowsDir(wt), "rv.yaml"), RV.replace("name: rv", "name: other")));
+    expire(s.key);
+    const B = cloneOf(h, "b-misnamed", "bob");
+    const r = await B.norn("story", "checkout", s.key);
+    nothingTaken(B, s, r, "workflow_invalid");
+    expect((r.value as { error: string }).error).toContain("must equal the file name 'rv'");
+  });
+
+  test("the restart pins the branch's workflow with the fingerprint the listing gives it", async () => {
+    const s = await heldThenSilent(26, "same-hash", 0);
+    expire(s.key);
+    const B = cloneOf(h, "b-samehash", "bob");
+    expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
+    const listed = loadWorkflow(s.wt(h.root), "rv");
+    if (!listed.ok) throw new Error("rv does not load on the branch");
+    expect(state(s.runs(B.root))?.workflow_hash).toBe(listed.value.hash);
+    expect(readFileSync(join(s.runs(B.root), "workflow.yaml"), "utf8")).toBe(listed.value.source);
+  });
+
+  test("the restart flattens the shared file on the branch, not the one in the work tree", async () => {
+    const s = await heldThenSilent(27, "shared-wf", 0);
+    const branchCore = RV_CORE.replace('means: "built"', 'means: "built on the branch"');
+    onBranch(s, (wt) => {
+      writeFileSync(join(workflowsDir(wt), "rv.yaml"), RV_USING);
+      mkdirSync(join(workflowsDir(wt), "shared"), { recursive: true });
+      writeFileSync(join(workflowsDir(wt), "shared/rvcore.yaml"), branchCore);
+    });
+    expire(s.key);
+    const B = cloneOf(h, "b-sharedwf", "bob");
+    // B's work tree holds another text of the shared file: the branch's wins
+    mkdirSync(join(workflowsDir(B.root), "shared"), { recursive: true });
+    writeFileSync(join(workflowsDir(B.root), "shared/rvcore.yaml"), RV_CORE.replace('means: "built"', 'means: "built in the work tree"'));
+    expect((await B.norn("story", "checkout", s.key)).exit).toBe(0);
+    const pinned = readFileSync(join(s.runs(B.root), "workflow.yaml"), "utf8");
+    expect(pinned).toContain("built on the branch");
+    expect(pinned).not.toContain("use:");
+    const listed = loadWorkflow(s.wt(h.root), "rv");
+    if (!listed.ok) throw new Error("rv does not load on the branch");
+    expect(pinned).toBe(listed.value.source);
+    expect(state(s.runs(B.root))?.workflow_hash).toBe(listed.value.hash);
+  });
+
+  test("a shared file missing on the branch: refused workflow_invalid naming it, nothing taken", async () => {
+    const s = await heldThenSilent(28, "shared-missing", 0);
+    onBranch(s, (wt) => writeFileSync(join(workflowsDir(wt), "rv.yaml"), RV_USING));
+    expire(s.key);
+    const B = cloneOf(h, "b-sharedmissing", "bob");
+    // present in the work tree, which the restart never reads
+    mkdirSync(join(workflowsDir(B.root), "shared"), { recursive: true });
+    writeFileSync(join(workflowsDir(B.root), "shared/rvcore.yaml"), RV_CORE);
+    const r = await B.norn("story", "checkout", s.key);
+    nothingTaken(B, s, r, "workflow_invalid");
+    expect((r.value as { error: string }).error).toContain("shared/rvcore.yaml");
   });
 
   test("S5: a story not started on the branch (frontmatter new): no record lost; B takes the claim and its tick starts the story", async () => {

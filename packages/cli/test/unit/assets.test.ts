@@ -1,12 +1,13 @@
 /** Content installed by `norn init`: workflow templates, skills, repo config template. */
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { protocolLines } from "@norn/core";
+import { protocolLines, workflowHash } from "@norn/core";
 import { DEFAULT_CONFIG, type Workflow, outcomeEdge, validate } from "@norn/schema";
+import { loadWorkflow as loadRepoFile, loadWorkflows, workflowsDir } from "@norn/store";
 import { parseWaitCondition } from "@norn/view";
-import { parse } from "yaml";
+import { parse, parseDocument, visit } from "yaml";
 import { type AssetsSources, assetsDir, resolveAssetsDir } from "../../src/runtime/assets.ts";
 
 const ASSETS = join(import.meta.dir, "..", "..", "assets");
@@ -42,7 +43,33 @@ const CRAFT = SKILLS.filter((s) => s !== "norn" && !SUPERVISOR.includes(s));
 
 const readSkill = (name: string) => readFileSync(join(SKILLS_DIR, name, "SKILL.md"), "utf8");
 const workflowFiles = readdirSync(WORKFLOWS_DIR).filter((f) => /\.(ya?ml|json)$/.test(f));
-const loadWorkflow = (f: string) => parse(readFileSync(join(WORKFLOWS_DIR, f), "utf8")) as Workflow;
+const sharedFiles = readdirSync(join(WORKFLOWS_DIR, "shared"));
+/** The templates as norn loads them once `norn init` has copied them into a repo: through the store's loader. */
+const TEMPLATES_ROOT = mkdtempSync(join(tmpdir(), "norn-templates-"));
+cpSync(WORKFLOWS_DIR, workflowsDir(TEMPLATES_ROOT), { recursive: true });
+afterAll(() => rmSync(TEMPLATES_ROOT, { recursive: true, force: true }));
+const templates = loadWorkflows(TEMPLATES_ROOT);
+const loadWorkflow = (f: string): Workflow => {
+  const loaded = templates.workflows[f.replace(/\.(ya?ml|json)$/, "")];
+  if (!loaded) throw new Error(`${f} did not load: ${JSON.stringify(templates.errors)}`);
+  return loaded.workflow;
+};
+/** This repo's own copy of a workflow, as norn runs it: through the store's loader, its shared files brought in. */
+const repoWorkflow = (name: string): Workflow => {
+  const r = loadRepoFile(join(ASSETS, "..", "..", ".."), name);
+  if (!r.ok) throw new Error(`.agents/workflows/${name}.yaml did not load: ${JSON.stringify(r)}`);
+  return r.value.workflow;
+};
+const routeCount = (wf: Workflow) => Object.values(wf.steps).reduce((n, step) => n + Object.keys(step.outcomes ?? {}).length, 0);
+
+/**
+ * The meaning of each template a rewrite must keep, taken from the loader on the base before it: a changed
+ * route, counter or instruction changes the hash, formatting and key order never do.
+ */
+const PINNED_HASHES: Record<string, string> = {
+  quick: "78142b725e014c435e790c83c50f68c3186f0cc4c317873a1ff6c73bbcf749e9",
+  story: "887efb653b1edd5cb7513b215b816fc140c01154167c2b778bc91538cd2b7159",
+};
 
 /** Splits a SKILL.md into its YAML frontmatter and body. */
 function splitSkill(text: string): { meta: Record<string, unknown>; body: string } {
@@ -107,6 +134,40 @@ function uncountedCycle(wf: Workflow): string[] | null {
 }
 
 describe("workflow templates", () => {
+  test("load through the store's loader without errors", () => {
+    expect(templates.errors).toEqual([]);
+  });
+
+  test.each(Object.keys(PINNED_HASHES))("%s keeps its pinned meaning", (name) => {
+    expect(workflowHash(loadWorkflow(`${name}.yaml`))).toBe(PINNED_HASHES[name] as string);
+  });
+
+  test("quick has 29 routes and 8 counters, story 42 routes and 10 counters", () => {
+    const shape = (name: string) => {
+      const wf = loadWorkflow(`${name}.yaml`);
+      return { routes: routeCount(wf), counters: Object.keys(wf.counters ?? {}).length };
+    };
+    expect({ quick: shape("quick"), story: shape("story") }).toEqual({ quick: { routes: 29, counters: 8 }, story: { routes: 42, counters: 10 } });
+  });
+
+  test("the CI wait is written in exactly one bundled file, and copies are `like:` steps, never YAML anchors", () => {
+    const texts = Object.fromEntries([...workflowFiles, ...sharedFiles.map((f) => `shared/${f}`)].map((f) => [f, readFileSync(join(WORKFLOWS_DIR, f), "utf8")]));
+    expect(Object.keys(texts).filter((f) => texts[f]?.includes("gh pr checks") && texts[f]?.includes("--watch"))).toEqual(["shared/ship.yaml"]);
+    const anchored = (text: string) => {
+      let found = false;
+      visit(parseDocument(text), { Alias: () => void (found = true), Node: (_k, n) => void (n.anchor && (found = true)) });
+      return found;
+    };
+    expect(Object.keys(texts).filter((f) => anchored(texts[f] as string))).toEqual([]);
+    expect(Object.keys(texts).filter((f) => /^\s+like: /m.test(texts[f] as string))).toEqual(["shared/base-update.yaml"]);
+  });
+
+  test("quick and story take sync, base update and shipping from the shipped shared files", () => {
+    expect(sharedFiles.sort()).toEqual(["base-update.yaml", "ship.yaml", "sync.yaml"]);
+    const uses = (name: string) => Object.values(parse(readFileSync(join(WORKFLOWS_DIR, `${name}.yaml`), "utf8")).steps as Record<string, { use?: string }>).flatMap((s) => (s.use ? [s.use] : []));
+    expect({ quick: uses("quick"), story: uses("story") }).toEqual({ quick: ["sync", "base-update", "ship"], story: ["sync", "base-update", "ship"] });
+  });
+
   test("triage, reproduce, refinement, story, slice and quick are shipped", () => {
     expect(workflowFiles.sort()).toEqual(["quick.yaml", "refinement.yaml", "reproduce.yaml", "slice.yaml", "story.yaml", "triage.yaml"]);
   });
@@ -210,8 +271,7 @@ describe("single-purpose workflows (#136)", () => {
   });
 
   test("story's describe step reads the record, not runs/ in the worktree, here and in this repo's copy (B28)", () => {
-    const local = parse(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "workflows", "story.yaml"), "utf8")) as Workflow;
-    for (const w of [wf("story"), local]) expect(w.steps.describe).toMatchObject({ skill: "norn-pr", inputs: ["spec", "diff", "record"] });
+    for (const w of [wf("story"), repoWorkflow("story")]) expect(w.steps.describe).toMatchObject({ skill: "norn-pr", inputs: ["spec", "diff", "record"] });
     expect(readSkill("norn-pr")).toContain("`evidence/<unit>/<run_id>/<file>`");
   });
 
@@ -242,7 +302,7 @@ describe("single-purpose workflows (#136)", () => {
   });
 
   test("story, quick and release approve at ready into a merge step that goes back to update when stale, in both copies", () => {
-    const local = (name: string) => parse(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "workflows", `${name}.yaml`), "utf8")) as Workflow;
+    const local = repoWorkflow;
     const all = [wf("story"), wf("quick"), local("story"), local("quick"), local("release")];
     for (const w of all) {
       const ready = Object.fromEntries(Object.entries(w.steps.ready?.outcomes ?? {}).map(([o, e]) => [o, outcomeEdge(e as Parameters<typeof outcomeEdge>[0]).to]));
@@ -255,7 +315,7 @@ describe("single-purpose workflows (#136)", () => {
     const run = (name: string) => (wf(name).steps.ci as { run?: string }).run;
     expect(run("story")).toContain("gh pr checks");
     expect(run("quick")).toBe(run("story"));
-    const local = (name: string) => parse(readFileSync(join(ASSETS, "..", "..", "..", ".agents", "workflows", `${name}.yaml`), "utf8")) as Workflow;
+    const local = repoWorkflow;
     for (const w of [wf("story"), wf("quick"), local("story"), local("quick")]) {
       expect({ name: w.name, base: w.base }).toEqual({ name: w.name, base: { stale: "conflict", step: "update", verify: "test" } });
       expect({ name: w.name, verify: w.steps.test?.type }).toEqual({ name: w.name, verify: "check" });

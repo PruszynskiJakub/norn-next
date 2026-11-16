@@ -71,6 +71,24 @@ describe("workflows", () => {
     expect(loadWorkflow(repo, "nope")).toEqual({ ok: false, reason: "missing" });
   });
 
+  test("a workflow whose name is not its file name is listed broken, the name pointed at", () => {
+    const repo = tmp();
+    mkdirSync(workflowsDir(repo), { recursive: true });
+    writeFileSync(join(workflowsDir(repo), "story.yaml"), WORKFLOW_YAML);
+    const l = loadWorkflows(repo);
+    expect(l.workflows.story).toBeUndefined();
+    expect(l.errors[0]?.errors).toEqual([{ path: "/name", message: "must equal the file name 'story'" }]);
+    expect(loadWorkflow(repo, "story")).toMatchObject({ ok: false, reason: "corrupt" });
+  });
+
+  test("a loaded workflow pins its file's text byte for byte, fingerprinted by its sha256", () => {
+    const repo = tmp();
+    mkdirSync(workflowsDir(repo), { recursive: true });
+    const text = `# kept\n${WORKFLOW_YAML}`;
+    writeFileSync(join(workflowsDir(repo), "slice.yaml"), text);
+    expect(loadWorkflows(repo).workflows.slice).toMatchObject({ source: text, hash: sha256(text) });
+  });
+
   test("B25, B26: a workflow takes a top-level mode and a defaults block", () => {
     const repo = tmp();
     mkdirSync(workflowsDir(repo), { recursive: true });
