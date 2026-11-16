@@ -4,14 +4,16 @@ A route leaving a shared file through a named exit is counted by one derived cou
 
 ### Proof
 
-All in `packages/store/test/unit/derived-counters.test.ts` › "one counter per shared-file exit" (seam S1, through `loadWorkflowText` with shared texts), each red before the code:
-- AC1 three check `fail` edges behind `broken` share `base-update.broken` max 5 › "three check fail edges leaving through one exit share the counter `<use step>.<exit>` at 5"
-- AC2 reject-only → 2, stale-only → 10, `max: 3` on the use route → 3 › "an exit fed only by a gate's reject counts at 2, only by stale at 10; max: on the use route overrides it"; a non-deriving feeder stays uncounted, a use route to `$done`/`$stuck` derives nothing › "a feeder that derives nothing stays uncounted; …"
-- AC3 conflict feeders: max 2, reset on every other outcome of every feeder step › "an exit fed by conflict edges counts at 2 and resets …"
-- AC4 mixed check fail + gate reject refused at `/steps/<use>/outcomes/<exit>`, prefixed with the shared file, naming each kind with its edge; with `max: 4` both share it, no reset › "an exit fed by edges of different kinds is refused …"
-- extra: `max:` on a use route to `$done` refused at that route › "max: on a use route to $done is refused at that route"
-- AC5 `norn doctor --repo --json` reports the mixed exit prefixed with `shared/checked.yaml:` › `packages/cli/test/integration/derived-counters.test.ts` › "a shared exit fed by edges of different kinds, with no max: on its route, is reported prefixed with the shared file and naming the exit" (seam S4)
-- `bun run test` and `bun run typecheck` green.
+Traceability (review #1; seam S1 through `loadWorkflowText` with shared texts, seam S4 for doctor). Each test was read and seen to assert its item; `bun run test` (2108 pass) and `bun run typecheck` green at review.
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | three check `fail` edges leaving through exit `broken` of `base-update` pin one counter `base-update.broken`, max 5 | test | `packages/store/test/unit/derived-counters.test.ts` › "three check fail edges leaving through one exit share the counter `<use step>.<exit>` at 5" |
+| AC2 | a reject-only exit counts at 2, stale-only at 10, `max: 3` on the use route gives 3; a non-deriving feeder stays uncounted; a use route to `$done`/`$stuck` derives nothing | test | `packages/store/test/unit/derived-counters.test.ts` › "an exit fed only by a gate's reject counts at 2, only by stale at 10; max: on the use route overrides it" and "a feeder that derives nothing stays uncounted; a use route to $done or $stuck derives nothing" |
+| AC3 | a conflict-fed exit counts at 2 and resets on every other outcome of every feeder step | test | `packages/store/test/unit/derived-counters.test.ts` › "an exit fed by conflict edges counts at 2 and resets on every other outcome of every feeder step" |
+| AC4 | check fail + gate reject behind one exit, no `max:`, is refused at the use route naming the exit, its use step and each kind with its edge; with `max:` both share it, no reset | test | `packages/store/test/unit/derived-counters.test.ts` › "an exit fed by edges of different kinds is refused at the use route without max:, and shares max: with no reset when given" |
+| AC5 | `norn doctor` reports the mixed-kind refusal prefixed with the shared file, naming the exit | test | `packages/cli/test/integration/derived-counters.test.ts` › "a shared exit fed by edges of different kinds, with no max: on its route, is reported prefixed with the shared file and naming the exit" (integration tier: runs in CI) |
+| — | extra: `max:` on a use route to `$done` is refused at that route | test | `packages/store/test/unit/derived-counters.test.ts` › "max: on a use route to $done is refused at that route: there is no loop to bound" |
 
 ### Easy to miss
 
@@ -21,7 +23,8 @@ All in `packages/store/test/unit/derived-counters.test.ts` › "one counter per 
 
 ### Not proven yet
 
-- AC5's integration test was not run locally (the brief keeps the integration tier for CI); it type-checks and mirrors slice 02's doctor tests.
+- AC5's integration test was read, not run (the integration tier runs in CI only); CI must show it green.
+- Agent feeders of a shared exit (derive together when one lies on an uncounted loop) have no test; review note, not blocking.
 
 ### Notes
 
@@ -31,4 +34,4 @@ All in `packages/store/test/unit/derived-counters.test.ts` › "one counter per 
 
 ### Resume
 
-Slice done; next is review of gh-345/03.
+Review approved with two minor notes (findings in the review receipt); next is integrating gh-345/03 into the story branch.
