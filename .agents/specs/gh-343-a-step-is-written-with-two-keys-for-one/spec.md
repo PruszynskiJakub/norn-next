@@ -13,7 +13,7 @@ labels:
   - norn:risk:high
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-11-16T15:23:54.534Z
 body_hash: 7fbc55d648d29da4c82b1f01627eee670941563520c70a99287cf49a8e7474ca
 refined_body_hash: 7fbc55d648d29da4c82b1f01627eee670941563520c70a99287cf49a8e7474ca
@@ -71,6 +71,13 @@ criteria:
   - { id: 09.AC8, verifier: agent }
   - { id: 10.AC1, verifier: agent }
   - { id: 10.AC2, verifier: test }
+merge:
+  pr: 353
+  url: https://github.com/PruszynskiJakub/norn-next/pull/353
+  head_sha: 2b42ac7ea033bdec33718f41a9a7c4174b23a429
+  merge_commit_sha: bce18d34b2ce34e3ec32375c9d4bf6194d655751
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-16T18:02:41.000Z
 ---
 
 # A step is written with two keys for one fact, and an agent step must name a skill
