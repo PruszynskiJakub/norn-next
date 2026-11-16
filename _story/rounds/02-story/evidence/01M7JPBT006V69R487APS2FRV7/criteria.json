@@ -1,0 +1,280 @@
+[
+ {
+  "id": "01.AC1",
+  "verdict": "unverified",
+  "reason": "the cli integration tests for the trace, record and restart readers have not run on this head (last CI d01b9d7 had 3/4 integration shards red; no local integration runs)",
+  "how": "CI integration tier green on the pushed head; copy-read equality is shown in 04.AC12.md",
+  "evidence": "01.AC1.md"
+ },
+ {
+  "id": "01.AC2",
+  "verdict": "pass",
+  "evidence": "01.AC2.md"
+ },
+ {
+  "id": "02.AC1",
+  "verdict": "pass",
+  "evidence": "02.AC1.md"
+ },
+ {
+  "id": "02.AC2",
+  "verdict": "pass",
+  "evidence": "02.AC2.md"
+ },
+ {
+  "id": "02.AC3",
+  "verdict": "pass",
+  "evidence": "02.AC3.md"
+ },
+ {
+  "id": "02.AC4",
+  "verdict": "pass",
+  "evidence": "02.AC4.md"
+ },
+ {
+  "id": "02.AC5",
+  "verdict": "pass",
+  "evidence": "02.AC5.md"
+ },
+ {
+  "id": "02.AC6",
+  "verdict": "pass",
+  "evidence": "02.AC6.md"
+ },
+ {
+  "id": "03.AC1",
+  "verdict": "pass",
+  "evidence": "03.AC1.md"
+ },
+ {
+  "id": "03.AC2",
+  "verdict": "pass",
+  "evidence": "03.AC2.md"
+ },
+ {
+  "id": "03.AC3",
+  "verdict": "pass",
+  "evidence": "03.AC3.md"
+ },
+ {
+  "id": "03.AC4",
+  "verdict": "pass",
+  "evidence": "03.AC4.md"
+ },
+ {
+  "id": "03.AC5",
+  "verdict": "pass",
+  "evidence": "03.AC5.md"
+ },
+ {
+  "id": "03.AC6",
+  "verdict": "pass",
+  "evidence": "03.AC6.md"
+ },
+ {
+  "id": "03.AC7",
+  "verdict": "pass",
+  "evidence": "03.AC7.md"
+ },
+ {
+  "id": "03.AC8",
+  "verdict": "pass",
+  "evidence": "03.AC8.md"
+ },
+ {
+  "id": "03.AC9",
+  "verdict": "pass",
+  "evidence": "03.AC9.md"
+ },
+ {
+  "id": "04.AC1",
+  "verdict": "pass",
+  "evidence": "04.AC1.md"
+ },
+ {
+  "id": "04.AC2",
+  "verdict": "pass",
+  "evidence": "04.AC2.md"
+ },
+ {
+  "id": "04.AC3",
+  "verdict": "pass",
+  "evidence": "04.AC3.md"
+ },
+ {
+  "id": "04.AC4",
+  "verdict": "pass",
+  "evidence": "04.AC4.md"
+ },
+ {
+  "id": "04.AC5",
+  "verdict": "pass",
+  "evidence": "04.AC5.md"
+ },
+ {
+  "id": "04.AC6",
+  "verdict": "pass",
+  "evidence": "04.AC6.md"
+ },
+ {
+  "id": "04.AC7",
+  "verdict": "pass",
+  "evidence": "04.AC7.md"
+ },
+ {
+  "id": "04.AC8",
+  "verdict": "pass",
+  "evidence": "04.AC8.md"
+ },
+ {
+  "id": "04.AC9",
+  "verdict": "pass",
+  "evidence": "04.AC9.md"
+ },
+ {
+  "id": "04.AC10",
+  "verdict": "pass",
+  "evidence": "04.AC10.md"
+ },
+ {
+  "id": "04.AC11",
+  "verdict": "pass",
+  "evidence": "04.AC11.md"
+ },
+ {
+  "id": "04.AC12",
+  "verdict": "pass",
+  "evidence": "04.AC12.md"
+ },
+ {
+  "id": "04.AC13",
+  "verdict": "pass",
+  "evidence": "04.AC13.md"
+ },
+ {
+  "id": "05.AC1",
+  "verdict": "pass",
+  "evidence": "05.AC1.md"
+ },
+ {
+  "id": "05.AC2",
+  "verdict": "pass",
+  "evidence": "05.AC2.md"
+ },
+ {
+  "id": "05.AC3",
+  "verdict": "pass",
+  "evidence": "05.AC3.md"
+ },
+ {
+  "id": "05.AC4",
+  "verdict": "person",
+  "how": "Read the agent: lines in packages/cli/assets/workflows/*.yaml and judge whether each tells its step's purpose (see 05.AC4.md). human-qa#1 approved the orientations at ebc79fa; `git diff ebc79fa..HEAD -- packages/cli/assets/workflows .agents/workflows` is empty on this head, so confirm the same text.",
+  "evidence": "05.AC4.md"
+ },
+ {
+  "id": "06.AC1",
+  "verdict": "unverified",
+  "reason": "no CI run covers HEAD 3af53e1 (PR #353 head is d01b9d7, where integration shards 1, 2 and 4 failed); the integration tier is CI-only",
+  "how": "all four integration shards of PR #353 green once norn pushes this head",
+  "evidence": "06.AC1.md"
+ },
+ {
+  "id": "06.AC2",
+  "verdict": "pass",
+  "evidence": "06.AC2.md"
+ },
+ {
+  "id": "07.AC1",
+  "verdict": "pass",
+  "evidence": "07.AC1.md"
+ },
+ {
+  "id": "07.AC2",
+  "verdict": "pass",
+  "evidence": "07.AC2.md"
+ },
+ {
+  "id": "08.AC1",
+  "verdict": "pass",
+  "evidence": "08.AC1.md"
+ },
+ {
+  "id": "08.AC2",
+  "verdict": "pass",
+  "evidence": "08.AC2.md"
+ },
+ {
+  "id": "08.AC3",
+  "verdict": "pass",
+  "evidence": "08.AC3.md"
+ },
+ {
+  "id": "08.AC4",
+  "verdict": "pass",
+  "evidence": "08.AC4.md"
+ },
+ {
+  "id": "08.AC5",
+  "verdict": "unverified",
+  "reason": "the machine dir here had no units with pins, receipts or state (making them needs a remote); hash unchanged only on an empty run state",
+  "how": "integration upgrade-wording.test.ts \u203a 'units with pins, receipts and state\u2026' in CI, or start a unit with a fake remote, hash runs/, norn upgrade, hash again",
+  "evidence": "08.AC5.md"
+ },
+ {
+  "id": "09.AC1",
+  "verdict": "pass",
+  "evidence": "09.AC1.md"
+ },
+ {
+  "id": "09.AC2",
+  "verdict": "pass",
+  "evidence": "09.AC2.md"
+ },
+ {
+  "id": "09.AC3",
+  "verdict": "pass",
+  "evidence": "09.AC3.md"
+ },
+ {
+  "id": "09.AC4",
+  "verdict": "unverified",
+  "reason": "story edit on an existing story and intake of an old-workflow issue need a remote with stories",
+  "how": "integration old-wording.test.ts \u203a 'story edit --workflow refuses\u2026' and 'a tick starts no story on an old file\u2026' in CI",
+  "evidence": "09.AC4.md"
+ },
+ {
+  "id": "09.AC5",
+  "verdict": "unverified",
+  "reason": "driving a story on an old-wording pin to the end of its round needs a remote; the copy read keeps bytes and hash at library level",
+  "how": "integration old-wording.test.ts \u203a 'the pin loads, its text and hash stay\u2026' in CI",
+  "evidence": "09.AC5.md"
+ },
+ {
+  "id": "09.AC6",
+  "verdict": "unverified",
+  "reason": "norn story checkout with a lost record needs a remote story branch; the copy read is verbatim with an equal hash at library level",
+  "how": "integration takeover-record-lost.test.ts \u203a 'an old-wording workflow file on the branch\u2026' in CI",
+  "evidence": "09.AC6.md"
+ },
+ {
+  "id": "09.AC7",
+  "verdict": "pass",
+  "evidence": "09.AC7.md"
+ },
+ {
+  "id": "09.AC8",
+  "verdict": "pass",
+  "evidence": "09.AC8.md"
+ },
+ {
+  "id": "10.AC1",
+  "verdict": "pass",
+  "evidence": "10.AC1.md"
+ },
+ {
+  "id": "10.AC2",
+  "verdict": "pass",
+  "evidence": "10.AC2.md"
+ }
+]

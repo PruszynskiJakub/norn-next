@@ -1,0 +1,51 @@
+$ bun test --config=bunfig.e2e.toml --parallel --timeout=20000
+bun test v1.3.13 (bf2e2cec) 12x PARALLEL
+
+test/e2e/light-path.test.ts:
+272 |   // not Bun.spawnSync with pipes: under load it now and then returns exit 0 with an empty stdout (spawnSyncCaptured)
+273 |   // Bounded like every spawnSync in the spawning tiers (spawn-sync-bound.ts), with a message naming the call
+274 |   const timeoutMs = spawnSyncTimeoutMs();
+275 |   const r = spawnSyncCaptured(["git", ...args], { cwd, timeoutMs, ...(input === undefined ? {} : { stdin: new TextEncoder().encode(input) }) });
+276 |   if (r.exitedDueToTimeout) throw new Error(`git ${args.join(" ")} (${cwd}): timed out after ${timeoutMs} ms (killed)`);
+277 |   if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")} (${cwd}): ${r.stderr.toString()}`);
+                                        ^
+error: git clone -q -b main /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-mkRII5/remote.git /private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-mkRII5/sibling-zsv28pwruu (/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-mkRII5): fatal: failed to copy file to '/private/var/folders/rb/k1spzrcd5lx7cb_bkzqw529h0000gn/T/norn-cli-mkRII5/sibling-zsv28pwruu/.git/objects/b1/f2ccc27a1f2d0af634ca5b80f9ca33b979dc58': No such file or directory
+
+      at sh (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-343-a-step-is-written-with-two-keys-for-one/test/support/harness.ts:277:35)
+      at siblingMerge (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-343-a-step-is-written-with-two-keys-for-one/test/e2e/light-path.test.ts:57:3)
+      at <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-343-a-step-is-written-with-two-keys-for-one/test/e2e/light-path.test.ts:147:17)
+      at <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-343-a-step-is-written-with-two-keys-for-one/test/e2e/light-path.test.ts:93:5)
+      at async <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-343-a-step-is-written-with-two-keys-for-one/test/e2e/light-path.test.ts:146:22)
+(fail) light path after a base update > a merge the resolver resolved since the approval ends resolved; the resolver's done records its head [4166.21ms]
+73 |     const seen: string[] = [];
+74 |     for (let i = 0; i < max && !pred(); i++) {
+75 |       step();
+76 |       seen.push(...kinds(await h.tick()));
+77 |     }
+78 |     if (!pred()) throw new Error(`${label} not reached: ${JSON.stringify(h.state(runs()))}\n${seen.join("\n")}`);
+                                ^
+error: ready not reached: {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"light","workflow_hash":"268ad599a282011c56a295151cbd4a83c7b9fbd2cf30fbb39d42d021478a37f2","step":"$done","attempt":2,"visits":{"update":2,"test":1,"open-pr":2,"ready":2,"test-merge":1},"step_entered_at":"2099-01-15T10:02:40.000Z","status":"done","park":null,"counters":{"base_conflict_loop":0},"nudges_used":0,"retries_used":0,"applied_through":9,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"2099-01-15T10:02:40.000Z","receipt_id":"03PGFN6XG0R0B8XZ2252MWQY57"},"created_at":"2099-01-15T10:00:20.000Z","updated_at":"2099-01-15T10:02:50.000Z","last_tick_id":"03PGFN778GT7B0XG3JDRAFQ2BN","mode":"auto"}
+
+      at <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-343-a-step-is-written-with-two-keys-for-one/test/e2e/light-path.test.ts:78:28)
+      at async <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-343-a-step-is-written-with-two-keys-for-one/test/e2e/light-path.test.ts:90:11)
+      at async <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-343-a-step-is-written-with-two-keys-for-one/test/e2e/light-path.test.ts:165:21)
+(fail) light path after a base update > code committed since the approval (new implement work) takes the full path [3529.19ms]
+73 |     const seen: string[] = [];
+74 |     for (let i = 0; i < max && !pred(); i++) {
+75 |       step();
+76 |       seen.push(...kinds(await h.tick()));
+77 |     }
+78 |     if (!pred()) throw new Error(`${label} not reached: ${JSON.stringify(h.state(runs()))}\n${seen.join("\n")}`);
+                                ^
+error: ready not reached: {"version":1,"story":"gh-7","slice":null,"unit_dir":"_story","workflow":"light","workflow_hash":"268ad599a282011c56a295151cbd4a83c7b9fbd2cf30fbb39d42d021478a37f2","step":"$done","attempt":2,"visits":{"update":2,"test":1,"open-pr":2,"ready":2,"test-merge":1},"step_entered_at":"2099-01-15T10:02:40.000Z","status":"done","park":null,"counters":{"base_conflict_loop":0},"nudges_used":0,"retries_used":0,"applied_through":9,"run":null,"last_outcome":{"step":"ready","outcome":"approve","source":"human","at":"2099-01-15T10:02:40.000Z","receipt_id":"03PGFN6XG0R0B8XZ2252MWQY57"},"created_at":"2099-01-15T10:00:20.000Z","updated_at":"2099-01-15T10:02:50.000Z","last_tick_id":"03PGFN778GT7B0XG3JDRAFQ2BN","mode":"auto"}
+
+      at <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-343-a-step-is-written-with-two-keys-for-one/test/e2e/light-path.test.ts:78:28)
+      at async <anonymous> (/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-343-a-step-is-written-with-two-keys-for-one/test/e2e/light-path.test.ts:175:21)
+(fail) light path after a base update > a spec.md changed since the approval takes the full path [3382.30ms]
+
+ 78 pass
+ 3 fail
+ 688 expect() calls
+Ran 81 tests across 9 files. [66.67s]
+error: script "test:e2e" exited with code 1
+exit=1

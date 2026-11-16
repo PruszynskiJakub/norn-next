@@ -1,0 +1,20 @@
+import { loadWorkflows, loadWorkflowText } from "/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-343-a-step-is-written-with-two-keys-for-one/packages/store/src/index.ts";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+const sha = (t: string) => createHash("sha256").update(t).digest("hex");
+const r1 = "/private/tmp/claude-501/-Users-jakubpruszynski--norn-repos-norn-b68fe828-worktrees-gh-343-a-step-is-written-with-two-keys-for-one/f593cd44-d57f-4510-ba33-59b41242229e/scratchpad/qa/r1";
+const l: any = loadWorkflows(r1);
+const story = l.workflows.story;
+console.log("09.AC7 listing keys:", Object.keys(l));
+const s = story.value ?? story;
+const src: string = s.source ?? s.pinned?.source;
+console.log("story source has 'use:'?", /^\s+use:/m.test(src), "| old keys?", /^\s+(type|skill|instructions|run|prompt|action):/m.test(src), "| shared included:", JSON.stringify(s.included));
+console.log("steps in pinned source:", (src.match(/^  [a-z-]+:$/gm) ?? []).join(" "));
+console.log(src.split("\n").slice(0, 25).join("\n"));
+// 09.AC6 / 09.AC5: an old-wording file read as a copy
+const old = execFileSync("git", ["-C", "/Users/jakubpruszynski/.norn/repos/norn-b68fe828/worktrees/gh-343-a-step-is-written-with-two-keys-for-one", "show", "origin/main:packages/cli/assets/workflows/reproduce.yaml"], { encoding: "utf8" });
+const c: any = loadWorkflowText("reproduce", old, "branch:.agents/workflows/reproduce.yaml", "copy");
+console.log("\ncopy read of old reproduce.yaml ok:", c.ok, "source === branch text:", c.value?.source === old, "hash === sha256(branch text):", c.value?.hash === sha(old));
+const m: any = loadWorkflowText("reproduce", old, ".agents/workflows/reproduce.yaml", "checkout");
+console.log("same text read as main checkout:", m.ok, m.error?.message ?? JSON.stringify(m.error).slice(0, 200));
