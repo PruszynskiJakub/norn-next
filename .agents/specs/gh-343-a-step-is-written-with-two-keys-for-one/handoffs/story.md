@@ -73,13 +73,13 @@ QA #1 report: 47 pass, 0 fail. Golden decisions are identical to origin/main in 
 ## Not proven yet
 
 - 06.AC1, 07.AC1, 01.AC1: integration CI has not yet run green on this head.
-- Review #1's minor and nit findings are left as notes in the review receipt, as the brief asked.
+- Review #1's minor and nit findings stay as notes (review receipt).
 
 ## Notes
 
-- Review #1 F1 (an old copy with a blank instructions or prompt loaded as corrupt) is fixed in `packages/store/src/wording.ts`. A blank `instructions`, `prompt` or `description` counts as missing on both paths and falls back to today's text. A `like` copy's blank override is dropped. Tests: store `new-wording.test.ts` › "blank %s loads with today's fallback text"; `wording.test.ts` › "a blank instructions or prompt takes today's fallback text".
+- Review #1 F1 (an old copy with a blank instructions or prompt loaded as corrupt) is fixed in `packages/store/src/wording.ts`. A blank `instructions`, `prompt` or `description` counts as missing on both paths and falls back to today's text. Tests: store `new-wording.test.ts` › "blank %s loads with today's fallback text"; `wording.test.ts` › "a blank instructions or prompt takes today's fallback text".
 - Review #1 F2 (upgrade could stage broken YAML) is fixed. `translateYaml` re-parses its splice and requires it to deep-equal `translateWordingValue`; otherwise it refuses at the step that differs. Flow-edge prose is removed one run at a time, so removals never overlap. A multi-line `skill:` is refused. Tests: `wording.test.ts` › "a flow edge with uneven spacing…", "a skill written as a block scalar is refused…", "a rewrite that would load differently… is refused at its step".
-- That check now refuses minor #3's input (a `like` copy that repeats `type: agent`). It does not translate it.
+- The check refuses minor #3's input (a copy repeating `type: agent`) rather than fixing it.
 
 ## Resume
 
