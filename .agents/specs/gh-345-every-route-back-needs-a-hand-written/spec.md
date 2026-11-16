@@ -11,12 +11,46 @@ labels:
   - norn:kind:feature
   - norn:priority:medium
   - norn:risk:medium
-  - norn:wf:refinement
+  - norn:wf:story
 workflow: story
 status: active
 intake_at: 2026-11-16T18:42:38.834Z
 body_hash: 3f838c286b80dba0453f1d471d2c2076536a71ad272f588e78bbd5ade8d2e576
 refined_body_hash: 3f838c286b80dba0453f1d471d2c2076536a71ad272f588e78bbd5ade8d2e576
+criteria:
+  - { id: 01.AC1, verifier: test }
+  - { id: 01.AC2, verifier: test }
+  - { id: 01.AC3, verifier: test }
+  - { id: 02.AC1, verifier: test }
+  - { id: 02.AC2, verifier: test }
+  - { id: 02.AC3, verifier: test }
+  - { id: 02.AC4, verifier: test }
+  - { id: 02.AC5, verifier: test }
+  - { id: 02.AC6, verifier: test }
+  - { id: 02.AC7, verifier: test }
+  - { id: 02.AC8, verifier: test }
+  - { id: 02.AC9, verifier: test }
+  - { id: 02.AC10, verifier: test }
+  - { id: 02.AC11, verifier: test }
+  - { id: 02.AC12, verifier: agent }
+  - { id: 03.AC1, verifier: test }
+  - { id: 03.AC2, verifier: test }
+  - { id: 03.AC3, verifier: test }
+  - { id: 03.AC4, verifier: test }
+  - { id: 03.AC5, verifier: agent }
+  - { id: 04.AC1, verifier: test }
+  - { id: 04.AC2, verifier: test }
+  - { id: 04.AC3, verifier: test }
+  - { id: 04.AC4, verifier: test }
+  - { id: 04.AC5, verifier: test }
+  - { id: 04.AC6, verifier: test }
+  - { id: 04.AC7, verifier: test }
+  - { id: 05.AC1, verifier: test }
+  - { id: 05.AC2, verifier: test }
+  - { id: 05.AC3, verifier: test }
+  - { id: 05.AC4, verifier: agent }
+  - { id: 06.AC1, verifier: agent }
+  - { id: 06.AC2, verifier: test }
 ---
 
 # Every route back needs a hand-written named counter
