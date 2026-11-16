@@ -8,7 +8,7 @@ start: sync
 steps:
   sync:
     update-branch:
-    outcomes: { done: refine, conflict: { to: sync-resolve, counter: sync_conflict_loop } }
+    outcomes: { done: refine, conflict: sync-resolve }
   sync-resolve:
     agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
     skills: [norn-merge]
@@ -46,6 +46,3 @@ steps:
       done: $done
     means:
       done: "spec.md's Plan section has seams, a coverage table for every user story, prefactoring, decisions and risks"
-counters:
-  # resets each time sync merges cleanly: only repeated conflicts on one base move count
-  sync_conflict_loop: { max: 2, reset_on: sync.done }

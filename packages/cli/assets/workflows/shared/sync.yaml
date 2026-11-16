@@ -1,13 +1,13 @@
 # Shared steps — installed by `norn init`; edit freely. A workflow brings them in with `use: sync`.
 # Brings the story branch up to date with its base before any work starts, so the work starts from
 # the current base and a later update merges only what moved meanwhile.
-# Exit `synced`: the branch holds the base. The workflow declares `sync_conflict_loop`.
+# Exit `synced`: the branch holds the base.
 description: Bring the story branch up to date with its base before the work starts.
 start: sync
 steps:
   sync:
     update-branch:
-    outcomes: { done: { exit: synced }, conflict: { to: sync-resolve, counter: sync_conflict_loop } }
+    outcomes: { done: { exit: synced }, conflict: sync-resolve }
   sync-resolve:
     agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
     skills: [norn-merge]

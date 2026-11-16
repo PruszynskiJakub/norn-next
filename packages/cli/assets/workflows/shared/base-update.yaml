@@ -4,7 +4,7 @@
 # Change the `test` step's `check:` to your repo's test command; the light path's test steps copy it (`like: test`).
 # Exits: `tested` (the full path's test passed), `broken` (a test failed: implement's work, which then
 # takes the full path), `ship` (the light path is done: open the PR), `redescribe` (pr.md's merge
-# danger changed). The workflow declares `base_conflict_loop` and `resolution_loop`.
+# danger changed).
 description: Update the story branch from its base, test the merged tree, take the light path when only the base moved.
 start: update
 steps:
@@ -19,7 +19,7 @@ steps:
       done: test
       clean: test-merge
       resolved: test-resolution
-      conflict: { to: resolve, counter: base_conflict_loop }
+      conflict: resolve
   resolve:
     agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase."
     skills: [norn-merge]
@@ -51,7 +51,7 @@ steps:
     outcomes:
       approve:           { exit: ship }
       redescribe:        { exit: redescribe }
-      changes_requested: { to: resolve, counter: resolution_loop }
+      changes_requested: { to: resolve, max: 2 }
     means:
       approve: "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger"
       redescribe: "the resolution is sound, but the merge danger pr.md describes changed"

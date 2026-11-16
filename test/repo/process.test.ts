@@ -33,9 +33,9 @@ const PERSON_ONLY_SKILLS = ["issue", "release-start"];
  * changed route, counter or instruction changes the hash, formatting and key order never do.
  */
 const PINNED_HASHES: Record<string, string> = {
-  quick: "eb9fd98842371cffab594bf022e4e868ae8b1fb0059dd5444785d35780945979",
-  story: "00bd96729f6a11bfe15dae01ddb75a6ac01a6d713a1d4b5f0fc32b4eb161d8c3",
-  release: "8032f58290802bb801afd45308ccb2d785a3d61847d513cadda4bfe8ff60c682",
+  quick: "34f1bf0f2c75ceb2595cd426922df7ef77d9f6c2f7b59800e5f7820779cf5760",
+  story: "587de0db6a21c2aee790bcdca692417e3db673adf7367abc7777f516ae57a7ef",
+  release: "d09f12e78efbe1531a45b1170b2a0adea880104c086005334713d298530d2682",
 };
 
 function frontmatter(skill: string): Record<string, unknown> {

@@ -33,13 +33,13 @@ steps:
       replan: "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans with `norn story edit <story> --workflow refinement --at plan`"
   approve-slices:
     gate: "Review the slice files in the spec folder (edit them if needed). Approve to start the slices, or reject with what to change."
-    outcomes: { approve: slices, reject: { to: slice, counter: slice_loop } }
+    outcomes: { approve: slices, reject: { to: slice, max: 3 } }
   slices:
     slices:
     outcomes: { done: update, stuck: $stuck }
   base-update:
     use: base-update
-    outcomes: { tested: qa, failed: { to: implement, counter: test_loop }, merged: open-pr, redescribe: describe }
+    outcomes: { tested: qa, failed: implement, merged: open-pr, redescribe: describe }
   qa:
     agent: "The criteria are spec.md's frontmatter `criteria`; an id `<nn>.<id>` is criterion `<id>` of slice file `<nn>-*.md`, which says what it means."
     skills: [norn-qa]
@@ -84,7 +84,7 @@ steps:
     hand_back: { changes_requested: findings }
     outcomes:
       approve:           test
-      changes_requested: { to: implement, counter: review_loop }
+      changes_requested: implement
     means:
       approve: "the rework does what the findings and the story ask and nothing else, no blocking findings"
       changes_requested: "blocking findings in the receipt"
@@ -99,21 +99,13 @@ steps:
   # a red run's failures become last_check for implement, whose rework goes back through open-pr to the new head
   ship:
     use: ci
-    outcomes: { passed: ready, failed: { to: implement, counter: ci_loop }, stale: { to: update, counter: stale_loop } }
+    outcomes: { passed: ready, failed: { to: implement, max: 3 }, stale: { to: update, counter: stale_loop } }
   land:
     use: land
-    outcomes: { rejected: { to: implement, counter: ready_loop }, stale: { to: update, counter: stale_loop } }
+    outcomes: { rejected: implement, stale: { to: update, counter: stale_loop } }
 counters:
-  slice_loop: { max: 3 }
-  test_loop: { max: 5 }
-  ci_loop: { max: 3 }
+  # QA's fail and the person's reject at human-qa share one budget
   qa_loop: { max: 2 }
-  ready_loop: { max: 2 }
-  review_loop: { max: 3 }
-  # reset each time their update merges cleanly (on either path): only repeated conflicts on one base move count
-  sync_conflict_loop: { max: 2, reset_on: sync.done }
-  base_conflict_loop: { max: 2, reset_on: [update.done, update.clean, update.resolved] }
-  resolution_loop: { max: 2 }
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
 # update-branch re-enters update, not sync (the default would be the first update step); a base move

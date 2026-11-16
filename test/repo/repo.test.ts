@@ -594,8 +594,8 @@ describe("test layout (AGENTS.md)", () => {
       expect(steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
       expect(steps.ci?.type).toBe("check");
       expect(steps.ci?.run).toBe(ciScript("release"));
-      expect(steps.ci?.outcomes).toEqual({ pass: "ready", fail: { to: "implement", counter: "ci_loop" }, stale: { to: "update", counter: "stale_loop" } });
-      expect(counters.ci_loop).toEqual({ max: 3 });
+      expect(steps.ci?.outcomes).toEqual({ pass: "ready", fail: { to: "implement", counter: "ship.failed" }, stale: { to: "update", counter: "stale_loop" } });
+      expect(counters["ship.failed"]).toEqual({ max: 3 });
     }
   });
 
@@ -612,7 +612,8 @@ describe("test layout (AGENTS.md)", () => {
     expect(steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
     expect(steps.ci?.type).toBe("check");
     expect(steps.ci?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: { to: "update", counter: "stale_loop" } });
-    expect(steps.ready?.outcomes.reject).toEqual({ to: "prepare", counter: "ready_loop" });
+    expect(steps.ready?.outcomes.reject).toEqual({ to: "prepare", counter: "ready.reject" });
+    expect(counters["ready.reject"]).toEqual({ max: 2 });
     expect(steps.ready?.outcomes.approve).toBe("merge");
     expect(steps.merge).toEqual({ type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } });
     expect(counters.version_loop).toBeUndefined();
@@ -642,7 +643,7 @@ describe("the ci check waits for the ci.yml run of the PR's head commit (#125)",
 });
 
 describe("intake by kind", () => {
-  type Wf = { start: string; steps: Record<string, { type: string; skills?: string[]; instructions?: string; outcomes: Record<string, unknown> }> };
+  type Wf = { start: string; steps: Record<string, { type: string; skills?: string[]; instructions?: string; outcomes: Record<string, unknown> }>; counters?: Record<string, unknown> };
   const workflow = (wf: string) => repoWorkflow<Wf>(wf);
 
   const targets = (wf: string, step: string) => Object.fromEntries(Object.entries(workflow(wf).steps[step]?.outcomes ?? {}).map(([k, v]) => [k, (v as { to: string }).to]));
@@ -668,7 +669,16 @@ describe("intake by kind", () => {
     cpSync(join(PKGS, "cli", "assets", "workflows"), workflowsDir(root), { recursive: true });
     const listing = loadWorkflows(root);
     const shipped = (wf: string) => listing.workflows[wf]?.workflow as unknown as Wf;
-    const shape = (w: Wf) => ({ start: w.start, steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { type: step.type, skills: step.skills, outcomes: step.outcomes }])) });
+    // a counter's name follows the exit its edge leaves by, and the copies name their exits apart: compare its bound
+    const bounded = (w: Wf, outcomes: Record<string, unknown>) =>
+      Object.fromEntries(
+        Object.entries(outcomes).map(([o, e]) => {
+          if (typeof e !== "object" || e === null || !("counter" in e)) return [o, e];
+          const { counter, ...rest } = e as { counter: string };
+          return [o, { ...rest, bound: w.counters?.[counter] }];
+        }),
+      );
+    const shape = (w: Wf) => ({ start: w.start, steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { type: step.type, skills: step.skills, outcomes: bounded(w, step.outcomes) }])) });
     for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(workflow(wf)) }).toEqual({ wf, ...shape(shipped(wf)) });
   });
 
