@@ -2,7 +2,7 @@
 id: gh-342/02
 title: One store function turns workflow text into a loaded workflow
 depends_on: []
-status: active
+status: integrated
 criteria:
   - { id: AC1, verifier: test }
   - { id: AC2, verifier: test }
