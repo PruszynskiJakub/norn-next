@@ -4,13 +4,17 @@
 
 ### Proof
 
-All in `packages/cli/test/integration/upgrade-wording.test.ts` (integration tier, CI; run locally once as a single file: 7 pass, and 6 of 7 red with the rewrite call disabled — the rerun case passes either way, as it should):
-- AC1 old files rewritten, same loaded workflow, staged, listed under `workflows.rewritten` (`--json` and markdown) → "each old file is rewritten…", "the markdown report names the rewritten files".
-- AC2 one unplaceable comment: that file untouched, listed under `workflows.refused` with file, line, message; others rewritten; `norn_version` written; exit 0 → "that file is left as written…", "the markdown report names the refused file with its line".
-- AC3 second run changes no workflow file → "a second run changes no workflow file…".
-- AC4 all-new repo: none rewritten, no workflow line → "a repo whose files are all in the new wording…".
-- AC5 run state under the norn home's `runs/` hashes the same → "units with pins, receipts and state…".
-- `bun run test` (2033 pass) and `bun run typecheck` green; `bun run docs:emit` run (reference summary line).
+Review #1 (approve) traceability; all tests in `packages/cli/test/integration/upgrade-wording.test.ts` (integration tier, CI). The reviewer ran the three upgrade integration files locally: 23 pass. test#1 (`bun run test` + `bun run typecheck`) passed.
+
+| Criterion or story | What it says | Verifier | Proven by |
+| --- | --- | --- | --- |
+| AC1 | old workflow/shared files rewritten, load to the same workflow, staged, listed under `workflows.rewritten` in `--json` and markdown | test | `upgrade-wording.test.ts` › "each old file is rewritten to the new wording…", "the markdown report names the rewritten files" |
+| AC2 | a file with an unplaceable comment left as written, listed under `workflows.refused` (file, line, message); others rewritten; `norn_version` written; exit 0 | test | `upgrade-wording.test.ts` › "that file is left as written and listed…", "the markdown report names the refused file with its line" |
+| AC3 | a second upgrade changes no workflow file | test | `upgrade-wording.test.ts` › "a second run changes no workflow file and reports none rewritten" |
+| AC4 | an all-new-wording repo: none rewritten, no workflow change reported | test | `upgrade-wording.test.ts` › "a repo whose files are all in the new wording…" |
+| AC5 | run state in the machine dir hashes the same before and after | test | `upgrade-wording.test.ts` › "units with pins, receipts and state…" |
+| Story 34 | one command and one commit move workflow and shared files over | test | AC1 tests (staged alongside skills and `norn_version`) |
+| Story 38 (S6 part) | an unplaceable comment refuses that file only; the others are still rewritten | test | AC2 tests |
 
 ### Easy to miss
 
