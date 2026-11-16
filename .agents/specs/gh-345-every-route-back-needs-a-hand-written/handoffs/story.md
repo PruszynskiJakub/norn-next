@@ -1,36 +1,36 @@
 #### Goal
 
-Derived default counters for workflow edges (`<step>.<outcome>`, `<use step>.<exit>`, `max:` on the edge). The spec and Plan are agreed. The Plan is now cut into six slices that await the person's approval.
+Derived default counters for workflow edges (`<step>.<outcome>`, `<use step>.<exit>`, `max:` on the edge). All six slices are built and integrated. Story QA has run.
 
 #### Proof
 
-- spec.md: 32 user stories, Plan (seams S1–S4, decisions D1–D11). Its frontmatter `criteria` lists every slice criterion, prefixed `01.AC1` … `06.AC2`.
-- slices/: six slice files. Every user story is cited by some slice's acceptance:
-  1. `01` Shared-exit routes kept after flattening, plus the invariant table of today's shipped counting. Prefactor, no behaviour change. Depends on nothing.
-  2. `02` Derive a counter per edge at load: defaults, `max:` on the edge, its refusals, dotted names valid where stored, doctor (a cli integration test over `norn doctor`). Depends on 01.
-  3. `03` One derived counter per shared-file exit, and the mixed-kind refusal, with doctor reporting it (a cli integration test). Depends on 01 and 02.
-  4. `04` Derived counters in the park, brief, status, story view and rerun, plus the `integrate.conflict` bound. Depends on 02.
-  5. `05` Shipped workflows drop default counters, and the golden cases are updated, and `docs:emit` rewrites the emitted reference. Depends on 01 and 03.
-  6. `06` Docs for derived counters. Depends on 05.
-- Critical path: 01 → 02 → 03 → 05 → 06 (5 slices). Startable at once: 01 only. 04 runs beside 03 once 02 is in.
+QA (qa#1) checked all 33 slice criteria through the dev CLI and the loader. 32 are `pass` and 1 is `person`. The evidence pack is in the run's evidence (criteria.json, report.md, one `<id>.md` per criterion):
+- **Pins of today's workflows:** all 13 of today's files, bundled and repo with release, pin byte for byte the same under the base loader and the head loader.
+- **Invariant table:** a counting table built without counter names shows the edited shipped files bound the same edges as today. The one difference is `integrate.conflict` also resetting on `integrate.done`. A changed bound makes `shipped-workflow-counting.test.ts` fail (checked with a mutation, then reverted).
+- **Derivation:** every row and refusal was checked on crafted workflows (evidence `derive-workflows/`, `derive-loaded.json`): check fail and exits outcomes 5, reject 2, conflict 2 with its reset, stale 10, agent send-back 3, `max:` on an edge, max+counter refused, max to `$done`/`$stuck` refused, dotted declared names refused, shared-exit counters, and the mixed-kind refusal.
+- **norn doctor (dev build) in a throwaway repo:** it passes all-default workflows and the bundled ones. It reports each refusal with its edge or exit (`doctor-ok.txt`, `doctor-bad.txt`).
+- **Running unit (harness through the CLI, `04-run.md`):**
+  - An exhausted park and the Unblock item name `review.changes_requested`.
+  - A machine that doesn't hold the unit sees it in `norn status` and `norn story view` as `review.changes_requested 1/3`.
+  - `rerun --reset review.changes_requested` works. An unknown name is refused, listing the counters the unit has.
+  - A unit pinned with `ready_loop` keeps that name.
+- **`integrate.conflict`:** it has the same bound as `conflict_loop` (`04.AC7.txt`).
+- **Golden cases:** `bun run golden -- --update` changed 0 of 139 cases, because they pin their own workflows. `docs:emit` leaves no diff, and the docs lints pass.
 
 #### Easy to miss
 
-- Derivation happens once, in the store's `loadWorkflowText`, before pinning (D1). A pin is never derived again. A file that derives nothing keeps its pin byte for byte (D2).
-- Dotted names become valid in state.json, receipts **and the pinned workflow.yaml**. This is one-way and goes in the PR's merge danger.
-- `stale_loop` stays shared wherever more than one edge shares it, and `qa_loop` stays too. A shared exit's counter covers only the feeders that derive a counter (D5). Rows 1–4 count an edge even when it lies on no loop (D4).
-- The invariant table (slice 01) is taken from today's files before any workflow file is edited. Shipped workflow edits go into both `packages/cli/assets/workflows/` and `.agents/workflows/` (release only in `.agents/`).
+- Derivation happens once, at load, before pinning. A file that derives nothing keeps its pin byte for byte.
+- Dotted names are valid in state.json, receipts and the pinned workflow.yaml. This is one-way: it belongs in the PR's merge danger.
+- The cycle check (`cycle without a counter`) runs in doctor and validation, not in `loadWorkflows`. A file with an uncounted loop still loads in the store listing.
 
 #### Not proven yet
 
-- All of it: nothing is built yet.
+- Criterion 04.AC2 (the brief warns `Last round on review.changes_requested (2/3)`) is `person`. The brief's last-round line names the derived counter and appears exactly one send-back before stuck, but it reads `(3/3)` with the counter at 3 of 3. At 2/3 the brief shows only `fix round … 2/3`. The threshold is the same as for named counters, and this story does not change it. A person confirms that the user story's intent is met, or rules otherwise.
 
 #### Notes
 
-- I checked the Plan against this base, and it holds: `loadWorkflowText` and `flattenWorkflowText` in store, `elementaryCycles` and `validateWorkflowDefinition` in core, the dotless `CounterName` in schema. `reproduce` and `triage` declare no counters, so slice 05 leaves them alone.
-- The schema change (dotted stored names, `max:` on an edge) is folded into slice 02, not cut as its own slice. This keeps the critical path at 3, and the change is small.
-- Rework after approve-slices rejected round 1: 02 now depends on 01 (the Plan puts the invariant table first), doctor criteria 02.AC12 and 03.AC5 are cli integration tests (seam S4), not agent checks, and 05 runs `bun run docs:emit` while 06 depends on 05, so the docs and the emitted reference follow the rules as built.
+- In the throwaway repo, doctor also reported `FAIL remote`, because gh has no auth under the sandboxed HOME. This has nothing to do with the story.
 
 #### Resume
 
-Next step: the person approves the slices. Then slice 01 starts; the rest follow by their dependencies.
+QA has reported `partial`. Next is the person's QA (human-qa) on the one `person` criterion, then describe.
