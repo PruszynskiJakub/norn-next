@@ -341,10 +341,14 @@ function listWorkflowFiles(root: string): Array<{ name: string; file: string }> 
     .map((n) => ({ name: n.slice(0, -extname(n).length), file: join(workflowsDir(root), n) }));
 }
 
-function loadFile(name: string, file: string, root: string): ReadResult<WorkflowFile> {
-  const raw = readText(file);
-  if (raw === null) return { ok: false, reason: "missing" };
-  const r = parseWorkflowText(raw, file, root);
+/**
+ * The text of the workflow file `file`, named `name` by its file name, as the workflow a unit pins:
+ * parsed, its `name` checked against `name`, with the `source` to pin and its `hash`. Every reader of a
+ * workflow file (the listing, a lost record's restart from its branch) goes through here so they pin
+ * the same thing.
+ */
+export function loadWorkflowText(name: string, text: string, file: string, root?: string): ReadResult<PinnedWorkflow> {
+  const r = parseWorkflowText(text, file, root);
   if (!r.ok) return r;
   if (r.value.name !== name)
     return {
@@ -352,7 +356,14 @@ function loadFile(name: string, file: string, root: string): ReadResult<Workflow
       reason: "corrupt",
       error: fileError(file, [{ path: "/name", message: `must equal the file name '${name}'` }], root),
     };
-  return { ok: true, raw, value: { name, file, workflow: r.value, hash: sha256(raw), source: raw } };
+  return { ok: true, raw: text, value: { workflow: r.value, hash: sha256(text), source: text } };
+}
+
+function loadFile(name: string, file: string, root: string): ReadResult<WorkflowFile> {
+  const raw = readText(file);
+  if (raw === null) return { ok: false, reason: "missing" };
+  const r = loadWorkflowText(name, raw, file, root);
+  return r.ok ? { ok: true, raw, value: { name, file, ...r.value } } : r;
 }
 
 /** Load and schema-validate every repo workflow; invalid files are reported, not thrown. */
