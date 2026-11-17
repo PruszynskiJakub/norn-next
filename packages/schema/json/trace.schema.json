@@ -357,6 +357,10 @@
                   "type": "string"
                 },
                 {
+                  "const": "background_wait",
+                  "type": "string"
+                },
+                {
                   "const": "session_end",
                   "type": "string"
                 }

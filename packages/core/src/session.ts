@@ -19,6 +19,8 @@ const HOOK_ACTIVITY: Record<HookEventKind, Activity> = {
   waiting_input: "waiting",
   permission_prompt: "waiting",
   turn_end: "turn_ended",
+  // the session is paused, not done: its background work reports back as a new turn
+  background_wait: "working",
   session_end: "ended",
 };
 

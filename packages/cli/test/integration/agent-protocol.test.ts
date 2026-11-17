@@ -539,7 +539,8 @@ describe("norn hook robustness", () => {
       const gh9 = facts.stories.find((s) => s.key === "gh-9")?.units[0];
       return { hooks, days, run9: gh9?.run?.hooks.map((f) => f.run_id) ?? [] };
     };
-    const own = (hookFileLines("gh-9").map((l) => JSON.parse(l) as HookTrace)).filter((e) => e.fact.run_id === run9);
+    // a turn end the hook refused never reaches the facts
+    const own = (hookFileLines("gh-9").map((l) => JSON.parse(l) as HookTrace)).filter((e) => e.fact.run_id === run9 && !(e.blocked && e.fact.event === "turn_end"));
     expect(own.length).toBeGreaterThan(0);
     // within the stalled window (15m): gh-10's file is read beside gh-9's, gh-404 (no unit) never
     h.clock.advance(14 * 60_000);
@@ -548,6 +549,38 @@ describe("norn hook robustness", () => {
     h.clock.advance(2 * 60_000);
     expect(await tick()).toEqual({ hooks: [file("gh-9")], days: [], run9: own.map(() => run9) });
     expect(h.state(runs())).toMatchObject({ status: "parked", run: { run_id: run9 } });
+  });
+
+  test("a turn end the hook refused, or one that waits on background work, is never silent", async () => {
+    h.report(runs(), "unstick", { to: "implement" }, "human");
+    h.clock.advance(10_000);
+    await h.tick();
+    const b = (await inWt(wt(), "brief", "--json")).value as { run_id: string };
+    const hookEvents = () => (readTrace(h.root, { types: ["hook"] }).events as HookTrace[]).filter((e) => e.fact.run_id === b.run_id);
+    const classified = () => receipts(runs()).filter((f) => f.endsWith("-classify.json"));
+    const before = classified();
+    h.clock.advance(1_000);
+    // the run's refusals are spent by now, so the refused Stop is traced as `norn hook` traces one
+    appendHookTrace(h.root, { story: "gh-9" }, { type: "hook", id: ulid(h.clock.now()), blocked: true, reason: "no report", fact: { event: "turn_end", at: h.clock.iso(), agent: "claude", native: "Stop", cwd: wt(), story: "gh-9", run_id: b.run_id, agent_session_id: "sess-1" } });
+    h.clock.advance(10_000);
+    await h.tick();
+    expect(classified()).toEqual(before);
+    // Claude Code lists the session's in-flight background work on Stop: the turn waits for it, so it is
+    // neither refused (no refusal spent) nor, with the idle notification after it, a turn end
+    h.clock.advance(1_000);
+    const subagent = { id: "a1", type: "subagent", status: "running", description: "Spec axis review", agent_type: "general-purpose" };
+    expect((await hook(wt(), "stop", { hook_event_name: "Stop", stop_hook_active: false, session_id: "sess-1", background_tasks: [subagent] })).value).toEqual({});
+    h.clock.advance(60_000);
+    await hook(wt(), "notification", { hook_event_name: "Notification", notification_type: "idle_prompt", message: "Claude is waiting for your input", session_id: "sess-1" });
+    expect(hookEvents().slice(-3).map((e) => [e.fact.event, e.blocked ?? false])).toEqual([
+      ["turn_end", true],
+      ["background_wait", false],
+      ["turn_end", false],
+    ]);
+    h.clock.advance(10_000);
+    await h.tick();
+    expect(classified()).toEqual(before);
+    expect(h.state(runs())).toMatchObject({ status: "running", step: "implement", nudges_used: 0 });
   });
 });
 

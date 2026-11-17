@@ -235,6 +235,10 @@ describe("classification", () => {
     expect(a).toMatchObject({ kind: "nudge", rule: "agent.silent.nudge", input: { session: { session_id: "s1" } }, snapshot: { transcript: "/t.jsonl" }, state: { nudges_used: 1, status: "running" } });
     expect(a.kind === "nudge" && a.receipts[0]?.receipt).toMatchObject({ kind: "classify", outcome: "silent", route: "nudge", counter: { name: "nudges", value: 1, max: 2 } });
   });
+  test("a turn ended to wait on background work is running, not silent", () => {
+    const hooks = [{ event: "background_wait" as const, at: at(T0 - 1000), agent: "claude", native: "Stop", cwd: "/w" }];
+    expect(kinds(facts([solo(running(), { hooks })]))).toEqual(["gh-1 noop agent.running"]);
+  });
   test("a turn end before the last nudge is not silent again", () => {
     const st = running({ nudges_used: 1, updated_at: at(T0 - 500) });
     expect(kinds(facts([solo(st, { hooks: [{ event: "turn_end", at: at(T0 - 1000), agent: "claude", native: "Stop", cwd: "/w" }] })]))).toEqual(["gh-1 noop agent.running"]);

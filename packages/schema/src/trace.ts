@@ -9,6 +9,8 @@ export const HookEventKind = Type.Union([
   Type.Literal("waiting_input"),
   Type.Literal("permission_prompt"),
   Type.Literal("turn_end"),
+  /** the turn ended while background work the session started (a subagent, a shell) is still in flight: it wakes the session again */
+  Type.Literal("background_wait"),
   Type.Literal("session_end"),
 ]);
 export type HookEventKind = Static<typeof HookEventKind>;
