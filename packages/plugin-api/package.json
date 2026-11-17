@@ -1,0 +1,11 @@
+{
+  "name": "@norn/plugin-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@norn/schema": "workspace:*",
+    "@sinclair/typebox": "^0.34.41"
+  }
+}

@@ -1,0 +1,176 @@
+{
+  "scenario": "permission-prompt",
+  "description": "A shell call waits for the person's permission while a parallel read finishes; the person approves it.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "SessionStart",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "SessionStart",
+        "source": "startup",
+        "model": "claude-opus-4-5"
+      }
+    },
+    {
+      "hook": "UserPromptSubmit",
+      "at": "2026-11-17T10:00:01.000Z",
+      "env": {
+        "NORN_PROMPT_SOURCE": "brief"
+      },
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Use the norn skill, then run `norn brief`."
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Read",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts"
+        },
+        "tool_use_id": "toolu_r1"
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "rm -rf build",
+          "description": "Clean the build"
+        },
+        "tool_use_id": "toolu_b1"
+      }
+    },
+    {
+      "hook": "Notification",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "Notification",
+        "message": "Claude needs your permission to use Bash",
+        "notification_type": "permission_prompt"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Read",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts"
+        },
+        "tool_response": {
+          "type": "text"
+        },
+        "tool_use_id": "toolu_r1"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:15:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "rm -rf build",
+          "description": "Clean the build"
+        },
+        "tool_response": {
+          "stdout": "",
+          "stderr": "",
+          "interrupted": false
+        },
+        "tool_use_id": "toolu_b1"
+      }
+    },
+    {
+      "hook": "Stop",
+      "at": "2026-11-17T10:15:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "Stop",
+        "stop_hook_active": false,
+        "last_assistant_message": "Cleaned the build."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 4,
+      "now": "2026-11-17T10:00:10.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pending_tools": 2
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T10:00:11.000Z",
+      "expect": {
+        "activity": "permission",
+        "permission": {
+          "prompt": "Claude needs your permission to use Bash"
+        }
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:10:00.000Z",
+      "expect": {
+        "activity": "permission",
+        "silent": false,
+        "pending_tools": 1,
+        "permission": {
+          "prompt": "Claude needs your permission to use Bash"
+        }
+      },
+      "why": "the parallel read finishing does not answer the shell call's prompt"
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T10:15:01.000Z",
+      "expect": {
+        "activity": "working",
+        "pending_tools": 0
+      },
+      "why": "the call the prompt was about ran, so the prompt was answered"
+    },
+    {
+      "after": 8,
+      "now": "2026-11-17T10:15:11.000Z",
+      "expect": {
+        "activity": "turn_ended"
+      }
+    }
+  ]
+}

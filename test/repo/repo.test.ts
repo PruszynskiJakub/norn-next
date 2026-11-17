@@ -18,6 +18,10 @@ const ALLOWED: Record<string, string[]> = {
   adapters: ["schema", "core", "store"],
   view: ["schema", "core", "store"],
   cli: ["schema", "core", "store", "adapters", "view"],
+  "plugin-api": ["schema"],
+  kernel: ["schema", "plugin-api"],
+  "harness-claude": ["schema", "plugin-api"],
+  conformance: ["schema", "plugin-api", "kernel"],
 };
 
 function files(dir: string): string[] {
@@ -921,6 +925,8 @@ const FS_WRITE = /\b(?:writeFileSync|appendFileSync|renameSync|cpSync|copyFileSy
 /** (a) S1: every file norn writes goes through store (atomic temp → fsync → rename). */
 const FS_WRITE_ALLOW: Counts = {
   "packages/cli/src/runtime/assets.ts": 2,
+  // the harness plugin writes the agent's own config file itself, temp → fsync → rename: it may not depend on store
+  "packages/harness-claude/src/files.ts": 1,
 };
 
 /** (b) raw git from store in cli: commands and runtime go through GitPort (4.1, 4.2). */
@@ -942,6 +948,7 @@ const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
   "packages/cli/src/commands/run-view.ts": [1, "clone: canonical JSON for the replay diff"],
   "packages/cli/src/runtime/detect.ts": [1, "file another tool owns: the repo's package.json"],
   "packages/cli/src/runtime/tick.ts": [1, "clone: trace-safe copy of facts"],
+  "packages/harness-claude/src/files.ts": [1, "file claude owns: .claude/settings.local.json"],
 };
 
 /** (d) processes are spawned by store and adapters only (ports perform effects). */

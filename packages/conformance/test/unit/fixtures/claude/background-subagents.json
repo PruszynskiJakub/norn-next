@@ -1,0 +1,239 @@
+{
+  "scenario": "background-subagents",
+  "description": "The agent launches two background subagents and waits for them through a long quiet stretch, before and after its own turn ends.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "SessionStart",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "SessionStart",
+        "source": "startup",
+        "model": "claude-opus-4-5"
+      }
+    },
+    {
+      "hook": "UserPromptSubmit",
+      "at": "2026-11-17T10:00:01.000Z",
+      "env": {
+        "NORN_PROMPT_SOURCE": "brief"
+      },
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Use the norn skill, then run `norn brief`."
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Agent",
+        "tool_input": {
+          "description": "Spec axis review",
+          "prompt": "Review the spec axis",
+          "subagent_type": "general-purpose",
+          "run_in_background": true
+        },
+        "tool_use_id": "toolu_bg1"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Agent",
+        "tool_input": {
+          "description": "Spec axis review",
+          "prompt": "Review the spec axis",
+          "subagent_type": "general-purpose",
+          "run_in_background": true
+        },
+        "tool_response": {
+          "status": "async_launched",
+          "agentId": "a1",
+          "description": "Spec axis review"
+        },
+        "tool_use_id": "toolu_bg1"
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:00:12.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Agent",
+        "tool_input": {
+          "description": "Standards axis review",
+          "prompt": "Review the standards axis",
+          "subagent_type": "general-purpose",
+          "run_in_background": true
+        },
+        "tool_use_id": "toolu_bg2"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:00:13.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Agent",
+        "tool_input": {
+          "description": "Standards axis review",
+          "prompt": "Review the standards axis",
+          "subagent_type": "general-purpose",
+          "run_in_background": true
+        },
+        "tool_response": {
+          "status": "async_launched",
+          "agentId": "a2",
+          "description": "Standards axis review"
+        },
+        "tool_use_id": "toolu_bg2"
+      }
+    },
+    {
+      "hook": "Stop",
+      "at": "2026-11-17T10:45:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "Stop",
+        "stop_hook_active": false,
+        "last_assistant_message": "Waiting for the two reviews.",
+        "background_tasks": [
+          {
+            "id": "a1",
+            "type": "subagent",
+            "status": "running",
+            "description": "Spec axis review",
+            "agent_type": "general-purpose"
+          },
+          {
+            "id": "a2",
+            "type": "subagent",
+            "status": "running",
+            "description": "Standards axis review",
+            "agent_type": "general-purpose"
+          }
+        ]
+      }
+    },
+    {
+      "hook": "Notification",
+      "at": "2026-11-17T10:46:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "Notification",
+        "message": "Claude is waiting for your input",
+        "notification_type": "idle_prompt"
+      }
+    },
+    {
+      "hook": "SubagentStop",
+      "at": "2026-11-17T11:30:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "SubagentStop",
+        "stop_hook_active": false,
+        "agent_id": "a1",
+        "agent_type": "general-purpose"
+      }
+    },
+    {
+      "hook": "SubagentStop",
+      "at": "2026-11-17T12:00:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "SubagentStop",
+        "stop_hook_active": false,
+        "agent_id": "a2",
+        "agent_type": "general-purpose"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 3,
+      "now": "2026-11-17T10:00:10.000Z",
+      "expect": {
+        "activity": "awaiting_subagents",
+        "subagents": 1,
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:00:13.000Z",
+      "expect": {
+        "activity": "awaiting_subagents",
+        "subagents": 2,
+        "pending_tools": 0
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:40:00.000Z",
+      "expect": {
+        "activity": "awaiting_subagents",
+        "silent": false,
+        "subagents": 2
+      },
+      "why": "forty minutes of quiet while the agent waits on its subagents is no silence"
+    },
+    {
+      "after": 8,
+      "now": "2026-11-17T11:23:20.000Z",
+      "expect": {
+        "activity": "awaiting_subagents",
+        "silent": false,
+        "subagents": 2
+      },
+      "why": "the turn ended, but background subagents outlive it and the idle notification does not end the wait"
+    },
+    {
+      "after": 9,
+      "now": "2026-11-17T11:40:00.000Z",
+      "expect": {
+        "activity": "awaiting_subagents",
+        "silent": false,
+        "subagents": 1
+      }
+    },
+    {
+      "after": 10,
+      "now": "2026-11-17T12:00:01.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "silent": false,
+        "subagents": 0
+      }
+    }
+  ]
+}

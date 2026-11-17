@@ -22,6 +22,10 @@
     "@norn/adapters": "workspace:*",
     "@norn/view": "workspace:*",
     "@norn/cli": "workspace:*",
+    "@norn/plugin-api": "workspace:*",
+    "@norn/kernel": "workspace:*",
+    "@norn/harness-claude": "workspace:*",
+    "@norn/conformance": "workspace:*",
     "@types/bun": "1.3.13",
     "typescript": "^5.9.3",
     "yaml": "^2.8.1"

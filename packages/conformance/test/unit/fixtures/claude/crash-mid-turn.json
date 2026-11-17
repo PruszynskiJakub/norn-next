@@ -1,0 +1,85 @@
+{
+  "scenario": "crash-mid-turn",
+  "description": "Claude Code dies in the middle of a shell call. It sends no hook for that, so the host records the end it detected.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "SessionStart",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "SessionStart",
+        "source": "startup",
+        "model": "claude-opus-4-5"
+      }
+    },
+    {
+      "hook": "UserPromptSubmit",
+      "at": "2026-11-17T10:00:01.000Z",
+      "env": {
+        "NORN_PROMPT_SOURCE": "brief"
+      },
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Use the norn skill, then run `norn brief`."
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "bun run build",
+          "description": "Build"
+        },
+        "tool_use_id": "toolu_01"
+      }
+    },
+    {
+      "host": {
+        "type": "session.ended",
+        "reason": "crash"
+      },
+      "at": "2026-11-17T10:02:00.000Z"
+    }
+  ],
+  "checks": [
+    {
+      "after": 3,
+      "now": "2026-11-17T10:01:00.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 4,
+      "now": "2026-11-17T10:02:01.000Z",
+      "expect": {
+        "activity": "ended",
+        "silent": false,
+        "pending_tools": 0
+      }
+    },
+    {
+      "after": 4,
+      "now": "2026-11-17T12:00:00.000Z",
+      "expect": {
+        "activity": "ended",
+        "silent": false,
+        "pending_tools": 0,
+        "subagents": 0
+      }
+    }
+  ]
+}

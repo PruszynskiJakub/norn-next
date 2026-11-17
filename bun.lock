@@ -7,7 +7,11 @@
       "devDependencies": {
         "@norn/adapters": "workspace:*",
         "@norn/cli": "workspace:*",
+        "@norn/conformance": "workspace:*",
         "@norn/core": "workspace:*",
+        "@norn/harness-claude": "workspace:*",
+        "@norn/kernel": "workspace:*",
+        "@norn/plugin-api": "workspace:*",
         "@norn/schema": "workspace:*",
         "@norn/store": "workspace:*",
         "@norn/view": "workspace:*",
@@ -27,7 +31,7 @@
     },
     "packages/cli": {
       "name": "@norn/cli",
-      "version": "0.13.0",
+      "version": "0.35.0",
       "bin": {
         "norn": "./src/main.ts",
       },
@@ -39,11 +43,47 @@
         "@norn/view": "workspace:*",
       },
     },
+    "packages/conformance": {
+      "name": "@norn/conformance",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/kernel": "workspace:*",
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+      },
+      "devDependencies": {
+        "@norn/harness-claude": "workspace:*",
+      },
+    },
     "packages/core": {
       "name": "@norn/core",
       "version": "0.0.0",
       "dependencies": {
         "@norn/schema": "workspace:*",
+      },
+    },
+    "packages/harness-claude": {
+      "name": "@norn/harness-claude",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+      },
+    },
+    "packages/kernel": {
+      "name": "@norn/kernel",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+      },
+    },
+    "packages/plugin-api": {
+      "name": "@norn/plugin-api",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/schema": "workspace:*",
+        "@sinclair/typebox": "^0.34.41",
       },
     },
     "packages/schema": {
@@ -79,7 +119,15 @@
 
     "@norn/cli": ["@norn/cli@workspace:packages/cli"],
 
+    "@norn/conformance": ["@norn/conformance@workspace:packages/conformance"],
+
     "@norn/core": ["@norn/core@workspace:packages/core"],
+
+    "@norn/harness-claude": ["@norn/harness-claude@workspace:packages/harness-claude"],
+
+    "@norn/kernel": ["@norn/kernel@workspace:packages/kernel"],
+
+    "@norn/plugin-api": ["@norn/plugin-api@workspace:packages/plugin-api"],
 
     "@norn/schema": ["@norn/schema@workspace:packages/schema"],
 

@@ -1,0 +1,189 @@
+{
+  "scenario": "person-types-in-pane",
+  "description": "The agent ends its turn on a question in prose; the person types the answer in the pane, then norn nudges once.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "SessionStart",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "SessionStart",
+        "source": "startup",
+        "model": "claude-opus-4-5"
+      }
+    },
+    {
+      "hook": "UserPromptSubmit",
+      "at": "2026-11-17T10:00:01.000Z",
+      "env": {
+        "NORN_PROMPT_SOURCE": "brief"
+      },
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Use the norn skill, then run `norn brief`."
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Read",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts"
+        },
+        "tool_use_id": "toolu_01"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Read",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts"
+        },
+        "tool_response": {
+          "type": "text"
+        },
+        "tool_use_id": "toolu_01"
+      }
+    },
+    {
+      "hook": "Stop",
+      "at": "2026-11-17T10:00:20.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "Stop",
+        "stop_hook_active": false,
+        "last_assistant_message": "Should the store use sqlite or postgres?"
+      }
+    },
+    {
+      "hook": "UserPromptSubmit",
+      "at": "2026-11-17T10:10:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "postgres"
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:10:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts",
+          "old_string": "a",
+          "new_string": "b"
+        },
+        "tool_use_id": "toolu_02"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:10:11.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts",
+          "old_string": "a",
+          "new_string": "b"
+        },
+        "tool_response": {
+          "success": true
+        },
+        "tool_use_id": "toolu_02"
+      }
+    },
+    {
+      "hook": "Stop",
+      "at": "2026-11-17T10:10:20.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "Stop",
+        "stop_hook_active": false,
+        "last_assistant_message": "Switched to postgres."
+      }
+    },
+    {
+      "hook": "UserPromptSubmit",
+      "at": "2026-11-17T10:20:00.000Z",
+      "env": {
+        "NORN_PROMPT_SOURCE": "nudge"
+      },
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Report the step with norn done."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 5,
+      "now": "2026-11-17T10:00:21.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "pane_answers": 0,
+        "last_message": "Should the store use sqlite or postgres?"
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:10:01.000Z",
+      "expect": {
+        "activity": "working",
+        "pane_answers": 1
+      }
+    },
+    {
+      "after": 9,
+      "now": "2026-11-17T10:10:21.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "pane_answers": 1,
+        "last_message": "Switched to postgres."
+      }
+    },
+    {
+      "after": 10,
+      "now": "2026-11-17T10:20:01.000Z",
+      "expect": {
+        "activity": "working",
+        "pane_answers": 1
+      },
+      "why": "a prompt norn sent is no answer from the pane"
+    }
+  ]
+}

@@ -1,0 +1,242 @@
+{
+  "scenario": "plain-done",
+  "description": "The agent works through a few tool calls, reports with `norn done` and ends its turn.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "SessionStart",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "SessionStart",
+        "source": "startup",
+        "model": "claude-opus-4-5"
+      }
+    },
+    {
+      "hook": "UserPromptSubmit",
+      "at": "2026-11-17T10:00:01.000Z",
+      "env": {
+        "NORN_PROMPT_SOURCE": "brief"
+      },
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Use the norn skill, then run `norn brief`."
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:00:05.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts",
+          "old_string": "a",
+          "new_string": "b"
+        },
+        "tool_use_id": "toolu_01"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:00:06.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts",
+          "old_string": "a",
+          "new_string": "b"
+        },
+        "tool_response": {
+          "success": true
+        },
+        "tool_use_id": "toolu_01"
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "bun run test",
+          "description": "Run the unit tier"
+        },
+        "tool_use_id": "toolu_02"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:01:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "bun run test",
+          "description": "Run the unit tier"
+        },
+        "tool_response": {
+          "stdout": "ok",
+          "stderr": "",
+          "interrupted": false
+        },
+        "tool_use_id": "toolu_02"
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:01:20.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "norn done",
+          "description": "Report the step"
+        },
+        "tool_use_id": "toolu_03"
+      }
+    },
+    {
+      "host": {
+        "type": "report.made",
+        "verb": "done",
+        "outcome": "approve"
+      },
+      "at": "2026-11-17T10:01:21.000Z"
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:01:22.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "norn done",
+          "description": "Report the step"
+        },
+        "tool_response": {
+          "stdout": "recorded",
+          "stderr": "",
+          "interrupted": false
+        },
+        "tool_use_id": "toolu_03"
+      }
+    },
+    {
+      "hook": "Stop",
+      "at": "2026-11-17T10:01:30.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "Stop",
+        "stop_hook_active": false,
+        "last_assistant_message": "Reported the step done."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 1,
+      "now": "2026-11-17T10:00:00.000Z",
+      "expect": {
+        "activity": "starting",
+        "silent": false
+      }
+    },
+    {
+      "after": 2,
+      "now": "2026-11-17T10:00:02.000Z",
+      "expect": {
+        "activity": "working",
+        "silent": false,
+        "pending_tools": 0
+      }
+    },
+    {
+      "after": 3,
+      "now": "2026-11-17T10:00:05.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 4,
+      "now": "2026-11-17T10:00:07.000Z",
+      "expect": {
+        "activity": "working",
+        "pending_tools": 0
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T10:00:40.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "silent": false,
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:01:15.000Z",
+      "expect": {
+        "activity": "working",
+        "silent": false
+      }
+    },
+    {
+      "after": 8,
+      "now": "2026-11-17T10:01:21.000Z",
+      "expect": {
+        "activity": "reported",
+        "report": {
+          "verb": "done",
+          "outcome": "approve"
+        }
+      }
+    },
+    {
+      "after": 10,
+      "now": "2026-11-17T11:00:00.000Z",
+      "expect": {
+        "activity": "reported",
+        "silent": false,
+        "report": {
+          "verb": "done",
+          "outcome": "approve"
+        },
+        "last_message": "Reported the step done.",
+        "pending_tools": 0,
+        "errors": []
+      }
+    }
+  ]
+}

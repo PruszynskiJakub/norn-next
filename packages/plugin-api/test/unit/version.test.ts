@@ -1,0 +1,38 @@
+import { describe, expect, test } from "bun:test";
+import { apiSatisfies, PLUGIN_API_VERSION } from "../../src/index.ts";
+
+describe("apiSatisfies", () => {
+  test("the running API is 1.0.0 and satisfies ^1", () => {
+    expect(PLUGIN_API_VERSION).toBe("1.0.0");
+    expect(apiSatisfies("^1")).toBe(true);
+    expect(apiSatisfies("^1.0")).toBe(true);
+    expect(apiSatisfies("^1.0.0")).toBe(true);
+  });
+
+  const table: Array<[range: string, version: string, expected: boolean]> = [
+    ["^1", "1.4.2", true],
+    ["^1.2", "1.2.0", true],
+    ["^1.2", "1.9.9", true],
+    ["^1.2", "1.1.9", false],
+    ["^1.2", "2.0.0", false],
+    ["^1.2.3", "1.2.2", false],
+    ["^1.2.3", "1.2.3", true],
+    ["^2", "1.9.0", false],
+    ["^0.3", "0.3.7", true],
+    ["^0.3", "0.4.0", false],
+    ["^0.0.3", "0.0.3", true],
+    ["^0.0.3", "0.0.4", false],
+    ["^0", "0.9.0", true],
+    ["^0", "1.0.0", false],
+    ["^0.0", "0.0.9", true],
+    ["^0.0", "0.1.0", false],
+  ];
+  for (const [range, version, expected] of table)
+    test(`${range} against ${version} → ${expected}`, () => {
+      expect(apiSatisfies(range, version)).toBe(expected);
+    });
+
+  test("anything but a caret range satisfies nothing", () => {
+    for (const range of ["1", "1.0.0", ">=1", "~1", "^", "^x", "^1.x", "^01", "*", ""]) expect({ range, ok: apiSatisfies(range) }).toEqual({ range, ok: false });
+  });
+});
