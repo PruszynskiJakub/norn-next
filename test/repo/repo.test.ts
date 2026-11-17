@@ -455,11 +455,14 @@ describe("test layout (AGENTS.md)", () => {
     expect(identity).toEqual(["integration", "e2e", "package"].map((n) => ({ n, name: true, email: true })));
   });
 
-  test("the latest released norn loads every non-release PR's tree, in a workflow of its own so a story's ci check never waits on it", () => {
+  test("the latest released norn loads every PR's tree but a release's, in a workflow of its own so a story's ci check never waits on it", () => {
     const wf = Bun.YAML.parse(readFileSync(join(ROOT, ".github", "workflows", "released-norn.yml"), "utf8")) as { on: Record<string, unknown>; jobs: Record<string, CiJob & { if?: string }> };
     expect(Object.keys(wf.on)).toEqual(["pull_request"]);
     const job = wf.jobs["released-norn"] as CiJob & { if?: string };
-    expect(job.if).toContain("!startsWith(github.event.pull_request.title, 'Release ')");
+    // a release PR is told by the norn version it records, never by its title (norn names the version after opening it)
+    expect(job.if).toBeUndefined();
+    expect(runs(job)).toContain("recorded=$(sed -n 's/^norn_version: *//p' .agents/norn.config.yaml)");
+    expect(runs(job)).toContain('if [ "$recorded" != "${tag#v}" ]; then');
     expect(runs(job)).toContainEqual(expect.stringContaining("gh release download --repo \"$GITHUB_REPOSITORY\" --pattern norn-linux-x64"));
     expect(runs(job)).toContainEqual(expect.stringContaining("norn-linux-x64\" doctor --repo"));
     expect(Object.keys(ciJobs("ci.yml"))).not.toContain("released-norn");
