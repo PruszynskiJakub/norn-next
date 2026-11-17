@@ -10,6 +10,7 @@
     "@norn/schema": "workspace:*"
   },
   "devDependencies": {
-    "@norn/harness-claude": "workspace:*"
+    "@norn/harness-claude": "workspace:*",
+    "@norn/store-local": "workspace:*"
   }
 }

@@ -1,5 +1,6 @@
 import type { ForgeFactory } from "./forge.ts";
 import type { Harness } from "./harness.ts";
+import { type StepKindDefinition, stepKindProblems } from "./step-kind.ts";
 import type { StoreFactory } from "./store.ts";
 import type { TrackerFactory } from "./tracker.ts";
 import { apiSatisfies, PLUGIN_API_VERSION } from "./version.ts";
@@ -13,6 +14,8 @@ export interface PluginProvides {
   tracker?: Record<string, TrackerFactory>;
   forge?: Record<string, ForgeFactory>;
   store?: Record<string, StoreFactory>;
+  /** workflow step kinds by head key (plugin API 1.3) */
+  stepKinds?: Record<string, StepKindDefinition>;
 }
 
 export interface NornPluginSpec {
@@ -30,6 +33,7 @@ export interface NornPlugin {
     tracker?: Readonly<Record<string, TrackerFactory>>;
     forge?: Readonly<Record<string, ForgeFactory>>;
     store?: Readonly<Record<string, StoreFactory>>;
+    stepKinds?: Readonly<Record<string, StepKindDefinition>>;
   }>;
 }
 
@@ -56,6 +60,11 @@ function checkFactory(slot: string): (plugin: string, key: string, f: TrackerFac
   };
 }
 
+function checkStepKind(plugin: string, key: string, k: StepKindDefinition): void {
+  const found = stepKindProblems(key, k);
+  if (found.length > 0) refuse(plugin, `step kind ${key} ${found.join("; ")}`);
+}
+
 function slot<T>(plugin: string, name: string, given: Record<string, T> | undefined, checkOne: (plugin: string, key: string, v: T) => void): Readonly<Record<string, T>> | undefined {
   if (given === undefined) return undefined;
   const out: Record<string, T> = {};
@@ -80,11 +89,13 @@ export function defineNornPlugin(spec: NornPluginSpec): NornPlugin {
   const tracker = slot(name, "tracker", spec.provides?.tracker, checkFactory("tracker"));
   const forge = slot(name, "forge", spec.provides?.forge, checkFactory("forge"));
   const store = slot(name, "store", spec.provides?.store, checkFactory("store"));
+  const stepKinds = slot(name, "step kind", spec.provides?.stepKinds, checkStepKind);
   const provides: NornPlugin["provides"] = {
     ...(harness && { harness }),
     ...(tracker && { tracker }),
     ...(forge && { forge }),
     ...(store && { store }),
+    ...(stepKinds && { stepKinds }),
   };
   return Object.freeze({ name, api: spec.api, provides: Object.freeze(provides) });
 }

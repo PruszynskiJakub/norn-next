@@ -4,8 +4,12 @@
   "private": true,
   "type": "module",
   "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "golden": "bun scripts/golden.ts"
+  },
   "dependencies": {
     "@norn/plugin-api": "workspace:*",
-    "@norn/schema": "workspace:*"
+    "@norn/schema": "workspace:*",
+    "@sinclair/typebox": "^0.34.41"
   }
 }

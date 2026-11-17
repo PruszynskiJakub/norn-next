@@ -59,6 +59,7 @@
       },
       "devDependencies": {
         "@norn/harness-claude": "workspace:*",
+        "@norn/store-local": "workspace:*",
       },
     },
     "packages/core": {
@@ -101,6 +102,7 @@
       "dependencies": {
         "@norn/plugin-api": "workspace:*",
         "@norn/schema": "workspace:*",
+        "@sinclair/typebox": "^0.34.41",
       },
     },
     "packages/plugin-api": {
