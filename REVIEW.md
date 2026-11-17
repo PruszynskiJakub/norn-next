@@ -28,6 +28,7 @@ A diff that touches any of these gets the security checklist:
 - **A persisted format that breaks old records.** A schema in `packages/schema/src/` changed so that a `state.json`, receipt, trace, claim or config an older norn wrote no longer validates or reads the same.
 - **A claim or lease race.** Two ticks or two checkouts can both believe they own a story, a slot or a lease (lease files are created with `O_EXCL`).
 - **A write that is not atomic.** A file norn writes outside store's temp file, fsync and rename; a receipt written after its effect; `state.json` not written last.
+- **A name from a file used before it is validated.** In `packages/store/`, a name or shape from a workflow or config file reaches the file system, becomes an object key (`__proto__`), or is mutated before its `@norn/schema` check.
 - **Core reaching for IO.** `fs`, `Bun.spawn`, `Date.now()` or a random id in `@norn/core`, instead of facts and `deriveUlid`.
 
 ## How to write a finding
