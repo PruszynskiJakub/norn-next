@@ -1,19 +1,24 @@
 /**
  * `norn watch`'s pause between ticks ends early when another process appends a
  * receipt (`norn done`, `ask`, `stuck`, `story answer`, a finished `norn check-run`): store's
- * `appendReceipt` rewrites the wake file in the checkout's machine dir, and the pause watches that dir.
+ * `appendReceipt` rewrites the wake file in the checkout's machine dir, and the pause polls that file.
  *
  * A tick's own receipts never wake the watch that made them: the pause takes the stamp it finds when it
  * starts, after the tick, as its baseline. A stamp that changed during the tick wakes at once, unless
  * this process wrote it (its pid). A change is followed by `WAKE_SETTLE_MS` of quiet so a burst of
- * writes is one tick. `fs.watch` failing (or missing an event) falls back to the interval.
+ * writes is one tick.
+ *
+ * It polls rather than `fs.watch`ing: on macOS, Bun's `FSWatcher.close()` keeps the directory's file
+ * descriptor, so a watcher per pause leaks one fd per tick until the process can no longer spawn `ps`.
  */
-import { type FSWatcher, watch } from "node:fs";
 import { machineDir, readWake } from "@norn/store";
 import type { Context } from "../context.ts";
 
 /** A burst of receipt writes (a report and its answer, a check's receipt and log) wakes one tick. */
 export const WAKE_SETTLE_MS = 250;
+
+/** How often the pause reads the wake file: a wake is seen within this, then settles. */
+export const WAKE_POLL_MS = 250;
 
 /** The wake stamp of `root`'s checkout now (null = none yet): what a tick started from. */
 export function wakeStamp(root: string): string | null {
@@ -35,21 +40,15 @@ export async function pauseUntilWake(ctx: Context, ms: number, since: string | n
   signal?.addEventListener("abort", onAbort, { once: true });
   let woke = false;
   let settle: ReturnType<typeof setTimeout> | null = null;
-  let watcher: FSWatcher | null = null;
-  try {
-    watcher = watch(machine, () => {
-      if (woke || (readWake(machine)?.stamp ?? null) === baseline) return;
-      woke = true;
-      settle = setTimeout(() => stop.abort(), WAKE_SETTLE_MS);
-    });
-    watcher.on("error", () => {});
-  } catch {
-    watcher = null; // no machine dir to watch: the interval alone
-  }
+  const poll = setInterval(() => {
+    if (woke || (readWake(machine)?.stamp ?? null) === baseline) return;
+    woke = true;
+    settle = setTimeout(() => stop.abort(), WAKE_SETTLE_MS);
+  }, WAKE_POLL_MS);
   try {
     if (!signal?.aborted) await ctx.sleep(ms, stop.signal);
   } finally {
-    watcher?.close();
+    clearInterval(poll);
     if (settle) clearTimeout(settle);
     signal?.removeEventListener("abort", onAbort);
   }
