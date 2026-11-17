@@ -1,16 +1,16 @@
 /**
  * ProcessPort: liveness by PID + start time. The start time and the zombie
- * rule come from store's one `ps -o stat= -o lstart=` parser (`parseStart`), shared with the
- * leases and locks, so both agree: a zombie is dead. The start time is kept opaque — only
+ * rule come from store's one `ps -o stat= -o lstart=` parser (`probeStart`), shared with the
+ * leases and locks, so both agree: a zombie is dead, and a probe that cannot answer is never dead. The start time is kept opaque — only
  * compared for equality, so a reused PID never looks like the original process.
  */
 import type { AdapterContext, ProcessPort } from "@norn/core";
 import type { ProcessIdentity } from "@norn/schema";
-import { PS_ENV, parseStart, processStart, psStartArgv, selfIdentity } from "@norn/store";
+import { PS_ENV, parseStart, probeAlive, probeStart, processStart, psStartArgv, selfIdentity } from "@norn/store";
 import { type Exec, unobservedExec } from "../exec.ts";
 
 export { type Exec, type ExecOptions, type ExecResult, bunExec, portError, shellJoin, shellQuote } from "../exec.ts";
-export { parseStart, psStartArgv } from "@norn/store";
+export { parseStart, probeStart, psStartArgv } from "@norn/store";
 
 /**
  * Every process with its environment appended to the command line. macOS (BSD ps) prints
@@ -51,8 +51,9 @@ export function createProcessPort(opts: ProcessPortOptions = {}): ProcessPort {
       return start === null ? null : { pid, pid_start: start };
     },
     async isAlive(proc) {
-      const now = await this.identify(proc.pid);
-      return now !== null && now.pid_start === proc.pid_start;
+      if (!Number.isInteger(proc.pid) || proc.pid <= 0) return false;
+      const r = await exec(psStartArgv(proc.pid), { env: PS_ENV });
+      return probeAlive(probeStart(r.stdout, r.code), proc);
     },
     async findByEnv(name, value) {
       const r = await exec(psEnvArgv(opts.platform), { env: PS_ENV });
