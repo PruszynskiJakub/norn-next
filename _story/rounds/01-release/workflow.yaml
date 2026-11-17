@@ -1,0 +1,103 @@
+name: release
+description: Write the changelog and propose the version, open the draft PR, wait for its CI, and let a person judge it at ready.
+start: prepare
+steps:
+  prepare:
+    agent: "Write the changelog section, the version bumps and the proposed version with its reason as the skill says; a version given in the issue's `## Version` or by the person in Rework wins over your proposal. Also write the PR body to pr.md in the spec folder: the proposed version, its reason and the new changelog section; norn puts the issue link under it. In the same diff as the bump, set `norn_version: X.Y.Z` in .agents/norn.config.yaml by editing the file (not with `norn upgrade`, which runs only in the main checkout) and copy packages/cli/assets/skills/norn* over .agents/skills/norn* as the skill says, so that once the PR merges the published binary is the one main asks for. Rename the issue to \"Release X.Y.Z\" with `gh issue edit`, the one remote write this step allows. Change no code."
+    skills:
+      - release
+    inputs:
+      - spec
+      - handoff
+    outcomes:
+      done: open-pr
+    means:
+      done: CHANGELOG.md, packages/cli/package.json, the README badge and norn_version in .agents/norn.config.yaml carry version X.Y.Z, .agents/skills/norn* match the bundled sources; pr.md and the handoff name it with its reason
+  update:
+    update-branch: null
+    outcomes:
+      done: prepare
+      conflict:
+        to: resolve
+        counter: update.conflict
+  resolve:
+    agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. CHANGELOG.md and version conflicts: keep the base side; prepare writes the release section again next."
+    skills:
+      - norn-merge
+    inputs:
+      - spec
+      - handoff
+    outcomes:
+      done: update
+    means:
+      done: base merged into the story branch, conflicts resolved and committed
+  open-pr:
+    open-pr: null
+    outcomes:
+      done: ci
+  ci:
+    check: |
+      sha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1
+      # GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story
+      # updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.
+      mergeable() {
+        m=UNKNOWN
+        for i in 1 2 3 4 5 6; do
+          m=$(gh pr view --json mergeable -q .mergeable) || return 1
+          [ "$m" != UNKNOWN ] && return 0
+          sleep 5
+        done
+      }
+      conflicting() { [ "$m" = CONFLICTING ] && echo "PR conflicts with its base: no CI runs on it until the branch takes the base"; }
+      mergeable || exit 1
+      conflicting && exit 3
+      run=
+      for i in $(seq 1 30); do
+        run=$(gh run list --workflow ci.yml --commit "$sha" --event pull_request --limit 1 --json databaseId -q '.[0].databaseId')
+        [ -n "$run" ] && break
+        sleep 10
+      done
+      if [ -z "$run" ]; then
+        mergeable || exit 1
+        conflicting && exit 3
+        echo "no ci.yml run for $sha after 5m (PR mergeable: $m)"
+        exit 1
+      fi
+      gh run watch "$run" --exit-status --interval 30 >/dev/null && exit 0
+      sh .agents/scripts/ci-failures.sh "$run"
+      exit 1
+    timeout: 30m
+    exits:
+      "3": stale
+    outcomes:
+      pass: ready
+      fail: $stuck
+      stale:
+        to: update
+        counter: stale_loop
+  ready:
+    gate: "Read the draft release PR: the proposed version and its reason, and the new CHANGELOG.md section. Approve to wait for the merge (a person merges the PR; CI then tags and publishes), or reject with the version or changelog changes you want."
+    outcomes:
+      approve: merge
+      reject:
+        to: prepare
+        counter: ready.reject
+      stale:
+        to: update
+        counter: stale_loop
+  merge:
+    await-merge: null
+    outcomes:
+      stale:
+        to: update
+        counter: stale_loop
+counters:
+  stale_loop:
+    max: 10
+  update.conflict:
+    max: 2
+    reset_on: update.done
+  ready.reject:
+    max: 2
+base:
+  stale: behind
