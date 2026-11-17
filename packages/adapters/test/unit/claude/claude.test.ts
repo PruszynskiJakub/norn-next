@@ -110,6 +110,18 @@ describe("claude refineHooks (§10 implicit ask shows the command)", () => {
     // another session's failed login does not swallow this session's idle notification
     expect(refine([{ ...loggedOut, agent_session_id: "zzz" }, idle])).toEqual([{ ...loggedOut, agent_session_id: "zzz" }, idle]);
   });
+  test("a Stop with background work in flight waits for it; its idle notification is no turn end until a new turn", () => {
+    const subagent = { id: "a1", type: "subagent", status: "running", description: "Spec axis review" };
+    const paused = f("stop", { ...payloads.Stop, background_tasks: [subagent] });
+    expect(paused).toMatchObject({ event: "background_wait", native: "Stop", message: "All tests pass." });
+    expect(f("stop", { ...payloads.Stop, background_tasks: [] })?.event).toBe("turn_end");
+    expect(f("stop", payloads.Stop)?.event).toBe("turn_end"); // older Claude Code sends no list
+    const prompt = f("user-prompt-submit", payloads.UserPromptSubmit);
+    const tool = f("pre-tool-use", payloads.PreToolUse);
+    const idle = f("notification", payloads.NotificationIdle);
+    // the subagent's own tool calls carry the session's id and keep the pause; its hand-back is a new turn
+    expect(refine([paused, tool, idle, prompt, idle])).toEqual([paused, tool, prompt, idle]);
+  });
 });
 
 describe("claude hookResponse", () => {

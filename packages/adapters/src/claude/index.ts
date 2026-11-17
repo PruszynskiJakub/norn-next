@@ -80,6 +80,12 @@ const STOP_FAILURE_EVENTS: Record<string, { event: HookEventKind; message: strin
   authentication_failed: { event: "waiting_input", message: "agent logged out — run `/login` in the pane" },
 };
 
+/** `Stop.background_tasks` holds an entry (Claude Code lists only running, pending or backgrounded work). */
+function inFlight(payload: unknown): boolean {
+  const work = typeof payload === "object" && payload !== null ? (payload as Record<string, unknown>).background_tasks : undefined;
+  return Array.isArray(work) && work.length > 0;
+}
+
 /** Notification without `notification_type` (older Claude Code): classify by the message text. */
 function untypedNotification(message: string | undefined): HookEventKind {
   if (/permission/i.test(message ?? "")) return "permission_prompt";
@@ -130,6 +136,9 @@ export function parseHookEvent(arg: string, payload: unknown, env: Record<string
     message = field(payload, "prompt");
   } else if (native === "Stop") {
     message = field(payload, "last_assistant_message"); // present in newer Claude Code versions
+    // Claude Code lists the session's in-flight background work here (empty when none): a turn that
+    // ends to wait for a background subagent is woken by its hand-back, so it has not ended
+    if (inFlight(payload)) event = "background_wait";
   } else if (native === "SessionStart" || native === "SessionEnd") {
     message = field(payload, native === "SessionStart" ? "source" : "reason");
   }
@@ -157,14 +166,21 @@ export function parseHookEvent(arg: string, payload: unknown, env: Record<string
  * - The idle notification that follows a failed login is dropped: the session went back to its
  *   prompt still logged out, and as a `turn_end` it would end the logged-out wait (and later be
  *   nudged) before anyone ran `/login`. The wait holds until the session's next other fact.
+ * - The idle notification after a `Stop` that left background work in flight (`background_wait`)
+ *   is dropped too: the session is paused until that work wakes it with a new turn. The pause holds
+ *   until the session's next fact other than a tool call.
  */
 function refineHooks(hooks: readonly HookFact[]): HookFact[] {
   const loggedOut = new Set<string | undefined>();
+  const paused = new Set<string | undefined>();
   return withPendingCommand(hooks).filter((h) => {
     if (h.agent !== NAME) return true;
-    if (h.native === "Notification" && h.event === "turn_end") return !loggedOut.has(h.agent_session_id);
+    if (h.native === "Notification" && h.event === "turn_end") return !loggedOut.has(h.agent_session_id) && !paused.has(h.agent_session_id);
     if (h.native === "StopFailure" && h.event === "waiting_input") loggedOut.add(h.agent_session_id);
     else loggedOut.delete(h.agent_session_id);
+    // a background subagent's own tool calls carry the session's id, so only a new turn ends the pause
+    if (h.event === "background_wait") paused.add(h.agent_session_id);
+    else if (h.event !== "tool_use") paused.delete(h.agent_session_id);
     return true;
   });
 }

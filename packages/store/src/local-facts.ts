@@ -193,7 +193,8 @@ export async function loadLocalFacts(root: string, opts: LocalFactsOptions): Pro
     return changed !== null && changed >= now - stalledMs;
   });
   const unitHooks = readUnitHooks(root, hooked.map((u) => u.unit), starts.sort()[0] as string);
-  const hooksOf = new Map(hooked.map((u, i) => [u, (unitHooks[i] ?? []).map((e) => e.fact)]));
+  // a turn end `norn hook` refused did not end the turn: the agent was sent back to work
+  const hooksOf = new Map(hooked.map((u, i) => [u, (unitHooks[i] ?? []).filter((e) => !(e.blocked && e.fact.event === "turn_end")).map((e) => e.fact)]));
   const drift = skillsDriftOf(opts);
   let refs: Map<string, string> | undefined;
   const stories = placed.map(({ s, storyWt, units: us }): LocalStory => {
