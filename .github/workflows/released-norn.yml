@@ -1,0 +1,40 @@
+# The latest released norn loads each PR's tree, as a machine still on it will after the merge: a change
+# that rewrites the repo's own workflows or config into a format that norn refuses leaves this checkout
+# unable to start a round, release included, until a norn built from the change is installed.
+# Its own workflow, never a job of ci.yml: a story's `ci` check waits on the ci.yml run, and such a
+# change is meant, not a failure to send back. Release PRs skip it: they change the norn version the
+# repo records, which the released norn refuses by design.
+name: released norn
+
+on:
+  pull_request:
+
+concurrency:
+  group: released-norn-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  released-norn:
+    if: ${{ !startsWith(github.event.pull_request.title, 'Release ') }}
+    name: released norn
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the latest released norn
+        run: |
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern norn-linux-x64 --pattern SHA256SUMS --dir "$RUNNER_TEMP/norn"
+          (cd "$RUNNER_TEMP/norn" && grep ' norn-linux-x64$' SHA256SUMS | sha256sum -c -)
+          chmod +x "$RUNNER_TEMP/norn/norn-linux-x64"
+      - name: The released norn reads this tree
+        run: |
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          if ! NORN_HOME_DIR="$RUNNER_TEMP/norn-home" "$RUNNER_TEMP/norn/norn-linux-x64" doctor --repo; then
+            echo "::error title=released norn::norn ${tag#v} cannot read this tree. Name it as merge danger in the PR, and install a norn built from this change before the next round starts in this checkout."
+            exit 1
+          fi

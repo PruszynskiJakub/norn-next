@@ -76,7 +76,7 @@ One entry per user story, in spec order, each at most three lines, headed by wha
 
 ### Merge danger
 
-- **Door.** Two-way: a revert undoes it completely (code, UI, a feature behind a flag). One-way: a revert leaves something behind — a migration that drops or rewrites data, a published API or file format others now depend on, deleted files or branches, messages already sent.
+- **Door.** Two-way: a revert undoes it completely (code, UI, a feature behind a flag). One-way: a revert leaves something behind — a migration that drops or rewrites data, a published API or file format others now depend on, deleted files or branches, messages already sent. Count the readers older than the change: a file it rewrites in a new format (a config, a pipeline definition, stored data) is one-way for every reader not yet upgraded, so say which one to upgrade first.
 - **Blast radius.** Who notices if this is wrong, in one or two words (`none`, `one screen`, `every user`, `API consumers`, `CI`), then the concrete ways it could hurt: layout shift, a breaking change for callers, slower startup, a changed default.
 
 Say low risk when it is low. A reviewer stops reading danger sections that always cry wolf.
