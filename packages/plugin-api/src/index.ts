@@ -6,6 +6,7 @@ export * from "./json.ts";
 export * from "./plugin.ts";
 export * from "./provider.ts";
 export * from "./result.ts";
+export * from "./store.ts";
 export * from "./story-key.ts";
 export * from "./tracker.ts";
 export * from "./version.ts";

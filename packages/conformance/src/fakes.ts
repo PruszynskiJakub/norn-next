@@ -87,6 +87,26 @@ export function steppingClock(start: string, stepMs = 1000): () => string {
   return () => new Date(t0 + stepMs * n++).toISOString();
 }
 
+export interface ManualClock {
+  /** the current time, ISO-8601 UTC; reading it never moves it */
+  now(): string;
+  /** move the clock forward */
+  advance(ms: number): void;
+}
+
+/** A clock that stands still until told to move, so a test decides exactly when a claim expires. */
+export function manualClock(start: string): ManualClock {
+  let t = Date.parse(start);
+  if (Number.isNaN(t)) throw new RangeError(`manualClock: not a time: ${start}`);
+  return {
+    now: () => new Date(t).toISOString(),
+    advance: (ms) => {
+      if (!Number.isFinite(ms) || ms < 0) throw new RangeError(`manualClock: cannot move by ${ms}`);
+      t += ms;
+    },
+  };
+}
+
 export interface MemoryHostParts {
   files?: HostFiles;
   exec?: HostContext["exec"];

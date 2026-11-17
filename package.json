@@ -29,6 +29,9 @@
     "@norn/plugin-github": "workspace:*",
     "@norn/tracker-local": "workspace:*",
     "@norn/forge-none": "workspace:*",
+    "@norn/host-node": "workspace:*",
+    "@norn/store-local": "workspace:*",
+    "@norn/store-refs": "workspace:*",
     "@types/bun": "1.3.13",
     "typescript": "^5.9.3",
     "yaml": "^2.8.1"

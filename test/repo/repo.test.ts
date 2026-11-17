@@ -25,6 +25,9 @@ const ALLOWED: Record<string, string[]> = {
   "plugin-github": ["schema", "plugin-api"],
   "tracker-local": ["schema", "plugin-api"],
   "forge-none": ["schema", "plugin-api"],
+  "host-node": ["schema", "plugin-api"],
+  "store-local": ["schema", "plugin-api"],
+  "store-refs": ["schema", "plugin-api"],
 };
 
 function files(dir: string): string[] {
@@ -930,6 +933,8 @@ const FS_WRITE_ALLOW: Counts = {
   "packages/cli/src/runtime/assets.ts": 2,
   // the harness plugin writes the agent's own config file itself, temp → fsync → rename: it may not depend on store
   "packages/harness-claude/src/files.ts": 1,
+  // the new architecture's one IO boundary: every new package writes files only through the HostContext this builds
+  "packages/host-node/src/files.ts": 1,
 };
 
 /** (b) raw git from store in cli: commands and runtime go through GitPort (4.1, 4.2). */
@@ -956,8 +961,11 @@ const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
   "packages/plugin-api/src/json.ts": [1, "tool output: the validated parse helper provider plugins use for CLI stdout and their own files"],
 };
 
-/** (d) processes are spawned by store and adapters only (ports perform effects). */
-const SPAWN_ALLOW: Counts = {};
+/** (d) processes are spawned by store and adapters only (ports perform effects), and in the new architecture by host-node alone. */
+const SPAWN_ALLOW: Counts = {
+  // the new architecture's one IO boundary: every new package starts processes only through the HostContext this builds
+  "packages/host-node/src/exec.ts": 1,
+};
 
 /**
  * (g) B1, B2, B5: norn's paths under a repo are spelled only by store's path module (paths .ts), so a

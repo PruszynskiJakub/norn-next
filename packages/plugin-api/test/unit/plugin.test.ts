@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Type } from "@sinclair/typebox";
-import { defineNornPlugin, type Forge, type ForgeFactory, type Harness, type HarnessEvent, type Tracker, type TrackerFactory } from "../../src/index.ts";
+import { defineNornPlugin, type Forge, type ForgeFactory, type Harness, type HarnessEvent, type Store, type StoreFactory, type Tracker, type TrackerFactory } from "../../src/index.ts";
 
 /** A harness that satisfies the contract and does nothing; enough to exercise the plugin checks. */
 function inertHarness(name = "inert"): Harness {
@@ -43,9 +43,9 @@ describe("defineNornPlugin", () => {
 
   test("refuses an API range the running API does not satisfy, naming both", () => {
     expect(() => defineNornPlugin({ name: "future", api: "^2", provides: {} })).toThrow(
-      'norn plugin future: wants plugin API "^2", but this norn implements 1.1.0',
+      'norn plugin future: wants plugin API "^2", but this norn implements 1.2.0',
     );
-    expect(() => defineNornPlugin({ name: "newer-minor", api: "^1.3", provides: {} })).toThrow(/implements 1\.1\.0/);
+    expect(() => defineNornPlugin({ name: "newer-minor", api: "^1.3", provides: {} })).toThrow(/implements 1\.2\.0/);
     expect(() => defineNornPlugin({ name: "loose", api: ">=1", provides: {} })).toThrow(/wants plugin API ">=1"/);
   });
 
@@ -85,5 +85,25 @@ describe("defineNornPlugin: tracker and forge slots", () => {
     );
     expect(() => defineNornPlugin({ name: "p", api: "^1", provides: { forge: { none: { configSchema } as unknown as ForgeFactory } } })).toThrow("norn plugin p: forge none lacks create");
     expect(() => defineNornPlugin({ name: "p", api: "^1", provides: { forge: { "": forge } } })).toThrow("norn plugin p: provides a forge with an empty key");
+  });
+});
+
+describe("defineNornPlugin: store slot", () => {
+  const store: StoreFactory = { configSchema: Type.Object({}), create: () => ({}) as Store };
+
+  test("keeps a store factory, frozen, and a plugin written against ^1.1 still loads", () => {
+    const plugin = defineNornPlugin({ name: "p", api: "^1.2", provides: { store: { local: store } } });
+    expect(plugin.provides.store?.local).toBe(store);
+    expect(Object.isFrozen(plugin.provides.store)).toBe(true);
+    expect(defineNornPlugin({ name: "old", api: "^1.1", provides: {} }).api).toBe("^1.1");
+  });
+
+  test("refuses a store factory without a configSchema or create", () => {
+    expect(() => defineNornPlugin({ name: "p", api: "^1", provides: { store: { local: { create: store.create } as unknown as StoreFactory } } })).toThrow(
+      "norn plugin p: store local needs a configSchema",
+    );
+    expect(() => defineNornPlugin({ name: "p", api: "^1", provides: { store: { refs: { configSchema: store.configSchema } as unknown as StoreFactory } } })).toThrow(
+      "norn plugin p: store refs lacks create",
+    );
   });
 });

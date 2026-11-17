@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { memoryFiles, memoryHost, scriptedExec, steppingClock, UNSCRIPTED_CODE } from "@norn/conformance";
+import { manualClock, memoryFiles, memoryHost, scriptedExec, steppingClock, UNSCRIPTED_CODE } from "@norn/conformance";
 
 describe("memoryFiles", () => {
   test("read gives null for a missing file and the text of a written one", async () => {
@@ -87,5 +87,17 @@ describe("clock and host", () => {
     expect(host.repo).toEqual({ root: "/r", dataDir: "/m" });
     expect((await host.exec(["anything"])).code).toBe(UNSCRIPTED_CODE);
     expect(Number.isNaN(Date.parse(host.now()))).toBe(false);
+  });
+});
+
+describe("manualClock", () => {
+  test("stands still until advanced, and refuses to move back", () => {
+    const c = manualClock("2026-11-17T10:00:00Z");
+    expect(c.now()).toBe("2026-11-17T10:00:00.000Z");
+    expect(c.now()).toBe("2026-11-17T10:00:00.000Z");
+    c.advance(1500);
+    expect(c.now()).toBe("2026-11-17T10:00:01.500Z");
+    expect(() => c.advance(-1)).toThrow("cannot move");
+    expect(() => manualClock("soon")).toThrow("not a time");
   });
 });

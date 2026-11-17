@@ -11,11 +11,14 @@
         "@norn/core": "workspace:*",
         "@norn/forge-none": "workspace:*",
         "@norn/harness-claude": "workspace:*",
+        "@norn/host-node": "workspace:*",
         "@norn/kernel": "workspace:*",
         "@norn/plugin-api": "workspace:*",
         "@norn/plugin-github": "workspace:*",
         "@norn/schema": "workspace:*",
         "@norn/store": "workspace:*",
+        "@norn/store-local": "workspace:*",
+        "@norn/store-refs": "workspace:*",
         "@norn/tracker-local": "workspace:*",
         "@norn/view": "workspace:*",
         "@types/bun": "1.3.13",
@@ -85,6 +88,13 @@
         "@norn/schema": "workspace:*",
       },
     },
+    "packages/host-node": {
+      "name": "@norn/host-node",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+      },
+    },
     "packages/kernel": {
       "name": "@norn/kernel",
       "version": "0.0.0",
@@ -131,6 +141,31 @@
         "yaml": "^2.8.1",
       },
     },
+    "packages/store-local": {
+      "name": "@norn/store-local",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+        "@sinclair/typebox": "^0.34.41",
+      },
+      "devDependencies": {
+        "@norn/conformance": "workspace:*",
+      },
+    },
+    "packages/store-refs": {
+      "name": "@norn/store-refs",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+        "@sinclair/typebox": "^0.34.41",
+      },
+      "devDependencies": {
+        "@norn/conformance": "workspace:*",
+        "@norn/host-node": "workspace:*",
+      },
+    },
     "packages/tracker-local": {
       "name": "@norn/tracker-local",
       "version": "0.0.0",
@@ -167,6 +202,8 @@
 
     "@norn/harness-claude": ["@norn/harness-claude@workspace:packages/harness-claude"],
 
+    "@norn/host-node": ["@norn/host-node@workspace:packages/host-node"],
+
     "@norn/kernel": ["@norn/kernel@workspace:packages/kernel"],
 
     "@norn/plugin-api": ["@norn/plugin-api@workspace:packages/plugin-api"],
@@ -176,6 +213,10 @@
     "@norn/schema": ["@norn/schema@workspace:packages/schema"],
 
     "@norn/store": ["@norn/store@workspace:packages/store"],
+
+    "@norn/store-local": ["@norn/store-local@workspace:packages/store-local"],
+
+    "@norn/store-refs": ["@norn/store-refs@workspace:packages/store-refs"],
 
     "@norn/tracker-local": ["@norn/tracker-local@workspace:packages/tracker-local"],
 

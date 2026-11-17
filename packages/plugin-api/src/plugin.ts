@@ -1,5 +1,6 @@
 import type { ForgeFactory } from "./forge.ts";
 import type { Harness } from "./harness.ts";
+import type { StoreFactory } from "./store.ts";
 import type { TrackerFactory } from "./tracker.ts";
 import { apiSatisfies, PLUGIN_API_VERSION } from "./version.ts";
 
@@ -11,6 +12,7 @@ export interface PluginProvides {
   harness?: Record<string, Harness>;
   tracker?: Record<string, TrackerFactory>;
   forge?: Record<string, ForgeFactory>;
+  store?: Record<string, StoreFactory>;
 }
 
 export interface NornPluginSpec {
@@ -27,6 +29,7 @@ export interface NornPlugin {
     harness?: Readonly<Record<string, Harness>>;
     tracker?: Readonly<Record<string, TrackerFactory>>;
     forge?: Readonly<Record<string, ForgeFactory>>;
+    store?: Readonly<Record<string, StoreFactory>>;
   }>;
 }
 
@@ -43,8 +46,8 @@ function checkHarness(plugin: string, key: string, h: Harness): void {
     refuse(plugin, `harness ${key} needs a name and capabilities`);
 }
 
-/** A tracker or forge is made per repo from its config, so only the factory can be checked here. */
-function checkFactory(slot: string): (plugin: string, key: string, f: TrackerFactory | ForgeFactory) => void {
+/** A tracker, forge or store is made per repo from its config, so only the factory can be checked here. */
+function checkFactory(slot: string): (plugin: string, key: string, f: TrackerFactory | ForgeFactory | StoreFactory) => void {
   return (plugin, key, f) => {
     const loose = f as unknown as Record<string, unknown> | null;
     const schema = loose?.configSchema;
@@ -76,10 +79,12 @@ export function defineNornPlugin(spec: NornPluginSpec): NornPlugin {
   const harness = slot(name, "harness", spec.provides?.harness, checkHarness);
   const tracker = slot(name, "tracker", spec.provides?.tracker, checkFactory("tracker"));
   const forge = slot(name, "forge", spec.provides?.forge, checkFactory("forge"));
+  const store = slot(name, "store", spec.provides?.store, checkFactory("store"));
   const provides: NornPlugin["provides"] = {
     ...(harness && { harness }),
     ...(tracker && { tracker }),
     ...(forge && { forge }),
+    ...(store && { store }),
   };
   return Object.freeze({ name, api: spec.api, provides: Object.freeze(provides) });
 }

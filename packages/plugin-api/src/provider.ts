@@ -1,5 +1,5 @@
 /**
- * Turning a factory and a config into a working tracker or forge. The host goes through here rather
+ * Turning a factory and a config into a working tracker, forge or store. The host goes through here rather
  * than calling `create` itself, so a bad config or a plugin that hands back half an object fails
  * once, as a PluginResult, before any effect is asked of it.
  */
@@ -7,6 +7,7 @@ import { check } from "@norn/schema";
 import type { Forge, ForgeFactory } from "./forge.ts";
 import type { HostContext } from "./host.ts";
 import { fail, ok, type PluginResult } from "./result.ts";
+import type { Store, StoreFactory } from "./store.ts";
 import { isKeyPrefix } from "./story-key.ts";
 import type { Tracker, TrackerFactory } from "./tracker.ts";
 
@@ -14,6 +15,12 @@ const TRACKER_CAPABILITIES = ["assign", "labels", "comment", "create", "close"] 
 const TRACKER_METHODS = ["whoami", "intake", "get", "perform"] as const;
 const FORGE_CAPABILITIES = ["draft", "checks", "raw_urls"] as const;
 const FORGE_METHODS = ["findChanges", "checks", "perform"] as const;
+const STORE_METHODS = ["listUnits", "readUnit", "appendReceipt", "commitState", "archive"] as const;
+const STORE_PARTS = {
+  claims: ["read", "acquire", "renew", "release"],
+  mailbox: ["send", "receive", "ack"],
+  artifacts: ["read", "write", "list", "remove"],
+} as const;
 
 type Loose = Record<string, unknown>;
 
@@ -46,6 +53,41 @@ export function forgeProblems(value: unknown): string[] {
   return shapeProblems(value, FORGE_CAPABILITIES, FORGE_METHODS);
 }
 
+function partProblems(v: Loose, part: keyof typeof STORE_PARTS): string[] {
+  const given = v[part];
+  if (given === null || typeof given !== "object") return [`needs ${part}`];
+  const missing = STORE_PARTS[part].filter((m) => typeof (given as Loose)[m] !== "function");
+  return missing.length > 0 ? [`${part} lacks ${missing.join(", ")}`] : [];
+}
+
+/**
+ * What is wrong with a value offered as a store; empty when it fits the contract. A capability and
+ * the part it names must agree both ways: the kernel reads the capability, never probes the part.
+ */
+export function storeProblems(value: unknown): string[] {
+  if (value === null || typeof value !== "object") return ["is not an object"];
+  const v = value as Loose;
+  const out: string[] = [];
+  if (typeof v.name !== "string" || !v.name) out.push("needs a name");
+  const missing = STORE_METHODS.filter((m) => typeof v[m] !== "function");
+  if (missing.length > 0) out.push(`lacks ${missing.join(", ")}`);
+  out.push(...partProblems(v, "claims"));
+  const caps = v.capabilities as Loose | null | undefined;
+  if (caps === null || typeof caps !== "object") return [...out, "needs capabilities"];
+  const bad = (["shared", "mailbox", "artifacts"] as const).filter((c) => typeof caps[c] !== "boolean");
+  if (bad.length > 0) out.push(`capabilities ${bad.join(", ")} must be booleans`);
+  if (caps.claims !== "local" && caps.claims !== "distributed") out.push('capability claims must be "local" or "distributed"');
+  for (const part of ["mailbox", "artifacts"] as const) {
+    if (caps[part] === true) out.push(...partProblems(v, part));
+    else if (caps[part] === false && v[part] !== undefined) out.push(`offers ${part} its capabilities deny`);
+  }
+  for (const m of ["sync", "flush"] as const) {
+    if (v[m] !== undefined && typeof v[m] !== "function") out.push(`${m} must be a function`);
+    else if (caps.shared === true && typeof v[m] !== "function") out.push(`a shared store lacks ${m}`);
+  }
+  return out;
+}
+
 function instantiate<T>(
   what: string,
   factory: { configSchema: unknown; create(ctx: HostContext, config: never): unknown },
@@ -73,4 +115,8 @@ export function createTracker(factory: TrackerFactory, ctx: HostContext, config:
 
 export function createForge(factory: ForgeFactory, ctx: HostContext, config: unknown): PluginResult<Forge> {
   return instantiate<Forge>("forge", factory, ctx, config, forgeProblems);
+}
+
+export function createStore(factory: StoreFactory, ctx: HostContext, config: unknown): PluginResult<Store> {
+  return instantiate<Store>("store", factory, ctx, config, storeProblems);
 }
