@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CLAUDE_HOOKS, claudeHarness, hookCommandFor, NORN_MARKER, settingsLocalPath } from "../../src/index.ts";
 
-const HOOK_COMMAND = "norn hook";
+const HOOK_COMMAND = "norn hook claude";
 let wt: string;
 const local = () => settingsLocalPath(wt);
 const committed = () => join(wt, ".claude", "settings.json");
@@ -57,7 +57,7 @@ describe("claude install", () => {
   });
   test("a changed hook command replaces norn's entries instead of adding more", async () => {
     await claudeHarness.install({ worktree: wt, hookCommand: HOOK_COMMAND });
-    expect(await claudeHarness.install({ worktree: wt, hookCommand: "bunx norn hook" })).toEqual({ changed: [local()] });
+    expect(await claudeHarness.install({ worktree: wt, hookCommand: "bunx norn hook claude" })).toEqual({ changed: [local()] });
     expect(read().hooks.Stop).toEqual([{ hooks: [{ type: "command", command: "bunx norn hook claude Stop # norn-owned" }] }]);
   });
   test("writes through a temp file it renames into place, leaving no temp file behind", async () => {

@@ -1,0 +1,175 @@
+{
+  "scenario": "elicitation-answered",
+  "description": "An extension tool asks for input in a dialog in the middle of its call; the person answers it in the pane and the agent carries on.",
+  "derived_from": "Derived, not recorded: the payloads are what norn's pi extension (packages/harness-pi/src/extension.ts) sends for the pi 1.5.2 events docs/extensions.md describes, with the session and tool shapes of the earlier pi adapter's fixtures; the timeline mirrors the claude recording of the same scenario.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "session_start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "hook_event_name": "session_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "reason": "startup"
+      }
+    },
+    {
+      "hook": "before_agent_start",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "hook_event_name": "before_agent_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "message_type": "user",
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool_call",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "hook_event_name": "tool_call",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_g1",
+        "tool_name": "github_create_issue",
+        "tool_input": {
+          "title": "Flag alias"
+        }
+      }
+    },
+    {
+      "hook": "ui_prompt_start",
+      "at": "2026-11-17T10:00:12.000Z",
+      "payload": {
+        "hook_event_name": "ui_prompt_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "kind": "input",
+        "title": "github: paste a token with repo scope",
+        "prompt_seq": "mi3k2x0a-1"
+      }
+    },
+    {
+      "hook": "ui_prompt_end",
+      "at": "2026-11-17T10:02:00.000Z",
+      "payload": {
+        "hook_event_name": "ui_prompt_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12"
+      }
+    },
+    {
+      "hook": "tool_execution_end",
+      "at": "2026-11-17T10:02:05.000Z",
+      "payload": {
+        "hook_event_name": "tool_execution_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_g1",
+        "tool_name": "github_create_issue",
+        "is_error": false
+      }
+    },
+    {
+      "hook": "tool_call",
+      "at": "2026-11-17T10:02:10.000Z",
+      "payload": {
+        "hook_event_name": "tool_call",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_b1",
+        "tool_name": "bash",
+        "tool_input": {
+          "command": "bun run test"
+        }
+      }
+    },
+    {
+      "hook": "tool_execution_end",
+      "at": "2026-11-17T10:02:40.000Z",
+      "payload": {
+        "hook_event_name": "tool_execution_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_b1",
+        "tool_name": "bash",
+        "is_error": false
+      }
+    },
+    {
+      "hook": "agent_before_settle",
+      "at": "2026-11-17T10:02:45.000Z",
+      "payload": {
+        "hook_event_name": "agent_before_settle",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "stop_reason": "stop",
+        "last_assistant_message": "Filed #42 and the tests pass."
+      }
+    },
+    {
+      "hook": "agent_settled",
+      "at": "2026-11-17T10:02:46.000Z",
+      "payload": {
+        "hook_event_name": "agent_settled",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "aborted": false
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 4,
+      "now": "2026-11-17T10:01:00.000Z",
+      "expect": {
+        "activity": "asking",
+        "silent": false,
+        "ask": {
+          "question": "github: paste a token with repo scope"
+        },
+        "pending_tools": 1
+      },
+      "why": "a dialog waits on the person, so the session is not silent"
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T10:02:01.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pane_answers": 1,
+        "pending_tools": 1
+      },
+      "why": "the answer in the dialog closes the ask; the tool it was raised in still runs"
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T10:02:11.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pane_answers": 1,
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 10,
+      "now": "2026-11-17T10:02:46.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "last_message": "Filed #42 and the tests pass."
+      }
+    }
+  ]
+}

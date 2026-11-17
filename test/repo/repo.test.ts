@@ -21,6 +21,7 @@ const ALLOWED: Record<string, string[]> = {
   "plugin-api": ["schema"],
   kernel: ["schema", "plugin-api"],
   "harness-claude": ["schema", "plugin-api"],
+  "harness-pi": ["schema", "plugin-api"],
   conformance: ["schema", "plugin-api", "kernel"],
   "plugin-github": ["schema", "plugin-api"],
   "tracker-local": ["schema", "plugin-api"],
@@ -46,6 +47,7 @@ const ALLOWED: Record<string, string[]> = {
     "store-local",
     "store-refs",
     "harness-claude",
+    "harness-pi",
     "runner-headless",
     "runner-herdr",
     "pack-sdlc",
@@ -955,6 +957,8 @@ const FS_WRITE_ALLOW: Counts = {
   "packages/cli/src/runtime/assets.ts": 2,
   // the harness plugin writes the agent's own config file itself, temp → fsync → rename: it may not depend on store
   "packages/harness-claude/src/files.ts": 1,
+  // the same for pi: the harness writes the extension pi loads, temp → fsync → rename
+  "packages/harness-pi/src/files.ts": 1,
   // the new architecture's one IO boundary: every new package writes files only through the HostContext this builds
   "packages/host-node/src/files.ts": 1,
 };
@@ -979,6 +983,7 @@ const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
   "packages/cli/src/runtime/detect.ts": [1, "file another tool owns: the repo's package.json"],
   "packages/cli/src/runtime/tick.ts": [1, "clone: trace-safe copy of facts"],
   "packages/harness-claude/src/files.ts": [1, "file claude owns: .claude/settings.local.json"],
+  "packages/harness-pi/src/extension.ts": [1, "text the harness writes, run inside pi: the extension reading the hook command's stdout"],
   // plugins cannot reach store and schema parses no text, so this helper is their one JSON read, validated against a schema at once
   "packages/plugin-api/src/json.ts": [1, "tool output: the validated parse helper provider plugins use for CLI stdout and their own files"],
 };

@@ -1,7 +1,7 @@
 /**
  * `norn doctor`: check the config, plugins, workflows, harness hooks and tools this repo needs.
  * Checks: config valid, every slot resolves, API ranges, workflows load, harness hooks installable,
- * tools present (git; gh with github; herdr with the herdr runner; claude with the claude harness).
+ * tools present (git; gh with github; herdr with the herdr runner; claude with the claude harness; pi with the pi harness).
  * Every failing check names its fix in `do_instead`; any failure exits 1 with the whole report.
  */
 import { defineCommand } from "../command.ts";

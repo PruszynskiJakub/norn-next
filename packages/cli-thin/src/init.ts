@@ -2,7 +2,8 @@
  * What `norn init` detects and chooses. Detection only reads (git's remote and branches, which tools
  * answer `--version`); every choice can be given as a flag instead, and a flag always wins. The herdr
  * runner is offered, never taken unasked: agents in panes are a person's choice, so it takes
- * `--runner herdr` or `--yes`.
+ * `--runner herdr` or `--yes`. The executor is claude unless only pi is on PATH; pi beside claude is
+ * offered, since which agent does the work is a person's choice too.
  */
 import type { HostContext } from "@norn/plugin-api";
 import { stringify } from "yaml";
@@ -16,6 +17,7 @@ export interface Detected {
   github: boolean;
   gh: boolean;
   claude: boolean;
+  pi: boolean;
   /** herdr answers and this shell runs inside it */
   herdr: boolean;
   /** origin's default branch, else the current branch */
@@ -55,11 +57,12 @@ export async function detect(host: HostContext, env: Readonly<Record<string, str
   const github = origin !== null && isGithubUrl(origin);
   const gh = github && (await answers(host, ["gh", "--version"], root)) !== null;
   const claude = (await answers(host, ["claude", "--version"], root)) !== null;
+  const pi = (await answers(host, ["pi", "--version"], root)) !== null;
   const herdr = Boolean(env.HERDR_ENV) && (await answers(host, ["herdr", "--version"], root)) !== null;
   const originHead = await answers(host, ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], root);
   const current = originHead ? null : await answers(host, ["git", "branch", "--show-current"], root);
   const base = originHead ? originHead.replace(/^origin\//, "") : current || null;
-  return { origin, github, gh, claude, herdr, base };
+  return { origin, github, gh, claude, pi, herdr, base };
 }
 
 export function choose(d: Detected, f: InitFlags): { choices: Choices; offered: string[] } {
@@ -69,12 +72,21 @@ export function choose(d: Detected, f: InitFlags): { choices: Choices; offered: 
     tracker: f.tracker ?? (onGithub ? "github" : "local"),
     forge: f.forge ?? (onGithub ? "github" : "none"),
     store: f.store ?? "local",
-    executor: f.executor ?? "claude",
+    executor: f.executor ?? (d.pi && !d.claude ? "pi" : "claude"),
     runner,
     base: d.base ?? "main",
   };
-  const offered = d.herdr && runner !== "herdr" && f.runner === undefined ? ["herdr"] : [];
+  const offered = [
+    ...(d.herdr && runner !== "herdr" && f.runner === undefined ? ["herdr"] : []),
+    ...(d.pi && choices.executor !== "pi" && f.executor === undefined ? ["pi"] : []),
+  ];
   return { choices, offered };
+}
+
+/** One line of init's markdown per offer: what was found and the command that takes it. */
+export function offerLine(offer: string, c: Choices): string {
+  if (offer === "pi") return `- offered: pi is on PATH; norn config set executors.pi "{harness: pi, runner: ${c.runner}}" adds it as an executor, and norn config set executor pi makes it the default`;
+  return `- offered: this shell runs inside ${offer}; norn config set executors.${c.executor}.runner ${offer} runs agents in its panes`;
 }
 
 export const INTAKE_LABEL = "norn";

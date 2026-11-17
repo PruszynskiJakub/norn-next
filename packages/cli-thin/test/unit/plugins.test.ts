@@ -64,6 +64,7 @@ describe("bundled plugins", () => {
         "norn-forge-none",
         "norn-github",
         "norn-harness-claude",
+        "norn-harness-pi",
         "norn-pack-sdlc",
         "norn-runner-headless",
         "norn-runner-herdr",

@@ -53,6 +53,18 @@ describe("norn doctor", () => {
     expect(check("tool claude").do_instead).toContain("Claude Code");
   });
 
+  test("pi is needed when an executor runs the pi harness, and claude only when one runs claude", async () => {
+    const pi = LOCAL_CONFIG.replace("harness: claude", "harness: pi");
+    expect(pi).not.toBe(LOCAL_CONFIG);
+    const missing = await doctor({ config: pi, have: ["git", "norn", "claude"] });
+    expect(missing.check("tool pi")).toMatchObject({ ok: false, code: "tool_missing" });
+    expect(missing.check("tool pi").do_instead).toContain("pi coding agent");
+    expect(missing.check("tool claude")).toBeUndefined();
+    const present = await doctor({ config: pi, have: ["git", "norn", "pi"] });
+    expect(present.body.ok).toBe(true);
+    expect(present.body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "hooks", "tool git", "tool pi"]);
+  });
+
   test("gh is needed with the github tracker or forge, herdr with the herdr runner", async () => {
     const github = LOCAL_CONFIG.replace("forge: { use: none }", "forge: { use: github }").replace("runner: headless", "runner: herdr");
     const { check } = await doctor({ config: github, have: ["git", "norn", "claude"] });

@@ -15,6 +15,15 @@ export {
   UNSCRIPTED_CODE,
 } from "./fakes.ts";
 export { forgeContract, type ForgeContractOptions, type ForgeContractTest, type ForgeWorld } from "./forge-contract.ts";
+export {
+  HARNESS_SCENARIOS,
+  harnessConformance,
+  type HarnessConformanceOptions,
+  type HarnessConformanceTest,
+  type HarnessScenarioSpec,
+  type ReportedCapability,
+  UNREPORTED,
+} from "./harness-contract.ts";
 export { eventsByStep, project, type Reading, readAt } from "./replay.ts";
 export { type Check, type EventBody, type HookStep, type HostStep, isHostStep, type Scenario, type Step } from "./scenario.ts";
 export { oddJson, storeContract, type StoreContractTest, type StoreWorld } from "./store-contract.ts";

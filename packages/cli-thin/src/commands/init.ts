@@ -13,7 +13,7 @@ import { configError, loadConfig, mergeConfig, parseLayer } from "../config/load
 import { AGENTS_DIR, configPaths, type Layer, layerFileName, REPO_COMMITTED_FILE, REPO_LOCAL_FILE } from "../config/paths.ts";
 import { CliContext } from "../context.ts";
 import { doctorLines, runDoctor } from "../doctor.ts";
-import { choose, completable, completedText, detect, initLayer, initText, withExcluded } from "../init.ts";
+import { choose, completable, completedText, detect, initLayer, initText, offerLine, withExcluded } from "../init.ts";
 import { refuse, rendered } from "../output.ts";
 import { wirePlugins } from "../wiring.ts";
 
@@ -34,7 +34,7 @@ export const initCommand = defineCommand({
     "--tracker <name>": "the tracker plugin (detected: github when origin is on GitHub and gh is present, else local)",
     "--forge <name>": "the forge plugin (detected: github with the github tracker, else none)",
     "--store <name>": "where run state lives (default local)",
-    "--executor <harness>": "the default executor's harness (detected: claude when it is on PATH)",
+    "--executor <harness>": "the default executor's harness (detected: claude when it is on PATH, else pi when it is)",
     "--runner <name>": "where agents run (default headless; herdr when inside herdr and asked)",
     "--commit": `write the committed config (${REPO_COMMITTED_FILE}, team mode) instead of the repo-local one (${REPO_LOCAL_FILE})`,
     "--yes": "take every detected choice without asking",
@@ -86,10 +86,10 @@ export const initCommand = defineCommand({
       `- tracker: ${choices.tracker}${flags.tracker ? "" : detected.github ? (detected.gh ? " (origin is on GitHub)" : " (origin is on GitHub, but gh is not installed)") : " (no GitHub origin)"}`,
       `- forge: ${choices.forge}`,
       `- store: ${choices.store}`,
-      `- executor: ${choices.executor} in ${choices.runner}${flags.executor || detected.claude ? "" : " (claude is not on PATH)"}`,
+      `- executor: ${choices.executor} in ${choices.runner}${flags.executor || (choices.executor === "pi" ? detected.pi : detected.claude) ? "" : ` (${choices.executor} is not on PATH)`}`,
       `- base: ${choices.base}`,
       `- .git/info/exclude: ${exclude === "added" ? `added ${AGENTS_DIR}` : exclude === "present" ? `${AGENTS_DIR} already there` : "untouched (team mode)"}`,
-      ...offered.map((o) => `- offered: this shell runs inside ${o}; norn config set executors.${choices.executor}.runner ${o} runs agents in its panes`),
+      ...offered.map((o) => offerLine(o, choices)),
       "",
       `## norn doctor: ${doctor.ok ? "all checks pass" : "some checks fail"}`,
       "",

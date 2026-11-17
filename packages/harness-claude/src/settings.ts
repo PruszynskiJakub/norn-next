@@ -7,7 +7,8 @@ import { isObject, type JsonObject } from "./payload.ts";
 
 export const NORN_MARKER = "# norn-owned";
 
-export const hookCommandFor = (hookCommand: string, hook: string) => `${hookCommand} claude ${hook} ${NORN_MARKER}`;
+// the hook command already names the harness (`norn hook claude`): only the hook's own name follows it
+export const hookCommandFor = (hookCommand: string, hook: string) => `${hookCommand} ${hook} ${NORN_MARKER}`;
 
 const isNornHook = (h: unknown) => isObject(h) && typeof h.command === "string" && h.command.trimEnd().endsWith(NORN_MARKER);
 

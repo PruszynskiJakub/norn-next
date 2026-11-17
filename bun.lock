@@ -12,6 +12,7 @@
         "@norn/core": "workspace:*",
         "@norn/forge-none": "workspace:*",
         "@norn/harness-claude": "workspace:*",
+        "@norn/harness-pi": "workspace:*",
         "@norn/host-node": "workspace:*",
         "@norn/kernel": "workspace:*",
         "@norn/pack-sdlc": "workspace:*",
@@ -64,6 +65,7 @@
       "dependencies": {
         "@norn/forge-none": "workspace:*",
         "@norn/harness-claude": "workspace:*",
+        "@norn/harness-pi": "workspace:*",
         "@norn/host-node": "workspace:*",
         "@norn/kernel": "workspace:*",
         "@norn/pack-sdlc": "workspace:*",
@@ -94,6 +96,7 @@
       },
       "devDependencies": {
         "@norn/harness-claude": "workspace:*",
+        "@norn/harness-pi": "workspace:*",
         "@norn/store-local": "workspace:*",
       },
     },
@@ -118,6 +121,14 @@
     },
     "packages/harness-claude": {
       "name": "@norn/harness-claude",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+      },
+    },
+    "packages/harness-pi": {
+      "name": "@norn/harness-pi",
       "version": "0.0.0",
       "dependencies": {
         "@norn/plugin-api": "workspace:*",
@@ -317,6 +328,8 @@
     "@norn/forge-none": ["@norn/forge-none@workspace:packages/forge-none"],
 
     "@norn/harness-claude": ["@norn/harness-claude@workspace:packages/harness-claude"],
+
+    "@norn/harness-pi": ["@norn/harness-pi@workspace:packages/harness-pi"],
 
     "@norn/host-node": ["@norn/host-node@workspace:packages/host-node"],
 

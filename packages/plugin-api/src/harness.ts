@@ -55,7 +55,10 @@ export interface NativeReply {
 
 export interface InstallTarget {
   worktree: string;
-  /** the command the agent's hooks run, as the caller gives it; a harness appends its own arguments */
+  /**
+   * the command the agent's hooks run, the harness's name already on it (`norn hook claude`); a
+   * harness appends only the hook's own name, as a second copy of its name is an argument too many
+   */
   hookCommand: string;
 }
 

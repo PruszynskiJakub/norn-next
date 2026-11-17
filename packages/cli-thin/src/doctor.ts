@@ -50,6 +50,7 @@ export function toolsNeeded(config: NornConfig | null): Array<{ tool: string; wh
   if (executors.some((e) => (typeof e.runner === "string" ? e.runner : e.runner.use) === "herdr"))
     out.push({ tool: "herdr", why: "an executor runs in the herdr runner", install: "install herdr, or norn config set executors.<name>.runner headless" });
   if (executors.some((e) => e.harness === "claude")) out.push({ tool: "claude", why: "an executor runs the claude harness", install: "install Claude Code (https://claude.com/claude-code)" });
+  if (executors.some((e) => e.harness === "pi")) out.push({ tool: "pi", why: "an executor runs the pi harness", install: "install the pi coding agent (https://pi.dev), or norn config set executors.<name>.harness claude" });
   return out;
 }
 

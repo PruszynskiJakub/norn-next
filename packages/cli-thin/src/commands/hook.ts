@@ -3,7 +3,7 @@
  * Prints the harness's native reply and exits with its code; never a CliError, as a hook must always answer.
  */
 import { type Harness, parseJson, RUN_ENV } from "@norn/plugin-api";
-import { failedHookReply, ingestHook } from "@norn/runtime";
+import { failedHookReply, type IngestInput, ingestHook } from "@norn/runtime";
 import { Type } from "@sinclair/typebox";
 import { defineCommand } from "../command.ts";
 import type { CliContext } from "../context.ts";
@@ -53,18 +53,35 @@ function writableRoots(env: Readonly<Record<string, string | undefined>>): strin
   return [...new Set([env.TMPDIR?.replace(/\/+$/, ""), "/tmp", "/private/tmp"].filter((x): x is string => Boolean(x)))];
 }
 
+/** More words than any hook line has: past it the line is not a hook's at all. */
+const MAX_HOOK_ARGS = 16;
+
+/** norn failed before its guard could run: an empty reply would let a write through, as a harness reads it as allow. */
+async function failedBeforeGuard(ctx: CliContext, input: IngestInput, problem: string) {
+  ctx.note(problem);
+  const h = input.harness ? await fallbackHarness(ctx, input.harness) : undefined;
+  if (!h || !input.hook) return raw("", 0);
+  const reply = failedHookReply(h, input, problem, new Date().toISOString());
+  return raw(reply.stdout, reply.exit_code);
+}
+
 export const hookCommand = defineCommand({
   name: "hook",
   summary: "Answer a harness hook: the payload on stdin, the harness's reply on stdout",
   usage: "norn hook <harness> <hook>",
-  positionals: { min: 2, max: 2 },
+  // the count is checked here, not by the parser: a refused line would answer nothing, which lets a write through
+  positionals: { min: 0, max: MAX_HOOK_ARGS },
   answersRaw: true,
   async run(ctx, args) {
-    const [harness, hook] = args.positionals as [string, string];
+    const words = args.positionals;
+    const harness = words[0] ?? "";
+    // the hook's name is last on the line: a hook line that names the harness twice still says which hook it is
+    const hook = words.length >= 2 ? (words.at(-1) as string) : "";
     const payload = await payloadOf(ctx);
     // a session norn did not launch is not norn's to answer, and must not need a config to be let through
     if (!ctx.env[RUN_ENV.unit] || !ctx.env[RUN_ENV.run]) return raw("", 0);
     const input = { harness, hook, payload, env: { ...ctx.env } };
+    if (words.length !== 2) return failedBeforeGuard(ctx, input, `norn hook: expected <harness> <hook>, got ${words.length} argument(s)`);
     let r: Awaited<ReturnType<typeof ingestHook>>;
     try {
       const env = await ctx.runtimeEnv();
@@ -79,13 +96,7 @@ export const hookCommand = defineCommand({
         input,
       );
     } catch (e) {
-      // norn failed before its guard could run: an empty reply would let a write through, as a harness reads it as allow
-      const problem = `norn hook: ${errorText(e)}`;
-      ctx.note(problem);
-      const h = await fallbackHarness(ctx, harness);
-      if (!h) return raw("", 0);
-      const reply = failedHookReply(h, input, problem, new Date().toISOString());
-      return raw(reply.stdout, reply.exit_code);
+      return failedBeforeGuard(ctx, input, `norn hook: ${errorText(e)}`);
     }
     for (const p of r.problems) ctx.note(`norn hook: ${p}`);
     const log = ctx.io.log;

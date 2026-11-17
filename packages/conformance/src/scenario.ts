@@ -38,6 +38,8 @@ export interface Check {
 export interface Scenario {
   scenario: string;
   description: string;
+  /** set on a recording assembled from documentation rather than captured from the agent: what it was derived from */
+  derived_from?: string;
   run_id: string;
   steps: Step[];
   checks: Check[];

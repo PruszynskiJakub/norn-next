@@ -109,6 +109,19 @@ describe("the machine contract", () => {
     const allowed = await runCli(["hook", "claude", "PreToolUse"], machine({ stdin: read, env, seed: broken }).io);
     expect({ exit: allowed.exit, stdout: allowed.stdout }).toEqual({ exit: 0, stdout: "" });
   });
+
+  test("a hook line with an argument too many (the harness named twice) still denies a write; anything else is let through", async () => {
+    const env = { NORN_UNIT: "lt-1", NORN_RUN_ID: "r1" };
+    const write = JSON.stringify({ hook_event_name: "PreToolUse", tool_use_id: "t1", tool_name: "Write", tool_input: { file_path: "/etc/passwd", content: "x" } });
+    const r = await runCli(["hook", "claude", "claude", "PreToolUse"], machine({ stdin: write, env }).io);
+    expect(r.exit).toBe(0);
+    const out = JSON.parse(r.stdout).hookSpecificOutput;
+    expect(out.permissionDecision).toBe("deny");
+    expect(out.permissionDecisionReason).toContain("expected <harness> <hook>, got 3 argument(s)");
+    const read = JSON.stringify({ hook_event_name: "PreToolUse", tool_use_id: "t2", tool_name: "Read", tool_input: { file_path: "/etc/passwd" } });
+    const allowed = await runCli(["hook", "claude", "claude", "PreToolUse"], machine({ stdin: read, env }).io);
+    expect({ exit: allowed.exit, stdout: allowed.stdout }).toEqual({ exit: 0, stdout: "" });
+  });
 });
 
 describe("the context a command runs with", () => {

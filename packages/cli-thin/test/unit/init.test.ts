@@ -81,6 +81,35 @@ describe("norn init: detection", () => {
     const outside = await init(["--yes"], { w: { tools: ["claude", "herdr"] } });
     expect({ runner: (outside.body.chose as { runner: string }).runner, offered: outside.body.offered }).toEqual({ runner: "headless", offered: [] });
   });
+
+  test("pi alone on PATH: the pi executor, written with the pi harness, and doctor checks the pi binary", async () => {
+    const { m, r, body } = await init([], { w: { tools: ["pi"] } });
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(body.chose).toMatchObject({ executor: "pi", runner: "headless" });
+    expect(body.detected).toMatchObject({ claude: false, pi: true });
+    expect(body.offered).toEqual([]);
+    expect((await written(m, PATHS.local)).executors).toEqual({ pi: { harness: "pi", runner: "headless" } });
+    const checks = (body.doctor as { checks: Array<{ name: string; ok: boolean }> }).checks;
+    expect(checks.map((c) => [c.name, c.ok])).toContainEqual(["tool pi", true]);
+    expect(checks.map((c) => c.name)).not.toContain("tool claude");
+  });
+
+  test("pi beside claude: claude stays the executor and pi is offered, not taken, even with --yes", async () => {
+    for (const args of [[], ["--yes"]]) {
+      const { body } = await init(args, { w: { tools: ["claude", "pi"] } });
+      expect({ executor: (body.chose as { executor: string }).executor, offered: body.offered }).toEqual({ executor: "claude", offered: ["pi"] });
+    }
+    const m = machine({ script: world({ tools: ["claude", "pi"] }) });
+    const r = await runCli(["init"], m.io);
+    expect(r.stdout).toContain('- offered: pi is on PATH; norn config set executors.pi "{harness: pi, runner: headless}" adds it as an executor');
+  });
+
+  test("--executor pi takes pi without offering it, and --executor claude offers nothing", async () => {
+    const pi = await init(["--executor", "pi"], { w: { tools: ["claude", "pi"] } });
+    expect({ executor: (pi.body.chose as { executor: string }).executor, offered: pi.body.offered }).toEqual({ executor: "pi", offered: [] });
+    const claude = await init(["--executor", "claude"], { w: { tools: ["claude", "pi"] } });
+    expect(claude.body.offered).toEqual([]);
+  });
 });
 
 describe("norn init: flags", () => {

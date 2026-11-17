@@ -1,6 +1,7 @@
 /** The plugins the binary ships: a fresh install runs on these without `norn plugin add`. */
 import { forgeNonePlugin } from "@norn/forge-none";
 import { claudePlugin } from "@norn/harness-claude";
+import { piPlugin } from "@norn/harness-pi";
 import { packSdlcPlugin } from "@norn/pack-sdlc";
 import type { NornPlugin } from "@norn/plugin-api";
 import { githubPlugin } from "@norn/plugin-github";
@@ -20,6 +21,7 @@ export const BUNDLED_PLUGINS: readonly NornPlugin[] = Object.freeze([
   localStorePlugin,
   refsStorePlugin,
   claudePlugin,
+  piPlugin,
   headlessRunnerPlugin,
   herdrRunnerPlugin,
   packSdlcPlugin,

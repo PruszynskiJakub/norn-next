@@ -1,0 +1,144 @@
+{
+  "scenario": "usage-limit",
+  "description": "pi reports no usage limit: a run that pi gave up retrying on a 429 settles on a provider error, with no reset time. The session reads as a turn that ended on that error, never limited and never silent, until norn nudges it.",
+  "derived_from": "Derived, not recorded: the payloads are what norn's pi extension (packages/harness-pi/src/extension.ts) sends for the pi 1.5.2 events docs/extensions.md describes, with the session and tool shapes of the earlier pi adapter's fixtures; the timeline mirrors the claude recording of the same scenario.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "session_start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "hook_event_name": "session_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "reason": "startup"
+      }
+    },
+    {
+      "hook": "before_agent_start",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "hook_event_name": "before_agent_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "message_type": "user",
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool_call",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "hook_event_name": "tool_call",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_01",
+        "tool_name": "bash",
+        "tool_input": {
+          "command": "bun run test"
+        }
+      }
+    },
+    {
+      "hook": "tool_execution_end",
+      "at": "2026-11-17T10:01:00.000Z",
+      "payload": {
+        "hook_event_name": "tool_execution_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_01",
+        "tool_name": "bash",
+        "is_error": false
+      }
+    },
+    {
+      "hook": "agent_settled",
+      "at": "2026-11-17T10:01:02.000Z",
+      "payload": {
+        "hook_event_name": "agent_settled",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "aborted": false,
+        "outcome": "error",
+        "stop_reason": "error",
+        "error_message": "429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your account's rate limit. Please try again later.\"}}",
+        "last_assistant_message": "Running the linter next."
+      }
+    },
+    {
+      "hook": "before_agent_start",
+      "at": "2026-11-17T13:00:00.000Z",
+      "payload": {
+        "hook_event_name": "before_agent_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "message_type": "user",
+        "prompt": "Carry on with the step.\n\n<!-- norn-prompt source=nudge id=p-nudge-1 -->"
+      }
+    },
+    {
+      "hook": "tool_call",
+      "at": "2026-11-17T13:00:05.000Z",
+      "payload": {
+        "hook_event_name": "tool_call",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_02",
+        "tool_name": "bash",
+        "tool_input": {
+          "command": "bun run test"
+        }
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 4,
+      "now": "2026-11-17T10:01:01.000Z",
+      "expect": {
+        "activity": "working"
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T10:01:02.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "silent": false,
+        "last_message": "pi stopped on an error: 429 {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"This request would exceed your account's rate limit. Please try again later.\"}}"
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T12:59:59.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "silent": false
+      },
+      "why": "hours of quiet after the error are an ended turn a person or norn can read, never a silent agent"
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T13:00:01.000Z",
+      "expect": {
+        "activity": "working",
+        "silent": false
+      }
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T13:00:06.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "silent": false
+      }
+    }
+  ]
+}
