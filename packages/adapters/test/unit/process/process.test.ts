@@ -18,6 +18,17 @@ describe("process port", () => {
     expect(await port.isAlive({ pid: 9, pid_start: "Thu Oct 22 10:00:00 2026" })).toBe(false);
   });
 
+  test("dead only when ps says so; a probe that cannot answer is never dead", async () => {
+    const holder = { pid: 9, pid_start: "Fri Oct 23 10:00:00 2026" };
+    const answering = (code: number, stdout: string) => createProcessPort({ exec: async () => ({ code, stdout, stderr: "" }) });
+    expect(await answering(1, "").isAlive(holder)).toBe(false); // no such pid
+    expect(await answering(0, "Z  Fri Oct 23 10:00:00 2026\n").isAlive(holder)).toBe(false);
+    expect(await answering(0, "").isAlive(holder)).toBe(true); // ps from a process out of file descriptors
+    expect(await answering(127, "").isAlive(holder)).toBe(true); // ps could not be started
+    expect(await answering(124, "").isAlive(holder)).toBe(true); // timed out
+    expect(await answering(0, "").identify(9)).toBeNull(); // no identity to hand over to
+  });
+
   test("shellJoin quotes only what needs it", () => {
     expect(shellJoin(["claude", "-p", "it's `x`", "a=b"])).toBe(`claude -p 'it'\\''s \`x\`' a=b`);
   });
