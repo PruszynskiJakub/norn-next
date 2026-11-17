@@ -13,7 +13,7 @@ labels:
   - norn:risk:medium
   - norn:wf:story
 workflow: story
-status: active
+status: done
 intake_at: 2026-11-16T18:42:38.834Z
 body_hash: 3f838c286b80dba0453f1d471d2c2076536a71ad272f588e78bbd5ade8d2e576
 refined_body_hash: 3f838c286b80dba0453f1d471d2c2076536a71ad272f588e78bbd5ade8d2e576
@@ -51,6 +51,13 @@ criteria:
   - { id: 05.AC4, verifier: agent }
   - { id: 06.AC1, verifier: agent }
   - { id: 06.AC2, verifier: test }
+merge:
+  pr: 355
+  url: https://github.com/PruszynskiJakub/norn-next/pull/355
+  head_sha: 74c8a437a7c799748085e2c5804394f2b582ba7a
+  merge_commit_sha: e6fdf0d3bc19abc154756ce8ce2c6696c921f29b
+  merged_by: PruszynskiJakub
+  merged_at: 2026-11-17T00:24:39.000Z
 ---
 
 # Every route back needs a hand-written named counter
