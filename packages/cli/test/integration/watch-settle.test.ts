@@ -5,7 +5,7 @@
  * and an injected sleep that records each pause.
  */
 import { afterAll, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test";
-import { writeFileSync } from "node:fs";
+import { readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { machineDir, machineDirOfRunState, touchWake, wakePath, workflowsDir } from "@norn/store";
 import { settleStep, SETTLE_TICKS } from "../../src/commands/watch.ts";
@@ -160,6 +160,14 @@ describe("pauseUntilWake", () => {
   test("a run-state folder outside a machine dir touches nothing", () => {
     expect(machineDirOfRunState(join(h.dir, "elsewhere", "runs", "gh-1", "_story"))).toBeNull();
     expect(machineDirOfRunState(join(machine(), "runs", "gh-1", "_story", "rounds", "01-story"))).toBe(machine());
+  });
+
+  test("a pause keeps no file descriptor once it ends", async () => {
+    const open = () => readdirSync("/dev/fd").length;
+    await pauseUntilWake(ctx(), 1, wakeStamp(h.root)); // anything opened once per process is open now
+    const before = open();
+    for (let i = 0; i < 50; i++) await pauseUntilWake(ctx(), 1, wakeStamp(h.root));
+    expect(open() - before).toBeLessThanOrEqual(2);
   });
 
   test("Ctrl-C ends the pause as an interval, never a wake", async () => {
