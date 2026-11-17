@@ -26,6 +26,9 @@
     "@norn/kernel": "workspace:*",
     "@norn/harness-claude": "workspace:*",
     "@norn/conformance": "workspace:*",
+    "@norn/plugin-github": "workspace:*",
+    "@norn/tracker-local": "workspace:*",
+    "@norn/forge-none": "workspace:*",
     "@types/bun": "1.3.13",
     "typescript": "^5.9.3",
     "yaml": "^2.8.1"

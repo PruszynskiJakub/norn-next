@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { defineNornPlugin, type Harness, type HarnessEvent } from "../../src/index.ts";
+import { Type } from "@sinclair/typebox";
+import { defineNornPlugin, type Forge, type ForgeFactory, type Harness, type HarnessEvent, type Tracker, type TrackerFactory } from "../../src/index.ts";
 
 /** A harness that satisfies the contract and does nothing; enough to exercise the plugin checks. */
 function inertHarness(name = "inert"): Harness {
@@ -42,9 +43,9 @@ describe("defineNornPlugin", () => {
 
   test("refuses an API range the running API does not satisfy, naming both", () => {
     expect(() => defineNornPlugin({ name: "future", api: "^2", provides: {} })).toThrow(
-      'norn plugin future: wants plugin API "^2", but this norn implements 1.0.0',
+      'norn plugin future: wants plugin API "^2", but this norn implements 1.1.0',
     );
-    expect(() => defineNornPlugin({ name: "newer-minor", api: "^1.3", provides: {} })).toThrow(/implements 1\.0\.0/);
+    expect(() => defineNornPlugin({ name: "newer-minor", api: "^1.3", provides: {} })).toThrow(/implements 1\.1\.0/);
     expect(() => defineNornPlugin({ name: "loose", api: ">=1", provides: {} })).toThrow(/wants plugin API ">=1"/);
   });
 
@@ -61,5 +62,28 @@ describe("defineNornPlugin", () => {
     expect(() => defineNornPlugin({ name: "p", api: "^1", provides: { harness: { x: nameless } } })).toThrow(
       "norn plugin p: harness x needs a name and capabilities",
     );
+  });
+});
+
+describe("defineNornPlugin: tracker and forge slots", () => {
+  const configSchema = Type.Object({});
+  const tracker: TrackerFactory = { configSchema, create: () => ({}) as Tracker };
+  const forge: ForgeFactory = { configSchema, create: () => ({}) as Forge };
+
+  test("keeps the factories, frozen, beside a harness", () => {
+    const plugin = defineNornPlugin({ name: "p", api: "^1.1", provides: { tracker: { local: tracker }, forge: { none: forge } } });
+    expect(plugin.provides.tracker?.local).toBe(tracker);
+    expect(plugin.provides.forge?.none).toBe(forge);
+    expect(Object.isFrozen(plugin.provides.tracker)).toBe(true);
+    expect(Object.isFrozen(plugin.provides.forge)).toBe(true);
+    expect(Object.keys(plugin.provides).sort()).toEqual(["forge", "tracker"]);
+  });
+
+  test("refuses a factory without a configSchema or create", () => {
+    expect(() => defineNornPlugin({ name: "p", api: "^1", provides: { tracker: { local: { create: tracker.create } as unknown as TrackerFactory } } })).toThrow(
+      "norn plugin p: tracker local needs a configSchema",
+    );
+    expect(() => defineNornPlugin({ name: "p", api: "^1", provides: { forge: { none: { configSchema } as unknown as ForgeFactory } } })).toThrow("norn plugin p: forge none lacks create");
+    expect(() => defineNornPlugin({ name: "p", api: "^1", provides: { forge: { "": forge } } })).toThrow("norn plugin p: provides a forge with an empty key");
   });
 });

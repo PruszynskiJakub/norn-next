@@ -9,11 +9,14 @@
         "@norn/cli": "workspace:*",
         "@norn/conformance": "workspace:*",
         "@norn/core": "workspace:*",
+        "@norn/forge-none": "workspace:*",
         "@norn/harness-claude": "workspace:*",
         "@norn/kernel": "workspace:*",
         "@norn/plugin-api": "workspace:*",
+        "@norn/plugin-github": "workspace:*",
         "@norn/schema": "workspace:*",
         "@norn/store": "workspace:*",
+        "@norn/tracker-local": "workspace:*",
         "@norn/view": "workspace:*",
         "@types/bun": "1.3.13",
         "typescript": "^5.9.3",
@@ -62,6 +65,18 @@
         "@norn/schema": "workspace:*",
       },
     },
+    "packages/forge-none": {
+      "name": "@norn/forge-none",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+        "@sinclair/typebox": "^0.34.41",
+      },
+      "devDependencies": {
+        "@norn/conformance": "workspace:*",
+      },
+    },
     "packages/harness-claude": {
       "name": "@norn/harness-claude",
       "version": "0.0.0",
@@ -86,6 +101,18 @@
         "@sinclair/typebox": "^0.34.41",
       },
     },
+    "packages/plugin-github": {
+      "name": "@norn/plugin-github",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+        "@sinclair/typebox": "^0.34.41",
+      },
+      "devDependencies": {
+        "@norn/conformance": "workspace:*",
+      },
+    },
     "packages/schema": {
       "name": "@norn/schema",
       "version": "0.0.0",
@@ -102,6 +129,19 @@
         "@norn/core": "workspace:*",
         "@norn/schema": "workspace:*",
         "yaml": "^2.8.1",
+      },
+    },
+    "packages/tracker-local": {
+      "name": "@norn/tracker-local",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+        "@sinclair/typebox": "^0.34.41",
+        "yaml": "^2.8.1",
+      },
+      "devDependencies": {
+        "@norn/conformance": "workspace:*",
       },
     },
     "packages/view": {
@@ -123,15 +163,21 @@
 
     "@norn/core": ["@norn/core@workspace:packages/core"],
 
+    "@norn/forge-none": ["@norn/forge-none@workspace:packages/forge-none"],
+
     "@norn/harness-claude": ["@norn/harness-claude@workspace:packages/harness-claude"],
 
     "@norn/kernel": ["@norn/kernel@workspace:packages/kernel"],
 
     "@norn/plugin-api": ["@norn/plugin-api@workspace:packages/plugin-api"],
 
+    "@norn/plugin-github": ["@norn/plugin-github@workspace:packages/plugin-github"],
+
     "@norn/schema": ["@norn/schema@workspace:packages/schema"],
 
     "@norn/store": ["@norn/store@workspace:packages/store"],
+
+    "@norn/tracker-local": ["@norn/tracker-local@workspace:packages/tracker-local"],
 
     "@norn/view": ["@norn/view@workspace:packages/view"],
 
