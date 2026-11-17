@@ -4,7 +4,7 @@
  * flat workflow: core, decide and receipts never see a shared file. Pure over a reader of shared
  * texts, so a caller reading them from a branch reads first (`sharedFilesUsed`) and passes them in.
  */
-import { check, type SchemaError, UseStep, WorkflowSharedModel } from "@norn/schema";
+import { check, type SchemaError, SharedName, StepName, UseStep, WorkflowSharedModel } from "@norn/schema";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { stepWordingErrors, toModelSteps } from "./step-wording.ts";
 
@@ -61,11 +61,26 @@ function parsed(text: string): { ok: true; value: unknown } | { ok: false; messa
   }
 }
 
-/** The shared files (names) a workflow text brings in with `use:`. */
+/**
+ * The shared files (names) a workflow text brings in with `use:`. Callers read each one from disk or
+ * a branch by this name, so a name that fails `SharedName` (`../x`) is left out, never read: flattening
+ * refuses its use step.
+ */
 export function sharedFilesUsed(text: string): string[] {
   const p = parsed(text);
   if (!p.ok) return [];
-  return [...new Set(useSteps(p.value).flatMap(([, s]) => (typeof s.use === "string" ? [s.use] : [])))];
+  return [...new Set(useSteps(p.value).flatMap(([, s]) => (typeof s.use === "string" && check(SharedName, s.use).ok ? [s.use] : [])))];
+}
+
+/**
+ * Step names that fail `StepName`, checked before any pass keys an object by them: assigning a
+ * step named `__proto__` sets the copy's prototype instead of naming a step, so it would vanish.
+ */
+function badStepNames(steps: Obj): SchemaError[] {
+  return Object.keys(steps).flatMap((name) => {
+    const r = check(StepName, name);
+    return r.ok ? [] : r.errors.map((e) => ({ path: `/steps/${name}`, message: e.message }));
+  });
 }
 
 interface Included {
@@ -86,6 +101,8 @@ export function flattenWorkflowText(text: string, read: SharedReader): Flattened
   const written = p.value;
   const uses = useSteps(written);
   if (!uses.length && !likeSteps(written.steps as Obj).length) return null;
+  const badNames = badStepNames(written.steps as Obj);
+  if (badNames.length) return { ok: false, errors: badNames };
 
   // Copies resolve within their own file first, so the use steps flatten copies already filled in
   const elsewhere = new Map<string, string>();
@@ -179,6 +196,8 @@ function readShared(name: string, by: string, routes: Obj, read: SharedReader, e
   }
   let resolved = value;
   if (isObj(value) && isObj(value.steps)) {
+    const badNames = badStepNames(value.steps);
+    if (badNames.length) return { errors: badNames.map(inFile) };
     const own = resolveLikes(value.steps, elsewhere);
     if ("errors" in own) return { errors: own.errors.map(inFile) };
     resolved = { ...value, steps: own.steps };
