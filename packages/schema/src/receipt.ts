@@ -1,7 +1,6 @@
 import { type Static, type TProperties, Type } from "@sinclair/typebox";
 import {
   Actor,
-  CounterName,
   GitSha,
   IsoTime,
   Mode,
@@ -13,6 +12,7 @@ import {
   PromptChoice,
   SliceKey,
   StepName,
+  StoredCounterName,
   TaggedUnion,
   Target,
   Ulid,
@@ -149,7 +149,7 @@ export const RejectReceipt = mailboxReceipt("reject", {
 });
 export const UnstickReceipt = mailboxReceipt("unstick", {
   to: Type.Optional(StepName),
-  reset: Type.Optional(Type.Array(CounterName, { uniqueItems: true })),
+  reset: Type.Optional(Type.Array(StoredCounterName, { uniqueItems: true })),
   comment: Type.Optional(Type.String()),
 });
 export const ModeReceipt = receipt("mode", { mode: Mode, previous: Mode });

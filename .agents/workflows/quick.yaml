@@ -31,7 +31,7 @@ steps:
       done: "the change is made; each behaviour change and rework point has a passing test"
   base-update:
     use: base-update
-    outcomes: { tested: review, failed: { to: implement, counter: test_loop }, merged: open-pr, redescribe: describe }
+    outcomes: { tested: review, failed: implement, merged: open-pr, redescribe: describe }
   review:
     agent: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
     skills: [norn-review]
@@ -39,7 +39,7 @@ steps:
     hand_back: { changes_requested: findings }
     outcomes:
       approve:           describe
-      changes_requested: { to: implement, counter: review_loop }
+      changes_requested: implement
     means:
       approve: "the change does what the story asks and nothing else, no blocking findings"
       changes_requested: "blocking findings in the receipt"
@@ -54,19 +54,11 @@ steps:
   # a red run's failures become last_check for implement, whose rework goes back through open-pr to the new head
   ship:
     use: ci
-    outcomes: { passed: ready, failed: { to: implement, counter: ci_loop }, stale: { to: update, counter: stale_loop } }
+    outcomes: { passed: ready, failed: { to: implement, max: 3 }, stale: { to: update, counter: stale_loop } }
   land:
     use: land
-    outcomes: { rejected: { to: implement, counter: ready_loop }, stale: { to: update, counter: stale_loop } }
+    outcomes: { rejected: implement, stale: { to: update, counter: stale_loop } }
 counters:
-  test_loop: { max: 5 }
-  ci_loop: { max: 3 }
-  review_loop: { max: 3 }
-  ready_loop: { max: 2 }
-  # reset each time their update merges cleanly (on either path): only repeated conflicts on one base move count
-  sync_conflict_loop: { max: 2, reset_on: sync.done }
-  base_conflict_loop: { max: 2, reset_on: [update.done, update.clean, update.resolved] }
-  resolution_loop: { max: 2 }
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }
 # update-branch re-enters update, not sync (the default would be the first update step); a base move

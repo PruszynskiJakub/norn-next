@@ -67,8 +67,8 @@ const routeCount = (wf: Workflow) => Object.values(wf.steps).reduce((n, step) =>
  * route, counter or instruction changes the hash, formatting and key order never do.
  */
 const PINNED_HASHES: Record<string, string> = {
-  quick: "ec970041e0b269cad98ea6405025173e9c0f0e3322ff9b9ca6ddfab4ef19d22c",
-  story: "1e309a8e820b38ea46eebf3cc3d94e15e7f7be21b3a5a5ec1340342f427ba9f9",
+  quick: "01c0daa65ccfe38cd5e0a86360cb9ccd83d5b6c38b6e4c3195cfafb5df771225",
+  story: "ea30a4ecc5c7fa998f3fd471343caa73088bdff74e3a7983154a9ba107d671ca",
 };
 
 /** Splits a SKILL.md into its YAML frontmatter and body. */
@@ -142,12 +142,47 @@ describe("workflow templates", () => {
     expect(workflowHash(loadWorkflow(`${name}.yaml`))).toBe(PINNED_HASHES[name] as string);
   });
 
-  test("quick has 29 routes and 8 counters, story 42 routes and 10 counters", () => {
+  test("quick has 29 routes and 8 counters, none written; story 42 routes and 10 counters, 2 written", () => {
     const shape = (name: string) => {
       const wf = loadWorkflow(`${name}.yaml`);
-      return { routes: routeCount(wf), counters: Object.keys(wf.counters ?? {}).length };
+      const written = (parse(readFileSync(join(WORKFLOWS_DIR, `${name}.yaml`), "utf8")) as { counters?: object }).counters ?? {};
+      return { routes: routeCount(wf), counters: Object.keys(wf.counters ?? {}).length, written: Object.keys(written).length };
     };
-    expect({ quick: shape("quick"), story: shape("story") }).toEqual({ quick: { routes: 29, counters: 8 }, story: { routes: 42, counters: 10 } });
+    expect({ quick: shape("quick"), story: shape("story") }).toEqual({
+      quick: { routes: 29, counters: 8, written: 0 },
+      story: { routes: 42, counters: 10, written: 2 },
+    });
+  });
+
+  // A counter whose max and reset match the default for its edge is derived; the files write only what differs
+  test("the shipped files, bundled and this repo's, write a counter only to share it and a max only where it differs from the default", () => {
+    const REPO_WORKFLOWS = join(ASSETS, "..", "..", "..", ".agents", "workflows");
+    const written = (dir: string) => {
+      const files = [...readdirSync(dir).filter((f) => f.endsWith(".yaml")), ...readdirSync(join(dir, "shared")).map((f) => `shared/${f}`)];
+      const declared: string[] = [];
+      const maxes: string[] = [];
+      for (const f of files.sort()) {
+        const doc = parse(readFileSync(join(dir, f), "utf8")) as { counters?: object; steps: Record<string, { outcomes?: Record<string, unknown> }> };
+        for (const c of Object.keys(doc.counters ?? {})) declared.push(`${f}:${c}`);
+        for (const [s, step] of Object.entries(doc.steps))
+          for (const [o, e] of Object.entries(step.outcomes ?? {}))
+            if (e && typeof e === "object" && "max" in e) maxes.push(`${f}:${s}.${o}=${(e as { max: number }).max}`);
+      }
+      return { declared, maxes };
+    };
+    expect(written(WORKFLOWS_DIR)).toEqual({
+      declared: ["story.yaml:qa_loop", "story.yaml:stale_loop"],
+      maxes: ["quick.yaml:ship.ci-failed=3", "shared/base-update.yaml:resolution-review.changes_requested=2", "story.yaml:approve-slices.reject=3", "story.yaml:ship.ci-failed=3"],
+    });
+    expect(written(REPO_WORKFLOWS)).toEqual({
+      declared: ["quick.yaml:stale_loop", "release.yaml:stale_loop", "story.yaml:qa_loop", "story.yaml:stale_loop"],
+      maxes: ["quick.yaml:ship.failed=3", "shared/base-update.yaml:resolution-review.changes_requested=2", "story.yaml:approve-slices.reject=3", "story.yaml:ship.failed=3"],
+    });
+    // every name still written is shared by more than one edge once loaded
+    for (const w of [loadWorkflow("story.yaml"), repoWorkflow("quick"), repoWorkflow("release"), repoWorkflow("story")]) {
+      const uses = (c: string) => Object.values(w.steps).flatMap((s) => Object.values(s.outcomes).filter((e) => outcomeEdge(e as Parameters<typeof outcomeEdge>[0]).counter === c));
+      for (const c of ["qa_loop", "stale_loop"].filter((c) => w.counters?.[c])) expect({ name: w.name, c, shared: uses(c).length > 1 }).toEqual({ name: w.name, c, shared: true });
+    }
   });
 
   test("the CI wait is written in exactly one bundled file, and copies are `like:` steps, never YAML anchors", () => {
@@ -340,7 +375,7 @@ describe("single-purpose workflows (#136)", () => {
   test("story reviews its rework before the check, and a round without rework never reaches review", () => {
     expect(targets("story", "implement")).toEqual({ done: "review" });
     expect(wf("story").steps.review).toMatchObject({ type: "agent", skills: ["norn-review"], inputs: ["spec", "diff", "last_findings"] });
-    expect(wf("story").steps.review?.outcomes).toMatchObject({ changes_requested: { counter: "review_loop" } });
+    expect(wf("story").steps.review?.outcomes).toMatchObject({ changes_requested: { counter: "review.changes_requested" } });
     expect(targets("story", "review")).toEqual({ approve: "test", changes_requested: "implement" });
     const into = (step: string) =>
       Object.entries(wf("story").steps).flatMap(([from, s]) =>
@@ -368,7 +403,9 @@ describe("single-purpose workflows (#136)", () => {
     for (const w of all) {
       const ready = Object.fromEntries(Object.entries(w.steps.ready?.outcomes ?? {}).map(([o, e]) => [o, outcomeEdge(e as Parameters<typeof outcomeEdge>[0]).to]));
       expect({ name: w.name, approve: ready.approve }).toEqual({ name: w.name, approve: "merge" });
-      expect({ name: w.name, merge: w.steps.merge }).toMatchObject({ name: w.name, merge: { type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } } });
+      expect({ name: w.name, merge: w.steps.merge }).toMatchObject({ name: w.name, merge: { type: "merge", outcomes: { stale: { to: "update" } } } });
+      const stale = outcomeEdge((w.steps.merge?.outcomes as Record<string, unknown>).stale as Parameters<typeof outcomeEdge>[0]).counter as string;
+      expect({ name: w.name, max: w.counters?.[stale]?.max }).toEqual({ name: w.name, max: 10 });
     }
   });
 

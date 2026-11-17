@@ -228,7 +228,8 @@ esac
 
   test("story runs the same script as quick, declaring exit 3 as stale → update", () => {
     expect(bundledCiScript("story")).toBe(bundledCiScript("quick"));
-    for (const wf of ["story", "quick"])
-      expect(ciStep(SHIPPED_DIR, wf)).toMatchObject({ exits: { 3: "stale" }, outcomes: { stale: { to: "update", counter: "stale_loop" } } });
+    // story shares stale_loop with human-qa's stale; quick's ship step derives ship.stale
+    for (const [wf, counter] of [["story", "stale_loop"], ["quick", "ship.stale"]])
+      expect(ciStep(SHIPPED_DIR, wf as string)).toMatchObject({ exits: { 3: "stale" }, outcomes: { stale: { to: "update", counter } } });
   });
 });

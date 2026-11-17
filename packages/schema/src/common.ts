@@ -28,6 +28,8 @@ const IDENT = "[a-z][a-z0-9_-]*";
 export const STEP_NAME_PATTERN = `^(?!(${RESERVED_STEP_NAMES.join("|")})$)${IDENT}$`;
 export const OUTCOME_NAME_PATTERN = `^${IDENT}$`;
 export const COUNTER_NAME_PATTERN = `^${IDENT}$`;
+/** A counter name where norn stores one: a declared name, or `<step>.<outcome>` derived from the edge it counts. */
+export const STORED_COUNTER_NAME_PATTERN = `^${IDENT}(\\.${IDENT})?$`;
 export const TARGET_PATTERN = `^(\\$done|\\$stuck|(?!(${RESERVED_STEP_NAMES.join("|")})$)${IDENT})$`;
 
 export const Ulid = Type.String({ pattern: ULID_PATTERN, description: "ULID" });
@@ -43,6 +45,7 @@ export const UnitDir = Type.String({ pattern: UNIT_DIR_PATTERN, description: "_s
 export const StepName = Type.String({ pattern: STEP_NAME_PATTERN });
 export const OutcomeName = Type.String({ pattern: OUTCOME_NAME_PATTERN });
 export const CounterName = Type.String({ pattern: COUNTER_NAME_PATTERN });
+export const StoredCounterName = Type.String({ pattern: STORED_COUNTER_NAME_PATTERN });
 /** A step name or a reserved target (`$done`, `$stuck`). */
 export const Target = Type.String({ pattern: TARGET_PATTERN });
 export const NonEmpty = Type.String({ minLength: 1 });

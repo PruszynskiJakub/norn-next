@@ -29,4 +29,5 @@ export * from "./unit-state.ts";
 export * from "./update-outcome.ts";
 export * from "./regenerate.ts";
 export * from "./verbs.ts";
+export * from "./derive-counters.ts";
 export * from "./workflow.ts";

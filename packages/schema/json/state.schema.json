@@ -97,7 +97,7 @@
         "counters": {
           "type": "object",
           "patternProperties": {
-            "^[a-z][a-z0-9_-]*$": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
               "minimum": 0,
               "type": "integer"
             }
@@ -305,7 +305,7 @@
         "counters": {
           "type": "object",
           "patternProperties": {
-            "^[a-z][a-z0-9_-]*$": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
               "minimum": 0,
               "type": "integer"
             }
@@ -724,7 +724,7 @@
               ],
               "properties": {
                 "name": {
-                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "type": "string"
                 },
                 "max": {
@@ -746,7 +746,7 @@
         "counters": {
           "type": "object",
           "patternProperties": {
-            "^[a-z][a-z0-9_-]*$": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
               "minimum": 0,
               "type": "integer"
             }
@@ -1180,7 +1180,7 @@
               ],
               "properties": {
                 "name": {
-                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "type": "string"
                 },
                 "max": {
@@ -1202,7 +1202,7 @@
         "counters": {
           "type": "object",
           "patternProperties": {
-            "^[a-z][a-z0-9_-]*$": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
               "minimum": 0,
               "type": "integer"
             }
@@ -1617,7 +1617,7 @@
                   ],
                   "properties": {
                     "name": {
-                      "pattern": "^[a-z][a-z0-9_-]*$",
+                      "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                       "type": "string"
                     },
                     "max": {
@@ -1641,7 +1641,7 @@
         "counters": {
           "type": "object",
           "patternProperties": {
-            "^[a-z][a-z0-9_-]*$": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
               "minimum": 0,
               "type": "integer"
             }
@@ -1957,7 +1957,7 @@
               ],
               "properties": {
                 "name": {
-                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "type": "string"
                 },
                 "max": {
@@ -1979,7 +1979,7 @@
         "counters": {
           "type": "object",
           "patternProperties": {
-            "^[a-z][a-z0-9_-]*$": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
               "minimum": 0,
               "type": "integer"
             }

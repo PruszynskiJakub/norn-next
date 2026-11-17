@@ -200,6 +200,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -322,6 +326,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -390,6 +398,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -432,6 +444,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -474,6 +490,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -540,6 +560,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -582,6 +606,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -624,6 +652,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -666,6 +698,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -732,6 +768,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -774,6 +814,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -840,6 +884,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -882,6 +930,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -948,6 +1000,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -990,6 +1046,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -1056,6 +1116,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -1122,6 +1186,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }
@@ -1164,6 +1232,10 @@
                                 "counter": {
                                   "pattern": "^[a-z][a-z0-9_-]*$",
                                   "type": "string"
+                                },
+                                "max": {
+                                  "minimum": 1,
+                                  "type": "integer"
                                 }
                               }
                             }

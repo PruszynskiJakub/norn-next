@@ -20,10 +20,11 @@ import {
   toJsonSchema,
 } from "@norn/schema";
 import { type Document, isCollection, isMap, isScalar, parseDocument, parse as parseYaml, stringify as stringifyYaml } from "yaml";
+import { withDerivedCounters } from "./derived-counters.ts";
 import { atomicWrite, fileError, isErrno, readText, type ReadResult } from "./fsx.ts";
 import { recordedInterval } from "./heartbeat.ts";
 import { checkoutOf, LOCAL_CONFIG_FILE, LOCAL_CONFIG_SCHEMA_FILE, nornHome, REPO_CONFIG_SCHEMA_FILE, REPO_CONFIG_FILE, repoConfigPath, USER_CONFIG_SCHEMA_FILE, userConfigPath, workflowsDir } from "./paths.ts";
-import { flattenWorkflowText, SHARED_DIR, sharedFile, sharedFilesUsed } from "./shared-workflow.ts";
+import { flattenWorkflowText, SHARED_DIR, type SharedExit, sharedFile, sharedFilesUsed } from "./shared-workflow.ts";
 import { inNewWording, oldWordingSteps } from "./wording.ts";
 import { oldWordingError, type PinnedWorkflow, parseWorkflowText, sha256, type WorkflowRead } from "./unit.ts";
 
@@ -323,6 +324,8 @@ export interface WorkflowFile extends PinnedWorkflow {
   file: string;
   /** included step → the shared file (name) it came from; absent when the workflow uses none */
   included?: Record<string, string>;
+  /** flat edge (`<step>.<outcome>`) → the shared exit it left by, with that use route's counter and max; absent when the workflow uses none */
+  exits?: Record<string, SharedExit>;
 }
 
 export interface WorkflowListing {
@@ -359,7 +362,7 @@ export function loadWorkflowText(
   read: WorkflowRead,
   root?: string,
   readShared: (shared: string) => string | null = () => null,
-): ReadResult<PinnedWorkflow & Pick<WorkflowFile, "included">> {
+): ReadResult<PinnedWorkflow & Pick<WorkflowFile, "included" | "exits">> {
   // The main checkout takes only the new wording, in the file and in every shared file it uses; a copy
   // is translated first, since flattening works on the new wording
   const own = read === "copy" ? inNewWording(text) : text;
@@ -372,8 +375,10 @@ export function loadWorkflowText(
   }
   const flat = flattenWorkflowText(own, (n) => { const t = shared.get(n); return t == null ? null : read === "copy" ? inNewWording(t) : t; });
   if (flat && !flat.ok) return { ok: false, reason: "corrupt", error: fileError(file, flat.errors, root) };
-  // A workflow without `use` loads as written, so its pin and fingerprint stay byte for byte
-  const source = flat ? flat.source : text;
+  // A workflow without `use` that derives no counter loads as written, so its pin and fingerprint stay byte for byte
+  const derived = withDerivedCounters(flat ? flat.source : own, flat?.included, flat?.exits);
+  if (!derived.ok) return { ok: false, reason: "corrupt", error: fileError(file, derived.errors, root) };
+  const source = derived.source ?? (flat ? flat.source : text);
   const r = parseWorkflowText(source, file, read, root);
   if (!r.ok) return r;
   if (r.value.name !== name)
@@ -382,7 +387,7 @@ export function loadWorkflowText(
       reason: "corrupt",
       error: fileError(file, [{ path: "/name", message: `must equal the file name '${name}'` }], root),
     };
-  return { ok: true, raw: text, value: { workflow: r.value, hash: sha256(source), source, ...(flat?.included && { included: flat.included }) } };
+  return { ok: true, raw: text, value: { workflow: r.value, hash: sha256(source), source, ...(flat?.included && { included: flat.included }), ...(flat?.exits && { exits: flat.exits }) } };
 }
 
 // A text that is not YAML has no steps to find old wording in; the parse that follows reports it

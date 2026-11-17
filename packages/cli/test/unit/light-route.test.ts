@@ -14,11 +14,12 @@ import { loadWorkflow, parseWorkflowText, workflowsDir } from "@norn/store";
 
 const ROOT = join(import.meta.dir, "..", "..", "..", "..");
 const SHIPPED = join(ROOT, "packages", "cli", "assets", "workflows");
+/** Each copy with the counter its base update's failed tests share: the exit they leave by, which the copies name apart. */
 const COPIES = [
-  ["shipped story", SHIPPED, "story"],
-  ["shipped quick", SHIPPED, "quick"],
-  ["repo story", workflowsDir(ROOT), "story"],
-  ["repo quick", workflowsDir(ROOT), "quick"],
+  ["shipped story", SHIPPED, "story", "base-update.broken"],
+  ["shipped quick", SHIPPED, "quick", "base-update.broken"],
+  ["repo story", workflowsDir(ROOT), "story", "base-update.failed"],
+  ["repo quick", workflowsDir(ROOT), "quick", "base-update.failed"],
 ] as const;
 
 /** A workflow as norn loads it from a workflows folder: through the store's loader, its shared files brought in. */
@@ -64,7 +65,7 @@ function walk(wf: Workflow, at: string, outcomes: string[], counters: Record<str
   return seen;
 }
 
-describe.each(COPIES)("%s workflow routes the light path", (_name, dir, name) => {
+describe.each(COPIES)("%s workflow routes the light path", (_name, dir, name, broken) => {
   const wf = load(dir, name);
   const text = writtenText(dir, name);
 
@@ -74,8 +75,8 @@ describe.each(COPIES)("%s workflow routes the light path", (_name, dir, name) =>
   });
 
   test("the merge test passes to open-pr, the resolution test to the resolution review, and both fail to implement", () => {
-    expect(edges(wf, "test-merge")).toEqual({ pass: { to: "open-pr" }, fail: { to: "implement", counter: "test_loop" } });
-    expect(edges(wf, "test-resolution")).toEqual({ pass: { to: "resolution-review" }, fail: { to: "implement", counter: "test_loop" } });
+    expect(edges(wf, "test-merge")).toEqual({ pass: { to: "open-pr" }, fail: { to: "implement", counter: broken } });
+    expect(edges(wf, "test-resolution")).toEqual({ pass: { to: "resolution-review" }, fail: { to: "implement", counter: broken } });
   });
 
   test("the test command is written once and every test step runs it", () => {
@@ -90,7 +91,7 @@ describe.each(COPIES)("%s workflow routes the light path", (_name, dir, name) =>
     expect(edges(wf, "resolution-review")).toMatchObject({
       approve: { to: "open-pr" },
       redescribe: { to: "describe" },
-      changes_requested: { to: "resolve", counter: "resolution_loop" },
+      changes_requested: { to: "resolve", counter: "resolution-review.changes_requested" },
     });
   });
 
@@ -103,9 +104,9 @@ describe.each(COPIES)("%s workflow routes the light path", (_name, dir, name) =>
     expect(walk(wf, "update", ["resolved", "pass"]).map((s) => s.step)).toEqual(["update", "test-resolution", "resolution-review"]);
   });
 
-  test("blocking findings of the resolution review go back to resolve on resolution_loop, not to implement", () => {
+  test("blocking findings of the resolution review go back to resolve on its own counter, not to implement", () => {
     const last = walk(wf, "resolution-review", ["changes_requested"]).at(-1);
-    expect({ step: last?.step, loop: last?.counters.resolution_loop }).toEqual({ step: "resolve", loop: 1 });
+    expect({ step: last?.step, loop: last?.counters["resolution-review.changes_requested"] }).toEqual({ step: "resolve", loop: 1 });
   });
 
   test("approve goes to open-pr without describe; redescribe runs describe again first", () => {
@@ -113,8 +114,8 @@ describe.each(COPIES)("%s workflow routes the light path", (_name, dir, name) =>
     expect(walk(wf, "resolution-review", ["redescribe", "done"]).map((s) => s.step)).toEqual(["resolution-review", "describe", "open-pr"]);
   });
 
-  test("a light-path update resets base_conflict_loop like a full one: conflicts on one base move count, not across moves", () => {
-    for (const outcome of ["done", "clean", "resolved"]) expect({ outcome, loop: walk(wf, "update", [outcome], { base_conflict_loop: 1 }).at(-1)?.counters.base_conflict_loop }).toEqual({ outcome, loop: 0 });
+  test("a light-path update resets the update's conflict counter like a full one: conflicts on one base move count, not across moves", () => {
+    for (const outcome of ["done", "clean", "resolved"]) expect({ outcome, loop: walk(wf, "update", [outcome], { "update.conflict": 1 }).at(-1)?.counters["update.conflict"] }).toEqual({ outcome, loop: 0 });
   });
 
   describe("the light path is measured only from an approval the PR already holds", () => {

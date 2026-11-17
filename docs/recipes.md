@@ -93,7 +93,7 @@ Set `status: done` in the story's `spec.md` on the base yourself and commit it, 
 ## Write your own workflow
 
 1. Copy one of the workflows in `.agents/workflows/` under a new name, for example `docs.yaml`, and change its `name:`.
-2. Edit the steps. Each opens with one head key that says what happens (`agent:`, `check:`, `gate:` or a verb with no value such as `open-pr:`), then says where each outcome goes in `outcomes:`. A route back needs a counter. An agent step's head is its orientation, what the step is for; `skills:` (optional) lists the skills it uses, `by:` picks a configured agent, and `means:` says what each routed outcome means (with `verdict:` beside it when the outcome judges the criteria):
+2. Edit the steps. Each opens with one head key that says what happens (`agent:`, `check:`, `gate:` or a verb with no value such as `open-pr:`), then says where each outcome goes in `outcomes:`. A route back is bounded by a counter norn derives from the kind of edge, so you write one only when its default is wrong ([Bound a loop](#bound-a-loop)). An agent step's head is its orientation, what the step is for; `skills:` (optional) lists the skills it uses, `by:` picks a configured agent, and `means:` says what each routed outcome means (with `verdict:` beside it when the outcome judges the criteria):
 
 ```yaml
   implement:
@@ -107,10 +107,10 @@ Set `status: done` in the story's `spec.md` on the base yourself and commit it, 
   test:
     check: npm ci && npm test
     timeout: 15m
-    outcomes: { pass: review, fail: { to: implement, counter: test_loop } }
+    outcomes: { pass: review, fail: { to: implement, max: 3 } }
   ready:
     gate: Read the draft PR. Approve to wait for the merge, or reject with what to change.
-    outcomes: { approve: merge, reject: { to: implement, counter: ready_loop } }
+    outcomes: { approve: merge, reject: implement }
 ```
 
    norn refuses at load a step with two head keys or none, a verb given a value (`open-pr: now`), an agent step with no orientation, a skill listed twice, a routed outcome with no meaning, a meaning or verdict for an outcome the step does not route, and `means:` or `verdict:` on a step that is not an agent step.
@@ -119,11 +119,11 @@ Set `status: done` in the story's `spec.md` on the base yourself and commit it, 
 
    A file in the old wording (`type: agent` with `skill:` and `instructions:`, `type: check` with `run:`, `type: gate` with `prompt:`, `type: git` with `action:`, `means`/`verdict` inside a route) is refused in the main checkout. Run `norn upgrade`: it rewrites each such file in place, keeping its comments and layout. A story already in flight keeps running on its pinned workflow.
 
-   An `await-merge:` step after the last gate keeps a story past that gate in its workflow until its PR merges: `merge: { await-merge: null, outcomes: { stale: { to: update, counter: stale_loop } } }`. Its one outcome is `stale`; the merge itself ends the story.
+   An `await-merge:` step after the last gate keeps a story past that gate in its workflow until its PR merges: `merge: { await-merge: null, outcomes: { stale: update } }`. Its one outcome is `stale`; the merge itself ends the story.
 
    Once `open-pr` has run, every route from a step that changes code (an agent step or `update-branch:`) to a gate or merge step the round can end from must pass `open-pr` again: then the PR head a person merges is the commit CI checked. norn refuses a workflow that skips it and names the path. At run time, a story waiting at such a gate or merge step whose local head changes a path outside its spec folder that the PR lacks goes back to `open-pr` on its own. Changes inside the spec folder stay local.
 
-   A check ends in `pass` (exit 0) or `fail` (any other exit). One that can end another way names the outcome per exit code in `exits` and routes it like any other: the shipped `ci` check exits 3 on a PR that conflicts with its base, and `exits: { 3: stale }` with `stale: { to: update, counter: stale_loop }` sends the story to take the base instead of to `implement`.
+   A check ends in `pass` (exit 0) or `fail` (any other exit). One that can end another way names the outcome per exit code in `exits` and routes it like any other: the shipped `ci` check exits 3 on a PR that conflicts with its base, and `exits: { 3: stale }` with `stale: update` sends the story to take the base instead of to `implement`.
 
 3. Write a step once and reuse it, when the same steps appear in several workflows or a step differs from another only in its routes (below).
 4. Commit it. norn validates a workflow before a unit uses it and refuses one that does not hold together, naming what is wrong.
@@ -155,7 +155,7 @@ steps:
       stale: { exit: behind }
 ```
 
-A workflow brings the file in with a step that holds only `use: <name>` and the routes for the file's named exits. The `use` step routes each named exit like an outcome, counters included:
+A workflow brings the file in with a step that holds only `use: <name>` and the routes for the file's named exits. The `use` step routes each named exit like an outcome, `max:` and `counter:` included:
 
 ```yaml
   describe:
@@ -167,8 +167,8 @@ A workflow brings the file in with a step that holds only `use: <name>` and the 
     use: ship
     outcomes:
       green:  ready
-      red:    { to: implement, counter: ci_loop }
-      behind: { to: update, counter: stale_loop }
+      red:    { to: implement, max: 3 }
+      behind: update
 ```
 
 The shared steps keep their own names, so the brief, receipts, history and `--at` show `open-pr` and `ci`, never `ship`. A route, `start` or `base.step` that names the `use` step enters the file at its `start`; any route, `base.step` or `base.verify` can name an included step to enter the file in the middle. A named exit the `use` step does not route goes to `$stuck`. A route inside the shared file can name a counter the workflow declares, and the workflow's `defaults:` apply to the included steps as to its own.
@@ -181,13 +181,56 @@ A step written `like: <step>` copies that step of the same file and replaces eac
   test:
     check: npm ci && npm test
     timeout: 15m
-    outcomes: { pass: qa, fail: { to: implement, counter: test_loop } }
+    outcomes: { pass: qa, fail: implement }
   test-merge:
     like: test
-    outcomes: { pass: open-pr, fail: { to: implement, counter: test_loop } }
+    outcomes: { pass: open-pr, fail: implement }
 ```
 
 `test-merge` runs the same command with the same timeout; only its `outcomes` differ. A key is replaced whole, never merged: `test-merge` above writes both of its routes. A copy inherits its target's head key and may not write another one (that is two head keys). The same holds for `means:` and `verdict:`: a copy that writes `means:` replaces the whole map, so it must give a meaning for every outcome it routes, inherited ones included, or it is refused.
+
+### Bound a loop
+
+Every route back to an earlier step is counted, and a unit whose counter passes its max is stuck. You write none of these counters yourself: norn derives one from the kind of each edge when it loads the workflow.
+
+| Edge | Default max | Resets |
+|---|---|---|
+| a check's `fail`, or an outcome its `exits` names for an exit code, other than `stale` | 5 | never |
+| a gate's `reject` | 2 | never |
+| a `conflict` | 2 | on any other outcome of the same step |
+| `stale`, on any kind of step | 10 | never |
+| an agent outcome other than `done`, `pass` or `approve` that lies on a loop the rows above leave uncounted (`review.changes_requested → implement`) | 3 | never |
+
+Only an edge to a step is counted; an edge to `$done` or `$stuck` ends the round. The first four rows count their edge even where it lies on no loop. A `done`, `pass` or `approve` edge, and an agent outcome on no loop that is still uncounted, get no counter: forward progress is never counted.
+
+**Names.** A derived counter is named after the edge it counts, `<step>.<outcome>` (`test.fail`, `review.changes_requested`), the spelling `reset_on` uses for an edge. A route that leaves a [shared file](#share-steps-between-workflows) through a named exit is counted by one counter, `<use step>.<exit>` (`ship.stale`, `base-update.broken`), shared by every edge inside the file that leaves through that exit; its default comes from the kind of those edges. The name is what the brief's last-round warning (`Last round on review.changes_requested (2/3)`), `norn status`, `norn story view` and the Unblock item show, and what `norn run rerun <unit> --reset review.changes_requested` takes.
+
+**Change the bound with `max:` on the edge.** `fail: { to: implement, max: 3 }` replaces the default max and keeps the name and the reset. On an edge that would derive no counter (a gate's `approve` or an agent's `done` that leads back), `max:` counts it as `<step>.<outcome>` with that max and no reset. On a `use` step's route, `max:` bounds the exit's counter: `ci-failed: { to: implement, max: 3 }`.
+
+**When you still name a counter.** Write `counter: <name>` on the edges and declare it under `counters:` when several edges share one budget, or when a counter resets on edges you choose:
+
+```yaml
+steps:
+  qa:
+    # …
+    outcomes: { pass: describe, fail: { to: implement, counter: qa_loop } }
+  human-qa:
+    # …
+    outcomes: { approve: describe, reject: { to: implement, counter: qa_loop } }
+counters:
+  # QA's fail and the person's reject share one budget of 2
+  qa_loop: { max: 2 }
+  # or reset it whenever the person approves: { max: 2, reset_on: human-qa.approve }
+```
+
+An edge with `counter:` gets no derived counter. A name under `counters:` has no dot; a dotted name is always derived, so `counter: review.changes_requested` is refused as not declared. A workflow written before derived counters, every route with its `counter:` and a `counters:` block, loads and runs as it did.
+
+norn refuses at load, and `norn doctor` reports with the edge or exit it is about:
+
+- `max:` and `counter:` on one edge: a named counter's max goes under `counters:`;
+- `max:` on an edge to `$done` or `$stuck`: there is no loop to bound;
+- a shared exit fed by edges of different kinds (a check's `fail` and a gate's `reject`) when the `use` step's route gives no `max:`: the message names the exit and the edges of each kind;
+- a loop still uncounted after derivation (`cycle without a counter`, naming its edges).
 
 ### What norn refuses
 
@@ -202,7 +245,7 @@ norn refuses the workflow when it loads, naming the file and the step, and shows
 - `reset_on` or `base.verify` naming a `use` step: name the included step instead;
 - a `like:` naming a step that does not exist, the step itself, another `like` step, a `use` step or a step of another file, and a `use` step that carries `like`.
 
-An included step that breaks an ordinary rule (an unknown counter, a route back without a counter) is refused with a message that names its shared file and the step in it.
+An included step that breaks an ordinary rule (an unknown counter, a loop no counter bounds) is refused with a message that names its shared file and the step in it.
 
 ## Name your own skill in a step
 

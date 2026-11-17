@@ -5,7 +5,7 @@ start: sync
 steps:
   sync:
     update-branch:
-    outcomes: { done: { exit: synced }, conflict: { to: sync-resolve, counter: sync_conflict_loop } }
+    outcomes: { done: { exit: synced }, conflict: sync-resolve }
   sync-resolve:
     agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
     skills: [norn-merge]

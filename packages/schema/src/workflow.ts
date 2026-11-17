@@ -7,6 +7,7 @@ import {
   OutcomeName,
   PosInt,
   StepName,
+  StoredCounterName,
   TaggedUnion,
   Target,
 } from "./common.ts";
@@ -20,7 +21,7 @@ export type HandBack = Static<typeof HandBack>;
 export const OutcomeEdge = Type.Object(
   {
     to: Target,
-    counter: Type.Optional(CounterName),
+    counter: Type.Optional(StoredCounterName),
     means: Type.Optional(Type.String({ minLength: 1, description: "Shown to the agent in the brief" })),
     /** Reportable only when the worst verdict of the `--criteria` report is this one (agent steps) */
     verdict: Type.Optional(Verdict),
@@ -304,7 +305,7 @@ export const Workflow = Type.Object(
     ),
     start: StepName,
     steps: Type.Record(StepName, Step, { minProperties: 1, additionalProperties: false }),
-    counters: Type.Optional(Type.Record(CounterName, CounterSpec, { additionalProperties: false })),
+    counters: Type.Optional(Type.Record(StoredCounterName, CounterSpec, { additionalProperties: false })),
     base: Type.Optional(BaseSync),
   },
   {
@@ -326,14 +327,26 @@ export const ExitEdge = Type.Object(
 );
 export type ExitEdge = Static<typeof ExitEdge>;
 
-/** A route as a file writes it: a bare target or `{ to, counter }`; its meaning and verdict sit in the step's sibling maps. */
-const FileRoute = Type.Union([Target, Type.Object({ to: Target, counter: Type.Optional(CounterName) }, { additionalProperties: false })]);
+/**
+ * A route as a file writes it: a bare target or `{ to, counter, max }`; its meaning and verdict sit in the step's sibling maps.
+ * `max` bounds the counter derived from the edge; the loader turns it into a counter, so the loaded workflow never holds it.
+ */
+const RouteEdge = Type.Object(
+  { to: Target, counter: Type.Optional(CounterName), max: Type.Optional(PosInt) },
+  { additionalProperties: false },
+);
+const FileRoute = Type.Union([Target, RouteEdge]);
 const fileSteps = (route: TSchema) => Object.values(fileStepTypes(route)) as TObject[];
 const FileSteps = fileSteps(FileRoute);
 // A shared file's route may also leave it through an exit, which its `use` step routes by name
 const SharedSteps = fileSteps(Type.Union([FileRoute, Type.Object({ exit: OutcomeName }, { additionalProperties: false })]));
 
-const SharedModelSteps = stepTypes(Type.Union([Target, OutcomeEdge, ExitEdge]));
+// As written in a shared file: a declared (dotless) counter, and a `max` the loader turns into a derived counter
+const SharedModelEdge = Type.Object(
+  { ...OutcomeEdge.properties, counter: Type.Optional(CounterName), max: Type.Optional(PosInt) },
+  { additionalProperties: false },
+);
+const SharedModelSteps = stepTypes(Type.Union([Target, SharedModelEdge, ExitEdge]));
 
 /** A shared file's steps in the loaded model's form, the way the loader checks them before flattening; never published. */
 export const WorkflowSharedModel = Type.Object(
@@ -368,7 +381,7 @@ export const UseStep = Type.Object(
   {
     use: SharedName,
     outcomes: Type.Optional(
-      Type.Record(OutcomeName, Type.Union([Target, Type.Object({ to: Target, counter: Type.Optional(CounterName) }, { additionalProperties: false })]), {
+      Type.Record(OutcomeName, Type.Union([Target, RouteEdge]), {
         additionalProperties: false,
       }),
     ),
@@ -382,6 +395,8 @@ export const WorkflowSource = Type.Object(
   {
     ...Workflow.properties,
     steps: Type.Record(StepName, Type.Union([...FileSteps, UseStep, LikeStep]), { minProperties: 1, additionalProperties: false }),
+    // a dotted name is derived from its edge, so a declared one never clashes with it
+    counters: Type.Optional(Type.Record(CounterName, CounterSpec, { additionalProperties: false })),
   },
   {
     $id: "https://norn.dev/schema/workflow-source.json",

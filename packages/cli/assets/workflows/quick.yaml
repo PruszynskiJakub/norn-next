@@ -35,7 +35,7 @@ steps:
     use: base-update
     outcomes:
       tested: review
-      broken: { to: implement, counter: test_loop }
+      broken: implement
       ship: ship
       redescribe: describe
   review:
@@ -45,7 +45,7 @@ steps:
     hand_back: { changes_requested: findings }
     outcomes:
       approve:           describe
-      changes_requested: { to: implement, counter: review_loop }
+      changes_requested: implement
     means:
       approve: "the change does what the story asks and nothing else, no blocking findings"
       changes_requested: "blocking findings in the receipt"
@@ -61,20 +61,9 @@ steps:
   ship:
     use: ship
     outcomes:
-      ci-failed: { to: implement, counter: ci_loop }
-      rejected: { to: implement, counter: ready_loop }
-      stale: { to: update, counter: stale_loop }
-counters:
-  test_loop: { max: 5 }
-  ci_loop: { max: 3 }
-  review_loop: { max: 3 }
-  ready_loop: { max: 2 }
-  # reset each time their update merges cleanly (on either path): only repeated conflicts on one base move count
-  sync_conflict_loop: { max: 2, reset_on: sync.done }
-  base_conflict_loop: { max: 2, reset_on: [update.done, update.clean, update.resolved] }
-  resolution_loop: { max: 2 }
-  # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
-  stale_loop: { max: 10 }
+      ci-failed: { to: implement, max: 3 }
+      rejected: implement
+      stale: update
 # update-branch re-enters update, not sync (the default would be the first update step); a base move
 # without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once per
 # base move (no push, no CI): red goes back through update like a conflict
