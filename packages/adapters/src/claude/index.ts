@@ -74,10 +74,13 @@ const NOTIFICATION_EVENTS: Record<string, HookEventKind | null> = {
  * Claude Code `StopFailure.error` (the turn ended on an API error; output is ignored) → event and
  * the line a person reads. A failed login leaves the session unable to act on any prompt, so it
  * waits on a person (`/login` in the pane) like the usage-limit wait, rather than ending a turn
- * that would be nudged. Other errors are ignored: the idle notification still ends the turn.
+ * that would be nudged. A usage limit waits the same way, though Claude Code itself continues the
+ * session at the reset: its next fact ends the wait, so the unit goes on with no answer from anyone.
+ * Other errors are ignored: the idle notification still ends the turn.
  */
 const STOP_FAILURE_EVENTS: Record<string, { event: HookEventKind; message: string }> = {
   authentication_failed: { event: "waiting_input", message: "agent logged out — run `/login` in the pane" },
+  rate_limit: { event: "waiting_input", message: "usage limit reached — Claude Code continues the session when it resets" },
 };
 
 /** Notification without `notification_type` (older Claude Code): classify by the message text. */

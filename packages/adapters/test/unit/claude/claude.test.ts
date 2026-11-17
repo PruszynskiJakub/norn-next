@@ -68,8 +68,11 @@ describe("claude StopFailure (a turn that ended on an API error)", () => {
   test("a failed login waits on a person to run /login, so no nudge is spent", () => {
     expect(sf("authentication_failed")).toMatchObject({ event: "waiting_input", native: "StopFailure", message: "agent logged out — run `/login` in the pane" });
   });
+  test("a usage limit waits for its reset, so no nudge is spent and nobody is asked to unstick it", () => {
+    expect(sf("rate_limit")).toMatchObject({ event: "waiting_input", native: "StopFailure", message: "usage limit reached — Claude Code continues the session when it resets" });
+  });
   test("other API errors are ignored, as before", () => {
-    for (const e of ["rate_limit", "server_error", "invalid_request", "max_output_tokens", "unknown", "something_new", undefined]) expect(sf(e)).toBeNull();
+    for (const e of ["server_error", "invalid_request", "max_output_tokens", "unknown", "something_new", undefined]) expect(sf(e)).toBeNull();
   });
   test("its response is silent: Claude Code ignores StopFailure output", () => {
     expect(claudeAgent.hookResponse(sf("authentication_failed")!, { kind: "block", reason: "r" })).toEqual({ stdout: "", exit_code: 0 });

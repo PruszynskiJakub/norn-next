@@ -827,6 +827,7 @@ export function protocolLines(step: ProtocolStep): string[] {
     '  - "push, open or comment on a pull request" → leave it to norn',
     '  - "run another norn command" → only when the person asks you to directly',
     "- A subagent you start works under these rules, though it never sees this brief: give it the ones its work can break, each with its reason (no push, no branch or worktree switch, no norn command, no edit under `runs/`); one that only reads needs none.",
+    "- A usage limit, yours or a subagent's, is not a reason for `norn stuck`: it resets on its own. Go on without the subagent if you can; otherwise end your turn, and the session continues once the limit resets.",
   ];
 }
 
