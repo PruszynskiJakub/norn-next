@@ -16,6 +16,12 @@ export interface BriefCommands {
 
 export const DEFAULT_BRIEF_COMMANDS: BriefCommands = Object.freeze({ brief: "norn brief", done: "norn done", ask: "norn ask", stuck: "norn stuck" });
 
+/** A question an earlier session of the step asked and a person answered; the question is absent when the record lost it. */
+export interface AnsweredAsk {
+  question?: string;
+  answer: string;
+}
+
 export interface BriefRenderInput {
   brief: BriefInputs;
   /** `gh-12` or `gh-12/03` */
@@ -34,6 +40,8 @@ export interface BriefRenderInput {
   means?: Readonly<Record<string, string>>;
   /** a person works in the session: questions go to them, and `done` waits for their agreement */
   attended?: boolean;
+  /** answers given to earlier sessions of this step, which a fresh session would otherwise never see */
+  answered?: readonly AnsweredAsk[];
 }
 
 /** What a hook's stop block and a nudge say about reporting: the one line every harness repeats. */
@@ -86,6 +94,11 @@ function skillLine(skills: readonly string[]): string {
   return `Use the ${list} skill${named.length === 1 ? "" : "s"}.`;
 }
 
+function answeredLines(answered: readonly AnsweredAsk[]): string[] {
+  const indent = (t: string) => t.trim().replaceAll("\n", "\n  ");
+  return answered.map((a) => (a.question ? `- Asked: ${indent(a.question)}\n  Answered: ${indent(a.answer)}` : `- Answered: ${indent(a.answer)}`));
+}
+
 function finishLines(input: BriefRenderInput, c: BriefCommands): string[] {
   const out: string[] = [];
   for (const o of input.outcomes) {
@@ -119,6 +132,15 @@ export function renderBrief(input: BriefRenderInput): string {
   if (b.skills.length > 0) out.push(skillLine(b.skills), "");
   if (!input.instructions && !input.description && b.skills.length === 0) out.push(`Work step \`${b.step}\` of workflow \`${b.workflow}\`.`, "");
   if (input.rework) out.push("## Rework", "", "This attempt reworks what was sent back. Address the points below first.", "", input.rework.trim(), "");
+  if (input.answered && input.answered.length > 0)
+    out.push(
+      "## Answers already given",
+      "",
+      "An earlier session of this step asked a person and these are the answers; treat them as decided and do not ask again:",
+      "",
+      ...answeredLines(input.answered),
+      "",
+    );
   if (b.inputs.length > 0) out.push("## Inputs", "", "Read these before you change anything:", "", ...b.inputs.map(inputLine), "");
   if (input.handoff)
     out.push(

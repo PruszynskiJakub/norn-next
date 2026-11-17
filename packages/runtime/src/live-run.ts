@@ -3,7 +3,7 @@
  * step that waits on a report, and which outcomes `done` may name. Read from the run state and the
  * flat workflow document it pins, so a hook process needs no loaded workflows to answer.
  */
-import { OVERRIDABLE_OUTCOMES, type RunInfo, type RunState, type UnitJournal } from "@norn/kernel";
+import { type KernelReceipt, OVERRIDABLE_OUTCOMES, type RunInfo, type RunState, type UnitJournal } from "@norn/kernel";
 
 const CLASSIFIED: ReadonlySet<string> = new Set(OVERRIDABLE_OUTCOMES);
 
@@ -23,14 +23,36 @@ export function reportableOutcomes(routed: readonly string[]): string[] {
   return routed.filter((o) => !CLASSIFIED.has(o));
 }
 
-/** The unit's live run and its step, or null when no run is on the record or the unit has ended. */
-export function liveStepOf(state: RunState | null): LiveStep | null {
-  if (!state || state.ended !== undefined || !state.run) return null;
+/**
+ * The agent run the newest launch on the record started at the unit's step, applied or not. The
+ * launch's receipt is applied by the next tick, but the agent it started asks for its brief and may
+ * stop or report within seconds: until then the unapplied receipt is the only word that it is live.
+ */
+function launchedRun(state: RunState, unapplied: readonly KernelReceipt[]): RunInfo | null {
+  let run = state.run;
+  for (const r of unapplied) {
+    const d = r.data;
+    if (d.kind !== "run.started" || d.run_kind !== "agent" || d.step !== state.step || d.attempt !== state.attempt || run?.id === d.run_id) continue;
+    // as the kernel applies it: a fresh run only where none is, a retry only of the current one
+    if ((d.retry_of ?? null) !== (run?.id ?? null)) continue;
+    run = { id: d.run_id, step: state.step, attempt: state.attempt, started_at: r.at, executor: d.executor, attended: d.attended, nudges: 0, ...(d.session !== undefined && { session: d.session }) };
+  }
+  return run;
+}
+
+/**
+ * The unit's live run and its step, or null when no run is on the record or the unit has ended.
+ * `unapplied` is the record's receipts above its state, so a run launched since the last tick counts.
+ */
+export function liveStepOf(state: RunState | null, unapplied: readonly KernelReceipt[] = []): LiveStep | null {
+  if (!state || state.ended !== undefined) return null;
+  const run = launchedRun(state, unapplied);
+  if (!run) return null;
   const doc = state.workflow.doc.steps[state.step];
   if (!doc) return null;
   const agent = typeof doc.agent === "string";
   return {
-    run: state.run,
+    run,
     step: state.step,
     attempt: state.attempt,
     agent,

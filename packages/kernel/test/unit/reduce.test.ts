@@ -296,6 +296,11 @@ describe("reduceSession", () => {
     expect(reduceSession(stream(START, { type: "session.ended", reason: "crash" }, START)).ended).toBeUndefined();
   });
 
+  test("a session resumed after its turn ended and its process exited is not read as a turn ended before its prompt arrives", () => {
+    const resumed = reduceSession(stream(START, BRIEF, { type: "report.made", verb: "ask" }, { type: "turn.ended" }, { type: "session.ended", reason: "exit" }, START));
+    expect({ ended: resumed.ended, turn_ended: resumed.turn_ended }).toEqual({ ended: undefined, turn_ended: false });
+  });
+
   test("an end drops every outstanding call and subagent", () => {
     const v = reduceSession(
       stream(BRIEF, { type: "tool.requested", id: "t1", kind: "shell", tool: "Bash" }, { type: "subagent.started", id: "a1", background: true }, { type: "session.ended", reason: "killed" }),

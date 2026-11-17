@@ -1,11 +1,14 @@
 /**
  * Gathering KernelFacts: the tracker's intake and items, the forge's changes, every unit read through
  * the Journal with its version, claims, the mailbox, sessions, in-flight step runs, and base_stale and
- * unpushed from the vcs. Facts are read, never acted on, so gathering twice changes nothing.
+ * unpushed from the vcs. Facts are read, never acted on as run state, so gathering twice changes nothing.
  *
  * A story whose record or claim cannot be read is left out of the tick whole: half a story (a slice
  * missing, a claim read as nobody's) would let decide start what is already running. A tracker or
  * forge that fails only leaves its fact empty, which decide reads as nothing new.
+ *
+ * The tick's gathering writes host memory (settled step runs, a stopped overdue check, a store sync);
+ * a read-only gathering skips those writes.
  */
 import {
   type ExecutorCapabilities,
@@ -32,12 +35,21 @@ export interface GatheredFacts {
   problems: string[];
 }
 
+/**
+ * `readOnly`: a reader outside the tick lock (a view) computes the same facts but writes nothing: no
+ * settled step run, no stop of a check past its deadline, no store sync. Those writes race the tick's
+ * own (a view settling a check start the tick has in flight would have it spawned twice).
+ */
+export interface GatherOptions {
+  readOnly?: boolean;
+}
+
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 function capabilitiesOf(env: RuntimeEnv): KernelCapabilities {
   const executors: Record<string, ExecutorCapabilities> = {};
   for (const [name, harness] of Object.entries(env.slots.executors)) {
-    const { blockStop, denyTool, injectContext, subagents, limits, paneInput, promptMarks } = harness.capabilities;
+    const { blockStop, denyTool, injectContext, subagents, limits, paneInput, promptMarks, resume } = harness.capabilities;
     const own = env.launcher.modesOf?.(name) ?? null;
     executors[name] = {
       blockStop,
@@ -48,6 +60,8 @@ function capabilitiesOf(env: RuntimeEnv): KernelCapabilities {
       // a harness that reads typed prompts still has no pane input in a runner without a pane
       paneInput: own ? paneInput && own.paneInput : paneInput,
       ...(promptMarks !== undefined && { promptMarks }),
+      // decide applies an answer undelivered only when no resumed session could take it
+      ...(resume !== undefined && { resume }),
       headless: own?.headless ?? env.launcher.modes.headless,
       attended: own?.attended ?? env.launcher.modes.attended,
     };
@@ -66,7 +80,7 @@ interface StoryRead {
   pinned: PinnedWorkflow[];
 }
 
-async function readStory(env: RuntimeEnv, key: string, unitIds: string[], problems: string[]): Promise<PluginResult<StoryRead>> {
+async function readStory(env: RuntimeEnv, key: string, unitIds: string[], problems: string[], opts: GatherOptions): Promise<PluginResult<StoryRead>> {
   const claim = await env.slots.store.claims.read(key);
   if (!claim.ok) return fail(claim.failure.code, `claim: ${claim.failure.message}`, claim.failure.retryable);
   const units: UnitFacts[] = [];
@@ -75,7 +89,7 @@ async function readStory(env: RuntimeEnv, key: string, unitIds: string[], proble
   // the story's own unit first, then its slices by number, as decide expects
   const ordered = [...unitIds].sort((a, b) => (a === key ? -1 : b === key ? 1 : a.localeCompare(b)));
   for (const id of ordered) {
-    const read = await readUnitFacts(env, id, problems);
+    const read = await readUnitFacts(env, id, problems, opts);
     if (!read.ok) return read;
     units.push(read.value.facts);
     const j = read.value.journal;
@@ -120,11 +134,11 @@ function byStory(ids: readonly string[]): Map<string, string[]> {
   return out;
 }
 
-async function readStories(env: RuntimeEnv, ids: readonly string[], problems: string[]): Promise<StoryRead[]> {
+async function readStories(env: RuntimeEnv, ids: readonly string[], problems: string[], opts: GatherOptions): Promise<StoryRead[]> {
   const reads: StoryRead[] = [];
   for (const [key, unitIds] of byStory(ids)) {
     try {
-      const read = await readStory(env, key, unitIds, problems);
+      const read = await readStory(env, key, unitIds, problems, opts);
       if (read.ok) reads.push(read.value);
       else problems.push(`${key} left out: ${read.failure.message}`);
     } catch (e) {
@@ -134,18 +148,18 @@ async function readStories(env: RuntimeEnv, ids: readonly string[], problems: st
   return reads.sort((a, b) => a.since.localeCompare(b.since) || a.key.localeCompare(b.key));
 }
 
-export async function gatherFacts(env: RuntimeEnv, tickId: string): Promise<PluginResult<GatheredFacts>> {
+export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherOptions = {}): Promise<PluginResult<GatheredFacts>> {
   const problems: string[] = [];
   // a shared store shows other machines' run data only once synced; without it a story another machine
   // carried on (or finished) would be decided from this machine's stale copy
   const store = env.slots.store;
-  if (store.capabilities.shared && store.sync) {
+  if (!opts.readOnly && store.capabilities.shared && store.sync) {
     const synced = await store.sync();
     if (!synced.ok) problems.push(`store sync: ${synced.failure.message}`);
   }
   const listed = await store.listUnits();
   if (!listed.ok) return fail(listed.failure.code, `store: ${listed.failure.message}`, listed.failure.retryable);
-  const reads = await readStories(env, listed.value, problems);
+  const reads = await readStories(env, listed.value, problems, opts);
   const workflows = tickWorkflows(
     env,
     reads.flatMap((r) => r.pinned),

@@ -286,3 +286,29 @@ describe("an agent run, judged from its session", () => {
     expect(decideCase(c)).toEqual(decideCase(c));
   });
 });
+
+describe("an answer to a session that cannot take it", () => {
+  const parked = { reason: "build: the agent asks a question", since: minutesAgo(10) };
+  const answered = [receipt(7, { kind: "answer.sent", input_id: "q1", text: "main", by: "ann" })];
+  const at = (over = {}) => stateAt("build", { parked, applied_through: 6, run: run({ session: "h-1", ...over }) });
+
+  test("an ended session on an executor that cannot resume gets the answer applied undelivered, and the unit unparks", () => {
+    const d = kindOf(decideCase({ state: at(), receipts: answered, session: session("ended") }), "apply_receipts");
+    expect(d.rule).toBe("receipts.apply.undelivered");
+    expect(d.undelivered).toEqual(["r-7"]);
+    expect(d.state.parked).toBeUndefined();
+    // the next tick judges the ended session dead and retries it, in a fresh session whose brief carries the answer
+    expect(decideCase({ state: d.state, session: session("ended") })?.rule).toBe("agent.died.retry");
+  });
+
+  test("a live session, a session that can be resumed, or an attended run takes the answer as usual", () => {
+    for (const c of [
+      { state: at(), session: session("working") },
+      { state: at(), session: session("ended"), executors: { claude: caps({ resume: true }) } },
+      { state: at({ attended: true }), session: session("ended") },
+    ]) {
+      const d = kindOf(decideCase({ ...c, receipts: answered }), "apply_receipts");
+      expect([d.rule, d.undelivered]).toEqual(["receipts.apply", undefined]);
+    }
+  });
+});

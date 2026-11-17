@@ -1,0 +1,79 @@
+/** An in-memory machine for running the CLI in-process: files in memory, git answered by script, no child process. */
+import { type ExecScript, type MemoryFiles, memoryFiles, memoryHost, type ScriptedExec, scriptedExec } from "@norn/conformance";
+import type { CliIo, PluginImporter } from "../../src/index.ts";
+
+export const HOME = "/home/me/.norn";
+export const ROOT = "/work/repo";
+export const COMMON = "/work/repo/.git";
+
+/** Detached-process methods that start nothing: a runner needs them to be built, and no unit test starts an agent. */
+const NO_PROCESSES = {
+  spawn: async () => {
+    throw new Error("no process starts in a unit test");
+  },
+  alive: async () => false,
+  kill: async () => {},
+};
+
+export interface TestMachine {
+  io: CliIo;
+  files: MemoryFiles;
+  /** every command run, `git rev-parse` included */
+  exec: ScriptedExec;
+}
+
+export interface MachineOptions {
+  seed?: Record<string, string>;
+  cwd?: string;
+  common?: string | null;
+  stdin?: string;
+  env?: Record<string, string>;
+  /** answers every command but `git rev-parse`; unscripted ones fail as a missing binary would */
+  script?: ExecScript;
+  importer?: PluginImporter;
+  signal?: AbortSignal;
+  log?: (line: string) => void;
+}
+
+/** `cwd` inside the checkout (or a worktree of it); git answers `rev-parse` with `common`, or as outside a repo when null. */
+export function machine(opts: MachineOptions = {}): TestMachine {
+  const files = memoryFiles(opts.seed ?? {});
+  const common = opts.common === undefined ? COMMON : opts.common;
+  const cwd = opts.cwd ?? ROOT;
+  const exec = scriptedExec((argv, o) => {
+    if (argv[0] !== "git" || argv[1] !== "rev-parse") return opts.script?.(argv, o);
+    if (common === null) return { code: 128, stderr: "fatal: not a git repository" };
+    return { stdout: `${common}\n${cwd}\n` };
+  });
+  const io: CliIo = {
+    env: { NORN_HOME_DIR: HOME, USER: "me", ...(opts.env ?? {}) },
+    cwd,
+    userHome: "/home/me",
+    stdin: async () => opts.stdin ?? "",
+    self: ["norn"],
+    version: "9.9.9",
+    hosts: { exec, host: (r) => ({ ...memoryHost({ files, exec, repo: { root: r.root, dataDir: r.dataDir } }), ...NO_PROCESSES }) },
+    importer:
+      opts.importer ??
+      (async (name) => {
+        throw new Error(`no plugin ${name} in this test`);
+      }),
+    hostname: "box",
+    ...(opts.signal ? { signal: opts.signal } : {}),
+    ...(opts.log ? { log: opts.log } : {}),
+  };
+  return { io, files, exec };
+}
+
+/** A complete repo-local config on bundled plugins. */
+export const LOCAL_CONFIG = [
+  "format: 1",
+  "tracker:",
+  "  use: local",
+  "  intake: { label: norn }",
+  "forge: { use: none }",
+  "store: { use: local }",
+  "executors:",
+  "  claude: { harness: claude, runner: headless }",
+  "",
+].join("\n");

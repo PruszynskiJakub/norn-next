@@ -9,6 +9,7 @@ import {
   claimReceived,
   decodeLaunchHandle,
   HarnessLauncher,
+  nudgePromptId,
   markDelivered,
   pendingInjections,
   readEvents,
@@ -161,6 +162,30 @@ describe("harness launcher start", () => {
     expect(s.paneHarness.launches[0]?.resume).toBe("sess-9");
   });
 
+  test("an agent launches on its step's model, else its executor's, and a resume keeps the model the run started on", async () => {
+    const s = setup({ bgHarness: { resume: true } });
+    const withModel = new HarnessLauncher({
+      ...s.launcher.opts,
+      executors: { pane: { harness: s.paneHarness, runner: s.pane, model: "opus" }, bg: { harness: s.bgHarness, runner: s.bg, model: "opus" } },
+    });
+    await withModel.start(run());
+    expect(s.paneHarness.launches[0]?.model).toBe("opus");
+    const runId = "01JRUN0000000000000000000B";
+    const started = await withModel.start(run({ executor: "bg", attended: false, run_id: runId, brief: { ...brief, model: "haiku" } }));
+    expect(s.bgHarness.launches[0]?.model).toBe("haiku");
+    if (!started.ok) throw new Error("start failed");
+    await appendEvents(s.ctx, "gh-12/03", runId, [{ type: "session.started", run_id: runId, seq: 0, at: START, harness_session: "sess-1" }]);
+    s.bg.live.clear();
+    expect(await withModel.answer(started.value.handle, "q1", "go left")).toEqual(ok(undefined));
+    expect([s.bgHarness.launches[1]?.resume, s.bgHarness.launches[1]?.model]).toEqual(["sess-1", "haiku"]);
+  });
+
+  test("an executor with no model leaves the model to the harness", async () => {
+    const s = setup();
+    await s.launcher.start(run());
+    expect(s.paneHarness.launches[0]?.model).toBeUndefined();
+  });
+
   test("an unknown executor, a brief that cannot render and a failed runner start are refusals", async () => {
     const s = setup();
     expect(await s.launcher.start(run({ executor: "nope" }))).toMatchObject({ ok: false, failure: { code: "not_found" } });
@@ -172,16 +197,37 @@ describe("harness launcher start", () => {
 });
 
 describe("harness launcher nudge and answer", () => {
-  test("with a pane, a nudge is recorded as sent and typed, marked with its own id", async () => {
+  test("with a pane, a nudge is recorded as sent and typed, marked with the id its decision gave it", async () => {
     const s = setup();
     const started = await s.launcher.start(run());
     if (!started.ok) throw new Error("start failed");
-    expect(await s.launcher.nudge(started.value.handle, "carry on")).toEqual(ok(undefined));
+    expect(await s.launcher.nudge(started.value.handle, "carry on", nudgePromptId("01JINTENT/7"))).toEqual(ok(undefined));
     const typed = s.pane.sent[0];
     expect(typed?.handle).toBe("proc|1");
     const mark = readPromptMark(typed?.text ?? "");
-    expect(mark?.source).toBe("nudge");
+    expect(mark).toEqual({ source: "nudge", id: "nudge-01JINTENT_7" });
     expect(await readSentPrompt(s.ctx, "gh-12/03", "01JRUN0000000000000000000A", mark?.id ?? "")).toMatchObject({ source: "nudge" });
+  });
+
+  test("a nudge replayed under its decision's id is the same prompt: once the hook saw it arrive it is not typed again", async () => {
+    const s = setup();
+    const started = await s.launcher.start(run());
+    if (!started.ok) throw new Error("start failed");
+    const id = nudgePromptId("01JINTENT7");
+    await s.launcher.nudge(started.value.handle, "carry on", id);
+    await claimReceived(s.ctx, "gh-12/03", "01JRUN0000000000000000000A", id);
+    await s.launcher.nudge(started.value.handle, "carry on", id);
+    expect(s.pane.sent).toHaveLength(1);
+  });
+
+  test("without a pane, a nudge replayed under its decision's id is queued once", async () => {
+    const s = setup();
+    const started = await s.launcher.start(run({ executor: "bg", attended: false }));
+    if (!started.ok) throw new Error("start failed");
+    const id = nudgePromptId("01JINTENT7");
+    await s.launcher.nudge(started.value.handle, "carry on", id);
+    await s.launcher.nudge(started.value.handle, "carry on", id);
+    expect((await pendingInjections(s.ctx, "gh-12/03", "01JRUN0000000000000000000A")).injections.map((p) => p.id)).toEqual([id]);
   });
 
   test("a replayed answer is typed again unless the hook already saw it arrive", async () => {
@@ -293,12 +339,12 @@ describe("harness launcher nudge and answer", () => {
     const s = setup({ bgHarness: { injectContext: false } });
     const started = await s.launcher.start(run({ executor: "bg", attended: false }));
     if (!started.ok) throw new Error("start failed");
-    expect(await s.launcher.nudge(started.value.handle, "carry on")).toMatchObject({ ok: false, failure: { code: "invalid" } });
+    expect(await s.launcher.nudge(started.value.handle, "carry on", "nudge-1")).toMatchObject({ ok: false, failure: { code: "invalid" } });
   });
 
   test("a handle this launcher did not make is refused", async () => {
     const s = setup();
-    expect(await s.launcher.nudge("h-01JRUN", "x")).toMatchObject({ ok: false, failure: { code: "invalid" } });
+    expect(await s.launcher.nudge("h-01JRUN", "x", "nudge-1")).toMatchObject({ ok: false, failure: { code: "invalid" } });
     expect(await s.launcher.stop("h-01JRUN")).toMatchObject({ ok: false, failure: { code: "invalid" } });
   });
 });

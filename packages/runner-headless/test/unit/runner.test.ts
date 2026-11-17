@@ -76,7 +76,10 @@ describe("headless start", () => {
     const racing = { ...files, create: async (p: string, d: string) => (await files.write(p, JSON.stringify({ key: "01JRUN", handle: "7@winner" })), false) };
     const r = await createHeadlessRunner(memoryHost({ files: racing }), f.procs, {}, { sleep: noSleep }).start(req());
     expect(r).toEqual({ ok: true, value: { handle: "7@winner" } });
-    expect(f.kills).toEqual([{ pid: 100, signal: "TERM" }]);
+    expect(f.kills).toEqual([
+      { pid: 100, signal: "TERM" },
+      { pid: 100, signal: "KILL" },
+    ]);
   });
 
   test("a key record it cannot read is refused, never overwritten", async () => {
@@ -125,13 +128,19 @@ describe("headless alive and stop", () => {
     expect(((await runner.alive("garbage")) as { failure?: { code: string } }).failure?.code).toBe("invalid");
   });
 
-  test("stop sends TERM to the group and is done once the process ends", async () => {
+  test("stop sends TERM to the group, and KILL to what is left of it as soon as the leader ends", async () => {
     const f = fakeProcs();
-    const runner = createHeadlessRunner(memoryHost(), f.procs, {}, { sleep: noSleep });
+    const slept: number[] = [];
+    const runner = createHeadlessRunner(memoryHost(), f.procs, { kill_grace_ms: 300 }, { sleep: async (ms) => void slept.push(ms) });
     const started = await runner.start(req());
     if (!started.ok) throw new Error(started.failure.message);
     expect(await runner.stop(started.value.handle)).toEqual({ ok: true, value: undefined });
-    expect(f.kills).toEqual([{ pid: 100, signal: "TERM" }]);
+    // a child that ignored TERM outlives its leader: the group still gets KILL, without waiting out the grace
+    expect(f.kills).toEqual([
+      { pid: 100, signal: "TERM" },
+      { pid: 100, signal: "KILL" },
+    ]);
+    expect(slept).toEqual([100]);
   });
 
   test("a process that outlives TERM by the grace gets KILL", async () => {

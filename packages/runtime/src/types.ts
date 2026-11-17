@@ -16,6 +16,8 @@ export interface SlotChoice {
 export interface ExecutorChoice extends SlotChoice {
   /** absent: the launcher's default runner */
   runner?: SlotChoice;
+  /** the model its agents launch on when the step names none; absent: the harness's default */
+  model?: string;
 }
 
 export interface RuntimeConfig {
@@ -82,7 +84,8 @@ export interface AgentLauncher {
    */
   modesOf?(executor: string): ExecutorModes | null;
   start(run: AgentRunRequest): Promise<PluginResult<{ handle: string }>>;
-  nudge(handle: string, text: string): Promise<PluginResult<void>>;
+  /** `promptId` is derived from the nudge's decision, so a replayed nudge is the same prompt and sent once */
+  nudge(handle: string, text: string, promptId: string): Promise<PluginResult<void>>;
   answer(handle: string, inputId: string, text: string): Promise<PluginResult<void>>;
   stop(handle: string): Promise<PluginResult<void>>;
   /** whether the handle's process still runs; null when it cannot tell, which is never read as dead */

@@ -48,6 +48,7 @@ export const RULE_IDS: readonly string[] = [
   "unit.parked",
   "unit.unpark",
   "receipts.apply",
+  "receipts.apply.undelivered",
   "receipts.reject",
   // checks, gates, plugin steps
   "check.run",

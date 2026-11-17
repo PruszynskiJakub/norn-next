@@ -4,15 +4,17 @@
  * can watch and type, and `send` types text and submits it. The handle is herdr's pane id.
  *
  * `start` is idempotent by key. The key's record (`<dataDir>/runners/herdr/<key>.json`) is made with
- * `ctx.files.create` as soon as the pane exists and marked `ran` once the agent's command went in:
+ * `ctx.files.create` before any pane is opened, holding no pane yet; it names the pane once one is
+ * opened and is marked `ran` once the agent's command went in:
  * - a record that `ran` hands back its pane, alive or not: a key is one run, and a run that died is
  *   for the host to see as died, never to restart under the same key;
- * - a record that has not `ran` (a crash between the two) sends the command into its pane;
- * - no record (a crash before it) adopts a tab of the story's workspace labelled with the title whose
- *   pane holds nothing but its shell, so a replay neither opens a second tab nor ever takes over a
- *   pane where some agent, perhaps an earlier run's, still works.
- * Two starts racing for one key both open a tab; the one whose record lands first keeps its tab and
- * the other closes its own.
+ * - a record with a pane that has not `ran` (a crash between the two) sends the command into its pane;
+ * - a record with no pane (a crash between opening the pane and naming it) adopts a tab of the story's
+ *   workspace labelled with the title whose pane holds nothing but its shell, so a replay neither opens
+ *   a second tab nor ever takes over a pane where some agent still works;
+ * - no record is a fresh start, which always opens its own tab: an idle tab with the same title is
+ *   another run's (an earlier attempt's, a person's), never this one's.
+ * Two starts racing for one key: the one whose record lands first goes on, the other opens nothing.
  */
 import { fail, type HostContext, ok, parseJson, type PluginResult, type Runner, type RunnerCapabilities, type RunnerStartRequest } from "@norn/plugin-api";
 import { type Static, Type } from "@sinclair/typebox";
@@ -28,8 +30,9 @@ export const HerdrKeyRecord = Type.Object(
   {
     key: Type.String(),
     /** herdr's workspace id */
-    workspace: Type.String(),
-    pane: Type.String(),
+    workspace: Type.Optional(Type.String()),
+    /** absent until the pane is open: a record without one is a start that may have opened it */
+    pane: Type.Optional(Type.String()),
     title: Type.String(),
     /** the agent's command went into the pane */
     ran: Type.Boolean(),
@@ -124,7 +127,7 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
     return r.ok ? ok(r.value.result.workspaces.find((w) => w.label === label)?.workspace_id ?? null) : r;
   }
 
-  /** The one idle pane of a tab labelled `title` in the workspace, for a replay that lost its record. */
+  /** The one idle pane of a tab labelled `title` in the workspace, for a replay whose record names no pane. */
   async function findIdlePane(workspace: string, title: string): Promise<PluginResult<string | null>> {
     const tabs = await herdrJson(herdr, ["tab", "list", "--workspace", workspace], TabList);
     if (!tabs.ok) return isGone(tabs) ? ok(null) : tabs;
@@ -194,15 +197,45 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
   }
 
   /** Run the command in a recorded pane, then mark the record; a failed run removes both so a retry starts clean. */
-  async function finish(path: string, rec: HerdrKeyRecord, argv: string[]): Promise<PluginResult<{ handle: string }>> {
+  async function finish(path: string, rec: HerdrKeyRecord & { pane: string }, argv: string[]): Promise<PluginResult<{ handle: string }>> {
     const ran = await runIn(rec.pane, argv);
     if (!ran.ok) {
       await herdr(["pane", "close", rec.pane]);
-      await ctx.files.remove(path).catch(() => undefined);
+      await forget(path);
       return ran;
     }
     const marked = await writeRecord(path, { ...rec, ran: true });
     return marked.ok ? ok({ handle: rec.pane }) : marked;
+  }
+
+  async function forget(path: string): Promise<void> {
+    await ctx.files.remove(path).catch(() => undefined);
+  }
+
+  /** A record that names no pane yet: find the pane the crashed start may have opened, else open one. */
+  async function openOrAdopt(path: string, rec: HerdrKeyRecord, req: RunnerStartRequest, adopt: boolean): Promise<PluginResult<{ handle: string }>> {
+    const ws = await findWorkspace(req.workspace ?? req.title);
+    if (!ws.ok) return ws;
+    let workspace = ws.value;
+    if (workspace && adopt) {
+      const idle = await findIdlePane(workspace, req.title);
+      if (!idle.ok) return idle;
+      if (idle.value) {
+        const named = { ...rec, workspace, pane: idle.value };
+        const wrote = await writeRecord(path, named);
+        return wrote.ok ? finish(path, named, withEnv(req)) : wrote;
+      }
+    }
+    const opened = await openPane(req, workspace);
+    if (!opened.ok) {
+      await forget(path);
+      return opened;
+    }
+    workspace = opened.value.workspace;
+    const named = { ...rec, workspace, pane: opened.value.pane };
+    const wrote = await writeRecord(path, named);
+    if (!wrote.ok) return closeAfter(named.pane, wrote);
+    return finish(path, named, req.argv);
   }
 
   return {
@@ -215,50 +248,36 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
       const path = keyRecordPath(ctx, req.key);
       const known = await readRecord(path);
       if (!known.ok) return known;
-      if (known.value?.ran) return ok({ handle: known.value.pane });
-      if (known.value) {
-        const info = await processInfo(known.value.pane);
+      const rec = known.value;
+      if (rec?.ran && rec.pane) return ok({ handle: rec.pane });
+      if (rec?.pane) {
+        const info = await processInfo(rec.pane);
         if (!info.ok) return info;
         // gone, or something already runs there: the command went in before the crash, so it is not sent twice
         if (info.value === null || busy(info.value)) {
-          const marked = await writeRecord(path, { ...known.value, ran: true });
-          return marked.ok ? ok({ handle: known.value.pane }) : marked;
+          const marked = await writeRecord(path, { ...rec, ran: true });
+          return marked.ok ? ok({ handle: rec.pane }) : marked;
         }
-        return finish(path, known.value, withEnv(req));
+        return finish(path, { ...rec, pane: rec.pane }, withEnv(req));
       }
+      // a record without a pane is this key's own crashed start, the one case that may adopt a pane
+      if (rec) return openOrAdopt(path, rec, req, true);
 
-      const ws = await findWorkspace(req.workspace ?? req.title);
-      if (!ws.ok) return ws;
-      let pane: string | null = null;
-      let workspace = ws.value;
-      let argv = req.argv;
-      if (workspace) {
-        const idle = await findIdlePane(workspace, req.title);
-        if (!idle.ok) return idle;
-        pane = idle.value;
-        if (pane) argv = withEnv(req);
-      }
-      if (!pane) {
-        const opened = await openPane(req, workspace);
-        if (!opened.ok) return opened;
-        pane = opened.value.pane;
-        workspace = opened.value.workspace;
-      }
-      const rec: HerdrKeyRecord = { key: req.key, workspace: workspace as string, pane, title: req.title, ran: false };
+      const intent: HerdrKeyRecord = { key: req.key, title: req.title, ran: false };
       let made: boolean;
       try {
-        made = await ctx.files.create(path, `${JSON.stringify(rec)}\n`);
+        made = await ctx.files.create(path, `${JSON.stringify(intent)}\n`);
       } catch (e) {
-        return closeAfter(pane, fail("unavailable", `herdr runner: cannot record ${path}: ${message(e)}`));
+        return fail("unavailable", `herdr runner: cannot record ${path}: ${message(e)}`);
       }
       if (!made) {
-        // another start under the same key recorded first: its tab is the run's, ours goes
+        // another start under the same key recorded first: the run is its to open
         const theirs = await readRecord(path);
         if (!theirs.ok) return theirs;
-        if (theirs.value?.pane !== pane) await herdr(["pane", "close", pane]);
-        return theirs.value ? ok({ handle: theirs.value.pane }) : fail("conflict", `herdr runner: ${path} vanished during start`);
+        if (theirs.value?.pane) return ok({ handle: theirs.value.pane });
+        return fail("conflict", `herdr runner: another start of ${req.key} is opening its pane`, true);
       }
-      return finish(path, rec, argv);
+      return openOrAdopt(path, intent, req, false);
     },
 
     async alive(handle) {
@@ -267,6 +286,9 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
     },
 
     async send(handle, text) {
+      // herdr's parser (not clap's) reads `<target> <text>` by position, so a text that starts with `-`
+      // is still the text; a `--` there would itself be the text and the real text an option
+      // (`--wait` would become the flag), as test/integration/send-argv.test.ts shows on herdr itself
       const prompted = await herdr(["agent", "prompt", handle, text]);
       if (prompted.ok) return ok(undefined);
       // no agent herdr recognizes in the pane (a harness herdr does not know): raw text and enter

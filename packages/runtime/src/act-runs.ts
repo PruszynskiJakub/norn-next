@@ -10,6 +10,7 @@ import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import { ensureWorktree } from "./branches.ts";
 import { stopDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
+import { nudgePromptId } from "./launcher.ts";
 import { unitInFacts } from "./record.ts";
 import { readStepRun } from "./step-runs.ts";
 
@@ -81,7 +82,7 @@ export async function nudge(t: TickContext, d: DecisionOf<"nudge">): Promise<Plu
   const handle = runOnRecord(t, unit, d.run_id)?.session;
   // checked before the intent: a nudge recorded but never sent would still count against the step's nudges
   if (!handle) return fail("not_found", `run ${d.run_id} of ${unit} has no session to nudge`, false);
-  const acted = await t.env.journal.act(unit, { intent: d.intent, perform: () => t.env.launcher.nudge(handle, nudgeText(d.reason)), outcome: null, next: () => null });
+  const acted = await t.env.journal.act(unit, { intent: d.intent, perform: () => t.env.launcher.nudge(handle, nudgeText(d.reason), nudgePromptId(d.intent.id)), outcome: null, next: () => null });
   return acted.ok ? ok({ performed: acted.value.performed }) : acted;
 }
 

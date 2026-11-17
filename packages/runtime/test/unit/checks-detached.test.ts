@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { DecisionOf } from "@norn/kernel";
-import { act, checkExitPath, checkWrapperArgv, readStepRun, type StepRunRecord } from "../../src/index.ts";
+import { act, CHECK_START_GRACE_MS, checkExitPath, checkPidPath, checkWrapperArgv, gatherFacts, readStepRun, type StepRunRecord, stepRunPath } from "../../src/index.ts";
 import { decisionOf, FakeProcesses, type Harnessed, has, harness, MINUTE, record, rulesOf, tickUntil, trackerItem } from "./support.ts";
 
 const kinds = async (h: Harnessed, unit: string) => (await record(h, unit)).receipts.map((r) => r.data.kind);
@@ -67,9 +67,83 @@ describe("detached checks", () => {
     const { h, procs } = await atCheck();
     h.clock.advance(6 * MINUTE);
     await tickUntil(h, has("check.finished"));
-    expect(procs.killed).toEqual([100]);
+    // the group gets KILL once its leader is gone: a worker that ignored TERM outlives the wrapper
+    expect(procs.signals).toEqual([
+      [100, "TERM"],
+      [100, "KILL"],
+    ]);
     expect((await record(h, "lt-1")).receipts.at(-1)?.data).toMatchObject({ kind: "check.finished", outcome: "fail" });
     expect(await readStepRun(h.ctx, "lt-1")).toMatchObject({ outcome: "fail", output: expect.stringContaining("timed out after 300000 ms") });
+  });
+
+  test("a start cut short between its spawn and recording the handle is found by the wrapper's pid file, never spawned twice", async () => {
+    const procs = new FakeProcesses();
+    const h = harness({ processes: procs });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    const { t, d, index } = await decisionOf(h, "check.run");
+    await act(t, d, index);
+    const { handle: _lost, ...cut } = (await readStepRun(h.ctx, "lt-1")) as StepRunRecord;
+    await h.files.write(stepRunPath(h.ctx, "lt-1"), JSON.stringify(cut));
+    await h.files.write(checkPidPath(h.ctx, "lt-1", cut.run_id, cut.attempt), "100\n");
+    expect(await act(t, d, index)).toMatchObject({ ok: true, detail: { performed: false, running: true } });
+    expect(procs.spawned).toHaveLength(1);
+    expect((await readStepRun(h.ctx, "lt-1"))?.handle).toBe("100@");
+  });
+
+  test("facts read a start cut short before its handle by the pid file, and the check runs on", async () => {
+    const { h, procs } = await atCheck();
+    const { handle: _lost, ...cut } = (await readStepRun(h.ctx, "lt-1")) as StepRunRecord;
+    await h.files.write(stepRunPath(h.ctx, "lt-1"), JSON.stringify(cut));
+    await h.files.write(checkPidPath(h.ctx, "lt-1", cut.run_id, cut.attempt), "100\n");
+    expect(rulesOf(await h.runtime.tick())).toContain("lt-1 check.running");
+    expect(procs.spawned).toHaveLength(1);
+    expect((await readStepRun(h.ctx, "lt-1"))?.handle).toBe("100@");
+  });
+
+  test("a start recorded but never spawned (no pid file) reads cut short, and decide runs the check again", async () => {
+    const { h, procs } = await atCheck();
+    const { handle: _lost, ...cut } = (await readStepRun(h.ctx, "lt-1")) as StepRunRecord;
+    await h.files.write(stepRunPath(h.ctx, "lt-1"), JSON.stringify(cut));
+    procs.dead.add(100);
+    h.clock.advance(CHECK_START_GRACE_MS + 1);
+    const reports = await tickUntil(h, has("check.rerun"));
+    expect(reports.flatMap(rulesOf)).toContain("lt-1 check.rerun");
+    expect(procs.spawned).toHaveLength(2);
+  });
+
+  test("a start recorded but not yet spawned reads running within the grace, so no tick spawns it twice", async () => {
+    const { h, procs } = await atCheck();
+    const { handle: _inFlight, ...recorded } = (await readStepRun(h.ctx, "lt-1")) as StepRunRecord;
+    const starting = { ...recorded, at: h.ctx.now() };
+    await h.files.write(stepRunPath(h.ctx, "lt-1"), JSON.stringify(starting));
+    procs.dead.add(100);
+    h.clock.advance(CHECK_START_GRACE_MS - 1);
+    expect(rulesOf(await h.runtime.tick())).toContain("lt-1 check.running");
+    expect(procs.spawned).toHaveLength(1);
+    expect(await readStepRun(h.ctx, "lt-1")).toEqual(starting);
+  });
+
+  test("a read-only gathering settles a dead check in its facts but writes no record and sends no stop", async () => {
+    const { h, procs } = await atCheck();
+    const before = await readStepRun(h.ctx, "lt-1");
+    h.clock.advance(6 * MINUTE);
+    const read = await gatherFacts(h.env, h.tickIds[0] as string, { readOnly: true });
+    if (!read.ok) throw new Error(read.failure.message);
+    expect(read.value.facts.stories[0]?.units[0]?.step_run).toMatchObject({ kind: "check", running: false, outcome: "fail" });
+    expect(await readStepRun(h.ctx, "lt-1")).toEqual(before);
+    expect(procs.signals).toEqual([]);
+  });
+
+  test("a read-only gathering leaves a start without its handle untouched past the grace, for the tick to settle", async () => {
+    const { h, procs } = await atCheck();
+    const { handle: _lost, ...cut } = (await readStepRun(h.ctx, "lt-1")) as StepRunRecord;
+    await h.files.write(stepRunPath(h.ctx, "lt-1"), JSON.stringify(cut));
+    procs.dead.add(100);
+    h.clock.advance(CHECK_START_GRACE_MS + 1);
+    const read = await gatherFacts(h.env, h.tickIds[0] as string, { readOnly: true });
+    expect(read.ok && read.value.facts.stories[0]?.units[0]?.step_run?.running).toBe(false);
+    expect(await readStepRun(h.ctx, "lt-1")).toEqual(cut);
   });
 
   test("an exit file that fails validation fails the check and says why, never guessing an exit", async () => {

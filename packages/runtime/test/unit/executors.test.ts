@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { defineNornPlugin, type NornPlugin, ok, type Runner, type RunnerFactory } from "@norn/plugin-api";
+import { defineNornPlugin, type Harness, type NornPlugin, ok, type Runner, type RunnerFactory } from "@norn/plugin-api";
 import { Type } from "@sinclair/typebox";
 import { type AgentLauncher, createRuntimeEnv, gatherFacts, HarnessLauncher, type RuntimeConfig } from "../../src/index.ts";
 import { harness } from "./support.ts";
@@ -49,6 +49,31 @@ describe("executors as a harness in a runner", () => {
     if (!gathered.ok) throw new Error(gathered.failure.message);
     expect(gathered.value.facts.capabilities.executors.claude).toMatchObject({ headless: false, attended: true, paneInput: false });
     expect(gathered.value.facts.capabilities.executors.bot).toMatchObject({ headless: true, attended: false });
+  });
+
+  test("an executor's model is handed to the launcher with its harness and runner", () => {
+    const { env } = build((c) => ({ ...c, executors: { claude: { name: "fake", runner: { name: "pane" }, model: "opus" }, bot: { name: "fake", runner: { name: "bg" } } } }));
+    if (!env.ok) throw new Error(env.failure.message);
+    const executors = (env.value.launcher as HarnessLauncher).opts.executors;
+    expect([executors.claude?.model, executors.bot?.model]).toEqual(["opus", undefined]);
+  });
+
+  test("an executor's facts carry whether its harness resumes a session, which decide reads before delivering an answer", async () => {
+    const h = harness();
+    const fake = h.plugins[0]?.provides.harness?.fake as Harness;
+    const resumer: Harness = { ...fake, name: "resumer", capabilities: { ...fake.capabilities, resume: true } };
+    const plugin = defineNornPlugin({ name: "resumer", api: "^1.5", provides: { harness: { resumer } } });
+    const env = createRuntimeEnv({
+      ctx: h.ctx,
+      plugins: [...h.plugins, runners, plugin],
+      config: { ...h.config, executors: { claude: { name: "fake" }, bot: { name: "resumer" } }, runner: { name: "bg" } },
+      sessions: h.sessions,
+    });
+    if (!env.ok) throw new Error(env.failure.message);
+    const gathered = await gatherFacts(env.value, "01JD5G00000000000000000000");
+    if (!gathered.ok) throw new Error(gathered.failure.message);
+    expect(gathered.value.facts.capabilities.executors.bot?.resume).toBe(true);
+    expect(gathered.value.facts.capabilities.executors.claude?.resume).toBeUndefined();
   });
 
   test("an executor with no runner and no default runner is a refusal naming it", () => {

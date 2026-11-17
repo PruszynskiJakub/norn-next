@@ -36,6 +36,14 @@ describe("renderBrief", () => {
     expect(md.indexOf("## Rework")).toBeLessThan(md.indexOf("## Inputs"));
   });
 
+  test("carries the answers earlier sessions of the step were given, so a fresh session does not ask again", () => {
+    const md = renderBrief(input({ answered: [{ question: "Which branch?", answer: "main,\nnot develop" }, { answer: "yes" }] }));
+    expect(md).toContain("## Answers already given");
+    expect(md).toContain("- Asked: Which branch?\n  Answered: main,\n  not develop");
+    expect(md).toContain("- Answered: yes");
+    expect(renderBrief(input({ answered: [] }))).not.toContain("## Answers already given");
+  });
+
   test("an attended step sends questions to the person, never through ask", () => {
     const md = renderBrief(input({ attended: true }));
     expect(md).toContain("A person works with you in this session");

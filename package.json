@@ -37,6 +37,7 @@
     "@norn/pack-sdlc": "workspace:*",
     "@norn/runner-headless": "workspace:*",
     "@norn/runner-herdr": "workspace:*",
+    "@norn/cli-thin": "workspace:*",
     "@types/bun": "1.3.13",
     "typescript": "^5.9.3",
     "yaml": "^2.8.1"

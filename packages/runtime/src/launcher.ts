@@ -6,7 +6,7 @@
  *   (prompt id = the run id) and recorded as sent, `harness.launch` (headless when the runner has no
  *   pane), then `runner.start` keyed by the run id, so a replayed start finds the first process. The
  *   launch env carries RUN_ENV (unit and run) and never the per-launch NORN_PROMPT_SOURCE.
- * - nudge / answer: marked and recorded as sent, then `runner.send` when the runner has pane input
+ * - nudge / answer: marked with an id derived from the decision (nudgePromptId, answerPromptId) and recorded as sent, then `runner.send` when the runner has pane input
  *   and the harness reads typed prompts; else queued in the run's outbox for the next hook answer
  *   (`injectContext`), or, when the run's process has ended (a headless agent exits as its turn
  *   ends), handed to a resumed launch of its session (launcher-resume.ts). With none of these,
@@ -16,7 +16,6 @@
  */
 import type { Harness, HostContext, NornPromptSource, PluginResult, Runner } from "@norn/plugin-api";
 import { fail, markPrompt, ok, RUN_ENV } from "@norn/plugin-api";
-import { ulid } from "@norn/schema";
 import { markDelivered, pendingInjections, queueInjection, recordSentPrompt } from "./events/outbox.ts";
 import { receivedDir } from "./events/paths.ts";
 import { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
@@ -26,6 +25,8 @@ import type { AgentLauncher, AgentRunRequest, ExecutorModes, LauncherModes } fro
 export interface Executor {
   harness: Harness;
   runner: Runner;
+  /** the model a launch asks for when the step names none */
+  model?: string;
 }
 
 export interface HarnessLauncherOptions {
@@ -63,6 +64,14 @@ export function answerPromptId(inputId: string): string {
   return `answer-${inputId.replace(PROMPT_ID_CHAR, "_")}`.slice(0, 128);
 }
 
+/**
+ * The prompt id a nudge goes under: derived from the decision's intent, so a nudge the act protocol
+ * replays after a crash is the same prompt, which the sent records and the outbox keep once.
+ */
+export function nudgePromptId(intentId: string): string {
+  return `nudge-${intentId.replace(PROMPT_ID_CHAR, "_")}`.slice(0, 128);
+}
+
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
 export class HarnessLauncher implements AgentLauncher {
@@ -96,6 +105,7 @@ export class HarnessLauncher implements AgentLauncher {
     const recorded = await recordSentPrompt(ctx, run.unit, run.run_id, { id: run.run_id, source: "brief", at: ctx.now() });
     if (!recorded.ok) return recorded;
     const headless = !e.runner.capabilities.attended;
+    const model = run.brief.model ?? e.model;
     let spec: ReturnType<Harness["launch"]>;
     try {
       spec = e.harness.launch({
@@ -103,6 +113,7 @@ export class HarnessLauncher implements AgentLauncher {
         prompt: markPrompt(brief.value, { source: "brief", id: run.run_id }),
         run_id: run.run_id,
         env: { [RUN_ENV.unit]: run.unit, [RUN_ENV.run]: run.run_id },
+        ...(model !== undefined ? { model } : {}),
         ...(run.resume !== undefined ? { resume: run.resume } : {}),
         ...(headless ? { headless: true } : {}),
       });
@@ -115,16 +126,15 @@ export class HarnessLauncher implements AgentLauncher {
       workspace: run.unit.split("/")[0] as string,
       logPath: this.opts.logPath?.(run) ?? sessionLogPath(ctx, run.run_id),
     };
-    const launched = await recordLaunch(ctx, run.unit, run.run_id, { executor: run.executor, ...where });
+    const launched = await recordLaunch(ctx, run.unit, run.run_id, { executor: run.executor, ...where, ...(model !== undefined ? { model } : {}) });
     if (!launched.ok) return launched;
     const started = await e.runner.start({ key: run.run_id, argv: spec.argv, env: { ...spec.env, [RUN_ENV.unit]: run.unit, [RUN_ENV.run]: run.run_id }, ...where });
     if (!started.ok) return started;
     return ok({ handle: encodeLaunchHandle({ executor: run.executor, unit: run.unit, run_id: run.run_id, runner: started.value.handle }) });
   }
 
-  async nudge(handle: string, text: string): Promise<PluginResult<void>> {
-    // a nudge carries no id of its own; each one is a new prompt
-    return this.deliver(handle, "nudge", `nudge-${ulid(Date.parse(this.opts.ctx.now()))}`, text);
+  async nudge(handle: string, text: string, promptId: string): Promise<PluginResult<void>> {
+    return this.deliver(handle, "nudge", promptId, text);
   }
 
   async answer(handle: string, inputId: string, text: string): Promise<PluginResult<void>> {

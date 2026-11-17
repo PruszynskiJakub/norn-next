@@ -56,7 +56,7 @@ async function liveAgent(env: RuntimeEnv, unit: string): Promise<Refusable<{ rec
   const record = read.value;
   if (record.corrupt !== undefined) return refuse(`${unit} is corrupt: ${record.corrupt}`, "end your turn: a person has to look at the unit's record", "corrupt");
   if (record.state?.ended !== undefined) return refuse(`${unit} has ended ${record.state.ended}`, "end your turn: the unit takes no more reports", "ended");
-  const live = liveStepOf(record.state);
+  const live = liveStepOf(record.state, record.unapplied);
   if (!live) return refuse(`${unit} has no run in progress`, "end your turn: no step of this unit is waiting on you", "no_run");
   if (!live.agent) return refuse(`${unit} is at ${live.step}, which runs no agent`, "end your turn: no agent step of this unit is waiting on you", "not_agent");
   return { ok: true, value: { record, live } };
@@ -81,7 +81,7 @@ export async function briefOf(env: RuntimeEnv, unit: string): Promise<Refusable<
   const { record, live } = found.value;
   const doc = record.state?.workflow.doc.steps[live.step];
   const brief = briefInputsOf(record, live, { skills: doc?.skills ?? [], inputs: doc?.inputs ?? [], ...(doc?.model !== undefined && { model: doc.model }) });
-  const input = await renderInputFrom(env, record, brief);
+  const input = await renderInputFrom(env, record, brief, live.run.id);
   if (!input.ok) return refuse(`cannot brief ${unit}: ${input.failure.message}`, "tell the person: the unit's workflow does not load", input.failure.code);
   return { ok: true, value: { unit, run_id: live.run.id, markdown: renderBrief(input.value) } };
 }

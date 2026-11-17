@@ -21,7 +21,15 @@ import { launchRecordPath, resumesDir } from "./events/paths.ts";
 import type { LaunchHandle } from "./launcher-handle.ts";
 
 const LaunchRecord = Type.Object(
-  { executor: NonEmpty, cwd: NonEmpty, title: Type.String(), workspace: Type.String(), logPath: NonEmpty },
+  {
+    executor: NonEmpty,
+    cwd: NonEmpty,
+    title: Type.String(),
+    workspace: Type.String(),
+    logPath: NonEmpty,
+    /** a resume asks for the model the run started on, as a harness may otherwise resume on its default */
+    model: Type.Optional(NonEmpty),
+  },
   { additionalProperties: false, title: "LaunchRecord" },
 );
 type LaunchRecord = typeof LaunchRecord.static;
@@ -101,7 +109,8 @@ export async function resumeWith(input: ResumeInput): Promise<PluginResult<void>
   const env = { [RUN_ENV.unit]: h.unit, [RUN_ENV.run]: h.run_id };
   let spec: ReturnType<Harness["launch"]>;
   try {
-    spec = harness.launch({ cwd: launch.value.cwd, prompt: text, run_id: h.run_id, env, resume: session, headless: true });
+    const model = launch.value.model;
+    spec = harness.launch({ cwd: launch.value.cwd, prompt: text, run_id: h.run_id, env, resume: session, headless: true, ...(model !== undefined ? { model } : {}) });
   } catch (e) {
     return fail("invalid", `${harness.name}: resume could not be built: ${message(e)}`, false);
   }

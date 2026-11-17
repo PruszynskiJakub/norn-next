@@ -63,8 +63,10 @@ export function createHeadlessRunner(ctx: HostContext, procs: HostProcesses, con
   }
 
   /**
-   * TERM to the group, KILL when the leader outlives the grace. Signals go only while the leader is
-   * the process the handle names: once it is gone its pid may be someone else's.
+   * TERM to the group, then KILL to the group once the leader ends or outlives the grace: a child
+   * that ignores TERM lives on after its leader, and a group id is not handed out again while any
+   * member lives, so the KILL reaches only what is left of this run. Nothing is sent when the leader
+   * is not the process the handle names: its pid may be someone else's by now.
    */
   async function stopHandle(handle: string): Promise<void> {
     const h = decodeHandle(handle);
@@ -72,7 +74,7 @@ export function createHeadlessRunner(ctx: HostContext, procs: HostProcesses, con
     await procs.kill(h.pid, "TERM");
     for (let waited = 0; waited < graceMs; waited += STOP_POLL_MS) {
       await sleep(STOP_POLL_MS);
-      if (!(await procs.alive(h.pid, h.started))) return;
+      if (!(await procs.alive(h.pid, h.started))) break;
     }
     await procs.kill(h.pid, "KILL");
   }

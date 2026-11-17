@@ -1,13 +1,14 @@
 /**
  * One hook call, end to end (what `norn hook <harness>` will call): resolve the run from the launch
- * env (plugin-api RUN_ENV), normalize the payload with the harness, append the events to the run's
- * log, reduce the log with the kernel's session reducer, compute the answer, and render it with the
- * harness. A prompt mark is trusted only when the host sent that id and has not seen it before;
+ * env (plugin-api RUN_ENV), normalize the payload with the harness, reduce the log and the new
+ * events with the kernel's session reducer, compute the answer, render it with the harness, and
+ * append the events to the run's log (a refused stop without its turn end). A prompt mark is trusted only when the host sent that id and has not seen it before;
  * otherwise the turn is rewritten as the person's.
  *
  * Never throws and never blocks the agent on norn's own failure: an internal failure answers allow
  * (a harness renders null as allow) and records the problem (a `hook.error` event when the log can
- * be written, else in the result).
+ * be written, else in the result). The one exception is a write the guard never judged: allowed, it
+ * could land in another unit's worktree or norn's run state, so it is denied with the reason.
  */
 import { type BriefCommands, type Journal, type ReportHintInput, reduceSession, renderReportHint, renderStepReminder } from "@norn/kernel";
 import { type Harness, type HarnessAnswer, type HarnessEvent, type HostContext, type NativeReply, RUN_ENV } from "@norn/plugin-api";
@@ -66,6 +67,39 @@ function allowWith(harness: Harness | undefined, hook: string, problems: string[
   return { reply, problems, delivered: nothing };
 }
 
+/** The events of a hook whose ingest failed, for the guard's sake: normalized again when the first pass never got that far. */
+function eventsOf(harness: Harness, input: IngestInput, at: string, runId: string, normalized: HarnessEvent[] | null): HarnessEvent[] {
+  if (normalized) return normalized;
+  try {
+    return harness.normalize({ hook: input.hook, payload: input.payload, env: input.env, at, run_id: runId, seq: 0 });
+  } catch {
+    return [];
+  }
+}
+
+const writes = (events: readonly HarnessEvent[]): boolean => events.some((e) => e.type === "tool.requested" && e.kind === "write");
+
+function denyWith(harness: Harness, hook: string, problems: string[]): IngestResult {
+  const reason = `norn: this write was not checked against the unit's worktree, because norn failed (${problems.at(-1)}). Try it again; if it keeps failing, tell the person.`;
+  try {
+    return { reply: harness.respond({ hook, answer: { kind: "deny", reason } }), problems, delivered: nothing };
+  } catch (e) {
+    problems.push(`${harness.name} respond threw: ${errorText(e)}`);
+    return { reply: SILENT, problems, delivered: nothing };
+  }
+}
+
+/**
+ * The reply to a hook norn failed before it could ingest at all (no config, a plugin that would not
+ * load): the same rule as an ingest that failed inside, so a guarded write is denied with `problem`
+ * as its reason and anything else is let through. Never throws.
+ */
+export function failedHookReply(harness: Harness, input: IngestInput, problem: string, at: string): NativeReply {
+  const problems = [problem];
+  if (harness.capabilities.denyTool && writes(eventsOf(harness, input, at, input.env[RUN_ENV.run] ?? "", null))) return denyWith(harness, input.hook, problems).reply;
+  return allowWith(harness, input.hook, problems).reply;
+}
+
 /**
  * A mark is a claim; the record decides. A norn source survives only when the host sent that id as
  * that source and this is its first arrival; otherwise the turn is the person's, and so is any
@@ -107,26 +141,23 @@ export async function ingestHook(deps: IngestDeps, input: IngestInput): Promise<
   // a session norn did not launch (a person's own, in a checkout with the hooks installed) is not norn's to answer
   if (!unit || !runId) return allowWith(harness, input.hook, []);
   const { ctx } = deps;
+  let normalized: HarnessEvent[] | null = null;
   try {
     const before = await readEvents(ctx, unit, runId);
     problems.push(...before.problems);
-    const normalized = harness.normalize({ hook: input.hook, payload: input.payload, env: input.env, at: ctx.now(), run_id: runId, seq: before.next_seq });
-    const events = await attribute(ctx, unit, runId, normalized);
-    let fresh = events;
-    if (events.length > 0) {
-      const appended = await appendEvents(ctx, unit, runId, events);
-      if (appended.ok) fresh = appended.value.events;
-      else problems.push(`event log: ${appended.failure.message}`);
-    }
+    normalized = harness.normalize({ hook: input.hook, payload: input.payload, env: input.env, at: ctx.now(), run_id: runId, seq: before.next_seq });
+    const fresh = await attribute(ctx, unit, runId, normalized);
     const view = reduceSession([...before.events, ...fresh]);
 
     const read = await deps.journal.readUnit(unit);
     if (!read.ok) problems.push(`record of ${unit}: ${read.failure.message}`);
     const record = read.ok && read.value.corrupt === undefined ? read.value : null;
     if (read.ok && read.value.corrupt !== undefined) problems.push(`record of ${unit} is corrupt: ${read.value.corrupt}`);
-    const live = liveStepOf(record?.state ?? null);
+    const live = liveStepOf(record?.state ?? null, record?.unapplied ?? []);
     const isLive = live !== null && live.run.id === runId;
-    const reported = view.report !== undefined || (record !== null && reportOnRecord(record, runId) !== null);
+    // the receipt is written before the event, so a readable record has the last word: a report the
+    // kernel rejected leaves its event in the log, and must not let the turn end unreported
+    const reported = record !== null ? reportOnRecord(record, runId) !== null : view.report !== undefined;
     const hintInput: ReportHintInput | null = live && { unit, step: live.step, outcomes: live.outcomes, attended: live.attended, ...(deps.commands && { commands: deps.commands }) };
 
     let pending: Injection[] = [];
@@ -162,6 +193,14 @@ export async function ingestHook(deps: IngestDeps, input: IngestInput): Promise<
       ...(isLive && live.agent && hintInput && before.events.length > 0 && { reminder: renderStepReminder(hintInput) }),
     });
     const reply = harness.respond({ hook: input.hook, answer: computed.answer ?? ALLOW });
+    // a stop the agent was refused is a turn that goes on: logged as ended, the session would read as
+    // quiet and be nudged while the agent works on the reason it was given
+    const blocked = computed.answer?.kind === "block" && carried(reply);
+    const logged = blocked ? fresh.filter((e) => e.type !== "turn.ended") : fresh;
+    if (logged.length > 0) {
+      const appended = await appendEvents(ctx, unit, runId, logged);
+      if (!appended.ok) problems.push(`event log: ${appended.failure.message}`);
+    }
     const delivers = carried(reply) ? computed.delivers : [];
     const answers = pending.filter((p) => delivers.includes(p.id) && p.source === "answer");
     const delivered = async (): Promise<void> => {
@@ -184,6 +223,7 @@ export async function ingestHook(deps: IngestDeps, input: IngestInput): Promise<
     } catch {
       // the problem is already in the result, which is all a failing disk leaves
     }
+    if (harness.capabilities.denyTool && writes(eventsOf(harness, input, ctx.now(), runId, normalized))) return denyWith(harness, input.hook, problems);
     return allowWith(harness, input.hook, problems);
   }
 }

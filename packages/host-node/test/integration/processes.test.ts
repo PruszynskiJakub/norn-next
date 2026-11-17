@@ -89,6 +89,20 @@ describe("alive and kill", () => {
     expect(await until(async () => !(await procs().alive(grandchild)))).toBe(true);
   });
 
+  test("KILL reaches a group member that ignored TERM after its leader has exited", async () => {
+    const pidFile = join(root, "stubborn.pid");
+    // the subshell ignores TERM and exec keeps that for sleep; the leader sh dies of the TERM
+    const p = await procs().spawn(["sh", "-c", `(trap "" TERM; exec sleep 30) & echo $! > ${pidFile}; wait`], { cwd: root, logPath: join(root, "e.log") });
+    spawned.push(p.pid);
+    expect(await until(() => existsSync(pidFile) && readFileSync(pidFile, "utf8").trim() !== "")).toBe(true);
+    const stubborn = Number(readFileSync(pidFile, "utf8").trim());
+    await procs().kill(p.pid, "TERM");
+    expect(await until(async () => !(await procs().alive(p.pid, p.started)))).toBe(true);
+    expect(await procs().alive(stubborn)).toBe(true);
+    await procs().kill(p.pid, "KILL");
+    expect(await until(async () => !(await procs().alive(stubborn)))).toBe(true);
+  });
+
   test("killing a process already gone, or a pid that is no pid, is not an error", async () => {
     const p = await procs().spawn(["true"], { cwd: root, logPath: join(root, "d.log") });
     await until(async () => !(await procs().alive(p.pid, p.started)));

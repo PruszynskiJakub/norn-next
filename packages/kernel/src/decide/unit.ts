@@ -60,7 +60,9 @@ export function decideUnit(story: StoryFacts, unit: UnitFacts, ctx: DecideContex
   // receipts always win over session and step facts
   if (unit.receipts.length) {
     const d = applyDecision(view, "receipts.apply", []);
-    return d.rejected.length === unit.receipts.length ? { ...d, rule: "receipts.reject" } : d;
+    if (d.rejected.length === unit.receipts.length) return { ...d, rule: "receipts.reject" };
+    const undelivered = undeliverableAnswers(unit, state, ctx);
+    return undelivered.length > 0 ? { ...d, rule: "receipts.apply.undelivered", undelivered } : d;
   }
   if (state.ended) return noop(view, `unit.ended.${state.ended}`, state.ended_reason ?? state.ended);
   if (parked && !derived) return noop(view, "unit.parked", parked.reason);
@@ -72,6 +74,19 @@ export function decideUnit(story: StoryFacts, unit: UnitFacts, ctx: DecideContex
   if (d.kind === "park" || d.kind === "apply_receipts") return d;
   // a derived park whose cause is gone is lifted first; the next tick decides from the lifted state
   return applyAction(unit.id, unit, "unit.unpark", [], view.state, [], ctx);
+}
+
+/**
+ * The answers waiting on a session that can no longer take them: it ended, and its executor cannot
+ * resume a session to hand one over. Delivery would be refused on every tick and the unit would stay
+ * parked for good; applied undelivered, the unit unparks, the ended session is judged dead and retried,
+ * and the retry's brief carries the answers.
+ */
+function undeliverableAnswers(unit: UnitFacts, state: RunState, ctx: DecideContext): string[] {
+  const run = state.run;
+  if (!run?.session || run.attended || unit.session?.activity !== "ended") return [];
+  if (ctx.facts.capabilities.executors[run.executor]?.resume === true) return [];
+  return unit.receipts.filter((r) => r.data.kind === "answer.sent").map((r) => r.id);
 }
 
 function unparked(state: RunState): RunState {

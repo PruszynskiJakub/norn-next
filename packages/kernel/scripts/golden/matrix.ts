@@ -283,6 +283,20 @@ export const MATRIX: Scenario[] = [
     3,
   ),
   scenario(
+    "agent-answer-undelivered",
+    "An answer to a headless session that ended after asking, on an executor that cannot resume a session: the answer is applied without delivery (so the unit unparks rather than refusing delivery every tick), and the next tick retries the run in a fresh session. An executor that resumes sessions gets the answer delivered as usual (the model host resumes nothing, so its ended session is retried on the next tick too).",
+    { files: shippedFiles("slice"), capabilities: capabilities({ executors: { claude: executor(), resumer: executor({ resume: true }) } }) },
+    (w) => {
+      const parked = { parked: { reason: "implement: the agent asks a question", since: earlier(w, 10) } };
+      quietStory(w, "gh-118", { run: { session: "h-118" }, state: parked }, session("ended"));
+      w.append("gh-118", { kind: "answer.sent", input_id: "q-118", text: "Use the main branch.", by: "person" });
+      quietStory(w, "gh-119", { run: { session: "h-119", executor: "resumer" }, state: parked }, session("ended"));
+      w.append("gh-119", { kind: "answer.sent", input_id: "q-119", text: "Use the main branch.", by: "person" });
+    },
+    ["receipts.apply.undelivered", "receipts.apply", "agent.died.retry"],
+    2,
+  ),
+  scenario(
     "agent-routed",
     "A step that routes the outcomes norn classifies: a question, a dead session, a run past its deadline and a silent agent each take the step's route to a person's gate instead of the built-in handling.",
     { files: { routed: ROUTED_DOC } },

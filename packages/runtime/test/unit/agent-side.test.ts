@@ -82,6 +82,16 @@ describe("stop hook", () => {
     expect((await hook(h, runId, "Stop", {})).reply.stdout).toBe("");
   });
 
+  test("a report whose receipt the kernel rejected does not let the turn end unreported", async () => {
+    const { h, runId } = await running();
+    const reported = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
+    if (!reported.ok) throw new Error(reported.refusal.error);
+    expect((await hook(h, runId, "Stop", {})).reply.stdout).toBe("");
+    // the report.made event stays in the log; the record says the report does not stand
+    await h.env.journal.record(UNIT, { id: "reject-r1", data: { kind: "receipt.rejected", seq: reported.value.seq, reason: "test: refused" } });
+    expect(JSON.parse((await hook(h, runId, "Stop", {})).reply.stdout).decision).toBe("block");
+  });
+
   test("a hook from a run that is no longer live is never held to a report", async () => {
     const { h } = await running();
     const r = await hook(h, "01JOLDRUN00000000000000000", "Stop", {});
@@ -94,6 +104,20 @@ describe("stop hook", () => {
     const r = await ingestHook(deps(h), { harness: "claude", hook: "Stop", payload: { hook_event_name: "Stop" }, env: {} });
     expect(r.reply.stdout).toBe("");
     expect(h.files.snapshot()).toEqual(before);
+  });
+
+  test("a stop it refused is a turn that goes on: the session does not read as a turn ended, so it is not nudged as quiet", async () => {
+    const { h, runId } = await running();
+    expect(JSON.parse((await hook(h, runId, "Stop", {})).reply.stdout).decision).toBe("block");
+    const facts = await new EventLogSessionSource({ ctx: h.ctx, classify: { silentAfterMs: 60_000 } }).facts(UNIT, runId);
+    expect(facts?.activity).not.toBe("turn_ended");
+  });
+
+  test("a nudge queued before the run reported does not block the stop after it", async () => {
+    const { h, runId } = await running();
+    await queueInjection(h.ctx, UNIT, runId, { id: "n1", source: "nudge", text: "norn: your turn ended without a report", at: h.ctx.now() });
+    expect((await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).ok).toBe(true);
+    expect((await hook(h, runId, "Stop", {})).reply).toEqual({ stdout: "", exit_code: 0 });
   });
 
   test("a queued nudge rides on the stop block and is delivered once", async () => {
@@ -189,6 +213,30 @@ describe("ingest never throws", () => {
     expect(r.reply).toEqual({ stdout: "", exit_code: 0 });
     expect(r.problems).toEqual([expect.stringContaining("disk on fire")]);
     expect((await readEvents(h.ctx, UNIT, runId)).events.at(-1)).toMatchObject({ type: "hook.error" });
+  });
+
+  test("a write the guard could not judge is denied with the reason, never let through", async () => {
+    const { h, runId } = await running();
+    const r = await hook(h, runId, "PreToolUse", preWrite("src/x.ts"), {
+      worktreeOf: () => {
+        throw new Error("no worktree");
+      },
+    });
+    const out = JSON.parse(r.reply.stdout);
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toContain("was not checked");
+    expect(r.problems).toEqual([expect.stringContaining("no worktree")]);
+  });
+
+  test("a write is denied even when the failure came before the hook was read, and a shell call is still allowed", async () => {
+    const { h, runId } = await running();
+    const broken = { ...h.files, list: async () => Promise.reject(new Error("disk on fire")) };
+    const ctx = { ...h.ctx, files: broken };
+    const write = await hook(h, runId, "PreToolUse", preWrite("src/x.ts"), { ctx });
+    expect(JSON.parse(write.reply.stdout).hookSpecificOutput.permissionDecision).toBe("deny");
+    const shell = await hook(h, runId, "PreToolUse", { tool_use_id: "b1", tool_name: "Bash", tool_input: { command: "ls" } }, { ctx });
+    expect(shell.reply.stdout).toBe("");
+    expect(shell.problems).toEqual([expect.stringContaining("disk on fire")]);
   });
 
   test("an unknown harness answers nothing and says why", async () => {
@@ -291,6 +339,23 @@ describe("brief", () => {
     expect(md).toContain("`norn done done` — the thing is built");
     expect(md).toContain("norn ask");
     expect(md).toContain("norn stuck");
+  });
+
+  test("an agent launched since the last tick gets its brief, is held to its report and may report, before a tick applies its launch", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    const unit = await record(h, UNIT);
+    expect(unit.state?.run).toBeNull();
+    const launch = unit.unapplied.find((r) => r.data.kind === "run.started");
+    const runId = launch?.data.kind === "run.started" ? launch.data.run_id : "";
+    expect(runId).not.toBe("");
+    const brief = await briefOf(h.env, UNIT);
+    expect(brief.ok && brief.value.run_id).toBe(runId);
+    expect(JSON.parse((await hook(h, runId, "Stop", {})).reply.stdout).decision).toBe("block");
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "early")).toMatchObject({ ok: true, value: { replayed: false } });
+    await tickUntil(h, has("receipts.apply"));
+    expect((await record(h, UNIT)).state?.ended).toBe("done");
   });
 
   test("no brief for a unit with no live agent run", async () => {

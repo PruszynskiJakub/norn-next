@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import type { Decision, DecisionOf } from "@norn/kernel";
+import { type Decision, type DecisionOf, renderBrief } from "@norn/kernel";
 import { deriveUlid } from "@norn/schema";
-import { act, readStepRun } from "../../src/index.ts";
+import { layout } from "@norn/store-local";
+import { act, type AgentRunRequest, appendEvents, briefRenderInput, nudgePromptId, readStepRun } from "../../src/index.ts";
 import { decided, decisionOf, has, harness, MINUTE, record, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
 
 const kinds = async (h: ReturnType<typeof harness>, unit: string) => (await record(h, unit)).receipts.map((r) => r.data.kind);
@@ -38,7 +39,9 @@ describe("agent runs", () => {
     h.sessions.byUnit.set("lt-1", session("working", { silent: true }));
     await tickUntil(h, has("agent.silent.nudge"));
     const handle = (await record(h, "lt-1")).state?.run?.session;
-    expect(h.launcher.of("nudge")).toEqual([[handle, expect.stringContaining("norn done")]]);
+    const sent = (await record(h, "lt-1")).receipts.find((r) => r.data.kind === "nudge.sent");
+    // the prompt id comes from the decision's intent, so a replayed nudge is the same prompt
+    expect(h.launcher.of("nudge")).toEqual([[handle, expect.stringContaining("norn done"), nudgePromptId(sent?.id ?? "")]]);
     expect(await kinds(h, "lt-1")).toContain("nudge.sent");
   });
 
@@ -120,6 +123,33 @@ describe("agent runs", () => {
     ]);
     expect((await record(h, "lt-1")).state?.parked).toBeUndefined();
   });
+
+  test("an answer to a session that ended and cannot be resumed is applied undelivered, and the retry's brief carries it", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const st = (await record(h, "lt-1")).state;
+    const first = st?.run?.id as string;
+    await appendEvents(h.ctx, "lt-1", first, [{ type: "input.requested", run_id: first, seq: 0, at: h.ctx.now(), id: "q1", question: "Which way?" }]);
+    h.sessions.byUnit.set("lt-1", session("asking", { ask: { id: "q1", question: "Which way?" } }));
+    await tickUntil(h, has("agent.asking.park"));
+    // a headless agent exits once its turn ends; the fake harness cannot resume a session
+    h.sessions.byUnit.set("lt-1", session("ended"));
+    h.launcher.failAnswers = true;
+    await h.env.journal.record("lt-1", { id: "01JD5G0000ANSWER000000000Q", data: { kind: "answer.sent", input_id: "q1", text: "left", by: "person", step: st?.step, attempt: st?.attempt } });
+    const applied = await h.runtime.tick();
+    expect(applied.outcomes.find((o) => o.decision.rule === "receipts.apply.undelivered")).toMatchObject({ ok: true });
+    expect(h.launcher.of("answer")).toEqual([]);
+    expect((await record(h, "lt-1")).state?.parked).toBeUndefined();
+    await tickUntil(h, has("agent.died.retry"));
+    const retry = h.launcher.of("start").at(-1)?.[0] as AgentRunRequest;
+    expect(retry.run_id).not.toBe(first);
+    const input = await briefRenderInput(h.env, "lt-1", retry.brief, retry.run_id);
+    if (!input.ok) throw new Error(input.failure.message);
+    expect(input.value.answered).toEqual([{ question: "Which way?", answer: "left" }]);
+    expect(renderBrief(input.value)).toContain("- Asked: Which way?\n  Answered: left");
+  });
 });
 
 describe("checks and plugin steps", () => {
@@ -192,6 +222,17 @@ describe("unit records", () => {
     expect(raw.ok && raw.value.receipts.at(-1)?.data).toMatchObject({ kind: "unit.marked", ended: "corrupt" });
     const next = await h.runtime.tick();
     expect(rulesOf(next)).toContain("lt-1 unit.corrupt.held");
+  });
+
+  test("a run-state file the store cannot parse makes the unit corrupt, held without a mark, never a story left out", async () => {
+    const h = harness();
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    await h.ctx.files.write(layout(h.ctx.repo.dataDir).state("lt-1"), '{"format": 1, "unit": 7');
+    const unit = await record(h, "lt-1");
+    expect(unit.corrupt).toContain("not JSON");
+    const ticks = [await h.runtime.tick(), await h.runtime.tick()];
+    expect(ticks.map(rulesOf)).toEqual([["lt-1 unit.corrupt.held"], ["lt-1 unit.corrupt.held"]]);
   });
 
   test("a refused receipt is recorded as refused in the same act and costs no extra tick", async () => {

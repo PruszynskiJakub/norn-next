@@ -101,11 +101,20 @@ export function owesReportBlock(events: readonly HarnessEvent[], ctx: Pick<Answe
   return ctx.capabilities.blockStop && ctx.needsReport && !ctx.reported;
 }
 
+/**
+ * The pending entries this answer may carry. A nudge asks for the report, so once the run has
+ * reported it has nothing left to say: carried on a stop, it would block a run that is done.
+ */
+function due(ctx: AnswerContext): readonly Injection[] {
+  return ctx.reported ? ctx.pending.filter((p) => p.source !== "nudge") : ctx.pending;
+}
+
 function stop(ctx: AnswerContext): ComputedAnswer {
   const blocks = ctx.capabilities.blockStop;
   const owed = ctx.needsReport && !ctx.reported && ctx.stopBlocksSpent !== true;
   // a queued nudge or answer rides on the block: the agent reads the reason and carries on with it
-  const carried = blocks && ctx.pending.length > 0 ? ctx.pending : [];
+  const pending = due(ctx);
+  const carried = blocks && pending.length > 0 ? pending : [];
   if (!owed && carried.length === 0) return { answer: null, delivers: [] };
   if (!blocks) return { answer: null, delivers: [] };
   const reason = [carried.length > 0 ? joined(carried) : null, owed ? ctx.reportHint : null].filter((x): x is string => x !== null).join("\n\n");
@@ -115,9 +124,10 @@ function stop(ctx: AnswerContext): ComputedAnswer {
 function context(events: readonly HarnessEvent[], ctx: AnswerContext): ComputedAnswer {
   if (!ctx.capabilities.injectContext) return { answer: null, delivers: [] };
   const restarted = events.some((e) => e.type === "session.started" || e.type === "context.compacted");
-  const texts = [restarted && ctx.reminder ? ctx.reminder : null, ctx.pending.length > 0 ? joined(ctx.pending) : null].filter((x): x is string => x !== null);
+  const pending = due(ctx);
+  const texts = [restarted && ctx.reminder ? ctx.reminder : null, pending.length > 0 ? joined(pending) : null].filter((x): x is string => x !== null);
   if (texts.length === 0) return { answer: null, delivers: [] };
-  return { answer: { kind: "context", text: texts.join("\n\n") }, delivers: ctx.pending.map((p) => p.id) };
+  return { answer: { kind: "context", text: texts.join("\n\n") }, delivers: pending.map((p) => p.id) };
 }
 
 export function answerFor(events: readonly HarnessEvent[], ctx: AnswerContext): ComputedAnswer {

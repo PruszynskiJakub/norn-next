@@ -129,8 +129,8 @@ export class FakeLauncher implements AgentLauncher {
     if (failing === "fail") return fail<{ handle: string }>("unavailable", `launch of ${run.unit} failed`);
     return ok({ handle: `h-${run.run_id}` });
   }
-  async nudge(handle: string, text: string) {
-    this.calls.push({ op: "nudge", args: [handle, text] });
+  async nudge(handle: string, text: string, promptId: string) {
+    this.calls.push({ op: "nudge", args: [handle, text, promptId] });
     return ok(undefined);
   }
   async answer(handle: string, inputId: string, text: string) {
@@ -262,7 +262,10 @@ export interface Harnessed {
 export class FakeProcesses {
   readonly spawned: { pid: number; argv: string[]; cwd: string; logPath: string }[] = [];
   readonly dead = new Set<number>();
+  /** each pid signalled, once */
   readonly killed: number[] = [];
+  /** every signal sent, in order */
+  readonly signals: [number, string][] = [];
   failSpawn = false;
   private next = 100;
 
@@ -274,8 +277,9 @@ export class FakeProcesses {
       return { pid, started: `start-${pid}` };
     },
     alive: async (pid: number, started?: string) => !this.dead.has(pid) && this.spawned.some((p) => p.pid === pid) && (started === undefined || started === `start-${pid}`),
-    kill: async (pid: number) => {
-      this.killed.push(pid);
+    kill: async (pid: number, signal?: string) => {
+      this.signals.push([pid, signal ?? "TERM"]);
+      if (!this.killed.includes(pid)) this.killed.push(pid);
       this.dead.add(pid);
     },
   };

@@ -19,7 +19,7 @@ function briefRenderer(envOf: () => RuntimeEnv | undefined) {
   return async (run: AgentRunRequest): Promise<PluginResult<string>> => {
     const env = envOf();
     if (!env) return fail("unavailable", "the runtime env is not ready", false);
-    const input = await briefRenderInput(env, run.unit, run.brief);
+    const input = await briefRenderInput(env, run.unit, run.brief, run.run_id);
     if (!input.ok) return input;
     try {
       return ok(renderBrief(input.value));

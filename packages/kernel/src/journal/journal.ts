@@ -3,7 +3,7 @@
  * It holds the write rules: receipts before effects, state last as the commit point, a commit that
  * lost a race re-read and never forced, and anything failing validation read as corrupt, never guessed.
  */
-import { fail, ok, type PluginResult, type Store } from "@norn/plugin-api";
+import { fail, ok, type PluginResult, parseUnitId, type Store } from "@norn/plugin-api";
 import { check, deriveUlid } from "@norn/schema";
 import { type KernelReceipt, type ReceiptData, ReceiptIntent } from "../model/receipts.ts";
 import type { RunState } from "../model/run-state.ts";
@@ -72,13 +72,22 @@ function corruptUnit(unit: string, version: number | null, reason: string, recor
   return { unit, version, state: null, receipts: [], unapplied: [], corrupt: reason, ...(marked ? { corrupt_marked: true } : {}) };
 }
 
+/**
+ * A store that refuses for good to read a well-named unit holds files it cannot parse: the unit is
+ * corrupt, never left unread. It reads as marked already: a mark appended to it could never be read
+ * back, so decide would append another on every tick.
+ */
+function unreadableUnit(unit: string, reason: string): UnitJournal {
+  return { ...corruptUnit(unit, null, reason, []), corrupt_marked: true };
+}
+
 export class Journal {
   constructor(readonly store: Store) {}
 
   /** Read and validate a unit; a failing envelope or document comes back as `corrupt`, not as a failure. */
   async readUnit(unit: string): Promise<PluginResult<UnitJournal>> {
     const read = await this.store.readUnit(unit);
-    if (!read.ok) return read;
+    if (!read.ok) return read.failure.code === "invalid" && !read.failure.retryable && parseUnitId(unit) ? ok(unreadableUnit(unit, read.failure.message)) : read;
     const record = read.value;
     const version = record.state?.version ?? null;
     const receipts: KernelReceipt[] = [];

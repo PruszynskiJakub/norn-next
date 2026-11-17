@@ -76,9 +76,10 @@ function apply(acc: Acc, e: HarnessEvent): void {
   const v = acc.view;
   switch (e.type) {
     case "session.started":
-      // a resumed session starts again after its end
+      // a resumed session starts again after its end, on a prompt: the turn that ended was the last process's
       v.harness_session = e.harness_session;
       delete v.ended;
+      v.turn_ended = false;
       return;
     case "turn.started":
       resumed(acc);

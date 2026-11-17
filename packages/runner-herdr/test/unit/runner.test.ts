@@ -184,29 +184,41 @@ describe("herdr start", () => {
     expect(record().ran).toBe(true);
   });
 
-  test("with no record, a replay adopts the idle pane of the tab titled for the run, with the env on the command", async () => {
-    const { h, runner, record } = setup();
+  test("a record that names no pane yet (a crash after the pane opened) adopts the idle pane of the tab titled for the run", async () => {
+    const { h, runner, files, ctx, record } = setup();
     h.workspaces.push({ workspace_id: "w9", label: "gh-1" });
     h.tabs.push({ tab_id: "w9:t1", workspace_id: "w9", label: "gh-1 implement" });
     h.panes.push({ pane_id: "w9:p1", tab_id: "w9:t1", workspace_id: "w9", shell: 50, fg: 50 });
+    await files.write(keyRecordPath(ctx, "01JRUN1"), JSON.stringify({ key: "01JRUN1", title: "gh-1 implement", ran: false }));
     expect(await runner.start(req())).toEqual({ ok: true, value: { handle: "w9:p1" } });
     expect(h.calls()).not.toContain("tab create");
     expect(h.exec.calls.find((c) => c.argv[2] === "run")?.argv[4]).toBe("env NORN_RUN_ID=01JRUN1 NORN_UNIT=gh-1 claude --settings 'a b.json'");
     expect(record()).toEqual({ key: "01JRUN1", workspace: "w9", pane: "w9:p1", title: "gh-1 implement", ran: true });
   });
 
-  test("a same-titled tab where an agent still works is never taken over: the run gets a new tab", async () => {
-    const { h, runner } = setup();
+  test("a fresh start never adopts another run's idle tab with the same title: it opens its own", async () => {
+    const { h, runner, record } = setup();
+    h.workspaces.push({ workspace_id: "w9", label: "gh-1" });
+    h.tabs.push({ tab_id: "w9:t1", workspace_id: "w9", label: "gh-1 implement" });
+    h.panes.push({ pane_id: "w9:pOld", tab_id: "w9:t1", workspace_id: "w9", shell: 50, fg: 50 });
+    expect(await runner.start(req())).toEqual({ ok: true, value: { handle: "w9:p1" } });
+    expect(h.calls()).toContain("tab create");
+    expect(h.exec.calls.filter((c) => c.argv[2] === "run").map((c) => c.argv[3])).toEqual(["w9:p1"]);
+    expect(record()).toEqual({ key: "01JRUN1", workspace: "w9", pane: "w9:p1", title: "gh-1 implement", ran: true });
+  });
+
+  test("a same-titled tab where an agent still works is never taken over, even on a replay: the run gets a new tab", async () => {
+    const { h, runner, files, ctx } = setup();
     h.workspaces.push({ workspace_id: "w9", label: "gh-1" });
     h.tabs.push({ tab_id: "w9:t1", workspace_id: "w9", label: "gh-1 implement" });
     h.panes.push({ pane_id: "w9:pBusy", tab_id: "w9:t1", workspace_id: "w9", shell: 50, fg: 99 });
-    const r = await runner.start(req());
-    expect(r).toEqual({ ok: true, value: { handle: "w9:p1" } });
+    await files.write(keyRecordPath(ctx, "01JRUN1"), JSON.stringify({ key: "01JRUN1", title: "gh-1 implement", ran: false }));
+    expect(await runner.start(req())).toEqual({ ok: true, value: { handle: "w9:p1" } });
     expect(h.panes.find((p) => p.pane_id === "w9:pBusy")?.fg).toBe(99);
     expect(h.calls()).toContain("tab create");
   });
 
-  test("two starts racing for one key: the second closes its own tab and hands back the first's pane", async () => {
+  test("two starts racing for one key: the second opens nothing and hands back the first's pane", async () => {
     const h = fakeHerdr();
     const files = memoryFiles();
     // the other start's record lands between this start's read and its create
@@ -219,8 +231,32 @@ describe("herdr start", () => {
     };
     const runner = createHerdrRunner(memoryHost({ exec: h.exec, files: racing }), {}, { sleep: noSleep });
     expect(await runner.start(req())).toEqual({ ok: true, value: { handle: "w0:p0" } });
-    expect(h.panes).toEqual([]);
-    expect(h.calls()).not.toContain("pane run");
+    expect(h.exec.calls).toEqual([]);
+  });
+
+  test("losing the race to a start that has not opened its pane yet is a retryable conflict, and nothing opens", async () => {
+    const h = fakeHerdr();
+    const files = memoryFiles();
+    const racing = {
+      ...files,
+      create: async (p: string, d: string) => {
+        await files.write(p, JSON.stringify({ key: "01JRUN1", title: "gh-1 implement", ran: false }));
+        return files.create(p, d);
+      },
+    };
+    const runner = createHerdrRunner(memoryHost({ exec: h.exec, files: racing }), {}, { sleep: noSleep });
+    const r = await runner.start(req());
+    expect(!r.ok && [r.failure.code, r.failure.retryable]).toEqual(["conflict", true]);
+    expect(h.exec.calls).toEqual([]);
+  });
+
+  test("a pane that cannot be opened leaves no record, so a retry starts fresh", async () => {
+    const files = memoryFiles();
+    const exec = scriptedExec((argv) => (argv[2] === "list" ? { stdout: JSON.stringify({ result: { workspaces: [] } }) } : { code: 1, stderr: '{"error":{"code":"internal","message":"boom"}}' }));
+    const ctx = memoryHost({ exec, files });
+    const r = await createHerdrRunner(ctx, {}, { sleep: noSleep }).start(req());
+    expect(!r.ok && r.failure.code).toBe("unknown");
+    expect(files.snapshot()[keyRecordPath(ctx, "01JRUN1")]).toBeUndefined();
   });
 
   test("a command that never takes the foreground fails with what the pane showed, closes the pane and leaves no record", async () => {
@@ -270,6 +306,18 @@ describe("herdr alive, send and stop", () => {
     await runner.start(req());
     expect(await runner.send("w1:p2", "carry on\nplease")).toEqual({ ok: true, value: undefined });
     expect(h.exec.calls.at(-1)?.argv).toEqual(["herdr", "agent", "prompt", "w1:p2", "carry on\nplease"]);
+  });
+
+  test("a text that starts with a dash goes in the text position, never as an option and with no separator", async () => {
+    const { h, runner } = setup({}, { agentKnown: false });
+    await runner.start(req());
+    for (const text of ["- yes, the second one", "--wait"]) expect(await runner.send("w1:p2", text)).toEqual({ ok: true, value: undefined });
+    expect(h.exec.calls.filter((c) => c.argv[2] === "prompt" || c.argv[2] === "send-text").map((c) => c.argv.slice(1))).toEqual([
+      ["agent", "prompt", "w1:p2", "- yes, the second one"],
+      ["pane", "send-text", "w1:p2", "- yes, the second one"],
+      ["agent", "prompt", "w1:p2", "--wait"],
+      ["pane", "send-text", "w1:p2", "--wait"],
+    ]);
   });
 
   test("with no agent herdr recognizes in the pane, send types the text and presses enter", async () => {

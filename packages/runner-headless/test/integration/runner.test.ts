@@ -87,6 +87,15 @@ describe("headless runner on the node host", () => {
     expect(await runner.stop(handle)).toEqual({ ok: true, value: undefined });
   });
 
+  test("stop ends a child that ignores TERM even once the leader has exited", async () => {
+    const pidFile = join(root, "stubborn.pid");
+    const handle = await start(req({ argv: ["sh", "-c", `(trap "" TERM; exec sleep 30) & echo $! > ${pidFile}; wait`] }));
+    expect(await until(() => existsSync(pidFile) && readFileSync(pidFile, "utf8").trim() !== "")).toBe(true);
+    const stubborn = Number(readFileSync(pidFile, "utf8").trim());
+    expect(await runner.stop(handle)).toEqual({ ok: true, value: undefined });
+    expect(await until(() => !pidRuns(stubborn))).toBe(true);
+  });
+
   test("a handle whose pid now belongs to another start reads as dead", async () => {
     const handle = await start(req({}));
     const h = decodeHandle(handle);

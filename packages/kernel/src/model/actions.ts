@@ -82,13 +82,17 @@ const ACTIONS = [
    * write `receipts` (if any), then commit `state` against `expect_version`; the commit point of every
    * routed outcome. `rejected` lists the refusals for a reader: each is already among `receipts` as a
    * `receipt.rejected`, and `state` applies those too when nothing else is left unapplied before them,
-   * so a refusal costs no tick of its own.
+   * so a refusal costs no tick of its own. The `answer.sent` receipts it applies go to the run's session
+   * first, except those `undelivered` names: no session can take them (it ended, and its executor cannot
+   * resume one), so they are applied undelivered and the run's retry carries them in its brief.
    */
   action("apply_receipts", {
     receipts: Type.Array(ReceiptIntent),
     state: RunState,
     expect_version: Type.Union([PosInt, Type.Null()]),
     rejected: Type.Array(RejectedReceipt),
+    /** ids of the `answer.sent` receipts the host applies without delivering */
+    undelivered: Type.Optional(Type.Array(Id, { minItems: 1 })),
   }),
   action("start_run", {
     run_id: Id,

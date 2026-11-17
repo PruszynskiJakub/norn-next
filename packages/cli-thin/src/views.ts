@@ -1,0 +1,123 @@
+/**
+ * The read model `status`, `story list` and `story view` print: the facts a tick would decide from,
+ * gathered and never acted on, shaped for a person. What waits for a person (a gate, a question, a
+ * parked or stuck unit) is named per unit, so `status` reads as a list of what needs doing.
+ */
+import type { KernelWorkflows, StoryFacts, UnitFacts } from "@norn/kernel";
+import { gatherFacts, newTickId, type RuntimeEnv } from "@norn/runtime";
+import { refuse } from "./output.ts";
+
+export interface UnitView {
+  id: string;
+  /** null: nothing committed yet */
+  step: string | null;
+  /** the step's kind: agent, check, gate, or a plugin's */
+  kind: string | null;
+  attempt: number | null;
+  workflow: string | null;
+  ended?: string;
+  ended_reason?: string;
+  parked?: string;
+  corrupt?: string;
+  run: { id: string; executor: string; started_at: string; activity: string | null } | null;
+  /** what a person is asked for, when anything */
+  waiting: { for: "gate" | "answer" | "permission" | "person"; text: string } | null;
+  /** receipts taken but not yet applied by a tick */
+  pending_receipts: number;
+}
+
+export interface StoryView {
+  key: string;
+  title: string | null;
+  url: string | null;
+  open: boolean | null;
+  claim: { holder: string; expires_at: string } | null;
+  change: { id: number; state: string; url: string | null } | null;
+  units: UnitView[];
+}
+
+export interface IntakeView {
+  key: string;
+  title: string;
+  url: string | null;
+}
+
+export interface ProjectView {
+  stories: StoryView[];
+  /** open items the intake query matches that no tick has taken yet */
+  intake: IntakeView[];
+  problems: string[];
+}
+
+function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined): UnitView["waiting"] {
+  const s = u.state;
+  if (!s || s.ended === "done") return null;
+  if (s.ended) return { for: "person", text: `ended ${s.ended}${s.ended_reason ? `: ${s.ended_reason}` : ""}` };
+  if (s.parked) return { for: "person", text: s.parked.reason };
+  if (u.session?.ask) return { for: "answer", text: u.session.ask.question };
+  if (u.session?.permission) return { for: "permission", text: u.session.permission.prompt };
+  if (kind === "gate") return { for: "gate", text: prompt ?? s.step };
+  return null;
+}
+
+export function unitView(u: UnitFacts, workflows: KernelWorkflows): UnitView {
+  const s = u.state;
+  const step = s ? workflows.byHash[s.workflow.hash]?.graph.steps[s.step] : undefined;
+  const kind = step?.kind ?? null;
+  return {
+    id: u.id,
+    step: s?.step ?? null,
+    kind,
+    attempt: s?.attempt ?? null,
+    workflow: s?.workflow.name ?? null,
+    ...(s?.ended ? { ended: s.ended } : {}),
+    ...(s?.ended_reason ? { ended_reason: s.ended_reason } : {}),
+    ...(s?.parked ? { parked: s.parked.reason } : {}),
+    ...(u.corrupt ? { corrupt: u.corrupt } : {}),
+    run: s?.run ? { id: s.run.id, executor: s.run.executor, started_at: s.run.started_at, activity: u.session?.activity ?? null } : null,
+    waiting: u.corrupt ? { for: "person", text: `corrupt: ${u.corrupt}` } : waitingOf(u, kind, step?.gate?.prompt),
+    pending_receipts: u.receipts.length,
+  };
+}
+
+export function storyView(s: StoryFacts, workflows: KernelWorkflows): StoryView {
+  return {
+    key: s.key,
+    title: s.item?.title ?? null,
+    url: s.item?.url ?? null,
+    open: s.item ? s.item.open : null,
+    claim: s.claim ? { holder: s.claim.holder, expires_at: s.claim.expires_at } : null,
+    change: s.change ? { id: s.change.id, state: s.change.state, url: s.change.url ?? null } : null,
+    units: s.units.map((u) => unitView(u, workflows)),
+  };
+}
+
+/** The facts of a tick that never acts: the same reads, so what is shown is what the next tick decides from. */
+export async function loadProjectView(env: RuntimeEnv): Promise<ProjectView> {
+  // outside the tick lock: a view that wrote what it read would race the tick's own writes
+  const gathered = await gatherFacts(env, newTickId(env.ctx.now()), { readOnly: true });
+  if (!gathered.ok) throw refuse(`the store could not be read: ${gathered.failure.message}`, "norn doctor", "facts_unavailable");
+  const { facts, workflows, problems } = gathered.value;
+  return {
+    stories: facts.stories.map((s) => storyView(s, workflows)),
+    // an item a tick took is a story from then on, whatever the tracker's query still matches
+    intake: facts.intake.filter((i) => !facts.stories.some((s) => s.key === i.key)).map((i) => ({ key: i.key, title: i.title, url: i.url ?? null })),
+    problems,
+  };
+}
+
+export function unitLine(u: UnitView): string {
+  if (u.corrupt !== undefined) return `${u.id}: corrupt — ${u.corrupt}`;
+  if (!u.step) return `${u.id}: not started`;
+  const where = `${u.id}: ${u.step}${u.kind ? ` (${u.kind})` : ""}${u.attempt && u.attempt > 1 ? ` attempt ${u.attempt}` : ""}`;
+  if (u.ended === "done") return `${where}, done`;
+  const run = u.run ? `, run by ${u.run.executor}${u.run.activity ? ` (${u.run.activity})` : ""}` : "";
+  const waiting = u.waiting ? ` — waits for ${u.waiting.for}: ${u.waiting.text}` : "";
+  return `${where}${run}${waiting}`;
+}
+
+export function storyHead(s: StoryView): string {
+  const change = s.change ? `, change #${s.change.id} ${s.change.state}` : "";
+  const claim = s.claim ? `, claimed by ${s.claim.holder}` : "";
+  return `${s.key}${s.title ? ` ${s.title}` : ""}${claim}${change}`;
+}
