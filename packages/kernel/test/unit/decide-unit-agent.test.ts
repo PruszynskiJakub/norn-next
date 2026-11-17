@@ -24,6 +24,14 @@ describe("a ready agent step", () => {
     expect(d.inbox?.text).toContain("codex");
   });
 
+  test("a park is a unit.parked receipt and the state that applies it, so state and facts agree on the next tick", () => {
+    const d = kindOf(decideCase({ state: stateAt("build", { applied_through: 6 }), config: { mode: "manual" } }), "park");
+    expect(d.intent.data).toEqual({ kind: "unit.parked", reason: "agent.ready.manual", step: "build", attempt: 1 });
+    expect(d.state).toMatchObject({ step: "build", parked: { reason: "agent.ready.manual", since: NOW }, applied_through: 7 });
+    expect(d.expect_version).toBe(4);
+    expect(decideCase({ state: d.state, config: { mode: "manual" } })?.rule).toBe("unit.parked");
+  });
+
   test("manual mode waits for a person with an inbox item, from the config, the workflow or the story", () => {
     const fromConfig = kindOf(decideCase({ state: stateAt("build"), config: { mode: "manual" } }), "park");
     expect(fromConfig).toMatchObject({ rule: "agent.ready.manual", reason: "agent.ready.manual", inbox: { kind: "manual", unit: "gh-1", step: "build", since: NOW } });
@@ -94,6 +102,18 @@ describe("an agent run, judged from its session", () => {
     const d = kindOf(decideCase({ state: running(), receipts }), "apply_receipts");
     expect(d.rule).toBe("receipts.reject");
     expect(d.rejected.map((r) => r.seq)).toEqual([1]);
+    // each refusal is written in the same act and applied with it, so the next tick has nothing left to apply
+    expect(d.receipts.map((r) => r.data)).toEqual([{ kind: "receipt.rejected", seq: 1, reason: "stale run run-old; the current run is run-1" }]);
+    expect(d.state.applied_through).toBe(2);
+  });
+
+  test("a refusal beside an intent is written after it, and both are applied", () => {
+    const reported = [receipt(1, { kind: "run.reported", run_id: "run-old", verb: "done", outcome: "done" })];
+    const d = kindOf(decideCase({ state: running(), receipts: reported, session: session("working", { silent: true }) }), "apply_receipts");
+    expect(d.receipts.map((r) => r.data.kind)).toEqual(["receipt.rejected"]);
+    const fresh = kindOf(decideCase({ state: running(), session: session("reported", { report: { verb: "done", outcome: "done" } }) }), "apply_receipts");
+    expect(fresh.receipts.map((r) => r.data.kind)).toEqual(["run.reported"]);
+    expect(fresh.state.applied_through).toBe(1);
   });
 
   test("a silent agent is nudged while nudges last, then the unit ends stuck", () => {
@@ -120,6 +140,18 @@ describe("an agent run, judged from its session", () => {
     expect(d.intent.data).toMatchObject({ kind: "run.started", retry_of: "run-1", run_id: d.run_id });
     const spent = decideCase({ state: stateAt("build", { run: run(), retries_used: 1 }), session: session("working", { silent: true }), executors });
     expect(spent?.rule).toBe("agent.silent.exhausted");
+  });
+
+  test("a step that routes stalled takes it for an agent with no activity, ahead of silent; a turn ended without a report stays silent", () => {
+    const wf = loaded(graph({ build: { routes: { done: { to: "test" }, stalled: { to: "$stuck" }, silent: { to: "test" } } } }));
+    const d = kindOf(decideCase({ state: stateAt("build", { run: run() }, wf), workflows: [wf], session: session("working", { silent: true }) }), "apply_receipts");
+    expect(d.rule).toBe("agent.stalled.route");
+    expect(d.receipts[0]?.data).toMatchObject({ kind: "run.classified", outcome: "stalled", rule: "agent.stalled.route" });
+    expect(d.state).toMatchObject({ ended: "stuck" });
+    expect(decideCase({ state: stateAt("build", { run: run() }, wf), workflows: [wf], session: session("turn_ended") })?.rule).toBe("agent.turn_ended.route");
+    // a step that routes only stalled leaves a turn ended without a report to the silent rules
+    const only = loaded(graph({ build: { routes: { done: { to: "test" }, stalled: { to: "$stuck" } } } }));
+    expect(decideCase({ state: stateAt("build", { run: run() }, only), workflows: [only], session: session("turn_ended") })?.rule).toBe("agent.turn_ended.nudge");
   });
 
   test("a step that routes silent takes its route instead of the nudges", () => {

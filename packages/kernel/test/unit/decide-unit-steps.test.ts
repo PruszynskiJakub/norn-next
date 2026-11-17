@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { decideCase, graph, kindOf, loaded, minutesAgo, run, stateAt } from "./decide-unit-fixtures.ts";
+import { decideCase, graph, kindOf, loaded, minutesAgo, receipt, run, stateAt } from "./decide-unit-fixtures.ts";
 
 const checkRun = run({ id: "chk-1", step: "test", executor: "check" });
 const shipRun = run({ id: "step-1", step: "ship", executor: "open-pr" });
@@ -146,15 +146,36 @@ describe("a plugin step kind", () => {
     expect(decideCase({ state: stateAt("merged", { run: mergedRun }), story: { unpushed: true } })?.rule).toBe("step.poll");
   });
 
+  test("a story polled at a wait step takes its stale route when the host reads the base as stale; a step that does not route it is polled", () => {
+    const wf = loaded(graph({ merged: { outcomes: ["merged", "stale", "unpushed"], routes: { merged: { to: "approve" }, stale: { to: "build", counter: "merged.stale" }, unpushed: { to: "ship" } } } }));
+    const d = kindOf(decideCase({ state: stateAt("merged", { run: mergedRun }, wf), workflows: [wf], story: { base_stale: true }, step_run: { kind: "await-merge", running: false, outcome: "waiting" } }), "apply_receipts");
+    expect(d.rule).toBe("step.stale");
+    expect(d.receipts[0]?.data).toMatchObject({ kind: "step.finished", run_id: "step-2", step_kind: "await-merge", outcome: "stale" });
+    expect(d.state.step).toBe("build");
+    const plain = loaded(graph({ merged: { outcomes: ["merged"], routes: { merged: { to: "approve" } } } }));
+    expect(decideCase({ state: stateAt("merged", { run: mergedRun }, plain), workflows: [plain], story: { base_stale: true } })?.rule).toBe("step.poll");
+  });
+
   test("a step run of another kind is not this step's", () => {
     expect(decideCase({ state: stateAt("merged", { run: mergedRun }), step_run: { kind: "open-pr", running: true } })?.rule).toBe("step.poll");
   });
 });
 
 describe("the unit's record", () => {
-  test("a corrupt record is marked corrupt once, then held", () => {
-    expect(decideCase({ state: stateAt("build"), corrupt: "state failed validation" })).toMatchObject({ kind: "mark_corrupt", rule: "unit.corrupt" });
-    expect(decideCase({ state: stateAt("build", { ended: "corrupt" }), corrupt: "state failed validation" })?.rule).toBe("unit.corrupt.held");
+  test("a corrupt record is marked corrupt once, by a receipt the record keeps, then held", () => {
+    const d = kindOf(decideCase({ state: null, corrupt: "state failed validation" }), "mark_corrupt");
+    expect({ rule: d.rule, mark: d.intent.data, state: d.state }).toEqual({ rule: "unit.corrupt", mark: { kind: "unit.marked", ended: "corrupt", reason: "state failed validation" }, state: null });
+    expect(decideCase({ state: null, corrupt: "state failed validation", corrupt_marked: true })).toEqual({ kind: "noop", unit: "gh-1", rule: "unit.corrupt.held", reason: "state failed validation" });
+  });
+
+  test("a readable unit marked corrupt ends corrupt with its mark applied, so the next tick holds it", () => {
+    const d = kindOf(decideCase({ state: stateAt("build", { run: run(), applied_through: 4, parked: { reason: "gate.park", since: minutesAgo(2) } }), workflows: [] }), "mark_corrupt");
+    expect(d.state).toMatchObject({ ended: "corrupt", run: null, applied_through: 5 });
+    expect(d.state?.parked).toBeUndefined();
+    expect(decideCase({ state: d.state, receipts: [] })?.rule).toBe("unit.corrupt.held");
+    // receipts already waiting stay unapplied: applying them would need the graph that is gone
+    const waiting = kindOf(decideCase({ state: stateAt("build", { applied_through: 4 }), receipts: [receipt(5, { kind: "nudge.sent", run_id: "run-1", reason: "silent" })], workflows: [] }), "mark_corrupt");
+    expect(waiting.state?.applied_through).toBe(4);
   });
 
   test("a pinned workflow that is not loaded, or lacks the unit's step, marks it corrupt", () => {

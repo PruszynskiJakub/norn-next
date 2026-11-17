@@ -110,6 +110,19 @@ describe("Journal: reading a unit", () => {
     expect(unit.corrupt).toContain("/verb");
   });
 
+  test("decide's corrupt mark appended to a corrupt record reads back as corrupt_marked, and nothing else of the record does", async () => {
+    const { store } = await seeded();
+    await store.appendReceipt(UNIT, { id: "r1", data: { kind: "run.reported", run_id: "a1", verb: "shipped" } });
+    expect((await read(store)).corrupt_marked).toBeUndefined();
+    // a stuck mark is not the corrupt one
+    await new Journal(store).record(UNIT, { id: "r2", data: { kind: "unit.marked", ended: "stuck", reason: "x" } });
+    expect((await read(store)).corrupt_marked).toBeUndefined();
+    await new Journal(store).record(UNIT, { id: "r3", data: { kind: "unit.marked", ended: "corrupt", reason: "receipt 1 (r1): /verb" } });
+    const unit = await read(store);
+    expect(unit).toMatchObject({ state: null, receipts: [], unapplied: [], corrupt_marked: true });
+    expect(unit.corrupt).toStartWith("receipt 1 (r1): ");
+  });
+
   test("a run state that fails the schema, is of an unreadable format, or names another unit makes the unit corrupt", async () => {
     const state = newRunState({ unit: UNIT, story: UNIT, workflow: WORKFLOW });
     const cases: Array<[unknown, string]> = [
@@ -125,6 +138,31 @@ describe("Journal: reading a unit", () => {
       expect(unit.state).toBeNull();
       expect(unit.corrupt).toStartWith(reason);
     }
+  });
+
+  test("a corrupt mark never makes a record whole again: applied_through one ahead stays corrupt and marked once the mark takes that seq", async () => {
+    const state = newRunState({ unit: UNIT, story: UNIT, workflow: WORKFLOW });
+    const store = storeOver(memoryFiles());
+    await store.appendReceipt(UNIT, { id: "r1", data: { kind: "mode.changed", mode: "auto", by: "a-person" } });
+    expect((await store.commitState(UNIT, { ...state, applied_through: 2 }, null)).ok).toBe(true);
+    const before = await read(store);
+    expect(before.corrupt).toStartWith("run state v1 applied through receipt 2, but the unit has 1");
+    expect(before.corrupt_marked).toBeUndefined();
+    const wrote = await new Journal(store).record(UNIT, { id: "r2", data: { kind: "unit.marked", ended: "corrupt", reason: before.corrupt as string } });
+    expect(wrote).toEqual({ ok: true, value: { seq: 2, replayed: false } });
+    const after = await read(store);
+    expect(after).toMatchObject({ state: null, receipts: [], unapplied: [], corrupt_marked: true });
+    expect(after.corrupt).toStartWith("marked corrupt by receipt 2");
+  });
+
+  test("a readable state that ended corrupt with its mark reads as that state", async () => {
+    const { store } = await seeded();
+    await new Journal(store).record(UNIT, { id: "r1", data: { kind: "unit.marked", ended: "corrupt", reason: "workflow gone" } });
+    const state: RunState = { ...newRunState({ unit: UNIT, story: UNIT, workflow: WORKFLOW }), ended: "corrupt", ended_reason: "workflow gone", applied_through: 1 };
+    expect((await new Journal(store).commit(UNIT, state, 1)).ok).toBe(true);
+    const unit = await read(store);
+    expect(unit.corrupt).toBeUndefined();
+    expect(unit.state).toMatchObject({ ended: "corrupt", applied_through: 1 });
   });
 
   test("receipts above applied_through are the unapplied ones", async () => {

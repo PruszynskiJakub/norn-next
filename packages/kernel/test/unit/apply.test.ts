@@ -206,6 +206,15 @@ describe("applyReceipts: counters", () => {
   });
 });
 
+describe("applyReceipts: parks", () => {
+  test("a unit.parked receipt parks the unit from its time; one written for another step is refused, and an answer lifts it", () => {
+    const parked = apply(fresh(), journal(1, { kind: "unit.parked", reason: "gate.park", step: "implement", attempt: 1 }));
+    expect(parked.state.parked).toEqual({ reason: "gate.park", since: iso(1) });
+    expect(apply(fresh(), journal(1, { kind: "unit.parked", reason: "gate.park", step: "test", attempt: 1 })).rejected[0]?.reason).toBe("stale: written for step test, the unit is at implement");
+    expect(apply(parked.state, journal(2, { kind: "answer.sent", input_id: "q1", text: "yes", by: "ann" })).state.parked).toBeUndefined();
+  });
+});
+
 describe("applyReceipts: refusals", () => {
   test("an outcome the step does not declare is refused, and applied_through moves past it", () => {
     const state = apply(fresh(), journal(1, started("a1"))).state;

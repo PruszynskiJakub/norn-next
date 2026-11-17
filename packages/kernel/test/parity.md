@@ -15,7 +15,13 @@ park kind (`ask`, `gate`, `merge`, `attended`). Every combination the old engine
 out in full below.
 
 Where a new action is `apply_receipts (X)`, decide writes receipt X through the action's `receipts`
-and commits the state applyReceipts computes, all in one act.
+and commits the state applyReceipts computes, all in one act. A refusal (`rejected`) is among those
+`receipts` as a `receipt.rejected`, written after what was refused and applied in the same commit, so
+recording it costs no tick of its own. A `park` writes a `unit.parked` receipt and commits the state that
+applies it (a unit with no run state keeps the receipt alone, and the same park on its record is held
+as `unit.parked`), so state and facts agree and a park is never sent twice. A `mark_corrupt` writes a
+`unit.marked` corrupt receipt, appended even to a record that fails validation, which the journal reads
+back as the unit's `corrupt_marked` fact.
 
 ## Rule ids
 
@@ -41,7 +47,7 @@ and commits the state applyReceipts computes, all in one act.
 | (none) | | `claim.pending` | `noop` (the claim is taken or reacquired this tick; units wait for it) |
 | (none) | | `claim.release` | `release_claim` (nothing of the story is left open) |
 | `story.finished` | `noop` | `story.ended` | `noop` |
-| `story.corrupt` | `mark_corrupt` | `unit.corrupt` | `mark_corrupt` (each unit whose record fails validation; there is no story-wide record to fail) |
+| `story.corrupt` | `mark_corrupt` | `unit.corrupt` | `mark_corrupt` (each unit whose record fails validation, once: its `unit.marked` receipt is read back as `corrupt_marked`; there is no story-wide record to fail) |
 | `story.record_only` | `noop` | dropped: a record without a branch is an old-layout case; the store holds the record | |
 | `start.record_unplaced` | `noop` | dropped: the store holds the record; there is nothing to place | |
 | `round.migrate` | `round_migrate` | dropped: old on-disk layout | |
@@ -56,7 +62,8 @@ and commits the state applyReceipts computes, all in one act.
 |---|---|---|---|
 | `remote.pr_merged` | `cleanup_merged_story` | `story.change_merged` | `mark_done` (`unit.marked` done) for every unit not ended; `claim.release` follows once nothing is open |
 | `remote.issue_closed` | `close_story` | `story.item_closed` | `apply_receipts` (`unit.marked` stuck, reason: the item closed); `claim.release` follows |
-| `remote.park` | `park` | `story.change_closed` | `park` (inbox `stuck`: the change closed unmerged) |
+| (none) | | `story.change_merged.stop`, `story.item_closed.stop` | `stop_run` (with a `stop.sent` intent) when the unit's run may still be going (an agent session not ended, a check or step run running) and no stop was ordered; the mark follows the next tick, the order applied with it |
+| `remote.park` | `park` | `story.change_closed` | `park` (inbox `stuck`: the change closed unmerged), at any step once no receipt waits and no run is live, so a story polled at merge parks too |
 | `remote.unpark_finished` | `apply_receipts` | dropped: a park the facts no longer support is lifted by a person's receipt, never by decide reading a tracker | |
 | `story.halted` | `noop` | `unit.parked` | `noop` (the unit waits on its park) |
 | `remote.mirror` | `update_story_mirror` | dropped: labels and comments are display; the host's tracker plugin mirrors after a commit, decide never reads them back | |
@@ -81,7 +88,7 @@ and commits the state applyReceipts computes, all in one act.
 
 | Old rule | Old action | New rule | New action |
 |---|---|---|---|
-| `unit.corrupt` | `mark_corrupt` / `noop` | `unit.corrupt` (mark), `unit.corrupt.held` (already marked) | `mark_corrupt` / `noop` |
+| `unit.corrupt` | `mark_corrupt` / `noop` | `unit.corrupt` (mark), `unit.corrupt.held` (already marked: an ended corrupt state, or `corrupt_marked` on a record that fails validation) | `mark_corrupt` / `noop` |
 | `unit.workflow_missing` | `mark_corrupt` | `unit.workflow_missing` | `mark_corrupt` (the pinned hash is in no loaded workflow) |
 | `workflow.drift` | `park` | dropped: a unit runs its pinned workflow by hash; a changed file affects only a new round | |
 | `unit.rebase_in_progress` | `noop` | dropped: worktree state belongs to the repository plugin's step kinds | |
@@ -95,7 +102,7 @@ and commits the state applyReceipts computes, all in one act.
 | (none) | | `unit.unpark` | `apply_receipts` (no receipts: a park decide derived from facts whose cause is gone is lifted) |
 | `receipts.apply` | `apply_receipts` | `receipts.apply` | `apply_receipts` |
 | `receipts.apply.resume` (`${rule}.resume`) | `apply_receipts` | `receipts.apply` | `apply_receipts` (`answer.sent` lifts the park; the host delivers the answer to the live session, so there is no resume rule) |
-| `receipts.reject` | `reject_receipt` | `receipts.reject` | `apply_receipts` (every unapplied receipt refused, each recorded as `receipt.rejected`) |
+| `receipts.reject` | `reject_receipt` | `receipts.reject` | `apply_receipts` (every unapplied receipt refused, each recorded as `receipt.rejected` in the same act and applied with it) |
 
 ### Slices (old `decide/steps.ts`)
 
@@ -124,12 +131,13 @@ and commits the state applyReceipts computes, all in one act.
 | (none) | | `check.finished` | `apply_receipts` (`check.finished` from the check's answered outcome) |
 | `check.queued` | `noop` | dropped: decide bounds agent runs only (`maxAgents`); the host queues the check processes it runs | |
 | `check.no_worktree` | `noop` | dropped: the host resolves the worktree when it runs the check | |
-| `verify.run` | `run_check` | dropped for now: re-verifying a base move needs a base-moved fact; it returns as a repository plugin's wait step kind | |
+| `verify.run` | `run_check` | folded into `base_stale`: the host runs the vcs plugin's `verify-base` step kind on a clean base move under a story waiting at a step that routes `stale`, once per (head, base) pair, and a red merged tree reads as `base_stale` | then `gate.stale` or `step.stale` (the failing output is not handed to the next step as `last_check`) |
 | `verify.awaits_sync` | `noop` | dropped: as `verify.run` | |
 | `gate.wait` | `noop` | `gate.park` (entering), then `unit.parked` | `park` (inbox `gate`, the gate's prompt) |
 | `gate.stale` | `classify` | `gate.stale` | `apply_receipts` (`step.finished` gate stale, from `base_stale`) |
 | `gate.stale.awaits_sync` | `noop` | dropped: the host gathers fresh facts before decide | |
 | `gate.carried` | `apply_receipts` | dropped: decide never decides a gate; a light path is a route the workflow names | |
+| (none) | | `step.stale` | `apply_receipts` (`step.finished` stale at a `wait` step kind, from `base_stale`, between polls; `await-merge` never answers `stale` itself, since the base policy is the workflow's) |
 | `merge.wait` | `noop` | `step.poll` | `run_step` (step kind `await-merge`, mode `wait`, no intent after the first poll) |
 | `open_pr.guard` | `classify` | `gate.unpushed` (a gate), `step.unpushed` (a `wait` step kind, between polls) | `apply_receipts` (`step.finished` unpushed, from the story's `unpushed` fact, the story's own unit only); the workflow routes `unpushed` back to its open-pr step (`shared/ship.yaml`'s `ready` and `merge` gain `unpushed: open-pr` as mechanical edits), counted as a stale route is, where the old engine took it with no edge and no counter |
 | `open_pr.guard.awaits_sync` | `noop` | dropped: as `gate.stale.awaits_sync` | |
@@ -227,9 +235,9 @@ New rule ids: `agent.died.route`, `agent.died.manual`, `agent.died.retry`, `agen
 | `agent.silent.<route>`, `agent.silent.route`, `agent.silent.park` | `classify` | `agent.silent.route`, `agent.turn_ended.route` | `apply_receipts` (`run.classified` silent) |
 | `agent.silent.stuck`, `agent.silent.$stuck` | `classify` | `agent.silent.exhausted`, `agent.turn_ended.exhausted` | `apply_receipts` (`run.classified` silent: nudges ran out) |
 | `agent.silent.launch_prompt`, `agent.silent.launch_prompt.nudge` | `classify` / `nudge` | dropped: as `agent.launch_prompt.resend` | |
-| `agent.stalled` | `classify` | dropped: the session reducer's `silent` covers a quiet agent (`agent.silent.*`); `stalled` stays a routable outcome name only | |
+| `agent.stalled` | `classify` | `agent.stalled.route`, `agent.silent.*` | a session with no activity (the reducer's `silent`) takes the step's `stalled` route when it has one, else the silent rules |
 | `agent.stalled.nudge` | `nudge` | `agent.silent.nudge` | `nudge` |
-| `agent.stalled.route`, `agent.stalled.<route>` | `classify` | `agent.silent.route` | `apply_receipts` (`run.classified` silent); a step's own `stalled` route is never taken, since decide classifies a quiet agent as `silent` |
+| `agent.stalled.route`, `agent.stalled.<route>` | `classify` | `agent.stalled.route` | `apply_receipts` (`run.classified` stalled), ahead of a `silent` route; a turn ended without a report and a limit waited out stay `silent` |
 | `agent.stalled.surface` | `classify` | `agent.silent.manual` | `park` |
 | `agent.stalled.stuck` | `classify` | `agent.silent.exhausted` | `apply_receipts` |
 
@@ -249,7 +257,7 @@ New rule ids: `agent.died.route`, `agent.died.manual`, `agent.died.retry`, `agen
 | `park` | `park` |
 | `mark_done` | `mark_done` |
 | `commit_push` | dropped: run state is committed through the store, never git |
-| `reject_receipt` | `apply_receipts` (rejected, recorded as `receipt.rejected`) |
+| `reject_receipt` | `apply_receipts` (rejected, recorded as `receipt.rejected` among its `receipts`) |
 | `mark_corrupt` | `mark_corrupt` |
 | `import_mailbox` | `import_mailbox` |
 | `claim` (acquire / renew / release) | `claim` / `renew_claim` / `release_claim` |

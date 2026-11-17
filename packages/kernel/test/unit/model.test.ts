@@ -144,6 +144,7 @@ describe("kernel schemas", () => {
       { kind: "run.limited", run_id: "r", resets_at: "2026-11-17T10:00:00.000Z" },
       { kind: "round.started", workflow: pinned },
       { kind: "unit.marked", ended: "stuck", reason: "counter qa_loop ran out" },
+      { kind: "unit.parked", reason: "gate.park" },
       { kind: "mode.changed", mode: "auto", by: "a-person" },
       { kind: "receipt.rejected", seq: 3, reason: "outcome nope is not declared by work" },
     ];
@@ -202,7 +203,7 @@ describe("decide frame", () => {
     out.add({ kind: "renew_claim", unit: null, rule: "claim.renew", story: "gh-1" });
     out.add({ kind: "noop", unit: "gh-1", rule: "gate.wait", reason: "" });
     expect(out.has("gh-1")).toBe(true);
-    expect(() => out.add({ kind: "mark_corrupt", unit: "gh-1", rule: "unit.corrupt", reason: "bad" })).toThrow("decide: second action for gh-1 (unit.corrupt)");
+    expect(() => out.add({ kind: "noop", unit: "gh-1", rule: "unit.corrupt.held", reason: "bad" })).toThrow("decide: second action for gh-1 (unit.corrupt.held)");
     expect(out.all().map((d) => d.rule)).toEqual(["claim.renew", "gate.wait"]);
   });
 });

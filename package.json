@@ -32,6 +32,9 @@
     "@norn/host-node": "workspace:*",
     "@norn/store-local": "workspace:*",
     "@norn/store-refs": "workspace:*",
+    "@norn/runtime": "workspace:*",
+    "@norn/vcs-git": "workspace:*",
+    "@norn/pack-sdlc": "workspace:*",
     "@types/bun": "1.3.13",
     "typescript": "^5.9.3",
     "yaml": "^2.8.1"

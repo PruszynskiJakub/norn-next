@@ -24,6 +24,8 @@ export interface UnitJournal {
   unapplied: KernelReceipt[];
   /** why the unit's record failed validation; `state` and `receipts` are then empty, never a partial read */
   corrupt?: string;
+  /** set with `corrupt` when the record holds a valid `unit.marked` corrupt receipt: decide's mark is already there */
+  corrupt_marked?: boolean;
 }
 
 /**
@@ -58,14 +60,17 @@ export function outcomeReceiptId(intentId: string): string {
   return deriveUlid(intentId, 1);
 }
 
-const corruptUnit = (unit: string, version: number | null, reason: string): UnitJournal => ({
-  unit,
-  version,
-  state: null,
-  receipts: [],
-  unapplied: [],
-  corrupt: reason,
-});
+/**
+ * A corrupt read: nothing of the record is handed on but why, and whether decide's mark is on it.
+ * The mark is the one receipt read from a corrupt record, and only to say it is there.
+ */
+function corruptUnit(unit: string, version: number | null, reason: string, record: readonly { data: unknown }[]): UnitJournal {
+  const marked = record.some((r) => {
+    const data = validateReceiptData(r.data);
+    return data.ok && data.value.kind === "unit.marked" && data.value.ended === "corrupt";
+  });
+  return { unit, version, state: null, receipts: [], unapplied: [], corrupt: reason, ...(marked ? { corrupt_marked: true } : {}) };
+}
 
 export class Journal {
   constructor(readonly store: Store) {}
@@ -79,16 +84,20 @@ export class Journal {
     const receipts: KernelReceipt[] = [];
     for (const r of record.receipts) {
       const data = validateReceiptData(r.data);
-      if (!data.ok) return ok(corruptUnit(unit, version, `receipt ${r.seq} (${r.id}): ${schemaReason(data.errors)}`));
+      if (!data.ok) return ok(corruptUnit(unit, version, `receipt ${r.seq} (${r.id}): ${schemaReason(data.errors)}`, record.receipts));
       receipts.push({ seq: r.seq, id: r.id, at: r.at, data: data.value });
     }
     if (record.state === null) return ok({ unit, version, state: null, receipts, unapplied: receipts });
     const state = readRunState(record.state.data);
-    if (!state.ok) return ok(corruptUnit(unit, version, `run state v${version}: ${state.reason}`));
+    if (!state.ok) return ok(corruptUnit(unit, version, `run state v${version}: ${state.reason}`, record.receipts));
     const s = state.state;
-    if (s.unit !== unit) return ok(corruptUnit(unit, version, `run state v${version} is for unit ${s.unit}`));
+    if (s.unit !== unit) return ok(corruptUnit(unit, version, `run state v${version} is for unit ${s.unit}`, record.receipts));
+    // a corrupt mark is only settled by a state that ended corrupt; below it the record was read as
+    // corrupt once, and the mark's own seq could make a numbering fault look whole again
+    const mark = receipts.find((r) => r.data.kind === "unit.marked" && r.data.ended === "corrupt");
+    if (mark && s.ended !== "corrupt") return ok(corruptUnit(unit, version, `marked corrupt by receipt ${mark.seq}, and the run state never ended corrupt`, record.receipts));
     const last = receipts.at(-1)?.seq ?? 0;
-    if (s.applied_through > last) return ok(corruptUnit(unit, version, `run state v${version} applied through receipt ${s.applied_through}, but the unit has ${last}`));
+    if (s.applied_through > last) return ok(corruptUnit(unit, version, `run state v${version} applied through receipt ${s.applied_through}, but the unit has ${last}`, record.receipts));
     return ok({ unit, version, state: s, receipts, unapplied: receipts.filter((r) => r.seq > s.applied_through) });
   }
 

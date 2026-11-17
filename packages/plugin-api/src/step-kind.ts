@@ -6,8 +6,21 @@
  */
 import { OUTCOME_NAME_PATTERN } from "@norn/schema";
 import type { Static, TSchema } from "@sinclair/typebox";
+import type { Forge } from "./forge.ts";
 import type { HostContext } from "./host.ts";
 import type { PluginResult } from "./result.ts";
+import type { Tracker } from "./tracker.ts";
+import type { Vcs } from "./vcs.ts";
+
+/**
+ * The configured providers a step kind may use (plugin API 1.4), so one kind works over whichever
+ * forge or vcs a repo picked without naming a provider. Only the host's `run` sees them; decide never does.
+ */
+export interface StepKindSlots {
+  vcs?: Vcs;
+  forge?: Forge;
+  tracker?: Tracker;
+}
 
 /** Head keys the kernel runs itself; a plugin may not provide a step kind by these names. */
 export const BUILTIN_STEP_KINDS = ["agent", "check", "gate", "slices"] as const;
@@ -57,6 +70,25 @@ export interface StepKindInput<C = Record<string, unknown>> {
   config: C;
   /** the unit's worktree, when the host has one for it */
   worktree?: string;
+  /** the repo's configured slots; a slot the repo has none of is absent */
+  slots?: StepKindSlots;
+  /** the unit's branch, as the host made it; a kind over the slots cannot learn it from a provider-neutral vcs */
+  branch?: string;
+  /**
+   * The story's base: `branch` as the forge names it (`main`), `ref` as the vcs resolves its newest
+   * known commit (`origin/main`), so a kind compares against the base the host last fetched.
+   */
+  base?: StepKindBase;
+  /**
+   * The receipt the host wrote before running the kind (the run's intent); the idempotence key of
+   * every effect the kind asks a provider for, so a run the host repeats after a crash replays it.
+   */
+  receipt_id?: string;
+}
+
+export interface StepKindBase {
+  branch: string;
+  ref: string;
 }
 
 export interface StepKindOutcome {

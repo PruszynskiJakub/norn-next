@@ -3027,7 +3027,153 @@
         "step": "implement",
         "since": "2026-11-17T09:00:00.000Z",
         "text": "run run-gh-142-1 went quiet without a report"
-      }
+      },
+      "intent": {
+        "id": "01JD5G0000FWPMF8ZZQPVMTVA7",
+        "data": {
+          "kind": "unit.parked",
+          "reason": "agent.silent.manual",
+          "step": "implement",
+          "attempt": 1
+        }
+      },
+      "state": {
+        "format": 1,
+        "unit": "gh-142",
+        "story": "gh-142",
+        "workflow": {
+          "name": "slice",
+          "hash": "6c26df89bfb1d4128f71beb2e9465cfe3bb2dd90e61af760b5521d4e2f9c3fb4",
+          "doc": {
+            "name": "slice",
+            "description": "Build one slice test-first, check and review it, and integrate it into the story branch.",
+            "start": "implement",
+            "steps": {
+              "implement": {
+                "agent": "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "inputs": [
+                  "slice",
+                  "spec",
+                  "handoff",
+                  "last_check",
+                  "last_findings"
+                ],
+                "outcomes": {
+                  "done": "test"
+                },
+                "means": {
+                  "done": "every acceptance criterion (or rework point) has a passing test"
+                }
+              },
+              "test": {
+                "check": "bun test",
+                "timeout": "10m",
+                "outcomes": {
+                  "pass": "review",
+                  "fail": {
+                    "to": "implement",
+                    "counter": "test.fail"
+                  }
+                }
+              },
+              "review": {
+                "agent": "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch.",
+                "skills": [
+                  "norn-review"
+                ],
+                "inputs": [
+                  "slice",
+                  "spec",
+                  "diff",
+                  "last_findings"
+                ],
+                "hand_back": {
+                  "changes_requested": "findings"
+                },
+                "outcomes": {
+                  "approve": "integrate",
+                  "changes_requested": {
+                    "to": "implement",
+                    "counter": "review.changes_requested"
+                  }
+                },
+                "means": {
+                  "approve": "all criteria met, no blocking findings",
+                  "changes_requested": "blocking findings in the receipt"
+                }
+              },
+              "integrate": {
+                "integrate": null,
+                "outcomes": {
+                  "done": "$done",
+                  "conflict": {
+                    "to": "merge",
+                    "counter": "integrate.conflict"
+                  }
+                }
+              },
+              "merge": {
+                "agent": "Integrating this slice into the story branch conflicted: resolve each conflict keeping the intent of both sides, and prove it with the tests.",
+                "skills": [
+                  "norn-merge"
+                ],
+                "inputs": [
+                  "slice",
+                  "spec"
+                ],
+                "outcomes": {
+                  "done": "integrate"
+                },
+                "means": {
+                  "done": "conflicts resolved keeping the intent of both sides; tests pass"
+                }
+              }
+            },
+            "counters": {
+              "test.fail": {
+                "max": 5
+              },
+              "integrate.conflict": {
+                "max": 2,
+                "reset_on": "integrate.done"
+              },
+              "review.changes_requested": {
+                "max": 3
+              }
+            }
+          }
+        },
+        "step": "implement",
+        "attempt": 1,
+        "counters": {
+          "test.fail": 0,
+          "integrate.conflict": 0,
+          "review.changes_requested": 0
+        },
+        "retries_used": 0,
+        "run": {
+          "id": "run-gh-142-1",
+          "step": "implement",
+          "attempt": 1,
+          "started_at": "2026-11-17T08:55:00.000Z",
+          "executor": "claude",
+          "attended": false,
+          "nudges": 0
+        },
+        "applied_through": 2,
+        "visits": {
+          "implement": 1
+        },
+        "mode": "manual",
+        "parked": {
+          "reason": "agent.silent.manual",
+          "since": "2026-11-17T09:00:00.000Z"
+        }
+      },
+      "expect_version": 2
     },
     {
       "kind": "apply_receipts",
@@ -3035,7 +3181,7 @@
       "rule": "agent.silent.exhausted",
       "receipts": [
         {
-          "id": "01JD5G0000FWPMF8ZZQPVMTVA7",
+          "id": "01JD5G0000DXAZ7T4XPG82QXGC",
           "data": {
             "kind": "run.classified",
             "run_id": "run-gh-143-1",
@@ -3178,7 +3324,7 @@
       "kind": "retry_run",
       "unit": "gh-144",
       "rule": "agent.silent.retry",
-      "run_id": "01JD5G0000DXAZ7T4XPG82QXGC",
+      "run_id": "01JD5G0000G5CYANXJR76YS26J",
       "previous_run_id": "run-gh-144-1",
       "executor": "plain",
       "attended": false,
@@ -3199,10 +3345,10 @@
         ]
       },
       "intent": {
-        "id": "01JD5G0000G5CYANXJR76YS26J",
+        "id": "01JD5G0000HNQP0MC6STEJTCXV",
         "data": {
           "kind": "run.started",
-          "run_id": "01JD5G0000DXAZ7T4XPG82QXGC",
+          "run_id": "01JD5G0000G5CYANXJR76YS26J",
           "run_kind": "agent",
           "executor": "plain",
           "attended": false,
@@ -3219,7 +3365,7 @@
       "run_id": "run-gh-145-1",
       "reason": "turn_ended",
       "intent": {
-        "id": "01JD5G0000HNQP0MC6STEJTCXV",
+        "id": "01JD5G00006H3304GBHG0V39M9",
         "data": {
           "kind": "nudge.sent",
           "run_id": "run-gh-145-1",
@@ -3246,7 +3392,153 @@
         "step": "implement",
         "since": "2026-11-17T09:00:00.000Z",
         "text": "run run-gh-147-1 went quiet without a report"
-      }
+      },
+      "intent": {
+        "id": "01JD5G00005T6A7417ACH49BGG",
+        "data": {
+          "kind": "unit.parked",
+          "reason": "agent.turn_ended.manual",
+          "step": "implement",
+          "attempt": 1
+        }
+      },
+      "state": {
+        "format": 1,
+        "unit": "gh-147",
+        "story": "gh-147",
+        "workflow": {
+          "name": "slice",
+          "hash": "6c26df89bfb1d4128f71beb2e9465cfe3bb2dd90e61af760b5521d4e2f9c3fb4",
+          "doc": {
+            "name": "slice",
+            "description": "Build one slice test-first, check and review it, and integrate it into the story branch.",
+            "start": "implement",
+            "steps": {
+              "implement": {
+                "agent": "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "inputs": [
+                  "slice",
+                  "spec",
+                  "handoff",
+                  "last_check",
+                  "last_findings"
+                ],
+                "outcomes": {
+                  "done": "test"
+                },
+                "means": {
+                  "done": "every acceptance criterion (or rework point) has a passing test"
+                }
+              },
+              "test": {
+                "check": "bun test",
+                "timeout": "10m",
+                "outcomes": {
+                  "pass": "review",
+                  "fail": {
+                    "to": "implement",
+                    "counter": "test.fail"
+                  }
+                }
+              },
+              "review": {
+                "agent": "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch.",
+                "skills": [
+                  "norn-review"
+                ],
+                "inputs": [
+                  "slice",
+                  "spec",
+                  "diff",
+                  "last_findings"
+                ],
+                "hand_back": {
+                  "changes_requested": "findings"
+                },
+                "outcomes": {
+                  "approve": "integrate",
+                  "changes_requested": {
+                    "to": "implement",
+                    "counter": "review.changes_requested"
+                  }
+                },
+                "means": {
+                  "approve": "all criteria met, no blocking findings",
+                  "changes_requested": "blocking findings in the receipt"
+                }
+              },
+              "integrate": {
+                "integrate": null,
+                "outcomes": {
+                  "done": "$done",
+                  "conflict": {
+                    "to": "merge",
+                    "counter": "integrate.conflict"
+                  }
+                }
+              },
+              "merge": {
+                "agent": "Integrating this slice into the story branch conflicted: resolve each conflict keeping the intent of both sides, and prove it with the tests.",
+                "skills": [
+                  "norn-merge"
+                ],
+                "inputs": [
+                  "slice",
+                  "spec"
+                ],
+                "outcomes": {
+                  "done": "integrate"
+                },
+                "means": {
+                  "done": "conflicts resolved keeping the intent of both sides; tests pass"
+                }
+              }
+            },
+            "counters": {
+              "test.fail": {
+                "max": 5
+              },
+              "integrate.conflict": {
+                "max": 2,
+                "reset_on": "integrate.done"
+              },
+              "review.changes_requested": {
+                "max": 3
+              }
+            }
+          }
+        },
+        "step": "implement",
+        "attempt": 1,
+        "counters": {
+          "test.fail": 0,
+          "integrate.conflict": 0,
+          "review.changes_requested": 0
+        },
+        "retries_used": 0,
+        "run": {
+          "id": "run-gh-147-1",
+          "step": "implement",
+          "attempt": 1,
+          "started_at": "2026-11-17T08:55:00.000Z",
+          "executor": "claude",
+          "attended": false,
+          "nudges": 0
+        },
+        "applied_through": 2,
+        "visits": {
+          "implement": 1
+        },
+        "mode": "manual",
+        "parked": {
+          "reason": "agent.turn_ended.manual",
+          "since": "2026-11-17T09:00:00.000Z"
+        }
+      },
+      "expect_version": 2
     },
     {
       "kind": "apply_receipts",
@@ -3254,7 +3546,7 @@
       "rule": "agent.turn_ended.exhausted",
       "receipts": [
         {
-          "id": "01JD5G00006H3304GBHG0V39M9",
+          "id": "01JD5G0000K82YN0J3WZ0DAWAT",
           "data": {
             "kind": "run.classified",
             "run_id": "run-gh-148-1",
@@ -3397,7 +3689,7 @@
       "kind": "retry_run",
       "unit": "gh-149",
       "rule": "agent.turn_ended.retry",
-      "run_id": "01JD5G00005T6A7417ACH49BGG",
+      "run_id": "01JD5G0000ZJJQWQYF9123TAM0",
       "previous_run_id": "run-gh-149-1",
       "executor": "plain",
       "attended": false,
@@ -3418,10 +3710,10 @@
         ]
       },
       "intent": {
-        "id": "01JD5G0000K82YN0J3WZ0DAWAT",
+        "id": "01JD5G0000WWRZFAC85EFVB6ME",
         "data": {
           "kind": "run.started",
-          "run_id": "01JD5G00005T6A7417ACH49BGG",
+          "run_id": "01JD5G0000ZJJQWQYF9123TAM0",
           "run_kind": "agent",
           "executor": "plain",
           "attended": false,
@@ -3438,7 +3730,7 @@
       "run_id": "run-gh-150-1",
       "reason": "limited",
       "intent": {
-        "id": "01JD5G0000ZJJQWQYF9123TAM0",
+        "id": "01JD5G00002AZQWCETWCAAAGJ0",
         "data": {
           "kind": "nudge.sent",
           "run_id": "run-gh-150-1",
@@ -3465,7 +3757,153 @@
         "step": "implement",
         "since": "2026-11-17T09:00:00.000Z",
         "text": "run run-gh-152-1 went quiet without a report"
-      }
+      },
+      "intent": {
+        "id": "01JD5G0000MAT6JEWR670DGJGT",
+        "data": {
+          "kind": "unit.parked",
+          "reason": "agent.limited.manual",
+          "step": "implement",
+          "attempt": 1
+        }
+      },
+      "state": {
+        "format": 1,
+        "unit": "gh-152",
+        "story": "gh-152",
+        "workflow": {
+          "name": "slice",
+          "hash": "6c26df89bfb1d4128f71beb2e9465cfe3bb2dd90e61af760b5521d4e2f9c3fb4",
+          "doc": {
+            "name": "slice",
+            "description": "Build one slice test-first, check and review it, and integrate it into the story branch.",
+            "start": "implement",
+            "steps": {
+              "implement": {
+                "agent": "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "inputs": [
+                  "slice",
+                  "spec",
+                  "handoff",
+                  "last_check",
+                  "last_findings"
+                ],
+                "outcomes": {
+                  "done": "test"
+                },
+                "means": {
+                  "done": "every acceptance criterion (or rework point) has a passing test"
+                }
+              },
+              "test": {
+                "check": "bun test",
+                "timeout": "10m",
+                "outcomes": {
+                  "pass": "review",
+                  "fail": {
+                    "to": "implement",
+                    "counter": "test.fail"
+                  }
+                }
+              },
+              "review": {
+                "agent": "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch.",
+                "skills": [
+                  "norn-review"
+                ],
+                "inputs": [
+                  "slice",
+                  "spec",
+                  "diff",
+                  "last_findings"
+                ],
+                "hand_back": {
+                  "changes_requested": "findings"
+                },
+                "outcomes": {
+                  "approve": "integrate",
+                  "changes_requested": {
+                    "to": "implement",
+                    "counter": "review.changes_requested"
+                  }
+                },
+                "means": {
+                  "approve": "all criteria met, no blocking findings",
+                  "changes_requested": "blocking findings in the receipt"
+                }
+              },
+              "integrate": {
+                "integrate": null,
+                "outcomes": {
+                  "done": "$done",
+                  "conflict": {
+                    "to": "merge",
+                    "counter": "integrate.conflict"
+                  }
+                }
+              },
+              "merge": {
+                "agent": "Integrating this slice into the story branch conflicted: resolve each conflict keeping the intent of both sides, and prove it with the tests.",
+                "skills": [
+                  "norn-merge"
+                ],
+                "inputs": [
+                  "slice",
+                  "spec"
+                ],
+                "outcomes": {
+                  "done": "integrate"
+                },
+                "means": {
+                  "done": "conflicts resolved keeping the intent of both sides; tests pass"
+                }
+              }
+            },
+            "counters": {
+              "test.fail": {
+                "max": 5
+              },
+              "integrate.conflict": {
+                "max": 2,
+                "reset_on": "integrate.done"
+              },
+              "review.changes_requested": {
+                "max": 3
+              }
+            }
+          }
+        },
+        "step": "implement",
+        "attempt": 1,
+        "counters": {
+          "test.fail": 0,
+          "integrate.conflict": 0,
+          "review.changes_requested": 0
+        },
+        "retries_used": 0,
+        "run": {
+          "id": "run-gh-152-1",
+          "step": "implement",
+          "attempt": 1,
+          "started_at": "2026-11-17T08:55:00.000Z",
+          "executor": "claude",
+          "attended": false,
+          "nudges": 0
+        },
+        "applied_through": 2,
+        "visits": {
+          "implement": 1
+        },
+        "mode": "manual",
+        "parked": {
+          "reason": "agent.limited.manual",
+          "since": "2026-11-17T09:00:00.000Z"
+        }
+      },
+      "expect_version": 2
     },
     {
       "kind": "apply_receipts",
@@ -3473,7 +3911,7 @@
       "rule": "agent.limited.exhausted",
       "receipts": [
         {
-          "id": "01JD5G0000WWRZFAC85EFVB6ME",
+          "id": "01JD5G0000FPFVA0W55SXBZ8Z3",
           "data": {
             "kind": "run.classified",
             "run_id": "run-gh-153-1",
@@ -3616,7 +4054,7 @@
       "kind": "retry_run",
       "unit": "gh-154",
       "rule": "agent.limited.retry",
-      "run_id": "01JD5G00002AZQWCETWCAAAGJ0",
+      "run_id": "01JD5G0000FS9ENF9G8KGMDNVC",
       "previous_run_id": "run-gh-154-1",
       "executor": "plain",
       "attended": false,
@@ -3637,10 +4075,10 @@
         ]
       },
       "intent": {
-        "id": "01JD5G0000MAT6JEWR670DGJGT",
+        "id": "01JD5G0000GJBB8J7N71N4JDVF",
         "data": {
           "kind": "run.started",
-          "run_id": "01JD5G00002AZQWCETWCAAAGJ0",
+          "run_id": "01JD5G0000FS9ENF9G8KGMDNVC",
           "run_kind": "agent",
           "executor": "plain",
           "attended": false,
@@ -3656,7 +4094,7 @@
       "rule": "agent.limited.record",
       "receipts": [
         {
-          "id": "01JD5G0000FPFVA0W55SXBZ8Z3",
+          "id": "01JD5G0000D6186AEBQJWTF8DA",
           "data": {
             "kind": "run.limited",
             "run_id": "run-gh-155-1",

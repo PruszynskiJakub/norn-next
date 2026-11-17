@@ -125,6 +125,7 @@ export interface Case {
   receipts?: KernelReceipt[];
   step_run?: UnitFacts["step_run"];
   corrupt?: string;
+  corrupt_marked?: boolean;
   unitId?: string;
   story?: Partial<StoryFacts>;
   executors?: Record<string, ExecutorCapabilities>;
@@ -138,6 +139,7 @@ export function factsOf(c: Case): KernelFacts {
   const unit: UnitFacts = { id: c.unitId ?? "gh-1", state: c.state, receipts: c.receipts ?? [], session: c.session ?? null, version: 4 };
   if (c.step_run) unit.step_run = c.step_run;
   if (c.corrupt) unit.corrupt = c.corrupt;
+  if (c.corrupt_marked) unit.corrupt_marked = true;
   const story: StoryFacts = { key: "gh-1", item: null, change: null, claim: null, units: [unit], mailbox: [], ...c.story };
   const others: StoryFacts[] = (c.others ?? []).map((u, i) => ({ key: `gh-${i + 10}`, item: null, change: null, claim: null, units: [u], mailbox: [] }));
   return {

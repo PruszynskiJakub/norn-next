@@ -28,6 +28,9 @@ const ALLOWED: Record<string, string[]> = {
   "host-node": ["schema", "plugin-api"],
   "store-local": ["schema", "plugin-api"],
   "store-refs": ["schema", "plugin-api"],
+  runtime: ["schema", "plugin-api", "kernel"],
+  "vcs-git": ["schema", "plugin-api"],
+  "pack-sdlc": ["plugin-api"],
 };
 
 function files(dir: string): string[] {

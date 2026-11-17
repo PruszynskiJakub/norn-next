@@ -39,6 +39,22 @@ function quietStory(w: World, key: string, s: Partial<Seed>, sess: ReturnType<ty
   w.unit(key).session = sess;
 }
 
+/** A step that routes `stalled` apart from `silent`: an agent with no activity goes to a person, one that ended its turn quietly is sent back. */
+const STALLED_DOC = {
+  name: "stalled",
+  description: "An agent step that routes a stalled agent to a person and a silent one back to work.",
+  start: "work",
+  steps: {
+    work: {
+      agent: "Do the work.",
+      skills: ["norn-implement"],
+      outcomes: { done: "$done", stalled: "triage", silent: "work" },
+      means: { done: "the work is done" },
+    },
+    triage: { gate: "The agent stalled. Approve to end the round, or reject to leave it stuck.", outcomes: { approve: "$done", reject: "$stuck" } },
+  },
+};
+
 const later = (w: World, minutes: number) => new Date(w.now + minutes * 60_000).toISOString();
 const earlier = (w: World, minutes: number) => new Date(w.now - minutes * 60_000).toISOString();
 
@@ -87,6 +103,69 @@ export const MATRIX: Scenario[] = [
     },
     ["unit.corrupt", "unit.corrupt.held", "unit.workflow_missing"],
     2,
+  ),
+  scenario(
+    "corrupt-marked",
+    "A record that fails validation is marked once: the mark is a receipt the record keeps beside what failed, read back as corrupt_marked, so the next tick holds the unit instead of marking it again.",
+    SLICE(),
+    (w) => {
+      seed(w, "gh-73", { workflow: "slice", step: "implement" });
+      w.unit("gh-73").corrupt = "run state v2: /attempt must be >= 1";
+    },
+    ["unit.corrupt", "unit.corrupt.held"],
+    2,
+  ),
+  scenario(
+    "ended-while-running",
+    "Stories ended from outside while a run is live: a merged change with an agent at work and a closed item with a check running each stop the run first, the order recorded, then mark the unit the tick after with the order applied; a run already over is marked at once.",
+    SLICE(),
+    (w) => {
+      w.manual.add("gh-83");
+      seed(w, "gh-83", { workflow: "slice", step: "implement", run: {} });
+      w.unit("gh-83").session = session("working");
+      w.story("gh-83").change = { id: 7, url: "https://forge.example/pr/7", state: "merged", draft: false, head_branch: "gh-83-x", base_branch: "main", head_sha: "c7", merge_sha: "m7", merged_at: w.iso(), title: "Story 83" };
+      seed(w, "gh-84", { workflow: "slice", step: "test", run: { executor: "check" }, item: item(84, "Story 84", { open: false }) });
+      w.unit("gh-84").step_run = { kind: "check", running: true };
+      seed(w, "gh-85", { workflow: "slice", step: "implement", run: {}, item: item(85, "Story 85", { open: false }) });
+      w.unit("gh-85").session = session("ended");
+      w.manual.add("gh-85");
+    },
+    ["story.change_merged.stop", "story.item_closed.stop", "story.change_merged", "story.item_closed"],
+    3,
+  ),
+  scenario(
+    "park-once",
+    "Parks are receipts: a story whose workflow fails to load keeps the park's receipt alone and is held on the next tick rather than parked again; a gate's park commits the state that applies its receipt, and the next tick holds it.",
+    { files: { ...shippedFiles("quick"), deploy: DEPLOY_DOC }, config: config({ workflow: "deploy" }) },
+    (w) => {
+      w.stories.push({ key: "gh-96", item: item(96, "Deploy the docs site"), change: null, claim: claim(w, "gh-96"), units: [], mailbox: [] });
+      seed(w, "gh-97", { workflow: "quick", step: "ready" });
+    },
+    ["round.workflow_invalid", "gate.park", "unit.parked"],
+    2,
+  ),
+  scenario(
+    "refusal-recorded",
+    "A refusal is written in the act that refused it and applied with it: a report from a run already replaced is refused onto the record, and the next tick has nothing left to apply.",
+    { files: shippedFiles("quick") },
+    (w) => {
+      w.manual.add("gh-107");
+      seed(w, "gh-107", { workflow: "quick", step: "review", run: {} });
+      w.unit("gh-107").session = session("working");
+      w.append("gh-107", { kind: "run.reported", run_id: "run-replaced", verb: "done", outcome: "approve", step: "review", attempt: 1 });
+    },
+    ["receipts.reject", "agent.running"],
+    2,
+  ),
+  scenario(
+    "agent-stalled-route",
+    "A step that routes stalled: an agent with no activity takes the stalled route to a person, while one that ended its turn without a report takes the silent route back to work.",
+    { files: { stalled: STALLED_DOC } },
+    (w) => {
+      quietStory(w, "gh-136", { workflow: "stalled", step: "work" }, session("working", { silent: true }));
+      quietStory(w, "gh-137", { workflow: "stalled", step: "work" }, session("turn_ended"));
+    },
+    ["agent.stalled.route", "agent.turn_ended.route"],
   ),
   scenario(
     "story-ended-outside",
@@ -263,6 +342,32 @@ export const MATRIX: Scenario[] = [
       w.story("gh-171").unpushed = true;
     },
     ["gate.unpushed", "step.unpushed"],
+  ),
+  scenario(
+    "base-stale-at-merge",
+    "A story polled at merge whose base the host reads as stale (a conflicting move, or a clean one that failed base.verify) goes back through its stale route; one whose base only moved clean keeps waiting.",
+    { files: shippedFiles("quick") },
+    (w) => {
+      seed(w, "gh-175", { workflow: "quick", step: "merge", run: { executor: "await-merge" } });
+      w.unit("gh-175").step_run = { kind: "await-merge", running: false, outcome: "waiting" };
+      w.story("gh-175").base_stale = true;
+      seed(w, "gh-176", { workflow: "quick", step: "merge", run: { executor: "await-merge" } });
+      w.unit("gh-176").step_run = { kind: "await-merge", running: false, outcome: "waiting" };
+      w.story("gh-176").base_stale = false;
+    },
+    ["step.stale", "step.poll"],
+  ),
+  scenario(
+    "change-closed-at-merge",
+    "A person closes the story's change while it is polled at merge: the story parks for them, once, rather than polling a closed change forever or opening a new one.",
+    { files: shippedFiles("quick") },
+    (w) => {
+      seed(w, "gh-177", { workflow: "quick", step: "merge", run: { executor: "await-merge" } });
+      w.unit("gh-177").step_run = { kind: "await-merge", running: false, outcome: "waiting" };
+      w.story("gh-177").change = { id: 77, state: "closed", draft: false, head_branch: "norn/gh-177", base_branch: "main", head_sha: "a77", title: "Story 177" };
+    },
+    ["story.change_closed", "unit.parked"],
+    2,
   ),
   scenario(
     "steps-cut-short",

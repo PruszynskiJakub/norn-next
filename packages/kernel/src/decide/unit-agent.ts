@@ -5,7 +5,8 @@
  * prompt parks the unit for a person, a usage limit waits for its reset without counting against the
  * deadline, a run past its deadline is stopped once, and a quiet agent is nudged. Every nudge and retry is bounded by
  * the step's `nudges` and `retries`; running out routes the classified outcome, which ends `$stuck`
- * unless the step routes it.
+ * unless the step routes it. A quiet agent takes the step's `stalled` route when it has one, else the
+ * silent rules.
  */
 import type { Mode } from "@norn/schema";
 import type { Decision } from "../model/actions.ts";
@@ -155,6 +156,8 @@ function died(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
  * its way. An executor that cannot take a nudge gets a fresh session while retries last.
  */
 function quiet(v: UnitView, spec: AgentStepSpec, run: RunInfo, base: string): Decision {
+  // a session with no activity is what a workflow names `stalled`; a turn ended or a limit waited out is `silent`
+  if (base === "agent.silent" && routes(v, "stalled")) return classified(v, run, "stalled", "agent.stalled.route");
   if (routes(v, "silent")) return classified(v, run, "silent", `${base}.route`);
   if (run.last_nudge_at !== undefined && ageMs(v.ctx, run.last_nudge_at) < v.ctx.config.silentAfterMs)
     return noop(v, `${base}.nudged`, `nudged at ${run.last_nudge_at}; waiting for the agent to take it`);

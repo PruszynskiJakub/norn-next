@@ -1,0 +1,70 @@
+# Quick workflow — example installed by `norn init`; edit freely.
+# For refactors, docs, chores, other small changes and the fix of a bug a reproduce round confirmed.
+# A story workflow without `slices`: every step works in the story worktree. Bring the story up
+# to date with its base, implement, bring it up to date again, check, review, describe, open the
+# draft PR (or rewrite the body of the open one), wait for the PR's CI, and wait for a person at
+# ready, then wait at merge until the person merges the PR.
+# A story waiting at ready or merge goes back through update when the base moved under it in a way
+# that conflicts (base.stale: conflict).
+# Steps shared with other workflows come from `shared/` (`use:`): change the test command in
+# `shared/base-update.yaml`, the CI wait in `shared/ship.yaml`.
+name: quick
+description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
+start: sync
+steps:
+  # the sync, its conflict resolution (shared/sync.yaml); the step is `sync`, the use step only brings it in
+  sync-base:
+    use: sync
+    outcomes: { synced: implement }
+  implement:
+    agent: >-
+      Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one,
+      otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask.
+      A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the
+      suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Notes and
+      the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
+      changing any code, then fix the cause.
+    skills: [norn-implement]
+    inputs: [spec, handoff, last_check, last_findings]
+    outcomes:
+      done: update
+    means:
+      done: "the change is made; each behaviour change and rework point has a passing test"
+  # update, resolve, test and the light path's steps (shared/base-update.yaml)
+  base-update:
+    use: base-update
+    outcomes:
+      tested: review
+      broken: implement
+      ship: ship
+      redescribe: describe
+  review:
+    agent: "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else."
+    skills: [norn-review]
+    inputs: [spec, diff, last_findings]
+    hand_back: { changes_requested: findings }
+    outcomes:
+      approve:           describe
+      changes_requested: implement
+    means:
+      approve: "the change does what the story asks and nothing else, no blocking findings"
+      changes_requested: "blocking findings in the receipt"
+  describe:
+    agent: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
+    skills: [norn-pr]
+    inputs: [spec, diff, handoff]
+    outcomes:
+      done: ship
+    means:
+      done: "pr.md describes the branch as it is now: summary, evidence, merge danger"
+  # open-pr, ci, ready and merge (shared/ship.yaml)
+  ship:
+    use: ship
+    outcomes:
+      ci-failed: { to: implement, max: 3 }
+      rejected: implement
+      stale: update
+# update-branch re-enters update, not sync (the default would be the first update step); a base move
+# without a conflict under a story waiting at ready or merge runs `test` on the merged tree, once per
+# base move (no push, no CI): red goes back through update like a conflict
+base: { stale: conflict, step: update, verify: test }

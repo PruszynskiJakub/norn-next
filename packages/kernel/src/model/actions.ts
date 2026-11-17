@@ -78,7 +78,12 @@ const ACTIONS = [
   action("claim", { story: NonEmpty, expect_version: Type.Union([PosInt, Type.Null()]) }),
   action("renew_claim", { story: NonEmpty }),
   action("release_claim", { story: NonEmpty }),
-  /** write `receipts` (if any), then commit `state` against `expect_version`; the commit point of every routed outcome */
+  /**
+   * write `receipts` (if any), then commit `state` against `expect_version`; the commit point of every
+   * routed outcome. `rejected` lists the refusals for a reader: each is already among `receipts` as a
+   * `receipt.rejected`, and `state` applies those too when nothing else is left unapplied before them,
+   * so a refusal costs no tick of its own.
+   */
   action("apply_receipts", {
     receipts: Type.Array(ReceiptIntent),
     state: RunState,
@@ -126,9 +131,23 @@ const ACTIONS = [
   }),
   action("start_slices", { slices: Type.Array(SliceStart, { minItems: 1 }) }),
   action("mark_done", { intent: ReceiptIntent }),
-  action("mark_corrupt", { reason: NonEmpty }),
-  /** the unit waits for a person; the inbox item says what for */
-  action("park", { reason: NonEmpty, inbox: Type.Union([InboxItem, Type.Null()]) }),
+  /**
+   * write `intent` (a `unit.marked` corrupt receipt: the mark, kept even beside a record that fails
+   * validation), then commit `state` when there is one; null when the record cannot be read
+   */
+  action("mark_corrupt", { reason: NonEmpty, intent: ReceiptIntent, state: Type.Union([RunState, Type.Null()]), expect_version: Type.Union([PosInt, Type.Null()]) }),
+  /**
+   * the unit waits for a person; the inbox item says what for. Write `intent` (a `unit.parked`
+   * receipt), then commit `state` when there is one: a unit with no run state yet keeps the receipt
+   * alone, which decide reads back so it does not park again
+   */
+  action("park", {
+    reason: NonEmpty,
+    inbox: Type.Union([InboxItem, Type.Null()]),
+    intent: ReceiptIntent,
+    state: Type.Union([RunState, Type.Null()]),
+    expect_version: Type.Union([PosInt, Type.Null()]),
+  }),
   action("notify", { item: InboxItem }),
   action("import_mailbox", { story: NonEmpty, ids: Type.Array(Id, { minItems: 1 }) }),
   /** publish a shared store's run data for the story */

@@ -10,11 +10,15 @@ import { fail, ok, type PluginResult } from "./result.ts";
 import type { Store, StoreFactory } from "./store.ts";
 import { isKeyPrefix } from "./story-key.ts";
 import type { Tracker, TrackerFactory } from "./tracker.ts";
+import type { Vcs, VcsFactory } from "./vcs.ts";
 
 const TRACKER_CAPABILITIES = ["assign", "labels", "comment", "create", "close"] as const;
 const TRACKER_METHODS = ["whoami", "intake", "get", "perform"] as const;
 const FORGE_CAPABILITIES = ["draft", "checks", "raw_urls"] as const;
 const FORGE_METHODS = ["findChanges", "checks", "perform"] as const;
+const VCS_CAPABILITIES = ["worktrees", "merge", "push"] as const;
+const VCS_METHODS = ["head", "isAncestor", "mergeBase", "merge", "push", "fetch"] as const;
+const VCS_WORKTREE_METHODS = ["ensure", "remove", "path"] as const;
 const STORE_METHODS = ["listUnits", "readUnit", "appendReceipt", "commitState", "archive"] as const;
 const STORE_PARTS = {
   claims: ["read", "acquire", "renew", "release"],
@@ -51,6 +55,16 @@ export function trackerProblems(value: unknown): string[] {
 /** What is wrong with a value offered as a forge; empty when it fits the contract. */
 export function forgeProblems(value: unknown): string[] {
   return shapeProblems(value, FORGE_CAPABILITIES, FORGE_METHODS);
+}
+
+/** What is wrong with a value offered as a vcs; empty when it fits the contract. */
+export function vcsProblems(value: unknown): string[] {
+  const out = shapeProblems(value, VCS_CAPABILITIES, VCS_METHODS);
+  if (value === null || typeof value !== "object") return out;
+  const wt = (value as Loose).worktree;
+  if (wt === null || typeof wt !== "object") return [...out, "needs worktree"];
+  const missing = VCS_WORKTREE_METHODS.filter((m) => typeof (wt as Loose)[m] !== "function");
+  return missing.length > 0 ? [...out, `worktree lacks ${missing.join(", ")}`] : out;
 }
 
 function partProblems(v: Loose, part: keyof typeof STORE_PARTS): string[] {
@@ -119,4 +133,8 @@ export function createForge(factory: ForgeFactory, ctx: HostContext, config: unk
 
 export function createStore(factory: StoreFactory, ctx: HostContext, config: unknown): PluginResult<Store> {
   return instantiate<Store>("store", factory, ctx, config, storeProblems);
+}
+
+export function createVcs(factory: VcsFactory, ctx: HostContext, config: unknown): PluginResult<Vcs> {
+  return instantiate<Vcs>("vcs", factory, ctx, config, vcsProblems);
 }

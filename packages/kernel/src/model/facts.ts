@@ -41,6 +41,11 @@ export const UnitFacts = Type.Object(
     receipts: Type.Array(KernelReceipt),
     /** why the unit's record failed validation; a corrupt unit is never guessed at */
     corrupt: Type.Optional(NonEmpty),
+    /**
+     * The corrupt record already holds the mark decide asked for (a `unit.marked` corrupt receipt,
+     * appended beside what failed), so the unit is held rather than marked again every tick.
+     */
+    corrupt_marked: Type.Optional(Type.Boolean()),
     /** the classified session of the unit's current agent run, when there is one */
     session: Type.Union([SessionFactsSchema, Type.Null()]),
     step_run: Type.Optional(StepRunFacts),

@@ -388,7 +388,139 @@
         "step": "refine",
         "since": "2026-11-17T09:00:00.000Z",
         "text": "Write the spec into the body of spec.md; keep its frontmatter unchanged."
-      }
+      },
+      "intent": {
+        "id": "01JD5G0000C73G79TPA9EMCVD5",
+        "data": {
+          "kind": "unit.parked",
+          "reason": "agent.ready.attended",
+          "step": "refine",
+          "attempt": 1
+        }
+      },
+      "state": {
+        "format": 1,
+        "unit": "gh-115",
+        "story": "gh-115",
+        "workflow": {
+          "name": "refinement",
+          "hash": "445716529e1222da051b722543654d3636753f05c8a1e4636986e081289850a8",
+          "doc": {
+            "name": "refinement",
+            "description": "Agree a story's spec and plan with a person, against the current base; no code.",
+            "start": "sync",
+            "steps": {
+              "sync": {
+                "update-branch": null,
+                "outcomes": {
+                  "done": "refine",
+                  "conflict": {
+                    "to": "sync-resolve",
+                    "counter": "sync.conflict"
+                  },
+                  "clean": "refine",
+                  "resolved": "refine"
+                }
+              },
+              "sync-resolve": {
+                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                "skills": [
+                  "norn-merge"
+                ],
+                "inputs": [
+                  "spec",
+                  "handoff"
+                ],
+                "outcomes": {
+                  "done": "sync"
+                },
+                "means": {
+                  "done": "base merged into the story branch, conflicts resolved and committed"
+                }
+              },
+              "refine": {
+                "agent": "Write the spec into the body of spec.md; keep its frontmatter unchanged.",
+                "skills": [
+                  "norn-refine"
+                ],
+                "attended": true,
+                "inputs": [
+                  "spec",
+                  "handoff"
+                ],
+                "outcomes": {
+                  "done": "plan",
+                  "questions": "clarify"
+                },
+                "means": {
+                  "done": "spec complete: problem statement, solution, numbered user stories, out of scope; no open questions",
+                  "questions": "spec written, but open questions are listed that need the person's answers"
+                }
+              },
+              "clarify": {
+                "agent": "Settle the spec's open questions with the person, one question at a time, folding each answer into the section it changes.",
+                "skills": [
+                  "norn-clarify"
+                ],
+                "attended": true,
+                "inputs": [
+                  "spec",
+                  "handoff"
+                ],
+                "outcomes": {
+                  "done": "plan"
+                },
+                "means": {
+                  "done": "every open question is answered and folded into the spec"
+                }
+              },
+              "plan": {
+                "agent": "Write the Plan section of spec.md.",
+                "skills": [
+                  "norn-plan"
+                ],
+                "attended": true,
+                "inputs": [
+                  "spec",
+                  "handoff"
+                ],
+                "outcomes": {
+                  "done": "$done"
+                },
+                "means": {
+                  "done": "spec.md's Plan section has seams, a coverage table for every user story, prefactoring, decisions and risks"
+                }
+              }
+            },
+            "counters": {
+              "sync.conflict": {
+                "max": 2,
+                "reset_on": [
+                  "sync.done",
+                  "sync.clean",
+                  "sync.resolved"
+                ]
+              }
+            }
+          }
+        },
+        "step": "refine",
+        "attempt": 1,
+        "counters": {
+          "sync.conflict": 0
+        },
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 1,
+        "visits": {
+          "refine": 1
+        },
+        "parked": {
+          "reason": "agent.ready.attended",
+          "since": "2026-11-17T09:00:00.000Z"
+        }
+      },
+      "expect_version": 1
     }
   ]
 }

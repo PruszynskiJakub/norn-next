@@ -79,6 +79,8 @@ const KINDS = [
   kind("run.limited", { run_id: Id, resets_at: IsoTime }),
   kind("round.started", { workflow: PinnedWorkflow, by: Type.Optional(NonEmpty) }),
   kind("unit.marked", { ended: Ended, reason: Type.Optional(NonEmpty) }),
+  /** the unit waits for a person; `reason` names the rule that parked it, or why, and becomes the state's park */
+  kind("unit.parked", { reason: NonEmpty }),
   kind("mode.changed", { mode: Mode, by: NonEmpty }),
   /** applyReceipts refused receipt `seq`; written so the refusal is on the record, never silent */
   kind("receipt.rejected", { seq: PosInt, reason: NonEmpty }),

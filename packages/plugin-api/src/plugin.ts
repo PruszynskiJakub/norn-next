@@ -1,8 +1,10 @@
 import type { ForgeFactory } from "./forge.ts";
 import type { Harness } from "./harness.ts";
+import { type Pack, packProblems } from "./pack.ts";
 import { type StepKindDefinition, stepKindProblems } from "./step-kind.ts";
 import type { StoreFactory } from "./store.ts";
 import type { TrackerFactory } from "./tracker.ts";
+import type { VcsFactory } from "./vcs.ts";
 import { apiSatisfies, PLUGIN_API_VERSION } from "./version.ts";
 
 /**
@@ -16,6 +18,10 @@ export interface PluginProvides {
   store?: Record<string, StoreFactory>;
   /** workflow step kinds by head key (plugin API 1.3) */
   stepKinds?: Record<string, StepKindDefinition>;
+  /** version control by name (plugin API 1.4) */
+  vcs?: Record<string, VcsFactory>;
+  /** workflows, shared files and skills shipped together, by pack name (plugin API 1.4) */
+  packs?: Record<string, Pack>;
 }
 
 export interface NornPluginSpec {
@@ -34,6 +40,8 @@ export interface NornPlugin {
     forge?: Readonly<Record<string, ForgeFactory>>;
     store?: Readonly<Record<string, StoreFactory>>;
     stepKinds?: Readonly<Record<string, StepKindDefinition>>;
+    vcs?: Readonly<Record<string, VcsFactory>>;
+    packs?: Readonly<Record<string, Pack>>;
   }>;
 }
 
@@ -51,7 +59,7 @@ function checkHarness(plugin: string, key: string, h: Harness): void {
 }
 
 /** A tracker, forge or store is made per repo from its config, so only the factory can be checked here. */
-function checkFactory(slot: string): (plugin: string, key: string, f: TrackerFactory | ForgeFactory | StoreFactory) => void {
+function checkFactory(slot: string): (plugin: string, key: string, f: TrackerFactory | ForgeFactory | StoreFactory | VcsFactory) => void {
   return (plugin, key, f) => {
     const loose = f as unknown as Record<string, unknown> | null;
     const schema = loose?.configSchema;
@@ -63,6 +71,19 @@ function checkFactory(slot: string): (plugin: string, key: string, f: TrackerFac
 function checkStepKind(plugin: string, key: string, k: StepKindDefinition): void {
   const found = stepKindProblems(key, k);
   if (found.length > 0) refuse(plugin, `step kind ${key} ${found.join("; ")}`);
+}
+
+function checkPack(plugin: string, key: string, p: Pack): void {
+  const found = packProblems(p);
+  if (found.length > 0) refuse(plugin, `pack ${key} ${found.join("; ")}`);
+}
+
+/** A pack is frozen to its leaves, so no holder of the plugin can change a workflow another holder loads. */
+function freezePack(p: Pack): Pack {
+  const copy = (r: Record<string, string>) => Object.freeze({ ...r });
+  const skills: Record<string, Readonly<Record<string, string>>> = {};
+  for (const [name, files] of Object.entries(p.skills)) skills[name] = copy(files);
+  return Object.freeze({ workflows: copy(p.workflows), shared: copy(p.shared), skills: Object.freeze(skills) });
 }
 
 function slot<T>(plugin: string, name: string, given: Record<string, T> | undefined, checkOne: (plugin: string, key: string, v: T) => void): Readonly<Record<string, T>> | undefined {
@@ -90,12 +111,16 @@ export function defineNornPlugin(spec: NornPluginSpec): NornPlugin {
   const forge = slot(name, "forge", spec.provides?.forge, checkFactory("forge"));
   const store = slot(name, "store", spec.provides?.store, checkFactory("store"));
   const stepKinds = slot(name, "step kind", spec.provides?.stepKinds, checkStepKind);
+  const vcs = slot(name, "vcs", spec.provides?.vcs, checkFactory("vcs"));
+  const packs = slot(name, "pack", spec.provides?.packs, checkPack);
   const provides: NornPlugin["provides"] = {
     ...(harness && { harness }),
     ...(tracker && { tracker }),
     ...(forge && { forge }),
     ...(store && { store }),
     ...(stepKinds && { stepKinds }),
+    ...(vcs && { vcs }),
+    ...(packs && { packs: Object.freeze(Object.fromEntries(Object.entries(packs).map(([k, p]) => [k, freezePack(p)]))) }),
   };
   return Object.freeze({ name, api: spec.api, provides: Object.freeze(provides) });
 }

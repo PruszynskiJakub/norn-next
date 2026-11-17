@@ -1,0 +1,25 @@
+{
+  "name": "@norn/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@norn/kernel": "workspace:*",
+    "@norn/plugin-api": "workspace:*",
+    "@norn/schema": "workspace:*",
+    "@sinclair/typebox": "^0.34.41",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@norn/conformance": "workspace:*",
+    "@norn/forge-none": "workspace:*",
+    "@norn/host-node": "workspace:*",
+    "@norn/pack-sdlc": "workspace:*",
+    "@norn/plugin-github": "workspace:*",
+    "@norn/store-local": "workspace:*",
+    "@norn/store-refs": "workspace:*",
+    "@norn/tracker-local": "workspace:*",
+    "@norn/vcs-git": "workspace:*"
+  }
+}

@@ -763,7 +763,7 @@
       "kind": "retry_run",
       "unit": "gh-121",
       "rule": "agent.died.retry",
-      "run_id": "01JD5G0000TBCAQE1RJPWE2BZC",
+      "run_id": "01JD5G00005HJZ90TBJ9VNMQSP",
       "previous_run_id": "run-gh-121-1",
       "executor": "claude",
       "attended": false,
@@ -784,10 +784,10 @@
         ]
       },
       "intent": {
-        "id": "01JD5G00005HJZ90TBJ9VNMQSP",
+        "id": "01JD5G00006PQ4D2GG42AW7161",
         "data": {
           "kind": "run.started",
-          "run_id": "01JD5G0000TBCAQE1RJPWE2BZC",
+          "run_id": "01JD5G00005HJZ90TBJ9VNMQSP",
           "run_kind": "agent",
           "executor": "claude",
           "attended": false,

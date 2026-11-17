@@ -38,6 +38,8 @@ export interface SimUnit {
   session: SessionFacts | null;
   step_run?: StepRunFacts;
   corrupt?: string;
+  /** the corrupt record holds decide's mark, as the journal reads it back */
+  corrupt_marked?: boolean;
 }
 
 export interface SimStory {
@@ -158,6 +160,7 @@ export class World {
           f.corrupt = u.corrupt;
           f.state = null;
           f.receipts = [];
+          if (u.corrupt_marked) f.corrupt_marked = true;
         }
         return f;
       });
@@ -308,12 +311,16 @@ export class World {
       }
       case "park": {
         const u = this.unitOf(d);
-        if (u.state) this.commit(u, { ...u.state, parked: { reason: d.reason, since: this.iso() } }, u.version);
+        this.record(u, d.intent);
+        if (d.state) this.commit(u, d.state, d.expect_version);
         return;
       }
       case "mark_corrupt": {
+        // the mark is appended even to a record that fails validation; the journal reads it back as corrupt_marked
         const u = this.unitOf(d);
-        if (u.state && u.corrupt === undefined) this.commit(u, { ...u.state, run: null, ended: "corrupt", ended_reason: d.reason }, u.version);
+        this.record(u, d.intent);
+        if (u.corrupt !== undefined) u.corrupt_marked = true;
+        else if (d.state) this.commit(u, d.state, d.expect_version);
         return;
       }
       case "stop_run": {

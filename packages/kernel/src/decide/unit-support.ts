@@ -9,6 +9,7 @@ import type { RunState } from "../model/run-state.ts";
 import type { CompiledStep, WorkflowGraph } from "../workflow/graph.ts";
 import { applyReceipts } from "../journal/apply.ts";
 import type { DecideContext } from "./context.ts";
+import { applyAction, lastSeq, parkWith } from "./record.ts";
 
 /** One unit at its current step, as every step rule reads it. */
 export interface UnitView {
@@ -32,23 +33,15 @@ export function intentFor(v: UnitView, body: ReceiptBody): ReceiptIntent {
 
 /**
  * Write `intents` and commit the state applyReceipts computes from the unit's unapplied receipts and
- * them, in that order. The new receipts are numbered after the last one the facts show; the store
- * numbers them for real, and a replay reads them back from the record.
+ * them, in that order, with any refusal recorded in the same act. The new receipts are numbered after
+ * the last one the facts show; the store numbers them for real, and a replay reads them back.
  */
 export function applyDecision(v: UnitView, rule: string, intents: readonly ReceiptIntent[]): DecisionOf<"apply_receipts"> {
   const pending = v.unit.receipts;
-  let seq = Math.max(v.state.applied_through, pending.at(-1)?.seq ?? 0);
+  let seq = lastSeq(v.unit);
   const fresh: KernelReceipt[] = intents.map((i) => ({ seq: ++seq, id: i.id, at: v.ctx.facts.now, data: i.data }));
   const res = applyReceipts(v.state, [...pending, ...fresh], v.graph);
-  return {
-    kind: "apply_receipts",
-    unit: v.unit.id,
-    rule,
-    receipts: [...intents],
-    state: res.state,
-    expect_version: v.unit.version ?? null,
-    rejected: res.rejected,
-  };
+  return applyAction(v.unit.id, v.unit, rule, intents, res.state, res.rejected, v.ctx);
 }
 
 /**
@@ -59,7 +52,7 @@ export function applyDecision(v: UnitView, rule: string, intents: readonly Recei
  */
 export function applyOrPark(v: UnitView, rule: string, rejectedRule: string, intents: readonly ReceiptIntent[]): DecisionOf<"apply_receipts"> | DecisionOf<"park"> {
   const d = applyDecision(v, rule, intents);
-  const through = Math.max(v.state.applied_through, v.unit.receipts.at(-1)?.seq ?? 0);
+  const through = lastSeq(v.unit);
   const refused = d.rejected.filter((r) => r.seq > through);
   if (!refused.length) return d;
   return parkDecision(v, rejectedRule, "stuck", { text: `not applied: ${refused.map((r) => r.reason).join("; ")}` });
@@ -89,7 +82,7 @@ export function inboxItem(v: UnitView, kind: InboxKind, detail: InboxDetail = {}
  * a park decide derives from facts (and lifts when they change) from one a receipt put there.
  */
 export function parkDecision(v: UnitView, rule: string, kind: InboxKind, detail: InboxDetail = {}): DecisionOf<"park"> {
-  return { kind: "park", unit: v.unit.id, rule, reason: rule, inbox: inboxItem(v, kind, detail) };
+  return parkWith(v.unit.id, v.unit, v.state, rule, rule, inboxItem(v, kind, detail), v.ctx);
 }
 
 export function noop(v: UnitView, rule: string, reason: string): DecisionOf<"noop"> {

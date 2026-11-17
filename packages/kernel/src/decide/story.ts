@@ -1,7 +1,8 @@
 /**
  * Story rules: what holds or ends a story's units as a whole, and what is decided per story rather
  * than per unit. Claims (take, renew, reacquire, expiry, release), slices (start, blocked, stuck), a
- * new round, a merged change ending the story, a closed item closing it, corrupt units, a pinned
+ * new round, a merged change ending the story, a closed item closing it (a live run stopped before
+ * either mark), corrupt units, a pinned
  * workflow missing or invalid, importing the mailbox, and flushing a shared store. A tracker or forge
  * is read for facts only, never as a record of where a story stands.
  */
@@ -9,6 +10,7 @@ import type { TrackerItem } from "@norn/plugin-api";
 import type { Decision } from "../model/actions.ts";
 import { DEFAULT_WORKFLOW_LABEL_PREFIX } from "../model/config.ts";
 import type { StoryFacts, UnitFacts } from "../model/facts.ts";
+import type { RunInfo, RunState } from "../model/run-state.ts";
 import type { DecideContext } from "./context.ts";
 import { hasPendingUnitWork, held, isOpen, mailboxDecisions, unitIds } from "./story-claim.ts";
 import { decideSlices } from "./story-slices.ts";
@@ -98,6 +100,19 @@ function intakeWorkflow(item: TrackerItem, ctx: DecideContext): string | null {
   return null;
 }
 
+/**
+ * The run on the record when it may still be going and no stop was ordered for it: an agent whose
+ * session has not ended (or was never seen), or a check or plugin step the host reports running.
+ */
+function liveRun(u: UnitFacts, state: RunState, ctx: DecideContext): RunInfo | null {
+  const run = state.run;
+  if (!run || run.stopped_at !== undefined) return null;
+  if (u.receipts.some((r) => r.data.kind === "stop.sent" && r.data.run_id === run.id)) return null;
+  const kind = ctx.workflows.byHash[state.workflow.hash]?.graph.steps[run.step]?.kind;
+  if (kind === "agent") return u.session?.activity === "ended" ? null : run;
+  return u.step_run?.running === true ? run : null;
+}
+
 function endedNoop(story: StoryFacts, id: string): Decision[] {
   const u = story.units.find((x) => x.id === id);
   if (!u) return [];
@@ -122,9 +137,18 @@ function unitRule(story: StoryFacts, id: string, u: UnitFacts | null, ctx: Decid
   if (round) return round;
   if (state.ended) return endedRule(u);
 
-  if (merged) {
+  if (merged || itemClosed) {
     // a mark already on the record is applied by the unit rules; marking again would write it twice
     if (u.receipts.some((r) => r.data.kind === "unit.marked")) return null;
+    // the run is stopped before the mark, which takes it off the record: a session left running would act on an ended unit
+    const live = liveRun(u, state, ctx);
+    if (live) {
+      const why = merged ? "the change merged" : "the item closed";
+      const rule = merged ? "story.change_merged.stop" : "story.item_closed.stop";
+      return { kind: "stop_run", unit: id, rule, run_id: live.id, reason: why, intent: { id: ctx.nextId(), data: { kind: "stop.sent", run_id: live.id, reason: why, step: state.step, attempt: state.attempt } } };
+    }
+  }
+  if (merged) {
     return {
       kind: "mark_done",
       unit: id,
@@ -133,12 +157,14 @@ function unitRule(story: StoryFacts, id: string, u: UnitFacts | null, ctx: Decid
     };
   }
   if (itemClosed) return applyWith(u, state, { kind: "unit.marked", ended: "stuck", reason: "the item closed", step: state.step, attempt: state.attempt }, "story.item_closed", ctx);
+  // a closed change parks at any step once nothing is waiting on the record: a wait or check run
+  // stays on the record between polls, and would otherwise poll a change a person closed forever
+  if (isStory && story.change?.state === "closed" && u.receipts.length === 0 && state.parked === undefined && !liveRun(u, state, ctx)) {
+    const where = story.change.url ? ` ${story.change.url}` : "";
+    return park(u.id, u, state, "story.change_closed", "stuck", `the change${where} closed without merging`, ctx);
+  }
   // the unit rules apply what is on the record, and settle a run, before anything here reads the step
   if (hasPendingUnitWork(u, state)) return null;
-  if (isStory && story.change?.state === "closed") {
-    const where = story.change.url ? ` ${story.change.url}` : "";
-    return park(u.id, state, "story.change_closed", "stuck", `the change${where} closed without merging`, ctx);
-  }
   if (isStory && ctx.workflows.byHash[state.workflow.hash]?.graph.steps[state.step]?.kind === "slices") return decideSlices(story, u, state, ctx);
   return null;
 }

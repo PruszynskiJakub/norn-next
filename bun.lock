@@ -13,13 +13,16 @@
         "@norn/harness-claude": "workspace:*",
         "@norn/host-node": "workspace:*",
         "@norn/kernel": "workspace:*",
+        "@norn/pack-sdlc": "workspace:*",
         "@norn/plugin-api": "workspace:*",
         "@norn/plugin-github": "workspace:*",
+        "@norn/runtime": "workspace:*",
         "@norn/schema": "workspace:*",
         "@norn/store": "workspace:*",
         "@norn/store-local": "workspace:*",
         "@norn/store-refs": "workspace:*",
         "@norn/tracker-local": "workspace:*",
+        "@norn/vcs-git": "workspace:*",
         "@norn/view": "workspace:*",
         "@types/bun": "1.3.13",
         "typescript": "^5.9.3",
@@ -105,6 +108,19 @@
         "@sinclair/typebox": "^0.34.41",
       },
     },
+    "packages/pack-sdlc": {
+      "name": "@norn/pack-sdlc",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+      },
+      "devDependencies": {
+        "@norn/kernel": "workspace:*",
+        "@norn/runtime": "workspace:*",
+        "@norn/vcs-git": "workspace:*",
+        "yaml": "^2.8.1",
+      },
+    },
     "packages/plugin-api": {
       "name": "@norn/plugin-api",
       "version": "0.0.0",
@@ -123,6 +139,28 @@
       },
       "devDependencies": {
         "@norn/conformance": "workspace:*",
+      },
+    },
+    "packages/runtime": {
+      "name": "@norn/runtime",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/kernel": "workspace:*",
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+        "@sinclair/typebox": "^0.34.41",
+        "yaml": "^2.8.1",
+      },
+      "devDependencies": {
+        "@norn/conformance": "workspace:*",
+        "@norn/forge-none": "workspace:*",
+        "@norn/host-node": "workspace:*",
+        "@norn/pack-sdlc": "workspace:*",
+        "@norn/plugin-github": "workspace:*",
+        "@norn/store-local": "workspace:*",
+        "@norn/store-refs": "workspace:*",
+        "@norn/tracker-local": "workspace:*",
+        "@norn/vcs-git": "workspace:*",
       },
     },
     "packages/schema": {
@@ -181,6 +219,19 @@
         "@norn/conformance": "workspace:*",
       },
     },
+    "packages/vcs-git": {
+      "name": "@norn/vcs-git",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+        "@sinclair/typebox": "^0.34.41",
+      },
+      "devDependencies": {
+        "@norn/conformance": "workspace:*",
+        "@norn/host-node": "workspace:*",
+      },
+    },
     "packages/view": {
       "name": "@norn/view",
       "version": "0.0.0",
@@ -208,9 +259,13 @@
 
     "@norn/kernel": ["@norn/kernel@workspace:packages/kernel"],
 
+    "@norn/pack-sdlc": ["@norn/pack-sdlc@workspace:packages/pack-sdlc"],
+
     "@norn/plugin-api": ["@norn/plugin-api@workspace:packages/plugin-api"],
 
     "@norn/plugin-github": ["@norn/plugin-github@workspace:packages/plugin-github"],
+
+    "@norn/runtime": ["@norn/runtime@workspace:packages/runtime"],
 
     "@norn/schema": ["@norn/schema@workspace:packages/schema"],
 
@@ -221,6 +276,8 @@
     "@norn/store-refs": ["@norn/store-refs@workspace:packages/store-refs"],
 
     "@norn/tracker-local": ["@norn/tracker-local@workspace:packages/tracker-local"],
+
+    "@norn/vcs-git": ["@norn/vcs-git@workspace:packages/vcs-git"],
 
     "@norn/view": ["@norn/view@workspace:packages/view"],
 

@@ -1,0 +1,260 @@
+import { describe, expect, test } from "bun:test";
+import type { Decision, DecisionOf } from "@norn/kernel";
+import { deriveUlid } from "@norn/schema";
+import { act, readStepRun } from "../../src/index.ts";
+import { decided, decisionOf, has, harness, MINUTE, record, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
+
+const kinds = async (h: ReturnType<typeof harness>, unit: string) => (await record(h, unit)).receipts.map((r) => r.data.kind);
+
+describe("agent runs", () => {
+  test("a crash between the intent and the launch replays without writing the intent twice, and a done launch is never repeated", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    const { t, d, index } = await decisionOf(h, "agent.start");
+    h.launcher.failStart.set("lt-1", "throw");
+    const crashed = await act(t, d, index);
+    expect(crashed.ok).toBe(false);
+    expect(await kinds(h, "lt-1")).toEqual(["round.started", "run.started"]);
+
+    h.launcher.failStart.delete("lt-1");
+    const replayed = await act(t, d, index);
+    expect(replayed).toMatchObject({ ok: true, detail: { performed: true } });
+    const receipts = (await record(h, "lt-1")).receipts;
+    expect(receipts.map((r) => r.data.kind)).toEqual(["round.started", "run.started", "run.started"]);
+    expect(receipts[2]?.data).toMatchObject({ run_id: (d as DecisionOf<"start_run">).run_id, session: `h-${(d as DecisionOf<"start_run">).run_id}` });
+
+    const again = await act(t, d, index);
+    expect(again).toMatchObject({ ok: true, detail: { performed: false } });
+    expect(h.launcher.of("start")).toHaveLength(2);
+    expect(await kinds(h, "lt-1")).toHaveLength(3);
+  });
+
+  test("a quiet agent is nudged through its session handle", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    h.sessions.byUnit.set("lt-1", session("working", { silent: true }));
+    await tickUntil(h, has("agent.silent.nudge"));
+    const handle = (await record(h, "lt-1")).state?.run?.session;
+    expect(h.launcher.of("nudge")).toEqual([[handle, expect.stringContaining("norn done")]]);
+    expect(await kinds(h, "lt-1")).toContain("nudge.sent");
+  });
+
+  test("a nudge to a run with no session handle fails before its intent, so it is not counted", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    h.sessions.byUnit.set("lt-1", session("working", { silent: true }));
+    const { t, d, index } = await decisionOf(h, "agent.silent.nudge");
+    const facts = structuredClone(t.facts);
+    const unit = facts.stories[0]?.units[0];
+    if (unit?.state?.run) delete unit.state.run.session;
+    const r = await act({ ...t, facts }, d, index);
+    expect(r).toMatchObject({ ok: false, error: expect.stringContaining("has no session to nudge") });
+    expect(await kinds(h, "lt-1")).not.toContain("nudge.sent");
+  });
+
+  test("a dead session is retried in a fresh one, the old one stopped first", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const old = (await record(h, "lt-1")).state?.run?.session;
+    h.sessions.byUnit.set("lt-1", session("ended"));
+    await tickUntil(h, has("agent.died.retry"));
+    expect(h.launcher.calls.slice(-2).map((c) => c.op)).toEqual(["stop", "start"]);
+    expect(h.launcher.of("stop").at(-1)).toEqual([old]);
+  });
+
+  test("a run past its deadline is stopped once, the order on the record", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    h.sessions.byUnit.set("lt-1", session("working"));
+    h.clock.advance(61 * MINUTE);
+    await tickUntil(h, has("agent.timeout"));
+    const handle = (await record(h, "lt-1")).state?.run?.session;
+    expect(h.launcher.of("stop")).toEqual([[handle]]);
+    expect(await kinds(h, "lt-1")).toContain("stop.sent");
+  });
+
+  test("an answer a person sent goes to the live session when it is applied", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const st = (await record(h, "lt-1")).state;
+    h.sessions.byUnit.set("lt-1", session("asking", { ask: { id: "q1", question: "Which way?" } }));
+    await tickUntil(h, has("agent.asking.park"));
+    await h.env.journal.record("lt-1", { id: "01JD5G0000ANSWER000000000Q", data: { kind: "answer.sent", input_id: "q1", text: "left", by: "person", step: st?.step, attempt: st?.attempt } });
+    h.sessions.byUnit.set("lt-1", session("working"));
+    await tickUntil(h, has("receipts.apply"));
+    expect(h.launcher.of("answer")).toEqual([[st?.run?.session, "q1", "left"]]);
+  });
+
+  test("an answer that fails to reach the session is not applied, and goes again next tick", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const st = (await record(h, "lt-1")).state;
+    h.sessions.byUnit.set("lt-1", session("asking", { ask: { id: "q1", question: "Which way?" } }));
+    await tickUntil(h, has("agent.asking.park"));
+    await h.env.journal.record("lt-1", { id: "01JD5G0000ANSWER000000000Q", data: { kind: "answer.sent", input_id: "q1", text: "left", by: "person", step: st?.step, attempt: st?.attempt } });
+    h.sessions.byUnit.set("lt-1", session("working"));
+    h.launcher.failAnswers = true;
+    const failed = await h.runtime.tick();
+    expect(failed.outcomes.find((o) => o.decision.rule === "receipts.apply")).toMatchObject({ ok: false, error: expect.stringContaining("is gone") });
+    const held = await record(h, "lt-1");
+    expect(held.state?.parked).toBeDefined();
+    expect(held.unapplied.map((r) => r.data.kind)).toContain("answer.sent");
+    h.launcher.failAnswers = false;
+    await tickUntil(h, has("receipts.apply"));
+    expect(h.launcher.of("answer")).toEqual([
+      [st?.run?.session, "q1", "left"],
+      [st?.run?.session, "q1", "left"],
+    ]);
+    expect((await record(h, "lt-1")).state?.parked).toBeUndefined();
+  });
+});
+
+describe("checks and plugin steps", () => {
+  test("a check run once under its intent is not run again on a replay", async () => {
+    const h = harness();
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    const { t, d, index } = await decisionOf(h, "check.run");
+    expect(await act(t, d, index)).toMatchObject({ ok: true, detail: { performed: true, outcome: "pass", exit: 0 } });
+    expect(await act(t, d, index)).toMatchObject({ ok: true, detail: { performed: false, outcome: "pass" } });
+    expect(h.exec.calls).toHaveLength(1);
+    expect(await kinds(h, "lt-1")).toEqual(["round.started", "run.started"]);
+  });
+
+  test("a check's outcome comes from its exit: `exits` names one, a timeout fails", async () => {
+    const answers = [{ code: 3 }, { code: 0, timedOut: true }];
+    const h = harness({ exec: () => answers.shift() });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    const first = await decisionOf(h, "check.run");
+    await act(first.t, first.d, first.index);
+    expect((await readStepRun(h.ctx, "lt-1"))?.outcome).toBe("flaky");
+    const again = { ...first.d, intent: { ...(first.d as DecisionOf<"run_check">).intent, id: deriveUlid(first.t.tickId, 77) } } as Decision;
+    expect((await act(first.t, again, first.index)).ok).toBe(true);
+    expect(await readStepRun(h.ctx, "lt-1")).toMatchObject({ outcome: "fail", output: expect.stringContaining("timed out") });
+  });
+
+  test("a step kind that fails leaves its error, and decide runs it again under its run", async () => {
+    const h = harness({ workflow: "stepped" });
+    h.items.push(trackerItem(1));
+    h.stepAnswers.probe = ["!fail", "done"];
+    await tickUntil(h, has("step.run"));
+    expect(await readStepRun(h.ctx, "lt-1")).toMatchObject({ kind: "probe", error: "probe: probe failed" });
+    const reports = await tickUntil(h, has("step.finished"));
+    expect(reports.flatMap(rulesOf)).toContain("lt-1 step.resume");
+  });
+});
+
+describe("unit records", () => {
+  test("a park is a receipt and a state, written once", async () => {
+    const h = harness({ workflow: "agented", kernel: { mode: "manual" } });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.ready.manual"));
+    const unit = await record(h, "lt-1");
+    expect(unit.receipts.at(-1)?.data).toMatchObject({ kind: "unit.parked", reason: "agent.ready.manual" });
+    expect(unit.state?.parked?.reason).toBe("agent.ready.manual");
+    const next = await h.runtime.tick();
+    expect(rulesOf(next)).toEqual(["lt-1 unit.parked"]);
+    expect((await record(h, "lt-1")).receipts).toHaveLength(unit.receipts.length);
+  });
+
+  test("a merged change marks the story done through its receipt", async () => {
+    const h = harness({ workflow: "stepped" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("gate.park"));
+    h.changes["norn/lt-1"] = { id: 4, state: "merged", draft: false, head_branch: "norn/lt-1", base_branch: "main", head_sha: "a1", title: "Story 1" };
+    await tickUntil(h, has("story.change_merged"));
+    expect((await record(h, "lt-1")).receipts.at(-1)?.data).toMatchObject({ kind: "unit.marked", ended: "done" });
+    await tickUntil(h, has("claim.release"));
+    expect((await record(h, "lt-1")).state?.ended).toBe("done");
+  });
+
+  test("a corrupt record is marked once: the mark is a receipt the next tick reads back", async () => {
+    const h = harness();
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    await h.env.slots.store.appendReceipt("lt-1", { id: "01JD5G0000GARBAGE000000000", data: { kind: "nonsense" } });
+    await tickUntil(h, has("unit.corrupt"));
+    const raw = await h.env.slots.store.readUnit("lt-1");
+    expect(raw.ok && raw.value.receipts.at(-1)?.data).toMatchObject({ kind: "unit.marked", ended: "corrupt" });
+    const next = await h.runtime.tick();
+    expect(rulesOf(next)).toContain("lt-1 unit.corrupt.held");
+  });
+
+  test("a refused receipt is recorded as refused in the same act and costs no extra tick", async () => {
+    const h = harness();
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    await h.env.journal.record("lt-1", { id: "01JD5G0000STALEGATE0000000", data: { kind: "gate.decided", outcome: "approve", by: "person", step: "elsewhere", attempt: 1 } });
+    await tickUntil(h, has("receipts.reject"));
+    const unit = await record(h, "lt-1");
+    expect(unit.receipts.map((r) => r.data.kind)).toEqual(["round.started", "gate.decided", "receipt.rejected"]);
+    expect(unit.unapplied).toEqual([]);
+    expect(rulesOf(await h.runtime.tick())).toEqual(["lt-1 check.run"]);
+  });
+
+  test("a record that moved since facts were read is not committed over", async () => {
+    const h = harness();
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    await h.env.journal.record("lt-1", { id: "01JD5G0000STALEGATE0000000", data: { kind: "gate.decided", outcome: "approve", by: "person", step: "elsewhere", attempt: 1 } });
+    const { t, d, index } = await decisionOf(h, "receipts.reject");
+    await h.env.journal.record("lt-1", { id: "01JD5G0000LATEWRITER000000", data: { kind: "mode.changed", mode: "manual", by: "person" } });
+    const before = (await record(h, "lt-1")).version;
+    expect(await act(t, d, index)).toMatchObject({ ok: false, error: expect.stringContaining("the record moved since facts were read") });
+    expect((await record(h, "lt-1")).version).toBe(before);
+  });
+
+  test("slices get their worktrees off the story branch and their first states, once", async () => {
+    const h = harness();
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    const { t } = await decided(h);
+    const load = t.workflows.byName.checked;
+    if (!load?.ok) throw new Error("checked does not load");
+    const d: Decision = { kind: "start_slices", unit: "lt-1", rule: "slices.start", slices: [{ unit: "lt-1/01", workflow: "checked", hash: load.workflow.pinned.hash }] };
+    expect(await act(t, d, 0)).toMatchObject({ ok: true, detail: { started: ["lt-1/01"] } });
+    expect(h.vcsCalls.filter((c) => c.op === "ensure").at(-1)?.args).toEqual(["lt-1/01", "norn/lt-1-01", "norn/lt-1"]);
+    expect((await record(h, "lt-1/01")).state).toMatchObject({ unit: "lt-1/01", story: "lt-1", step: "test" });
+    expect(await act(t, d, 0)).toMatchObject({ ok: true, detail: { started: [] } });
+  });
+});
+
+describe("the mailbox and the store", () => {
+  test("a letter becomes a receipt of the unit it names and is acknowledged; one that fails is only acknowledged", async () => {
+    const h = harness({ workflow: "stepped" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("gate.park"));
+    const st = (await record(h, "lt-1")).state;
+    const mailbox = h.env.slots.store.mailbox;
+    if (!mailbox) throw new Error("store-local has a mailbox");
+    await mailbox.send("lt-1", { id: "01JD5G0000LETTER0000000001", from: "machine-b", data: { unit: "lt-1", receipt: { kind: "gate.decided", outcome: "approve", by: "person", step: st?.step, attempt: st?.attempt } } });
+    await mailbox.send("lt-1", { id: "01JD5G0000LETTER0000000002", from: "machine-b", data: { what: "nonsense" } });
+    const [r] = await tickUntil(h, has("mailbox.import"));
+    expect(rulesOf(r as never)).toEqual(expect.arrayContaining(["- mailbox.import", "- mailbox.reject"]));
+    const got = await mailbox.receive("lt-1");
+    expect(got.ok && got.value).toEqual([]);
+    expect((await record(h, "lt-1")).receipts.find((x) => x.id === "01JD5G0000LETTER0000000001")?.data.kind).toBe("gate.decided");
+    await tickUntil(h, has("claim.release"));
+    expect((await record(h, "lt-1")).state?.ended).toBe("done");
+  });
+
+  test("a store without flush publishes nothing, and says so", async () => {
+    const h = harness();
+    const { t } = await decided(h);
+    expect(await act(t, { kind: "flush", unit: null, rule: "store.flush", story: "lt-1" }, 0)).toEqual({ decision: expect.anything(), ok: true, detail: { pushed: false } });
+  });
+});

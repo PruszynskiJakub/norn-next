@@ -162,22 +162,82 @@ describe("the change and the item", () => {
     expect(d.expect_version).toBe(3);
   });
 
+  test("a merged change or a closed item stops a live run first, the order recorded, and marks the unit the tick after", () => {
+    const live = { id: "run-1", step: "plan", attempt: 1, started_at: minutesAgo(5), executor: "claude", attended: false, nudges: 0 };
+    const working = { activity: "working" as const, silent: false, pending_tools: 0, subagents: 0, pane_answers: 0, errors: [] };
+    for (const [over, rule, why] of [
+      [{ change: change({ state: "merged" }) }, "story.change_merged.stop", "the change merged"],
+      [{ item: item(1, { open: false }) }, "story.item_closed.stop", "the item closed"],
+    ] as const) {
+      const u = unit("gh-1", state("gh-1", "plan", { run: live, applied_through: 1 }), { session: working });
+      const d = storyDecisions(story({ ...over, units: [u] }))[0] as DecisionOf<"stop_run">;
+      expect({ kind: d.kind, rule: d.rule, run: d.run_id, reason: d.reason, intent: d.intent?.data }).toEqual({
+        kind: "stop_run",
+        rule,
+        run: "run-1",
+        reason: why,
+        intent: { kind: "stop.sent", run_id: "run-1", reason: why, step: "plan", attempt: 1 },
+      });
+      // the order is on the record, not yet applied: the mark follows, the order applied with it
+      const ordered = unit("gh-1", state("gh-1", "plan", { run: live, applied_through: 1 }), { session: working, receipts: [receipt(2, { kind: "stop.sent", run_id: "run-1", reason: why, step: "plan", attempt: 1 })] });
+      const next = storyDecisions(story({ ...over, units: [ordered] }))[0];
+      expect(next?.rule).toBe(rule.replace(".stop", ""));
+      if (next?.kind === "apply_receipts") expect(next.state).toMatchObject({ ended: "stuck", run: null, applied_through: 3 });
+    }
+  });
+
+  test("a run already over is not stopped before the mark: a session that ended, a step run not running, or a stop already ordered", () => {
+    const run = { id: "run-1", step: "plan", attempt: 1, started_at: minutesAgo(5), executor: "claude", attended: false, nudges: 0 };
+    const ended = { activity: "ended" as const, silent: false, pending_tools: 0, subagents: 0, pane_answers: 0, errors: [] };
+    const merged = { change: change({ state: "merged" }) };
+    expect(rules(storyDecisions(story({ ...merged, units: [unit("gh-1", state("gh-1", "plan", { run }), { session: ended })] })))).toEqual(["story.change_merged"]);
+    expect(rules(storyDecisions(story({ ...merged, units: [unit("gh-1", state("gh-1", "plan", { run: { ...run, stopped_at: minutesAgo(1) } }))] })))).toEqual(["story.change_merged"]);
+    const slices = { ...run, step: "split", executor: "slices" };
+    expect(rules(storyDecisions(story({ ...merged, units: [unit("gh-1", state("gh-1", "split", { run: slices }), { step_run: { kind: "slices", running: false } })] })))).toEqual(["story.change_merged"]);
+    expect(rules(storyDecisions(story({ ...merged, units: [unit("gh-1", state("gh-1", "split", { run: slices }), { step_run: { kind: "slices", running: true } })] })))).toEqual(["story.change_merged.stop"]);
+  });
+
   test("a change closed without merging parks the story unit for a person", () => {
     const d = storyDecisions(story({ change: change({ state: "closed", url: "https://x/5" }) }))[0] as DecisionOf<"park">;
     expect(d).toMatchObject({ kind: "park", unit: "gh-1", rule: "story.change_closed" });
     expect(d.inbox).toEqual({ kind: "stuck", unit: "gh-1", step: "plan", text: "the change https://x/5 closed without merging", since: "2026-11-17T10:00:00.000Z" });
+    // the park is a receipt, and the state committed with it applies it
+    expect(d.intent.data).toEqual({ kind: "unit.parked", reason: "the change https://x/5 closed without merging", step: "plan", attempt: 1 });
+    expect(d.state).toMatchObject({ parked: { reason: "the change https://x/5 closed without merging", since: "2026-11-17T10:00:00.000Z" }, applied_through: 1 });
+    expect(d.expect_version).toBe(3);
   });
 
-  test("a closed change does not park a unit already parked or with a run on the record", () => {
+  test("a closed change does not park a unit already parked or with a live run", () => {
     const parked = unit("gh-1", state("gh-1", "plan", { parked: { reason: "ask", since: minutesAgo(3) } }));
     expect(storyDecisions(story({ change: change({ state: "closed" }), units: [parked] }))).toEqual([]);
+    const run = { id: "run-1", step: "plan", attempt: 1, started_at: minutesAgo(5), executor: "claude", attended: false, nudges: 0 };
+    const working = unit("gh-1", state("gh-1", "plan", { run }));
+    expect(rules(storyDecisions(story({ change: change({ state: "closed" }), units: [working] })))).not.toContain("story.change_closed");
+  });
+
+  test("a closed change parks a story waiting at a wait step, whose run stays on the record between polls", () => {
+    const run = { id: "run-1", step: "split", attempt: 1, started_at: minutesAgo(5), executor: "slices", attended: false, nudges: 0 };
+    const waiting = unit("gh-1", state("gh-1", "split", { run }), { step_run: { kind: "slices", running: false } });
+    expect(rules(storyDecisions(story({ change: change({ state: "closed" }), units: [waiting] })))).toEqual(["story.change_closed"]);
   });
 });
 
 describe("corrupt units and pinned workflows", () => {
-  test("a unit whose record failed validation is marked corrupt", () => {
+  test("a unit whose record failed validation is marked corrupt once: the mark is a receipt, with no state to commit", () => {
     const ds = storyDecisions(story({ units: [unit("gh-1", null, { corrupt: "state: /step must be string" })] }));
-    expect(ds).toEqual([{ kind: "mark_corrupt", unit: "gh-1", rule: "unit.corrupt", reason: "state: /step must be string" }]);
+    expect(ds).toEqual([
+      {
+        kind: "mark_corrupt",
+        unit: "gh-1",
+        rule: "unit.corrupt",
+        reason: "state: /step must be string",
+        intent: { id: "01JD000000R7NNCSVTM7HP3B33", data: { kind: "unit.marked", ended: "corrupt", reason: "state: /step must be string" } },
+        state: null,
+        expect_version: null,
+      },
+    ]);
+    const marked = storyDecisions(story({ units: [unit("gh-1", null, { corrupt: "state: /step must be string", corrupt_marked: true })] }));
+    expect(marked).toEqual([{ kind: "noop", unit: "gh-1", rule: "unit.corrupt.held", reason: "state: /step must be string" }]);
   });
 
   test("a unit already marked corrupt is never touched", () => {
@@ -192,7 +252,15 @@ describe("corrupt units and pinned workflows", () => {
 
   test("a unit at a step its pinned workflow lacks is marked corrupt", () => {
     const ds = storyDecisions(story({ units: [unit("gh-1", state("gh-1", "gone"))] }));
-    expect(ds).toEqual([{ kind: "mark_corrupt", unit: "gh-1", rule: "unit.workflow_missing", reason: "pinned workflow story has no step 'gone'" }]);
+    const d = ds[0] as DecisionOf<"mark_corrupt">;
+    expect(ds).toHaveLength(1);
+    expect({ rule: d.rule, reason: d.reason, mark: d.intent.data }).toEqual({
+      rule: "unit.workflow_missing",
+      reason: "pinned workflow story has no step 'gone'",
+      mark: { kind: "unit.marked", ended: "corrupt", reason: "pinned workflow story has no step 'gone'" },
+    });
+    // the readable state ends corrupt with its mark applied, so the next tick holds it
+    expect({ ended: d.state?.ended, run: d.state?.run, through: d.state?.applied_through }).toEqual({ ended: "corrupt", run: null, through: 1 });
   });
 });
 
@@ -216,9 +284,17 @@ describe("round start", () => {
     expect(d.state).toMatchObject({ step: "polish", applied_through: 1 });
   });
 
-  test("a missing workflow parks the story with a workflow item", () => {
+  test("a missing workflow parks the story with a workflow item, once: the park's receipt is all a unit with no state keeps", () => {
     const d = storyDecisions(story({ units: [unit("gh-1", null)] }), {}, workflows({ story: undefined }))[0] as DecisionOf<"park">;
     expect(d).toMatchObject({ kind: "park", rule: "round.workflow_invalid", reason: "workflow story is not loaded", inbox: { kind: "workflow", unit: "gh-1" } });
+    expect({ mark: d.intent.data, state: d.state, expect: d.expect_version }).toEqual({ mark: { kind: "unit.parked", reason: "workflow story is not loaded" }, state: null, expect: null });
+    const parked = unit("gh-1", null, { receipts: [receipt(1, d.intent.data)] });
+    expect(storyDecisions(story({ units: [parked] }), {}, workflows({ story: undefined }))).toEqual([{ kind: "noop", unit: "gh-1", rule: "unit.parked", reason: "workflow story is not loaded" }]);
+    // once the workflow loads, the round starts and the park, written before any round, is refused onto the record in the same act
+    const started = storyDecisions(story({ units: [parked] }))[0] as DecisionOf<"apply_receipts">;
+    expect(started.rule).toBe("round.start");
+    expect(started.receipts.map((r) => r.data.kind)).toEqual(["round.started", "receipt.rejected"]);
+    expect(started.state.applied_through).toBe(3);
   });
 
   test("an invalid workflow parks the story naming the step kind no plugin provides", () => {
@@ -242,7 +318,9 @@ describe("round start", () => {
     const d = storyDecisions(story({ units: [u] }))[0] as DecisionOf<"apply_receipts">;
     expect(d.rule).toBe("receipts.reject");
     expect(d.rejected).toEqual([{ seq: 3, reason: "stale: written for plan#1, the unit is at split#1" }]);
-    expect(d.state).toMatchObject({ step: "split", applied_through: 3 });
+    // the refusal is written in the same act and applied with it, so it costs no tick of its own
+    expect(d.receipts.map((r) => r.data)).toEqual([{ kind: "receipt.rejected", seq: 3, reason: "stale: written for plan#1, the unit is at split#1" }]);
+    expect({ step: d.state.step, through: d.state.applied_through }).toEqual({ step: "split", through: 4 });
   });
 
   test("a round pinning a workflow decide cannot find is refused", () => {

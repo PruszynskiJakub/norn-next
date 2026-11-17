@@ -52,6 +52,8 @@ export function applyOne(state: RunState, r: KernelReceipt, graph: WorkflowGraph
       return route(state, graph, d.outcome);
     case "answer.sent":
       return { state: unparked(state) };
+    case "unit.parked":
+      return { state: { ...state, parked: { reason: d.reason, since: r.at } } };
     case "nudge.sent":
       return runBound(state, d.run_id) ?? nudged(state, r.at);
     case "run.resumed":

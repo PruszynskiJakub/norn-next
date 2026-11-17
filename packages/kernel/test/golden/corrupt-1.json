@@ -576,7 +576,17 @@
       "kind": "mark_corrupt",
       "unit": "gh-70",
       "rule": "unit.corrupt",
-      "reason": "receipt 4 (01JD...): /data/outcome must be string"
+      "reason": "receipt 4 (01JD...): /data/outcome must be string",
+      "intent": {
+        "id": "01JD5G0000TBCAQE1RJPWE2BZC",
+        "data": {
+          "kind": "unit.marked",
+          "ended": "corrupt",
+          "reason": "receipt 4 (01JD...): /data/outcome must be string"
+        }
+      },
+      "state": null,
+      "expect_version": 1
     },
     {
       "kind": "noop",

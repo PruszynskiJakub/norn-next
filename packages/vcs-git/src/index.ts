@@ -1,0 +1,13 @@
+export { GitVcsConfig } from "./config.ts";
+export { git, GIT_ENV } from "./git.ts";
+export { abortMerge, type MergeAttempt, mergeInto } from "./merge.ts";
+export { vcsGitPlugin } from "./plugin.ts";
+export { fetchRemote, pushBranch } from "./push.ts";
+export { GitStepConfig } from "./steps/common.ts";
+export { integrate, IntegrateConfig } from "./steps/integrate.ts";
+export { bookkeeping, type LightCommit, lightOutcome } from "./steps/light.ts";
+export { push, PushConfig } from "./steps/push.ts";
+export { updateBranch, UpdateBranchConfig } from "./steps/update-branch.ts";
+export { DEFAULT_VERIFY_TIMEOUT_MS, verifyBase, VerifyBaseConfig } from "./steps/verify-base.ts";
+export { createGitVcs, DEFAULT_REMOTE, gitVcsFactory } from "./vcs.ts";
+export { ensureWorktree, gitWorktrees, removeWorktree, worktreePath } from "./worktree.ts";

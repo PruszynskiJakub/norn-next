@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Type } from "@sinclair/typebox";
-import { defineNornPlugin, ok, type StepKindDefinition, stepKindAnswerProblem, stepKindProblems, WAITING_OUTCOME } from "../../src/index.ts";
+import { defineNornPlugin, ok, type StepKindDefinition, stepKindAnswerProblem, stepKindProblems, type Vcs, WAITING_OUTCOME } from "../../src/index.ts";
 
 function kind(over: Partial<StepKindDefinition> = {}): StepKindDefinition {
   return {
@@ -65,5 +65,20 @@ describe("stepKindAnswerProblem", () => {
     expect(stepKindAnswerProblem(wait, { outcome: "closed" })).toBe('step kind await-merge answered "closed", which it does not declare');
     expect(stepKindAnswerProblem(wait, { detail: 1 })).toBe("step kind await-merge answered no outcome");
     expect(stepKindAnswerProblem(wait, null)).toBe("step kind await-merge answered no outcome");
+  });
+});
+
+describe("step kind slots", () => {
+  test("a kind reads the configured slots from its input without naming a provider, and runs without them", async () => {
+    const pushKind = kind({
+      name: "push",
+      outcomes: ["pushed", "no-vcs"],
+      run: async (input) => ok({ outcome: input.slots?.vcs ? "pushed" : "no-vcs", detail: input.slots?.vcs?.name }),
+    });
+    const ctx = {} as Parameters<StepKindDefinition["run"]>[1];
+    const base = { unit: "gh-1", story: "gh-1", step: "push", config: {} };
+    const vcs = { name: "git" } as unknown as Vcs;
+    expect(await pushKind.run({ ...base, slots: { vcs } }, ctx)).toEqual(ok({ outcome: "pushed", detail: "git" }));
+    expect(await pushKind.run(base, ctx)).toEqual(ok({ outcome: "no-vcs", detail: undefined }));
   });
 });

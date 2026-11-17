@@ -1,0 +1,521 @@
+{
+  "name": "agent-stalled-route",
+  "description": "A step that routes stalled: an agent with no activity takes the stalled route to a person, while one that ended its turn without a report takes the silent route back to work.",
+  "step_kinds": {
+    "update-branch": {
+      "outcomes": [
+        "done",
+        "conflict",
+        "clean",
+        "resolved"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "integrate": {
+      "outcomes": [
+        "done",
+        "conflict"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "open-pr": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "push": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "await-merge": {
+      "outcomes": [
+        "merged",
+        "stale"
+      ],
+      "mode": "wait",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "stalled": {
+        "name": "stalled",
+        "description": "An agent step that routes a stalled agent to a person and a silent one back to work.",
+        "start": "work",
+        "steps": {
+          "work": {
+            "agent": "Do the work.",
+            "skills": [
+              "norn-implement"
+            ],
+            "outcomes": {
+              "done": "$done",
+              "stalled": "triage",
+              "silent": "work"
+            },
+            "means": {
+              "done": "the work is done"
+            }
+          },
+          "triage": {
+            "gate": "The agent stalled. Approve to end the round, or reject to leave it stuck.",
+            "outcomes": {
+              "approve": "$done",
+              "reject": "$stuck"
+            }
+          }
+        }
+      }
+    },
+    "pinned": []
+  },
+  "config": {
+    "counterDefaults": {
+      "checkFail": 5,
+      "gateReject": 2,
+      "conflict": 2,
+      "stale": 10,
+      "agentBack": 3
+    },
+    "silentAfterMs": 900000,
+    "maxNudges": 2,
+    "maxRetries": 1,
+    "deadlineMs": 3600000,
+    "mode": "auto",
+    "executor": "claude",
+    "workflow": "story",
+    "intakeWorkflowLabelPrefix": "norn:wf:",
+    "sliceWorkflow": "slice",
+    "claimTtlMs": 600000,
+    "claimRenewBeforeMs": 400000,
+    "maxAgents": 9
+  },
+  "facts": {
+    "tick_id": "01JD5G00000MR9XA8KKK8P87K1",
+    "now": "2026-11-17T09:00:00.000Z",
+    "holder": "machine-a",
+    "capabilities": {
+      "tracker": {
+        "assign": true,
+        "labels": true,
+        "comment": true,
+        "create": true,
+        "close": true
+      },
+      "forge": {
+        "draft": true,
+        "checks": true,
+        "raw_urls": true
+      },
+      "store": {
+        "shared": false,
+        "claims": "local",
+        "mailbox": true,
+        "artifacts": true
+      },
+      "executors": {
+        "claude": {
+          "blockStop": true,
+          "denyTool": true,
+          "injectContext": true,
+          "subagents": true,
+          "limits": true,
+          "paneInput": false,
+          "headless": true,
+          "attended": true
+        }
+      }
+    },
+    "stories": [
+      {
+        "key": "gh-136",
+        "item": {
+          "id": 136,
+          "key": "gh-136",
+          "title": "Story 136",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-136",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-136",
+            "state": {
+              "format": 1,
+              "unit": "gh-136",
+              "story": "gh-136",
+              "workflow": {
+                "name": "stalled",
+                "hash": "8b7c261e35139f137ab38a5430cccadaa66c20ba111a67c72488716ea6fe2add",
+                "doc": {
+                  "name": "stalled",
+                  "description": "An agent step that routes a stalled agent to a person and a silent one back to work.",
+                  "start": "work",
+                  "steps": {
+                    "work": {
+                      "agent": "Do the work.",
+                      "skills": [
+                        "norn-implement"
+                      ],
+                      "outcomes": {
+                        "done": "$done",
+                        "stalled": "triage",
+                        "silent": {
+                          "to": "work",
+                          "counter": "work.silent"
+                        }
+                      },
+                      "means": {
+                        "done": "the work is done"
+                      }
+                    },
+                    "triage": {
+                      "gate": "The agent stalled. Approve to end the round, or reject to leave it stuck.",
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": "$stuck"
+                      }
+                    }
+                  },
+                  "counters": {
+                    "work.silent": {
+                      "max": 3
+                    }
+                  }
+                }
+              },
+              "step": "work",
+              "attempt": 1,
+              "counters": {
+                "work.silent": 0
+              },
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-136-1",
+                "step": "work",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "work": 1
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": {
+              "activity": "working",
+              "silent": true,
+              "pending_tools": 0,
+              "subagents": 0,
+              "pane_answers": 0,
+              "errors": []
+            }
+          }
+        ],
+        "mailbox": []
+      },
+      {
+        "key": "gh-137",
+        "item": {
+          "id": 137,
+          "key": "gh-137",
+          "title": "Story 137",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-137",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-137",
+            "state": {
+              "format": 1,
+              "unit": "gh-137",
+              "story": "gh-137",
+              "workflow": {
+                "name": "stalled",
+                "hash": "8b7c261e35139f137ab38a5430cccadaa66c20ba111a67c72488716ea6fe2add",
+                "doc": {
+                  "name": "stalled",
+                  "description": "An agent step that routes a stalled agent to a person and a silent one back to work.",
+                  "start": "work",
+                  "steps": {
+                    "work": {
+                      "agent": "Do the work.",
+                      "skills": [
+                        "norn-implement"
+                      ],
+                      "outcomes": {
+                        "done": "$done",
+                        "stalled": "triage",
+                        "silent": {
+                          "to": "work",
+                          "counter": "work.silent"
+                        }
+                      },
+                      "means": {
+                        "done": "the work is done"
+                      }
+                    },
+                    "triage": {
+                      "gate": "The agent stalled. Approve to end the round, or reject to leave it stuck.",
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": "$stuck"
+                      }
+                    }
+                  },
+                  "counters": {
+                    "work.silent": {
+                      "max": 3
+                    }
+                  }
+                }
+              },
+              "step": "work",
+              "attempt": 1,
+              "counters": {
+                "work.silent": 0
+              },
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-137-1",
+                "step": "work",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "work": 1
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": {
+              "activity": "turn_ended",
+              "silent": false,
+              "pending_tools": 0,
+              "subagents": 0,
+              "pane_answers": 0,
+              "errors": []
+            }
+          }
+        ],
+        "mailbox": []
+      }
+    ],
+    "intake": []
+  },
+  "decisions": [
+    {
+      "kind": "apply_receipts",
+      "unit": "gh-136",
+      "rule": "agent.stalled.route",
+      "receipts": [
+        {
+          "id": "01JD5G0000C73G79TPA9EMCVD5",
+          "data": {
+            "kind": "run.classified",
+            "run_id": "run-gh-136-1",
+            "outcome": "stalled",
+            "rule": "agent.stalled.route",
+            "step": "work",
+            "attempt": 1
+          }
+        }
+      ],
+      "state": {
+        "format": 1,
+        "unit": "gh-136",
+        "story": "gh-136",
+        "workflow": {
+          "name": "stalled",
+          "hash": "8b7c261e35139f137ab38a5430cccadaa66c20ba111a67c72488716ea6fe2add",
+          "doc": {
+            "name": "stalled",
+            "description": "An agent step that routes a stalled agent to a person and a silent one back to work.",
+            "start": "work",
+            "steps": {
+              "work": {
+                "agent": "Do the work.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "outcomes": {
+                  "done": "$done",
+                  "stalled": "triage",
+                  "silent": {
+                    "to": "work",
+                    "counter": "work.silent"
+                  }
+                },
+                "means": {
+                  "done": "the work is done"
+                }
+              },
+              "triage": {
+                "gate": "The agent stalled. Approve to end the round, or reject to leave it stuck.",
+                "outcomes": {
+                  "approve": "$done",
+                  "reject": "$stuck"
+                }
+              }
+            },
+            "counters": {
+              "work.silent": {
+                "max": 3
+              }
+            }
+          }
+        },
+        "step": "triage",
+        "attempt": 1,
+        "counters": {
+          "work.silent": 0
+        },
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 2,
+        "visits": {
+          "work": 1,
+          "triage": 1
+        }
+      },
+      "expect_version": 2,
+      "rejected": []
+    },
+    {
+      "kind": "apply_receipts",
+      "unit": "gh-137",
+      "rule": "agent.turn_ended.route",
+      "receipts": [
+        {
+          "id": "01JD5G0000FWPMF8ZZQPVMTVA7",
+          "data": {
+            "kind": "run.classified",
+            "run_id": "run-gh-137-1",
+            "outcome": "silent",
+            "rule": "agent.turn_ended.route",
+            "step": "work",
+            "attempt": 1
+          }
+        }
+      ],
+      "state": {
+        "format": 1,
+        "unit": "gh-137",
+        "story": "gh-137",
+        "workflow": {
+          "name": "stalled",
+          "hash": "8b7c261e35139f137ab38a5430cccadaa66c20ba111a67c72488716ea6fe2add",
+          "doc": {
+            "name": "stalled",
+            "description": "An agent step that routes a stalled agent to a person and a silent one back to work.",
+            "start": "work",
+            "steps": {
+              "work": {
+                "agent": "Do the work.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "outcomes": {
+                  "done": "$done",
+                  "stalled": "triage",
+                  "silent": {
+                    "to": "work",
+                    "counter": "work.silent"
+                  }
+                },
+                "means": {
+                  "done": "the work is done"
+                }
+              },
+              "triage": {
+                "gate": "The agent stalled. Approve to end the round, or reject to leave it stuck.",
+                "outcomes": {
+                  "approve": "$done",
+                  "reject": "$stuck"
+                }
+              }
+            },
+            "counters": {
+              "work.silent": {
+                "max": 3
+              }
+            }
+          }
+        },
+        "step": "work",
+        "attempt": 2,
+        "counters": {
+          "work.silent": 1
+        },
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 2,
+        "visits": {
+          "work": 2
+        }
+      },
+      "expect_version": 2,
+      "rejected": []
+    }
+  ]
+}

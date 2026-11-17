@@ -16,7 +16,7 @@ export function decideSlices(story: StoryFacts, u: UnitFacts, state: RunState, c
   const finish = (outcome: "done" | "stuck", rule: string, detail: string): Decision =>
     applyWith(u, state, { kind: "step.finished", step_kind: "slices", outcome, detail, step: state.step, attempt: state.attempt }, rule, ctx);
   const plan = story.plan;
-  if (plan?.invalid) return park(u.id, state, "slices.plan_invalid", "stuck", `the slice files failed validation: ${plan.invalid}`, ctx);
+  if (plan?.invalid) return park(u.id, u, state, "slices.plan_invalid", "stuck", `the slice files failed validation: ${plan.invalid}`, ctx);
   if (!plan?.slices.length) return finish("stuck", "slices.none", "no slice files");
 
   const unitOf = (id: string) => story.units.find((x) => x.id === id);
@@ -38,7 +38,7 @@ export function decideSlices(story: StoryFacts, u: UnitFacts, state: RunState, c
       const name = s.workflow ?? ctx.config.sliceWorkflow;
       const load = ctx.workflows.byName[name];
       const problem = loadProblem(name, load);
-      if (problem || !load?.ok) return park(u.id, state, "slices.workflow_invalid", "workflow", `slice ${s.unit}: ${problem ?? `workflow ${name} is not loaded`}`, ctx);
+      if (problem || !load?.ok) return park(u.id, u, state, "slices.workflow_invalid", "workflow", `slice ${s.unit}: ${problem ?? `workflow ${name} is not loaded`}`, ctx);
       slices.push({ unit: s.unit, workflow: name, hash: load.workflow.pinned.hash });
     }
     return { kind: "start_slices", unit: u.id, rule: "slices.start", slices };

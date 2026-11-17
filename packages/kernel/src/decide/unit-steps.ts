@@ -93,7 +93,10 @@ export function decidePluginStep(v: UnitView, mode: "effect" | "wait"): Decision
     return applyOrPark(v, "step.finished", "step.finished.rejected", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: v.step.kind, outcome })]);
   }
   if (mode === "wait") {
-    // checked between polls: a story waiting on a merge goes back to push what its change lacks
+    // checked between polls: the host's base_stale already reads the workflow's base policy, which a step kind does not know
+    if (v.story.base_stale === true && v.step.routes.stale !== undefined)
+      return applyDecision(v, "step.stale", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: v.step.kind, outcome: "stale" })]);
+    // a story waiting on a merge goes back to push what its change lacks
     if (unpushed(v)) return applyDecision(v, "step.unpushed", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: v.step.kind, outcome: "unpushed" })]);
     return { ...base, rule: "step.poll", run_id: run.id };
   }

@@ -10,25 +10,27 @@ import type { KernelReceipt, ReceiptData, RejectedReceipt } from "../model/recei
 import type { RunState } from "../model/run-state.ts";
 import type { LoadedWorkflow, WorkflowLoad } from "../workflow/graph.ts";
 import type { DecideContext } from "./context.ts";
+import { applyAction, lastSeq, markCorrupt, parkWith } from "./record.ts";
 
 /** The seq the store gives the next receipt of the unit: receipts are numbered n+1 with no gaps. */
 export function nextSeq(u: UnitFacts | null): number {
-  const last = u?.receipts.at(-1)?.seq ?? 0;
-  return Math.max(u?.state?.applied_through ?? 0, last) + 1;
+  return lastSeq(u) + 1;
 }
 
 /** A corrupt record, a unit marked corrupt, or a pinned workflow decide cannot find: never guessed at. */
 export function corruptRule(u: UnitFacts | null, ctx: DecideContext): Decision | null {
   if (!u) return null;
-  if (u.corrupt !== undefined) return { kind: "mark_corrupt", unit: u.id, rule: "unit.corrupt", reason: u.corrupt };
+  if (u.corrupt !== undefined) {
+    if (u.corrupt_marked === true) return { kind: "noop", unit: u.id, rule: "unit.corrupt.held", reason: u.corrupt };
+    return markCorrupt(u, "unit.corrupt", u.corrupt, ctx);
+  }
   const state = u.state;
   if (!state) return null;
   if (state.ended === "corrupt") return { kind: "noop", unit: u.id, rule: "unit.corrupt.held", reason: state.ended_reason ?? "corrupt; never touched" };
   if (state.ended !== undefined) return null;
   const loaded = ctx.workflows.byHash[state.workflow.hash];
-  if (!loaded) return { kind: "mark_corrupt", unit: u.id, rule: "unit.workflow_missing", reason: `pinned workflow ${state.workflow.name} (${state.workflow.hash.slice(0, 12)}) is not loaded` };
-  if (!loaded.graph.steps[state.step])
-    return { kind: "mark_corrupt", unit: u.id, rule: "unit.workflow_missing", reason: `pinned workflow ${state.workflow.name} has no step '${state.step}'` };
+  if (!loaded) return markCorrupt(u, "unit.workflow_missing", `pinned workflow ${state.workflow.name} (${state.workflow.hash.slice(0, 12)}) is not loaded`, ctx);
+  if (!loaded.graph.steps[state.step]) return markCorrupt(u, "unit.workflow_missing", `pinned workflow ${state.workflow.name} has no step '${state.step}'`, ctx);
   return null;
 }
 
@@ -40,10 +42,14 @@ export function endedRule(u: UnitFacts): Decision | null {
   return { kind: "noop", unit: u.id, rule: `unit.ended.${state.ended}`, reason: state.ended_reason ?? `ended ${state.ended} at ${state.step}` };
 }
 
-/** The unit waits for a person, with an inbox item saying why. */
-export function park(unit: string, state: RunState | null, rule: string, kind: InboxKind, reason: string, ctx: DecideContext): Decision {
+/**
+ * The unit waits for a person, with an inbox item saying why. A unit with no run state keeps only the
+ * park's receipt, so the same park already on its record is held rather than written again.
+ */
+export function park(unit: string, u: UnitFacts | null, state: RunState | null, rule: string, kind: InboxKind, reason: string, ctx: DecideContext): Decision {
+  if (state === null && u?.receipts.some((r) => r.data.kind === "unit.parked" && r.data.reason === reason)) return { kind: "noop", unit, rule: "unit.parked", reason };
   const inbox = { kind, unit, ...(state ? { step: state.step } : {}), text: reason, since: ctx.facts.now };
-  return { kind: "park", unit, rule, reason, inbox };
+  return parkWith(unit, u, state, rule, reason, inbox, ctx);
 }
 
 /**
@@ -52,10 +58,10 @@ export function park(unit: string, state: RunState | null, rule: string, kind: I
  */
 export function applyWith(u: UnitFacts, state: RunState, data: ReceiptData, rule: string, ctx: DecideContext): Decision {
   const loaded = ctx.workflows.byHash[state.workflow.hash];
-  if (!loaded) return { kind: "mark_corrupt", unit: u.id, rule: "unit.workflow_missing", reason: `pinned workflow ${state.workflow.name} is not loaded` };
+  if (!loaded) return markCorrupt(u, "unit.workflow_missing", `pinned workflow ${state.workflow.name} is not loaded`, ctx);
   const receipt: KernelReceipt = { seq: nextSeq(u), id: ctx.nextId(), at: ctx.facts.now, data };
   const res = applyReceipts(state, [...u.receipts, receipt], loaded.graph);
-  return { kind: "apply_receipts", unit: u.id, rule, receipts: [{ id: receipt.id, data }], state: res.state, expect_version: u.version ?? null, rejected: res.rejected };
+  return applyAction(u.id, u, rule, [{ id: receipt.id, data }], res.state, res.rejected, ctx);
 }
 
 /** Why a workflow file cannot start a round, naming any step kind no configured plugin provides. */
@@ -82,17 +88,17 @@ export function startRule(story: StoryFacts, u: UnitFacts | null, ctx: DecideCon
   if (round?.data.kind === "round.started") {
     const pinned = round.data.workflow;
     const loaded = ctx.workflows.byHash[pinned.hash];
-    if (!loaded) return park(unit, null, "round.workflow_invalid", "workflow", `workflow ${pinned.name} (${pinned.hash.slice(0, 12)}) is not loaded`, ctx);
+    if (!loaded) return park(unit, u, null, "round.workflow_invalid", "workflow", `workflow ${pinned.name} (${pinned.hash.slice(0, 12)}) is not loaded`, ctx);
     const state = { ...firstState(story, loaded), applied_through: round.seq };
-    return { kind: "apply_receipts", unit, rule: "round.start", receipts: [], state, expect_version: null, rejected: rejectAll(receipts.slice(0, at), "no round had started") };
+    return applyAction(unit, u, "round.start", [], state, rejectAll(receipts.slice(0, at), "no round had started"), ctx);
   }
   const name = ctx.config.workflow;
   const load = ctx.workflows.byName[name];
   const problem = loadProblem(name, load);
-  if (problem || !load?.ok) return park(unit, null, "round.workflow_invalid", "workflow", problem ?? `workflow ${name} is not loaded`, ctx);
+  if (problem || !load?.ok) return park(unit, u, null, "round.workflow_invalid", "workflow", problem ?? `workflow ${name} is not loaded`, ctx);
   const intent = { id: ctx.nextId(), data: { kind: "round.started" as const, workflow: structuredClone(load.workflow.pinned) } };
   const state = { ...firstState(story, load.workflow), applied_through: nextSeq(u) };
-  return { kind: "apply_receipts", unit, rule: "round.start", receipts: [intent], state, expect_version: null, rejected: rejectAll(receipts, "no round had started") };
+  return applyAction(unit, u, "round.start", [intent], state, rejectAll(receipts, "no round had started"), ctx);
 }
 
 function firstState(story: StoryFacts, workflow: LoadedWorkflow): RunState {
@@ -110,21 +116,13 @@ export function roundRule(u: UnitFacts, state: RunState, ctx: DecideContext): De
   if (at < 0) return null;
   const current = ctx.workflows.byHash[state.workflow.hash];
   if (at > 0) {
-    if (!current) return { kind: "mark_corrupt", unit: u.id, rule: "unit.workflow_missing", reason: `pinned workflow ${state.workflow.name} is not loaded` };
+    if (!current) return markCorrupt(u, "unit.workflow_missing", `pinned workflow ${state.workflow.name} is not loaded`, ctx);
     const res = applyReceipts(state, u.receipts.slice(0, at), current.graph);
-    return { kind: "apply_receipts", unit: u.id, rule: "receipts.apply", receipts: [], state: res.state, expect_version: u.version ?? null, rejected: res.rejected };
+    return applyAction(u.id, u, "receipts.apply", [], res.state, res.rejected, ctx);
   }
   const r = u.receipts[0] as KernelReceipt;
   if (r.data.kind !== "round.started") return null;
-  const refuse = (rule: string, reason: string): Decision => ({
-    kind: "apply_receipts",
-    unit: u.id,
-    rule,
-    receipts: [],
-    state: { ...state, applied_through: r.seq },
-    expect_version: u.version ?? null,
-    rejected: [{ seq: r.seq, reason }],
-  });
+  const refuse = (rule: string, reason: string): Decision => applyAction(u.id, u, rule, [], { ...state, applied_through: r.seq }, [{ seq: r.seq, reason }], ctx);
   const { step, attempt } = r.data;
   if ((step !== undefined && step !== state.step) || (attempt !== undefined && attempt !== state.attempt))
     return refuse("receipts.reject", `stale: written for ${step ?? state.step}#${attempt ?? state.attempt}, the unit is at ${state.step}#${state.attempt}`);
@@ -132,5 +130,5 @@ export function roundRule(u: UnitFacts, state: RunState, ctx: DecideContext): De
   const loaded = ctx.workflows.byHash[pinned.hash];
   if (!loaded) return refuse("round.workflow_invalid", `workflow ${pinned.name} (${pinned.hash.slice(0, 12)}) is not loaded`);
   const res = applyReceipts(state, [r], loaded.graph);
-  return { kind: "apply_receipts", unit: u.id, rule: "round.start", receipts: [], state: res.state, expect_version: u.version ?? null, rejected: res.rejected };
+  return applyAction(u.id, u, "round.start", [], res.state, res.rejected, ctx);
 }

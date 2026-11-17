@@ -3496,7 +3496,16 @@
       "kind": "apply_receipts",
       "unit": "gh-106",
       "rule": "receipts.reject",
-      "receipts": [],
+      "receipts": [
+        {
+          "id": "01JD5G0000G5CYANXJR76YS26J",
+          "data": {
+            "kind": "receipt.rejected",
+            "seq": 2,
+            "reason": "stale run run-replaced; the current run is run-gh-106-1"
+          }
+        }
+      ],
       "state": {
         "format": 1,
         "unit": "gh-106",
@@ -3799,7 +3808,7 @@
           "attended": false,
           "nudges": 0
         },
-        "applied_through": 2,
+        "applied_through": 3,
         "visits": {
           "review": 1
         }
