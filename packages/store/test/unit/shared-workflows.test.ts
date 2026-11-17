@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { validateWorkflowDefinition } from "@norn/core";
 import { parse as parseYaml } from "yaml";
-import { loadWorkflow, loadWorkflows, parseWorkflowText, sha256, workflowsDir } from "../../src/index.ts";
+import { loadWorkflow, loadWorkflows, parseWorkflowText, sha256, sharedFilesUsed, workflowsDir } from "../../src/index.ts";
 import { tmp, WORKFLOW_YAML } from "../helpers.ts";
 
 /** The loaded text as norn reads it back from a pin: parsed, each `skill` read into the model's `skills`. */
@@ -299,10 +299,22 @@ describe("like: refusals", () => {
     expect(refusal({ "story.yaml": fromWorkflow, "shared/base-update.yaml": BASE_UPDATE })).toEqual([
       "/steps/test2/like `test` is a step of shared/base-update.yaml: like copies a step of its own file",
     ]);
-    const fromShared = BASE_UPDATE.replace("  test:\n", "  ask:\n    like: qa\n  test:\n");
+    const fromShared = BASE_UPDATE.replace("  test:\n", "  review:\n    like: qa\n  test:\n");
     expect(refusal({ "story.yaml": STORY, "shared/base-update.yaml": fromShared })).toEqual([
-      "/steps/ask/like shared/base-update.yaml: `qa` is a step of the workflow: like copies a step of its own file",
+      "/steps/review/like shared/base-update.yaml: `qa` is a step of the workflow: like copies a step of its own file",
     ]);
+  });
+
+  test("a name that fails its pattern is refused before any file is read or any step is keyed by it", () => {
+    // `use:` names a file inside shared/ only: a path out of it is never read, even when the file is there
+    const escape = STORY.replace("use: base-update", "use: ../../outside");
+    expect(sharedFilesUsed(escape)).toEqual([]);
+    expect(refusal({ "story.yaml": escape, "../outside.yaml": BASE_UPDATE })).toEqual(["/steps/base/use must match ^[a-z][a-z0-9_-]*$"]);
+    // a step named `__proto__` would set the copy's prototype instead of naming a step
+    const proto = `${LIKE}  __proto__:\n    like: test\n`;
+    expect(refusal({ "story.yaml": proto })).toEqual([expect.stringMatching(/^\/steps\/__proto__ /)]);
+    const protoShared = BASE_UPDATE.replace("  test:\n", "  __proto__:\n    like: test\n  test:\n");
+    expect(refusal({ "story.yaml": STORY, "shared/base-update.yaml": protoShared })).toEqual([expect.stringMatching(/^\/steps\/__proto__ shared\/base-update\.yaml: /)]);
   });
 
   test("a use step carrying like is refused", () => {
