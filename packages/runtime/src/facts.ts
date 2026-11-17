@@ -36,7 +36,22 @@ const message = (e: unknown): string => (e instanceof Error ? e.message : String
 
 function capabilitiesOf(env: RuntimeEnv): KernelCapabilities {
   const executors: Record<string, ExecutorCapabilities> = {};
-  for (const [name, harness] of Object.entries(env.slots.executors)) executors[name] = { ...harness.capabilities, ...env.launcher.modes };
+  for (const [name, harness] of Object.entries(env.slots.executors)) {
+    const { blockStop, denyTool, injectContext, subagents, limits, paneInput, promptMarks } = harness.capabilities;
+    const own = env.launcher.modesOf?.(name) ?? null;
+    executors[name] = {
+      blockStop,
+      denyTool,
+      injectContext,
+      subagents,
+      limits,
+      // a harness that reads typed prompts still has no pane input in a runner without a pane
+      paneInput: own ? paneInput && own.paneInput : paneInput,
+      ...(promptMarks !== undefined && { promptMarks }),
+      headless: own?.headless ?? env.launcher.modes.headless,
+      attended: own?.attended ?? env.launcher.modes.attended,
+    };
+  }
   return { tracker: { ...env.slots.tracker.capabilities }, forge: { ...env.slots.forge.capabilities }, store: { ...env.slots.store.capabilities }, executors };
 }
 

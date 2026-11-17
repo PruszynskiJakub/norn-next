@@ -1,4 +1,38 @@
 export { act } from "./act.ts";
+export { briefRenderInput, renderInputFrom } from "./brief-context.ts";
+export {
+  CheckExit,
+  canDetach,
+  checkExitPath,
+  checkLogPath,
+  checkWrapperArgv,
+  type DetachedCheckRead,
+  decodeCheckHandle,
+  encodeCheckHandle,
+  readDetachedCheck,
+  startDetachedCheck,
+  stopDetachedCheck,
+} from "./checks-detached.ts";
+export { type AnswerContext, answerFor, type ComputedAnswer, MAX_STOP_BLOCKS, owesReportBlock, resolvePath } from "./events/answer.ts";
+export { type IngestDeps, type IngestInput, type IngestResult, ingestHook } from "./events/ingest.ts";
+export { appendEvents, EventBatch, type EventLogRead, readEvents } from "./events/log.ts";
+export {
+  claimReceived,
+  Injection,
+  markDelivered,
+  pendingInjections,
+  queueInjection,
+  readSentPrompt,
+  recordSentPrompt,
+  SentPrompt,
+} from "./events/outbox.ts";
+export { batchesDir, batchName, batchSeq, deliveredDir, EVENTS_DIR, outboxDir, receivedDir, runEventsDir, sentDir } from "./events/paths.ts";
+export { EventLogSessionSource, type EventLogSessionSourceOptions } from "./events/session-source.ts";
+export { createHarnessLauncher, DEFAULT_HOOK_COMMAND, resolveExecutors } from "./executors.ts";
+export { answerPromptId, type Executor, HarnessLauncher, type HarnessLauncherOptions, sessionLogPath, shellQuote } from "./launcher.ts";
+export { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
+export { type LiveStep, liveStepOf, reportableOutcomes, reportOnRecord } from "./live-run.ts";
+export { type BriefShown, briefOf, type Refusable, type ReportRecorded, type ReportRefusal, type ReportRequest, reportReceiptId, reportRun } from "./report.ts";
 export { nudgeText } from "./act-runs.ts";
 export { checkOutcome } from "./act-steps.ts";
 export { branchOf, cutFrom, ensureWorktree } from "./branches.ts";
@@ -6,7 +40,7 @@ export type { RuntimeEnv, TickContext } from "./env.ts";
 export { type GatheredFacts, gatherFacts } from "./facts.ts";
 export { acquireTickLock, DEFAULT_LOCK_STALE_MS, type TickLock, tickLockPath } from "./lock.ts";
 export { lastSeqIn, unitInFacts, writeAndCommit, type Written } from "./record.ts";
-export { collectStepKinds, loadPackWorkflows, type ResolvedSlots, resolveSlots } from "./resolve.ts";
+export { collectStepKinds, findProvided, loadPackWorkflows, type ResolvedSlots, resolveSlots, type SlotName } from "./resolve.ts";
 export { createRuntime, createRuntimeEnv } from "./runtime.ts";
 export { awaitMerge } from "./steps-forge/await-merge.ts";
 export { openPr } from "./steps-forge/open-pr.ts";

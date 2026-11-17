@@ -15,6 +15,7 @@ export type {
   SessionView,
 } from "./session/view.ts";
 
+export { type BriefCommands, type BriefRenderInput, DEFAULT_BRIEF_COMMANDS, type ReportHintInput, renderBrief, renderReportHint, renderStepReminder } from "./brief/render.ts";
 export * from "./model/actions.ts";
 export * from "./model/capabilities.ts";
 export * from "./model/config.ts";

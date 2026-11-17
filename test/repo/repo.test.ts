@@ -31,6 +31,8 @@ const ALLOWED: Record<string, string[]> = {
   runtime: ["schema", "plugin-api", "kernel"],
   "vcs-git": ["schema", "plugin-api"],
   "pack-sdlc": ["plugin-api"],
+  "runner-headless": ["schema", "plugin-api"],
+  "runner-herdr": ["schema", "plugin-api"],
 };
 
 function files(dir: string): string[] {
@@ -968,6 +970,8 @@ const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
 const SPAWN_ALLOW: Counts = {
   // the new architecture's one IO boundary: every new package starts processes only through the HostContext this builds
   "packages/host-node/src/exec.ts": 1,
+  // the same boundary for the detached processes a runner or a detached check starts
+  "packages/host-node/src/spawn.ts": 1,
 };
 
 /**

@@ -285,6 +285,12 @@ describe("reduceSession", () => {
     expect(v.ended).toBe("exit");
   });
 
+  test("an answer received settles an ask report; any other report stands", () => {
+    const answered = (verb: "ask" | "stuck") => reduceSession(stream(BRIEF, { type: "report.made", verb }, { type: "input.received", id: "a1", by: "norn" })).report;
+    expect(answered("ask")).toBeUndefined();
+    expect(answered("stuck")).toEqual({ verb: "stuck" });
+  });
+
   test("a new turn clears a report; a resumed session clears its end", () => {
     expect(reduceSession(stream(BRIEF, { type: "report.made", verb: "stuck" }, { type: "turn.started", source: "nudge" })).report).toBeUndefined();
     expect(reduceSession(stream(START, { type: "session.ended", reason: "crash" }, START)).ended).toBeUndefined();

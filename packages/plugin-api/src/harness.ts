@@ -19,7 +19,25 @@ export interface HarnessCapabilities {
   limits: boolean;
   /** a person can type into the agent's pane, so answers may arrive there */
   paneInput: boolean;
+  /**
+   * `normalize` reads the prompt mark (see prompt-mark.ts) of a submitted prompt, so norn's prompts
+   * are told from a person's per prompt (plugin API 1.5). Without it every prompt is read by the
+   * harness's older rule, and a host treats pane prompts as unattributed.
+   */
+  promptMarks?: boolean;
+  /**
+   * `launch` honours `resume`: the agent continues that harness session with its history (plugin API
+   * 1.5). A host resumes a headless session that ended to hand it an answer or a nudge; without it
+   * such a delivery is refused rather than given to an agent that never saw the question.
+   */
+  resume?: boolean;
 }
+
+/**
+ * Set by the host on every launch, so the hook command files each event under its unit and run
+ * without asking anything (plugin API 1.5). A harness passes the launch env through untouched.
+ */
+export const RUN_ENV = Object.freeze({ unit: "NORN_UNIT", run: "NORN_RUN_ID" } as const);
 
 /** The kernel's ruling on a tool call about to run. */
 export type GuardAnswer = { kind: "allow" } | { kind: "deny"; reason: string };
@@ -47,6 +65,7 @@ export interface UninstallTarget {
 
 export interface LaunchRequest {
   cwd: string;
+  /** the first prompt, already marked by the host (see prompt-mark.ts); a harness passes it on whole */
   prompt: string;
   run_id: string;
   model?: string;
@@ -54,6 +73,11 @@ export interface LaunchRequest {
   resume?: string;
   env: Record<string, string>;
   args?: string[];
+  /**
+   * No terminal will show the agent (a headless runner): launch its non-interactive mode, such as
+   * `claude -p` (plugin API 1.5). Absent or false: the agent gets a pane.
+   */
+  headless?: boolean;
 }
 
 /** The process to start; the caller spawns it, so a harness stays free of IO here. */

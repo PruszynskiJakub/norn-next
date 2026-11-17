@@ -49,10 +49,59 @@ export interface HostRepo {
   dataDir: string;
 }
 
-export interface HostContext {
+export interface SpawnOptions {
+  cwd: string;
+  /** added to the host's environment, never replacing it wholesale */
+  env?: Record<string, string>;
+  /** stdout and stderr are appended here; the folder is made when missing */
+  logPath: string;
+}
+
+/**
+ * A process the host started and does not wait for. `started` is an opaque start marker (the OS's
+ * start time of the pid), compared only for equality: a pid the OS hands out again later is never
+ * taken for this process.
+ */
+export interface SpawnedProcess {
+  pid: number;
+  started: string;
+}
+
+export type KillSignal = "TERM" | "KILL";
+
+/**
+ * Detached processes (plugin API 1.5). Optional on HostContext, as a host without them (a browser,
+ * a test with no processes) is still a host; a plugin that needs them refuses at create time.
+ */
+export interface HostProcesses {
+  /**
+   * Start argv in its own process group, detached, so it outlives the tick that started it. Rejects
+   * only when the executable cannot be started; an exit right after the start is the process's own.
+   */
+  spawn(argv: string[], opts: SpawnOptions): Promise<SpawnedProcess>;
+  /**
+   * Whether the pid runs, and is the process `started` names when given. A zombie is dead; a probe
+   * that cannot answer is alive, so an outage of `ps` never reads as a died session.
+   */
+  alive(pid: number, started?: string): Promise<boolean>;
+  /** Signal the pid's process group (default TERM); a pid already gone is not an error. */
+  kill(pid: number, signal?: KillSignal): Promise<void>;
+}
+
+export interface HostContext extends Partial<HostProcesses> {
   exec(argv: string[], opts?: ExecOptions): Promise<ExecOutput>;
   files: HostFiles;
   /** ISO-8601 UTC; a plugin never reads the clock itself, so a replay sees the same time */
   now(): string;
   repo: HostRepo;
+}
+
+const PROCESS_METHODS = ["spawn", "alive", "kill"] as const;
+
+/** The host's detached-process methods, or the names of those it lacks, for a plugin to refuse with. */
+export function hostProcesses(ctx: HostContext): { ok: true; value: HostProcesses } | { ok: false; missing: string[] } {
+  const missing = PROCESS_METHODS.filter((m) => typeof ctx[m] !== "function");
+  if (missing.length > 0) return { ok: false, missing: [...missing] };
+  const { spawn, alive, kill } = ctx as HostContext & HostProcesses;
+  return { ok: true, value: { spawn: spawn.bind(ctx), alive: alive.bind(ctx), kill: kill.bind(ctx) } };
 }

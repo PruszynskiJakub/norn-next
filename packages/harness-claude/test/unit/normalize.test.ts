@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type HarnessEvent, isHarnessEvent } from "@norn/plugin-api";
+import { type HarnessEvent, isHarnessEvent, markPrompt } from "@norn/plugin-api";
 import { claudeHarness, PROMPT_SOURCE_ENV } from "../../src/index.ts";
 import payloads from "./fixtures/hook-payloads.json" with { type: "json" };
 
@@ -48,6 +48,21 @@ describe("claude normalize: session and turn hooks", () => {
       { type: "turn.started", source: "answer" },
       { type: "input.received", by: "norn" },
     ]);
+  });
+  test.each(["brief", "nudge"] as const)("a prompt carrying a %s mark → turn.started with that source and the prompt id", (source) => {
+    const prompt = markPrompt("carry on", { source, id: "p-1" });
+    expect(body("UserPromptSubmit", { ...payloads.UserPromptSubmit, prompt })).toEqual([{ type: "turn.started", source, prompt_id: "p-1" }]);
+  });
+  test("an answer mark → turn.started answer with its id plus an answer from norn", () => {
+    const prompt = markPrompt("yes, go on", { source: "answer", id: "a-1" });
+    expect(body("UserPromptSubmit", { ...payloads.UserPromptSubmit, prompt })).toEqual([
+      { type: "turn.started", source: "answer", prompt_id: "a-1" },
+      { type: "input.received", by: "norn" },
+    ]);
+  });
+  test("a prompt mark wins over the per-launch env", () => {
+    const marked = markPrompt("x", { source: "nudge", id: "n-1" });
+    expect(body("UserPromptSubmit", { ...payloads.UserPromptSubmit, prompt: marked }, { [PROMPT_SOURCE_ENV]: "brief" })[0]).toEqual({ type: "turn.started", source: "nudge", prompt_id: "n-1" });
   });
   test("an unknown prompt source counts as a person", () => {
     expect(body("UserPromptSubmit", payloads.UserPromptSubmit, { [PROMPT_SOURCE_ENV]: "elsewhere" })[0]).toEqual({ type: "turn.started", source: "person" });

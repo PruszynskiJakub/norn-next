@@ -14,6 +14,9 @@ describe("claude launch", () => {
   test("a resume with no prompt passes none", () => {
     expect(claudeHarness.launch({ ...REQ, prompt: "", resume: "abc123" }).argv).toEqual(["claude", "--resume", "abc123"]);
   });
+  test("headless launches print mode, still before --", () => {
+    expect(claudeHarness.launch({ ...REQ, headless: true }).argv).toEqual(["claude", "-p", "--", REQ.prompt]);
+  });
   test("the caller's env cannot override the run id", () => {
     expect(claudeHarness.launch({ ...REQ, env: { [RUN_ID_ENV]: "other" } }).env[RUN_ID_ENV]).toBe("run-1");
   });
@@ -28,6 +31,6 @@ describe("claude plugin", () => {
   });
   test("declares what Claude Code's hooks can do", () => {
     expect(claudeHarness.name).toBe("claude");
-    expect(claudeHarness.capabilities).toEqual({ blockStop: true, denyTool: true, injectContext: true, subagents: true, limits: true, paneInput: true });
+    expect(claudeHarness.capabilities).toEqual({ blockStop: true, denyTool: true, injectContext: true, subagents: true, limits: true, paneInput: true, promptMarks: true, resume: true });
   });
 });

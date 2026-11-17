@@ -1,0 +1,132 @@
+/**
+ * The agent's side (what `norn brief`, `norn done`, `norn ask` and `norn stuck` will call): the
+ * brief of the unit's live run, and a report recorded as the kernel's `run.reported` receipt through
+ * the Journal, plus a `report.made` event in the run's log so the session reads as reported and the
+ * stop hook lets the turn end.
+ *
+ * A report is idempotent by its report id (the receipt's id derives from it), so a retried command
+ * records once. It is refused, never guessed at, when the run is not the unit's live one or `done`
+ * names an outcome the step does not route.
+ */
+import { type BriefInputs, renderBrief, type UnitJournal } from "@norn/kernel";
+import type { HarnessEvent } from "@norn/plugin-api";
+import { STORE_ID_PATTERN } from "@norn/plugin-api";
+import { renderInputFrom } from "./brief-context.ts";
+import type { RuntimeEnv } from "./env.ts";
+import { appendEvents, readEvents } from "./events/log.ts";
+import { type LiveStep, liveStepOf, reportOnRecord } from "./live-run.ts";
+
+export type ReportRequest = { verb: "done"; outcome: string; text?: string } | { verb: "ask"; question: string } | { verb: "stuck"; reason: string };
+
+/** A refusal in the CLI's machine contract: what went wrong and what to do instead. */
+export interface ReportRefusal {
+  error: string;
+  do_instead: string;
+  code?: string;
+}
+
+export type Refusable<T> = { ok: true; value: T } | { ok: false; refusal: ReportRefusal };
+
+export interface ReportRecorded {
+  /** the receipt's seq in the unit's record */
+  seq: number;
+  /** the same report id was recorded before; nothing new was written */
+  replayed: boolean;
+}
+
+export interface BriefShown {
+  unit: string;
+  run_id: string;
+  markdown: string;
+}
+
+/** The receipt id a report id records under: deterministic, so a retry finds the first. */
+export function reportReceiptId(reportId: string): string {
+  return `report-${reportId}`;
+}
+
+const refuse = <T>(error: string, do_instead: string, code?: string): Refusable<T> => ({ ok: false, refusal: { error, do_instead, ...(code && { code }) } });
+
+const REPORT_ID = new RegExp(STORE_ID_PATTERN);
+
+/** The unit's record and its live agent step, or why an agent cannot act on it now. */
+async function liveAgent(env: RuntimeEnv, unit: string): Promise<Refusable<{ record: UnitJournal; live: LiveStep }>> {
+  const read = await env.journal.readUnit(unit);
+  if (!read.ok) return refuse(`cannot read ${unit}: ${read.failure.message}`, "try again; if it keeps failing, tell the person", read.failure.code);
+  const record = read.value;
+  if (record.corrupt !== undefined) return refuse(`${unit} is corrupt: ${record.corrupt}`, "end your turn: a person has to look at the unit's record", "corrupt");
+  if (record.state?.ended !== undefined) return refuse(`${unit} has ended ${record.state.ended}`, "end your turn: the unit takes no more reports", "ended");
+  const live = liveStepOf(record.state);
+  if (!live) return refuse(`${unit} has no run in progress`, "end your turn: no step of this unit is waiting on you", "no_run");
+  if (!live.agent) return refuse(`${unit} is at ${live.step}, which runs no agent`, "end your turn: no agent step of this unit is waiting on you", "not_agent");
+  return { ok: true, value: { record, live } };
+}
+
+function briefInputsOf(record: UnitJournal, live: LiveStep, spec: { skills: string[]; inputs: BriefInputs["inputs"]; model?: string }): BriefInputs {
+  const state = record.state as NonNullable<UnitJournal["state"]>;
+  const brief: BriefInputs = {
+    workflow: state.workflow.name,
+    hash: state.workflow.hash,
+    step: live.step,
+    attempt: live.attempt,
+    skills: [...spec.skills],
+    inputs: structuredClone(spec.inputs),
+  };
+  return spec.model === undefined ? brief : { ...brief, model: spec.model };
+}
+
+export async function briefOf(env: RuntimeEnv, unit: string): Promise<Refusable<BriefShown>> {
+  const found = await liveAgent(env, unit);
+  if (!found.ok) return found;
+  const { record, live } = found.value;
+  const doc = record.state?.workflow.doc.steps[live.step];
+  const brief = briefInputsOf(record, live, { skills: doc?.skills ?? [], inputs: doc?.inputs ?? [], ...(doc?.model !== undefined && { model: doc.model }) });
+  const input = await renderInputFrom(env, record, brief);
+  if (!input.ok) return refuse(`cannot brief ${unit}: ${input.failure.message}`, "tell the person: the unit's workflow does not load", input.failure.code);
+  return { ok: true, value: { unit, run_id: live.run.id, markdown: renderBrief(input.value) } };
+}
+
+function eventOf(runId: string, req: ReportRequest): HarnessEvent {
+  const base = { type: "report.made" as const, run_id: runId, seq: 0, at: "1970-01-01T00:00:00.000Z" };
+  return req.verb === "done" ? { ...base, verb: "done", outcome: req.outcome } : { ...base, verb: req.verb };
+}
+
+function textOf(req: ReportRequest): string | undefined {
+  const t = req.verb === "done" ? req.text : req.verb === "ask" ? req.question : req.reason;
+  return t?.trim() ? t.trim() : undefined;
+}
+
+export async function reportRun(env: RuntimeEnv, unit: string, runId: string, req: ReportRequest, reportId: string): Promise<Refusable<ReportRecorded>> {
+  const receiptId = reportReceiptId(reportId);
+  if (!REPORT_ID.test(receiptId)) return refuse(`report id ${JSON.stringify(reportId)} is not one norn can record`, "use letters, digits, `.`, `_` and `-`, at most 120 of them", "invalid");
+  const read = await env.journal.readUnit(unit);
+  if (read.ok && read.value.corrupt === undefined) {
+    // a retried command finds its first report, wherever the unit has moved since
+    const earlier = read.value.receipts.find((r) => r.id === receiptId);
+    if (earlier) return { ok: true, value: { seq: earlier.seq, replayed: true } };
+  }
+  const found = await liveAgent(env, unit);
+  if (!found.ok) return found;
+  const { record, live } = found.value;
+  if (live.run.id !== runId)
+    return refuse(`run ${runId} is not the live run of ${unit}; the live run is ${live.run.id}`, "end your turn: this session's run was replaced, and its report would move nothing", "stale_run");
+  if (reportOnRecord(record, runId)) return refuse(`run ${runId} has reported already`, "end your turn: a run reports exactly once", "reported");
+  if (req.verb === "done" && !live.outcomes.includes(req.outcome)) {
+    const allowed = live.outcomes.map((o) => `\`${o}\``).join(", ");
+    return refuse(`outcome ${JSON.stringify(req.outcome)} is not one step ${live.step} routes`, `report one of ${allowed || "the step's outcomes"}`, "outcome");
+  }
+  if (req.verb === "ask" && !textOf(req)) return refuse("an ask without a question", "ask one self-contained question", "invalid");
+  const text = textOf(req);
+  const outcome = req.verb === "done" ? req.outcome : undefined;
+  const wrote = await env.journal.record(unit, {
+    id: receiptId,
+    data: { kind: "run.reported", step: live.step, attempt: live.attempt, run_id: runId, verb: req.verb, ...(outcome !== undefined && { outcome }), ...(text !== undefined && { text }) },
+  });
+  if (!wrote.ok) return refuse(`cannot record the report: ${wrote.failure.message}`, "report again with the same report id", wrote.failure.code);
+  if (!wrote.value.replayed) {
+    // the receipt is the report; the event only lets the session read as reported before a tick applies it
+    const { next_seq } = await readEvents(env.ctx, unit, runId);
+    await appendEvents(env.ctx, unit, runId, [{ ...eventOf(runId, req), seq: next_seq, at: env.ctx.now() }]);
+  }
+  return { ok: true, value: { seq: wrote.value.seq, replayed: wrote.value.replayed } };
+}

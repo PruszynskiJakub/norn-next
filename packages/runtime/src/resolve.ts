@@ -35,12 +35,14 @@ export interface ResolvedSlots {
   pack: Pack;
 }
 
-type SlotName = "tracker" | "forge" | "store" | "vcs" | "harness" | "packs";
+export type SlotName = "tracker" | "forge" | "store" | "vcs" | "harness" | "packs" | "runners";
+
+const SLOT_NOUN: Partial<Record<SlotName, string>> = { packs: "pack", runners: "runner" };
 
 /** The one plugin providing `name` in `slot`; two plugins offering the same name is a refusal, never a pick. */
-function find<T>(plugins: readonly NornPlugin[], slot: SlotName, name: string): PluginResult<T> {
+export function findProvided<T>(plugins: readonly NornPlugin[], slot: SlotName, name: string): PluginResult<T> {
   const offering = plugins.filter((p) => (p.provides[slot] as Record<string, unknown> | undefined)?.[name] !== undefined);
-  if (offering.length === 0) return fail("not_found", `no configured plugin provides ${slot === "packs" ? "pack" : slot} ${JSON.stringify(name)}`);
+  if (offering.length === 0) return fail("not_found", `no configured plugin provides ${SLOT_NOUN[slot] ?? slot} ${JSON.stringify(name)}`);
   if (offering.length > 1) return fail("invalid", `${slot} ${JSON.stringify(name)} is provided by ${offering.map((p) => p.name).join(" and ")}`);
   return ok((offering[0]?.provides[slot] as Record<string, T>)[name] as T);
 }
@@ -60,20 +62,20 @@ export function collectStepKinds(plugins: readonly NornPlugin[]): PluginResult<R
 }
 
 export function resolveSlots(ctx: HostContext, plugins: readonly NornPlugin[], config: RuntimeConfig): PluginResult<ResolvedSlots> {
-  const trackerF = find<Parameters<typeof createTracker>[0]>(plugins, "tracker", config.tracker.name);
+  const trackerF = findProvided<Parameters<typeof createTracker>[0]>(plugins, "tracker", config.tracker.name);
   if (!trackerF.ok) return trackerF;
-  const forgeF = find<Parameters<typeof createForge>[0]>(plugins, "forge", config.forge.name);
+  const forgeF = findProvided<Parameters<typeof createForge>[0]>(plugins, "forge", config.forge.name);
   if (!forgeF.ok) return forgeF;
-  const storeF = find<Parameters<typeof createStore>[0]>(plugins, "store", config.store.name);
+  const storeF = findProvided<Parameters<typeof createStore>[0]>(plugins, "store", config.store.name);
   if (!storeF.ok) return storeF;
-  const vcsF = find<Parameters<typeof createVcs>[0]>(plugins, "vcs", config.vcs.name);
+  const vcsF = findProvided<Parameters<typeof createVcs>[0]>(plugins, "vcs", config.vcs.name);
   if (!vcsF.ok) return vcsF;
-  const pack = find<Pack>(plugins, "packs", config.pack);
+  const pack = findProvided<Pack>(plugins, "packs", config.pack);
   if (!pack.ok) return pack;
   const executors: Record<string, Harness> = {};
   // an executor is the name a step's `by:` selects; the harness it runs on is the one its choice names
   for (const [executor, choice] of Object.entries(config.executors)) {
-    const h = find<Harness>(plugins, "harness", choice.name);
+    const h = findProvided<Harness>(plugins, "harness", choice.name);
     if (!h.ok) return h;
     executors[executor] = h.value;
   }

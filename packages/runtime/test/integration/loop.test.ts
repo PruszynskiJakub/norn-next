@@ -86,8 +86,11 @@ describe("a check that keeps failing", () => {
     expect(state?.ended_reason).toContain("test");
     // the first failure and the one the counter allows go back to implement; the third ends it
     expect(m.agents.starts.map((s) => s.step)).toEqual(["implement", "implement", "implement"]);
+    // each check runs detached: the tick that starts it returns at once, and a later tick routes its outcome
     const checks = reports.flatMap((r) => r.outcomes).filter((o) => o.decision.rule === "check.run");
-    expect(checks.map((o) => (o.ok ? (o.detail as { outcome?: string }).outcome : o.error))).toEqual(["fail", "fail", "fail"]);
+    expect(checks.map((o) => (o.ok ? (o.detail as { running?: boolean }).running : o.error))).toEqual([true, true, true]);
+    const finished = (await unitRecord(m, unit)).receipts.flatMap((r) => (r.data.kind === "check.finished" ? [r.data.outcome] : []));
+    expect(finished).toEqual(["fail", "fail", "fail"]);
     expect(reports.flatMap(rulesOf).filter((r) => r.includes("!"))).toEqual([]);
     await tickUntil(m, async () => {
       const claim = await m.env.slots.store.claims.read(unit);

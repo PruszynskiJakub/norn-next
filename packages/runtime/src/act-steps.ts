@@ -1,19 +1,19 @@
 /**
- * Checks and plugin step kinds, run inside the tick in the unit's worktree. Each run goes under its
- * intent receipt, and how it went is kept as the unit's step run, which the next ticks turn into a
- * receipt through decide. A run found already answered under the same intent is not run again, so a
- * replay of the act repeats no effect; a failure that left no answer is recorded as the run's error,
- * and decide runs it again while the retries last.
+ * Checks and plugin step kinds in the unit's worktree. A check runs detached on a host that can
+ * spawn (checks-detached.ts), so the tick does not wait for it; on a host that cannot, it runs inside
+ * the tick. A plugin step kind runs inside the tick. Each run goes under its intent receipt, and how
+ * it went is kept as the unit's step run, which the next ticks turn into a receipt through decide. A
+ * run found already answered under the same intent is not run again, so a replay of the act repeats
+ * no effect; a failure that left no answer is recorded as the run's error, and decide runs it again
+ * while the retries last.
  */
 import type { DecisionOf, ReceiptIntent } from "@norn/kernel";
 import { fail, ok, type PluginResult, stepKindAnswerProblem, type StepKindOutcome } from "@norn/plugin-api";
 import { branchOf, ensureWorktree } from "./branches.ts";
+import { canDetach, checkOutcome, OUTPUT_TAIL, startDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
 import { unitInFacts } from "./record.ts";
 import { readStepRun, type StepRunRecord, writeStepRun } from "./step-runs.ts";
-
-/** How much of a check's output is kept for the step that reworks it: the end, where a test runner sums up. */
-const OUTPUT_TAIL = 8000;
 
 const unitOf = (d: { unit: string | null; rule: string }): string => {
   if (d.unit === null) throw new Error(`${d.rule}: a unit decision without a unit`);
@@ -22,12 +22,7 @@ const unitOf = (d: { unit: string | null; rule: string }): string => {
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-/** `pass` on exit 0, the outcome `exits` names for the code, else `fail`; a timeout has no exit and fails. */
-export function checkOutcome(exits: Readonly<Record<string, string>>, code: number, timedOut: boolean): string {
-  if (timedOut) return "fail";
-  if (code === 0) return "pass";
-  return exits[String(code)] ?? "fail";
-}
+export { checkOutcome };
 
 /**
  * Run `perform` under the decision's intent, or alone for a wait poll that carries none. The run is
@@ -63,6 +58,7 @@ function base(t: TickContext, unit: string, d: { run_id: string; step: string; a
 }
 
 export async function runCheck(t: TickContext, d: DecisionOf<"run_check">): Promise<PluginResult<unknown>> {
+  if (canDetach(t.env.ctx)) return startDetachedCheck(t, d);
   const unit = unitOf(d);
   const state = unitInFacts(t.facts, unit)?.state;
   const exits = state ? (t.workflows.byHash[state.workflow.hash]?.graph.steps[d.step]?.check?.exits ?? {}) : {};

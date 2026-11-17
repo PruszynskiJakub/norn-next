@@ -1,0 +1,200 @@
+/**
+ * AgentLauncher by composition: each executor is a harness (how the agent is wired and launched)
+ * running in a runner (where its process lives).
+ *
+ * - start: `harness.install` in the worktree with the hook command, the brief rendered and marked
+ *   (prompt id = the run id) and recorded as sent, `harness.launch` (headless when the runner has no
+ *   pane), then `runner.start` keyed by the run id, so a replayed start finds the first process. The
+ *   launch env carries RUN_ENV (unit and run) and never the per-launch NORN_PROMPT_SOURCE.
+ * - nudge / answer: marked and recorded as sent, then `runner.send` when the runner has pane input
+ *   and the harness reads typed prompts; else queued in the run's outbox for the next hook answer
+ *   (`injectContext`), or, when the run's process has ended (a headless agent exits as its turn
+ *   ends), handed to a resumed launch of its session (launcher-resume.ts). With none of these,
+ *   refused: a nudge is never dropped silently.
+ * - stop / alive: the runner, on the run's newest process (its latest resume, else the first).
+ * The handle is launcher-handle.ts's: executor, unit, run and the runner's own handle.
+ */
+import type { Harness, HostContext, NornPromptSource, PluginResult, Runner } from "@norn/plugin-api";
+import { fail, markPrompt, ok, RUN_ENV } from "@norn/plugin-api";
+import { ulid } from "@norn/schema";
+import { markDelivered, pendingInjections, queueInjection, recordSentPrompt } from "./events/outbox.ts";
+import { receivedDir } from "./events/paths.ts";
+import { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
+import { currentRunnerHandle, recordLaunch, resumesOf, resumeWith } from "./launcher-resume.ts";
+import type { AgentLauncher, AgentRunRequest, ExecutorModes, LauncherModes } from "./types.ts";
+
+export interface Executor {
+  harness: Harness;
+  runner: Runner;
+}
+
+export interface HarnessLauncherOptions {
+  ctx: HostContext;
+  executors: Readonly<Record<string, Executor>>;
+  /**
+   * The hook command's argv prefix; the launcher appends the harness's name and hands the harness
+   * the shell-quoted line. The CLI passes `["norn", "hook"]`, so hooks run `norn hook claude`.
+   */
+  hookCommand: readonly string[];
+  /** the brief for a run, as brief-context.ts renders it */
+  renderBrief(run: AgentRunRequest): Promise<PluginResult<string>>;
+  /** where a run's output goes when no pane shows it; default `<dataDir>/runtime/sessions/<run>.log` */
+  logPath?(run: AgentRunRequest): string;
+}
+
+export function sessionLogPath(ctx: HostContext, runId: string): string {
+  return `${ctx.repo.dataDir}/runtime/sessions/${runId}.log`;
+}
+
+const SAFE_WORD = /^[A-Za-z0-9_@%+=:,./-]+$/;
+
+/** One POSIX shell word: hook configs hold a command line, and a path with a space must stay one argument. */
+export function shellQuote(argv: readonly string[]): string {
+  return argv.map((a) => (SAFE_WORD.test(a) ? a : `'${a.replaceAll("'", `'\\''`)}'`)).join(" ");
+}
+
+const PROMPT_ID_CHAR = /[^A-Za-z0-9._:-]/g;
+
+/**
+ * The prompt id an answer goes under: derived from the input it answers, so a replayed answer is the
+ * same prompt and the outbox and sent records keep it once.
+ */
+export function answerPromptId(inputId: string): string {
+  return `answer-${inputId.replace(PROMPT_ID_CHAR, "_")}`.slice(0, 128);
+}
+
+const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+export class HarnessLauncher implements AgentLauncher {
+  constructor(readonly opts: HarnessLauncherOptions) {}
+
+  /** Any executor that can run headless or attended makes the launcher able to. */
+  get modes(): LauncherModes {
+    const runners = Object.values(this.opts.executors).map((e) => e.runner.capabilities);
+    return { headless: runners.some((c) => c.headless), attended: runners.some((c) => c.attended) };
+  }
+
+  modesOf(executor: string): ExecutorModes | null {
+    const e = this.opts.executors[executor];
+    if (!e) return null;
+    const r = e.runner.capabilities;
+    return { headless: r.headless, attended: r.attended, paneInput: r.paneInput && e.harness.capabilities.paneInput };
+  }
+
+  async start(run: AgentRunRequest): Promise<PluginResult<{ handle: string }>> {
+    const e = this.opts.executors[run.executor];
+    if (!e) return fail("not_found", `no executor ${JSON.stringify(run.executor)} is configured`, false);
+    const { ctx } = this.opts;
+    try {
+      await e.harness.install({ worktree: run.worktree, hookCommand: shellQuote([...this.opts.hookCommand, e.harness.name]) });
+    } catch (err) {
+      return fail("unavailable", `${e.harness.name}: installing hooks in ${run.worktree} failed: ${message(err)}`);
+    }
+    const brief = await this.opts.renderBrief(run);
+    if (!brief.ok) return brief;
+    // the brief's id is the run's own: a replayed start records and sends the same prompt
+    const recorded = await recordSentPrompt(ctx, run.unit, run.run_id, { id: run.run_id, source: "brief", at: ctx.now() });
+    if (!recorded.ok) return recorded;
+    const headless = !e.runner.capabilities.attended;
+    let spec: ReturnType<Harness["launch"]>;
+    try {
+      spec = e.harness.launch({
+        cwd: run.worktree,
+        prompt: markPrompt(brief.value, { source: "brief", id: run.run_id }),
+        run_id: run.run_id,
+        env: { [RUN_ENV.unit]: run.unit, [RUN_ENV.run]: run.run_id },
+        ...(run.resume !== undefined ? { resume: run.resume } : {}),
+        ...(headless ? { headless: true } : {}),
+      });
+    } catch (err) {
+      return fail("invalid", `${e.harness.name}: launch could not be built: ${message(err)}`, false);
+    }
+    const where = {
+      cwd: run.worktree,
+      title: `${run.unit} ${run.step}`,
+      workspace: run.unit.split("/")[0] as string,
+      logPath: this.opts.logPath?.(run) ?? sessionLogPath(ctx, run.run_id),
+    };
+    const launched = await recordLaunch(ctx, run.unit, run.run_id, { executor: run.executor, ...where });
+    if (!launched.ok) return launched;
+    const started = await e.runner.start({ key: run.run_id, argv: spec.argv, env: { ...spec.env, [RUN_ENV.unit]: run.unit, [RUN_ENV.run]: run.run_id }, ...where });
+    if (!started.ok) return started;
+    return ok({ handle: encodeLaunchHandle({ executor: run.executor, unit: run.unit, run_id: run.run_id, runner: started.value.handle }) });
+  }
+
+  async nudge(handle: string, text: string): Promise<PluginResult<void>> {
+    // a nudge carries no id of its own; each one is a new prompt
+    return this.deliver(handle, "nudge", `nudge-${ulid(Date.parse(this.opts.ctx.now()))}`, text);
+  }
+
+  async answer(handle: string, inputId: string, text: string): Promise<PluginResult<void>> {
+    return this.deliver(handle, "answer", answerPromptId(inputId), text, inputId);
+  }
+
+  async stop(handle: string): Promise<PluginResult<void>> {
+    const found = this.resolve(handle);
+    if (!found.ok) return found;
+    const { handle: h, executor } = found.value;
+    // newest first: the live process goes before the ones that ended on their own
+    const resumed = (await resumesOf(this.opts.ctx, h.unit, h.run_id)).map((r) => r.handle).reverse();
+    for (const runner of [...resumed, h.runner]) {
+      const stopped = await executor.runner.stop(runner);
+      if (!stopped.ok) return stopped;
+    }
+    return ok(undefined);
+  }
+
+  /**
+   * Whether the handle's process still runs, for the session source's died detection; null when the
+   * runner cannot tell (or the handle is not this launcher's), which is never read as dead.
+   */
+  async alive(handle: string): Promise<boolean | null> {
+    const found = this.resolve(handle);
+    if (!found.ok) return null;
+    try {
+      const alive = await found.value.executor.runner.alive(await currentRunnerHandle(this.opts.ctx, found.value.handle));
+      return alive.ok ? alive.value : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private resolve(handle: string): PluginResult<{ handle: LaunchHandle; executor: Executor }> {
+    const h = decodeLaunchHandle(handle);
+    if (!h) return fail("invalid", `${JSON.stringify(handle)} is not a handle this launcher made`, false);
+    const executor = this.opts.executors[h.executor];
+    if (!executor) return fail("not_found", `no executor ${JSON.stringify(h.executor)} is configured for ${h.unit} run ${h.run_id}`, false);
+    return ok({ handle: h, executor });
+  }
+
+  private async deliver(handle: string, source: Exclude<NornPromptSource, "brief">, id: string, text: string, inputId?: string): Promise<PluginResult<void>> {
+    const found = this.resolve(handle);
+    if (!found.ok) return found;
+    const { ctx } = this.opts;
+    const { handle: h, executor } = found.value;
+    const marked = markPrompt(text, { source, id });
+    const at = ctx.now();
+    const extra = inputId !== undefined ? { input_id: inputId } : {};
+    const pane = this.modesOf(h.executor)?.paneInput === true;
+    if (!pane && !executor.harness.capabilities.injectContext)
+      return fail("invalid", `${h.unit} run ${h.run_id} cannot take a ${source}: ${executor.runner.name} has no pane input and ${executor.harness.name} cannot add context`, false);
+    const recorded = await recordSentPrompt(ctx, h.unit, h.run_id, { id, source, at, ...extra });
+    if (!recorded.ok) return recorded;
+    if (pane) {
+      // a replay types the prompt again unless the hook already saw it arrive: twice beats never
+      if (!recorded.value.recorded && (await ctx.files.read(`${receivedDir(ctx, h.unit, h.run_id)}/${id}`)) !== null) return ok(undefined);
+      return executor.runner.send(h.runner, marked);
+    }
+    const resume = () => resumeWith({ ctx, handle: h, harness: executor.harness, runner: executor.runner, id, text: marked });
+    if ((await this.alive(handle)) === false) return resume();
+    const queued = await queueInjection(ctx, h.unit, h.run_id, { id, source, text: marked, at, ...extra });
+    if (!queued.ok) return queued;
+    // the process may have ended between the probe and the queue, leaving no hook to carry the entry
+    if ((await this.alive(handle)) !== false) return ok(undefined);
+    if (!(await pendingInjections(ctx, h.unit, h.run_id)).injections.some((p) => p.id === id)) return ok(undefined);
+    const resumed = await resume();
+    if (!resumed.ok) return resumed;
+    // the resumed prompt carries it; a later hook of the resumed session must not deliver it again
+    return markDelivered(ctx, h.unit, h.run_id, [id]);
+  }
+}

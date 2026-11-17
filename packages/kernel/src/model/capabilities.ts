@@ -31,6 +31,8 @@ export const HarnessCapabilitiesSchema = Type.Object(
     subagents: Type.Boolean(),
     limits: Type.Boolean(),
     paneInput: Type.Boolean(),
+    promptMarks: Type.Optional(Type.Boolean()),
+    resume: Type.Optional(Type.Boolean()),
   },
   closed,
 );

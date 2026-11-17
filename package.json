@@ -35,6 +35,8 @@
     "@norn/runtime": "workspace:*",
     "@norn/vcs-git": "workspace:*",
     "@norn/pack-sdlc": "workspace:*",
+    "@norn/runner-headless": "workspace:*",
+    "@norn/runner-herdr": "workspace:*",
     "@types/bun": "1.3.13",
     "typescript": "^5.9.3",
     "yaml": "^2.8.1"

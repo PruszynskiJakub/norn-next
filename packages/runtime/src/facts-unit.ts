@@ -6,7 +6,9 @@
 import { type UnitFacts, type UnitJournal, validateReceiptData } from "@norn/kernel";
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import type { RuntimeEnv } from "./env.ts";
-import { readStepRun, stepRunFact } from "./step-runs.ts";
+import { readDetachedCheck, stopDetachedCheck } from "./checks-detached.ts";
+import { sessionReportOnRecord } from "./live-run.ts";
+import { readStepRun, type StepRunRecord, stepRunFact, writeStepRun } from "./step-runs.ts";
 
 export interface UnitRead {
   facts: UnitFacts;
@@ -27,6 +29,27 @@ async function corruptMarked(env: RuntimeEnv, unit: string): Promise<boolean> {
   });
 }
 
+/**
+ * The unit's step run, a detached check of its current run read against its exit file, process and
+ * deadline. Gathering facts writes two things here, both host memory and never run state: the
+ * settled record (so a finished check's outcome outlives its files), and the stop of a check past
+ * its deadline (a lingering check would hold the worktree while decide moves on).
+ */
+async function settledStepRun(env: RuntimeEnv, unit: string, run: { id: string; step: string; attempt: number }, problems: string[]): Promise<StepRunRecord | null> {
+  const record = await readStepRun(env.ctx, unit);
+  if (!record || record.running !== true || record.kind !== "check" || stepRunFact(record, run) === undefined) return record;
+  try {
+    const read = await readDetachedCheck(env.ctx, record, env.ctx.now());
+    if (read.stop) await stopDetachedCheck(env.ctx, read.stop);
+    if (!read.settled) return record;
+    await writeStepRun(env.ctx, read.settled);
+    return read.settled;
+  } catch (e) {
+    problems.push(`${unit}: the detached check could not be read: ${e instanceof Error ? e.message : String(e)}`);
+    return record;
+  }
+}
+
 export async function readUnitFacts(env: RuntimeEnv, unit: string, problems: string[]): Promise<PluginResult<UnitRead>> {
   const read = await env.journal.readUnit(unit);
   if (!read.ok) return fail(read.failure.code, `${unit}: ${read.failure.message}`, read.failure.retryable);
@@ -40,11 +63,13 @@ export async function readUnitFacts(env: RuntimeEnv, unit: string, problems: str
   const run = j.state?.run ?? null;
   if (run) {
     try {
-      facts.session = env.sessions.facts(unit, run.id);
+      const session = await env.sessions.facts(unit, run.id, run.session);
+      if (session?.report && sessionReportOnRecord(j, run.id, session.report)) delete session.report;
+      facts.session = session;
     } catch (e) {
       problems.push(`${unit}: the session source failed: ${e instanceof Error ? e.message : String(e)}`);
     }
-    const sr = stepRunFact(await readStepRun(env.ctx, unit), run);
+    const sr = stepRunFact(await settledStepRun(env, unit, run, problems), run);
     if (sr) facts.step_run = sr;
   }
   return ok({ facts, journal: j });

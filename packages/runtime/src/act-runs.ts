@@ -8,8 +8,10 @@
 import type { DecisionOf, ReceiptData, ReceiptIntent, RunInfo } from "@norn/kernel";
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import { ensureWorktree } from "./branches.ts";
+import { stopDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
 import { unitInFacts } from "./record.ts";
+import { readStepRun } from "./step-runs.ts";
 
 const unitOf = (d: { unit: string | null; rule: string }): string => {
   if (d.unit === null) throw new Error(`${d.rule}: a unit decision without a unit`);
@@ -83,11 +85,26 @@ export async function nudge(t: TickContext, d: DecisionOf<"nudge">): Promise<Plu
   return acted.ok ? ok({ performed: acted.value.performed }) : acted;
 }
 
-/** A stop with no session on the record has nothing to reach: a check or step runs inside the tick and has ended already. */
+/** The handle of the run's detached check while it still runs: a stop must reach it, as no session stands for it. */
+async function runningCheck(t: TickContext, unit: string, runId: string): Promise<string | undefined> {
+  const record = await readStepRun(t.env.ctx, unit);
+  return record?.run_id === runId && record.running === true ? record.handle : undefined;
+}
+
+/**
+ * A stop with no session on the record reaches the run's detached check when one runs; else there
+ * is nothing to reach: a plugin step runs inside the tick and has ended already.
+ */
 export async function stopRun(t: TickContext, d: DecisionOf<"stop_run">): Promise<PluginResult<unknown>> {
   const unit = unitOf(d);
-  const handle = runOnRecord(t, unit, d.run_id)?.session;
-  const perform = async (): Promise<PluginResult<void>> => (handle ? t.env.launcher.stop(handle) : ok(undefined));
+  const session = runOnRecord(t, unit, d.run_id)?.session;
+  const check = session ? undefined : await runningCheck(t, unit, d.run_id);
+  const handle = session ?? check;
+  const perform = async (): Promise<PluginResult<void>> => {
+    if (session) return t.env.launcher.stop(session);
+    if (check) await stopDetachedCheck(t.env.ctx, check);
+    return ok(undefined);
+  };
   if (!d.intent) {
     const stopped = await perform();
     return stopped.ok ? ok({ stopped: handle !== undefined }) : stopped;

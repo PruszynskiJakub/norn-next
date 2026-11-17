@@ -5,8 +5,9 @@
  */
 import { check } from "@norn/schema";
 import type { Forge, ForgeFactory } from "./forge.ts";
-import type { HostContext } from "./host.ts";
+import { type HostContext, hostProcesses } from "./host.ts";
 import { fail, ok, type PluginResult } from "./result.ts";
+import type { Runner, RunnerFactory } from "./runner.ts";
 import type { Store, StoreFactory } from "./store.ts";
 import { isKeyPrefix } from "./story-key.ts";
 import type { Tracker, TrackerFactory } from "./tracker.ts";
@@ -19,6 +20,8 @@ const FORGE_METHODS = ["findChanges", "checks", "perform"] as const;
 const VCS_CAPABILITIES = ["worktrees", "merge", "push"] as const;
 const VCS_METHODS = ["head", "isAncestor", "mergeBase", "merge", "push", "fetch"] as const;
 const VCS_WORKTREE_METHODS = ["ensure", "remove", "path"] as const;
+const RUNNER_CAPABILITIES = ["attended", "headless", "paneInput"] as const;
+const RUNNER_METHODS = ["start", "alive", "send", "stop"] as const;
 const STORE_METHODS = ["listUnits", "readUnit", "appendReceipt", "commitState", "archive"] as const;
 const STORE_PARTS = {
   claims: ["read", "acquire", "renew", "release"],
@@ -65,6 +68,11 @@ export function vcsProblems(value: unknown): string[] {
   if (wt === null || typeof wt !== "object") return [...out, "needs worktree"];
   const missing = VCS_WORKTREE_METHODS.filter((m) => typeof (wt as Loose)[m] !== "function");
   return missing.length > 0 ? [...out, `worktree lacks ${missing.join(", ")}`] : out;
+}
+
+/** What is wrong with a value offered as a runner; empty when it fits the contract. */
+export function runnerProblems(value: unknown): string[] {
+  return shapeProblems(value, RUNNER_CAPABILITIES, RUNNER_METHODS);
 }
 
 function partProblems(v: Loose, part: keyof typeof STORE_PARTS): string[] {
@@ -137,4 +145,13 @@ export function createStore(factory: StoreFactory, ctx: HostContext, config: unk
 
 export function createVcs(factory: VcsFactory, ctx: HostContext, config: unknown): PluginResult<Vcs> {
   return instantiate<Vcs>("vcs", factory, ctx, config, vcsProblems);
+}
+
+export function createRunner(factory: RunnerFactory, ctx: HostContext, config: unknown): PluginResult<Runner> {
+  if (factory.needsProcesses === true) {
+    const procs = hostProcesses(ctx);
+    // refused before create: a runner that cannot start a process would fail only at the first run
+    if (!procs.ok) return fail("invalid", `runner needs a host that starts processes; this host lacks ${procs.missing.join(", ")}`, false);
+  }
+  return instantiate<Runner>("runner", factory, ctx, config, runnerProblems);
 }

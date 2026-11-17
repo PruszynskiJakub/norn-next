@@ -1,29 +1,62 @@
 /**
  * Building the tick host: resolve every slot by name, load the pack's workflows with every
- * registered step kind, and hand back a runtime whose `tick` runs one tick at a time.
+ * registered step kind, build the launcher from the executors' harnesses and runners unless one is
+ * given, and hand back a runtime whose `tick` runs one tick at a time.
  */
-import { Journal } from "@norn/kernel";
-import { ok, type PluginResult } from "@norn/plugin-api";
+import { Journal, renderBrief } from "@norn/kernel";
+import { fail, ok, type PluginResult } from "@norn/plugin-api";
+import { briefRenderInput } from "./brief-context.ts";
 import type { RuntimeEnv } from "./env.ts";
-import { loadPackWorkflows, resolveSlots } from "./resolve.ts";
+import { createHarnessLauncher, DEFAULT_HOOK_COMMAND } from "./executors.ts";
+import { loadPackWorkflows, type ResolvedSlots, resolveSlots } from "./resolve.ts";
 import { newTickId, tick } from "./tick.ts";
-import type { Runtime, RuntimeDeps } from "./types.ts";
+import type { AgentLauncher, AgentRunRequest, Runtime, RuntimeDeps } from "./types.ts";
 
-/** What every tick works with, or the refusal naming the slot or workflow that does not resolve. */
+const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** The brief a launch sends, rendered from the env once it exists: the launcher is built before it. */
+function briefRenderer(envOf: () => RuntimeEnv | undefined) {
+  return async (run: AgentRunRequest): Promise<PluginResult<string>> => {
+    const env = envOf();
+    if (!env) return fail("unavailable", "the runtime env is not ready", false);
+    const input = await briefRenderInput(env, run.unit, run.brief);
+    if (!input.ok) return input;
+    try {
+      return ok(renderBrief(input.value));
+    } catch (e) {
+      return fail("invalid", `the brief of ${run.unit} could not be rendered: ${message(e)}`, false);
+    }
+  };
+}
+
+function launcherOf(deps: Omit<RuntimeDeps, "tickId">, slots: ResolvedSlots, envOf: () => RuntimeEnv | undefined): PluginResult<AgentLauncher> {
+  if (deps.launcher) return ok(deps.launcher);
+  return createHarnessLauncher(deps.ctx, deps.plugins, deps.config, slots.executors, {
+    hookCommand: deps.hookCommand ?? DEFAULT_HOOK_COMMAND,
+    renderBrief: briefRenderer(envOf),
+  });
+}
+
+/** What every tick works with, or the refusal naming the slot, runner or workflow that does not resolve. */
 export function createRuntimeEnv(deps: Omit<RuntimeDeps, "tickId">): PluginResult<RuntimeEnv> {
   const slots = resolveSlots(deps.ctx, deps.plugins, deps.config);
   if (!slots.ok) return slots;
   const workflows = loadPackWorkflows(slots.value.pack, slots.value.stepKinds, deps.config.kernel);
   if (!workflows.ok) return workflows;
-  return ok({
+  let env: RuntimeEnv | undefined;
+  const launcher = launcherOf(deps, slots.value, () => env);
+  if (!launcher.ok) return launcher;
+  const sessions = typeof deps.sessions === "function" ? deps.sessions(launcher.value) : deps.sessions;
+  env = {
     ctx: deps.ctx,
     config: deps.config,
     slots: slots.value,
     journal: new Journal(slots.value.store),
-    launcher: deps.launcher,
-    sessions: deps.sessions,
+    launcher: launcher.value,
+    sessions,
     workflows: workflows.value,
-  });
+  };
+  return ok(env);
 }
 
 export function createRuntime(deps: RuntimeDeps): PluginResult<Runtime> {

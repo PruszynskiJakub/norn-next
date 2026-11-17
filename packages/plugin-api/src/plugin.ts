@@ -2,6 +2,7 @@ import type { ForgeFactory } from "./forge.ts";
 import type { Harness } from "./harness.ts";
 import { type Pack, packProblems } from "./pack.ts";
 import { type StepKindDefinition, stepKindProblems } from "./step-kind.ts";
+import type { RunnerFactory } from "./runner.ts";
 import type { StoreFactory } from "./store.ts";
 import type { TrackerFactory } from "./tracker.ts";
 import type { VcsFactory } from "./vcs.ts";
@@ -22,6 +23,8 @@ export interface PluginProvides {
   vcs?: Record<string, VcsFactory>;
   /** workflows, shared files and skills shipped together, by pack name (plugin API 1.4) */
   packs?: Record<string, Pack>;
+  /** where agent processes run (herdr, headless), by name (plugin API 1.5) */
+  runners?: Record<string, RunnerFactory>;
 }
 
 export interface NornPluginSpec {
@@ -42,6 +45,7 @@ export interface NornPlugin {
     stepKinds?: Readonly<Record<string, StepKindDefinition>>;
     vcs?: Readonly<Record<string, VcsFactory>>;
     packs?: Readonly<Record<string, Pack>>;
+    runners?: Readonly<Record<string, RunnerFactory>>;
   }>;
 }
 
@@ -59,7 +63,7 @@ function checkHarness(plugin: string, key: string, h: Harness): void {
 }
 
 /** A tracker, forge or store is made per repo from its config, so only the factory can be checked here. */
-function checkFactory(slot: string): (plugin: string, key: string, f: TrackerFactory | ForgeFactory | StoreFactory | VcsFactory) => void {
+function checkFactory(slot: string): (plugin: string, key: string, f: TrackerFactory | ForgeFactory | StoreFactory | VcsFactory | RunnerFactory) => void {
   return (plugin, key, f) => {
     const loose = f as unknown as Record<string, unknown> | null;
     const schema = loose?.configSchema;
@@ -113,6 +117,7 @@ export function defineNornPlugin(spec: NornPluginSpec): NornPlugin {
   const stepKinds = slot(name, "step kind", spec.provides?.stepKinds, checkStepKind);
   const vcs = slot(name, "vcs", spec.provides?.vcs, checkFactory("vcs"));
   const packs = slot(name, "pack", spec.provides?.packs, checkPack);
+  const runners = slot(name, "runner", spec.provides?.runners, checkFactory("runner"));
   const provides: NornPlugin["provides"] = {
     ...(harness && { harness }),
     ...(tracker && { tracker }),
@@ -121,6 +126,7 @@ export function defineNornPlugin(spec: NornPluginSpec): NornPlugin {
     ...(stepKinds && { stepKinds }),
     ...(vcs && { vcs }),
     ...(packs && { packs: Object.freeze(Object.fromEntries(Object.entries(packs).map(([k, p]) => [k, freezePack(p)]))) }),
+    ...(runners && { runners }),
   };
   return Object.freeze({ name, api: spec.api, provides: Object.freeze(provides) });
 }

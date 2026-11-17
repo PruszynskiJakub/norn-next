@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "dependencies": {
     "@norn/kernel": "workspace:*",
     "@norn/plugin-api": "workspace:*",
@@ -14,9 +16,12 @@
   "devDependencies": {
     "@norn/conformance": "workspace:*",
     "@norn/forge-none": "workspace:*",
+    "@norn/harness-claude": "workspace:*",
     "@norn/host-node": "workspace:*",
     "@norn/pack-sdlc": "workspace:*",
     "@norn/plugin-github": "workspace:*",
+    "@norn/runner-headless": "workspace:*",
+    "@norn/runner-herdr": "workspace:*",
     "@norn/store-local": "workspace:*",
     "@norn/store-refs": "workspace:*",
     "@norn/tracker-local": "workspace:*",

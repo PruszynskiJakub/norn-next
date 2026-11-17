@@ -16,6 +16,8 @@
         "@norn/pack-sdlc": "workspace:*",
         "@norn/plugin-api": "workspace:*",
         "@norn/plugin-github": "workspace:*",
+        "@norn/runner-headless": "workspace:*",
+        "@norn/runner-herdr": "workspace:*",
         "@norn/runtime": "workspace:*",
         "@norn/schema": "workspace:*",
         "@norn/store": "workspace:*",
@@ -141,6 +143,32 @@
         "@norn/conformance": "workspace:*",
       },
     },
+    "packages/runner-headless": {
+      "name": "@norn/runner-headless",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+        "@sinclair/typebox": "^0.34.41",
+      },
+      "devDependencies": {
+        "@norn/conformance": "workspace:*",
+        "@norn/host-node": "workspace:*",
+      },
+    },
+    "packages/runner-herdr": {
+      "name": "@norn/runner-herdr",
+      "version": "0.0.0",
+      "dependencies": {
+        "@norn/plugin-api": "workspace:*",
+        "@norn/schema": "workspace:*",
+        "@sinclair/typebox": "^0.34.41",
+      },
+      "devDependencies": {
+        "@norn/conformance": "workspace:*",
+        "@norn/host-node": "workspace:*",
+      },
+    },
     "packages/runtime": {
       "name": "@norn/runtime",
       "version": "0.0.0",
@@ -154,9 +182,12 @@
       "devDependencies": {
         "@norn/conformance": "workspace:*",
         "@norn/forge-none": "workspace:*",
+        "@norn/harness-claude": "workspace:*",
         "@norn/host-node": "workspace:*",
         "@norn/pack-sdlc": "workspace:*",
         "@norn/plugin-github": "workspace:*",
+        "@norn/runner-headless": "workspace:*",
+        "@norn/runner-herdr": "workspace:*",
         "@norn/store-local": "workspace:*",
         "@norn/store-refs": "workspace:*",
         "@norn/tracker-local": "workspace:*",
@@ -264,6 +295,10 @@
     "@norn/plugin-api": ["@norn/plugin-api@workspace:packages/plugin-api"],
 
     "@norn/plugin-github": ["@norn/plugin-github@workspace:packages/plugin-github"],
+
+    "@norn/runner-headless": ["@norn/runner-headless@workspace:packages/runner-headless"],
+
+    "@norn/runner-herdr": ["@norn/runner-herdr@workspace:packages/runner-herdr"],
 
     "@norn/runtime": ["@norn/runtime@workspace:packages/runtime"],
 

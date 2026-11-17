@@ -3,9 +3,11 @@
  * The kernel routes a check's or step's outcome from facts (`step_run`), not from a receipt the host
  * writes itself, so the answer is kept here between the tick that ran it and the tick that applies it.
  *
- * Only a finished run is written: a run is never recorded as running, because a tick that crashed
- * mid-run would leave it running for good, where no record at all reads as cut short and decide runs
- * it again under its retries.
+ * A run inside the tick is written only once finished: a tick that crashed mid-run would leave it
+ * running for good, where no record at all reads as cut short and decide runs it again under its
+ * retries. A detached run (a check started through `ctx.spawn`) is written `running` with the handle
+ * of its process, so liveness, not the record, tells a died run: running, not alive and no exit
+ * recorded is a failed outcome with its reason (see checks-detached.ts).
  */
 import { type HostContext, parseJson } from "@norn/plugin-api";
 import { IsoTime, NonEmpty, PosInt } from "@norn/schema";
@@ -32,6 +34,15 @@ export const StepRunRecord = Type.Object(
     output: Type.Optional(Type.String()),
     detail: Type.Optional(Type.Unknown()),
     at: IsoTime,
+    /** a detached run that was started and has not been seen to finish */
+    running: Type.Optional(Type.Boolean()),
+    /** the detached process, as checks-detached.ts encodes it */
+    handle: Type.Optional(NonEmpty),
+    /** where the detached process's output goes, for the output tail once it exits */
+    log: Type.Optional(NonEmpty),
+    /** the deadline facts enforce on a detached run: started `at` plus this */
+    timeout_ms: Type.Optional(PosInt),
+    finished_at: Type.Optional(IsoTime),
   },
   { additionalProperties: false, title: "StepRunRecord" },
 );
@@ -56,7 +67,7 @@ export async function writeStepRun(ctx: HostContext, record: StepRunRecord): Pro
 /** The fact decide reads: the record when it belongs to the run, step and attempt the unit is at. */
 export function stepRunFact(record: StepRunRecord | null, run: { id: string; step: string; attempt: number } | null): StepRunFacts | undefined {
   if (!record || !run || record.run_id !== run.id || record.step !== run.step || record.attempt !== run.attempt) return undefined;
-  const fact: StepRunFacts = { kind: record.kind, running: false };
+  const fact: StepRunFacts = { kind: record.kind, running: record.running === true };
   if (record.outcome !== undefined) fact.outcome = record.outcome;
   if (record.error !== undefined) fact.error = record.error;
   return fact;

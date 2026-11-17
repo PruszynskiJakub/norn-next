@@ -33,7 +33,8 @@ export type EndReason = Static<typeof EndReason>;
 
 const VARIANTS = [
   variant("session.started", { harness_session: Id, transcript: Type.Optional(Type.String()) }),
-  variant("turn.started", { source: TurnSource }),
+  /** `prompt_id`: the id of the prompt mark the turn's prompt carried (plugin API 1.5), for the host to check against what it sent */
+  variant("turn.started", { source: TurnSource, prompt_id: Type.Optional(Id) }),
   variant("tool.requested", { id: Id, kind: ToolKind, tool: Type.String(), detail: Type.Optional(Type.String()) }),
   variant("tool.permission", { id: Id, prompt: Type.String() }),
   variant("tool.finished", { id: Id, ok: Type.Boolean() }),

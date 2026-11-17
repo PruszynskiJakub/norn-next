@@ -12,13 +12,21 @@ export interface SlotChoice {
   config?: unknown;
 }
 
+/** An executor: the harness its choice names, and the runner its agent runs in (plugin API 1.5). */
+export interface ExecutorChoice extends SlotChoice {
+  /** absent: the launcher's default runner */
+  runner?: SlotChoice;
+}
+
 export interface RuntimeConfig {
   tracker: SlotChoice;
   forge: SlotChoice;
   store: SlotChoice;
   vcs: SlotChoice;
   /** executors (harnesses an agent step runs on) by the name a step's `by:` selects */
-  executors: Record<string, SlotChoice>;
+  executors: Record<string, ExecutorChoice>;
+  /** the runner an executor runs in when its choice names none */
+  runner?: SlotChoice;
   /** the pack whose workflows the runtime loads */
   pack: string;
   kernel: KernelConfig;
@@ -55,6 +63,12 @@ export interface LauncherModes {
   attended: boolean;
 }
 
+/** What one executor can do once its harness runs in its runner: the modes, and whether a pane takes typed input. */
+export interface ExecutorModes extends LauncherModes {
+  /** the harness reads typed prompts and the runner has a pane to type them into */
+  paneInput: boolean;
+}
+
 /**
  * Starts and steers agent runs. Every call is idempotent by the run id (or input id) it names,
  * because the act protocol may replay a start after a crash between the effect and its receipt, and
@@ -62,23 +76,37 @@ export interface LauncherModes {
  */
 export interface AgentLauncher {
   readonly modes: LauncherModes;
+  /**
+   * The executor's own modes, when they differ by executor (a herdr executor beside a headless one);
+   * absent: `modes` for every executor, with the harness's own `paneInput`.
+   */
+  modesOf?(executor: string): ExecutorModes | null;
   start(run: AgentRunRequest): Promise<PluginResult<{ handle: string }>>;
   nudge(handle: string, text: string): Promise<PluginResult<void>>;
   answer(handle: string, inputId: string, text: string): Promise<PluginResult<void>>;
   stop(handle: string): Promise<PluginResult<void>>;
+  /** whether the handle's process still runs; null when it cannot tell, which is never read as dead */
+  alive?(handle: string): Promise<boolean | null>;
 }
 
-/** Classified sessions, read once per tick; null when the run has no session on record. */
+/**
+ * Classified sessions, read once per tick; null when the run has no session on record. `session` is
+ * the launcher's handle the run's record holds, for a source that asks the runner whether it lives.
+ */
 export interface SessionSource {
-  facts(unit: string, runId: string): SessionFacts | null;
+  facts(unit: string, runId: string, session?: string): SessionFacts | null | Promise<SessionFacts | null>;
 }
 
 export interface RuntimeDeps {
   ctx: HostContext;
   plugins: readonly NornPlugin[];
   config: RuntimeConfig;
-  launcher: AgentLauncher;
-  sessions: SessionSource;
+  /** absent: a HarnessLauncher over the config's executors, each a harness in its runner */
+  launcher?: AgentLauncher;
+  /** the session source, or how to make it from the launcher (whose handles it asks the runner about) */
+  sessions: SessionSource | ((launcher: AgentLauncher) => SessionSource);
+  /** the built launcher's hook command prefix; default `["norn", "hook"]` */
+  hookCommand?: readonly string[];
   /** mints each tick's id; a test passes a fixed sequence so its traces and ids repeat */
   tickId?: () => string;
 }

@@ -130,6 +130,8 @@ function apply(acc: Acc, e: HarnessEvent): void {
       // an answer without an id is typed into the pane, and answers whatever is open
       if (e.id !== undefined) closeInput(acc, e.id);
       else if (v.input) closeInput(acc, v.input.id);
+      // an ask is a report the answer settles: left standing, it would read as asked again and park the unit anew
+      if (v.report?.verb === "ask") delete v.report;
       return;
     case "limit.hit":
       v.limit = e.resets_at ? { kind: e.kind, resets_at: e.resets_at } : { kind: e.kind };

@@ -255,17 +255,46 @@ export interface Harnessed {
   tickIds: string[];
 }
 
+/**
+ * A host's detached processes, faked: a spawn starts nothing and records its argv; a test ends a
+ * process by writing its exit (as the check wrapper would) or by marking it dead.
+ */
+export class FakeProcesses {
+  readonly spawned: { pid: number; argv: string[]; cwd: string; logPath: string }[] = [];
+  readonly dead = new Set<number>();
+  readonly killed: number[] = [];
+  failSpawn = false;
+  private next = 100;
+
+  readonly host = {
+    spawn: async (argv: string[], opts: { cwd: string; logPath: string }) => {
+      if (this.failSpawn) throw new Error("spawn sh ENOENT");
+      const pid = this.next++;
+      this.spawned.push({ pid, argv, cwd: opts.cwd, logPath: opts.logPath });
+      return { pid, started: `start-${pid}` };
+    },
+    alive: async (pid: number, started?: string) => !this.dead.has(pid) && this.spawned.some((p) => p.pid === pid) && (started === undefined || started === `start-${pid}`),
+    kill: async (pid: number) => {
+      this.killed.push(pid);
+      this.dead.add(pid);
+    },
+  };
+}
+
 export interface HarnessOptions {
   workflow?: string;
   kernel?: Partial<KernelConfig>;
   exec?: ExecScript;
+  /** give the host detached processes, so checks run outside the tick */
+  processes?: FakeProcesses;
 }
 
 export function harness(opts: HarnessOptions = {}): Harnessed {
   const files = memoryFiles();
   const clock = manualClock(START);
   const exec = scriptedExec(opts.exec ?? ((argv) => (argv[0] === "sh" ? { code: 0, stdout: "ok" } : undefined)));
-  const ctx = memoryHost({ files, exec, now: clock.now, repo: { root: "/repo", dataDir: "/machine/repo" } });
+  const base = memoryHost({ files, exec, now: clock.now, repo: { root: "/repo", dataDir: "/machine/repo" } });
+  const ctx: HostContext = opts.processes ? { ...base, ...opts.processes.host } : base;
   const items: TrackerItem[] = [];
   const changes: Record<string, ChangeRequest> = {};
   const heads: Record<string, string> = {};
