@@ -3,7 +3,7 @@ import type { ExecScript } from "@norn/conformance";
 import { parse } from "yaml";
 import { join } from "node:path";
 import { AGENTS_DIR, configPaths, ExitCode, OLD_REPO_CONFIG_FILE, runCli } from "../../src/index.ts";
-import { COMMON, HOME, machine, ROOT } from "./support.ts";
+import { COMMON, HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
 
 const PATHS = configPaths(HOME, ROOT);
 const EXCLUDE = `${COMMON}/info/exclude`;
@@ -288,5 +288,50 @@ describe("norn init: a repo still on the old norn's config", () => {
   test("once a config of this norn is there, the old file no longer stops any command", async () => {
     const { m } = await init([], { w: { tools: ["claude"] }, seed: { [OLD]: OLD_TEXT } });
     expect((await runCli(["config", "show", "--json"], m.io)).exit).toBe(ExitCode.ok);
+  });
+});
+
+describe("norn init: a machine still on the old norn's user config", () => {
+  const OLD_USER = ["# norn user layer — machine-wide defaults", "max_agents: 4", "mode: auto", "trace: { retain: 14d }", "notify: { os: false }", ""].join("\n");
+
+  test("any other command refuses with config_old and sends the person to norn init", async () => {
+    const m = machine({ seed: { [PATHS.user]: "max_agents: 4\n", [PATHS.local]: LOCAL_CONFIG } });
+    const r = await runCli(["status", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.config);
+    expect(json(r.stdout)).toMatchObject({ code: "config_old", do_instead: expect.stringContaining("norn init") });
+  });
+
+  test("init rewrites it in this norn's keys, keeps the old text beside it and names what it left behind", async () => {
+    const { m, r, body } = await init([], { w: { tools: ["claude"] }, seed: { [PATHS.user]: OLD_USER } });
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(await written(m, PATHS.user)).toEqual({ kernel: { max_agents: 4, mode: "auto" }, trace: { retain: "14d" } });
+    expect(await m.files.read(`${PATHS.user}.old`)).toBe(OLD_USER);
+    expect(body.user_migrated).toMatchObject({
+      backup: `${PATHS.user}.old`,
+      mapped: ["max_agents → kernel.max_agents", "mode → kernel.mode", "trace.retain → trace.retain"],
+      ignored: [expect.stringContaining("notify: ")],
+    });
+    // and the next command loads it
+    expect((await runCli(["status", "--json"], m.io)).exit).toBe(ExitCode.ok);
+  });
+
+  test("in a repo set up already, init still rewrites it and leaves the repo's config as it is", async () => {
+    const { m, r, body } = await init([], { w: { tools: ["claude"] }, seed: { [PATHS.user]: "max_agents: 2\n", [PATHS.local]: LOCAL_CONFIG } });
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(await written(m, PATHS.user)).toEqual({ kernel: { max_agents: 2 } });
+    expect(await m.files.read(PATHS.local)).toBe(LOCAL_CONFIG);
+    expect(body.user_migrated).toMatchObject({ mapped: ["max_agents → kernel.max_agents"] });
+  });
+
+  test("an old backup is never overwritten", async () => {
+    const { m } = await init([], { w: { tools: ["claude"] }, seed: { [PATHS.user]: "max_agents: 3\n", [`${PATHS.user}.old`]: "kept\n" } });
+    expect(await m.files.read(`${PATHS.user}.old`)).toBe("kept\n");
+    expect(await m.files.read(`${PATHS.user}.old-2`)).toBe("max_agents: 3\n");
+  });
+
+  test("a user config that is merely wrong is not taken for the old one", async () => {
+    const m = machine({ seed: { [PATHS.user]: "max_agents: 4\nnot_a_key: 1\n", [PATHS.local]: LOCAL_CONFIG } });
+    const r = await runCli(["status", "--json"], m.io);
+    expect(json(r.stdout)).toMatchObject({ code: "config_invalid" });
   });
 });
