@@ -2,8 +2,9 @@
  * The inputs read off the story's record rather than its documents: `record` (what every unit of the
  * story reported, its criteria reports with their evidence), `resolution` (the merges a resolver
  * finished, to review against git's own merge) and `base_side` (what the base changed in each path a
- * base update conflicted in, or for a slice whose integrate conflicted, what the story branch changed). The vcs slot answers no log, so where the agent needs commits the text
- * names the exact git command over the commits the receipts recorded, as `diff` does.
+ * base update conflicted in, or, for a slice whose integrate conflicted, what the story branch
+ * changed). The vcs slot answers no log, so where the agent needs commits the text names the exact
+ * git command over the commits the receipts recorded, as `diff` does.
  */
 import type { KernelReceipt, RunState, UnitJournal } from "@norn/kernel";
 import { parseUnitId } from "@norn/plugin-api";
@@ -50,8 +51,9 @@ function conflictLine(r: UpdateFinished): string {
 }
 
 /**
- * The base commit the unit's latest base update could not merge, or null when that update did not
- * end `conflict` (or none ran): the commit a resolver is sent to merge.
+ * The commit the unit's latest merge of its base could not make (a base update's base, or a slice's
+ * integrate's story branch head), or null when that merge did not end `conflict` (or none ran): the
+ * commit a resolver is sent to merge.
  */
 export function baseConflictOf(record: UnitJournal): { ref: string; sha: string } | null {
   const last = record.receipts.findLast(isMerge);

@@ -247,8 +247,9 @@ async function unfinishedRefusal(env: RuntimeEnv, unit: string): Promise<Refusab
 
 /**
  * Why the done of a step sent to merge the base cannot be recorded, or null when it can: the step
- * takes the `base_side` input and the latest base update stopped on a conflict, yet the unit's branch
- * does not contain that base commit, so the merge was never made (or was made on another branch).
+ * takes the `base_side` input and the unit's latest merge of its base (a base update, or a slice's
+ * integrate into the story branch) stopped on a conflict, yet the unit's branch does not contain that
+ * commit, so the merge was never made (or was made on another branch).
  * Read before the markers, as a merge never made leaves none to find.
  */
 async function baseUnmergedRefusal(env: RuntimeEnv, record: UnitJournal, live: LiveStep): Promise<Refusable<never> | null> {
@@ -262,7 +263,7 @@ async function baseUnmergedRefusal(env: RuntimeEnv, record: UnitJournal, live: L
   if (!r.ok) return refuse(`cannot tell whether ${base.ref} at ${short} is merged into ${branch}: ${r.failure.message}`, "report again with the same command", r.failure.code);
   if (r.value) return null;
   return refuse(
-    `${base.ref} at ${short}, the base this step merges, is not merged into ${branch}: its head does not contain it`,
+    `${base.ref} at ${short}, the commit this step merges, is not merged into ${branch}: its head does not contain it`,
     `merge it in the worktree with \`git merge ${base.sha}\` (a merge commit, never a rebase), resolve every conflict, commit, then report again; if a person must choose, \`norn ask\``,
     "merge_unfinished",
   );
