@@ -53,7 +53,7 @@ steps:
       unverified: human-qa
     means:
       pass: "every acceptance criterion of the story and its slices observed with evidence"
-      fail: "a criterion fails; repro in findings"
+      fail: "a criterion fails; its repro in the criteria report, and the findings handed back with --findings <file>"
       partial: "criteria only a person can judge, evidence prepared"
       unverified: "criteria this session could not check; how to check each one is in the report"
     verdict:
@@ -87,7 +87,7 @@ steps:
       changes_requested: implement
     means:
       approve: "the rework does what the findings and the story ask and nothing else, no blocking findings"
-      changes_requested: "blocking findings in the receipt"
+      changes_requested: "blocking findings, handed back with --findings <file>"
   describe:
     agent: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
     skills: [norn-pr]

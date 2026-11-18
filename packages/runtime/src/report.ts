@@ -12,7 +12,7 @@
 import { type BriefInputs, checkCriteriaReport, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
 import type { HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
 import { STORE_ID_PATTERN } from "@norn/plugin-api";
-import type { CriterionVerdict, Verdict } from "@norn/schema";
+import type { CriterionVerdict, Finding, Verdict } from "@norn/schema";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
 import { readBackDocs, worktreeOf } from "./inputs.ts";
@@ -20,7 +20,10 @@ import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
 import { type LiveStep, liveStepOf, reportOnRecord } from "./live-run.ts";
 
-export type ReportRequest = { verb: "done"; outcome: string; text?: string; criteria?: CriterionVerdict[] } | { verb: "ask"; question: string } | { verb: "stuck"; reason: string };
+export type ReportRequest =
+  | { verb: "done"; outcome: string; text?: string; criteria?: CriterionVerdict[]; findings?: Finding[] }
+  | { verb: "ask"; question: string }
+  | { verb: "stuck"; reason: string };
 
 /** A refusal in the CLI's machine contract: what went wrong and what to do instead. */
 export interface ReportRefusal {
@@ -140,6 +143,8 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   }
   if (req.verb === "ask" && !textOf(req)) return refuse("an ask without a question", "ask one self-contained question", "invalid");
   if (req.verb === "done") {
+    const handBack = handBackRefusal(live, req);
+    if (handBack) return handBack;
     const stopped = await unfinishedRefusal(env, unit);
     if (stopped) return stopped;
   }
@@ -153,6 +158,7 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     if (!checked.ok) return checked;
     criteria = checked.value ?? undefined;
   }
+  const findings = req.verb === "done" && req.findings !== undefined && req.findings.length > 0 ? req.findings : undefined;
   const wrote = await env.journal.record(unit, {
     id: receiptId,
     data: {
@@ -164,6 +170,7 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
       ...(outcome !== undefined && { outcome }),
       ...(text !== undefined && { text }),
       ...(criteria !== undefined && { criteria: criteria.report }),
+      ...(findings !== undefined && { findings }),
     },
   });
   if (!wrote.ok) return refuse(`cannot record the report: ${wrote.failure.message}`, "report again with the same report id", wrote.failure.code);
@@ -173,6 +180,27 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     await appendEvents(env.ctx, unit, runId, [{ ...eventOf(runId, req), seq: next_seq, at: env.ctx.now() }]);
   }
   return { ok: true, value: { seq: wrote.value.seq, replayed: wrote.value.replayed, ...(criteria !== undefined && { criteria: criteria.summary }) } };
+}
+
+const FINDINGS_SHAPE =
+  'a JSON file {"findings": [{"severity": "blocking" | "major" | "minor" | "nit", "title": "...", "detail"?, "file"?, "line"?, "criterion"?, "repro"?}]} with at least one finding';
+
+/**
+ * Why a `done` whose outcome hands findings back cannot be recorded as it is, or null when it can:
+ * the step it sends the work back to reworks what the report carries, so one that carries nothing
+ * leaves it nothing to do. Findings, a note, or a criteria report with a verdict short of `pass`
+ * (each carries its repro or how to check it) are something to rework; an empty findings file is not.
+ */
+function handBackRefusal(live: LiveStep, req: Extract<ReportRequest, { verb: "done" }>): Refusable<never> | null {
+  if (live.handBack[req.outcome] !== "findings") return null;
+  const carries = (req.findings?.length ?? 0) > 0 || textOf(req) !== undefined || (req.criteria ?? []).some((c) => c.verdict !== "pass");
+  if (carries) return null;
+  const criteria = live.criteria || live.verdict[req.outcome] !== undefined ? " --criteria <file>" : "";
+  return refuse(
+    `step ${live.step} hands back findings with outcome ${req.outcome} (hand_back), and this report has none`,
+    `write ${FINDINGS_SHAPE}, then run: norn done ${req.outcome}${criteria} --findings <file>`,
+    "hand_back_required",
+  );
 }
 
 const CONCLUDE: Record<VcsUnfinished["operation"], string> = { merge: "git commit", rebase: "git rebase --continue", "cherry-pick": "git cherry-pick --continue" };

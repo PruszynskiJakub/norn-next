@@ -15,7 +15,7 @@
  */
 import type { BriefInputs, BriefInputView, BriefStory, KernelReceipt, UnitJournal } from "@norn/kernel";
 import { ok, type PluginResult, parseStoryKey, parseUnitId, type TrackerItem } from "@norn/plugin-api";
-import type { CriterionVerdict } from "@norn/schema";
+import type { CriterionVerdict, Finding } from "@norn/schema";
 import { baseRefOf, cutFrom } from "./branches.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
@@ -167,7 +167,7 @@ const handsBackFindings = (record: UnitJournal, step: string | undefined, outcom
 function carriesFindings(record: UnitJournal, r: KernelReceipt): boolean {
   const d = r.data;
   if (d.kind === "gate.decided") return d.outcome === "reject";
-  if (d.kind !== "run.reported" || d.verb !== "done" || (d.text === undefined && d.criteria === undefined)) return false;
+  if (d.kind !== "run.reported" || d.verb !== "done" || (d.text === undefined && d.criteria === undefined && d.findings === undefined)) return false;
   return handsBackFindings(record, d.step, d.outcome);
 }
 
@@ -193,10 +193,33 @@ export function unsettledCriteria(criteria: readonly CriterionVerdict[] | undefi
   return lines.length > 0 ? `\n\nCriteria not passed:\n\n${lines.join("\n")}` : "";
 }
 
+function findingLine(f: Finding, severity: boolean): string {
+  const where = [f.file !== undefined ? `${f.file}${f.line !== undefined ? `:${f.line}` : ""}` : undefined, f.criterion].filter((x) => x !== undefined);
+  const head = `- ${f.id !== undefined ? `\`${f.id}\` ` : ""}${severity ? `${f.severity}: ` : ""}${f.title}${where.length > 0 ? ` (${where.join(", ")})` : ""}`;
+  const more = [f.detail, f.repro !== undefined ? `Repro: ${f.repro}` : undefined].filter((x): x is string => x !== undefined && x.trim() !== "");
+  return [head, ...more.map((m) => `  ${m.trim().replaceAll("\n", "\n  ")}`)].join("\n");
+}
+
+/**
+ * A report's findings, the ones that send the work back (blocking, major) first: a minor or nit
+ * finding is a note for the person, and listing it among the rework would have it fixed in a round
+ * nobody asked for.
+ */
+export function findingsList(findings: readonly Finding[] | undefined): string {
+  const all = findings ?? [];
+  const rework = all.filter((f) => f.severity === "blocking" || f.severity === "major");
+  const other = all.filter((f) => f.severity !== "blocking" && f.severity !== "major");
+  const out: string[] = [];
+  if (rework.length > 0) out.push(`\n\nBlocking findings:\n\n${rework.map((f) => findingLine(f, f.severity !== "blocking")).join("\n")}`);
+  if (other.length > 0) out.push(`\n\nOther findings, notes for the person rather than rework:\n\n${other.map((f) => findingLine(f, true)).join("\n")}`);
+  return out.join("");
+}
+
 function findingsText(r: KernelReceipt): string | null {
   const d = r.data;
   if (d.kind === "gate.decided") return `\`${d.step ?? "the gate"}\` was decided \`${d.outcome}\` by ${d.by}${d.reason ? `:\n\n${d.reason}` : "."}`;
-  if (d.kind === "run.reported") return `\`${d.step ?? "a step"}\` reported \`${d.verb}${d.outcome ? ` ${d.outcome}` : ""}\`${d.text ? `:\n\n${d.text}` : "."}${unsettledCriteria(d.criteria)}`;
+  if (d.kind === "run.reported")
+    return `\`${d.step ?? "a step"}\` reported \`${d.verb}${d.outcome ? ` ${d.outcome}` : ""}\`${d.text ? `:\n\n${d.text}` : "."}${findingsList(d.findings)}${unsettledCriteria(d.criteria)}`;
   return null;
 }
 

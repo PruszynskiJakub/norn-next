@@ -13,7 +13,7 @@ import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import type { RuntimeEnv } from "./env.ts";
 import { readEvents } from "./events/log.ts";
 import { historyOf, rulingsOf } from "./input-history.ts";
-import { INPUTS_NOTE, materializeInputs, unsettledCriteria, worktreeOf } from "./inputs.ts";
+import { findingsList, INPUTS_NOTE, materializeInputs, unsettledCriteria, worktreeOf } from "./inputs.ts";
 import { reportableOutcomes } from "./live-run.ts";
 import { readStepRun } from "./step-runs.ts";
 import { loadPinned } from "./workflows.ts";
@@ -40,7 +40,7 @@ async function reworkText(env: RuntimeEnv, unit: string, receipt: KernelReceipt 
     case "gate.decided":
       return `\`${d.step ?? "the gate"}\` was decided \`${d.outcome}\` by ${d.by}${d.reason ? `: ${d.reason}` : "."}`;
     case "run.reported":
-      return `\`${d.step ?? "a step"}\` reported \`${d.verb}${d.outcome ? ` ${d.outcome}` : ""}\`${d.text ? `: ${d.text}` : "."}${unsettledCriteria(d.criteria)}`;
+      return `\`${d.step ?? "a step"}\` reported \`${d.verb}${d.outcome ? ` ${d.outcome}` : ""}\`${d.text ? `: ${d.text}` : "."}${findingsList(d.findings)}${unsettledCriteria(d.criteria)}`;
     case "step.finished":
       return `\`${d.step ?? d.step_kind}\` ended \`${d.outcome}\`.`;
     default:
@@ -148,6 +148,7 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
     ...(Object.keys(means).length > 0 && { means }),
     ...(wantsCriteria(spec) && { criteria: { required: spec.criteria, verdict: { ...spec.verdict } } }),
     ...(attendedRun(record, runId, spec.attended) && { attended: true }),
+    ...(Object.keys(spec.hand_back).length > 0 && { handBack: { ...spec.hand_back } }),
     ...(rework !== undefined && { rework }),
     ...(answered.length > 0 && { answered }),
     ...(retry !== undefined && { retry }),

@@ -42,7 +42,7 @@ steps:
       changes_requested: implement
     means:
       approve: "the change does what the story asks and nothing else, no blocking findings"
-      changes_requested: "blocking findings in the receipt"
+      changes_requested: "blocking findings, handed back with --findings <file>"
   describe:
     agent: "Write the PR body to pr.md in the spec folder; norn puts the issue link under it."
     skills: [norn-pr]

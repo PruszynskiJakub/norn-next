@@ -72,7 +72,7 @@ Write everything to one directory **outside the repository** (e.g. under `$TMPDI
 
 ## Report
 
-The worst verdict decides what you may report: fail > unverified > person > pass; a report that contradicts it is refused. Report with the criteria file: `norn done <outcome> --criteria <dir>/criteria.json` (or the report command your instructions name). A step that requires criteria refuses a report without it, and one that does not cover exactly the frontmatter `criteria` ids. Put what the next step must know in `--note`: on a `fail`, each failing criterion's repro and the path of `findings.json`, since rework reads the note; name the evidence directory there too.
+The worst verdict decides what you may report: fail > unverified > person > pass; a report that contradicts it is refused. Report with the criteria file: `norn done <outcome> --criteria <dir>/criteria.json` (or the report command your instructions name). A step that requires criteria refuses a report without it, and one that does not cover exactly the frontmatter `criteria` ids. On a `fail`, hand `findings.json` back with the report (`--findings <dir>/findings.json`): rework reads it. Put anything else the next step must know in `--note`, and name the evidence directory there.
 
 ## Rules
 

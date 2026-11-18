@@ -27,7 +27,7 @@ steps:
       changes_requested: implement
     means:
       approve: "all criteria met, no blocking findings"
-      changes_requested: "blocking findings in the receipt"
+      changes_requested: "blocking findings, handed back with --findings <file>"
   integrate:
     integrate:
     outcomes: { done: $done, conflict: merge }
