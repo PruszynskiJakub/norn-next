@@ -5,6 +5,8 @@
  * happens; stdout gets one summary when the loop ends.
  *
  * The interval is the longest a watch waits, not the pace of a story:
+ * - a tick that carried out an action is followed at once, up to `SETTLE_TICKS` in a row, since its
+ *   action usually leaves the next one ready (a report applied, a step to start);
  * - a receipt another process records during the pause (`norn done`, a person's answer) or a detached
  *   check that finishes rewrites the wake stamp, which ends the pause within about a second;
  */
@@ -19,6 +21,8 @@ import { wireRuntime } from "../wiring.ts";
 const DEFAULT_INTERVAL = "30s";
 const DURATION = new RegExp(Duration.pattern as string);
 
+/** At most this many ticks in a row follow an acting tick at once, so a unit that acts on every tick never spins. */
+export const SETTLE_TICKS = 3;
 /** How often a pause reads the wake stamp. */
 export const WAKE_POLL_MS = 500;
 /** The quiet after a wake before the tick, so a burst of receipts (a report and its events) is one tick. */
@@ -82,6 +86,9 @@ const progress = (r: TickReport) => ({
   lines: tickLines(r),
 });
 
+/** A failed action is retried an interval later, never at once: what failed now (an outage) most likely fails again now. */
+const acted = (r: TickReport): boolean => r.outcomes.some((o) => o.ok);
+
 export const watchCommand = defineCommand({
   name: "watch",
   summary: "Tick on an interval until a signal stops it",
@@ -110,6 +117,7 @@ export const watchCommand = defineCommand({
     const log = (line: string) => ctx.io.log?.(line);
     const signal = ctx.io.signal;
     const summary: WatchSummary = { ticks: 0, failed_actions: 0, skipped_locked: 0, interval };
+    let settling = 0;
     while (summary.ticks < max && !signal?.aborted) {
       const before = await read();
       const report = await runtime.tick();
@@ -118,6 +126,11 @@ export const watchCommand = defineCommand({
       summary.failed_actions += failedCount(report);
       log(JSON.stringify(progress(report)));
       if (summary.ticks >= max || signal?.aborted) break;
+      if (acted(report) && settling < SETTLE_TICKS) {
+        settling++;
+        continue;
+      }
+      settling = 0;
       await pauseUntilWake(sleep, ms, read, before, env.wakeBy, signal);
     }
     // a failed action is retried by the next tick, so a long watch that saw one still ended as asked

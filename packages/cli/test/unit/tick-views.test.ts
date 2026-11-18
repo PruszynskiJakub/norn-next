@@ -131,6 +131,17 @@ function timedWatch(m: TestMachine, during: Record<number, () => Promise<void>> 
 }
 
 describe("norn watch's cadence", () => {
+  test("a tick that acted is followed at once, up to three in a row; its own receipts never wake the pause after", async () => {
+    const m = repo();
+    await addItem(m, "First");
+    const w = timedWatch(m);
+    await runCli(["watch", "--interval", "30s", "--max-ticks", "5", "--json"], m.io);
+    expect(w.ticks[0]?.lines).toContain("lt-1  intake.story → intake_story");
+    // the first four ticks each act (intake, round, ...); the fourth acting tick in a row waits the interval
+    expect(w.ticks.slice(0, 4).every((t) => t.actions > 0)).toBe(true);
+    expect(w.gaps()).toEqual([0, 0, 0, 30_000]);
+  });
+
   test("a tick that did nothing waits out the whole interval", async () => {
     const m = repo();
     const w = timedWatch(m);

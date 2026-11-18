@@ -70,6 +70,7 @@ Checks and the git and forge steps always run on their own. Gates, attended step
 
 `norn watch` runs the heartbeat until Ctrl-C, which lets the tick in flight finish. `norn tick` runs one by hand. The interval (30 seconds, `--interval` changes it) is the longest watch waits, not the pace of a story:
 
+- a tick that carried out an action is followed at once by up to three more, so a step that ends leads to the next one in the same moment;
 - a receipt recorded during the pause by another process on this machine (`norn done`, `norn story answer`) or a check that finishes ends the pause within about a second. A receipt written on another machine arrives with the next tick's sync;
 
 Each tick:
