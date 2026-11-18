@@ -9,7 +9,7 @@ steps:
       Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red
       check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps.
       Run `bun run test` (the unit tier) after each change, and the type check; this slice's `test` check runs
-      only those two: the integration and e2e tiers run in CI, once the story's PR is open, so do not run them
+      only those two: the integration tier runs in CI, once the story's PR is open, so do not run them
       before handing back.
     skills: [norn-implement]
     inputs: [slice, spec, handoff, last_check, last_findings]

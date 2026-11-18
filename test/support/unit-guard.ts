@@ -13,9 +13,9 @@ const ROOT = resolve(import.meta.dir, "..", "..");
 const SPAWNS_ALLOWED = Symbol.for("norn.unit-guard.spawns-allowed");
 
 /**
- * Marks this process as a spawning tier (integration, e2e): the guard passes every call through. Bun 1.3.13's
- * `--parallel` workers load the root bunfig's preloads as well as the `--config` ones, so the integration and
- * e2e configs preload `spawning-tier-preload.ts`, which calls this. The guard reads the flag at each call, so
+ * Marks this process as a spawning tier (integration): the guard passes every call through. Bun 1.3.13's
+ * `--parallel` workers load the root bunfig's preloads as well as the `--config` ones, so the integration
+ * config preloads `spawning-tier-preload.ts`, which calls this. The guard reads the flag at each call, so
  * the order the preloads ran in does not matter.
  */
 export function allowSpawns(on = true): void {

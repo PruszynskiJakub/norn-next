@@ -1,0 +1,67 @@
+import { describe, expect, test } from "bun:test";
+import { configPaths, ExitCode, runCli } from "../../src/index.ts";
+import { HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
+
+const PATHS = configPaths(HOME, ROOT);
+const DIR = `${ROOT}/.agents/workflows`;
+const json = (stdout: string): Record<string, unknown> => Bun.JSONL.parse(stdout)[0] as Record<string, unknown>;
+
+const TIDY = ["name: tidy", "start: work", "steps:", "  work:", "    agent: Do the work.", "    outcomes: { done: $done }", ""].join("\n");
+/** the local tracker names its user, so story create can assign the item without asking git */
+const CONFIG = LOCAL_CONFIG.replace("  intake: { label: norn }", "  intake: { label: norn }\n  user: me@box");
+const tools = (argv: string[]) => (argv[1] === "--version" && ["git", "norn", "claude"].includes(argv[0] as string) ? { stdout: "1.0\n" } : undefined);
+
+function repoWith(files: Record<string, string>) {
+  return machine({ seed: { [PATHS.local]: CONFIG, ...Object.fromEntries(Object.entries(files).map(([f, t]) => [`${DIR}/${f}`, t])) }, script: tools });
+}
+
+describe("the repo's own workflows in .agents/workflows", () => {
+  test("a new repo workflow loads beside the pack's: doctor names it as the repo's, and story create takes it", async () => {
+    const m = repoWith({ "tidy.yaml": TIDY });
+    const doctor = await runCli(["doctor", "--json"], m.io);
+    const check = (json(doctor.stdout).checks as Array<{ name: string; ok: boolean; detail?: string }>).find((c) => c.name === "workflows");
+    expect(check?.ok).toBe(true);
+    expect(check?.detail).toContain("tidy");
+    expect(check?.detail).toContain("(tidy from .agents/workflows/)");
+    expect(check?.detail).toContain("story");
+    const created = await runCli(["story", "create", "Tidy up", "--workflow", "tidy", "--json"], m.io);
+    expect({ exit: created.exit, labels: json(created.stdout).labels }).toEqual({ exit: ExitCode.ok, labels: ["norn", "norn:wf:tidy"] });
+  });
+
+  test("a repo file named like a pack workflow replaces it", async () => {
+    const m = repoWith({ "story.yaml": TIDY.replace("name: tidy", "name: story") });
+    const doctor = await runCli(["doctor", "--json"], m.io);
+    const check = (json(doctor.stdout).checks as Array<{ name: string; detail?: string }>).find((c) => c.name === "workflows");
+    expect(check?.detail).toContain("(story from .agents/workflows/)");
+  });
+
+  test("a broken repo file: a tick refuses naming the repo's path, doctor fails its workflows check, and the other commands still work", async () => {
+    const m = repoWith({ "tidy.yaml": TIDY, "broken.yaml": "name: broken\nsteps: [unclosed\n" });
+    const tick = await runCli(["tick", "--json"], m.io);
+    expect(tick.exit).toBe(ExitCode.refused);
+    const body = json(tick.stdout);
+    expect(body.code).toBe("repo_workflow_invalid");
+    expect(body.error).toContain(".agents/workflows/broken.yaml");
+    expect(body.error).toContain("does not parse");
+    expect(body.error).not.toContain("tidy");
+    expect(body.do_instead).toContain("fix .agents/workflows/broken.yaml");
+
+    const doctor = await runCli(["doctor", "--json"], m.io);
+    const checks = json(doctor.stdout).checks as Array<{ name: string; ok: boolean; code?: string }>;
+    expect(checks.find((c) => c.name === "slots")?.ok).toBe(true);
+    expect(checks.find((c) => c.name === "workflows")).toEqual(expect.objectContaining({ ok: false, code: "repo_workflow_invalid" }));
+
+    expect((await runCli(["config", "show", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    expect((await runCli(["story", "create", "Tidy up", "--workflow", "tidy", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    const asked = await runCli(["story", "create", "Fix it", "--workflow", "broken", "--json"], m.io);
+    expect({ exit: asked.exit, code: json(asked.stdout).code }).toEqual({ exit: ExitCode.refused, code: "unknown_workflow" });
+  });
+
+  test("a broken repo shared file is named for the pack workflow that loads it", async () => {
+    const m = repoWith({ "shared/sync.yaml": "start: sync\nsteps: [unclosed\n" });
+    const tick = await runCli(["tick", "--json"], m.io);
+    const body = json(tick.stdout);
+    expect(body.code).toBe("repo_workflow_invalid");
+    expect(body.error).toContain(".agents/workflows/shared/sync.yaml (workflow story)");
+  });
+});

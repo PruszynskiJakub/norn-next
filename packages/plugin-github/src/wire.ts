@@ -1,0 +1,88 @@
+/**
+ * The shapes `gh --json` and `gh api graphql` answer with, as far as the plugin reads them, and their
+ * mapping onto the contract. Extra fields are allowed (gh adds them over time); a missing or
+ * mistyped one fails validation rather than becoming a wrong fact.
+ */
+import { type ChangeRequest, formatStoryKey, type TrackerItem } from "@norn/plugin-api";
+import { IsoTime, NonEmpty, PosInt } from "@norn/schema";
+import { type Static, type TSchema, Type } from "@sinclair/typebox";
+import { stripMarkers } from "./marker.ts";
+
+export const ISSUE_FIELDS = "number,url,title,body,state,assignees,labels,updatedAt";
+export const PR_FIELDS = "number,url,title,state,isDraft,headRefName,headRefOid,baseRefName,mergedAt,mergeCommit";
+
+const Nullable = <T extends TSchema>(t: T) => Type.Optional(Type.Union([t, Type.Null()]));
+
+export const GhIssue = Type.Object({
+  number: PosInt,
+  url: Type.String(),
+  title: Type.String(),
+  body: Nullable(Type.String()),
+  state: Type.String(),
+  assignees: Type.Array(Type.Object({ login: NonEmpty })),
+  labels: Type.Array(Type.Object({ name: NonEmpty })),
+  updatedAt: IsoTime,
+});
+export type GhIssue = Static<typeof GhIssue>;
+export const GhIssues = Type.Array(GhIssue);
+
+export const GhIssueLabels = Type.Object({ labels: Type.Array(Type.Object({ name: NonEmpty })) });
+export const GhIssueComments = Type.Object({ comments: Type.Array(Type.Object({ body: Nullable(Type.String()), url: Type.Optional(Type.String()) })) });
+
+export const GhLabels = Type.Array(Type.Object({ name: NonEmpty }));
+
+export const GhPr = Type.Object({
+  number: PosInt,
+  url: Type.String(),
+  title: Type.String(),
+  state: Type.String(),
+  isDraft: Type.Boolean(),
+  headRefName: NonEmpty,
+  headRefOid: Type.String(),
+  baseRefName: NonEmpty,
+  mergedAt: Nullable(IsoTime),
+  mergeCommit: Type.Optional(Type.Union([Type.Object({ oid: Type.String() }), Type.Null()])),
+  body: Nullable(Type.String()),
+});
+export type GhPr = Static<typeof GhPr>;
+export const GhPrs = Type.Array(GhPr);
+
+export const GhChecks = Type.Array(Type.Object({ bucket: Type.String() }));
+
+export const GhPrsByBranch = Type.Object({
+  data: Type.Object({
+    repository: Type.Union([Type.Record(Type.String(), Type.Union([Type.Object({ nodes: GhPrs }), Type.Null()])), Type.Null()]),
+  }),
+});
+
+export function toItem(i: GhIssue, keyPrefix: string): TrackerItem {
+  return {
+    id: i.number,
+    key: formatStoryKey(keyPrefix, i.number),
+    title: i.title,
+    body: stripMarkers(i.body ?? ""),
+    open: i.state.toUpperCase() === "OPEN",
+    assignees: i.assignees.map((a) => a.login),
+    labels: i.labels.map((l) => l.name),
+    url: i.url,
+    updated_at: i.updatedAt,
+  };
+}
+
+export function toChange(p: GhPr): ChangeRequest {
+  const s = p.state.toUpperCase();
+  const merged = s === "MERGED";
+  return {
+    id: p.number,
+    url: p.url,
+    state: merged ? "merged" : s === "OPEN" ? "open" : "closed",
+    draft: p.isDraft,
+    head_branch: p.headRefName,
+    base_branch: p.baseRefName,
+    head_sha: p.headRefOid,
+    // the merge facts mean something only once merged; a closed change never carries them
+    ...(merged && p.mergeCommit?.oid ? { merge_sha: p.mergeCommit.oid } : {}),
+    ...(merged && p.mergedAt ? { merged_at: p.mergedAt } : {}),
+    title: p.title,
+  };
+}

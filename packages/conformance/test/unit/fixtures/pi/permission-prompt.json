@@ -1,0 +1,198 @@
+{
+  "scenario": "permission-prompt",
+  "description": "pi has no permission prompt of its own: a permission-gate extension asks in a select dialog before a shell call runs, while a read waits beside it. The gate reads as an ask, answered in the pane.",
+  "derived_from": "Derived, not recorded: the payloads are what norn's pi extension (packages/harness-pi/src/extension.ts) sends for the pi 1.5.2 events docs/extensions.md describes, with the session and tool shapes of the earlier pi adapter's fixtures; the timeline mirrors the claude recording of the same scenario.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "session_start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "hook_event_name": "session_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "reason": "startup"
+      }
+    },
+    {
+      "hook": "before_agent_start",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "hook_event_name": "before_agent_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "message_type": "user",
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool_call",
+      "at": "2026-11-17T10:00:05.000Z",
+      "payload": {
+        "hook_event_name": "tool_call",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_r1",
+        "tool_name": "read",
+        "tool_input": {
+          "path": "package.json"
+        }
+      }
+    },
+    {
+      "hook": "ui_prompt_start",
+      "at": "2026-11-17T10:00:06.000Z",
+      "payload": {
+        "hook_event_name": "ui_prompt_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "kind": "select",
+        "title": "⚠️ Dangerous command:\n\n  rm -rf dist\n\nAllow?",
+        "prompt_seq": "mi3k2x0a-1"
+      }
+    },
+    {
+      "hook": "ui_prompt_end",
+      "at": "2026-11-17T10:02:00.000Z",
+      "payload": {
+        "hook_event_name": "ui_prompt_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12"
+      }
+    },
+    {
+      "hook": "tool_call",
+      "at": "2026-11-17T10:02:00.000Z",
+      "payload": {
+        "hook_event_name": "tool_call",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_b1",
+        "tool_name": "bash",
+        "tool_input": {
+          "command": "rm -rf dist"
+        }
+      }
+    },
+    {
+      "hook": "tool_execution_end",
+      "at": "2026-11-17T10:02:01.000Z",
+      "payload": {
+        "hook_event_name": "tool_execution_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_r1",
+        "tool_name": "read",
+        "is_error": false
+      }
+    },
+    {
+      "hook": "tool_execution_end",
+      "at": "2026-11-17T10:02:02.000Z",
+      "payload": {
+        "hook_event_name": "tool_execution_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_b1",
+        "tool_name": "bash",
+        "is_error": false
+      }
+    },
+    {
+      "hook": "agent_before_settle",
+      "at": "2026-11-17T10:02:10.000Z",
+      "payload": {
+        "hook_event_name": "agent_before_settle",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "stop_reason": "stop",
+        "last_assistant_message": "Cleaned dist."
+      }
+    },
+    {
+      "hook": "agent_settled",
+      "at": "2026-11-17T10:02:11.000Z",
+      "payload": {
+        "hook_event_name": "agent_settled",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "aborted": false
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 3,
+      "now": "2026-11-17T10:00:05.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 4,
+      "now": "2026-11-17T10:00:07.000Z",
+      "expect": {
+        "activity": "asking",
+        "ask": {
+          "question": "⚠️ Dangerous command:\n\n  rm -rf dist\n\nAllow?"
+        },
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 4,
+      "now": "2026-11-17T10:01:30.000Z",
+      "expect": {
+        "activity": "asking",
+        "silent": false,
+        "ask": {
+          "question": "⚠️ Dangerous command:\n\n  rm -rf dist\n\nAllow?"
+        }
+      },
+      "why": "a gate waiting on the person is a reason to be quiet"
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T10:02:00.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pending_tools": 1,
+        "pane_answers": 1
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:02:00.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pending_tools": 2
+      }
+    },
+    {
+      "after": 8,
+      "now": "2026-11-17T10:02:03.000Z",
+      "expect": {
+        "activity": "working",
+        "pending_tools": 0
+      }
+    },
+    {
+      "after": 9,
+      "now": "2026-11-17T10:02:10.000Z",
+      "expect": {
+        "activity": "turn_ended"
+      }
+    }
+  ]
+}

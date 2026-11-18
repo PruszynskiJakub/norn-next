@@ -1,0 +1,195 @@
+{
+  "scenario": "ask-question",
+  "description": "The agent asks through an extension's question tool, which opens a select dialog; the person answers it in the pane.",
+  "derived_from": "Derived, not recorded: the payloads are what norn's pi extension (packages/harness-pi/src/extension.ts) sends for the pi 1.5.2 events docs/extensions.md describes, with the session and tool shapes of the earlier pi adapter's fixtures; the timeline mirrors the claude recording of the same scenario.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "session_start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "hook_event_name": "session_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "reason": "startup"
+      }
+    },
+    {
+      "hook": "before_agent_start",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "hook_event_name": "before_agent_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "message_type": "user",
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool_call",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "hook_event_name": "tool_call",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_ask1",
+        "tool_name": "question",
+        "tool_input": {
+          "question": "Which database should the store use?",
+          "options": [
+            "sqlite",
+            "postgres"
+          ]
+        }
+      }
+    },
+    {
+      "hook": "ui_prompt_start",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "hook_event_name": "ui_prompt_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "kind": "select",
+        "title": "Which database should the store use?",
+        "prompt_seq": "mi3k2x0a-1"
+      }
+    },
+    {
+      "hook": "ui_prompt_end",
+      "at": "2026-11-17T11:06:40.000Z",
+      "payload": {
+        "hook_event_name": "ui_prompt_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12"
+      }
+    },
+    {
+      "hook": "tool_execution_end",
+      "at": "2026-11-17T11:06:40.000Z",
+      "payload": {
+        "hook_event_name": "tool_execution_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_ask1",
+        "tool_name": "question",
+        "is_error": false
+      }
+    },
+    {
+      "hook": "tool_call",
+      "at": "2026-11-17T11:06:45.000Z",
+      "payload": {
+        "hook_event_name": "tool_call",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_02",
+        "tool_name": "edit",
+        "tool_input": {
+          "path": "src/a.ts",
+          "edits": [
+            {
+              "oldText": "a",
+              "newText": "b"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "hook": "tool_execution_end",
+      "at": "2026-11-17T11:06:46.000Z",
+      "payload": {
+        "hook_event_name": "tool_execution_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_02",
+        "tool_name": "edit",
+        "is_error": false
+      }
+    },
+    {
+      "hook": "agent_before_settle",
+      "at": "2026-11-17T11:06:50.000Z",
+      "payload": {
+        "hook_event_name": "agent_before_settle",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "stop_reason": "stop",
+        "last_assistant_message": "Switched the store to postgres."
+      }
+    },
+    {
+      "hook": "agent_settled",
+      "at": "2026-11-17T11:06:51.000Z",
+      "payload": {
+        "hook_event_name": "agent_settled",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "aborted": false
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 4,
+      "now": "2026-11-17T10:00:12.000Z",
+      "expect": {
+        "activity": "asking",
+        "ask": {
+          "question": "Which database should the store use?"
+        },
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 4,
+      "now": "2026-11-17T11:00:00.000Z",
+      "expect": {
+        "activity": "asking",
+        "silent": false,
+        "ask": {
+          "question": "Which database should the store use?"
+        }
+      },
+      "why": "an open ask is a reason to be quiet"
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T11:06:40.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pane_answers": 1,
+        "pending_tools": 1
+      },
+      "why": "the dialog closing answers the ask; the tool that raised it finishes next"
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T11:06:41.000Z",
+      "expect": {
+        "activity": "working",
+        "pane_answers": 1,
+        "pending_tools": 0
+      }
+    },
+    {
+      "after": 10,
+      "now": "2026-11-17T11:06:51.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "pane_answers": 1
+      }
+    }
+  ]
+}

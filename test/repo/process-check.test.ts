@@ -1,4 +1,4 @@
-/** The "process" check (scripts/process-check.ts,.github/workflows/process.yml). */
+/** The "process" check (scripts/process-check.ts, .github/workflows/process.yml). */
 import { describe, expect, test } from "bun:test";
 import { closedInBody, gatherFacts, linkedIssues, type PrFacts, processCheck, runCheck } from "../../scripts/process-check.ts";
 
@@ -55,8 +55,12 @@ describe("(a) norn story branch", () => {
     expect(v).toMatchObject({ ok: false, do_instead: expect.stringContaining("Closes #12") });
     expect(processCheck(pr()).ok).toBe(false);
   });
+  test("norn's story branch norn/gh-<N> passes the same way, closing its issue by URL", () => {
+    expect(processCheck(pr({ head: "norn/gh-12", body: `Summary\n\nCloses https://github.com/${REPO}/issues/12\n\nDelivered by norn (story gh-12).` })).ok).toBe(true);
+    expect(processCheck(pr({ head: "norn/gh-12", body: "Closes #13" }))).toMatchObject({ ok: false, do_instead: expect.stringContaining("Closes #12") });
+  });
   test("slice branches and look-alikes are not story branches", () => {
-    for (const head of ["gh-12/03-add-form", "gh-12", "gh-012-x", "GH-12-x", "gh-12-Fix", "feature/gh-12-x", "gl-12-x"])
+    for (const head of ["gh-12/03-add-form", "gh-12", "gh-012-x", "GH-12-x", "gh-12-Fix", "feature/gh-12-x", "gl-12-x", "norn/gh-12-03", "norn/gh-012", "norn/lt-12", "norn/gh-12/x"])
       expect(processCheck(pr({ head, closing: [12] })).ok).toBe(false);
   });
   test("refuses a story branch from a fork", () => {
@@ -104,9 +108,9 @@ describe("(c) Dependabot and everything else", () => {
 
 describe("installed bundled skill copies", () => {
   const copy = ".agents/skills/norn-review/SKILL.md";
-  test("refuses a story PR that edits an installed norn skill copy, and says to edit the bundled source", () => {
-    const v = processCheck(pr({ closing: [12], files: ["packages/cli/assets/skills/norn-review/SKILL.md", copy] }));
-    expect(v).toMatchObject({ ok: false, error: expect.stringContaining(copy), do_instead: expect.stringContaining("packages/cli/assets/skills/") });
+  test("refuses a story PR that edits a copy of a pack skill, and says to edit the pack's source", () => {
+    const v = processCheck(pr({ closing: [12], files: ["packages/pack-sdlc/assets/skills/norn-review/SKILL.md", copy] }));
+    expect(v).toMatchObject({ ok: false, error: expect.stringContaining(copy), do_instead: expect.stringContaining("packages/pack-sdlc/assets/skills/") });
   });
   test("refuses a bypass PR that edits one too", () => {
     const v = processCheck(

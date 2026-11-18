@@ -1,0 +1,354 @@
+{
+  "SessionStart": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "SessionStart",
+    "source": "startup",
+    "model": "claude-sonnet-4-5"
+  },
+  "UserPromptSubmit": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "Use the norn skill, then run `norn brief`."
+  },
+  "PreToolUse": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "bun test",
+      "description": "Run tests"
+    },
+    "tool_use_id": "toolu_01"
+  },
+  "PostToolUse": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Edit",
+    "tool_input": {
+      "file_path": "/repo/a.ts",
+      "old_string": "a",
+      "new_string": "b"
+    },
+    "tool_response": {
+      "success": true
+    },
+    "tool_use_id": "toolu_02"
+  },
+  "NotificationPermission": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "Notification",
+    "message": "Claude needs your permission to use Bash",
+    "notification_type": "permission_prompt"
+  },
+  "NotificationIdle": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "Notification",
+    "message": "Claude is waiting for your input",
+    "notification_type": "idle_prompt"
+  },
+  "Stop": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "Stop",
+    "stop_hook_active": false,
+    "last_assistant_message": "All tests pass."
+  },
+  "SessionEnd": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "SessionEnd",
+    "reason": "prompt_input_exit"
+  },
+  "StopFailureAuth": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "StopFailure",
+    "error": "authentication_failed",
+    "error_details": "401 Invalid authentication credentials",
+    "last_assistant_message": "API Error: 401"
+  },
+  "PreToolUseWrite": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Write",
+    "tool_input": {
+      "file_path": "/repo/.worktrees/gh-12/src/a.ts",
+      "content": "x"
+    },
+    "tool_use_id": "toolu_03"
+  },
+  "PreToolUseEdit": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Edit",
+    "tool_input": {
+      "file_path": "/repo/.worktrees/gh-12/src/b.ts",
+      "old_string": "a",
+      "new_string": "b"
+    },
+    "tool_use_id": "toolu_04"
+  },
+  "PreToolUseMultiEdit": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "MultiEdit",
+    "tool_input": {
+      "file_path": "/repo/.worktrees/gh-12/src/c.ts",
+      "edits": [
+        {
+          "old_string": "a",
+          "new_string": "b"
+        }
+      ]
+    },
+    "tool_use_id": "toolu_05"
+  },
+  "PreToolUseNotebookEdit": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "NotebookEdit",
+    "tool_input": {
+      "notebook_path": "/repo/.worktrees/gh-12/n.ipynb",
+      "new_source": "print(1)"
+    },
+    "tool_use_id": "toolu_06"
+  },
+  "PreToolUseRead": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Read",
+    "tool_input": {
+      "file_path": "/repo/.worktrees/gh-12/src/a.ts"
+    },
+    "tool_use_id": "toolu_08"
+  },
+  "PostToolUseFailure": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "PostToolUseFailure",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "bun test"
+    },
+    "tool_use_id": "toolu_01",
+    "error": "Exit code 1"
+  },
+  "PreToolUseAsk": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "AskUserQuestion",
+    "tool_use_id": "toolu_09",
+    "tool_input": {
+      "questions": [
+        {
+          "question": "Which database should the cache use?",
+          "header": "Cache",
+          "multiSelect": false,
+          "options": [
+            {
+              "label": "Redis",
+              "description": "in-memory"
+            },
+            {
+              "label": "SQLite",
+              "description": "on disk"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "PostToolUseAsk": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "AskUserQuestion",
+    "tool_use_id": "toolu_09",
+    "tool_input": {
+      "questions": [
+        {
+          "question": "Which database should the cache use?",
+          "header": "Cache",
+          "multiSelect": false,
+          "options": [
+            {
+              "label": "Redis",
+              "description": "in-memory"
+            },
+            {
+              "label": "SQLite",
+              "description": "on disk"
+            }
+          ]
+        }
+      ]
+    },
+    "tool_response": {
+      "answers": {
+        "Which database should the cache use?": "Redis"
+      }
+    }
+  },
+  "PreToolUseSubagent": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Task",
+    "tool_use_id": "toolu_10",
+    "tool_input": {
+      "description": "Spec axis review",
+      "prompt": "Review the diff against the spec",
+      "subagent_type": "general-purpose"
+    }
+  },
+  "PostToolUseSubagent": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Task",
+    "tool_use_id": "toolu_10",
+    "tool_input": {
+      "description": "Spec axis review",
+      "prompt": "Review the diff against the spec",
+      "subagent_type": "general-purpose"
+    },
+    "tool_response": {
+      "content": [
+        {
+          "type": "text",
+          "text": "No findings."
+        }
+      ],
+      "totalDurationMs": 4200
+    }
+  },
+  "PreToolUseBackgroundAgent": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Agent",
+    "tool_use_id": "toolu_11",
+    "tool_input": {
+      "description": "Spec axis review",
+      "prompt": "Review the diff against the spec",
+      "subagent_type": "general-purpose",
+      "run_in_background": true
+    }
+  },
+  "PostToolUseBackgroundAgent": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Agent",
+    "tool_use_id": "toolu_11",
+    "tool_input": {
+      "description": "Spec axis review",
+      "prompt": "Review the diff against the spec",
+      "subagent_type": "general-purpose",
+      "run_in_background": true
+    },
+    "tool_response": {
+      "status": "async_launched",
+      "agentId": "a1",
+      "description": "Spec axis review"
+    }
+  },
+  "SubagentStop": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "SubagentStop",
+    "stop_hook_active": false,
+    "agent_id": "a1",
+    "agent_type": "general-purpose",
+    "agent_transcript_path": "/home/u/.claude/projects/-repo/abc123/subagents/agent-a1.jsonl"
+  },
+  "StopBackground": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "permission_mode": "default",
+    "hook_event_name": "Stop",
+    "stop_hook_active": false,
+    "last_assistant_message": "All tests pass.",
+    "background_tasks": [
+      {
+        "id": "a1",
+        "type": "subagent",
+        "status": "running",
+        "description": "Spec axis review",
+        "agent_type": "general-purpose"
+      }
+    ]
+  },
+  "StopFailureRateLimit": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "StopFailure",
+    "error": "rate_limit",
+    "error_details": "Claude AI usage limit reached|1794920400",
+    "last_assistant_message": "Claude AI usage limit reached|1794920400"
+  },
+  "NotificationElicitation": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "Notification",
+    "message": "MCP server github requests input",
+    "notification_type": "elicitation_dialog"
+  },
+  "PreCompact": {
+    "session_id": "abc123",
+    "transcript_path": "/home/u/.claude/projects/-repo/abc123.jsonl",
+    "cwd": "/repo/.worktrees/gh-12",
+    "hook_event_name": "PreCompact",
+    "trigger": "auto",
+    "custom_instructions": ""
+  }
+}

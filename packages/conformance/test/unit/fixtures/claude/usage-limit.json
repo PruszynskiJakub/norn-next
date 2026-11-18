@@ -1,0 +1,151 @@
+{
+  "scenario": "usage-limit",
+  "description": "The turn stops on a usage limit with a known reset; the session waits for the reset, then carries on.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "SessionStart",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "SessionStart",
+        "source": "startup",
+        "model": "claude-opus-4-5"
+      }
+    },
+    {
+      "hook": "UserPromptSubmit",
+      "at": "2026-11-17T10:00:01.000Z",
+      "env": {
+        "NORN_PROMPT_SOURCE": "brief"
+      },
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Use the norn skill, then run `norn brief`."
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "bun run test",
+          "description": "Run the unit tier"
+        },
+        "tool_use_id": "toolu_01"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:01:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "bun run test",
+          "description": "Run the unit tier"
+        },
+        "tool_response": {
+          "stdout": "ok",
+          "stderr": "",
+          "interrupted": false
+        },
+        "tool_use_id": "toolu_01"
+      }
+    },
+    {
+      "hook": "StopFailure",
+      "at": "2026-11-17T10:01:01.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "StopFailure",
+        "error": "rate_limit",
+        "error_details": "Claude AI usage limit reached|1794920400",
+        "last_assistant_message": "API Error: usage limit"
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T13:00:05.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts",
+          "old_string": "a",
+          "new_string": "b"
+        },
+        "tool_use_id": "toolu_02"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 4,
+      "now": "2026-11-17T10:01:01.000Z",
+      "expect": {
+        "activity": "working"
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T10:01:02.000Z",
+      "expect": {
+        "activity": "limited",
+        "silent": false,
+        "limit": {
+          "kind": "usage",
+          "resets_at": "2026-11-17T13:00:00.000Z"
+        }
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T12:59:59.000Z",
+      "expect": {
+        "activity": "limited",
+        "silent": false,
+        "limit": {
+          "kind": "usage",
+          "resets_at": "2026-11-17T13:00:00.000Z"
+        }
+      },
+      "why": "hours of quiet before the reset are a limit, never a stuck or silent agent"
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T13:01:40.000Z",
+      "expect": {
+        "activity": "working",
+        "silent": true
+      },
+      "why": "once the reset has passed with nothing from the agent, it is quiet for no reason and can be nudged"
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T13:00:06.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "silent": false
+      }
+    }
+  ]
+}

@@ -1,39 +1,26 @@
 # Reference
 
-Every command and flag, every config key, the workflows `norn init` ships and the exit codes. The lists between the two marker comments below are generated from the CLI itself (`bun run docs:emit`), so they match the release this file ships with. What the terms mean is in [Concepts](concepts.md).
+Every command and flag, every config key, the workflows the bundled pack ships and the exit codes. The lists between the two marker comments below are generated from the CLI itself (`bun run docs:emit`), so they match the release this file ships with. What the terms mean is in [Concepts](concepts.md).
 
 ## Output and exit codes
 
-Commands a person or an agent reads (`brief`, `done`, `ask`, `stuck`, `help`, `init`, `doctor`, `config`, `status`, `story list`, `story view`, `run list`, `run view`) print markdown. Every command prints one JSON value instead with `--json`, and the commands a program reads (`tick`, `watch`, `hook`, `sync`, …) always do. Code should branch on the exit code and the `--json` data, never on the markdown.
+Commands a person or an agent reads print markdown. Every command prints one JSON value instead with `--json`; `norn hook` answers its harness in the harness's own format. Code should branch on the exit code and the `--json` data, never on the markdown.
 
-A refusal prints `{error, do_instead}` (as markdown without `--json`): what was refused and what to do instead. The exit code says why: `refused` (3) when a rule says no, `usage` (2) for bad arguments, `corrupt` (4) when a state file fails validation, `busy` (5) when another process holds the lock or the claim, `config` (6) when a config file is wrong. The full list is under [Exit codes](#exit-codes).
-
-A command a person runs that needs the tick lock (`norn story edit --workflow`, `norn story edit --at`, `norn story checkout`, `norn story handoff`, `norn story close`, `norn story reset`, `norn story reopen`, `norn tidy`, and the claim release when `norn watch` stops) waits for a running tick to finish, up to 60 seconds, with one line on stderr naming the tick it waits for, then runs as usual. Only a tick still running after 60 seconds gets it refused, `busy` with code `tick_locked`; Ctrl-C while it waits stops it with nothing changed. `norn tick` and `norn upgrade` refuse a running tick at once, and `norn story edit --auto|--manual` never waits.
+A refusal prints `{error, do_instead, code}` (as markdown without `--json`): what was refused, what to do instead and a stable code. The exit code says why: `refused` (3) when a rule says no, `usage` (2) for bad arguments, `corrupt` (4) when a file norn keeps fails validation, `busy` (5) when another process holds the lock or the claim, `config` (6) when a config file is wrong. The full list is under [Exit codes](#exit-codes).
 
 ## Config
 
-**Config** is optional: a solo developer on GitHub with Claude Code writes none. Each key belongs in one kind of file:
+`norn init` writes the config from what it detects (the tracker, the forge, the executor and the runner; a flag overrides each choice) and runs `norn doctor`. Three files hold it, and every file takes every key:
 
-| File | For | Keys |
-|---|---|---|
-| `~/.norn/config.yaml` | this machine, and your defaults for every repository | machine: `max_agents`, `notify`, `trace.retain` · yours: `mode`, `agent`, `agents.<name>` |
-| `.agents/norn.config.local.yaml` (gitignored) | you, in this repository | `mode`, `agent`, `agents.<name>`: these override the user file |
-| `.agents/norn.config.yaml` (committed) | the team | `provider`, `base_branch`, `workflow`, `slice_workflow`, `record.policy`, `regenerate`, `norn_version` |
-| a workflow file | the workflow | top-level `mode`; `defaults:` with `deadline`, `nudges`, `retries`, `stalled` |
+| File | For |
+|---|---|
+| `<norn home>/config.yaml` | this machine, and your defaults for every repository (`~/.norn`, or `NORN_HOME_DIR`) |
+| `.agents/norn.local.yaml` | you, in this repository: kept out of git, the file `norn init` writes |
+| `.agents/norn.yaml` | the team: committed, written by `norn init --commit` |
 
-For your keys the nearer file wins: local over user over built-in. Maps merge key by key; lists and scalars replace, so `agents: {claude: {model: …}}` keeps Claude's built-in `--permission-mode auto`, while setting `agents.claude.args` replaces that list, and `notify: {ntfy: <url>}` keeps OS notifications. A story's mode is, nearest first: the story's own (`norn story edit --auto|--manual`), its workflow's `mode`, the local file, the user file, then `manual`. A key in the wrong file, or one an older norn used, is refused with the file and key to use instead. `norn config` lists every setting in effect and the file it came from; `norn config set <key> <value>` changes one in the file you name with `--user`, `--local` or `--repo`.
+The nearer file wins: the committed file over the local file over the user file over the built-in defaults. Maps merge key by key; lists and scalars replace. A key norn does not know is refused with the file it is in, never ignored; a slot (`tracker`, `forge`, `store`, `vcs`, an executor's `runner`) also takes the keys of the plugin it names, and that plugin checks them. `norn config show` prints the merged config and the file each key came from; `norn config set <key> <value>` changes one key in the local file, or in the committed file with `--commit` or the user file with `--user`.
 
-`norn_version` is the repo's norn version: `norn init` records it on a repo with no team file (and refuses a team file with no or a pre-0.30 one), and only `norn upgrade` moves it (`norn config set|unset` refuse it). A binary of another minor, or an earlier patch, is refused by every command that acts, and so is a repo that records no `norn_version` (`version_missing`) or one below 0.30 (`version_too_old`); see [Concepts: the repo's norn version](concepts.md#the-repos-norn-version) and [Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team).
-
-`regenerate` maps generated files to the command that writes them, so a base update whose conflicts are all such files needs no agent: norn takes the base's version of each conflicting path, runs the command of every entry whose `paths` match one, and commits the merge with a `Norn-Regenerated: <paths>` trailer; any conflicting path no entry matches goes to `resolve` as before. Each entry is `{ paths: [<glob>…], run: <command>, timeout: <duration> }`: globs are repo-relative (`*` stays in a folder, `**` crosses folders), the command runs with `sh -c` at the root of the story's worktree, and `timeout` defaults to `2m`. The command holds up the tick while it runs, so it must be fast and deterministic: given the same sources it writes the same files. A command that fails or times out, or a path still conflicted after the commands ran, aborts the merge and sends it to `resolve` with the output in the brief. Map only files no person reviews by hand; never golden cases or snapshots that pin what code decides.
-
-```yaml
-regenerate:
-  - { paths: ["packages/schema/json/*.schema.json"], run: bun run schema:emit }
-  - { paths: [docs/reference.md], run: bun run docs:emit, timeout: 1m }
-```
-
-Everything else has no key. The runner is detected: Herdr when norn runs inside Herdr or `herdr` is installed, otherwise headless. GitHub or GitLab is read from the remote URL (`provider` is only for a self-hosted host). The git remote is the one the base branch tracks, else `origin`. Claims are timed from the tick interval (`norn watch --interval`, `norn tick --interval`). The label `norn`, the sync about every 5 minutes, slots 1–9 with ten ports each from 4010, and the 2-minute attended wait are fixed.
+A slot names a plugin with `use`: the bundled ones are listed by `norn plugin list`, and `norn plugin add <spec>` installs another and pins it in the plugin lock. An executor pairs a harness (the agent: `claude`, `pi`) with a runner (where it runs: `headless`, `herdr`); an agent step runs on `executor`, or on the only executor when there is one.
 
 ## Generated reference
 
@@ -41,504 +28,380 @@ Everything else has no key. The runner is detected: Herdr when norn runs inside 
 
 ### Commands
 
-#### Core
-
-##### `norn status`
-
-What needs you, grouped by action, with the command to resolve each item; --history for when items came and went
-
-```sh
-norn status [--json] [--details] [--notes] [--history [--since <iso|duration>]] | norn status --watch [--interval 5s] [--pane]
-```
-
-- `--details`: each item's full text
-- `--notes`: list the open notes, not one summary line
-- `--history [--since <iso|duration>]`: every item that needed you, with when it came and went
-- `--watch`: the live cockpit full screen: act on items by key, q or Esc quits
-- `--interval <duration>`: with --watch: how often it refreshes (default 5s)
-- `--pane`: with --watch: run it in a Herdr pane split below this one
-- `--segment`
-- `--ttl`
-
-##### `norn story` (noun)
-
-The stories of this repository
-
-##### `norn story create`
-
-Create a story's issue on the remote, assigned to you, and take it in
-
-```sh
-norn story create [--title "…"] [--body "…" | --body-file <f>] [--workflow <name>] [--web]
-```
-
-- `--title`: the issue title; prompted at a terminal when left out
-- `--body`: the issue body; at a terminal without --title, written in $EDITOR
-- `--body-file <f>`: read the body from a file
-- `--workflow <name>`: label the issue norn:wf:<name> so intake picks that workflow
-- `--web`: open the remote's new-issue page with the labels filled in; creates nothing
-
-##### `norn story take`
-
-Assign a labelled issue to you, so the next sync takes it in
-
-```sh
-norn story take <story>
-```
-
-##### `norn story list`
-
-Stories, slices, runs and claims at a glance
-
-```sh
-norn story list [--json]
-```
-
-##### `norn story view`
-
-One story: slices with their steps, the PR, open notes, what waits for you; --web opens the PR or issue
-
-```sh
-norn story view [<story|slice>] [--web] [--json]
-```
-
-- `--web`
-
-##### `norn story wait`
-
-Block until a story reaches a step, a gate, an ask, stuck, done or merged; exit 0 met, 7 timed out
-
-```sh
-norn story wait <story|slice> --until <step=<name>|gate|ask|stuck|done|merged> [--timeout <d>] [--interval <d>]
-```
-
-- `--until <condition>`: what to wait for: step=<name>, gate, ask, stuck, done, merged; gate, ask and stuck on a story also hold for its slices
-- `--timeout <d>`: give up after this long (e.g. 30m) and exit 7; default: wait until it holds
-- `--interval <d>`: how often to look again (default 5s)
-
-##### `norn story answer`
-
-Answer the question a unit is parked on; a prompt in an agent's pane gets the keys it expects
-
-```sh
-norn story answer [<story|unit>] "<text>" [--reason "…" --delegated]   (a choice prompt: the option number, e.g. "1")
-```
-
-- `--reason "…"`: why this answer, kept on the answer receipt
-- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason
-
-##### `norn story approve`
-
-Approve the gate a unit waits at
-
-```sh
-norn story approve [<story|slice>] [--reason "…"] [--delegated]
-```
-
-- `--reason <text>`: a comment kept on the approve receipt
-- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason
-
-##### `norn story reject`
-
-Reject the gate a unit waits at, with the reason the next attempt gets
-
-```sh
-norn story reject [<story|slice>] --reason "…" [--delegated]
-```
-
-- `--reason <text>`: required: what failed; the agent sent back gets it
-- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason
-
-##### `norn story update-branch`
-
-Send a waiting story back through its base update: done with an unmerged PR, at a gate or a merge step, or stuck
-
-```sh
-norn story update-branch [<story>]
-```
-
-##### `norn story start`
-
-Open an agent on the step a person starts: a Herdr tab in the unit worktree, or the command to run
-
-```sh
-norn story start [<story|slice>] [--print]
-```
-
-- `--print`: print the start command instead of opening a terminal
-
-##### `norn story chat`
-
-Give a story its own Herdr workspace with an agent to talk it over
-
-```sh
-norn story chat [<story>] [--json]
-```
-
-##### `norn story edit`
-
-Switch a story between auto and manual mode, or choose a unit's workflow
-
-```sh
-norn story edit [<story|slice>] --auto|--manual | --workflow <name> [--at <step>] [--force] [--reason "…" --delegated] | --at <step>
-```
-
-- `--auto`: the heartbeat starts the story's agent steps
-- `--manual`: a person starts the story's agent steps
-- `--workflow <name>`: the unit's workflow: set before it starts; on a started story, the next round's; on a started slice, switched with --at
-- `--at <step>`: with --workflow: the step the new round (story) or the switched slice lands on; alone: move the current round's cursor to that step
-- `--force`: with --workflow on a story (not a slice): end its unfinished round (recorded as ended by you) and start the new one
-- `--reason "…"`: with --workflow on a started story: why this workflow, kept on the round receipt
-- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason
-
-##### `norn story checkout`
-
-Take a story over on this machine: claim it, check out its branches, print the handoff
-
-```sh
-norn story checkout [<story>] [--force]
-```
-
-- `--force`: take over a claim another machine still holds (journaled in the claim and the take receipt)
-
-##### `norn story handoff`
-
-Hand a story over: push branches, handoff and the record, then delete the claim
-
-```sh
-norn story handoff [<story>]
-```
-
-##### `norn story close`
-
-Close a story: push its branches, then remove worktrees, local branches and the claim; the record, issue and PR stay
-
-```sh
-norn story close [<story>] [--yes]
-```
-
-- `--yes`: close without asking (needed under --json or without a terminal)
-
-##### `norn story reopen`
-
-Undo a close: claim the story here, restore its worktrees and put each unit back at its step
-
-```sh
-norn story reopen [<story>]
-```
-
-##### `norn story reset`
-
-Reset a story to before intake: remove its worktrees, local and remote branches, run state, record and claim; the issue stays
-
-```sh
-norn story reset [<story>] [--yes] [--force]
-```
-
-- `--yes`: reset without asking (needed under --json or without a terminal)
-- `--force`: reset a story that holds work: a PR, started slices or changes outside its spec folder
-
-##### `norn run` (noun)
-
-The runs of a unit: its step timeline, one run, why a tick decided what it did, its agent pane; rerun or cancel it
-
-##### `norn run list`
-
-Step timeline of a unit: durations, outcomes, who, reasons; a story with its slices
-
-```sh
-norn run list [<unit>] [--json] [--full] [--events] [--all] [--story-only] [--limit N]
-```
-
-- `--full`: keep reasons whole and list briefings and receipts
-- `--events`: attach the unit's events to each step
-- `--all`: with --events, no-op ticks too
-- `--story-only`: a story without its slices
-- `--limit N`: only the last N steps
-
-##### `norn run view`
-
-One run of a unit: step, attempt, outcome, durations, receipts; --why replays the decision
-
-```sh
-norn run view [<run|unit>] [--why [--tick <tick_id>] [--step <step>] [--attempt <n>] [--transition <step>.<outcome>] [--rule <prefix>]] | norn run view [<unit>] --receipt <receipt_id>
-```
-
-- `--why`: replay decide on the recorded tick and show the rule that fired and what triggered it
-- `--tick <tick_id>`: with --why: that tick
-- `--step <step>`: with --why: decisions about that step
-- `--attempt <n>`: with --why: that attempt
-- `--transition <step>.<outcome>`: with --why: the decision that took that edge
-- `--rule <prefix>`: with --why: decisions by rules with that prefix
-- `--receipt <id>`: the decision that applied that receipt (a note's inbox item)
-
-##### `norn run attach`
-
-Focus the Herdr agent pane of a unit's live run; --next: the oldest one waiting for you
-
-```sh
-norn run attach [<unit>] | norn run attach --next
-```
-
-- `--next`: the agent pane of the oldest Your turn item, without prompting
-
-##### `norn run rerun`
-
-Resume a stuck, parked or gate-waiting unit in a fresh session, optionally --step elsewhere and --reset counters
-
-```sh
-norn run rerun [<unit>] [--step <step>] [--reset <counter>]… [--reason "…"] [--delegated]
-```
-
-- `--step <step>`: move the unit to another step of its pinned workflow
-- `--reset <counter>`: reset a workflow counter to 0 (repeatable)
-- `--reason "…"`: why, journaled in the receipt
-- `--delegated`: a supervisor decides on your behalf: recorded apart from your own decisions, needs --reason
-
-##### `norn run cancel`
-
-Stop a unit's running agent session; the story and its work stay (rerun resumes it)
-
-```sh
-norn run cancel [<unit>]
-```
+Every command also takes `--json` (one JSON value instead of markdown) and `--help`.
 
 #### Setup
 
 ##### `norn init`
 
-Set up norn in this repository: config, workflows, skills, hooks
+Set up norn in this repo: detect the tracker, forge and executor, write the config, run doctor
 
 ```sh
-norn init [--json] [--hook-command <cmd>]
+norn init [--tracker <name>] [--forge <name>] [--store <name>] [--executor <harness>] [--runner <name>] [--mode auto|manual] [--commit] [--yes]
 ```
 
-- `--hook-command`
-
-##### `norn upgrade`
-
-Move this repo's norn_version, bundled skills and workflow wording to this norn, from norn 0.30 on, staged for you to commit
-
-```sh
-norn upgrade [--json]
-```
+- `--tracker <name>`: the tracker plugin (detected: github when origin is on GitHub and gh is present, else local)
+- `--forge <name>`: the forge plugin (detected: github with the github tracker, else none)
+- `--store <name>`: where run state lives (default local)
+- `--executor <harness>`: the default executor's harness (detected: claude when it is on PATH, else pi when it is)
+- `--runner <name>`: where agents run (default headless; herdr when inside herdr and asked)
+- `--mode auto|manual`: how agent steps start: auto on their own, manual when a person runs norn run start (default auto with the headless runner, else manual)
+- `--commit`: write the committed config (.agents/norn.yaml, team mode) instead of the repo-local one (.agents/norn.local.yaml)
+- `--yes`: take every detected choice without asking
 
 ##### `norn doctor`
 
-Check agents, hooks, skills, remote auth and runner on this machine, and the repo workflows and config
+Check the config, plugins, workflows, harness hooks and tools this repo needs
 
 ```sh
-norn doctor [--repo] [--live] [--json]
+norn doctor [--repo]
 ```
 
-- `--repo`: check only the repo: its norn version, bundled skills, workflows and config; no agent, runner or remote needed (CI, a test check)
-- `--live`: also run one cheap headless test turn per agent
+- `--repo`: check only the repo's config, plugins, slots and workflows; no hooks or tools (CI)
 
 ##### `norn config` (noun)
 
-Show the resolved config; set or unset one value in the user, local or team file
-
-##### `norn config list`
-
-Show the resolved config and which file set each value
-
-```sh
-norn config list [--json]
-```
+Read and change the config
 
 ##### `norn config get`
 
-Show one setting, or every setting under a key, and which file set it
+Print one config key of the merged config
 
 ```sh
-norn config get <key> [--json]
+norn config get <key>
 ```
 
 ##### `norn config set`
 
-Set one value in the user, local or repo config file
+Set one config key in the repo-local file (the committed one with --commit)
 
 ```sh
-norn config set <key> <value> [--user|--local|--repo] [--json]
+norn config set <key> [<value>] [--commit] [--user] [--unset]
 ```
 
-- `--user`: edit ~/.norn/config.yaml (this machine, your defaults)
-- `--local`: edit .agents/norn.config.local.yaml (you, in this repo)
-- `--repo`: edit .agents/norn.config.yaml (the team's, committed)
+- `--commit`: write the committed config (.agents/norn.yaml)
+- `--user`: write the user config (<norn home>/config.yaml)
+- `--unset`: remove the key instead of setting it
 
-##### `norn config unset`
+##### `norn config show`
 
-Remove one value from the user, local or repo config file
+Print the merged config and which file set each key
 
 ```sh
-norn config unset <key> [--user|--local|--repo] [--json]
+norn config show
 ```
 
-- `--user`: edit ~/.norn/config.yaml (this machine, your defaults)
-- `--local`: edit .agents/norn.config.local.yaml (you, in this repo)
-- `--repo`: edit .agents/norn.config.yaml (the team's, committed)
+##### `norn plugin` (noun)
 
-##### `norn uninstall`
+Install, list, update and remove plugins
 
-Remove norn-owned hooks and skills; keep config, workflows and specs
+##### `norn plugin add`
+
+Install a plugin (npm spec, git URL or local path) and pin it in the lock
 
 ```sh
-norn uninstall
+norn plugin add <spec>
 ```
 
-#### Background
+##### `norn plugin list`
+
+List the bundled and installed plugins and what each provides
+
+```sh
+norn plugin list
+```
+
+##### `norn plugin remove`
+
+Unpin an installed plugin from this repo's lock
+
+```sh
+norn plugin remove <name>
+```
+
+##### `norn plugin update`
+
+Update an installed plugin to the newest version its spec allows
+
+```sh
+norn plugin update <name>
+```
+
+#### A person's commands
+
+##### `norn status`
+
+Show every story and unit, read-only
+
+```sh
+norn status
+```
+
+##### `norn story` (noun)
+
+Stories: list, view, create, the person's decisions, the next round, taking one to this machine, and updating a finished one's branch
+
+##### `norn story list`
+
+List the stories norn tracks
+
+```sh
+norn story list
+```
+
+##### `norn story view`
+
+Show one story: its units, runs, gates and asks
+
+```sh
+norn story view <key>
+```
+
+##### `norn story create`
+
+Create a tracker item with the intake label (local tracker)
+
+```sh
+norn story create <title> [--body <text>] [--workflow <name>]
+```
+
+- `--body <text>`: the item's body
+- `--workflow <name>`: the workflow the story takes at intake
+
+##### `norn story approve`
+
+Approve the gate a story waits at
+
+```sh
+norn story approve <key> [--gate <step>] [--reason <text>]
+```
+
+- `--gate <step>`: the gate step, when the story waits on several
+- `--reason <text>`: a comment kept on the decision
+
+##### `norn story reject`
+
+Reject the gate a story waits at, with the reason the next attempt gets
+
+```sh
+norn story reject <key> --reason <text> [--gate <step>]
+```
+
+- `--gate <step>`: the gate step, when the story waits on several
+- `--reason <text>`: required: what failed; the agent sent back gets it
+
+##### `norn story answer`
+
+Answer the question a story's agent asked
+
+```sh
+norn story answer <key> <text>
+```
+
+##### `norn story round`
+
+Start a story's next round on a workflow
+
+```sh
+norn story round <key> --workflow <name> [--at <step>] [--force] [--reason <text>]
+```
+
+- `--workflow <name>`: the workflow the round runs, pinned as it loads now
+- `--at <step>`: the step the round starts at (default: the workflow's start)
+- `--force`: end the round still under way first
+- `--reason <text>`: why, kept on the record
+
+##### `norn story take`
+
+Take a story's claim to this machine, so its next tick carries the story on
+
+```sh
+norn story take <key> [--force] [--reason <text>]
+```
+
+- `--force`: take over a claim another machine holds, live or expired
+- `--reason <text>`: why, kept on the record
+
+##### `norn story update-branch`
+
+Merge the base into a finished story's branch and push it, for its open change
+
+```sh
+norn story update-branch <key> [--reason <text>]
+```
+
+- `--reason <text>`: why, kept on the record
+
+##### `norn story close`
+
+Close a story and stop its runs
+
+```sh
+norn story close <key>
+```
+
+##### `norn run` (noun)
+
+Runs: start one manual mode holds, stop a live one, run a step again
+
+##### `norn run start`
+
+Start the agent of a step manual mode holds
+
+```sh
+norn run start <unit>
+```
+
+##### `norn run stop`
+
+Stop a unit's live run
+
+```sh
+norn run stop <unit>
+```
+
+##### `norn run rerun`
+
+Run a unit's step again, or move it to another step, counters reset
+
+```sh
+norn run rerun <unit> [--step <step>] [--reset <counter>]... [--reason <text>]
+```
+
+- `--step <step>`: the step of the unit's pinned workflow to run (default: the step it is at)
+- `--reset <counter>`: set a counter of the workflow back to 0 (repeatable)
+- `--reason <text>`: why, kept on the record
+
+#### Background: run by a person, cron or a terminal multiplexer
 
 ##### `norn watch`
 
-Run ticks in a loop; a clean exit releases held claims
+Tick on an interval until a signal stops it
 
 ```sh
-norn watch [--interval 30s] [--max-ticks N] [--keep-claims] [--human]
+norn watch [--interval <duration>] [--max-ticks <n>]
 ```
 
-- `--interval`
-- `--max-ticks`
-- `--keep-claims`
-- `--human`
-
-##### `norn sync`
-
-Sync the remote now and take in new stories
-
-```sh
-norn sync
-```
-
-##### `norn tidy`
-
-Report or clean orphan worktrees, branches, stale leases, receipt reservations, Herdr panes of runs that reported done, stopped base-branch records whose story is gone, and trace days, hook files, briefings, transcripts, old session logs, cleared rejected mailbox receipts and records set aside as superseded older than trace.retain
-
-```sh
-norn tidy [--dry-run] [--retain <duration>]
-```
-
-- `--dry-run`
-- `--retain`
-
-#### Run by watch, cron or Herdr, not by hand
+- `--interval <duration>`: between ticks, as 30s or 2m (default 30s)
+- `--max-ticks <n>`: stop after this many ticks
 
 ##### `norn tick`
 
-One heartbeat pass: observe, decide, act, log
+Run one tick: read facts, decide, act
 
 ```sh
-norn tick [--sync | --offline] [--interval 30s]
+norn tick
 ```
-
-- `--interval`: how often this tick runs (cron): recorded for liveness and claim timing
-- `--sync`
-- `--offline`
 
 #### Agent protocol: the only commands an agent runs
 
 ##### `norn brief`
 
-Brief the agent on the current step of this worktree's unit; starts the run in manual mode
+Print the brief of the step this agent runs
 
 ```sh
-norn brief [--json]
+norn brief
 ```
 
 ##### `norn done`
 
-Report that the current step finished with a declared outcome; then end your turn
+Report the step done with an outcome
 
 ```sh
-norn done <outcome> --handoff "…" [--findings <file>] [--evidence <dir>] [--criteria <file>] [--note "…" [--note-criterion <id>]]…
+norn done <outcome> [--note <text>] [--report-id <id>]
 ```
 
-- `--handoff`
-- `--findings`
-- `--evidence`
-- `--criteria`
-- `--note`
-- `--note-criterion`
+- `--note <text>`: what the next step should know
+- `--report-id <id>`: the report's id; a retry with the same id records it once
 
 ##### `norn ask`
 
-Report that the step needs a person's answer to continue; then end your turn
+Ask the person a question and wait for the answer
 
 ```sh
-norn ask "<question>" [--option "<a>" --option "<b>"]
+norn ask <question> [--report-id <id>]
 ```
 
-- `--option`
+- `--report-id <id>`: the report's id; a retry with the same id records it once
 
 ##### `norn stuck`
 
-Report that the step cannot continue; then end your turn
+Report the step stuck, with the reason
 
 ```sh
-norn stuck "<reason>"
+norn stuck <reason> [--report-id <id>]
 ```
 
-#### Called by the agent's hooks, not by hand
+- `--report-id <id>`: the report's id; a retry with the same id records it once
+
+#### Called by the harness's hooks, not by hand
 
 ##### `norn hook`
 
-Agent hook entry point: record a lifecycle fact; refuse an unreported turn end or a tool call that breaks a hard rule
+Answer a harness hook: the payload on stdin, the harness's reply on stdout
 
 ```sh
-norn hook <event> [--agent claude]  (payload JSON on stdin)
-```
-
-- `--agent`
-
-#### Started by a tick, not by hand
-
-##### `norn check-run`
-
-Run a check step a tick started, and write its receipt; a tick starts it
-
-```sh
-norn check-run <run_id>
+norn hook <harness> <hook>
 ```
 
 #### Other
 
 ##### `norn help`
 
-List commands, and who runs each: a person or the agent
+Show every command, or one command's usage
 
 ```sh
-norn help [--all] [<command> | <noun> [<verb>]]
+norn help [<command>]
 ```
-
-- `--all`
 
 ### Config keys
 
-| Key | File | Type | Built-in default |
-|---|---|---|---|
-| `max_agents` | user | integer 1–9 | `9` |
-| `notify.os` | user | boolean | `true` |
-| `notify.ntfy` | user | URL | none |
-| `notify.webhook` | user | URL | none |
-| `trace.retain` | user | duration | `"14d"` |
-| `mode` | user, local | `"manual"` or `"auto"` | `"manual"` |
-| `agent` | user, local | `"claude"` or `"codex"` or `"opencode"` or `"gemini"` | `"claude"` |
-| `agents.claude.model` | user, local | string | none |
-| `agents.claude.args` | user, local | list of strings | `["--permission-mode","auto"]` |
-| `agents.codex.model` | user, local | string | none |
-| `agents.codex.args` | user, local | list of strings | none |
-| `agents.opencode.model` | user, local | string | none |
-| `agents.opencode.args` | user, local | list of strings | none |
-| `agents.gemini.model` | user, local | string | none |
-| `agents.gemini.args` | user, local | list of strings | none |
-| `provider` | team | `"gh"` or `"glab"` | derived from the remote URL |
-| `base_branch` | team | string or null | derived: the remote's default branch |
-| `workflow` | team | string | `"triage"` |
-| `slice_workflow` | team | string | `"slice"` |
-| `norn_version` | team | string | `null` |
-| `record.policy` | team | `"local"` or `"remote"` | `"local"` |
-| `regenerate` | team | list of maps | none |
+Every file takes every key: the user file, the repo-local file and the committed file, the nearer winning.
+
+| Key | Type | Default |
+|---|---|---|
+| `format` | `1` | `1` |
+| `tracker.use` | string | none |
+| `tracker.intake.label` | string | none |
+| `tracker.intake.assignee` | string or null | `"me"` |
+| `forge.use` | string | none |
+| `store.use` | string | none |
+| `vcs.use` | string | `"git"` |
+| `executors.<name>.harness` | string | none |
+| `executors.<name>.runner` | string or map | none |
+| `executors.<name>.runner.use` | string | none |
+| `executors.<name>.model` | string | none |
+| `executors.<name>.args` | list of strings | none |
+| `executor` | string | derived: the only executor |
+| `packs` | list of strings (one) | `["sdlc"]` |
+| `plugins.<name>` | string | none |
+| `base` | string | `"main"` |
+| `base_ref` | string | derived: `base` |
+| `holder` | string | derived: user@host |
+| `kernel.mode` | `"manual"` or `"auto"` | `"manual"` |
+| `kernel.workflow` | string | `"story"` |
+| `kernel.slice_workflow` | string | `"slice"` |
+| `kernel.intake_workflow_label_prefix` | string | `"norn:wf:"` |
+| `kernel.max_agents` | integer ≥ 1 | `9` |
+| `kernel.max_nudges` | integer ≥ 0 | `2` |
+| `kernel.max_retries` | integer ≥ 0 | `1` |
+| `kernel.silent_after` | duration | `"15m"` |
+| `kernel.deadline` | duration or `"none"` | `"1h"` |
+| `kernel.claim_ttl` | duration | `"10m"` |
+| `kernel.claim_renew_before` | duration | `"400s"` |
+| `kernel.lock_stale` | duration | `"10m"` |
+| `kernel.counters.check_fail` | integer ≥ 1 | `5` |
+| `kernel.counters.gate_reject` | integer ≥ 1 | `2` |
+| `kernel.counters.conflict` | integer ≥ 1 | `2` |
+| `kernel.counters.stale` | integer ≥ 1 | `10` |
+| `kernel.counters.agent_back` | integer ≥ 1 | `3` |
+| `trace.retain` | duration or `"keep"` | `"7d"` |
+
+Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner` take the keys of the plugin they name; that plugin checks them.
 
 ### Shipped workflows
+
+The `sdlc` pack's workflows:
 
 - `quick`: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
 - `refinement`: Agree a story's spec and plan with a person, against the current base; no code.
@@ -549,15 +412,15 @@ norn help [--all] [<command> | <noun> [<verb>]]
 
 ### Exit codes
 
-| Code | Name |
-|---|---|
-| 0 | `ok` |
-| 1 | `error` |
-| 2 | `usage` |
-| 3 | `refused` |
-| 4 | `corrupt` |
-| 5 | `busy` |
-| 6 | `config` |
-| 7 | `timeout` |
+| Code | Name | Meaning |
+|---|---|---|
+| 0 | `ok` | done |
+| 1 | `error` | an unexpected failure: a bug or an IO error |
+| 2 | `usage` | bad arguments |
+| 3 | `refused` | a rule says no; `do_instead` says what would succeed |
+| 4 | `corrupt` | a file norn keeps failed validation |
+| 5 | `busy` | another process holds the lock or the claim |
+| 6 | `config` | a config file a person wrote needs fixing |
+| 7 | `timeout` | a wait ran out of time before its condition held |
 
 <!-- norn:reference:end -->

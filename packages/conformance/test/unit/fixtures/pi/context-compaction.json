@@ -1,0 +1,162 @@
+{
+  "scenario": "context-compaction",
+  "description": "pi compacts the context on an overflow in the middle of a run and retries; the run goes on and nothing reads as idle.",
+  "derived_from": "Derived, not recorded: the payloads are what norn's pi extension (packages/harness-pi/src/extension.ts) sends for the pi 1.5.2 events docs/extensions.md describes, with the session and tool shapes of the earlier pi adapter's fixtures; the timeline mirrors the claude recording of the same scenario.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "session_start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "hook_event_name": "session_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "reason": "startup"
+      }
+    },
+    {
+      "hook": "before_agent_start",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "hook_event_name": "before_agent_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "message_type": "user",
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool_call",
+      "at": "2026-11-17T10:00:05.000Z",
+      "payload": {
+        "hook_event_name": "tool_call",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_01",
+        "tool_name": "bash",
+        "tool_input": {
+          "command": "bun run test"
+        }
+      }
+    },
+    {
+      "hook": "tool_execution_end",
+      "at": "2026-11-17T10:00:06.000Z",
+      "payload": {
+        "hook_event_name": "tool_execution_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_01",
+        "tool_name": "bash",
+        "is_error": false
+      }
+    },
+    {
+      "hook": "session_compact",
+      "at": "2026-11-17T10:00:30.000Z",
+      "payload": {
+        "hook_event_name": "session_compact",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "reason": "overflow"
+      }
+    },
+    {
+      "hook": "tool_call",
+      "at": "2026-11-17T10:00:35.000Z",
+      "payload": {
+        "hook_event_name": "tool_call",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_02",
+        "tool_name": "edit",
+        "tool_input": {
+          "path": "src/a.ts",
+          "edits": [
+            {
+              "oldText": "a",
+              "newText": "b"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "hook": "tool_execution_end",
+      "at": "2026-11-17T10:00:36.000Z",
+      "payload": {
+        "hook_event_name": "tool_execution_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_02",
+        "tool_name": "edit",
+        "is_error": false
+      }
+    },
+    {
+      "hook": "agent_before_settle",
+      "at": "2026-11-17T10:00:40.000Z",
+      "payload": {
+        "hook_event_name": "agent_before_settle",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "stop_reason": "stop",
+        "last_assistant_message": "Done."
+      }
+    },
+    {
+      "hook": "agent_settled",
+      "at": "2026-11-17T10:00:41.000Z",
+      "payload": {
+        "hook_event_name": "agent_settled",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "aborted": false
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 5,
+      "now": "2026-11-17T10:00:31.000Z",
+      "expect": {
+        "activity": "working",
+        "silent": false,
+        "compactions": 1
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:00:35.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "compactions": 1
+      }
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T10:00:37.000Z",
+      "expect": {
+        "activity": "working",
+        "compactions": 1
+      }
+    },
+    {
+      "after": 8,
+      "now": "2026-11-17T10:00:40.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "compactions": 1
+      }
+    }
+  ]
+}

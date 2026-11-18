@@ -1,0 +1,183 @@
+{
+  "scenario": "logged-out-login-nudge",
+  "description": "The turn fails on a lost login; the person runs /login in the pane and norn nudges the agent, which carries on.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "SessionStart",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "SessionStart",
+        "source": "startup",
+        "model": "claude-opus-4-5"
+      }
+    },
+    {
+      "hook": "UserPromptSubmit",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Use the norn skill, then run `norn brief`."
+      },
+      "env": {
+        "NORN_PROMPT_SOURCE": "brief"
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "ls"
+        },
+        "tool_use_id": "toolu_01"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "ls"
+        },
+        "tool_response": {
+          "stdout": "a",
+          "stderr": "",
+          "interrupted": false
+        },
+        "tool_use_id": "toolu_01"
+      }
+    },
+    {
+      "hook": "StopFailure",
+      "at": "2026-11-17T10:00:20.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "StopFailure",
+        "error": "authentication_failed",
+        "error_details": "401 Invalid authentication credentials",
+        "last_assistant_message": "API Error: 401"
+      }
+    },
+    {
+      "hook": "UserPromptSubmit",
+      "at": "2026-11-17T10:30:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "go on"
+      },
+      "env": {
+        "NORN_PROMPT_SOURCE": "nudge"
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:30:05.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts",
+          "old_string": "a",
+          "new_string": "b"
+        },
+        "tool_use_id": "toolu_02"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:30:06.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts",
+          "old_string": "a",
+          "new_string": "b"
+        },
+        "tool_response": {
+          "success": true
+        },
+        "tool_use_id": "toolu_02"
+      }
+    },
+    {
+      "hook": "Stop",
+      "at": "2026-11-17T10:30:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "Stop",
+        "stop_hook_active": false,
+        "last_assistant_message": "Done."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 5,
+      "now": "2026-11-17T10:25:00.000Z",
+      "expect": {
+        "activity": "asking",
+        "silent": false,
+        "ask": {
+          "question": "agent logged out: run /login in the pane"
+        }
+      },
+      "why": "a logged-out agent cannot act until a person logs it in"
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:30:01.000Z",
+      "expect": {
+        "activity": "working",
+        "pending_tools": 0
+      },
+      "why": "a prompt norn sends after /login starts a new turn, which closes the ask"
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T10:30:05.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pending_tools": 1
+      }
+    },
+    {
+      "after": 9,
+      "now": "2026-11-17T10:30:11.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "last_message": "Done."
+      }
+    }
+  ]
+}

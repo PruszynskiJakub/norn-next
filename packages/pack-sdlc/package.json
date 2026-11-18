@@ -1,0 +1,16 @@
+{
+  "name": "@norn/pack-sdlc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@norn/plugin-api": "workspace:*"
+  },
+  "devDependencies": {
+    "@norn/kernel": "workspace:*",
+    "@norn/runtime": "workspace:*",
+    "@norn/vcs-git": "workspace:*",
+    "yaml": "^2.8.1"
+  }
+}

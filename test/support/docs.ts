@@ -22,9 +22,9 @@ export function textFiles(dir: string, exts: string[]): string[] {
   });
 }
 
-/** Docs for people: the README, CONTRIBUTING, everything under docs/ and the Herdr plugin's README. */
+/** Docs for people: the README, CONTRIBUTING and everything under docs/. */
 export function userDocs(root: string): string[] {
-  return [join(root, "README.md"), join(root, "CONTRIBUTING.md"), ...textFiles(join(root, "docs"), [".md"]), join(root, "plugins", "herdr", "README.md")];
+  return [join(root, "README.md"), join(root, "CONTRIBUTING.md"), ...textFiles(join(root, "docs"), [".md"])];
 }
 
 /** Every doc a person or agent reads about norn: the user docs and AGENTS.md. */

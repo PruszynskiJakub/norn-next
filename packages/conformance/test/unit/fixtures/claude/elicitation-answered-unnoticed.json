@@ -1,0 +1,164 @@
+{
+  "scenario": "elicitation-answered-unnoticed",
+  "description": "An MCP elicitation dialog is answered in the pane but no answer notification arrives; the agent requesting its next tool shows the dialog is over.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "SessionStart",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "SessionStart",
+        "source": "startup",
+        "model": "claude-opus-4-5"
+      }
+    },
+    {
+      "hook": "UserPromptSubmit",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Use the norn skill, then run `norn brief`."
+      },
+      "env": {
+        "NORN_PROMPT_SOURCE": "brief"
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "mcp__github__create_issue",
+        "tool_input": {
+          "title": "Flaky test",
+          "body": "..."
+        },
+        "tool_use_id": "toolu_m1"
+      }
+    },
+    {
+      "hook": "Notification",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "Notification",
+        "message": "MCP server github requests input",
+        "notification_type": "elicitation_dialog"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:20:01.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "mcp__github__create_issue",
+        "tool_input": {
+          "title": "Flaky test",
+          "body": "..."
+        },
+        "tool_response": {
+          "number": 42
+        },
+        "tool_use_id": "toolu_m1"
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:20:05.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "bun run test"
+        },
+        "tool_use_id": "toolu_b1"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:20:30.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "bun run test"
+        },
+        "tool_response": {
+          "stdout": "ok",
+          "stderr": "",
+          "interrupted": false
+        },
+        "tool_use_id": "toolu_b1"
+      }
+    },
+    {
+      "hook": "Stop",
+      "at": "2026-11-17T10:20:35.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "Stop",
+        "stop_hook_active": false,
+        "last_assistant_message": "Filed #42 and the tests pass."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 4,
+      "now": "2026-11-17T10:15:00.000Z",
+      "expect": {
+        "activity": "asking",
+        "ask": {
+          "question": "MCP server github requests input"
+        }
+      }
+    },
+    {
+      "after": 5,
+      "now": "2026-11-17T10:20:02.000Z",
+      "expect": {
+        "activity": "asking",
+        "pending_tools": 0
+      },
+      "why": "the call the dialog was raised during finishing proves nothing about the dialog"
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:20:06.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "pending_tools": 1
+      },
+      "why": "the agent acting again shows the dialog was answered"
+    },
+    {
+      "after": 8,
+      "now": "2026-11-17T10:20:36.000Z",
+      "expect": {
+        "activity": "turn_ended"
+      }
+    }
+  ]
+}

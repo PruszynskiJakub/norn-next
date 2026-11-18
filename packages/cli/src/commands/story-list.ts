@@ -1,20 +1,35 @@
 /**
- * `norn story list [--json]`: stories, slices, runs and recently done units from
- * @norn/view, as a table; `--json` for data.
+ * `norn story list`: list the stories norn tracks, one line each, read-only.
  */
-import { formatStatus } from "@norn/view";
 import { defineCommand } from "../command.ts";
-import { rendered } from "../output.ts";
-import { projectView } from "../runtime/human.ts";
+import { rendered, tableCell } from "../output.ts";
+import { loadProjectView, type StoryView } from "../views.ts";
+
+const where = (s: StoryView): string => {
+  const own = s.units.find((u) => u.id === s.key) ?? s.units[0];
+  if (!own?.step) return "not started";
+  return own.ended ? `ended ${own.ended}` : own.step;
+};
 
 export const storyListCommand = defineCommand({
   name: "story list",
-  version: "reads",
-  summary: "Stories, slices, runs and claims at a glance",
-  usage: "norn story list [--json]",
-  markdown: true,
+  summary: "List the stories norn tracks",
+  usage: "norn story list",
   async run(ctx) {
-    const view = await projectView(ctx);
-    return rendered(view, formatStatus(view));
+    const { stories, problems } = await loadProjectView(await ctx.runtimeEnv());
+    const list = stories.map((s) => ({
+      key: s.key,
+      title: s.title,
+      step: where(s),
+      units: s.units.length,
+      waiting: s.units.filter((u) => u.waiting).length,
+      claim: s.claim?.holder ?? null,
+      change: s.change,
+    }));
+    const md =
+      list.length === 0
+        ? "No stories yet."
+        : ["| story | title | step | waiting | claim |", "| --- | --- | --- | --- | --- |", ...list.map((s) => `| ${s.key} | ${tableCell(s.title ?? "")} | ${s.step} | ${s.waiting} | ${s.claim ?? ""} |`)].join("\n");
+    return rendered({ stories: list, problems }, md);
   },
 });

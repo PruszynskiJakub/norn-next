@@ -46,22 +46,21 @@ The version from Rework, else the one in `## Version`, else your proposal. Befor
 
 - `version` in `packages/cli/package.json`.
 - The README release badge: `badge/release-vX.Y.Z-blue` and its alt text `Release vX.Y.Z`.
-- `norn_version: X.Y.Z` in `.agents/norn.config.yaml`: edit the line in place so the comments stay. Once the PR merges, `main` asks for exactly the binary it publishes.
 
-Edit by hand, never with `norn upgrade`: it runs only in the main checkout, and the norn running this step is the release before this one.
+The version in `packages/cli/package.json` is what tells CI's released-norn check that this PR is a release.
 
 ## 6. Refresh the bundled skills
 
-`.agents/skills/norn*` are copies of `packages/cli/assets/skills/norn*` and must match them in the same diff as the bump (B27). From the worktree root:
+`.agents/skills/norn*` are copies of `packages/pack-sdlc/assets/skills/norn*` and must match them in the same diff as the bump (B27). From the worktree root:
 
 ```sh
-for src in packages/cli/assets/skills/norn*/; do
+for src in packages/pack-sdlc/assets/skills/norn*/; do
   name=$(basename "$src")
   rm -rf ".agents/skills/$name" && cp -R "$src" ".agents/skills/$name"
   [ -e ".claude/skills/$name" ] || ln -s "../../.agents/skills/$name" ".claude/skills/$name"
 done
 for dst in .agents/skills/norn*/; do
-  [ -d "packages/cli/assets/skills/$(basename "$dst")" ] || echo "no longer bundled: $dst"
+  [ -d "packages/pack-sdlc/assets/skills/$(basename "$dst")" ] || echo "no longer bundled: $dst"
 done
 git status --short .agents/skills .claude/skills
 ```
@@ -78,13 +77,13 @@ Only `norn`-prefixed folders: `release`, `release-start` and `issue` are this re
 
 ## 9. Report
 
-`norn done done --handoff "Propose X.Y.Z: <reason>. <a> Added, <c> Changed, <f> Fixed; omitted #.., #.."`, or `"Apply X.Y.Z (from <Rework | issue>). …"` for a version the person gave.
+`norn done done --note "Propose X.Y.Z: <reason>. <a> Added, <c> Changed, <f> Fixed; omitted #.., #.."`, or `"Apply X.Y.Z (from <Rework | issue>). …"` for a version the person gave.
 
 ## Rework with another version
 
-Change the section heading, the three bumps, `pr.md` and the issue title to it; `git grep` the old version in those files so none is left.
+Change the section heading, the two bumps, `pr.md` and the issue title to it; `git grep` the old version in those files so none is left.
 
 ## Rules
 
-- Change only `CHANGELOG.md`, `packages/cli/package.json`, `README.md`, the `norn_version` line of `.agents/norn.config.yaml`, the `norn*` folders of `.agents/skills/` and their `.claude/skills/` links, and, in the spec folder, `pr.md` and the handoff.
+- Change only `CHANGELOG.md`, `packages/cli/package.json`, `README.md`, the `norn*` folders of `.agents/skills/` and their `.claude/skills/` links, and, in the spec folder, `pr.md` and the handoff.
 - Never tag, publish or push: merging the release PR does that in CI.

@@ -4,77 +4,51 @@ What norn does not do yet, what has not been proven in real use, and the limits 
 
 ## Proven envelope
 
-Trustworthy today:
-- One person, Claude agents, GitHub, and a good check configuration.
-- Manual or auto mode.
-- herdr or headless runners on **one machine**.
-- Several stories in parallel on one base.
+What the test tiers cover end to end, with real git, real processes and a scripted agent:
+- One person, on **one machine**.
+- The GitHub tracker and forge (over a scripted `gh`), or the local tracker with no forge.
+- The local store; several stories in parallel on one base.
+- The headless runner; manual or auto mode.
+- Claude Code and pi as harnesses, held to the same recorded sessions.
 
-Two-machine operation was only simulated on one Mac (`NORN_MACHINE`). Everything else below is either a known gap or unproven.
+The `refs` store shared by several clones is tested with clones on one machine only. Everything else below is either a known gap or unproven.
 
 ## Not built yet
 
-- **Secrets in pushed text.** Handoffs are committed, and check output, receipts, logs and evidence are pushed to the story's record ref (`refs/norn/runs/<story>`), unredacted. Keep secrets out of check output and evidence.
-- **No write-back to GitHub or GitLab** beyond pushes and the draft PR: no status comment edited in place, no `norn:stuck` label.
-- **No permission profiles per step.** Claude runs in its `auto` permission mode by default; a permission prompt the agent is blocked on shows up as an Answer item.
-- **The hooks are a reminder, not a sandbox.** In a unit worktree the pre-tool hook refuses a `git push`, a branch or worktree switch, a `gh`/`glab` command on its list of remote writes and a file-tool write under norn's run state, each with the rule's reason. It reads each shell command with a small tokenizer and allows what it cannot read, and it answers "allow" on any failure of its own, so it is no security boundary. What it misses is still forbidden by the brief: shell writes under norn's run state, remote writes not on its list (another tool, a script, a `curl`), and every norn command but `brief`, `done`, `ask` and `stuck`. An agent tool that cannot refuse a tool call (OpenCode) gets no refusals at all.
+- **A rerun moves one unit, and only within its round.** `norn run rerun` sends one unit (a slice included) to a step of the workflow it pinned. It never takes up a unit that ended done or is corrupt, never acts on a story whose change merged or whose item is closed, and never on a story another machine's claim holds. A slice taken up again does not take up its story: a story that ended stuck at its `slices` step needs its own rerun there. A story still in progress whose claim nobody holds stays held (`claim.none`): the rerun is recorded but waits until someone takes the claim with `norn story take`.
+- **No generated-file resolution.** A base update whose only conflicts are in generated files (emitted schemas, a generated reference) goes to the workflow's agent resolve step like any other conflict; no config names a command that rewrites them instead.
+- **A new round is the whole story's, and only before its change merged.** `norn story round` starts a story's next round with fresh counters. It never starts a round for a slice alone, never on a story whose change merged or whose item is closed, and not on a story another machine's claim holds. With `--force` it ends a round under way, but only once no run of any kind (agent, check, plugin step) is left on its record unstopped and every slice has ended. A slices step counts a story's slice units by id, not by round, so a round that can come to a `slices` step is refused while the story has slice units from an earlier round (`slices_from_earlier_round`): start it at a step no `slices` step follows (such as `--at qa`), or close the story and create a new one for new slices.
+- **A branch update is a one-off merge of the base, with no resolver.** `norn story update-branch` updates only a story whose units all ended and whose change is open, never a slice's branch, and never while a round is under way. On a conflict it aborts and refuses with the paths; resolving takes a round with an update step. A base conflict that only the real merge finds, after the change's head was merged in first, leaves that merge on the local branch, unpushed. It needs a vcs that merges in a story's own worktree. The update writes its `branch.update` intent before the first merge and its `branch.updated` outcome after the push; an update cut short between them (a crash, a failed push) leaves the merge on the local branch, and possibly on the remote, with only the intent recorded, until the verb is run again and finishes it under that intent. A round started meanwhile leaves that intent unfinished for good. It records nothing for an update that changed nothing, and a vcs without a remote is recorded as pushed though there was nowhere to push to.
+- **A takeover moves the claim and the record, not the old machine's work in progress.** `norn story take --force` moves a story's claim from another holder, live or expired. It does not stop that machine's agent: a run there keeps going until it ends, and with the `refs` store what it reports lands on that machine's copy of the record, which the new holder never reads (stop it there first with `norn run stop`). Commits the old machine never pushed stay on it. No command gives a claim up early; a tick gives it up when the story ends. A store without the `takeover` capability can take a free or expired claim but not a live one. If the takeover's record cannot be written after the claim moved, the claim is still yours, and the record lacks that takeover.
+- **No notifications and no live view.** Nothing tells you when a story starts waiting for you: keep `norn status` in view.
+- **Secrets in pushed run data.** With the `refs` store, receipts, check output and the story's documents are pushed to the remote unredacted. Keep secrets out of check output.
+- **No GitLab plugin.** The bundled tracker and forge are GitHub's and the local ones; another host needs a plugin ([Recipes: Write a plugin](recipes.md#write-a-plugin)).
+- **One pack per repository.** The config names one pack; a repo's own workflows in `.agents/workflows/` lay over it.
+- **No permission profiles per step.** Claude Code runs in its `auto` permission mode by default; a permission prompt the agent is blocked on shows up as a question.
+- **The hooks are a reminder, not a sandbox.** In a unit worktree the harness's hook refuses a file-tool write outside the worktree or under norn's run state, and keeps the agent from ending a turn without a report (a few times a run, then the step's nudges take over), each with the rule's reason. It reads only file-tool writes, refuses no shell command, and lets anything but a guarded write through when it fails itself, so it is no security boundary. What it misses is still forbidden by the brief: shell writes under norn's run state, remote writes not on its list (it lists none: a `git push`, a `gh` call, a `curl`), and every norn command but `brief`, `done`, `ask` and `stuck`.
 - **No guards on transitions** (`when:`), no per-slice mode, no `fork`/`join` steps: conditions are outcomes, a person's QA is a gate, and `attended: true` on a step covers the precise cases.
-- **One remote and project per repository.**
-- **No web cockpit, and no command that mines the trace for workflow changes.**
-
-## Gaps still open
-
-1. **Cross-machine handoff edges.**
-   - Under the `local` record policy, a holder that crashes without releasing its claim still loses the receipts and counters in the run record since its last record push (the last release, or the last time `open-pr` opened or updated the PR). Its work does not go: every boundary also pushes the story's head to `refs/norn/heads/<story>`, under either policy, and a takeover resumes the worktree from that ref, merged with the remote story branch (never rebased); a merge that would conflict refuses the takeover before anything is taken. The heads ref moves alone only while the PR is open: with no PR open, a branch that has diverged from it was rewritten, and the takeover takes the branch as it is. The step restarts at the boundary of that last record push, with the counters it recorded; a story whose record was never pushed restarts the step the heads ref's last boundary led to, with fresh counters. `record.policy: remote` pushes the record whenever it changes instead.
-   - A story whose record was lost and whose branch has no boundary commit (one with a `Norn-Outcome` trailer) since its run state was moved off the branch restarts at its workflow's first step, not the step it was at.
-   - After a `story checkout`, a foreign run parked on a prompt is never judged.
-   - An approve followed by a merge within one tick leaves the approve unapplied in the archived record: the unit ends at `$done` with the gate as its last step visited and no outcome for it.
-   - A merged story stays offered for `story checkout` on a checkout that once worked on it, and `norn tidy` does not remove leaked intake worktrees or slot leases.
-2. **A machine-specific hook command is committed as is.** The default hook command, `"${NORN_BIN:-norn}" hook`, is portable. But `norn init --hook-command` or `NORN_HOOK_COMMAND` with an absolute path writes that path into the committed `.claude/settings.json`, as the dogfood sandbox did, and a second machine then gets no hook facts. Without hook facts, `silent`, stalled, adoption and implicit asks are all lost. Neither `init` nor `doctor` flags it: `doctor` tests the hook command this machine would install, not the one committed.
-3. **Implicit asks flicker.** When an agent sends several tool calls at once, its Answer item can vanish for one tick and return with a new id. A notifier fires twice, and a `norn story answer` sent in the gap is refused.
-   - After an accepted answer, `status` and `story view` show the old question until the next tick, which `norn watch` runs within about a second (a cron `norn tick` only at its interval).
-   - If a runner kept reporting `waiting_input` from before the last answer, a second prompt would not be raised.
-4. **Agents' housekeeping.**
-   - QA agents commit evidence files at the repo root.
-5. **Marker check covers the pushed head only.** A marker commit that a later commit fixed is still published, because norn never rewrites history.
-6. **Commits made outside norn are blurred in two cases.**
-   - A person's commit made while an agent run is active is not flagged as made outside norn.
-   - A person's commit merged in by `update` no longer shows up as made outside norn; only the head-changed item reports it.
-7. **Nothing stops a person or tool typing into an agent's pane.** Answers typed there bypass norn's record, and on one checkout 7 of 30 prompts were answered in the pane.
-8. **Attended steps and per-worktree setup.**
-   - Attended steps with nobody in the pane. The inbox says when the agent waits, but "report once the person agrees" still cannot be met when no person comes, and nothing ends the wait.
-   - No per-worktree setup step and no config key for checks: check commands must prepend their own setup, such as `bun install --frozen-lockfile`.
-9. **No backfill of history** from before norn first observed a repo.
-10. **Cost per story** is not tracked; it is postponed.
+- **Cost per story** is not tracked.
 
 ## Not yet proven in real use
 
-- **Two real machines.** Claims and mailboxes are git refs with compare-and-swap, which is sound on paper. They were exercised only as simulated machines on one Mac.
-- **These recovery paths:**
-  - a resolve that ends `stuck`;
-  - exhausting `base_conflict_loop`;
-  - an agent that dies with no retries left;
-  - killing a herdr pane mid-merge.
+- **Two real machines.** Claims and the mailbox on the `refs` store are git refs with compare-and-swap, which is sound on paper and passes its contract suite, but no two real machines have shared a story.
+- **The herdr runner.** Its test against a real Herdr runs only when asked (`NORN_TEST_HERDR=1`), never in CI, and no long dogfood run has used it yet.
+- **Real agents in long runs.** The live canary runs one real turn of each agent tool when asked (`NORN_TEST_LIVE=1`); pi in particular has run few real stories, and reports no subagents and no usage limits, so norn cannot wait on either for it.
 - **A browser criterion checked live.** Nobody has yet had an agent with a browser pass a criterion seen in a web page.
-- **The herdr cockpit.** The attended wait, the cockpit (`norn status --watch`), the Herdr plugin (`plugins/herdr`), pane labels and the `herdr` notifier are tested against fixtures and a fake runner only. No dogfood run has used them yet.
-- **The auto permission mode default** (`--permission-mode auto` for `agents.claude`). Every live run set `agents.claude.args`, which replaces the list and the permission mode with it.
-- **codex, opencode, gemini and glab adapters.** They are tested only against recorded fixtures. Only claude, git, gh, herdr and headless ran live.
 
 ## Limits of the design
 
-- **Agents report their own work.** A receipt records what the agent claimed. Gates and checks are only as strong as the commands you configure, and a weak check config lets anything through.
-- **Decide never reads prose.** Anything that lives only in a spec body, `handoff.md` or a review comment does not influence the next step unless an agent turns it into a typed outcome.
-- **Corrupt means stopped.** A state file that fails validation marks the unit `corrupt`, by design. Hand edits to `.agents/` files or merge conflicts in them block the unit until a person repairs it.
-- **No host-less mode.** Story keys must be `gh-N`/`gl-N`, and intake reads issues from GitHub or GitLab. A repo with only local files and branches cannot run norn today. Business tracking in Jira stays outside norn by choice.
-- **No fork contributions.** norn works only for collaborators with write access to the repo: it needs to push story branches and claim refs to the remote. A PR from a fork cannot run through a workflow; in norn's own repo it is read as input to an issue, never merged as is.
-- **GitHub/GitLab-style flows only.** norn assumes PRs, branches and git refs. Trunk-based work without PRs, many teams sharing one `.agents/`, and non-git VCS are out of scope.
+- **Agents report their own work.** A receipt records what the agent claimed. Gates and checks are only as strong as the commands you configure, and a weak check lets anything through.
+- **Decide never reads prose.** Anything that lives only in a spec body, a handoff or a review comment does not influence the next step unless an agent turns it into a typed outcome.
+- **Corrupt means stopped.** A record that fails validation marks the unit `corrupt`, by design. Hand edits to norn's run data block the unit until a person repairs it.
+- **Trackers and forges hold no state.** Labels and comments norn writes on an issue are for people; norn reads its decisions only from the store. A story's workflow is read from its label once, at intake, and editing a label later never moves a story.
 - **Merge, never rebase.** Story branches gain merge commits from the base. Teams that require linear history must squash on merge; the base then stays linear.
-- **The cockpit takes keys, not the mouse.** `norn status --watch` is full screen with raw keys; there is no mouse support and no web panel yet (it would read `@norn/view` and act through the CLI verbs).
 - **Coarse grain.** norn works per story and slice on a heartbeat. It is the wrong tool for quick interactive edits, and the overhead is not worth it for tiny changes.
-- **Local environment must stay healthy.**
-  - It needs Bun, git ≥ 2.38 (for `merge-tree --write-tree`), git worktrees (disk plus per-worktree setup), an authenticated `gh`, and herdr for attended panes. The cockpit needs Herdr ≥ 0.9, and its plugin is installed by hand (`herdr plugin install PruszynskiJakub/norn-next/plugins/herdr`); `norn init` does not install it.
-  - Rate limits or a GitHub outage stop observation. A remote call that hangs costs a tick up to 2 minutes before it fails.
-  - A sleeping laptop pauses every watch, and claims expire. They are reacquired cleanly after wake, but nothing moves in the meantime.
 - **Workflows are pinned per unit.** Editing a workflow does not affect units already in flight. This is intended, but surprising.
-- **`heartbeat_id` per checkout, not per process** (a deliberate choice, see [Development › Decisions](development.md#decisions)). Two `watch` processes on one checkout share it and renew the same claim; the tick lock refuses a tick while another runs, so they take turns and a second one gains nothing.
-- **Observability covers only what goes through norn.** `norn run view --why` and `norn run list` replay norn's own decisions exactly. Anything a person or agent does outside norn, such as pane keystrokes or hand merges, shows up only as later-observed facts, without the reason.
+- **Nothing stops a person typing into an agent's pane.** With the herdr runner, an answer typed there bypasses norn's record: give decisions with `norn story answer` too.
+- **The local environment must stay healthy.**
+  - It needs git ≥ 2.38, disk for one worktree per running unit, and the tools `norn doctor` names for the config: `gh` signed in for GitHub, the agent tool, `herdr` for the herdr runner. Check commands must do their own setup in a fresh worktree, such as `bun install --frozen-lockfile`.
+  - Rate limits or a GitHub outage stop observation of the tracker and forge.
+  - A sleeping laptop pauses every watch, and claims expire. They are taken again cleanly after wake, but nothing moves in the meantime.
+  - Clean-up removes files only: the folders a finished story's logs lived in stay, empty. A unit that did not end done keeps its logs, as it keeps its worktree, and a session log a custom launcher wrote elsewhere stays too.
+- **Observability covers only what goes through norn.** The trace records every tick's facts and decisions, and is kept for `trace.retain` (a week by default). Anything a person or agent does outside norn, such as pane keystrokes or hand merges, shows up only as facts observed later, without the reason.

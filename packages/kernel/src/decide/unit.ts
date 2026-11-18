@@ -1,0 +1,106 @@
+/**
+ * Unit rules: one unit's next action from its run state, unapplied receipts, session and step run.
+ * Agent, check, gate and plugin steps, and the session-driven rules (silent → nudge, died → retry,
+ * asking or a permission prompt → park with an inbox item, limited → wait for the reset, a turn ended
+ * without a report → nudge, reported → apply). Every nudge and retry is bounded and running out is a
+ * visible stuck. Manual mode leaves a ready agent step for a person; an attended step always waits for one.
+ */
+import type { Decision } from "../model/actions.ts";
+import type { StoryFacts, UnitFacts } from "../model/facts.ts";
+import type { RunState } from "../model/run-state.ts";
+import type { DecideContext } from "./context.ts";
+import { applyAction, markCorrupt } from "./record.ts";
+import { decideAgent } from "./unit-agent.ts";
+import { decideCheck, decideGate, decidePluginStep } from "./unit-steps.ts";
+import { applyDecision, noop, type UnitView } from "./unit-support.ts";
+
+/**
+ * Parks the unit rules derive from facts each tick, by the rule that parks. A park with any other
+ * reason was put there by a receipt or the story rules and holds until a receipt lifts it.
+ */
+export const DERIVED_PARKS: ReadonlySet<string> = new Set([
+  "agent.ready.attended",
+  "agent.ready.manual",
+  "agent.ready.no_headless",
+  "agent.no_executor",
+  "agent.asking.park",
+  "agent.permission.park",
+  "agent.died.manual",
+  "agent.silent.manual",
+  "agent.turn_ended.manual",
+  "agent.limited.manual",
+  "agent.retry.no_headless",
+  "agent.limited.unknown",
+  "agent.reported.rejected",
+  "check.finished.rejected",
+  "step.finished.rejected",
+  "gate.park",
+]);
+
+/** The unit's one decision this tick, or null when nothing is to be done (a noop is still a decision). */
+export function decideUnit(story: StoryFacts, unit: UnitFacts, ctx: DecideContext): Decision | null {
+  const state = unit.state;
+  if (unit.corrupt !== undefined) {
+    if (unit.corrupt_marked === true) return { kind: "noop", unit: unit.id, rule: "unit.corrupt.held", reason: unit.corrupt };
+    return markCorrupt(unit, "unit.corrupt", unit.corrupt, ctx);
+  }
+  // a unit's first run state comes from its story: the round start, or the slices step
+  if (!state) return unit.id === story.key ? null : { kind: "noop", unit: unit.id, rule: "slice.not_started", reason: "started by the story's slices step" };
+  if (state.ended === "corrupt") return { kind: "noop", unit: unit.id, rule: "unit.corrupt.held", reason: state.ended_reason ?? "corrupt" };
+  // a new round is applied by the story rules, which pin its workflow, and so is a person's move,
+  // which stops a live run before it applies
+  if (unit.receipts.some((r) => r.data.kind === "round.started" || r.data.kind === "step.moved")) return null;
+  const graph = ctx.workflows.byHash[state.workflow.hash]?.graph;
+  if (!graph) return markCorrupt(unit, "unit.workflow_missing", `pinned workflow ${state.workflow.name} (${state.workflow.hash}) is not loaded`, ctx);
+  const step = graph.steps[state.step];
+  if (!step) return markCorrupt(unit, "unit.workflow_missing", `step '${state.step}' is not in workflow ${state.workflow.name}`, ctx);
+
+  const parked = state.parked;
+  const derived = parked !== undefined && DERIVED_PARKS.has(parked.reason);
+  const view: UnitView = { story, unit, state: derived ? unparked(state) : state, graph, step, ctx };
+  // receipts always win over session and step facts
+  if (unit.receipts.length) {
+    const d = applyDecision(view, "receipts.apply", []);
+    if (d.rejected.length === unit.receipts.length) return { ...d, rule: "receipts.reject" };
+    const undelivered = undeliverableAnswers(unit, state, ctx);
+    return undelivered.length > 0 ? { ...d, rule: "receipts.apply.undelivered", undelivered } : d;
+  }
+  if (state.ended) return noop(view, `unit.ended.${state.ended}`, state.ended_reason ?? state.ended);
+  if (parked && !derived) return noop(view, "unit.parked", parked.reason);
+
+  const d = decideStep(view);
+  if (!parked || d === null) return d;
+  if (d.kind === "park" && d.reason === parked.reason) return noop(view, "unit.parked", parked.reason);
+  // a park another rule now derives replaces it; an applied receipt commits a state already without it
+  if (d.kind === "park" || d.kind === "apply_receipts") return d;
+  // a derived park whose cause is gone is lifted first; the next tick decides from the lifted state
+  return applyAction(unit.id, unit, "unit.unpark", [], view.state, [], ctx);
+}
+
+/**
+ * The answers waiting on a session that can no longer take them: it ended, and its executor cannot
+ * resume a session to hand one over. Delivery would be refused on every tick and the unit would stay
+ * parked for good; applied undelivered, the unit unparks, the ended session is judged dead and retried,
+ * and the retry's brief carries the answers.
+ */
+function undeliverableAnswers(unit: UnitFacts, state: RunState, ctx: DecideContext): string[] {
+  const run = state.run;
+  if (!run?.session || run.attended || unit.session?.activity !== "ended") return [];
+  if (ctx.facts.capabilities.executors[run.executor]?.resume === true) return [];
+  return unit.receipts.filter((r) => r.data.kind === "answer.sent").map((r) => r.id);
+}
+
+function unparked(state: RunState): RunState {
+  const { parked: _lifted, ...rest } = state;
+  return rest;
+}
+
+function decideStep(v: UnitView): Decision | null {
+  const { step } = v;
+  if (step.runner.type === "plugin") return decidePluginStep(v, step.runner.mode);
+  if (step.agent) return decideAgent(v, step.agent);
+  if (step.check) return decideCheck(v, step.check);
+  if (step.gate) return decideGate(v, step.gate.prompt);
+  // the slices step is the story rules': they start, wait on and finish slices
+  return null;
+}

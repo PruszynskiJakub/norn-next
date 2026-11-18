@@ -1,46 +1,101 @@
 /**
- * `norn story view [<story|slice>] [--web] [--json]`: one story at a glance — its
- * slices with their workflow and step, the PR and its state, open notes, what waits for the person
- * (@norn/view orientReport). Read only: no receipt, run or claim. Markdown by default, `--json`
- * for data: the orient report extended with the slice steps and PR state. In a slice worktree
- * it views that slice's story. The chat agent (`norn story chat`, `NORN_ORIENT=1`) sees its
- * rules first. `--web` opens the story's PR in the browser, or its issue when there is no PR. A story
- * another machine holds shows its claim, branch, PR and record.
+ * `norn story view <key>`: show one story: its units, runs, gates and asks, who moved its claim
+ * between machines, and the branch updates a person made, read-only. A key no store holds is refused, naming where to look; a story with a
+ * corrupt unit is a corrupt error (exit 4).
  */
-import { cmd } from "@norn/core";
-import { formatElsewhere, formatStoryView, orientReport } from "@norn/view";
-import { defineCommand, opt } from "../command.ts";
-import { failure, refuse, rendered } from "../output.ts";
-import { ORIENT_ENV } from "../runtime/agent-unit.ts";
-import { parseUnitKey } from "../runtime/args.ts";
-import { projectView } from "../runtime/human.ts";
-import { openLink } from "../runtime/open-link.ts";
-import { aStory, targetKey } from "../runtime/target.ts";
+import type { RuntimeEnv } from "@norn/runtime";
+import { defineCommand } from "../command.ts";
+import { corruptError, failure, refuse, rendered } from "../output.ts";
+import { loadProjectView, type StoryView, storyHead, unitLine } from "../views.ts";
+
+/** One `norn story take` on the record of the story's own unit. */
+export interface TakeoverView {
+  at: string;
+  /** null: nobody held the claim */
+  from: string | null;
+  to: string;
+  by: string;
+  reason: string | null;
+}
+
+/** One `norn story update-branch` on the record of the story's own unit. */
+export interface BranchUpdateView {
+  at: string;
+  base: string;
+  base_sha: string;
+  merged: boolean;
+  head: string;
+  pushed: boolean;
+  by: string;
+  reason: string | null;
+}
+
+interface PersonRecord {
+  takeovers: TakeoverView[];
+  branch_updates: BranchUpdateView[];
+}
+
+/** Every claim takeover and branch update on the story's own unit, oldest first; the facts carry only receipts not yet applied, so the record is read whole. */
+async function recordOf(env: RuntimeEnv, key: string): Promise<PersonRecord> {
+  const read = await env.journal.readUnit(key);
+  if (!read.ok) throw failure(`cannot read ${key}: ${read.failure.message}`, "try again", read.failure.code);
+  const out: PersonRecord = { takeovers: [], branch_updates: [] };
+  for (const r of read.value.receipts) {
+    const d = r.data;
+    if (d.kind === "claim.taken") out.takeovers.push({ at: r.at, from: d.from ?? null, to: d.to, by: d.by, reason: d.reason ?? null });
+    if (d.kind === "branch.updated")
+      out.branch_updates.push({ at: r.at, base: d.base, base_sha: d.base_sha, merged: d.merged, head: d.head, pushed: d.pushed, by: d.by, reason: d.reason ?? null });
+  }
+  return out;
+}
+
+function updateLine(u: BranchUpdateView): string {
+  const what = u.merged ? `merged ${u.base} (${u.base_sha.slice(0, 12)})` : `already held ${u.base}`;
+  return `- ${u.at}: ${what}, now at ${u.head.slice(0, 12)}${u.pushed ? ", pushed" : ""}, by ${u.by}${u.reason ? ` — ${u.reason}` : ""}`;
+}
+
+function takeoverLine(t: TakeoverView): string {
+  const from = t.from ? ` from ${t.from}` : "";
+  const by = t.by === t.to ? "" : ` by ${t.by}`;
+  return `- ${t.at}: taken${from} to ${t.to}${by}${t.reason ? ` — ${t.reason}` : ""}`;
+}
+
+function markdown(s: StoryView, { takeovers, branch_updates }: PersonRecord): string {
+  const out = [`# ${storyHead(s)}`, ""];
+  if (s.url) out.push(`Item: ${s.url}`);
+  if (s.change?.url) out.push(`Change: ${s.change.url}`);
+  if (s.url || s.change?.url) out.push("");
+  out.push("## Units", "", ...s.units.map((u) => `- ${unitLine(u)}${u.pending_receipts ? ` (${u.pending_receipts} receipts not applied yet)` : ""}`));
+  if (takeovers.length) out.push("", "## Claim taken", "", ...takeovers.map(takeoverLine));
+  if (branch_updates.length) out.push("", "## Branch updated", "", ...branch_updates.map(updateLine));
+  return out.join("\n");
+}
 
 export const storyViewCommand = defineCommand({
   name: "story view",
-  version: "reads",
-  summary: "One story: slices with their steps, the PR, open notes, what waits for you; --web opens the PR or issue",
-  usage: "norn story view [<story|slice>] [--web] [--json]",
-  markdown: true,
-  options: { web: { type: "boolean" } },
-  positionals: { max: 1 },
+  summary: "Show one story: its units, runs, gates and asks",
+  usage: "norn story view <key>",
+  positionals: { min: 1, max: 1 },
   async run(ctx, args) {
-    const raw = await targetKey(ctx, args.positionals[0], args.json === true, aStory("story view", cmd.storyView));
-    const { key, story, slice } = parseUnitKey(raw);
-    const view = await projectView(ctx);
-    const report = orientReport(view, key, ctx.config.provider);
-    // A story another machine holds, from its claim, branch and record ref as fetched last
-    const elsewhere = report ? null : view.elsewhere.find((e) => e.key === story);
-    if (elsewhere && !opt.bool(args, "web")) return rendered(elsewhere, formatElsewhere(elsewhere));
-    if (!report) throw refuse(`unknown story ${story}`, cmd.status(), "unknown_unit");
-    if (slice && !report.slices.some((s) => s.key === slice)) throw refuse(`no slice ${slice} in story ${story}`, cmd.storyView(story), "unknown_unit");
-    if (!opt.bool(args, "web")) return rendered(report, formatStoryView(report, ctx.clock.now(), { rules: ctx.env[ORIENT_ENV] === "1" }));
-
-    const url = report.pr?.url ?? report.url;
-    if (!url) throw refuse(`${story} has no PR and no issue link to open`, report.pr_command, "no_url");
-    const r = await openLink(ctx, url);
-    if (r.code !== 0) throw failure(`could not open ${url}: ${r.stderr.trim().split("\n")[0] || `exit ${r.code}`}`, url, "open_failed");
-    return rendered({ story, opened: url }, `Opened ${url}`);
+    const key = args.positionals[0] as string;
+    const env = await ctx.runtimeEnv();
+    const view = await loadProjectView(env);
+    const story = view.stories.find((s) => s.key === key);
+    if (!story) {
+      const queued = view.intake.find((i) => i.key === key);
+      throw queued
+        ? refuse(`${key} is in the intake but no tick has taken it yet`, "norn tick", "story_not_started", { key })
+        : refuse(`no story ${key}`, "norn story list", "story_not_found", { key });
+    }
+    const corrupt = story.units.filter((u) => u.corrupt !== undefined);
+    // a record that fails validation is shown as what it is, never as a story at some step
+    if (corrupt.length > 0)
+      throw corruptError(
+        `${key} is corrupt: ${corrupt.map((u) => `${u.id}: ${u.corrupt}`).join("; ")}`,
+        "a person restores or removes the unit's run state; norn never repairs it",
+        { story },
+      );
+    const record = await recordOf(env, key);
+    return rendered({ ...story, ...record, problems: view.problems.filter((p) => p.startsWith(`${key}:`) || p.startsWith(`${key} `)) }, markdown(story, record));
   },
 });

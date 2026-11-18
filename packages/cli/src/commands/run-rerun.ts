@@ -1,74 +1,99 @@
 /**
- * `norn run rerun [<unit>] [--step <step>] [--reset <counter>]… [--reason "…"]`:
- * resume a stuck or parked unit (a gate or an ask included) at its step in a fresh session,
- * optionally at another step of its pinned workflow and with counters reset (journaled in the
- * receipt). A running unit is refused: stopping it is `norn run cancel`, except a rerun at the
- * check whose fail sent the unit to its step: the check runs again on the same code and
- * the next tick stops that step's session. Claim free: acquired here; held elsewhere: mailbox.
+ * `norn run rerun <unit> [--step <step>] [--reset <counter>]... [--reason <text>]`: run a unit's
+ * current step again, or send it to another step of its pinned workflow, with counters reset.
+ * Records the kernel's `step.moved` for the unit's step and attempt; the next tick stops a run that
+ * may still be going and then applies the move, taking up a unit that ended stuck. The receipt id
+ * carries the round, the visit and what the move asks, so a retried rerun records once.
  */
-import { checkRetryOf, cmd, nextCommand, rerunnable, rerunWarning, stepOf } from "@norn/core";
+import type { UnitJournal } from "@norn/kernel";
+import { parseUnitId, RUN_ENV } from "@norn/plugin-api";
+import { loadPinned } from "@norn/runtime";
 import { defineCommand, opt } from "../command.ts";
-import { refuse } from "../output.ts";
-import { at, DELEGATED_HELP, DELEGATED_OPTION, delegatedFields, delegation, humanReceipt, type StepOnlyBuild, stepOnlyReceipt, resolveTarget as resolveUnit, runHumanVerb } from "../runtime/human.ts";
-import { inState, targetKey } from "../runtime/target.ts";
+import { corruptError, failure, refuse, rendered } from "../output.ts";
+import { roundOf } from "./gate-support.ts";
+import { receiptId, refuseFinished, syncStore } from "./person-support.ts";
+
+const USAGE = "norn run rerun <unit> [--step <step>] [--reset <counter>]... [--reason <text>]";
 
 export const runRerunCommand = defineCommand({
   name: "run rerun",
-  version: "acts",
-  summary: "Resume a stuck, parked or gate-waiting unit in a fresh session, optionally --step elsewhere and --reset counters",
-  usage: 'norn run rerun [<unit>] [--step <step>] [--reset <counter>]… [--reason "…"] [--delegated]',
-  options: { step: { type: "string" }, reset: { type: "string", multiple: true }, reason: { type: "string" }, ...DELEGATED_OPTION },
-  optionHelp: {
-    "--step <step>": "move the unit to another step of its pinned workflow",
-    "--reset <counter>": "reset a workflow counter to 0 (repeatable)",
-    '--reason "…"': "why, journaled in the receipt",
-    ...DELEGATED_HELP,
+  summary: "Run a unit's step again, or move it to another step, counters reset",
+  usage: USAGE,
+  options: {
+    step: { type: "string" },
+    reset: { type: "string", multiple: true },
+    reason: { type: "string" },
   },
-  positionals: { max: 1 },
+  optionHelp: {
+    "--step <step>": "the step of the unit's pinned workflow to run (default: the step it is at)",
+    "--reset <counter>": "set a counter of the workflow back to 0 (repeatable)",
+    "--reason <text>": "why, kept on the record",
+  },
+  positionals: { min: 1, max: 1 },
   async run(ctx, args) {
-    const to = opt.str(args, "step");
+    const unit = args.positionals[0] as string;
     const reset = [...new Set(opt.list(args, "reset"))];
-    const d = delegation(ctx, args, "run rerun");
-    const key = await targetKey(ctx, args.positionals[0], args.json === true, inState("run rerun", (k) => cmd.runRerun(k), "Nothing is stuck, parked or at a gate", rerunnable));
-    // A `local` story held elsewhere: resume the step its last boundary led to, checked by the
-    // holder; --step and --reset are checked against the pinned workflow, which only the holder has
-    const stepOnly: StepOnlyBuild = (t, step) => {
-      if (to !== undefined || reset.length)
-        throw refuse(`${t.key}'s pinned workflow is on the machine that holds it: --step and --reset are checked there`, `${cmd.runRerun(t.key)} without --step and --reset, or ${cmd.storyCheckout(t.story, { force: true })}`, "story_not_local");
-      return stepOnlyReceipt(ctx, t, step, "unstick", delegatedFields(d));
-    };
-    // With --step, a unit whose last outcome is that step's (a failed check) is a target too
-    const t = await resolveUnit(ctx, key, (st) => rerunnable(st) || (to !== undefined && st.last_outcome?.step === to), { stepOnly });
-    const res = await runHumanVerb(ctx, t, {
-      verb: "run rerun",
-      mailbox: true,
-      check(t, st) {
-        const wf = t.workflow;
-        // A rerun at the check whose fail sent the unit here retries it on the same code
-        const retry = to !== undefined && !!wf && checkRetryOf(wf, st) === to;
-        // Otherwise stopping an agent is always its own, explicit act
-        if (!retry && st.status === "running") throw refuse(`${t.key} is running ${at(st)}; stop it first`, cmd.runCancel(t.key), "running");
-        if (!retry && !rerunnable(st)) throw refuse(`${t.key} is not stuck: it is at ${at(st)}`, nextCommand(t.key, st) ?? cmd.storyView(t.story), "not_stuck");
-        if (!wf) throw refuse(`${t.key} has no readable pinned workflow`, cmd.runView(t.key, { why: true }), "workflow_missing");
-        const steps = Object.keys(wf.steps);
-        if (to !== undefined && !stepOf(wf, to))
-          throw refuse(`no step '${to}' in ${t.key}'s pinned workflow ${wf.name}`, cmd.runRerun(t.key, { step: `<${steps.join("|")}>` }), "unknown_step");
-        if (to === undefined && !stepOf(wf, st.step))
-          throw refuse(`step '${st.step}' no longer exists in workflow ${wf.name}`, cmd.runRerun(t.key, { step: `<${steps.join("|")}>` }), "unknown_step");
-        const declared = Object.keys(wf.counters ?? {});
-        const unknown = reset.filter((c) => !declared.includes(c));
-        if (unknown.length)
-          throw refuse(
-            `unknown counter(s) ${unknown.join(", ")} in workflow ${wf.name}`,
-            declared.length ? cmd.runRerun(t.key, { reset: `<${declared.join("|")}>` }) : cmd.runRerun(t.key),
-            "unknown_counter",
-          );
-      },
-      build: (t, st) =>
-        humanReceipt(ctx, t, st, "unstick", { ...(to ? { to } : {}), ...(reset.length ? { reset } : {}), ...delegatedFields(d) }),
-    });
-    // A counter left at its max closes its edge again; say so, with the way out
-    const warning = t.state ? rerunWarning(t.key, t.state, { reset }) : null;
-    return warning ? { ...res, warning } : res;
+    const reason = opt.str(args, "reason")?.trim() || undefined;
+    // a step agent moving units would take where the work goes next away from the person
+    if (ctx.env[RUN_ENV.run]) throw refuse(`a step agent may not rerun a step (run ${ctx.env[RUN_ENV.run]})`, "a person reruns it, outside any norn run", "agent_rerun");
+    const ref = parseUnitId(unit);
+    if (!ref) throw refuse(`${unit} is not a unit id`, "norn story list", "unknown_unit");
+    const env = await ctx.runtimeEnv();
+    await syncStore(env, ref.story, `norn run rerun ${unit}`);
+
+    const read = await env.journal.readUnit(unit);
+    if (!read.ok) throw failure(`cannot read ${unit}: ${read.failure.message}`, "try again", read.failure.code);
+    const u = read.value;
+    const repair = `a person repairs the record of ${unit}`;
+    if (u.corrupt !== undefined) throw corruptError(`${unit} is corrupt: ${u.corrupt}`, repair, { unit });
+    const state = u.state as UnitJournal["state"];
+    if (!state) {
+      const known = u.receipts.length > 0;
+      throw refuse(known ? `${unit} has not started yet` : `${unit} has no run state on this machine`, known ? "norn tick starts it" : "norn story list", known ? "not_started" : "unknown_unit");
+    }
+    // a corrupt record is a person's repair: moving it would run a step on a record nobody can trust
+    if (state.ended === "corrupt") throw corruptError(`${unit} is corrupt: ${state.ended_reason ?? "marked corrupt"}`, repair, { unit });
+    if (state.ended === "done") {
+      const next = ref.slice === null ? `norn story round ${unit} --workflow <name>, for new work on the story` : `norn story view ${ref.story}`;
+      throw refuse(`${unit} ended done at ${state.step}; a rerun takes up only a unit that has not ended done`, next, "unit_done");
+    }
+
+    const graph = loadPinned(env, state.workflow)?.graph;
+    if (!graph) throw refuse(`${unit}'s pinned workflow ${state.workflow.name} no longer loads`, `norn story round ${ref.story} --workflow <name>`, "workflow_missing");
+    const to = opt.str(args, "step") ?? state.step;
+    const steps = Object.keys(graph.steps);
+    if (!graph.steps[to]) throw refuse(`${unit}'s workflow ${graph.name} has no step ${to}`, `name one of ${steps.join(", ")}`, "unknown_step", { steps });
+    const counters = Object.keys(graph.counters);
+    const unknown = reset.filter((c) => !graph.counters[c]);
+    if (unknown.length)
+      throw refuse(
+        `${unit}'s workflow ${graph.name} has no counter ${unknown.join(", ")}`,
+        counters.length ? `name one of ${counters.join(", ")}` : `norn run rerun ${unit} without --reset`,
+        "unknown_counter",
+        { counters },
+      );
+
+    const claim = await env.slots.store.claims.read(ref.story);
+    if (!claim.ok) throw failure(`cannot read the claim of ${ref.story}: ${claim.failure.message}`, "try again", claim.failure.code);
+    if (claim.value && claim.value.holder !== env.config.holder)
+      throw refuse(`${ref.story} is held by ${claim.value.holder} until ${claim.value.expires_at}`, `rerun it on the machine of ${claim.value.holder}, or norn story take ${ref.story} --force first`, "claim_held");
+    await refuseFinished(env, ref.story, "a rerun");
+
+    const where = { step: state.step, attempt: state.attempt };
+    const id = receiptId("move", `r${await roundOf(env, u)}`, state.step, String(state.attempt), to, ...[...reset].sort());
+    // only this verb's own receipt, from a try cut short, may wait unapplied: anything else changes where the unit stands
+    const pending = u.unapplied.filter((r) => r.id !== id);
+    if (pending.length)
+      throw refuse(`${unit} has receipts the next tick applies first (${pending.map((r) => r.data.kind).join(", ")})`, `norn tick, then norn run rerun ${unit} again`, "pending");
+
+    const data = { kind: "step.moved" as const, to, ...(reset.length > 0 && { reset }), by: env.config.holder, ...(reason && { reason }), ...where };
+    const wrote = await env.journal.record(unit, { id, data });
+    if (!wrote.ok) throw failure(`cannot record the rerun on ${unit}: ${wrote.failure.message}`, `norn run rerun ${unit} again`, wrote.failure.code);
+    const running = state.run !== null && state.ended === undefined;
+    const value = { unit, from: state.step, attempt: state.attempt, step: to, reset, stops_run: running ? state.run?.id ?? null : null, receipt_id: id, ...wrote.value };
+    const move = to === state.step ? `a rerun of ${to}` : `a move from ${state.step} to ${to}`;
+    const counted = reset.length ? `, ${reset.join(", ")} back to 0` : "";
+    const stop = running ? ` The next tick stops run ${state.run?.id} first, then applies it.` : " The next tick applies it.";
+    return rendered(value, `Recorded ${move} on ${unit}${counted}${wrote.value.replayed ? " (recorded before)" : ""}.${stop}`);
   },
 });

@@ -1,0 +1,17 @@
+{
+  "name": "@norn/conformance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "dependencies": {
+    "@norn/kernel": "workspace:*",
+    "@norn/plugin-api": "workspace:*",
+    "@norn/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "@norn/harness-claude": "workspace:*",
+    "@norn/harness-pi": "workspace:*",
+    "@norn/store-local": "workspace:*"
+  }
+}

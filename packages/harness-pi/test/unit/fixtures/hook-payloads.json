@@ -1,0 +1,24 @@
+{
+  "derived_from": "Derived, not recorded: the session ids, paths and tool inputs come from the earlier pi adapter's fixtures (packages/adapters/test/unit/pi/fixtures/hook-payloads.json), reshaped into the payloads norn's extension sends (src/extension.ts) from the event fields pi 1.5.2 documents in docs/extensions.md.",
+  "payloads": {
+    "session_start": { "hook_event_name": "session_start", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "reason": "startup" },
+    "session_start_resume": { "hook_event_name": "session_start", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "reason": "resume" },
+    "session_compact": { "hook_event_name": "session_compact", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "reason": "threshold" },
+    "before_agent_start": { "hook_event_name": "before_agent_start", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "message_type": "user", "prompt": "Run norn brief" },
+    "before_agent_start_custom": { "hook_event_name": "before_agent_start", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "message_type": "custom" },
+    "tool_call": { "hook_event_name": "tool_call", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "tool_call_id": "call_01", "tool_name": "bash", "tool_input": { "command": "bun test" } },
+    "tool_call_write": { "hook_event_name": "tool_call", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "tool_call_id": "call_02", "tool_name": "write", "tool_input": { "path": "src/a.ts", "content": "x" }, "resolved_path": "/w/src/a.ts" },
+    "tool_call_edit": { "hook_event_name": "tool_call", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "tool_call_id": "call_03", "tool_name": "edit", "tool_input": { "path": "src/b.ts", "edits": [] }, "resolved_path": "/w/src/b.ts" },
+    "tool_call_read": { "hook_event_name": "tool_call", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "tool_call_id": "call_04", "tool_name": "read", "tool_input": { "path": "src/a.ts" } },
+    "tool_execution_end": { "hook_event_name": "tool_execution_end", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "tool_call_id": "call_01", "tool_name": "bash", "is_error": false },
+    "tool_execution_end_error": { "hook_event_name": "tool_execution_end", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "tool_call_id": "call_02", "tool_name": "write", "is_error": true },
+    "ui_prompt_start": { "hook_event_name": "ui_prompt_start", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "kind": "confirm", "title": "Allow rm -rf?", "prompt_seq": "mi3k2x0a-1" },
+    "ui_prompt_end": { "hook_event_name": "ui_prompt_end", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w" },
+    "agent_before_settle": { "hook_event_name": "agent_before_settle", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "outcome": "completed", "stop_reason": "stop", "last_assistant_message": "Done." },
+    "agent_settled": { "hook_event_name": "agent_settled", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "aborted": false },
+    "agent_settled_aborted": { "hook_event_name": "agent_settled", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "aborted": true },
+    "agent_settled_error": { "hook_event_name": "agent_settled", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "aborted": false, "outcome": "error", "stop_reason": "error", "error_message": "429 rate_limit_error", "last_assistant_message": "Slice implemented;" },
+    "session_shutdown": { "hook_event_name": "session_shutdown", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "reason": "quit" },
+    "session_shutdown_new": { "hook_event_name": "session_shutdown", "session_id": "0199-pi", "transcript_path": "/s/0199-pi.jsonl", "cwd": "/w", "reason": "new" }
+  }
+}

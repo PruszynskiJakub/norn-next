@@ -1,10 +1,12 @@
 /**
- * Machine contract: every command prints exactly one JSON value on stdout and
- * exits with an `ExitCode`. Failures and refusals are `CliError` `{error, do_instead, code?}`.
- * Commands return a value (exit 0) or `withExit(value, code)`, and throw `CliFailure` to refuse.
+ * The machine contract: with `--json` a command prints exactly one JSON value; a refusal is a
+ * `CliError` `{error, do_instead, code?, details?}` with an `ExitCode`. Without `--json` a command
+ * prints markdown for an agent or a person, with the same exit code, so code branches on exit codes
+ * and JSON data, never on the markdown.
  */
-import { type ClaimBlob, type CliError, CONFIG_FILES, type ConfigProblem, ExitCode, problemText } from "@norn/schema";
-import { cmd } from "@norn/core";
+import { type CliError, ExitCode } from "@norn/schema";
+
+export { ExitCode };
 
 export class CliFailure extends Error {
   constructor(
@@ -24,46 +26,25 @@ const body = (error: string, do_instead: string | null, code?: string, details?:
 });
 
 /** A rule says no (exit 3); `do_instead` is the command or action that would succeed. */
-export const refuse = (error: string, do_instead: string | null, code?: string, details?: unknown) =>
+export const refuse = (error: string, do_instead: string | null, code = "refused", details?: unknown) =>
   new CliFailure(body(error, do_instead, code, details), ExitCode.refused);
 /** Bad arguments (exit 2). */
-export const usageError = (error: string, do_instead: string | null = cmd.help(), code = "usage") =>
-  new CliFailure(body(error, do_instead, code), ExitCode.usage);
-/** A state or config file failed validation (exit 4). */
+export const usageError = (error: string, do_instead: string | null = "norn help", code = "usage") => new CliFailure(body(error, do_instead, code), ExitCode.usage);
+/** A file norn keeps failed validation (exit 4). */
 export const corruptError = (error: string, do_instead: string | null, details?: unknown, code = "corrupt") =>
   new CliFailure(body(error, do_instead, code, details), ExitCode.corrupt);
-/**
- * Config files a person wrote need fixing (exit 6, "Config error"): code
- * `config_invalid`, `config_wrong_file` or `config_moved`, the files in `details`. Never corrupt.
- */
-export function configError(problems: readonly ConfigProblem[], paths?: Record<string, string>): CliFailure {
-  const first = problems[0];
-  const code = first?.code ?? "config_invalid";
-  const error = problems.map(problemText).join("; ");
-  const details = problems.map((p) => ({ ...p, path: paths?.[p.file] ?? CONFIG_FILES[p.file] }));
-  return new CliFailure(body(error || "config is invalid", `fix ${CONFIG_FILES[first?.file ?? "repo"]}`, code, details), ExitCode.config);
-}
 /** Another process holds the lock or claim (exit 5). */
 export const busyError = (error: string, do_instead: string | null, code = "busy", details?: unknown) =>
   new CliFailure(body(error, do_instead, code, details), ExitCode.busy);
-/**
- * Another heartbeat holds the story's claim: busy, exit 5, code `claim_held` — the one
- * refusal every verb uses, so scripts tell "wait / --force" apart from rule refusals.
- */
-export const claimHeld = (claim: Pick<ClaimBlob, "holder" | "acquired_at" | "expires_at">, do_instead: string, note = "") =>
-  busyError(`held by ${claim.holder} since ${claim.acquired_at} (expires ${claim.expires_at})${note}`, do_instead, "claim_held", { claim });
-/** The remote port, or the `no_remote` refusal when this repo has none. */
-export function requireRemote<R>(remote: R | null): R {
-  if (!remote) throw refuse("no remote is configured", cmd.doctor(), "no_remote");
-  return remote;
-}
-
-/** A remote call that threw, as the `remote_failed` failure. */
-export const remoteFailed = (e: unknown) => failure(`the remote failed: ${(e as Error).message}`, cmd.doctor(), "remote_failed");
-
+/** A config file a person wrote needs fixing (exit 6): never a guess at what they meant. */
+export const configFailure = (error: string, do_instead: string | null, code = "config_invalid", details?: unknown) =>
+  new CliFailure(body(error, do_instead, code, details), ExitCode.config);
 /** Unexpected failure (exit 1). */
 export const failure = (error: string, do_instead: string | null = null, code = "error", details?: unknown) =>
   new CliFailure(body(error, do_instead, code, details), ExitCode.error);
+
+/** A command whose body another change fills in: a refusal, so a script never mistakes it for done. */
+export const notBuilt = (command: string) => refuse(`norn ${command} is not built yet`, null, "not_built");
 
 const EXIT = Symbol("norn.exit");
 
@@ -73,7 +54,7 @@ export interface WithExit {
   exit: ExitCode;
 }
 
-/** Return a value with a non-zero exit code (e.g. a tick whose actions partly failed). */
+/** A value with a non-zero exit code (a tick whose actions partly failed). */
 export function withExit(value: unknown, exit: ExitCode): WithExit {
   return { [EXIT]: true, value, exit };
 }
@@ -84,28 +65,44 @@ export function isWithExit(v: unknown): v is WithExit {
 
 const RENDERED = Symbol("norn.rendered");
 
-/**
- * A command's data together with its markdown for a reader: stdout gets the markdown unless the
- * caller passes `--json`, which prints `value`. Exit codes are the same either way, so code
- * branches on them and on `--json` data, never on the markdown.
- * `asked` marks text a JSON command prints because the caller asked for it (`watch --human`).
- */
+/** A command's data with its markdown; `--json` prints `value`, otherwise the markdown. */
 export interface Rendered {
   [RENDERED]: true;
   value: unknown;
   markdown: string;
-  asked?: boolean;
 }
 
-export function rendered(value: unknown, markdown: string, opts: { asked?: boolean } = {}): Rendered {
-  return { [RENDERED]: true, value, markdown: markdown.endsWith("\n") ? markdown : `${markdown}\n`, ...(opts.asked ? { asked: true } : {}) };
+export function rendered(value: unknown, markdown: string): Rendered {
+  return { [RENDERED]: true, value, markdown: markdown.endsWith("\n") ? markdown : `${markdown}\n` };
 }
 
 export function isRendered(v: unknown): v is Rendered {
   return typeof v === "object" && v !== null && (v as Partial<Rendered>)[RENDERED] === true;
 }
 
-/** Text safe inside a markdown table cell: its pipes escaped. */
+const RAW = Symbol("norn.raw");
+
+/**
+ * Bytes printed as they are, whatever the flags: a hook's answer belongs to the harness that asked,
+ * and a hook must always answer, so it never becomes a CliError.
+ */
+export interface Raw {
+  [RAW]: true;
+  stdout: string;
+  exit: number;
+  /** runs once `stdout` is printed: what must never be marked done before the other program got it */
+  after?: () => Promise<void>;
+}
+
+export function raw(stdout: string, exit: number, after?: () => Promise<void>): Raw {
+  return { [RAW]: true, stdout, exit, ...(after && { after }) };
+}
+
+export function isRaw(v: unknown): v is Raw {
+  return typeof v === "object" && v !== null && (v as Partial<Raw>)[RAW] === true;
+}
+
+/** Text safe inside a markdown table cell. */
 export const tableCell = (s: string): string => s.replace(/\|/g, "\\|");
 
 const FAILURE_TITLE: Partial<Record<ExitCode, string>> = {
@@ -116,19 +113,18 @@ const FAILURE_TITLE: Partial<Record<ExitCode, string>> = {
   [ExitCode.config]: "Config error",
 };
 
-/** A `CliError` as markdown, for commands that print markdown; the exit code still says which kind. */
 export function failureMarkdown(f: CliFailure): string {
   const { error, do_instead, code } = f.body;
   const title = FAILURE_TITLE[f.exit] ?? "Error";
   return `**${title}${code ? ` (${code})` : ""}:** ${error}\n${do_instead ? `\nDo instead: ${do_instead}\n` : ""}`;
 }
 
-/** Normalize anything thrown into a CliFailure (never prose on stdout). */
-export function toFailure(e: unknown): CliFailure {
+/** Anything thrown, as a CliFailure: never prose on stdout. */
+export function toFailure(e: unknown, debug = false): CliFailure {
   if (e instanceof CliFailure) return e;
   const err = e instanceof Error ? e : new Error(String(e));
-  return failure(err.message, null, "error", process.env.NORN_DEBUG ? { stack: err.stack } : undefined);
+  return failure(err.message, null, "error", debug ? { stack: err.stack } : undefined);
 }
 
-/** One JSON value + newline. */
+/** One JSON value and a newline. */
 export const render = (value: unknown): string => `${JSON.stringify(value)}\n`;

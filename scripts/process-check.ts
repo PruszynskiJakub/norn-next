@@ -4,13 +4,14 @@
  * with `gh` and prints the verdict as one JSON value: `{ok, reason}` or `{error, do_instead}`.
  *
  * A PR passes iff
- *   (a) its head branch is a norn story branch `gh-<N>-<slug>` (storyBranch) and it closes #N;
+ *   (a) its head branch is a norn story branch and it closes #N: `norn/gh-<N>`, the story branch norn
+ *       names (packages/runtime/src/branches.ts), or `gh-<N>-<slug>`, the one earlier releases name;
  *   (b) it is labelled `bypass`, closes an issue labelled `bypass`, and that issue links another issue;
  *   (c) its author is Dependabot.
  * (a) and (b) also need a branch in this repository: a fork PR is input to an issue, not merged as is.
- * Neither (a) nor (b) may touch an installed bundled skill copy (`.agents/skills/norn*`) unless it is
- * a release PR (titled `Release X.Y.Z`): `norn upgrade` overwrites those copies from the released
- * binary, so an edit made there is reverted silently once main moves to the next release.
+ * Neither (a) nor (b) may touch a copy of a pack skill (`.agents/skills/norn*`) unless it is a release
+ * PR (titled `Release X.Y.Z`): the source is the pack, and a committed copy edited by hand either is
+ * overwritten from a released binary or, unmarked, shadows the pack's skill in every run in this repo.
  *
  *   bun scripts/process-check.ts <pr-number>   (needs GH_TOKEN; GITHUB_REPOSITORY names the repo)
  */
@@ -43,9 +44,12 @@ export type Verdict = { ok: true; reason: string } | { ok: false; error: string;
 
 export const BYPASS_LABEL = "bypass";
 const DEPENDABOT = new Set(["dependabot[bot]", "app/dependabot", "dependabot"]);
-/** storyBranch(`gh-<N>`, slug): STORY_KEY_PATTERN + "-" + SLUG_PATTERN (packages/schema/src/common.ts). */
-const STORY_BRANCH = /^gh-([1-9][0-9]*)-[a-z0-9]+(?:-[a-z0-9]+)*$/;
-/** Installed copies of the bundled skills; `release`, `release-start` and `issue` are repo-local. */
+/**
+ * `norn/<story key>` (a slice's branch adds `-<NN>` and is never a PR's head), or the older
+ * `gh-<N>-<slug>`: a repo still run by an earlier release opens its PRs from that one.
+ */
+const STORY_BRANCH = /^(?:norn\/gh-([1-9][0-9]*)|gh-([1-9][0-9]*)-[a-z0-9]+(?:-[a-z0-9]+)*)$/;
+/** Copies of the pack's skills; `release`, `release-start` and `issue` are repo-local. */
 const INSTALLED_SKILL = /^\.agents\/skills\/norn[^/]*(?:\/|$)/;
 /** The release workflow and its bypass both title the PR after the issue it renames. */
 const RELEASE_TITLE = /^Release \d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
@@ -92,8 +96,8 @@ export function processCheck(f: PrFacts): Verdict {
   const copies = f.files.filter((p) => INSTALLED_SKILL.test(p));
   if (copies.length && !RELEASE_TITLE.test(f.title))
     return refuse(
-      `PR edits installed bundled skill copies (${listed(copies)}); \`norn upgrade\` overwrites them from the released binary, reverting the edit`,
-      "Edit the skill's source in packages/cli/assets/skills/ instead and revert the change to .agents/skills/; the release PR copies the sources over.",
+      `PR edits copies of the pack's skills (${listed(copies)}); the pack is their source, so a hand edit is overwritten or shadows the pack's skill`,
+      "Edit the skill's source in packages/pack-sdlc/assets/skills/ instead and revert the change to .agents/skills/; the release PR copies the sources over.",
     );
   return origin;
 }
@@ -111,7 +115,7 @@ function processOrigin(f: PrFacts): Verdict {
   const story = STORY_BRANCH.exec(f.head);
   if (story) {
     if (fork) return fork;
-    const n = Number(story[1]);
+    const n = Number(story[1] ?? story[2]);
     if (closes.includes(n)) return { ok: true, reason: `norn story branch ${f.head} closes #${n}` };
     return refuse(
       `branch ${f.head} is the norn story branch for #${n}, but the PR does not close #${n}`,
@@ -139,7 +143,7 @@ function processOrigin(f: PrFacts): Verdict {
   }
 
   return refuse(
-    `branch ${f.head} is not a norn story branch (gh-<N>-<slug>) and the PR is not labelled \`${BYPASS_LABEL}\``,
+    `branch ${f.head} is not a norn story branch (norn/gh-<N>, or gh-<N>-<slug>) and the PR is not labelled \`${BYPASS_LABEL}\``,
     "Start every change as a norn issue and let norn open the PR from its story branch. Only when norn cannot deliver the change: open an issue labelled `bypass` that links the norn issue behind it, label this PR `bypass` and add `Closes #<bypass issue>`.",
   );
 }

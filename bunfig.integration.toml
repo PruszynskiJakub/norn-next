@@ -1,4 +1,4 @@
-# The integration tier (gh-118 B5): `bun run test:integration` selects only packages/*/test/integration/.
+# The integration tier: `bun run test:integration` selects only packages/*/test/integration/.
 # A package's own test root and its other subfolders (unit/, fixtures, per-adapter folders not yet in a
 # tier) are ignored, so nothing outside integration/ runs.
 [test]

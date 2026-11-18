@@ -1,0 +1,162 @@
+{
+  "scenario": "context-compaction",
+  "description": "Claude Code compacts the context in the middle of a turn; the turn goes on and nothing reads as idle.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "SessionStart",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "SessionStart",
+        "source": "startup",
+        "model": "claude-opus-4-5"
+      }
+    },
+    {
+      "hook": "UserPromptSubmit",
+      "at": "2026-11-17T10:00:01.000Z",
+      "env": {
+        "NORN_PROMPT_SOURCE": "brief"
+      },
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "UserPromptSubmit",
+        "prompt": "Use the norn skill, then run `norn brief`."
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Read",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts"
+        },
+        "tool_use_id": "toolu_01"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Read",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts"
+        },
+        "tool_response": {
+          "type": "text"
+        },
+        "tool_use_id": "toolu_01"
+      }
+    },
+    {
+      "hook": "PreCompact",
+      "at": "2026-11-17T10:00:12.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreCompact",
+        "trigger": "auto",
+        "custom_instructions": ""
+      }
+    },
+    {
+      "hook": "PreToolUse",
+      "at": "2026-11-17T10:01:10.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PreToolUse",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts",
+          "old_string": "a",
+          "new_string": "b"
+        },
+        "tool_use_id": "toolu_02"
+      }
+    },
+    {
+      "hook": "PostToolUse",
+      "at": "2026-11-17T10:01:11.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "PostToolUse",
+        "tool_name": "Edit",
+        "tool_input": {
+          "file_path": "/repo/.worktrees/gh-12/src/a.ts",
+          "old_string": "a",
+          "new_string": "b"
+        },
+        "tool_response": {
+          "success": true
+        },
+        "tool_use_id": "toolu_02"
+      }
+    },
+    {
+      "hook": "Stop",
+      "at": "2026-11-17T10:01:20.000Z",
+      "payload": {
+        "session_id": "sess-7f3a",
+        "transcript_path": "/home/u/.claude/projects/-repo/sess-7f3a.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "hook_event_name": "Stop",
+        "stop_hook_active": false,
+        "last_assistant_message": "Done editing."
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 5,
+      "now": "2026-11-17T10:00:13.000Z",
+      "expect": {
+        "activity": "working",
+        "silent": false,
+        "compactions": 1
+      }
+    },
+    {
+      "after": 6,
+      "now": "2026-11-17T10:01:10.000Z",
+      "expect": {
+        "activity": "awaiting_tools",
+        "compactions": 1
+      }
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T10:01:12.000Z",
+      "expect": {
+        "activity": "working",
+        "compactions": 1
+      }
+    },
+    {
+      "after": 8,
+      "now": "2026-11-17T10:01:21.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "compactions": 1
+      }
+    }
+  ]
+}

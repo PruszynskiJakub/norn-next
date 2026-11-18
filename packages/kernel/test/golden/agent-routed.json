@@ -1,0 +1,1155 @@
+{
+  "name": "agent-routed",
+  "description": "A step that routes the outcomes norn classifies: a question, a dead session, a run past its deadline and a silent agent each take the step's route to a person's gate instead of the built-in handling.",
+  "step_kinds": {
+    "update-branch": {
+      "outcomes": [
+        "done",
+        "conflict",
+        "clean",
+        "resolved"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "integrate": {
+      "outcomes": [
+        "done",
+        "conflict"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "open-pr": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "push": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "await-merge": {
+      "outcomes": [
+        "merged",
+        "stale"
+      ],
+      "mode": "wait",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "routed": {
+        "name": "routed",
+        "description": "An agent step that routes every outcome norn classifies to a person.",
+        "start": "work",
+        "steps": {
+          "work": {
+            "agent": "Do the work.",
+            "skills": [
+              "norn-implement"
+            ],
+            "outcomes": {
+              "done": "$done",
+              "silent": "triage",
+              "died": "triage",
+              "timeout": "triage",
+              "ask": "triage"
+            },
+            "means": {
+              "done": "the work is done"
+            }
+          },
+          "triage": {
+            "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+            "outcomes": {
+              "approve": "$done",
+              "reject": "$stuck"
+            }
+          }
+        }
+      }
+    },
+    "pinned": []
+  },
+  "config": {
+    "counterDefaults": {
+      "checkFail": 5,
+      "gateReject": 2,
+      "conflict": 2,
+      "stale": 10,
+      "agentBack": 3
+    },
+    "silentAfterMs": 900000,
+    "maxNudges": 2,
+    "maxRetries": 1,
+    "deadlineMs": 3600000,
+    "mode": "auto",
+    "executor": "claude",
+    "workflow": "story",
+    "sliceWorkflow": "slice",
+    "claimTtlMs": 600000,
+    "claimRenewBeforeMs": 400000,
+    "maxAgents": 9
+  },
+  "facts": {
+    "tick_id": "01JD5G00000MR9XA8KKK8P87K1",
+    "now": "2026-11-17T09:00:00.000Z",
+    "holder": "machine-a",
+    "capabilities": {
+      "tracker": {
+        "assign": true,
+        "labels": true,
+        "comment": true,
+        "create": true,
+        "close": true
+      },
+      "forge": {
+        "draft": true,
+        "checks": true,
+        "raw_urls": true
+      },
+      "store": {
+        "shared": false,
+        "claims": "local",
+        "mailbox": true,
+        "artifacts": true
+      },
+      "executors": {
+        "claude": {
+          "blockStop": true,
+          "denyTool": true,
+          "injectContext": true,
+          "subagents": true,
+          "limits": true,
+          "paneInput": false,
+          "headless": true,
+          "attended": true
+        }
+      }
+    },
+    "stories": [
+      {
+        "key": "gh-130",
+        "item": {
+          "id": 130,
+          "key": "gh-130",
+          "title": "Story 130",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-130",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-130",
+            "state": {
+              "format": 1,
+              "unit": "gh-130",
+              "story": "gh-130",
+              "workflow": {
+                "name": "routed",
+                "hash": "69c093846185f4a336712ac75474efe7c87ed2a1067dd5cf62a6b5ac54b6a7d2",
+                "doc": {
+                  "name": "routed",
+                  "description": "An agent step that routes every outcome norn classifies to a person.",
+                  "start": "work",
+                  "steps": {
+                    "work": {
+                      "agent": "Do the work.",
+                      "skills": [
+                        "norn-implement"
+                      ],
+                      "outcomes": {
+                        "done": "$done",
+                        "silent": "triage",
+                        "died": "triage",
+                        "timeout": "triage",
+                        "ask": "triage"
+                      },
+                      "means": {
+                        "done": "the work is done"
+                      }
+                    },
+                    "triage": {
+                      "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": "$stuck"
+                      }
+                    }
+                  }
+                }
+              },
+              "step": "work",
+              "attempt": 1,
+              "counters": {},
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-130-1",
+                "step": "work",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "work": 1
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": {
+              "activity": "asking",
+              "silent": false,
+              "pending_tools": 0,
+              "subagents": 0,
+              "pane_answers": 0,
+              "errors": [],
+              "ask": {
+                "id": "q-2",
+                "question": "Which branch?"
+              }
+            }
+          }
+        ],
+        "mailbox": []
+      },
+      {
+        "key": "gh-131",
+        "item": {
+          "id": 131,
+          "key": "gh-131",
+          "title": "Story 131",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-131",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-131",
+            "state": {
+              "format": 1,
+              "unit": "gh-131",
+              "story": "gh-131",
+              "workflow": {
+                "name": "routed",
+                "hash": "69c093846185f4a336712ac75474efe7c87ed2a1067dd5cf62a6b5ac54b6a7d2",
+                "doc": {
+                  "name": "routed",
+                  "description": "An agent step that routes every outcome norn classifies to a person.",
+                  "start": "work",
+                  "steps": {
+                    "work": {
+                      "agent": "Do the work.",
+                      "skills": [
+                        "norn-implement"
+                      ],
+                      "outcomes": {
+                        "done": "$done",
+                        "silent": "triage",
+                        "died": "triage",
+                        "timeout": "triage",
+                        "ask": "triage"
+                      },
+                      "means": {
+                        "done": "the work is done"
+                      }
+                    },
+                    "triage": {
+                      "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": "$stuck"
+                      }
+                    }
+                  }
+                }
+              },
+              "step": "work",
+              "attempt": 1,
+              "counters": {},
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-131-1",
+                "step": "work",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "work": 1
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": {
+              "activity": "ended",
+              "silent": false,
+              "pending_tools": 0,
+              "subagents": 0,
+              "pane_answers": 0,
+              "errors": []
+            }
+          }
+        ],
+        "mailbox": []
+      },
+      {
+        "key": "gh-132",
+        "item": {
+          "id": 132,
+          "key": "gh-132",
+          "title": "Story 132",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-132",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-132",
+            "state": {
+              "format": 1,
+              "unit": "gh-132",
+              "story": "gh-132",
+              "workflow": {
+                "name": "routed",
+                "hash": "69c093846185f4a336712ac75474efe7c87ed2a1067dd5cf62a6b5ac54b6a7d2",
+                "doc": {
+                  "name": "routed",
+                  "description": "An agent step that routes every outcome norn classifies to a person.",
+                  "start": "work",
+                  "steps": {
+                    "work": {
+                      "agent": "Do the work.",
+                      "skills": [
+                        "norn-implement"
+                      ],
+                      "outcomes": {
+                        "done": "$done",
+                        "silent": "triage",
+                        "died": "triage",
+                        "timeout": "triage",
+                        "ask": "triage"
+                      },
+                      "means": {
+                        "done": "the work is done"
+                      }
+                    },
+                    "triage": {
+                      "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": "$stuck"
+                      }
+                    }
+                  }
+                }
+              },
+              "step": "work",
+              "attempt": 1,
+              "counters": {},
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-132-1",
+                "step": "work",
+                "attempt": 1,
+                "started_at": "2026-11-17T07:45:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "work": 1
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": {
+              "activity": "working",
+              "silent": false,
+              "pending_tools": 0,
+              "subagents": 0,
+              "pane_answers": 0,
+              "errors": []
+            }
+          }
+        ],
+        "mailbox": []
+      },
+      {
+        "key": "gh-133",
+        "item": {
+          "id": 133,
+          "key": "gh-133",
+          "title": "Story 133",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-133",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-133",
+            "state": {
+              "format": 1,
+              "unit": "gh-133",
+              "story": "gh-133",
+              "workflow": {
+                "name": "routed",
+                "hash": "69c093846185f4a336712ac75474efe7c87ed2a1067dd5cf62a6b5ac54b6a7d2",
+                "doc": {
+                  "name": "routed",
+                  "description": "An agent step that routes every outcome norn classifies to a person.",
+                  "start": "work",
+                  "steps": {
+                    "work": {
+                      "agent": "Do the work.",
+                      "skills": [
+                        "norn-implement"
+                      ],
+                      "outcomes": {
+                        "done": "$done",
+                        "silent": "triage",
+                        "died": "triage",
+                        "timeout": "triage",
+                        "ask": "triage"
+                      },
+                      "means": {
+                        "done": "the work is done"
+                      }
+                    },
+                    "triage": {
+                      "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": "$stuck"
+                      }
+                    }
+                  }
+                }
+              },
+              "step": "work",
+              "attempt": 1,
+              "counters": {},
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-133-1",
+                "step": "work",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "work": 1
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": {
+              "activity": "working",
+              "silent": true,
+              "pending_tools": 0,
+              "subagents": 0,
+              "pane_answers": 0,
+              "errors": []
+            }
+          }
+        ],
+        "mailbox": []
+      },
+      {
+        "key": "gh-134",
+        "item": {
+          "id": 134,
+          "key": "gh-134",
+          "title": "Story 134",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-134",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-134",
+            "state": {
+              "format": 1,
+              "unit": "gh-134",
+              "story": "gh-134",
+              "workflow": {
+                "name": "routed",
+                "hash": "69c093846185f4a336712ac75474efe7c87ed2a1067dd5cf62a6b5ac54b6a7d2",
+                "doc": {
+                  "name": "routed",
+                  "description": "An agent step that routes every outcome norn classifies to a person.",
+                  "start": "work",
+                  "steps": {
+                    "work": {
+                      "agent": "Do the work.",
+                      "skills": [
+                        "norn-implement"
+                      ],
+                      "outcomes": {
+                        "done": "$done",
+                        "silent": "triage",
+                        "died": "triage",
+                        "timeout": "triage",
+                        "ask": "triage"
+                      },
+                      "means": {
+                        "done": "the work is done"
+                      }
+                    },
+                    "triage": {
+                      "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": "$stuck"
+                      }
+                    }
+                  }
+                }
+              },
+              "step": "work",
+              "attempt": 1,
+              "counters": {},
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-134-1",
+                "step": "work",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "work": 1
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": {
+              "activity": "turn_ended",
+              "silent": false,
+              "pending_tools": 0,
+              "subagents": 0,
+              "pane_answers": 0,
+              "errors": []
+            }
+          }
+        ],
+        "mailbox": []
+      },
+      {
+        "key": "gh-135",
+        "item": {
+          "id": 135,
+          "key": "gh-135",
+          "title": "Story 135",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-135",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-135",
+            "state": {
+              "format": 1,
+              "unit": "gh-135",
+              "story": "gh-135",
+              "workflow": {
+                "name": "routed",
+                "hash": "69c093846185f4a336712ac75474efe7c87ed2a1067dd5cf62a6b5ac54b6a7d2",
+                "doc": {
+                  "name": "routed",
+                  "description": "An agent step that routes every outcome norn classifies to a person.",
+                  "start": "work",
+                  "steps": {
+                    "work": {
+                      "agent": "Do the work.",
+                      "skills": [
+                        "norn-implement"
+                      ],
+                      "outcomes": {
+                        "done": "$done",
+                        "silent": "triage",
+                        "died": "triage",
+                        "timeout": "triage",
+                        "ask": "triage"
+                      },
+                      "means": {
+                        "done": "the work is done"
+                      }
+                    },
+                    "triage": {
+                      "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+                      "outcomes": {
+                        "approve": "$done",
+                        "reject": "$stuck"
+                      }
+                    }
+                  }
+                }
+              },
+              "step": "work",
+              "attempt": 1,
+              "counters": {},
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-135-1",
+                "step": "work",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0
+              },
+              "applied_through": 1,
+              "visits": {
+                "work": 1
+              }
+            },
+            "version": 2,
+            "receipts": [],
+            "session": {
+              "activity": "limited",
+              "silent": false,
+              "pending_tools": 0,
+              "subagents": 0,
+              "pane_answers": 0,
+              "errors": [],
+              "limit": {
+                "kind": "usage",
+                "resets_at": "2026-11-17T08:59:00.000Z"
+              }
+            }
+          }
+        ],
+        "mailbox": []
+      }
+    ],
+    "intake": []
+  },
+  "decisions": [
+    {
+      "kind": "apply_receipts",
+      "unit": "gh-130",
+      "rule": "agent.ask.route",
+      "receipts": [
+        {
+          "id": "01JD5G0000C73G79TPA9EMCVD5",
+          "data": {
+            "kind": "run.classified",
+            "run_id": "run-gh-130-1",
+            "outcome": "ask",
+            "rule": "agent.ask.route",
+            "step": "work",
+            "attempt": 1
+          }
+        }
+      ],
+      "state": {
+        "format": 1,
+        "unit": "gh-130",
+        "story": "gh-130",
+        "workflow": {
+          "name": "routed",
+          "hash": "69c093846185f4a336712ac75474efe7c87ed2a1067dd5cf62a6b5ac54b6a7d2",
+          "doc": {
+            "name": "routed",
+            "description": "An agent step that routes every outcome norn classifies to a person.",
+            "start": "work",
+            "steps": {
+              "work": {
+                "agent": "Do the work.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "outcomes": {
+                  "done": "$done",
+                  "silent": "triage",
+                  "died": "triage",
+                  "timeout": "triage",
+                  "ask": "triage"
+                },
+                "means": {
+                  "done": "the work is done"
+                }
+              },
+              "triage": {
+                "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+                "outcomes": {
+                  "approve": "$done",
+                  "reject": "$stuck"
+                }
+              }
+            }
+          }
+        },
+        "step": "triage",
+        "attempt": 1,
+        "counters": {},
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 2,
+        "visits": {
+          "work": 1,
+          "triage": 1
+        }
+      },
+      "expect_version": 2,
+      "rejected": []
+    },
+    {
+      "kind": "apply_receipts",
+      "unit": "gh-131",
+      "rule": "agent.died.route",
+      "receipts": [
+        {
+          "id": "01JD5G0000FWPMF8ZZQPVMTVA7",
+          "data": {
+            "kind": "run.classified",
+            "run_id": "run-gh-131-1",
+            "outcome": "died",
+            "rule": "agent.died.route",
+            "step": "work",
+            "attempt": 1
+          }
+        }
+      ],
+      "state": {
+        "format": 1,
+        "unit": "gh-131",
+        "story": "gh-131",
+        "workflow": {
+          "name": "routed",
+          "hash": "69c093846185f4a336712ac75474efe7c87ed2a1067dd5cf62a6b5ac54b6a7d2",
+          "doc": {
+            "name": "routed",
+            "description": "An agent step that routes every outcome norn classifies to a person.",
+            "start": "work",
+            "steps": {
+              "work": {
+                "agent": "Do the work.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "outcomes": {
+                  "done": "$done",
+                  "silent": "triage",
+                  "died": "triage",
+                  "timeout": "triage",
+                  "ask": "triage"
+                },
+                "means": {
+                  "done": "the work is done"
+                }
+              },
+              "triage": {
+                "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+                "outcomes": {
+                  "approve": "$done",
+                  "reject": "$stuck"
+                }
+              }
+            }
+          }
+        },
+        "step": "triage",
+        "attempt": 1,
+        "counters": {},
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 2,
+        "visits": {
+          "work": 1,
+          "triage": 1
+        }
+      },
+      "expect_version": 2,
+      "rejected": []
+    },
+    {
+      "kind": "apply_receipts",
+      "unit": "gh-132",
+      "rule": "agent.timeout.route",
+      "receipts": [
+        {
+          "id": "01JD5G0000DXAZ7T4XPG82QXGC",
+          "data": {
+            "kind": "run.classified",
+            "run_id": "run-gh-132-1",
+            "outcome": "timeout",
+            "rule": "agent.timeout.route",
+            "step": "work",
+            "attempt": 1
+          }
+        }
+      ],
+      "state": {
+        "format": 1,
+        "unit": "gh-132",
+        "story": "gh-132",
+        "workflow": {
+          "name": "routed",
+          "hash": "69c093846185f4a336712ac75474efe7c87ed2a1067dd5cf62a6b5ac54b6a7d2",
+          "doc": {
+            "name": "routed",
+            "description": "An agent step that routes every outcome norn classifies to a person.",
+            "start": "work",
+            "steps": {
+              "work": {
+                "agent": "Do the work.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "outcomes": {
+                  "done": "$done",
+                  "silent": "triage",
+                  "died": "triage",
+                  "timeout": "triage",
+                  "ask": "triage"
+                },
+                "means": {
+                  "done": "the work is done"
+                }
+              },
+              "triage": {
+                "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+                "outcomes": {
+                  "approve": "$done",
+                  "reject": "$stuck"
+                }
+              }
+            }
+          }
+        },
+        "step": "triage",
+        "attempt": 1,
+        "counters": {},
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 2,
+        "visits": {
+          "work": 1,
+          "triage": 1
+        }
+      },
+      "expect_version": 2,
+      "rejected": []
+    },
+    {
+      "kind": "apply_receipts",
+      "unit": "gh-133",
+      "rule": "agent.silent.route",
+      "receipts": [
+        {
+          "id": "01JD5G0000G5CYANXJR76YS26J",
+          "data": {
+            "kind": "run.classified",
+            "run_id": "run-gh-133-1",
+            "outcome": "silent",
+            "rule": "agent.silent.route",
+            "step": "work",
+            "attempt": 1
+          }
+        }
+      ],
+      "state": {
+        "format": 1,
+        "unit": "gh-133",
+        "story": "gh-133",
+        "workflow": {
+          "name": "routed",
+          "hash": "69c093846185f4a336712ac75474efe7c87ed2a1067dd5cf62a6b5ac54b6a7d2",
+          "doc": {
+            "name": "routed",
+            "description": "An agent step that routes every outcome norn classifies to a person.",
+            "start": "work",
+            "steps": {
+              "work": {
+                "agent": "Do the work.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "outcomes": {
+                  "done": "$done",
+                  "silent": "triage",
+                  "died": "triage",
+                  "timeout": "triage",
+                  "ask": "triage"
+                },
+                "means": {
+                  "done": "the work is done"
+                }
+              },
+              "triage": {
+                "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+                "outcomes": {
+                  "approve": "$done",
+                  "reject": "$stuck"
+                }
+              }
+            }
+          }
+        },
+        "step": "triage",
+        "attempt": 1,
+        "counters": {},
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 2,
+        "visits": {
+          "work": 1,
+          "triage": 1
+        }
+      },
+      "expect_version": 2,
+      "rejected": []
+    },
+    {
+      "kind": "apply_receipts",
+      "unit": "gh-134",
+      "rule": "agent.turn_ended.route",
+      "receipts": [
+        {
+          "id": "01JD5G0000HNQP0MC6STEJTCXV",
+          "data": {
+            "kind": "run.classified",
+            "run_id": "run-gh-134-1",
+            "outcome": "silent",
+            "rule": "agent.turn_ended.route",
+            "step": "work",
+            "attempt": 1
+          }
+        }
+      ],
+      "state": {
+        "format": 1,
+        "unit": "gh-134",
+        "story": "gh-134",
+        "workflow": {
+          "name": "routed",
+          "hash": "69c093846185f4a336712ac75474efe7c87ed2a1067dd5cf62a6b5ac54b6a7d2",
+          "doc": {
+            "name": "routed",
+            "description": "An agent step that routes every outcome norn classifies to a person.",
+            "start": "work",
+            "steps": {
+              "work": {
+                "agent": "Do the work.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "outcomes": {
+                  "done": "$done",
+                  "silent": "triage",
+                  "died": "triage",
+                  "timeout": "triage",
+                  "ask": "triage"
+                },
+                "means": {
+                  "done": "the work is done"
+                }
+              },
+              "triage": {
+                "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+                "outcomes": {
+                  "approve": "$done",
+                  "reject": "$stuck"
+                }
+              }
+            }
+          }
+        },
+        "step": "triage",
+        "attempt": 1,
+        "counters": {},
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 2,
+        "visits": {
+          "work": 1,
+          "triage": 1
+        }
+      },
+      "expect_version": 2,
+      "rejected": []
+    },
+    {
+      "kind": "apply_receipts",
+      "unit": "gh-135",
+      "rule": "agent.limited.route",
+      "receipts": [
+        {
+          "id": "01JD5G00006H3304GBHG0V39M9",
+          "data": {
+            "kind": "run.classified",
+            "run_id": "run-gh-135-1",
+            "outcome": "silent",
+            "rule": "agent.limited.route",
+            "step": "work",
+            "attempt": 1
+          }
+        }
+      ],
+      "state": {
+        "format": 1,
+        "unit": "gh-135",
+        "story": "gh-135",
+        "workflow": {
+          "name": "routed",
+          "hash": "69c093846185f4a336712ac75474efe7c87ed2a1067dd5cf62a6b5ac54b6a7d2",
+          "doc": {
+            "name": "routed",
+            "description": "An agent step that routes every outcome norn classifies to a person.",
+            "start": "work",
+            "steps": {
+              "work": {
+                "agent": "Do the work.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "outcomes": {
+                  "done": "$done",
+                  "silent": "triage",
+                  "died": "triage",
+                  "timeout": "triage",
+                  "ask": "triage"
+                },
+                "means": {
+                  "done": "the work is done"
+                }
+              },
+              "triage": {
+                "gate": "The agent stopped. Approve to end the round, or reject to leave it stuck.",
+                "outcomes": {
+                  "approve": "$done",
+                  "reject": "$stuck"
+                }
+              }
+            }
+          }
+        },
+        "step": "triage",
+        "attempt": 1,
+        "counters": {},
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 2,
+        "visits": {
+          "work": 1,
+          "triage": 1
+        }
+      },
+      "expect_version": 2,
+      "rejected": []
+    }
+  ]
+}

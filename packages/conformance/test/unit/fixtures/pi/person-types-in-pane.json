@@ -1,0 +1,200 @@
+{
+  "scenario": "person-types-in-pane",
+  "description": "The agent's run settles on a question in prose; the person types the answer in the pane, then norn nudges once.",
+  "derived_from": "Derived, not recorded: the payloads are what norn's pi extension (packages/harness-pi/src/extension.ts) sends for the pi 1.5.2 events docs/extensions.md describes, with the session and tool shapes of the earlier pi adapter's fixtures; the timeline mirrors the claude recording of the same scenario.",
+  "run_id": "run-1",
+  "steps": [
+    {
+      "hook": "session_start",
+      "at": "2026-11-17T10:00:00.000Z",
+      "payload": {
+        "hook_event_name": "session_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "reason": "startup"
+      }
+    },
+    {
+      "hook": "before_agent_start",
+      "at": "2026-11-17T10:00:01.000Z",
+      "payload": {
+        "hook_event_name": "before_agent_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "message_type": "user",
+        "prompt": "Use the norn skill, then run `norn brief`.\n\n<!-- norn-prompt source=brief id=p-brief-1 -->"
+      }
+    },
+    {
+      "hook": "tool_call",
+      "at": "2026-11-17T10:00:05.000Z",
+      "payload": {
+        "hook_event_name": "tool_call",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_r1",
+        "tool_name": "read",
+        "tool_input": {
+          "path": "src/store.ts"
+        }
+      }
+    },
+    {
+      "hook": "tool_execution_end",
+      "at": "2026-11-17T10:00:06.000Z",
+      "payload": {
+        "hook_event_name": "tool_execution_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_r1",
+        "tool_name": "read",
+        "is_error": false
+      }
+    },
+    {
+      "hook": "agent_before_settle",
+      "at": "2026-11-17T10:00:10.000Z",
+      "payload": {
+        "hook_event_name": "agent_before_settle",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "stop_reason": "stop",
+        "last_assistant_message": "Should the store use sqlite or postgres?"
+      }
+    },
+    {
+      "hook": "agent_settled",
+      "at": "2026-11-17T10:00:11.000Z",
+      "payload": {
+        "hook_event_name": "agent_settled",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "aborted": false
+      }
+    },
+    {
+      "hook": "before_agent_start",
+      "at": "2026-11-17T10:05:00.000Z",
+      "payload": {
+        "hook_event_name": "before_agent_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "message_type": "user",
+        "prompt": "postgres"
+      }
+    },
+    {
+      "hook": "tool_call",
+      "at": "2026-11-17T10:05:05.000Z",
+      "payload": {
+        "hook_event_name": "tool_call",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_e1",
+        "tool_name": "edit",
+        "tool_input": {
+          "path": "src/a.ts",
+          "edits": [
+            {
+              "oldText": "a",
+              "newText": "b"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "hook": "tool_execution_end",
+      "at": "2026-11-17T10:05:06.000Z",
+      "payload": {
+        "hook_event_name": "tool_execution_end",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "tool_call_id": "call_e1",
+        "tool_name": "edit",
+        "is_error": false
+      }
+    },
+    {
+      "hook": "agent_before_settle",
+      "at": "2026-11-17T10:05:10.000Z",
+      "payload": {
+        "hook_event_name": "agent_before_settle",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "stop_reason": "stop",
+        "last_assistant_message": "Switched to postgres."
+      }
+    },
+    {
+      "hook": "agent_settled",
+      "at": "2026-11-17T10:05:11.000Z",
+      "payload": {
+        "hook_event_name": "agent_settled",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "aborted": false
+      }
+    },
+    {
+      "hook": "before_agent_start",
+      "at": "2026-11-17T10:06:00.000Z",
+      "payload": {
+        "hook_event_name": "before_agent_start",
+        "session_id": "0199-pi",
+        "transcript_path": "/home/u/.pi/agent/sessions/--repo-.worktrees-gh-12--/2026-11-17T10-00-00-000Z_0199-pi.jsonl",
+        "cwd": "/repo/.worktrees/gh-12",
+        "message_type": "user",
+        "prompt": "Report the step with `norn done`, or say why you cannot.\n\n<!-- norn-prompt source=nudge id=p-nudge-1 -->"
+      }
+    }
+  ],
+  "checks": [
+    {
+      "after": 6,
+      "now": "2026-11-17T10:00:12.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "pane_answers": 0,
+        "last_message": "Should the store use sqlite or postgres?"
+      }
+    },
+    {
+      "after": 7,
+      "now": "2026-11-17T10:05:01.000Z",
+      "expect": {
+        "activity": "working",
+        "pane_answers": 1
+      }
+    },
+    {
+      "after": 11,
+      "now": "2026-11-17T10:05:12.000Z",
+      "expect": {
+        "activity": "turn_ended",
+        "pane_answers": 1,
+        "last_message": "Switched to postgres."
+      }
+    },
+    {
+      "after": 12,
+      "now": "2026-11-17T10:06:01.000Z",
+      "expect": {
+        "activity": "working",
+        "pane_answers": 1
+      },
+      "why": "a prompt norn sent is no answer from the pane"
+    }
+  ]
+}

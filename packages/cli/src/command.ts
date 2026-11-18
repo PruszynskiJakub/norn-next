@@ -1,81 +1,78 @@
 /**
- * Command framework. One file per command under `src/commands/`, each exporting a
- * `defineCommand({...})` value that is listed in `src/commands/index.ts`.
- *
- * Arguments are parsed with `node:util` parseArgs from the command's `options`; unknown
- * options and wrong positional counts are usage errors (exit 2). `run` gets the Context
- * (repo located first unless `repo: false`) and returns one JSON value, `withExit(value, code)`,
- * or throws a `CliFailure` (`refuse`, `usageError`, `corruptError`, `busyError`, `failure`).
- * A command whose reader is an agent or a person sets `markdown: true` and returns
- * `rendered(value, markdown)`; `--json` (accepted by every command) prints the value instead.
- *
- * A noun groups verbs (`norn run list`): `defineNoun({...})` with each verb a command named
- * `<noun> <verb>`, listed in `src/commands/index.ts` too. `norn <noun>` lists its verbs;
- * `norn help <noun> <verb>` and `--help` on a verb show its usage and `optionHelp`.
+ * The command framework. One file per command under `src/commands/`, each exporting a
+ * `defineCommand({...})` value listed in `src/commands/index.ts`, so two changes filling two commands
+ * never edit the same file. Flags are parsed from `options` before `run`; an unknown flag or a wrong
+ * argument count is a usage error (exit 2). `run` returns a value, `rendered(value, markdown)`,
+ * `withExit(value, code)` or `raw(stdout, exit)`, or throws a CliFailure.
  */
-import type { ParseArgsConfig } from "node:util";
-import type { Context } from "./context.ts";
+import { type ParseArgsConfig, parseArgs } from "node:util";
+import type { CliContext } from "./context.ts";
+import { usageError } from "./output.ts";
 
 export type OptionSpec = NonNullable<ParseArgsConfig["options"]>;
 
 export interface ParsedArgs {
-  /** option values by long name (strings, booleans, or arrays for `multiple`) */
   values: Record<string, string | boolean | Array<string | boolean> | undefined>;
   positionals: string[];
-  /** options in the order given (`--note a --note-criterion AC1 --note b` pairs by position) */
-  order?: Array<{ name: string; value: string | boolean }>;
-  /** `--json` was given (the dispatcher takes it out of `values`); a command that draws a screen prints data instead */
-  json?: boolean;
+  /** `--json` was given; the dispatcher takes it out of `values` */
+  json: boolean;
 }
 
-/**
- * How a binary that does not match the repo's `norn_version` treats a command. `acts`: refused;
- * `reads`: runs and shows the mismatch; `exempt`: never checked (setup and repair commands, an
- * agent's reports and hooks, and a tick's check-run, so a step in flight can finish).
- */
-export type VersionClass = "acts" | "reads" | "exempt";
-
 export interface Command {
+  /** as typed: `tick`, `story view` */
   name: string;
-  /** Required, so a new command cannot leave its version class out */
-  version: VersionClass;
-  /** one line, shown by `norn help` */
+  /** one line for `norn help` */
   summary: string;
   /** e.g. `norn watch [--interval 30s]` */
   usage: string;
   options?: OptionSpec;
-  /** one line per option for `norn help <command>`, keyed as typed (`--receipt <id>`) */
+  /** one line per option for `norn help <command>`, keyed as typed (`--note <text>`) */
   optionHelp?: Record<string, string>;
-  /** positional argument count bounds (default: none allowed) */
+  /** positional argument count bounds (default: none) */
   positionals?: { min?: number; max?: number };
-  /** prints markdown unless `--json` (refusals too): its reader is an agent or a person, not a program */
-  markdown?: boolean;
-  /** a JSON command's flag that asks for text (`watch --human`): with it, refusals print markdown too */
-  textFlag?: string;
-  /** needs a git repository (default true): `ctx.locate()` runs before `run` */
-  repo?: boolean;
-  run(ctx: Context, args: ParsedArgs): Promise<unknown>;
+  /** the rest of the line after the last fixed argument is one argument (`norn ask why is it red`) */
+  restJoined?: boolean;
+  /**
+   * The command answers another program in that program's own format (a hook answers its harness):
+   * it returns `raw(...)`, and a failure prints nothing with exit 0 rather than a CliError, so the
+   * harness never takes a norn error for its own protocol.
+   */
+  answersRaw?: boolean;
+  run(ctx: CliContext, args: ParsedArgs): Promise<unknown>;
 }
 
 export function defineCommand(c: Command): Command {
   return c;
 }
 
-/** A noun and its verbs, in the order `norn <noun>` lists them. */
+/** A noun and its verbs (`norn story view`); `norn <noun>` alone lists them. */
 export interface Noun {
   name: string;
-  /** one line, shown by `norn help` */
   summary: string;
   verbs: readonly Command[];
-  /** `norn <noun>` lists the verbs under these titles, by verb name (`create`); default: one list */
-  groups?: ReadonlyArray<{ title: string; verbs: readonly string[] }>;
 }
 
 export function defineNoun(n: Noun): Noun {
   return n;
 }
 
-/** Typed option getters (parseArgs values are loosely typed). */
+export function parseCommandArgs(c: Command, argv: string[], json: boolean): ParsedArgs {
+  let parsed: ReturnType<typeof parseArgs>;
+  try {
+    parsed = parseArgs({ args: argv, options: c.options ?? {}, allowPositionals: true, strict: true });
+  } catch (e) {
+    throw usageError((e as Error).message, `norn help ${c.name}`);
+  }
+  let positionals = parsed.positionals;
+  const max = c.positionals?.max ?? 0;
+  if (c.restJoined && max > 0 && positionals.length > max) positionals = [...positionals.slice(0, max - 1), positionals.slice(max - 1).join(" ")];
+  const min = c.positionals?.min ?? 0;
+  const n = positionals.length;
+  if (n < min || n > max) throw usageError(`${c.name}: expected ${min === max ? min : `${min} to ${max}`} argument(s), got ${n}`, c.usage);
+  return { values: parsed.values as ParsedArgs["values"], positionals, json };
+}
+
+/** Typed option getters: parseArgs values are loosely typed. */
 export const opt = {
   str(args: ParsedArgs, name: string): string | undefined {
     const v = args.values[name];

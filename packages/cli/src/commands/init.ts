@@ -1,243 +1,138 @@
 /**
- * `norn init`: repo config from the template if absent, workflow examples if
- * absent, the bundled skills into `.agents/skills/` (whole folders, the bundled version) linked
- * from each configured agent's skill folder, agent hooks (norn-owned, updated in place),
- * and machine-local paths in .gitignore. Idempotent: re-running updates norn-owned files only.
- * `norn_version` is recorded only in a repo with no team file; a team file with no or a pre-0.30
- * version is refused (the version guard's refusal) before any write; on a repo set up for another
- * version from 0.30 on, a differing bundled skill is left as it is and `norn upgrade` named instead.
- * Workflows created now get the repo's test command when its build files name one (`runtime/detect.ts`).
- * Last, the labels norn uses are created on the remote (`runtime/labels.ts`); a remote it
- * cannot reach or write is reported, never a failure.
- * A starter `REVIEW.md` at the repo root (what `norn-review` ignores, counts as failure and
- * does not report), only when the repo has none.
- * Prints a summary for a person, ending in the next steps to a first story; `--json` for data.
+ * `norn init [--tracker <name>] [--forge <name>] [--store <name>] [--executor <harness>] [--runner <name>] [--mode auto|manual] [--commit] [--yes]`: set up norn in this repo: detect the tracker, forge and executor, write the config, run doctor.
+ * Writes the repo-local config (or the committed one with `--commit`), keeps `.agents/` out of git
+ * unless committed, prints what it chose and runs doctor. It never asks: every choice is detected or
+ * given as a flag (`init.ts`). The choices are resolved against the bundled and installed plugins
+ * before anything is written, so a name no plugin provides is refused with nothing changed; a config
+ * file already there is never overwritten, though one holding only what `norn plugin add` wrote is
+ * completed, so a plugin that provides a choice can be added first. The old norn's team config, when
+ * the repo still holds it, gives the keys it can map (migrate.ts) and init says which it ignored.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
-import { atomicWrite, gitRemoteUrl, installSkills, LOCAL_CONFIG_FILE, linkSkills, loadWorkflows, readText, REPO_CONFIG_FILE, repoConfigPath, SHARED_DIR, SKILLS_DIR, skillsDrift, userConfigPath, WORKFLOWS_DIR, WORKTREE_LOCAL_FILES, workflowsDir, writeConfigSchemas, writeNornVersion } from "@norn/store";
+import { join } from "node:path";
 import { defineCommand, opt } from "../command.ts";
-import type { Context } from "../context.ts";
-import { refuse, rendered } from "../output.ts";
-import { agentsInUse } from "../runtime/agents-in-use.ts";
-import { assetsDir } from "../runtime/assets.ts";
-import { detectTestCommand, hasTemplateTestCommand, TEMPLATE_TEST_COMMAND, withTestCommand } from "../runtime/detect.ts";
-import { type LabelsReport, labelsLines, remoteLabels } from "../runtime/labels.ts";
-import { bundledSkills, checkedRepoWorkflows } from "../runtime/workflows.ts";
-import { cmd, versionBaseline } from "@norn/core";
-import { PROVIDERS, type RemoteProvider } from "@norn/schema";
+import { configError, loadConfig, mergeConfig, parseLayer } from "../config/load.ts";
+import { mapOldConfig, type OldConfig } from "../config/migrate.ts";
+import { AGENTS_DIR, configPaths, type Layer, layerFileName, OLD_REPO_CONFIG_FILE, REPO_COMMITTED_FILE, REPO_LOCAL_FILE } from "../config/paths.ts";
+import type { ConfigLayer } from "../config/schema.ts";
+import { CliContext } from "../context.ts";
+import { doctorLines, runDoctor } from "../doctor.ts";
+import { choose, completable, completedText, detect, initLayer, initText, offerLine, withExcluded } from "../init.ts";
+import { refuse, rendered, usageError } from "../output.ts";
+import { wirePlugins } from "../wiring.ts";
 
-/** The repo's review guide the `norn-review` skill reads, at the repo root. */
-const REVIEW_FILE = "REVIEW.md";
-
-/** Paths that must never be committed; the machine-local files live outside the checkout. */
-const IGNORED = [...WORKTREE_LOCAL_FILES, LOCAL_CONFIG_FILE];
-
-function ensureGitignore(root: string): string[] {
-  const path = join(root, ".gitignore");
-  const text = readText(path) ?? "";
-  const lines = text.split("\n").map((l) => l.trim());
-  const missing = IGNORED.filter((p) => !lines.includes(p));
-  if (missing.length) atomicWrite(path, `${text}${text && !text.endsWith("\n") ? "\n" : ""}# norn (machine-local)\n${missing.join("\n")}\n`);
-  return missing;
+/** The old config's workflow choices, which init's own layer has no detection for. */
+function withOldKernelKeys(layer: ConfigLayer, old: OldConfig | null): ConfigLayer {
+  if (!old?.workflow && !old?.slice_workflow) return layer;
+  return { ...layer, kernel: { ...layer.kernel, ...(old.workflow && { workflow: old.workflow }), ...(old.slice_workflow && { slice_workflow: old.slice_workflow }) } };
 }
 
-/**
- * Installed hooks run `$NORN_BIN` when set — the norn that launched the agent (act exports
- * it) — else the `norn` on PATH. Hooks run through `sh -c`, which expands it.
- */
-const DEFAULT_HOOK_COMMAND = '"${NORN_BIN:-norn}" hook';
-
-export function hookCommand(ctx: Context, flag?: string): string {
-  return flag ?? ctx.env.NORN_HOOK_COMMAND ?? DEFAULT_HOOK_COMMAND;
+function oldConfigLines(old: OldConfig): string[] {
+  const list = (keys: string[]) => (keys.length > 0 ? keys.join(", ") : "none");
+  return [
+    `- ${OLD_REPO_CONFIG_FILE} (the old norn's config): took ${list(old.mapped)}; ignored ${list(old.ignored)}`,
+    ...old.notes.map((n) => `- ${n}`),
+    `- this norn never reads ${OLD_REPO_CONFIG_FILE}: delete it once the new config holds what you need`,
+  ];
 }
-
-/** The binary a hook command runs, as the shell would pick it (`"${NORN_BIN:-norn}"` → NORN_BIN or norn). */
-export function hookBinary(command: string, env: Record<string, string | undefined>): string {
-  const first = command.trim().split(/\s+/)[0] ?? "";
-  const m = /^"?\$\{NORN_BIN:-([^}]+)\}"?$/.exec(first);
-  return m ? env.NORN_BIN || (m[1] as string) : first;
-}
-
-export interface InitReport {
-  root: string;
-  config: "exists" | "created";
-  /** `~/.norn/config.yaml` */
-  user_config: "exists" | "created";
-  /** The starter `REVIEW.md` at the repo root; never overwritten */
-  review: "exists" | "created";
-  /** Schema copies written or refreshed */
-  schemas: string[];
-  workflows: { created: string[]; kept: string[] };
-  skills: { dir: string; updated: string[]; unchanged: string[]; links: Array<{ agent: string; dir: string; linked: string[]; unchanged: string[]; kept: string[] }> };
-  hooks: Array<{ agent: string; tier: string; changed: string[] }>;
-  hook_command: string;
-  gitignore: string[];
-  /** the git remote norn pushes to; `url: null` when the repository has none (nothing can sync or push) */
-  remote: { provider: RemoteProvider; label: string; git_remote: string; url: string | null };
-  /** the `test` check command written into the workflows created now (null when none were created) */
-  test_command: { command: string; detected_from: string | null; set_in: string[] } | null;
-  /**
-   * The repo's `norn_version` after init and the running norn's; `recorded`
-   * when this init wrote it; `skills_kept`: bundled skills that differ and were left alone because
-   * the repo is on another version (`norn upgrade` moves both)
-   */
-  norn_version: { repo: string; running: string; recorded: boolean; skills_kept: string[] };
-  /** The labels created, already there, unused and not created, or why they were not checked */
-  labels: LabelsReport;
-}
-
-/** `norn init`: what changed, one line per part; names are listed only for what changed. */
-function formatInit(r: InitReport): string {
-  const rel = (p: string) => relative(r.root, p) || ".";
-  const count = (n: number, what: string) => `${n} ${what}`;
-  const v = r.norn_version;
-  const out = [`norn init in ${r.root}`, "", `norn version: ${v.repo}${v.recorded ? " (recorded)" : ""}`, ""];
-  const row = (label: string, text: string) => out.push(`  ${label.padEnd(15)} ${text}`);
-  row("config", `${REPO_CONFIG_FILE} ${r.config === "created" ? "created" : "kept (exists)"}`);
-  row("user config", `~/.norn/config.yaml ${r.user_config === "created" ? "created" : "kept (exists)"}`);
-  row("review", `${REVIEW_FILE} ${r.review === "created" ? "created" : "kept (exists)"}`);
-  if (r.schemas.length) row("schemas", `wrote ${r.schemas.map((p) => (p.startsWith(r.root) ? rel(p) : p)).join(", ")}`);
-  row("workflows", [r.workflows.created.length ? `created ${r.workflows.created.join(", ")}` : "", r.workflows.kept.length ? `kept ${r.workflows.kept.join(", ")}` : ""].filter(Boolean).join("; ") || "none");
-  const sk = r.skills;
-  const kept = v.skills_kept.length ? `; kept ${v.skills_kept.join(", ")} (norn ${v.repo}'s to change)` : "";
-  row("skills", `${rel(sk.dir)}: ${sk.updated.length ? `updated ${sk.updated.join(", ")}` : "up to date"}${kept} (${count(sk.updated.length + sk.unchanged.length + v.skills_kept.length, "skills")})`);
-  for (const l of sk.links) {
-    const parts = [l.linked.length ? `linked ${l.linked.join(", ")}` : "", l.kept.length ? `not linked, a folder of yours is in the way: ${l.kept.join(", ")}` : ""].filter(Boolean);
-    row("", `${l.agent} → ${rel(l.dir)}: ${parts.join("; ") || "all linked"}`);
-  }
-  for (const h of r.hooks) row("hooks", `${h.agent}: ${h.tier === "none" ? "none (adapter has no hooks)" : h.changed.length ? `installed in ${h.changed.map(rel).join(", ")}` : "up to date"}`);
-  row("hook command", r.hook_command);
-  row(".gitignore", r.gitignore.length ? `added ${r.gitignore.join(", ")}` : "up to date");
-  const changed = r.config === "created" || r.review === "created" || r.norn_version.recorded || r.schemas.some((p) => p.startsWith(r.root)) || r.workflows.created.length || sk.updated.length || sk.links.some((l) => l.linked.length) || r.hooks.some((h) => h.changed.length) || r.gitignore.length;
-  if (r.test_command) row("test command", `${r.test_command.command} (${r.test_command.detected_from ? `from ${r.test_command.detected_from}` : "not detected: the template's default"})`);
-  row("remote", r.remote.url ? `${r.remote.git_remote} → ${r.remote.url}` : `no git remote named ${r.remote.git_remote}`);
-  // The labels line says what norn did on the remote, or what to run
-  const [labelsHead = "", ...labelsRest] = labelsLines(r.labels);
-  row("labels", labelsHead.replace(/^labels: /, ""));
-  for (const l of labelsRest) row("", l.trim());
-  if (v.repo !== v.running) {
-    const differ = v.skills_kept.length ? `, with the bundled skills that differ: ${v.skills_kept.join(", ")}` : "";
-    out.push("", `this repo is on norn ${v.repo}, you run ${v.running}: \`${cmd.upgrade()}\` moves it${differ}`);
-  }
-  if (!changed && !(r.labels.checked && r.labels.created.length)) out.push("", "Nothing changed: norn is set up here.");
-  out.push("", "Next steps", ...nextSteps(r, !!changed).map((s, i) => `  ${i + 1}. ${s}`));
-  return out.join("\n");
-}
-
-/** What a person does after `norn init` to get a first story going, in order. */
-function nextSteps(r: InitReport, changed: boolean): string[] {
-  const rel = (p: string) => relative(r.root, p) || ".";
-  const steps: string[] = [];
-  if (!r.remote.url) steps.push(`Add the remote norn syncs issues from and pushes branches to: \`git remote add ${r.remote.git_remote} <url>\`.`);
-  const tc = r.test_command;
-  if (tc && !tc.detected_from) steps.push(`Set your test command: the \`test\` steps in ${WORKFLOWS_DIR}/ run \`${tc.command}\` — change \`check:\` there.`);
-  else if (tc) steps.push(`Check the test command \`${tc.command}\` in the \`test\` steps of ${WORKFLOWS_DIR}/ (detected from ${tc.detected_from}).`);
-  if (changed) {
-    // each agent folder whole (`.claude`, not `.claude/settings.json`): skills and hooks live there
-    const top = (p: string) => rel(p).split("/")[0] as string;
-    const paths = [".agents", ...r.skills.links.map((l) => top(l.dir)), ...r.hooks.flatMap((h) => h.changed.map(top)), ...(r.review === "created" ? [REVIEW_FILE] : []), ...(r.gitignore.length ? [".gitignore"] : [])];
-    steps.push(`Commit and push the setup: \`git add ${[...new Set(paths)].join(" ")} && git commit -m "Set up norn" && git push\`.`);
-  }
-  steps.push(`Check this machine: \`${cmd.doctor()}\`.`);
-  const label = r.remote.label;
-  // The labels line above says how to get a label norn could not create
-  const issueCreate = PROVIDERS[r.remote.provider].issueCreate;
-  steps.push(`Make a first story: an issue labelled \`${label}\` and assigned to you${issueCreate ? `, e.g. \`${issueCreate(label)}\`` : ""}.`);
-  steps.push(`Pick it up: \`${cmd.sync()}\`, keep \`${cmd.watch()}\` running (it moves every step on, in manual mode too), and \`${cmd.status()}\` shows what needs you and the command for each item.`);
-  return steps;
-}
-
-/** The files directly in a folder, sorted; none when it does not exist. */
-const files = (dir: string) => (existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name).sort() : []);
 
 export const initCommand = defineCommand({
   name: "init",
-  version: "exempt",
-  summary: "Set up norn in this repository: config, workflows, skills, hooks",
-  usage: "norn init [--json] [--hook-command <cmd>]",
-  markdown: true,
-  options: { "hook-command": { type: "string" } },
+  summary: "Set up norn in this repo: detect the tracker, forge and executor, write the config, run doctor",
+  usage: "norn init [--tracker <name>] [--forge <name>] [--store <name>] [--executor <harness>] [--runner <name>] [--mode auto|manual] [--commit] [--yes]",
+  options: {
+    tracker: { type: "string" },
+    forge: { type: "string" },
+    store: { type: "string" },
+    executor: { type: "string" },
+    runner: { type: "string" },
+    mode: { type: "string" },
+    commit: { type: "boolean" },
+    yes: { type: "boolean" },
+  },
+  optionHelp: {
+    "--tracker <name>": "the tracker plugin (detected: github when origin is on GitHub and gh is present, else local)",
+    "--forge <name>": "the forge plugin (detected: github with the github tracker, else none)",
+    "--store <name>": "where run state lives (default local)",
+    "--executor <harness>": "the default executor's harness (detected: claude when it is on PATH, else pi when it is)",
+    "--runner <name>": "where agents run (default headless; herdr when inside herdr and asked)",
+    "--mode auto|manual": "how agent steps start: auto on their own, manual when a person runs norn run start (default auto with the headless runner, else manual)",
+    "--commit": `write the committed config (${REPO_COMMITTED_FILE}, team mode) instead of the repo-local one (${REPO_LOCAL_FILE})`,
+    "--yes": "take every detected choice without asking",
+  },
   async run(ctx, args) {
-    const root = ctx.root;
-    // A config file with a problem refuses before init writes anything, so no half setup
-    void ctx.config;
-    const configPath = repoConfigPath(root);
-    // A team file with no or a pre-0.30 version is an older norn's repo, never stamped current:
-    // refused before any write, so it is left exactly as it was
-    if (existsSync(configPath)) {
-      const baseline = versionBaseline(ctx.config.norn_version, ctx.version);
-      if (baseline) throw refuse(baseline.error, baseline.do_instead, baseline.code, { repo: ctx.config.norn_version, running: ctx.version });
+    const w = await ctx.repo();
+    const files = w.ctx.files;
+    const commit = opt.bool(args, "commit");
+    const layer: Layer = commit ? "repo" : "local";
+    const paths = configPaths(w.home, w.repo.root);
+    const current = await files.read(paths[layer]);
+    const existing = current === null ? null : parseLayer(layer, current);
+    if (current !== null && !(existing?.ok && completable(existing.value)))
+      throw refuse(`norn is set up here already: ${layerFileName(layer)} exists`, "norn doctor, or norn config set <key> <value>", "already_initialized", { file: paths[layer] });
+
+    const given = opt.str(args, "mode");
+    if (given !== undefined && given !== "auto" && given !== "manual") throw usageError(`--mode ${given}: the mode is auto or manual`, "norn init --mode auto, or norn init --mode manual");
+
+    // the old norn's team config, when the repo still has it: its keys win over detection, a flag over both
+    const oldText = await files.read(join(w.repo.root, OLD_REPO_CONFIG_FILE));
+    const old = oldText === null ? null : mapOldConfig(oldText);
+    const mode: "auto" | "manual" | undefined = given ?? old?.mode;
+    const detected = await detect(w.ctx, ctx.env, w.repo.root);
+    const flags = {
+      tracker: opt.str(args, "tracker") ?? old?.tracker,
+      forge: opt.str(args, "forge") ?? old?.forge,
+      store: opt.str(args, "store"),
+      executor: opt.str(args, "executor"),
+      runner: opt.str(args, "runner"),
+      ...(mode !== undefined && { mode }),
+      yes: opt.bool(args, "yes"),
+    };
+    const { choices, offered } = choose(old?.base ? { ...detected, base: old.base } : detected, flags);
+    const doc = withOldKernelKeys(initLayer(choices), old);
+    const text = current !== null && existing?.ok && existing.value ? completedText(current, existing.value, doc) : initText(doc);
+
+    // checked as the next command will load it, with the other files, before a byte is written
+    const before = await loadConfig(files, paths);
+    const layers = before.ok ? before.value.layers : before.layers;
+    if (!before.ok && before.problems.some((p) => p.layer !== "merged")) throw configError(before.problems, layers, paths);
+    const own = parseLayer(layer, text);
+    if (!own.ok) throw configError(own.problems, { ...layers, [layer]: {} }, paths);
+    const merged = mergeConfig({ ...layers, [layer]: own.value }, paths);
+    if (!merged.ok) throw configError(merged.problems, { ...layers, [layer]: {} }, paths);
+    await wirePlugins(w, merged.value, ctx.io.importer);
+
+    await files.write(paths[layer], text);
+    let exclude: "added" | "present" | "committed" = "committed";
+    if (!commit) {
+      const path = join(w.repo.common, "info", "exclude");
+      const next = withExcluded(await files.read(path), AGENTS_DIR);
+      if (next !== null) await files.write(path, next);
+      exclude = next === null ? "present" : "added";
     }
 
-    const assets = assetsDir(ctx.env);
-    const config = existsSync(configPath) ? "exists" : (atomicWrite(configPath, readFileSync(join(assets, "config.yaml"), "utf8")), "created");
-    // The commented user file on a machine's first init, never overwritten
-    const userPath = userConfigPath(ctx.home);
-    const user_config = existsSync(userPath) ? "exists" : (atomicWrite(userPath, readFileSync(join(assets, "user-config.yaml"), "utf8")), "created");
-    const reviewPath = join(root, REVIEW_FILE);
-    const review = existsSync(reviewPath) ? "exists" : (atomicWrite(reviewPath, readFileSync(join(assets, REVIEW_FILE), "utf8")), "created");
-    // The schema copies the starters' modelines point at
-    const schemas = writeConfigSchemas({ repoRoot: root, home: ctx.home });
-
-    // The templates' `test` checks get the repo's own test command when its build files name one
-    const detected = detectTestCommand(root);
-    const testCommand = detected?.command ?? TEMPLATE_TEST_COMMAND;
-    const workflows = { created: [] as string[], kept: [] as string[] };
-    const setIn: string[] = [];
-    mkdirSync(join(workflowsDir(root), SHARED_DIR), { recursive: true });
-    // The shared files come with the workflows: a bundled workflow that uses one does not load without it
-    const templates = [...files(join(assets, "workflows")), ...files(join(assets, "workflows", SHARED_DIR)).map((f) => `${SHARED_DIR}/${f}`)];
-    for (const f of templates) {
-      const dest = join(workflowsDir(root), f);
-      if (existsSync(dest)) workflows.kept.push(f);
-      else {
-        const template = readFileSync(join(assets, "workflows", f), "utf8");
-        const text = detected ? withTestCommand(template, testCommand) : template;
-        atomicWrite(dest, text);
-        if (hasTemplateTestCommand(template)) setIn.push(f);
-        workflows.created.push(f);
-      }
-    }
-    const test_command = workflows.created.length ? { command: testCommand, detected_from: detected?.from ?? null, set_in: setIn } : null;
-
-    // The version is written only into a repo that has none; init never moves it
-    ctx.reload();
-    const recorded = ctx.config.norn_version === null;
-    if (recorded) {
-      const w = writeNornVersion(root, ctx.version);
-      if (!w.ok) throw new Error(`norn init: writing norn_version: ${w.error}`);
-      ctx.reload();
-    }
-    const repoVersion = ctx.config.norn_version ?? ctx.version;
-    const ports = await ctx.ports(); // validates the config again with the written files (exit 6 when invalid)
-    const agents = agentsInUse(root, ctx.resolved, ports);
-    const names = bundledSkills(ctx.env);
-    // On another version's repo, a missing skill is copied in and one that differs stays
-    const source = join(assets, "skills");
-    const skills_kept = repoVersion === ctx.version ? [] : skillsDrift(join(root, SKILLS_DIR), source, names);
-    const installed = installSkills(root, source, names.filter((n) => !skills_kept.includes(n)));
-    const links: Array<{ agent: string; dir: string; linked: string[]; unchanged: string[]; kept: string[] }> = [];
-    const seen = new Set<string>();
-    for (const [name, agent] of Object.entries(agents)) {
-      const dir = agent.skillDir(root);
-      if (seen.has(dir)) continue;
-      seen.add(dir);
-      links.push({ agent: name, ...linkSkills(root, dir, names) });
-    }
-    const skills = { ...installed, links };
-
-    const command = hookCommand(ctx, opt.str(args, "hook-command"));
-    const hooks: Array<{ agent: string; tier: string; changed: string[] }> = [];
-    for (const [name, agent] of Object.entries(agents)) {
-      const r = agent.tier === "none" ? { changed: [] } : await agent.installHooks(root, command, name);
-      hooks.push({ agent: name, tier: agent.tier, changed: r.changed });
-    }
-
-    const url = gitRemoteUrl(root, ctx.config.git_remote);
-    // After every file is in place, so the workflows (and the skills they name) are the repo's
-    const labels = await remoteLabels({ remote: ports.remote, gitRemoteUrl: url, intake: ctx.config.label, workflows: checkedRepoWorkflows(loadWorkflows(root), root, ctx.config, ports.agents), create: true });
-    const report: InitReport = { root, config, review, user_config, schemas, workflows, skills, hooks, hook_command: command, gitignore: ensureGitignore(root), remote: { provider: ctx.config.provider, label: ctx.config.label, git_remote: ctx.config.git_remote, url }, test_command, norn_version: { repo: repoVersion, running: ctx.version, recorded, skills_kept }, labels };
-    return rendered(report, formatInit(report));
+    // a fresh context: this one may hold the "no config" it saw before the file was written
+    const doctor = await runDoctor(new CliContext(ctx.io));
+    const migrated = old && { file: OLD_REPO_CONFIG_FILE, mapped: old.mapped, ignored: old.ignored, notes: old.notes };
+    const value = { root: w.repo.root, file: paths[layer], layer, team: commit, chose: choices, detected, offered, exclude, ...(migrated && { migrated }), doctor };
+    const md = [
+      `# norn init in ${w.repo.root}`,
+      "",
+      `Wrote ${layerFileName(layer)}${commit ? " (team mode: commit it)" : ""}.`,
+      "",
+      `- tracker: ${choices.tracker}${flags.tracker ? "" : detected.github ? (detected.gh ? " (origin is on GitHub)" : " (origin is on GitHub, but gh is not installed)") : " (no GitHub origin)"}`,
+      `- forge: ${choices.forge}`,
+      `- store: ${choices.store}`,
+      `- executor: ${choices.executor} in ${choices.runner}${flags.executor || (choices.executor === "pi" ? detected.pi : detected.claude) ? "" : ` (${choices.executor} is not on PATH)`}`,
+      `- mode: ${choices.mode}${flags.mode ? "" : choices.mode === "auto" ? ` (the ${choices.runner} runner has nobody beside the agent: agent steps start on their own)` : ` (agents run in ${choices.runner} beside a person: start each agent step with norn run start <unit>)`}`,
+      `- base: ${choices.base}`,
+      `- .git/info/exclude: ${exclude === "added" ? `added ${AGENTS_DIR}` : exclude === "present" ? `${AGENTS_DIR} already there` : "untouched (team mode)"}`,
+      ...offered.map((o) => offerLine(o, choices)),
+      ...(old ? oldConfigLines(old) : []),
+      "",
+      `## norn doctor: ${doctor.ok ? "all checks pass" : "some checks fail"}`,
+      "",
+      ...doctorLines(doctor),
+    ].join("\n");
+    return rendered(value, md);
   },
 });

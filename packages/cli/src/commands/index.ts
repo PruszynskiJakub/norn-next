@@ -1,35 +1,64 @@
 /**
- * Command registry. To add a command: create `src/commands/<name>.ts` exporting
- * `defineCommand({...})`, then list it here. A verb goes in its noun's `verbs` and the noun here.
+ * The command registry: every top-level command and every noun with its verbs, in the order
+ * `norn help` lists them. A command's body lives in its own file.
  */
 import type { Command, Noun } from "../command.ts";
+import { defineNoun } from "../command.ts";
 import { askCommand } from "./ask.ts";
 import { briefCommand } from "./brief.ts";
-import { doneCommand } from "./done.ts";
-import { hookEventCommand } from "./hook.ts";
-import { checkRunCommand } from "./check-run.ts";
-import { stuckCommand } from "./stuck.ts";
-import { helpCommand } from "./help.ts";
-import { initCommand } from "./init.ts";
-import { syncCommand } from "./sync.ts";
-import { tickCommand } from "./tick.ts";
-import { uninstallCommand } from "./uninstall.ts";
-import { watchCommand } from "./watch.ts";
-import { runNoun } from "./run.ts";
-import { storyNoun } from "./story.ts";
-import { statusCommand } from "./status.ts";
-import { configNoun } from "./config.ts";
+import { configGetCommand } from "./config-get.ts";
+import { configSetCommand } from "./config-set.ts";
+import { configShowCommand } from "./config-show.ts";
 import { doctorCommand } from "./doctor.ts";
-import { tidyCommand } from "./tidy.ts";
-import { upgradeCommand } from "./upgrade.ts";
+import { doneCommand } from "./done.ts";
+import { helpCommand } from "./help.ts";
+import { hookCommand } from "./hook.ts";
+import { initCommand } from "./init.ts";
+import { pluginAddCommand } from "./plugin-add.ts";
+import { pluginListCommand } from "./plugin-list.ts";
+import { pluginRemoveCommand } from "./plugin-remove.ts";
+import { pluginUpdateCommand } from "./plugin-update.ts";
+import { runRerunCommand } from "./run-rerun.ts";
+import { runStartCommand } from "./run-start.ts";
+import { runStopCommand } from "./run-stop.ts";
+import { statusCommand } from "./status.ts";
+import { storyAnswerCommand } from "./story-answer.ts";
+import { storyApproveCommand } from "./story-approve.ts";
+import { storyCloseCommand } from "./story-close.ts";
+import { storyCreateCommand } from "./story-create.ts";
+import { storyListCommand } from "./story-list.ts";
+import { storyRejectCommand } from "./story-reject.ts";
+import { storyRoundCommand } from "./story-round.ts";
+import { storyTakeCommand } from "./story-take.ts";
+import { storyUpdateBranchCommand } from "./story-update-branch.ts";
+import { storyViewCommand } from "./story-view.ts";
+import { stuckCommand } from "./stuck.ts";
+import { tickCommand } from "./tick.ts";
+import { watchCommand } from "./watch.ts";
 
-export const COMMANDS: readonly Command[] = [initCommand, uninstallCommand, syncCommand, tickCommand, watchCommand, briefCommand, doneCommand, askCommand, stuckCommand, hookEventCommand, checkRunCommand, statusCommand, tidyCommand, doctorCommand, upgradeCommand, helpCommand];
+export const COMMANDS: readonly Command[] = [
+  helpCommand,
+  initCommand,
+  doctorCommand,
+  statusCommand,
+  tickCommand,
+  watchCommand,
+  briefCommand,
+  doneCommand,
+  askCommand,
+  stuckCommand,
+  hookCommand,
+];
 
-export const NOUNS: readonly Noun[] = [storyNoun, runNoun, configNoun];
+export const NOUNS: readonly Noun[] = [
+  defineNoun({ name: "story", summary: "Stories: list, view, create, the person's decisions, the next round, taking one to this machine, and updating a finished one's branch", verbs: [storyListCommand, storyViewCommand, storyCreateCommand, storyApproveCommand, storyRejectCommand, storyAnswerCommand, storyRoundCommand, storyTakeCommand, storyUpdateBranchCommand, storyCloseCommand] }),
+  defineNoun({ name: "run", summary: "Runs: start one manual mode holds, stop a live one, run a step again", verbs: [runStartCommand, runStopCommand, runRerunCommand] }),
+  defineNoun({ name: "config", summary: "Read and change the config", verbs: [configGetCommand, configSetCommand, configShowCommand] }),
+  defineNoun({ name: "plugin", summary: "Install, list, update and remove plugins", verbs: [pluginAddCommand, pluginListCommand, pluginRemoveCommand, pluginUpdateCommand] }),
+];
 
-/** A flat command by name, or a verb by its full name (`run list`). */
 export function findCommand(name: string): Command | undefined {
-  return COMMANDS.find((c) => c.name === name) ?? NOUNS.flatMap((n) => n.verbs).find((c) => c.name === name);
+  return [...COMMANDS, ...NOUNS.flatMap((n) => n.verbs)].find((c) => c.name === name);
 }
 
 export function findNoun(name: string): Noun | undefined {

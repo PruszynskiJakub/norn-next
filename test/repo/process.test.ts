@@ -1,42 +1,15 @@
-/** norn's own process setup: the repo's workflows, config and skills load as norn would load them. */
+/** norn's own process setup: the repo's skills are named, linked and kept apart from the bundled ones. */
 import { describe, expect, test } from "bun:test";
-import { cpSync, existsSync, lstatSync, mkdtempSync, readdirSync, readFileSync, realpathSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
-import { checkWorkflowLevel, validateWorkflowDefinition, workflowHash } from "../../packages/core/src/index.ts";
-import { loadConfig, loadWorkflows, repoConfigPath, visibleSkills, workflowsDir } from "../../packages/store/src/index.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
-/**
- * This repo stays on the old layout until a released norn can migrate it (gh-110, out of scope), and
- * store reads only the new one: until then its config and workflows are read from a copy at the new
- * paths. Once `.agents/norn/` is gone this is ROOT.
- */
-const OLD_DIR = join(ROOT, ".agents", "norn");
-const CONFIG_ROOT = existsSync(OLD_DIR) ? newLayoutCopy() : ROOT;
-
-function newLayoutCopy(): string {
-  const root = mkdtempSync(join(tmpdir(), "norn-process-"));
-  cpSync(join(OLD_DIR, "config.yaml"), repoConfigPath(root));
-  cpSync(join(OLD_DIR, "workflows"), workflowsDir(root), { recursive: true });
-  return root;
-}
 const AGENTS_SKILLS = join(ROOT, ".agents", "skills");
 const CLAUDE_SKILLS = join(ROOT, ".claude", "skills");
+const BUNDLED_SKILLS = join(ROOT, "packages", "pack-sdlc", "assets", "skills");
 
-/** Workflows that end in `integrate` run on slices; every other one is a story workflow. */
-const SLICE_WORKFLOWS = new Set(["slice"]);
 const PERSON_ONLY_SKILLS = ["issue", "release-start"];
-/**
- * The meaning of each repo workflow a rewrite must keep, taken from the loader on the base before it: a
- * changed route, counter or instruction changes the hash, formatting and key order never do.
- */
-const PINNED_HASHES: Record<string, string> = {
-  quick: "34f1bf0f2c75ceb2595cd426922df7ef77d9f6c2f7b59800e5f7820779cf5760",
-  story: "587de0db6a21c2aee790bcdca692417e3db673adf7367abc7777f516ae57a7ef",
-  release: "d09f12e78efbe1531a45b1170b2a0adea880104c086005334713d298530d2682",
-};
 
 function frontmatter(skill: string): Record<string, unknown> {
   const text = readFileSync(join(AGENTS_SKILLS, skill, "SKILL.md"), "utf8");
@@ -44,47 +17,6 @@ function frontmatter(skill: string): Record<string, unknown> {
   if (!m) throw new Error(`${skill}/SKILL.md has no frontmatter`);
   return parse(m[1] as string) as Record<string, unknown>;
 }
-
-describe("repo config", () => {
-  test("loads, with triage as the default workflow", () => {
-    const loaded = loadConfig({ repoRoot: CONFIG_ROOT, home: mkdtempSync(join(tmpdir(), "norn-home-")) });
-    expect(loaded.ok ? loaded.config.workflow : loaded.errors).toBe("triage");
-  });
-});
-
-describe("repo workflows", () => {
-  const listing = loadWorkflows(CONFIG_ROOT);
-  const claude = visibleSkills(CLAUDE_SKILLS);
-
-  test("load without errors", () => {
-    expect(listing.errors).toEqual([]);
-  });
-  test.each(Object.keys(PINNED_HASHES))("%s keeps its pinned meaning", (name) => {
-    expect(workflowHash(listing.workflows[name]!.workflow)).toBe(PINNED_HASHES[name] as string);
-  });
-  test("are the six shipped workflows plus release, and no bug, fix or spec", () => {
-    expect(Object.keys(listing.workflows).sort()).toEqual(["quick", "refinement", "release", "reproduce", "slice", "story", "triage"]);
-  });
-  test.each(Object.keys(listing.workflows))("%s is valid for claude with the linked skills", (name) => {
-    const result = validateWorkflowDefinition(listing.workflows[name]!.workflow, {
-      agentSkills: { agent: "claude", visible: { claude } },
-    });
-    expect(result.ok ? [] : result.issues).toEqual([]);
-    if (result.ok) expect(checkWorkflowLevel(result.workflow, SLICE_WORKFLOWS.has(name) ? "slice" : "story")).toEqual([]);
-  });
-  test("the CI wait is written once, in a shared file, and every workflow in the folder still loads", () => {
-    const dir = workflowsDir(CONFIG_ROOT);
-    const files = [
-      ...readdirSync(dir).filter((f) => f.endsWith(".yaml")),
-      ...readdirSync(join(dir, "shared")).filter((f) => f.endsWith(".yaml")).map((f) => `shared/${f}`),
-    ];
-    expect(files.filter((f) => readFileSync(join(dir, f), "utf8").includes("gh run watch"))).toEqual(["shared/ci.yaml"]);
-    expect(listing.errors).toEqual([]);
-  });
-  test("story's and quick's resolve take the base side of each conflict, as the shipped copies do", () => {
-    for (const name of ["story", "quick"]) expect((listing.workflows[name]!.workflow.steps.resolve as { inputs?: unknown[] }).inputs).toContain("base_side");
-  });
-});
 
 describe("repo skills", () => {
   const skills = readdirSync(AGENTS_SKILLS).filter((n) => !n.startsWith("."));
@@ -102,7 +34,7 @@ describe("repo skills", () => {
     expect(frontmatter(skill)["disable-model-invocation"]).toBe(true);
   });
   test("repo-local skills never use the bundled norn- prefix", () => {
-    const bundled = new Set(readdirSync(join(ROOT, "packages", "cli", "assets", "skills")));
+    const bundled = new Set(readdirSync(BUNDLED_SKILLS));
     expect(skills.filter((s) => s.startsWith("norn") && !bundled.has(s))).toEqual([]);
   });
 });

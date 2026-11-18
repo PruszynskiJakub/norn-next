@@ -1,6 +1,6 @@
 # Every PR and every push to main: the unit tier and the type check first, then the integration
-# tier and the e2e tier in shards, and the distributables built and smoke-tested as a user would
-# install them, side by side (gh-118 B11, B12).
+# tier in shards and the distributables built and smoke-tested as a user would install them, side by
+# side.
 name: CI
 
 on:
@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 jobs:
-  # The unit tier spawns nothing (gh-118 B1, B4) and fails in seconds; every other job waits for it (B11).
+  # The unit tier spawns nothing and fails in seconds; every other job waits for it.
   unit:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -29,7 +29,7 @@ jobs:
       - run: bun run test
       - run: bun run typecheck
 
-  # bun shards by file (B12); the only place the integration tier runs, so no local check waits on it
+  # bun shards by file; the only place the integration tier runs, so no local check waits on it
   integration:
     needs: unit
     runs-on: ubuntu-latest
@@ -51,29 +51,6 @@ jobs:
           git config --global user.email "ci@norn.invalid"
           git config --global init.defaultBranch main
           bun run test:integration --shard=${{ matrix.shard }}/4
-
-  # bun shards by file (B12); every shard runs to the end, so a red run reports each failing shard
-  e2e:
-    needs: unit
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3]
-    name: e2e (shard ${{ matrix.shard }}/3)
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.13
-      - run: bun install --frozen-lockfile
-      - name: e2e tier, one shard
-        run: |
-          git config --global user.name "norn ci"
-          git config --global user.email "ci@norn.invalid"
-          git config --global init.defaultBranch main
-          bun run test:e2e --shard=${{ matrix.shard }}/3
 
   package:
     needs: unit

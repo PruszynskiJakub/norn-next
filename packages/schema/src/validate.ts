@@ -3,31 +3,9 @@ import { check, type SchemaError, type ValidationResult } from "./check.ts";
 import { CheckOrder, ClaimBlob, LeaseFile } from "./claim.ts";
 import { CliError } from "./cli.ts";
 import { CriteriaReport } from "./criteria.ts";
-import { LocalConfig, RepoConfig, ResolvedConfig, UserConfig } from "./config.ts";
 import { SliceFrontmatter, StoryFrontmatter } from "./frontmatter.ts";
-import {
-  LocalBaseFile,
-  LocalOverlapFile,
-  LocalCheckoutFile,
-  LocalCockpitFile,
-  LocalFailuresFile,
-  LocalForeignFile,
-  LocalHeartbeatFile,
-  LocalHookBackfillFile,
-  LocalInboxFile,
-  LocalLockFile,
-  LocalNoticesFile,
-  LocalRejectedFile,
-  LocalSupersededFile,
-  LocalNotifiedFile,
-  LocalIssueFile,
-  LocalPrFile,
-  LocalRecordsFile,
-  LocalRemoteFile,
-} from "./local.ts";
 import { Receipt } from "./receipt.ts";
 import { UnitState, UnitStateRecord } from "./state.ts";
-import { HookFact, TraceEvent } from "./trace.ts";
 import { Workflow, WorkflowShared, WorkflowSource } from "./workflow.ts";
 
 export { check, type SchemaError, type ValidationResult } from "./check.ts";
@@ -45,36 +23,11 @@ export const SCHEMAS = {
   // state.json as read and written: older shapes included, normalised by core normalizeUnitState
   "state-record": UnitStateRecord,
   receipt: Receipt,
-  trace: TraceEvent,
-  hook: HookFact,
   claim: ClaimBlob,
   lease: LeaseFile,
   "check-order": CheckOrder,
-  "user-config": UserConfig,
-  "local-config": LocalConfig,
-  "repo-config": RepoConfig,
-  "resolved-config": ResolvedConfig,
   "cli-error": CliError,
   "criteria-report": CriteriaReport,
-  // machine-local files of one checkout (its machine dir), read through store readLocalJson
-  "local-remote": LocalRemoteFile,
-  "local-notified": LocalNotifiedFile,
-  "local-records": LocalRecordsFile,
-  "local-foreign": LocalForeignFile,
-  "local-inbox": LocalInboxFile,
-  "local-heartbeat": LocalHeartbeatFile,
-  "local-failures": LocalFailuresFile,
-  "local-base": LocalBaseFile,
-  "local-overlap": LocalOverlapFile,
-  "local-pr": LocalPrFile,
-  "local-issue": LocalIssueFile,
-  "local-cockpit": LocalCockpitFile,
-  "local-lock": LocalLockFile,
-  "local-hook-backfill": LocalHookBackfillFile,
-  "local-notices": LocalNoticesFile,
-  "local-rejected": LocalRejectedFile,
-  "local-superseded": LocalSupersededFile,
-  "local-checkout": LocalCheckoutFile,
 } as const;
 export type SchemaName = keyof typeof SCHEMAS;
 

@@ -1,0 +1,664 @@
+{
+  "name": "agent-answer-undelivered-1",
+  "description": "An answer to a headless session that ended after asking, on an executor that cannot resume a session: the answer is applied without delivery (so the unit unparks rather than refusing delivery every tick), and the next tick retries the run in a fresh session. An executor that resumes sessions gets the answer delivered as usual (the model host resumes nothing, so its ended session is retried on the next tick too). Tick 1.",
+  "step_kinds": {
+    "update-branch": {
+      "outcomes": [
+        "done",
+        "conflict",
+        "clean",
+        "resolved"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "integrate": {
+      "outcomes": [
+        "done",
+        "conflict"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "open-pr": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "push": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "await-merge": {
+      "outcomes": [
+        "merged",
+        "stale"
+      ],
+      "mode": "wait",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "slice": {
+        "name": "slice",
+        "description": "Build one slice test-first, check and review it, and integrate it into the story branch.",
+        "start": "implement",
+        "steps": {
+          "implement": {
+            "agent": "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps.",
+            "skills": [
+              "norn-implement"
+            ],
+            "inputs": [
+              "slice",
+              "spec",
+              "handoff",
+              "last_check",
+              "last_findings"
+            ],
+            "outcomes": {
+              "done": "test"
+            },
+            "means": {
+              "done": "every acceptance criterion (or rework point) has a passing test"
+            }
+          },
+          "test": {
+            "check": "bun test",
+            "timeout": "10m",
+            "outcomes": {
+              "pass": "review",
+              "fail": {
+                "to": "implement",
+                "counter": "test.fail"
+              }
+            }
+          },
+          "review": {
+            "agent": "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch.",
+            "skills": [
+              "norn-review"
+            ],
+            "inputs": [
+              "slice",
+              "spec",
+              "diff",
+              "last_findings"
+            ],
+            "hand_back": {
+              "changes_requested": "findings"
+            },
+            "outcomes": {
+              "approve": "integrate",
+              "changes_requested": {
+                "to": "implement",
+                "counter": "review.changes_requested"
+              }
+            },
+            "means": {
+              "approve": "all criteria met, no blocking findings",
+              "changes_requested": "blocking findings in the receipt"
+            }
+          },
+          "integrate": {
+            "integrate": null,
+            "outcomes": {
+              "done": "$done",
+              "conflict": {
+                "to": "merge",
+                "counter": "integrate.conflict"
+              }
+            }
+          },
+          "merge": {
+            "agent": "Integrating this slice into the story branch conflicted: resolve each conflict keeping the intent of both sides, and prove it with the tests.",
+            "skills": [
+              "norn-merge"
+            ],
+            "inputs": [
+              "slice",
+              "spec"
+            ],
+            "outcomes": {
+              "done": "integrate"
+            },
+            "means": {
+              "done": "conflicts resolved keeping the intent of both sides; tests pass"
+            }
+          }
+        },
+        "counters": {
+          "test.fail": {
+            "max": 5
+          },
+          "integrate.conflict": {
+            "max": 2,
+            "reset_on": "integrate.done"
+          },
+          "review.changes_requested": {
+            "max": 3
+          }
+        }
+      }
+    },
+    "pinned": []
+  },
+  "config": {
+    "counterDefaults": {
+      "checkFail": 5,
+      "gateReject": 2,
+      "conflict": 2,
+      "stale": 10,
+      "agentBack": 3
+    },
+    "silentAfterMs": 900000,
+    "maxNudges": 2,
+    "maxRetries": 1,
+    "deadlineMs": 3600000,
+    "mode": "auto",
+    "executor": "claude",
+    "workflow": "story",
+    "intakeWorkflowLabelPrefix": "norn:wf:",
+    "sliceWorkflow": "slice",
+    "claimTtlMs": 600000,
+    "claimRenewBeforeMs": 400000,
+    "maxAgents": 9
+  },
+  "facts": {
+    "tick_id": "01JD5G0000TF3E9F0JQV3C0K26",
+    "now": "2026-11-17T09:01:00.000Z",
+    "holder": "machine-a",
+    "capabilities": {
+      "tracker": {
+        "assign": true,
+        "labels": true,
+        "comment": true,
+        "create": true,
+        "close": true
+      },
+      "forge": {
+        "draft": true,
+        "checks": true,
+        "raw_urls": true
+      },
+      "store": {
+        "shared": false,
+        "claims": "local",
+        "mailbox": true,
+        "artifacts": true
+      },
+      "executors": {
+        "claude": {
+          "blockStop": true,
+          "denyTool": true,
+          "injectContext": true,
+          "subagents": true,
+          "limits": true,
+          "paneInput": false,
+          "headless": true,
+          "attended": true
+        },
+        "resumer": {
+          "blockStop": true,
+          "denyTool": true,
+          "injectContext": true,
+          "subagents": true,
+          "limits": true,
+          "paneInput": false,
+          "headless": true,
+          "attended": true,
+          "resume": true
+        }
+      }
+    },
+    "stories": [
+      {
+        "key": "gh-118",
+        "item": {
+          "id": 118,
+          "key": "gh-118",
+          "title": "Story 118",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-118",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-118",
+            "state": {
+              "format": 1,
+              "unit": "gh-118",
+              "story": "gh-118",
+              "workflow": {
+                "name": "slice",
+                "hash": "6c26df89bfb1d4128f71beb2e9465cfe3bb2dd90e61af760b5521d4e2f9c3fb4",
+                "doc": {
+                  "name": "slice",
+                  "description": "Build one slice test-first, check and review it, and integrate it into the story branch.",
+                  "start": "implement",
+                  "steps": {
+                    "implement": {
+                      "agent": "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps.",
+                      "skills": [
+                        "norn-implement"
+                      ],
+                      "inputs": [
+                        "slice",
+                        "spec",
+                        "handoff",
+                        "last_check",
+                        "last_findings"
+                      ],
+                      "outcomes": {
+                        "done": "test"
+                      },
+                      "means": {
+                        "done": "every acceptance criterion (or rework point) has a passing test"
+                      }
+                    },
+                    "test": {
+                      "check": "bun test",
+                      "timeout": "10m",
+                      "outcomes": {
+                        "pass": "review",
+                        "fail": {
+                          "to": "implement",
+                          "counter": "test.fail"
+                        }
+                      }
+                    },
+                    "review": {
+                      "agent": "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch.",
+                      "skills": [
+                        "norn-review"
+                      ],
+                      "inputs": [
+                        "slice",
+                        "spec",
+                        "diff",
+                        "last_findings"
+                      ],
+                      "hand_back": {
+                        "changes_requested": "findings"
+                      },
+                      "outcomes": {
+                        "approve": "integrate",
+                        "changes_requested": {
+                          "to": "implement",
+                          "counter": "review.changes_requested"
+                        }
+                      },
+                      "means": {
+                        "approve": "all criteria met, no blocking findings",
+                        "changes_requested": "blocking findings in the receipt"
+                      }
+                    },
+                    "integrate": {
+                      "integrate": null,
+                      "outcomes": {
+                        "done": "$done",
+                        "conflict": {
+                          "to": "merge",
+                          "counter": "integrate.conflict"
+                        }
+                      }
+                    },
+                    "merge": {
+                      "agent": "Integrating this slice into the story branch conflicted: resolve each conflict keeping the intent of both sides, and prove it with the tests.",
+                      "skills": [
+                        "norn-merge"
+                      ],
+                      "inputs": [
+                        "slice",
+                        "spec"
+                      ],
+                      "outcomes": {
+                        "done": "integrate"
+                      },
+                      "means": {
+                        "done": "conflicts resolved keeping the intent of both sides; tests pass"
+                      }
+                    }
+                  },
+                  "counters": {
+                    "test.fail": {
+                      "max": 5
+                    },
+                    "integrate.conflict": {
+                      "max": 2,
+                      "reset_on": "integrate.done"
+                    },
+                    "review.changes_requested": {
+                      "max": 3
+                    }
+                  }
+                }
+              },
+              "step": "implement",
+              "attempt": 1,
+              "counters": {
+                "test.fail": 0,
+                "integrate.conflict": 0,
+                "review.changes_requested": 0
+              },
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-118-1",
+                "step": "implement",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "claude",
+                "attended": false,
+                "nudges": 0,
+                "session": "h-118"
+              },
+              "applied_through": 2,
+              "visits": {
+                "implement": 1
+              }
+            },
+            "version": 3,
+            "receipts": [],
+            "session": {
+              "activity": "ended",
+              "silent": false,
+              "pending_tools": 0,
+              "subagents": 0,
+              "pane_answers": 0,
+              "errors": []
+            }
+          }
+        ],
+        "mailbox": []
+      },
+      {
+        "key": "gh-119",
+        "item": {
+          "id": 119,
+          "key": "gh-119",
+          "title": "Story 119",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-119",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T09:09:00.000Z",
+          "version": 3
+        },
+        "units": [
+          {
+            "id": "gh-119",
+            "state": {
+              "format": 1,
+              "unit": "gh-119",
+              "story": "gh-119",
+              "workflow": {
+                "name": "slice",
+                "hash": "6c26df89bfb1d4128f71beb2e9465cfe3bb2dd90e61af760b5521d4e2f9c3fb4",
+                "doc": {
+                  "name": "slice",
+                  "description": "Build one slice test-first, check and review it, and integrate it into the story branch.",
+                  "start": "implement",
+                  "steps": {
+                    "implement": {
+                      "agent": "Build this slice test-first: each acceptance criterion in the slice file, or each rework point from a red check or a review, ends with a passing test. Stay inside the slice; later slices have their own steps.",
+                      "skills": [
+                        "norn-implement"
+                      ],
+                      "inputs": [
+                        "slice",
+                        "spec",
+                        "handoff",
+                        "last_check",
+                        "last_findings"
+                      ],
+                      "outcomes": {
+                        "done": "test"
+                      },
+                      "means": {
+                        "done": "every acceptance criterion (or rework point) has a passing test"
+                      }
+                    },
+                    "test": {
+                      "check": "bun test",
+                      "timeout": "10m",
+                      "outcomes": {
+                        "pass": "review",
+                        "fail": {
+                          "to": "implement",
+                          "counter": "test.fail"
+                        }
+                      }
+                    },
+                    "review": {
+                      "agent": "Review this slice's diff against its acceptance criteria and the spec, before it integrates into the story branch.",
+                      "skills": [
+                        "norn-review"
+                      ],
+                      "inputs": [
+                        "slice",
+                        "spec",
+                        "diff",
+                        "last_findings"
+                      ],
+                      "hand_back": {
+                        "changes_requested": "findings"
+                      },
+                      "outcomes": {
+                        "approve": "integrate",
+                        "changes_requested": {
+                          "to": "implement",
+                          "counter": "review.changes_requested"
+                        }
+                      },
+                      "means": {
+                        "approve": "all criteria met, no blocking findings",
+                        "changes_requested": "blocking findings in the receipt"
+                      }
+                    },
+                    "integrate": {
+                      "integrate": null,
+                      "outcomes": {
+                        "done": "$done",
+                        "conflict": {
+                          "to": "merge",
+                          "counter": "integrate.conflict"
+                        }
+                      }
+                    },
+                    "merge": {
+                      "agent": "Integrating this slice into the story branch conflicted: resolve each conflict keeping the intent of both sides, and prove it with the tests.",
+                      "skills": [
+                        "norn-merge"
+                      ],
+                      "inputs": [
+                        "slice",
+                        "spec"
+                      ],
+                      "outcomes": {
+                        "done": "integrate"
+                      },
+                      "means": {
+                        "done": "conflicts resolved keeping the intent of both sides; tests pass"
+                      }
+                    }
+                  },
+                  "counters": {
+                    "test.fail": {
+                      "max": 5
+                    },
+                    "integrate.conflict": {
+                      "max": 2,
+                      "reset_on": "integrate.done"
+                    },
+                    "review.changes_requested": {
+                      "max": 3
+                    }
+                  }
+                }
+              },
+              "step": "implement",
+              "attempt": 1,
+              "counters": {
+                "test.fail": 0,
+                "integrate.conflict": 0,
+                "review.changes_requested": 0
+              },
+              "retries_used": 0,
+              "run": {
+                "id": "run-gh-119-1",
+                "step": "implement",
+                "attempt": 1,
+                "started_at": "2026-11-17T08:55:00.000Z",
+                "executor": "resumer",
+                "attended": false,
+                "nudges": 0,
+                "session": "h-119"
+              },
+              "applied_through": 2,
+              "visits": {
+                "implement": 1
+              }
+            },
+            "version": 3,
+            "receipts": [],
+            "session": {
+              "activity": "ended",
+              "silent": false,
+              "pending_tools": 0,
+              "subagents": 0,
+              "pane_answers": 0,
+              "errors": []
+            }
+          }
+        ],
+        "mailbox": []
+      }
+    ],
+    "intake": []
+  },
+  "decisions": [
+    {
+      "kind": "retry_run",
+      "unit": "gh-118",
+      "rule": "agent.died.retry",
+      "run_id": "01JD5G0000TBCAQE1RJPWE2BZC",
+      "previous_run_id": "run-gh-118-1",
+      "executor": "claude",
+      "attended": false,
+      "brief": {
+        "workflow": "slice",
+        "hash": "6c26df89bfb1d4128f71beb2e9465cfe3bb2dd90e61af760b5521d4e2f9c3fb4",
+        "step": "implement",
+        "attempt": 1,
+        "skills": [
+          "norn-implement"
+        ],
+        "inputs": [
+          "slice",
+          "spec",
+          "handoff",
+          "last_check",
+          "last_findings"
+        ]
+      },
+      "intent": {
+        "id": "01JD5G00005HJZ90TBJ9VNMQSP",
+        "data": {
+          "kind": "run.started",
+          "run_id": "01JD5G0000TBCAQE1RJPWE2BZC",
+          "run_kind": "agent",
+          "executor": "claude",
+          "attended": false,
+          "retry_of": "run-gh-118-1",
+          "step": "implement",
+          "attempt": 1
+        }
+      }
+    },
+    {
+      "kind": "retry_run",
+      "unit": "gh-119",
+      "rule": "agent.died.retry",
+      "run_id": "01JD5G00006PQ4D2GG42AW7161",
+      "previous_run_id": "run-gh-119-1",
+      "executor": "resumer",
+      "attended": false,
+      "brief": {
+        "workflow": "slice",
+        "hash": "6c26df89bfb1d4128f71beb2e9465cfe3bb2dd90e61af760b5521d4e2f9c3fb4",
+        "step": "implement",
+        "attempt": 1,
+        "skills": [
+          "norn-implement"
+        ],
+        "inputs": [
+          "slice",
+          "spec",
+          "handoff",
+          "last_check",
+          "last_findings"
+        ]
+      },
+      "intent": {
+        "id": "01JD5G00005D15GMJ4AZGGQ8XD",
+        "data": {
+          "kind": "run.started",
+          "run_id": "01JD5G00006PQ4D2GG42AW7161",
+          "run_kind": "agent",
+          "executor": "resumer",
+          "attended": false,
+          "retry_of": "run-gh-119-1",
+          "step": "implement",
+          "attempt": 1
+        }
+      }
+    }
+  ]
+}
