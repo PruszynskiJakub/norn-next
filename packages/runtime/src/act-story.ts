@@ -8,8 +8,8 @@ import { fail, ok, type PluginResult, parseStoryKey } from "@norn/plugin-api";
 import { deriveUlid } from "@norn/schema";
 import { ensureWorktree } from "./branches.ts";
 import type { TickContext } from "./env.ts";
+import { endOf } from "./lifecycle.ts";
 import { mirrorSpec } from "./mount.ts";
-import { removeUnitLogs } from "./retention.ts";
 
 /**
  * Ids the host derives for receipts no decision carries, offset past any decide can mint from the
@@ -112,21 +112,10 @@ export async function finishStory(t: TickContext, d: DecisionOf<"finish_story">)
     if (!done.ok) return done;
     closed = true;
   }
-  const removed: string[] = [];
-  if (env.slots.vcs.capabilities.worktrees) {
-    for (const unit of d.worktrees) {
-      const gone = await env.slots.vcs.worktree.remove(unit);
-      if (!gone.ok) return gone;
-      removed.push(unit);
-    }
-  }
-  // the logs last, once no worktree is left whose agent could still write them; a log left behind is
-  // only disk, so it is reported and never fails the finish, which would keep the claim for it
-  let logs = 0;
-  for (const unit of d.worktrees) {
-    const gone = await removeUnitLogs(env, unit);
-    logs += gone.removed;
-    t.problems?.push(...gone.problems);
-  }
+  const end = await endOf(env, "story", { units: d.worktrees });
+  if (!end.ok) return end;
+  t.problems?.push(...end.value.problems);
+  const removed = end.value.removed.worktrees as string[];
+  const logs = end.value.removed["unit logs"] as number;
   return ok({ closed, removed, logs_removed: logs });
 }
