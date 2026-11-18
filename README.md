@@ -39,6 +39,7 @@ You need git ≥ 2.38 and an agent CLI (`claude` or `pi`) on `PATH`; for GitHub,
 curl -fsSLO https://github.com/PruszynskiJakub/norn-next/releases/latest/download/norn-darwin-arm64
 sudo install -d /usr/local/bin           # missing on a fresh Apple Silicon Mac
 sudo install -m 755 norn-darwin-arm64 /usr/local/bin/norn
+sudo codesign --force --sign - /usr/local/bin/norn   # macOS: a recent macOS kills it on start (exit 137) until it is signed here
 norn --version
 ```
 

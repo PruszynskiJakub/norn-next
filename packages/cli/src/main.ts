@@ -7,6 +7,7 @@ import { homedir } from "node:os";
 import { createNodeHost, nodeExec } from "@norn/host-node";
 import { runCli } from "./cli.ts";
 import { importFromPluginsDir } from "./plugins/installed.ts";
+import { selfCommand } from "./self.ts";
 import { NORN_VERSION } from "./version.ts";
 
 const controller = new AbortController();
@@ -18,9 +19,7 @@ for (const sig of ["SIGINT", "SIGTERM"] as const)
     controller.abort();
   });
 
-// run from source, the binary is `bun main.ts`: a launched agent's hooks must call this same build
-const script = process.argv[1] ?? "";
-const self = script.endsWith(".ts") ? [process.execPath, script] : [process.execPath];
+const self = selfCommand(process.execPath, process.argv[1]);
 
 const result = await runCli(process.argv.slice(2), {
   env: process.env,
