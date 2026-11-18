@@ -62,3 +62,4 @@ export { TickTrace, TRACE_DIR, tracePath } from "./trace.ts";
 export type * from "./types.ts";
 export { loadPinned, tickWorkflows } from "./workflows.ts";
 export { criteriaOf, declaredCriteria, frontmatterOf } from "./criteria.ts";
+export { CHECK_WAKE_WRITER, newWakeWriter, readWake, stampingReceipts, WAKE_FILE, wakePath, wakeWriterOf } from "./wake.ts";

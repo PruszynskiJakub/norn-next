@@ -25,6 +25,7 @@ import { ensureWorktree } from "./branches.ts";
 import type { TickContext } from "./env.ts";
 import { unitInFacts } from "./record.ts";
 import { readStepRun, type StepRunRecord, writeStepRun } from "./step-runs.ts";
+import { CHECK_WAKE_WRITER, wakePath } from "./wake.ts";
 
 /** What the wrapper leaves when the command exits. */
 export const CheckExit = Type.Object(
@@ -67,11 +68,13 @@ const WRAPPER = [
   "code=$?",
   'mkdir -p "$(dirname "$2")" || exit 1',
   `printf '{"exit":%d,"finished_at":"%s"}\\n' "$code" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$2.tmp" && mv -f "$2.tmp" "$2"`,
+  // after the exit file, so a watch woken by the stamp finds the check finished; best effort, as the stamp is only a hint
+  `{ mkdir -p "$(dirname "$3")" && printf '${CHECK_WAKE_WRITER} %s\\n' "$2" > "$3.$$.tmp" && mv -f "$3.$$.tmp" "$3"; } 2>/dev/null || true`,
 ].join("\n");
 
-/** The argv that runs `command` and writes the exit file once it exits. */
-export function checkWrapperArgv(command: string, exitPath: string): string[] {
-  return ["sh", "-c", WRAPPER, "norn-check", command, exitPath];
+/** The argv that runs `command`, writes the exit file once it exits, then stamps the wake file. */
+export function checkWrapperArgv(command: string, exitPath: string, wakeFile: string): string[] {
+  return ["sh", "-c", WRAPPER, "norn-check", command, exitPath, wakeFile];
 }
 
 /** A detached check's handle: `<pid>@<start marker>`; the marker is opaque, so only the first `@` splits. */
@@ -158,7 +161,7 @@ export async function startDetachedCheck(t: TickContext, d: DecisionOf<"run_chec
     const exitPath = checkExitPath(ctx, unit, d.run_id, d.attempt);
     let record: StepRunRecord;
     try {
-      const p = await procs.value.spawn(checkWrapperArgv(d.command, exitPath), { cwd: worktree.value, logPath: base.log as string });
+      const p = await procs.value.spawn(checkWrapperArgv(d.command, exitPath, wakePath(ctx)), { cwd: worktree.value, logPath: base.log as string });
       record = { ...base, handle: encodeCheckHandle(p.pid, p.started) };
     } catch (e) {
       const { running: _r, handle: _h, log: _l, timeout_ms: _t, ...rest } = base;

@@ -12,6 +12,7 @@ import { NO_REPO_WORKFLOWS, overlayRepoWorkflows } from "./repo-workflows.ts";
 import { loadPackWorkflows, type ResolvedSlots, resolveSlots } from "./resolve.ts";
 import { newTickId, tick } from "./tick.ts";
 import type { AgentLauncher, AgentRunRequest, Runtime, RuntimeDeps } from "./types.ts";
+import { newWakeWriter, stampingReceipts } from "./wake.ts";
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -53,11 +54,13 @@ export function createRuntimeEnv(deps: Omit<RuntimeDeps, "tickId">): PluginResul
   const launcher = launcherOf(deps, slots.value, () => env);
   if (!launcher.ok) return launcher;
   const sessions = typeof deps.sessions === "function" ? deps.sessions(launcher.value) : deps.sessions;
+  const wakeBy = newWakeWriter(deps.ctx.now());
   env = {
     ctx: deps.ctx,
     config: deps.config,
     slots: slots.value,
-    journal: new Journal(slots.value.store),
+    journal: new Journal(stampingReceipts(slots.value.store, deps.ctx, wakeBy)),
+    wakeBy,
     launcher: launcher.value,
     sessions,
     workflows: workflows.value,

@@ -22,6 +22,8 @@ export interface CliIo {
   stdin(): Promise<string>;
   /** aborted on the first SIGINT or SIGTERM: `watch` ends its tick and stops */
   signal?: AbortSignal;
+  /** waits `ms`, or less when the signal aborts; a test passes its own, so a watch's pauses take no wall time */
+  sleep?(ms: number, signal?: AbortSignal): Promise<void>;
   /** a line for a person on stderr; never data */
   log?(line: string): void;
   /** how this binary is invoked, so a launched agent's hooks call the same build: `[bun, main.ts]` or `[norn]` */

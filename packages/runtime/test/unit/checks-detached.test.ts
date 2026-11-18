@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { DecisionOf } from "@norn/kernel";
-import { act, CHECK_START_GRACE_MS, checkExitPath, checkPidPath, checkWrapperArgv, gatherFacts, readStepRun, type StepRunRecord, stepRunPath } from "../../src/index.ts";
+import { act, CHECK_START_GRACE_MS, checkExitPath, checkPidPath, checkWrapperArgv, gatherFacts, readStepRun, type StepRunRecord, stepRunPath, wakePath } from "../../src/index.ts";
 import { decisionOf, FakeProcesses, type Harnessed, has, harness, MINUTE, record, rulesOf, tickUntil, trackerItem } from "./support.ts";
 
 const kinds = async (h: Harnessed, unit: string) => (await record(h, unit)).receipts.map((r) => r.data.kind);
@@ -29,7 +29,7 @@ describe("detached checks", () => {
     expect(procs.spawned).toHaveLength(1);
     const sr = (await readStepRun(h.ctx, "lt-1")) as StepRunRecord;
     expect(sr).toMatchObject({ kind: "check", running: true, handle: "100@start-100", timeout_ms: 300_000, detail: { exits: { 3: "flaky" } } });
-    expect(procs.spawned[0]).toMatchObject({ argv: checkWrapperArgv("bun test", checkExitPath(h.ctx, "lt-1", sr.run_id, sr.attempt)), cwd: "/machine/repo/worktrees/lt-1", logPath: sr.log });
+    expect(procs.spawned[0]).toMatchObject({ argv: checkWrapperArgv("bun test", checkExitPath(h.ctx, "lt-1", sr.run_id, sr.attempt), wakePath(h.ctx)), cwd: "/machine/repo/worktrees/lt-1", logPath: sr.log });
     // while it runs, decide waits
     expect(rulesOf(await h.runtime.tick())).toContain("lt-1 check.running");
   });

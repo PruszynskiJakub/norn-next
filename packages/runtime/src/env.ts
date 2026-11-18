@@ -13,6 +13,8 @@ export interface RuntimeEnv {
   config: RuntimeConfig;
   slots: ResolvedSlots;
   journal: Journal;
+  /** the writer every receipt this env records stamps the wake file as */
+  wakeBy: string;
   launcher: AgentLauncher;
   sessions: SessionSource;
   /** the pack's workflows by name, the repo's laid over them; pinned ones a unit runs under are added per tick from its state */

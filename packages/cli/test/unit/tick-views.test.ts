@@ -15,9 +15,9 @@ function repo(opts: Parameters<typeof machine>[0] = {}): TestMachine {
   return machine({ seed: { [PATHS.local]: CONFIG }, script: gitAgrees, ...opts });
 }
 
-async function addItem(m: TestMachine, title: string): Promise<void> {
+async function addItem(m: TestMachine, title: string, labels = ["norn"]): Promise<void> {
   const env = await new CliContext(m.io).runtimeEnv();
-  const made = await env.slots.tracker.perform({ kind: "create", title, body: "", labels: ["norn"] }, { receipt_id: "01JAAAAAAAAAAAAAAAAAAAAAAA" });
+  const made = await env.slots.tracker.perform({ kind: "create", title, body: "", labels }, { receipt_id: "01JAAAAAAAAAAAAAAAAAAAAAAA" });
   if (!made.ok) throw new Error(made.failure.message);
 }
 
@@ -91,6 +91,71 @@ describe("norn watch", () => {
     expect((await runCli(["watch", "--interval", "soon"], repo().io)).exit).toBe(ExitCode.usage);
     expect((await runCli(["watch", "--max-ticks", "0"], repo().io)).exit).toBe(ExitCode.usage);
   });
+});
+
+/**
+ * A watch over a fake sleep: every pause is a `sleep <ms>` event in one timeline with the ticks and the
+ * reload notes, so a test reads how much waiting stood between two ticks without any wall time passing.
+ * `during` runs inside the n-th sleep (from 1), as another process acting while the watch pauses.
+ */
+function timedWatch(m: TestMachine, during: Record<number, () => Promise<void>> = {}) {
+  const events: string[] = [];
+  const ticks: Array<{ actions: number; lines: string[] }> = [];
+  let sleeps = 0;
+  m.io.log = (line) => {
+    const p = JSON.parse(line) as { tick_id?: string; actions: number; lines: string[]; config?: string };
+    if (p.tick_id) {
+      ticks.push(p);
+      events.push(`tick ${p.actions}`);
+    } else events.push(`config ${p.config}`);
+  };
+  m.io.sleep = async (ms) => {
+    events.push(`sleep ${ms}`);
+    await during[++sleeps]?.();
+  };
+  /** the milliseconds slept before each tick after the first */
+  const gaps = (): number[] => {
+    const out: number[] = [];
+    let waited = 0;
+    let seen = 0;
+    for (const e of events) {
+      if (e.startsWith("sleep ")) waited += Number(e.slice(6));
+      else if (e.startsWith("tick ")) {
+        if (seen++ > 0) out.push(waited);
+        waited = 0;
+      }
+    }
+    return out;
+  };
+  return { events, ticks, gaps };
+}
+
+describe("norn watch's cadence", () => {
+  test("a tick that did nothing waits out the whole interval", async () => {
+    const m = repo();
+    const w = timedWatch(m);
+    await runCli(["watch", "--interval", "30s", "--max-ticks", "2", "--json"], m.io);
+    expect(w.gaps()).toEqual([30_000]);
+  });
+
+  test("a receipt another process records during the pause wakes the watch well within the interval", async () => {
+    const m = repo();
+    await addItem(m, "First");
+    await runCli(["tick", "--json"], m.io);
+    const w = timedWatch(m, {
+      // `norn done` or `norn story answer` from another process, while this watch pauses
+      3: async () => {
+        const other = await new CliContext(m.io).runtimeEnv();
+        const wrote = await other.journal.record("lt-1", { id: "01JBBBBBBBBBBBBBBBBBBBBBBB", data: { kind: "unit.parked", reason: "a person parked it" } });
+        if (!wrote.ok) throw new Error(wrote.failure.message);
+      },
+    });
+    await runCli(["watch", "--interval", "30s", "--max-ticks", "6", "--json"], m.io);
+    const gaps = w.gaps();
+    const woke = gaps.findIndex((g) => g > 0);
+    expect(gaps[woke]).toBeLessThan(5_000);
+  });
+
 });
 
 describe("norn status, story list and story view", () => {

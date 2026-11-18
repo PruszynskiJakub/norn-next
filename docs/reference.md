@@ -282,7 +282,7 @@ Tick on an interval until a signal stops it
 norn watch [--interval <duration>] [--max-ticks <n>]
 ```
 
-- `--interval <duration>`: between ticks, as 30s or 2m (default 30s)
+- `--interval <duration>`: the longest pause between ticks, as 30s or 2m (default 30s)
 - `--max-ticks <n>`: stop after this many ticks
 
 ##### `norn tick`
