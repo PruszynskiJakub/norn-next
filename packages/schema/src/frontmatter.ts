@@ -37,7 +37,7 @@ export const StoryMerge = Type.Object(
 export type StoryMerge = Static<typeof StoryMerge>;
 
 /**
- * Frontmatter of `.agents/specs/<id>-<slug>/spec.md`.
+ * Frontmatter of `.agents/specs/<story>/spec.md`.
  * Mirrored fields (title, url, assignee, labels, body_hash) are written by the CLI;
  * the markdown body is the spec and is never overwritten.
  */
