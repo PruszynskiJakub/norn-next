@@ -160,7 +160,7 @@ function answeredLines(answered: readonly AnsweredAsk[]): string[] {
 const CRITERIA_FLAG = "--criteria <file>";
 const FINDINGS_FLAG = "--findings <file>";
 
-const FINDINGS_LINE = `- \`${FINDINGS_FLAG}\` is a JSON file, \`{"findings": [...]}\` or an array, each finding with a \`title\` and a \`severity\` (\`blocking\`, \`major\`, \`minor\`, \`nit\`), and where it can \`file\`, \`line\`, \`criterion\`, \`detail\` and \`repro\`; the step the work goes back to reads them. An outcome named with it needs findings, or a \`--note\` saying what to rework: without either it is refused.`;
+const FINDINGS_LINE = `- \`${FINDINGS_FLAG}\` is a JSON file, \`{"findings": [...]}\` or an array, each finding with a \`title\` and a \`severity\` (\`blocking\`, \`major\`, \`minor\`, \`nit\`), and where it can \`file\`, \`line\`, \`criterion\`, \`detail\` and \`repro\`; the step the work goes back to reads them. An outcome named with it needs findings, a \`--note\` saying what to rework, or a criteria report with a verdict short of \`pass\`: without one of them it is refused.`;
 
 function criteriaLine(criteria: NonNullable<BriefRenderInput["criteria"]>): string {
   const gated = Object.entries(criteria.verdict).map(([o, v]) => `\`${o}\` only when it is \`${v}\``);
