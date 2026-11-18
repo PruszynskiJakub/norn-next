@@ -41,7 +41,7 @@ export { createHarnessLauncher, DEFAULT_HOOK_COMMAND, resolveExecutors } from ".
 export { answerPromptId, type Executor, HarnessLauncher, type HarnessLauncherOptions, nudgePromptId, sessionLogPath, shellQuote } from "./launcher.ts";
 export { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
 export { type LiveStep, liveStepOf, reportableOutcomes, reportOnRecord } from "./live-run.ts";
-export { type BriefShown, briefOf, type Refusable, type ReportRecorded, type ReportRefusal, type ReportRequest, reportReceiptId, reportRun } from "./report.ts";
+export { type BriefShown, briefOf, type CriteriaSummary, type Refusable, type ReportRecorded, type ReportRefusal, type ReportRequest, reportReceiptId, reportRun } from "./report.ts";
 export { nudgeText } from "./act-runs.ts";
 export { checkOutcome } from "./act-steps.ts";
 export { branchOf, cutFrom, ensureWorktree } from "./branches.ts";
@@ -61,3 +61,4 @@ export { newTickId, tick } from "./tick.ts";
 export { TickTrace, TRACE_DIR, tracePath } from "./trace.ts";
 export type * from "./types.ts";
 export { loadPinned, tickWorkflows } from "./workflows.ts";
+export { criteriaOf, declaredCriteria, frontmatterOf } from "./criteria.ts";

@@ -246,6 +246,16 @@ norn config set store.use refs --commit
 
 The `refs` store keeps run data, claims and the mailbox on git refs under `refs/norn/v2/`, pushed to the remote, so every clone sees each story's step and who holds it. Commit the config (`norn init --commit` writes `.agents/norn.yaml`) so the team runs the same tracker, forge, store and plugins; the plugin lock `.agents/norn.plugins.lock` pins the version of each installed plugin beside it.
 
+## Decide from another machine
+
+```sh
+# on any clone, while another machine holds gh-12
+norn story approve gh-12
+norn story answer gh-12 "Keep the old endpoint"
+```
+
+`norn story answer`, `approve` and `reject` fetch the remote's run data first, so you decide on where the story stands now. While this machine holds the story's claim, or nobody does, the decision goes on the record here, as on one machine. While another machine holds it, live or expired, the decision is sent to the story's mailbox (`via: mailbox` and the holder in `--json`), and the holder's next tick imports it as the same receipt and applies it; your clone shows the outcome once the holder has published it and your next tick fetches it. Sending it again is a no-op. On the `refs` store the three verbs need the remote, even on the machine holding the story: they fetch first and read the claim there, and while the remote is unreachable they refuse; run them again once it answers. A store with no mailbox that other machines share refuses instead (`claim_held`): run the verb on the holder, or take the story first. `norn story round`, `norn run rerun` and `norn story update-branch` never go through the mailbox: run them on the holder, or take the story.
+
 ## Move a story to another machine
 
 ```sh

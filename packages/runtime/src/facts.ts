@@ -1,14 +1,14 @@
 /**
  * Gathering KernelFacts: the tracker's intake and items, the forge's changes, every unit read through
- * the Journal with its version, claims, the mailbox, sessions, in-flight step runs, and base_stale and
- * unpushed from the vcs. Facts are read, never acted on as run state, so gathering twice changes nothing.
+ * the Journal with its version, claims, the mailbox, sessions, in-flight step runs, base_stale and
+ * unpushed from the vcs, and the slice plan of a story at its slices step. Facts are read, never acted on as run state, so gathering twice changes nothing.
  *
  * A story whose record or claim cannot be read is left out of the tick whole: half a story (a slice
  * missing, a claim read as nobody's) would let decide start what is already running. A tracker or
  * forge that fails only leaves its fact empty, which decide reads as nothing new.
  *
- * The tick's gathering writes host memory (settled step runs, a stopped overdue check, a store sync);
- * a read-only gathering skips those writes.
+ * The tick's gathering writes host memory (settled step runs, a stopped overdue check, a store sync,
+ * the slice files a person edited read back); a read-only gathering skips those writes.
  */
 import {
   type ExecutorCapabilities,
@@ -24,6 +24,8 @@ import { type ChangeRequest, fail, ok, parseStoryKey, parseUnitId, type PluginRe
 import { branchOf } from "./branches.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { readUnitFacts } from "./facts-unit.ts";
+import { readBackDocs } from "./inputs.ts";
+import { readSlicePlan } from "./slice-plan.ts";
 import { vcsFacts } from "./facts-vcs.ts";
 import { tickWorkflows } from "./workflows.ts";
 
@@ -181,6 +183,17 @@ export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherO
     const graph = own ? workflows.byHash[own.workflow.hash]?.graph : undefined;
     const story: StoryFacts = { key: r.key, item: await itemOf(env, r.key, problems), change, claim: r.claim, units: r.units, mailbox: r.mailbox };
     Object.assign(story, await vcsFacts(env, r.key, own, graph, change, problems));
+    if (own && own.ended === undefined && graph?.steps[own.step]?.kind === "slices") {
+      // a person edits the slice files in the story's worktree at the gate before the slices step
+      if (!opts.readOnly) await readBackDocs(env, r.key);
+      const plan = await readSlicePlan(env, r.key);
+      if (!plan.ok) {
+        // half a plan could start a slice whose dependency was not read: the story waits for a full one
+        problems.push(`${r.key} left out: slice files: ${plan.failure.message}`);
+        continue;
+      }
+      if (plan.value) story.plan = plan.value;
+    }
     stories.push(story);
   }
   const intake = await env.slots.tracker.intake(env.config.intake);

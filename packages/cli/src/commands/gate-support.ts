@@ -4,6 +4,7 @@
  * attempt and outcome, so a retried decision records once and a stale one is refused by the kernel,
  * never routed. The round is in it because a new round starts the attempt count over on the same
  * record: without it a later round's decision would read as the earlier one's, recorded before.
+ * While another machine holds the story, the receipt goes to it through the mailbox (decision-route).
  */
 import type { GateOutcome, UnitJournal } from "@norn/kernel";
 import { RUN_ENV } from "@norn/plugin-api";
@@ -11,7 +12,8 @@ import type { RuntimeEnv } from "@norn/runtime";
 import { type ParsedArgs, opt } from "../command.ts";
 import type { CliContext } from "../context.ts";
 import { failure, refuse, rendered } from "../output.ts";
-import { ambiguous, readable, receiptId, unitsOf } from "./person-support.ts";
+import { deliverDecision, deliveredLine, routeDecision } from "./decision-route.ts";
+import { ambiguous, readable, receiptId, syncStore, unitsOf } from "./person-support.ts";
 
 function gateStep(u: UnitJournal): string | null {
   const s = u.state;
@@ -45,6 +47,8 @@ export async function decideGate(ctx: CliContext, args: ParsedArgs, outcome: Gat
   if (outcome === "reject" && !reason) throw refuse("a reject needs the reason the next attempt gets", `norn story reject ${key} --reason "<what to change>"`, "reason");
   const want = opt.str(args, "gate");
   const env = await ctx.runtimeEnv();
+  const retry = `norn ${verb} ${key}`;
+  await syncStore(env, key, retry);
   const units = readable(await unitsOf(env, key), key);
   const at = units.filter((u) => {
     const g = gateStep(u);
@@ -63,11 +67,10 @@ export async function decideGate(ctx: CliContext, args: ParsedArgs, outcome: Gat
   const u = at[0] as UnitJournal;
   const state = u.state as NonNullable<UnitJournal["state"]>;
   const id = receiptId("gate", `r${await roundOf(env, u)}`, state.step, String(state.attempt), outcome);
-  const wrote = await env.journal.record(u.unit, {
-    id,
-    data: { kind: "gate.decided", outcome, by: env.config.holder, step: state.step, attempt: state.attempt, ...(reason && { reason }) },
-  });
-  if (!wrote.ok) throw failure(`cannot record the decision on ${u.unit}: ${wrote.failure.message}`, `norn ${verb} ${key} again`, wrote.failure.code);
-  const value = { unit: u.unit, step: state.step, attempt: state.attempt, outcome, receipt_id: id, ...wrote.value };
-  return rendered(value, `Recorded \`${outcome}\` at gate ${state.step} of ${u.unit}${wrote.value.replayed ? " (recorded before)" : ""}. The next tick routes it.`);
+  const route = await routeDecision(env, key.split("/")[0] as string, retry);
+  const data = { kind: "gate.decided" as const, outcome, by: env.config.holder, step: state.step, attempt: state.attempt, ...(reason && { reason }) };
+  const sent = await deliverDecision(env, route, u.unit, { id, data }, retry);
+  const value = { unit: u.unit, step: state.step, attempt: state.attempt, outcome, receipt_id: id, ...sent };
+  const line = deliveredLine(sent, `\`${outcome}\` at gate ${state.step} of ${u.unit}`);
+  return rendered(value, sent.via === "local" ? `${line} The next tick routes it.` : line);
 }

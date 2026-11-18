@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { reportOnRecord } from "@norn/runtime";
-import { ExitCode, runCli } from "../../src/index.ts";
+import { decisionRoute } from "../../src/commands/decision-route.ts";
+import { CliFailure, ExitCode, runCli } from "../../src/index.ts";
 import { AGENT_STEP, configured, envOf, GATE_STEP, RUN, receiptsOf, runEnv, seedUnit, UNIT, withEnv } from "./units.ts";
 
 const json = (stdout: string): unknown => Bun.JSONL.parse(stdout)[0];
@@ -54,6 +55,83 @@ describe("story approve and reject", () => {
     expect(refusal(await runCli(["story", "reject", UNIT, "--json"], m.io))).toEqual({ exit: ExitCode.refused, code: "reason" });
     expect((await runCli(["story", "reject", UNIT, "--reason", "split slice 2", "--json"], m.io)).exit).toBe(ExitCode.ok);
     expect((await receiptsOf(m)).map((r) => r.data)).toEqual([{ kind: "gate.decided", outcome: "reject", by: "me@box", step: GATE_STEP, attempt: 1, reason: "split slice 2" }]);
+  });
+});
+
+describe("a decision on a story another machine holds", () => {
+  const OTHER = "someone@else";
+  const mailboxOf = async (m: ReturnType<typeof configured>) => {
+    const got = await (await envOf(m)).slots.store.mailbox?.receive(UNIT);
+    if (!got?.ok) throw new Error("no mailbox");
+    return got.value;
+  };
+
+  test("held here, approve records on this machine's record as before", async () => {
+    const m = configured();
+    await seedUnit(m, { step: GATE_STEP, run: null });
+    await (await envOf(m)).slots.store.claims.acquire(UNIT, "me@box", 60_000);
+    const r = json((await runCli(["story", "approve", UNIT, "--json"], m.io)).stdout);
+    expect(r).toMatchObject({ via: "local", replayed: false });
+    expect((await receiptsOf(m)).map((x) => x.data.kind)).toEqual(["gate.decided"]);
+    expect(await mailboxOf(m)).toEqual([]);
+  });
+
+  test("held by another holder, approve is sent to it as a letter under the receipt's id, once however often it is sent", async () => {
+    const m = configured();
+    await seedUnit(m, { step: GATE_STEP, run: null });
+    await (await envOf(m)).slots.store.claims.acquire(UNIT, OTHER, 60_000);
+    const first = await runCli(["story", "approve", UNIT, "--reason", "looks right", "--json"], m.io);
+    const again = json((await runCli(["story", "approve", UNIT, "--json"], m.io)).stdout);
+    expect(first.exit).toBe(ExitCode.ok);
+    const sent = json(first.stdout) as { receipt_id: string };
+    expect(sent).toMatchObject({ unit: UNIT, step: GATE_STEP, outcome: "approve", via: "mailbox", holder: OTHER, replayed: false });
+    expect(again).toMatchObject({ via: "mailbox", receipt_id: sent.receipt_id, replayed: true });
+    expect(await receiptsOf(m)).toEqual([]);
+    const letters = await mailboxOf(m);
+    expect(letters.map(({ id, from, data }) => ({ id, from, data }))).toEqual([
+      {
+        id: sent.receipt_id,
+        from: "me@box",
+        data: { unit: UNIT, receipt: { kind: "gate.decided", outcome: "approve", by: "me@box", step: GATE_STEP, attempt: 1, reason: "looks right" } },
+      },
+    ]);
+    const md = (await runCli(["story", "reject", UNIT, "--reason", "split it"], m.io)).stdout;
+    expect(md).toContain(`to ${OTHER}; its next tick applies it`);
+  });
+
+  test("an answer to a question goes the same way while another holder has the claim, expired or not", async () => {
+    const m = configured();
+    await seedUnit(m, { step: AGENT_STEP });
+    expect((await runCli(["ask", "which", "db?"], withEnv(m, runEnv()).io)).exit).toBe(ExitCode.ok);
+    const ask = (await receiptsOf(m))[0];
+    await (await envOf(m)).slots.store.claims.acquire(UNIT, OTHER, 1);
+    await Bun.sleep(5);
+    const r = json((await runCli(["story", "answer", UNIT, "use", "postgres", "--json"], m.io)).stdout);
+    expect(r).toMatchObject({ unit: UNIT, input_id: ask?.id, via: "mailbox", holder: OTHER });
+    expect((await receiptsOf(m)).map((x) => x.data.kind)).toEqual(["run.reported"]);
+    expect((await mailboxOf(m)).map((l) => l.data)).toEqual([
+      { unit: UNIT, receipt: { kind: "answer.sent", input_id: ask?.id as string, text: "use postgres", by: "me@box", step: AGENT_STEP, attempt: 1 } },
+    ]);
+  });
+
+  test("a store with no mailbox refuses on a shared store, naming the holder, and writes locally on a store every holder reads", () => {
+    const claim = { story: UNIT, holder: OTHER, acquired_at: "2026-11-18T10:00:00.000Z", expires_at: "2026-11-18T11:00:00.000Z", version: 1 };
+    const now = "2026-11-18T10:30:00.000Z";
+    const caps = { claims: "distributed" as const, mailbox: false, artifacts: true };
+    const shared = { name: "remote", capabilities: { ...caps, shared: true } };
+    let refused: unknown;
+    try {
+      decisionRoute(UNIT, claim, "me@box", shared, now, `norn story approve ${UNIT}`);
+    } catch (e) {
+      refused = e;
+    }
+    expect(refused).toBeInstanceOf(CliFailure);
+    const body = (refused as CliFailure).body;
+    expect(body).toMatchObject({ code: "claim_held", details: { holder: OTHER, expired: false } });
+    expect(body.do_instead).toContain(`norn story take ${UNIT} --force`);
+    expect(decisionRoute(UNIT, claim, "me@box", { name: "one", capabilities: { ...caps, shared: false } }, now, "x")).toEqual({ via: "local" });
+    expect(decisionRoute(UNIT, null, "me@box", shared, now, "x")).toEqual({ via: "local" });
+    expect(decisionRoute(UNIT, { ...claim, holder: "me@box" }, "me@box", shared, now, "x")).toEqual({ via: "local" });
   });
 });
 
@@ -394,6 +472,27 @@ describe("story take", () => {
     await other.files.write(path, text.replace(brief.value.expires_at, "2025-01-01T00:00:00.000Z"));
     expect(json((await take(other)).stdout)).toMatchObject({ code: "claim_held", details: { expired: true } });
     expect(json((await take(other, "--force")).stdout)).toMatchObject({ taken: true, from: "someone@else", expired: true });
+  });
+
+  test("story view lists the criteria QA left for the person at the gate, until a gate is decided", async () => {
+    const m = configured();
+    await seedUnit(m, { step: "human-qa", run: null });
+    const env = await envOf(m);
+    const criteria = [
+      { id: "AC1", verdict: "pass" as const, evidence: "AC1.md" },
+      { id: "AC2", verdict: "unverified" as const, reason: "no browser here", how: "open /today and look for the red flag" },
+    ];
+    const wrote = await env.journal.record(UNIT, { id: "report-qa-1", data: { kind: "run.reported", step: "qa", attempt: 1, run_id: RUN, verb: "done", outcome: "unverified", criteria } });
+    if (!wrote.ok) throw new Error(wrote.failure.message);
+    const view = json((await runCli(["story", "view", UNIT, "--json"], m.io)).stdout) as { criteria: unknown[] };
+    expect(view.criteria).toEqual([{ unit: UNIT, step: "qa", attempt: 1, at: expect.any(String), verdicts: [criteria[1]] }]);
+    const md = (await runCli(["story", "view", UNIT], m.io)).stdout;
+    expect(md).toContain("## Criteria to check");
+    expect(md).toContain("- `AC2` unverified: (no browser here); how to check: open /today and look for the red flag");
+    expect(md).not.toContain("`AC1`");
+    const ruled = await env.journal.record(UNIT, { id: "gate-ruled", data: { kind: "gate.decided", outcome: "approve", by: "me@box", step: "human-qa", attempt: 1 } });
+    if (!ruled.ok) throw new Error(ruled.failure.message);
+    expect((json((await runCli(["story", "view", UNIT, "--json"], m.io)).stdout) as { criteria: unknown[] }).criteria).toEqual([]);
   });
 
   test("story view lists every takeover on the story's record", async () => {

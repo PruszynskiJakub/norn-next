@@ -7,10 +7,11 @@
  * both say the same.
  */
 import type { AnsweredAsk, BriefInputs, BriefRenderInput, CompiledStep, KernelReceipt, LoadedWorkflow, RunState, UnitJournal } from "@norn/kernel";
+import { wantsCriteria } from "@norn/kernel";
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import type { RuntimeEnv } from "./env.ts";
 import { readEvents } from "./events/log.ts";
-import { INPUTS_NOTE, materializeInputs, worktreeOf } from "./inputs.ts";
+import { INPUTS_NOTE, materializeInputs, unsettledCriteria, worktreeOf } from "./inputs.ts";
 import { reportableOutcomes } from "./live-run.ts";
 import { readStepRun } from "./step-runs.ts";
 import { loadPinned } from "./workflows.ts";
@@ -37,7 +38,7 @@ async function reworkText(env: RuntimeEnv, unit: string, receipt: KernelReceipt 
     case "gate.decided":
       return `\`${d.step ?? "the gate"}\` was decided \`${d.outcome}\` by ${d.by}${d.reason ? `: ${d.reason}` : "."}`;
     case "run.reported":
-      return `\`${d.step ?? "a step"}\` reported \`${d.verb}${d.outcome ? ` ${d.outcome}` : ""}\`${d.text ? `: ${d.text}` : "."}`;
+      return `\`${d.step ?? "a step"}\` reported \`${d.verb}${d.outcome ? ` ${d.outcome}` : ""}\`${d.text ? `: ${d.text}` : "."}${unsettledCriteria(d.criteria)}`;
     case "step.finished":
       return `\`${d.step ?? d.step_kind}\` ended \`${d.outcome}\`.`;
     default:
@@ -115,6 +116,7 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
     instructions: spec.instructions,
     ...(step.description !== undefined && { description: step.description }),
     ...(Object.keys(means).length > 0 && { means }),
+    ...(wantsCriteria(spec) && { criteria: { required: spec.criteria, verdict: { ...spec.verdict } } }),
     ...(spec.attended && { attended: true }),
     ...(rework !== undefined && { rework }),
     ...(answered.length > 0 && { answered }),

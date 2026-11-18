@@ -1,6 +1,6 @@
 /**
  * `norn story approve <key> [--gate <step>] [--reason <text>]`: approve the gate a story waits at.
- * Records a `gate.decided` receipt through the journal.
+ * Records a `gate.decided` receipt through the journal, or sends it to the machine holding the story.
  */
 import { defineCommand } from "../command.ts";
 import { decideGate } from "./gate-support.ts";
