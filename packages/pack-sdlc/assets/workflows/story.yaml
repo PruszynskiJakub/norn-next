@@ -35,7 +35,7 @@ steps:
       replan: $stuck
     means:
       done: "slice files written against the current base; every user story is covered by some slice's acceptance"
-      replan: "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans with `norn story edit <story> --workflow refinement --at plan`"
+      replan: "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans it in a refinement round, from its plan step"
   approve-slices:
     gate: "Review the slice files in the spec folder (edit them if needed). Approve to start the slices, or reject with what to change."
     outcomes: { approve: slices, reject: { to: slice, max: 3 } }

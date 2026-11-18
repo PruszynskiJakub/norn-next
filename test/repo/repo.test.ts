@@ -347,6 +347,8 @@ describe("test layout (AGENTS.md)", () => {
     expect(runs(job)).toContain('if [ "$recorded" != "${tag#v}" ]; then');
     expect(runs(job)).toContainEqual(expect.stringContaining("gh release download --repo \"$GITHUB_REPOSITORY\" --pattern norn-linux-x64"));
     expect(runs(job)).toContainEqual(expect.stringContaining("norn-linux-x64\" doctor --repo"));
+    // a release from before the thin CLI cannot read the new config: told by its --version, it passes with a notice
+    expect(runs(job)).toContainEqual(expect.stringContaining("--version | grep -q '^plugin API '"));
     expect(Object.keys(ciJobs("ci.yml"))).not.toContain("released-norn");
   });
 

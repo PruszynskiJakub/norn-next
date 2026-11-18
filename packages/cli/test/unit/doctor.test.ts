@@ -21,10 +21,10 @@ const tools =
   (argv) =>
     argv[1] === "--version" && have.includes(argv[0] as string) ? { stdout: `${argv[0]} 1.0\n` } : undefined;
 
-async function doctor(opts: { config?: string; have?: string[]; seed?: Record<string, string>; importer?: PluginImporter } = {}) {
+async function doctor(opts: { config?: string; have?: string[]; seed?: Record<string, string>; importer?: PluginImporter; args?: string[] } = {}) {
   const seed = { ...(opts.config === undefined ? {} : { [PATHS.local]: opts.config }), ...(opts.seed ?? {}) };
   const m = machine({ seed, script: tools(...(opts.have ?? ["git", "norn", "claude"])), ...(opts.importer ? { importer: opts.importer } : {}) });
-  const r = await runCli(["doctor", "--json"], m.io);
+  const r = await runCli(["doctor", ...(opts.args ?? []), "--json"], m.io);
   const body = Bun.JSONL.parse(r.stdout)[0] as { ok: boolean; checks: Check[] };
   const check = (name: string) => body.checks.find((c) => c.name === name) as Check;
   return { r, body, check };
@@ -36,6 +36,12 @@ describe("norn doctor", () => {
     expect(r.exit).toBe(ExitCode.ok);
     expect(body.ok).toBe(true);
     expect(body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "hooks", "tool git", "tool claude"]);
+  });
+
+  test("--repo checks only the repo's tree: no hooks and no tools, so a machine with no agent passes", async () => {
+    const { r, body } = await doctor({ config: LOCAL_CONFIG, have: [], args: ["--repo"] });
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows"]);
   });
 
   test("no config: the config check fails naming norn init, the checks after it are skipped, git is still checked; exit 1", async () => {

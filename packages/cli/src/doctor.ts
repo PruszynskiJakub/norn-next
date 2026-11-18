@@ -87,7 +87,15 @@ async function hooksCheck(ctx: CliContext, cwd: string, harnesses: Readonly<Reco
   return passed("hooks", `${Object.keys(harnesses).join(", ")} install hooks that run ${self.join(" ")} hook`);
 }
 
-export async function runDoctor(ctx: CliContext): Promise<DoctorReport> {
+export interface DoctorOptions {
+  /**
+   * Only what the repo's tree decides: its config, the plugins it names, its slots and workflows. No
+   * hooks and no tools, so a machine with no agent or runner (CI checking a branch) can run it.
+   */
+  repoOnly?: boolean;
+}
+
+export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Promise<DoctorReport> {
   const checks: DoctorCheck[] = [];
   const w = await ctx.repo();
   const cwd = w.repo.root;
@@ -95,24 +103,24 @@ export async function runDoctor(ctx: CliContext): Promise<DoctorReport> {
   const config = await attempt("config", () => ctx.config());
   checks.push(config.check ?? passed("config", `executor ${config.value?.executor}; tracker ${config.value?.config.tracker.use}, forge ${config.value?.config.forge.use}, store ${config.value?.config.store.use}`));
 
-  if (config.check) checks.push(skipped("plugins", "config"), skipped("slots", "config"), skipped("workflows", "config"), skipped("hooks", "config"));
+  if (config.check) checks.push(skipped("plugins", "config"), skipped("slots", "config"), skipped("workflows", "config"), ...(opts.repoOnly ? [] : [skipped("hooks", "config")]));
   else {
     const plugins = await attempt("plugins", () => ctx.plugins());
     checks.push(plugins.check ?? passed("plugins", `${plugins.value?.plugins.length} plugins (${plugins.value?.lock.plugins.length} installed), every one on this plugin API`));
-    if (plugins.check) checks.push(skipped("slots", "plugins"), skipped("workflows", "plugins"), skipped("hooks", "plugins"));
+    if (plugins.check) checks.push(skipped("slots", "plugins"), skipped("workflows", "plugins"), ...(opts.repoOnly ? [] : [skipped("hooks", "plugins")]));
     else {
       const env = await attempt("slots", () => ctx.runtimeEnv());
-      if (env.check) checks.push(env.check, skipped("workflows", "slots"), skipped("hooks", "slots"));
+      if (env.check) checks.push(env.check, skipped("workflows", "slots"), ...(opts.repoOnly ? [] : [skipped("hooks", "slots")]));
       else if (env.value) {
         checks.push(passed("slots", "every slot builds from its config"));
         const workflows = await attempt("workflows", () => ctx.workflowEnv());
         checks.push(workflows.check ?? passed("workflows", workflowsDetail(env.value)));
-        checks.push(await hooksCheck(ctx, cwd, env.value.slots.executors));
+        if (!opts.repoOnly) checks.push(await hooksCheck(ctx, cwd, env.value.slots.executors));
       }
     }
   }
 
-  for (const t of toolsNeeded(config.value?.config ?? null)) checks.push(await toolCheck(ctx, cwd, t));
+  if (!opts.repoOnly) for (const t of toolsNeeded(config.value?.config ?? null)) checks.push(await toolCheck(ctx, cwd, t));
   return { ok: checks.every((c) => c.ok), checks };
 }
 

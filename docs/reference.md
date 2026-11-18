@@ -54,8 +54,10 @@ norn init [--tracker <name>] [--forge <name>] [--store <name>] [--executor <harn
 Check the config, plugins, workflows, harness hooks and tools this repo needs
 
 ```sh
-norn doctor
+norn doctor [--repo]
 ```
+
+- `--repo`: check only the repo's config, plugins, slots and workflows; no hooks or tools (CI)
 
 ##### `norn config` (noun)
 
