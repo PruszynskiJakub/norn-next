@@ -77,6 +77,15 @@ export class CliContext {
     this.pluginsP ??= Promise.all([this.repo(), this.config()]).then(([w, c]) => wirePlugins(w, c, this.io.importer));
     return this.pluginsP;
   }
+  /**
+   * Forget the config, the plugins and the env built from them, so the next use reads them again
+   * from disk; the checkout and its host stay.
+   */
+  reload(): void {
+    this.configP = undefined;
+    this.pluginsP = undefined;
+    this.envP = undefined;
+  }
   /** the runtime env the agent verbs and views read */
   runtimeEnv(): Promise<RuntimeEnv> {
     this.envP ??= this.parts().then(wireRuntimeEnv);

@@ -167,6 +167,52 @@ describe("norn watch's cadence", () => {
     expect(gaps[woke]).toBeLessThan(5_000);
   });
 
+  test("a config change is taken up at the next tick, without a restart", async () => {
+    const m = repo();
+    await addItem(m, "Later", ["later"]);
+    const w = timedWatch(m, {
+      1: async () => {
+        await m.files.write(PATHS.local, CONFIG.replace("label: norn", "label: later"));
+      },
+    });
+    await runCli(["watch", "--interval", "30s", "--max-ticks", "2", "--json"], m.io);
+    expect(w.ticks[0]?.actions).toBe(0);
+    expect(w.events).toContain("config reloaded");
+    expect(w.ticks[1]?.lines).toContain("lt-1  intake.story → intake_story");
+  });
+
+  test("a changed repo workflow is taken up at the next tick", async () => {
+    const m = repo();
+    const w = timedWatch(m, {
+      1: async () => {
+        await m.files.write(`${ROOT}/.agents/workflows/mine.yaml`, "not: a workflow\n");
+      },
+    });
+    await runCli(["watch", "--interval", "30s", "--max-ticks", "3", "--json"], m.io);
+    // the broken file is read, refused and named, where a watch that never re-reads would not see it at all
+    expect(w.events.filter((e) => e.startsWith("config "))).toEqual(["config refused"]);
+  });
+
+  test("a config change that does not load keeps the last good one, and says so once", async () => {
+    const m = repo();
+    const refused: string[] = [];
+    const w = timedWatch(m, {
+      1: async () => {
+        await addItem(m, "First");
+        await m.files.write(PATHS.local, "format: 1\ntracker: [\n");
+      },
+    });
+    const log = m.io.log as (line: string) => void;
+    m.io.log = (line) => {
+      if (line.includes('"refused"')) refused.push(line);
+      log(line);
+    };
+    const r = await runCli(["watch", "--interval", "30s", "--max-ticks", "4", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(w.ticks[1]?.lines).toContain("lt-1  intake.story → intake_story");
+    expect(refused).toHaveLength(1);
+    expect(JSON.parse(refused[0] as string)).toMatchObject({ config: "refused", error: expect.any(String), do_instead: expect.any(String) });
+  });
 });
 
 describe("norn status, story list and story view", () => {

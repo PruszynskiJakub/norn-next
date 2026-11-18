@@ -9,14 +9,18 @@
  *   action usually leaves the next one ready (a report applied, a step to start);
  * - a receipt another process records during the pause (`norn done`, a person's answer) or a detached
  *   check that finishes rewrites the wake stamp, which ends the pause within about a second;
+ * - before each tick the files the runtime is built from are read again, and a change rebuilds it, so a
+ *   `config set`, a merged workflow or a plugin add counts from the next tick. A change that does not
+ *   build keeps the last runtime that did, and is reported once as a `config` line.
  */
-import { readWake, type TickReport, wakeWriterOf } from "@norn/runtime";
+import { readWake, type Runtime, type RuntimeEnv, type TickReport, wakeWriterOf } from "@norn/runtime";
 import { defineCommand, opt } from "../command.ts";
+import type { CliContext } from "../context.ts";
 import { durationMs } from "../config/derive.ts";
 import { Duration } from "../config/schema.ts";
-import { rendered, usageError } from "../output.ts";
+import { rendered, toFailure, usageError } from "../output.ts";
 import { failedCount, tickLines } from "../tick-report.ts";
-import { wireRuntime } from "../wiring.ts";
+import { wireRuntime, wiringSources } from "../wiring.ts";
 
 const DEFAULT_INTERVAL = "30s";
 const DURATION = new RegExp(Duration.pattern as string);
@@ -66,6 +70,44 @@ async function pauseUntilWake(sleep: Sleep, ms: number, read: () => Promise<stri
   }
 }
 
+/** The runtime the watch ticks with, and the sources it was built from, rebuilt when those change. */
+class Rebuilding {
+  /** sources that failed to build: reported once, and tried again only once they change */
+  private refused: string | null = null;
+
+  private constructor(
+    private readonly ctx: CliContext,
+    private sources: string,
+    public env: RuntimeEnv,
+    public runtime: Runtime,
+  ) {}
+
+  /** Built before the loop: a config or plugin that does not resolve refuses the command once, not every interval. */
+  static async start(ctx: CliContext): Promise<Rebuilding> {
+    // read before the build, so a change landing during it is seen as a change next tick
+    const sources = await wiringSources(await ctx.repo());
+    const env = await ctx.workflowEnv();
+    return new Rebuilding(ctx, sources, env, wireRuntime(env));
+  }
+
+  async refresh(log: (line: string) => void): Promise<void> {
+    const now = await wiringSources(await this.ctx.repo());
+    if (now === this.sources || now === this.refused) return;
+    this.ctx.reload();
+    try {
+      this.env = await this.ctx.workflowEnv();
+      this.runtime = wireRuntime(this.env);
+      this.sources = now;
+      this.refused = null;
+      log(JSON.stringify({ config: "reloaded" }));
+    } catch (e) {
+      this.refused = now;
+      const { error, do_instead } = toFailure(e).body;
+      log(JSON.stringify({ config: "refused", error, do_instead, kept: "the last config that loaded" }));
+    }
+  }
+}
+
 export interface WatchSummary {
   ticks: number;
   failed_actions: number;
@@ -108,9 +150,7 @@ export const watchCommand = defineCommand({
     const max = maxRaw === undefined ? Number.POSITIVE_INFINITY : Number(maxRaw);
     if (!(Number.isInteger(max) || max === Number.POSITIVE_INFINITY) || max < 1) throw usageError(`bad --max-ticks '${maxRaw}' (a whole number from 1)`, "norn watch --max-ticks 10");
     const ms = durationMs(interval);
-    // built before the loop: a config or plugin that does not resolve refuses once, not every interval
-    const env = await ctx.workflowEnv();
-    const runtime = wireRuntime(env);
+    const built = await Rebuilding.start(ctx);
     const host = await ctx.host();
     const read = () => readWake(host);
     const sleep: Sleep = ctx.io.sleep ? ctx.io.sleep.bind(ctx.io) : pause;
@@ -119,8 +159,9 @@ export const watchCommand = defineCommand({
     const summary: WatchSummary = { ticks: 0, failed_actions: 0, skipped_locked: 0, interval };
     let settling = 0;
     while (summary.ticks < max && !signal?.aborted) {
+      if (summary.ticks > 0) await built.refresh(log);
       const before = await read();
-      const report = await runtime.tick();
+      const report = await built.runtime.tick();
       summary.ticks++;
       if (report.skipped === "locked") summary.skipped_locked++;
       summary.failed_actions += failedCount(report);
@@ -131,7 +172,7 @@ export const watchCommand = defineCommand({
         continue;
       }
       settling = 0;
-      await pauseUntilWake(sleep, ms, read, before, env.wakeBy, signal);
+      await pauseUntilWake(sleep, ms, read, before, built.env.wakeBy, signal);
     }
     // a failed action is retried by the next tick, so a long watch that saw one still ended as asked
     return rendered(summary, summaryText(summary));
