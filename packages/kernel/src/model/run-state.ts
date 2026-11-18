@@ -67,6 +67,12 @@ export const RunState = Type.Object(
      */
     visits: Type.Optional(Type.Record(StepName, PosInt)),
     counters: Type.Record(GraphCounterName, NonNegInt),
+    /**
+     * the receipt whose outcome sent the work back into this visit of an agent step (a red check, a
+     * reject, findings handed back, a counted edge); absent when the step was entered forward, by a
+     * person's move or a new round. Kept on the state because decide sees only receipts not yet applied.
+     */
+    rework_from: Type.Optional(PosInt),
     /** fresh-session retries used in this visit to the step */
     retries_used: NonNegInt,
     run: Type.Union([RunInfo, Type.Null()]),

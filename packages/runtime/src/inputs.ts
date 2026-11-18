@@ -16,7 +16,7 @@
 import type { BriefInputs, BriefInputView, BriefStory, KernelReceipt, UnitJournal } from "@norn/kernel";
 import { ok, type PluginResult, parseStoryKey, parseUnitId, type TrackerItem } from "@norn/plugin-api";
 import type { CriterionVerdict } from "@norn/schema";
-import { cutFrom } from "./branches.ts";
+import { baseRefOf, cutFrom } from "./branches.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 import { readStepRun } from "./step-runs.ts";
@@ -258,7 +258,7 @@ async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: Brief
       return written(env, worktree, name, "last_findings.md", "the last findings sent back", text);
     }
     case "diff":
-      return { name, label: "the change so far", note: `run \`git diff ${cutFrom(unit, env.config.base)}...HEAD\` in this worktree` };
+      return { name, label: "the change so far", note: `run \`git diff ${cutFrom(unit, await baseRefOf(env))}...HEAD\` in this worktree` };
     case "slice":
       return materializeSlice(env, worktree, unit, name);
     case "slices":

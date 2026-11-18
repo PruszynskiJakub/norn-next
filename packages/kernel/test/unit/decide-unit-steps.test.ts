@@ -105,6 +105,12 @@ describe("a plugin step kind", () => {
     expect(d.state.step).toBe("merged");
   });
 
+  test("the step kind's detail travels with its answer into step.finished, for the briefs that name what it found", () => {
+    const detail = { base: { ref: "origin/main", sha: "b".repeat(40) }, conflicts: ["a.txt"] };
+    const d = kindOf(decideCase({ state: stateAt("ship", { run: shipRun }), step_run: { kind: "open-pr", running: false, outcome: "opened", detail } }), "apply_receipts");
+    expect(d.receipts[0]?.data).toEqual({ kind: "step.finished", run_id: "step-1", step_kind: "open-pr", outcome: "opened", detail, step: "ship", attempt: 1 });
+  });
+
   test("an effect cut short is run again under its own run, recorded as run.resumed rather than a second run.started", () => {
     const d = kindOf(decideCase({ state: stateAt("ship", { run: shipRun }) }), "run_step");
     expect(d).toMatchObject({ rule: "step.resume", run_id: "step-1" });

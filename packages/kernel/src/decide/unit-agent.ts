@@ -53,15 +53,16 @@ export function decideAgent(v: UnitView, spec: AgentStepSpec): Decision {
 }
 
 function briefOf(v: UnitView, spec: AgentStepSpec) {
-  const brief = {
+  return {
     workflow: v.state.workflow.name,
     hash: v.state.workflow.hash,
     step: v.state.step,
     attempt: v.state.attempt,
     skills: [...spec.skills],
     inputs: structuredClone(spec.inputs),
+    ...(spec.model !== undefined && { model: spec.model }),
+    ...(v.state.rework_from !== undefined && { rework_from: v.state.rework_from }),
   };
-  return spec.model === undefined ? brief : { ...brief, model: spec.model };
 }
 
 function startAgent(v: UnitView, spec: AgentStepSpec): Decision {

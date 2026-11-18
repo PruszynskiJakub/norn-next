@@ -10,12 +10,12 @@
  * names an outcome the step does not route.
  */
 import { type BriefInputs, checkCriteriaReport, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
-import type { HarnessEvent } from "@norn/plugin-api";
+import type { HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
 import { STORE_ID_PATTERN } from "@norn/plugin-api";
 import type { CriterionVerdict, Verdict } from "@norn/schema";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
-import { readBackDocs } from "./inputs.ts";
+import { readBackDocs, worktreeOf } from "./inputs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
 import { type LiveStep, liveStepOf, reportOnRecord } from "./live-run.ts";
@@ -80,15 +80,18 @@ async function liveAgent(env: RuntimeEnv, unit: string): Promise<Refusable<{ rec
 
 function briefInputsOf(record: UnitJournal, live: LiveStep, spec: { skills: string[]; inputs: BriefInputs["inputs"]; model?: string }): BriefInputs {
   const state = record.state as NonNullable<UnitJournal["state"]>;
-  const brief: BriefInputs = {
+  // the state's rework belongs to the visit it is at; a live run of any other visit was not sent back by it
+  const sameVisit = state.step === live.step && state.attempt === live.attempt;
+  return {
     workflow: state.workflow.name,
     hash: state.workflow.hash,
     step: live.step,
     attempt: live.attempt,
     skills: [...spec.skills],
     inputs: structuredClone(spec.inputs),
+    ...(spec.model !== undefined && { model: spec.model }),
+    ...(sameVisit && state.rework_from !== undefined && { rework_from: state.rework_from }),
   };
-  return spec.model === undefined ? brief : { ...brief, model: spec.model };
 }
 
 export async function briefOf(env: RuntimeEnv, unit: string): Promise<Refusable<BriefShown>> {
@@ -136,6 +139,10 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     return refuse(`outcome ${JSON.stringify(req.outcome)} is not one step ${live.step} routes`, `report one of ${allowed || "the step's outcomes"}`, "outcome");
   }
   if (req.verb === "ask" && !textOf(req)) return refuse("an ask without a question", "ask one self-contained question", "invalid");
+  if (req.verb === "done") {
+    const stopped = await unfinishedRefusal(env, unit);
+    if (stopped) return stopped;
+  }
   const text = textOf(req);
   const outcome = req.verb === "done" ? req.outcome : undefined;
   // before the receipt: once it is applied the next step may launch, and it must read what this run wrote
@@ -166,6 +173,31 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     await appendEvents(env.ctx, unit, runId, [{ ...eventOf(runId, req), seq: next_seq, at: env.ctx.now() }]);
   }
   return { ok: true, value: { seq: wrote.value.seq, replayed: wrote.value.replayed, ...(criteria !== undefined && { criteria: criteria.summary }) } };
+}
+
+const CONCLUDE: Record<VcsUnfinished["operation"], string> = { merge: "git commit", rebase: "git rebase --continue", "cherry-pick": "git cherry-pick --continue" };
+
+/**
+ * Why a `done` cannot be recorded while the unit's checkout has a merge (or rebase, cherry-pick)
+ * stopped half-way, or null when it can: the next step would find the operation still open and
+ * fail on it, so the agent concludes it first. An ask or stuck is never held back, as a resolver may
+ * leave the merge open on purpose for a person to choose.
+ */
+async function unfinishedRefusal(env: RuntimeEnv, unit: string): Promise<Refusable<never> | null> {
+  const vcs = env.slots.vcs;
+  if (!vcs.unfinished) return null;
+  const worktree = worktreeOf(env, unit);
+  const r = await vcs.unfinished(worktree);
+  if (!r.ok) return refuse(`cannot tell whether a merge is in progress in ${worktree}: ${r.failure.message}`, "report again with the same command", r.failure.code);
+  if (r.value === null) return null;
+  const { operation, unmerged } = r.value;
+  const left = unmerged.length > 0 ? `unmerged: ${unmerged.join(", ")}` : "every conflict resolved, not yet concluded";
+  const conclude = CONCLUDE[operation];
+  return refuse(
+    `a ${operation} is still in progress in ${worktree} (${left})`,
+    `resolve what is left, conclude the ${operation} with \`${conclude}\`, then report again; if a person must choose, \`norn ask\` with the ${operation} kept in progress`,
+    "merge_unfinished",
+  );
 }
 
 /**

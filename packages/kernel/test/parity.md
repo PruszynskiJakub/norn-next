@@ -106,7 +106,7 @@ back as the unit's `corrupt_marked` fact.
 | (none) | | `unit.unpark` | `apply_receipts` (no receipts: a park decide derived from facts whose cause is gone is lifted) |
 | `receipts.apply` | `apply_receipts` | `receipts.apply` | `apply_receipts` |
 | `receipts.apply.resume` (`${rule}.resume`) | `apply_receipts` | `receipts.apply` | `apply_receipts` (`answer.sent` lifts the park; the host delivers the answer to the live session, so there is no resume rule) |
-| (none) | | `receipts.apply.undelivered` | `apply_receipts` naming the `answer.sent` receipts in `undelivered`: the run's session ended and its executor cannot resume one, so the host applies them without delivering, the ended session is retried next tick, and the retry's brief carries the answers (delivered, it would be refused on every tick and the unit would stay parked) |
+| (none) | | `receipts.apply.undelivered` | `apply_receipts` naming the `answer.sent` receipts in `undelivered`: the run's session ended and its executor cannot resume one, or none of its events are on this machine (a story taken from another machine), so the host applies them without delivering, the ended session is retried next tick, and the retry's brief carries the answers (delivered, it would be refused on every tick and the unit would stay parked) |
 | `receipts.reject` | `reject_receipt` | `receipts.reject` | `apply_receipts` (every unapplied receipt refused, each recorded as `receipt.rejected` in the same act and applied with it) |
 
 ### Slices (old `decide/steps.ts`)

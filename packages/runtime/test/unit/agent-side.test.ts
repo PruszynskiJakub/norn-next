@@ -299,6 +299,29 @@ describe("reporting", () => {
     expect(classified.ok).toBe(false);
   });
 
+  test("a done while a merge waits to be concluded in the worktree is refused and records nothing; ask and stuck still go through", async () => {
+    const { h, runId } = await running();
+    h.stopped[WORKTREE] = { operation: "merge", unmerged: ["a.txt"] };
+    const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
+    expect(r).toMatchObject({ ok: false, refusal: { code: "merge_unfinished", error: expect.stringContaining("unmerged: a.txt"), do_instead: expect.stringContaining("git commit") } });
+    expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
+    // resolved but not concluded is still unfinished
+    h.stopped[WORKTREE] = { operation: "merge", unmerged: [] };
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r2")).toMatchObject({ ok: false, refusal: { code: "merge_unfinished" } });
+    expect(await reportRun(h.env, UNIT, runId, { verb: "ask", question: "keep both sides of a.txt?" }, "r3")).toMatchObject({ ok: true });
+  });
+
+  test("a stuck mid-merge is recorded, and a done after the merge is concluded goes through", async () => {
+    const stuck = await running();
+    stuck.h.stopped[WORKTREE] = { operation: "merge", unmerged: ["a.txt"] };
+    expect(await reportRun(stuck.h.env, UNIT, stuck.runId, { verb: "stuck", reason: "cannot tell which side wins" }, "r1")).toMatchObject({ ok: true });
+    const { h, runId } = await running();
+    h.stopped[WORKTREE] = { operation: "merge", unmerged: [] };
+    expect((await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).ok).toBe(false);
+    delete h.stopped[WORKTREE];
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
   test("a unit with no run in progress is refused", async () => {
     const h = harness({ workflow: "agented" });
     expect(await reportRun(h.env, "lt-9", "r", { verb: "stuck", reason: "x" }, "r1")).toMatchObject({ ok: false, refusal: { code: "no_run" } });
@@ -356,6 +379,19 @@ describe("brief", () => {
     expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "early")).toMatchObject({ ok: true, value: { replayed: false } });
     await tickUntil(h, has("receipts.apply"));
     expect((await record(h, UNIT)).state?.ended).toBe("done");
+  });
+
+  test("the brief of a step a gate's reject sent back to carries the person's reason under Rework", async () => {
+    const h = harness({ workflow: "gated" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    const st = (await record(h, UNIT)).state;
+    await h.env.journal.record(UNIT, { id: "01JD5G0000REJECT0000000000", data: { kind: "gate.decided", outcome: "reject", by: "person", reason: "Make the button blue", step: st?.step, attempt: st?.attempt } });
+    await tickUntil(h, has("agent.start"));
+    const r = await briefOf(h.env, UNIT);
+    if (!r.ok) throw new Error(r.refusal.error);
+    expect(r.value.markdown).toContain("## Rework");
+    expect(r.value.markdown).toContain("`ready` was decided `reject` by person: Make the button blue");
   });
 
   test("no brief for a unit with no live agent run", async () => {

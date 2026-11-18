@@ -125,7 +125,7 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   "vcs.use": CONFIG_DEFAULTS.vcs?.use,
   packs: CONFIG_DEFAULTS.packs,
   base: CONFIG_DEFAULTS.base,
-  base_ref: { derived: "`base`" },
+  base_ref: { derived: "the remote's fetched copy of `base` (`origin/main`), else `base`" },
   holder: { derived: "user@host" },
   executor: { derived: "the only executor" },
   "tracker.intake.assignee": "me",

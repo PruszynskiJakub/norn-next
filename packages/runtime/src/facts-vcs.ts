@@ -6,7 +6,7 @@
  */
 import type { ChangeRequest } from "@norn/plugin-api";
 import type { RunState, StoryFacts, WorkflowGraph } from "@norn/kernel";
-import { branchOf } from "./branches.ts";
+import { baseRefOf, branchOf } from "./branches.ts";
 import type { RuntimeEnv } from "./env.ts";
 
 export type VcsFacts = Pick<StoryFacts, "base_stale" | "unpushed">;
@@ -24,7 +24,7 @@ async function baseStale(env: RuntimeEnv, story: string, state: RunState, graph:
   if (!graph) return undefined;
   const policy = graph.base?.stale ?? "conflict";
   if (policy === "conflict" && graph.steps[state.step]?.routes.stale === undefined) return undefined;
-  const ref = env.config.baseRef ?? env.config.base;
+  const ref = await baseRefOf(env);
   const base = await env.slots.vcs.head(ref);
   if (!base.ok || base.value === null) {
     problems.push(`base ${ref}: ${base.ok ? "names no commit" : base.failure.message}`);
@@ -69,7 +69,7 @@ async function verifyBroken(env: RuntimeEnv, story: string, graph: WorkflowGraph
     worktree: vcs.worktree.path(story),
     slots: { vcs, forge, tracker },
     branch: branchOf(story),
-    base: { branch: env.config.base, ref: env.config.baseRef ?? env.config.base },
+    base: { branch: env.config.base, ref: await baseRefOf(env) },
   };
   try {
     const got = await def.run(input, env.ctx);

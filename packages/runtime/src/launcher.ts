@@ -10,17 +10,21 @@
  * - nudge / answer: marked with an id derived from the decision (nudgePromptId, answerPromptId) and recorded as sent, then `runner.send` when the runner has pane input
  *   and the harness reads typed prompts; else queued in the run's outbox for the next hook answer
  *   (`injectContext`), or, when the run's process has ended (a headless agent exits as its turn
- *   ends), handed to a resumed launch of its session (launcher-resume.ts). With none of these,
- *   refused: a nudge is never dropped silently.
+ *   ends), handed to a resumed launch of its session (launcher-resume.ts). A nudge to a live process
+ *   with no hook activity for the silent window is not queued: a hung agent fires no hook, so its
+ *   process is stopped and the session resumed with the nudge. With none of these, refused: a nudge
+ *   is never dropped silently, nor counted when it cannot arrive.
  * - every launch, resumed ones too, puts agent-bin.ts's folder first on the agent's PATH, so the
  *   `norn` the brief tells the agent to run is the build that launched it.
  * - stop / alive: the runner, on the run's newest process (its latest resume, else the first).
  * The handle is launcher-handle.ts's: executor, unit, run and the runner's own handle.
  */
+import { DEFAULT_KERNEL_CONFIG, reduceSession } from "@norn/kernel";
 import type { Harness, HostContext, NornPromptSource, PluginResult, Runner } from "@norn/plugin-api";
 import { fail, markPrompt, ok, RUN_ENV } from "@norn/plugin-api";
 import { agentBinEnv, cliOfHookCommand } from "./agent-bin.ts";
-import { markDelivered, pendingInjections, queueInjection, recordSentPrompt } from "./events/outbox.ts";
+import { readEvents } from "./events/log.ts";
+import { markDelivered, pendingInjections, queueInjection, readSentPrompt, recordSentPrompt } from "./events/outbox.ts";
 import { receivedDir } from "./events/paths.ts";
 import { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
 import { currentRunnerHandle, recordLaunch, resumesOf, resumeWith } from "./launcher-resume.ts";
@@ -55,6 +59,11 @@ export interface HarnessLauncherOptions {
    * pane's shell starts from its own env, and the agent's `norn` and hooks must find this home.
    */
   agentEnv?: Readonly<Record<string, string>>;
+  /**
+   * How long a session goes without an event before it reads as silent (`kernel.silent_after`): a
+   * live process quiet this long fires no hook to carry a queued nudge. Default: the kernel's.
+   */
+  silentAfterMs?: number;
   /** the pack's skills, written into the harness's `skillsDir` in the worktree before every launch */
   skills?: PackSkills;
   /** the brief for a run, as brief-context.ts renders it */
@@ -232,7 +241,9 @@ export class HarnessLauncher implements AgentLauncher {
       if (!agentEnv.ok) return agentEnv;
       return resumeWith({ ctx, handle: h, harness: executor.harness, runner: executor.runner, id, text: marked, env: agentEnv.value, ...(executor.args !== undefined ? { args: executor.args } : {}) });
     };
-    if ((await this.alive(handle)) === false) return resume();
+    const alive = await this.alive(handle);
+    if (alive === false) return resume();
+    if (source === "nudge" && alive === true && (await this.silent(h))) return this.restartWith(handle, h, executor.harness, id, resume);
     const queued = await queueInjection(ctx, h.unit, h.run_id, { id, source, text: marked, at, ...extra });
     if (!queued.ok) return queued;
     // the process may have ended between the probe and the queue, leaving no hook to carry the entry
@@ -242,5 +253,30 @@ export class HarnessLauncher implements AgentLauncher {
     if (!resumed.ok) return resumed;
     // the resumed prompt carries it; a later hook of the resumed session must not deliver it again
     return markDelivered(ctx, h.unit, h.run_id, [id]);
+  }
+
+  /** No event from the run's session (or, before its first, since its launch) for the silent window. */
+  private async silent(h: LaunchHandle): Promise<boolean> {
+    const { ctx } = this.opts;
+    const last = reduceSession((await readEvents(ctx, h.unit, h.run_id)).events).last_event_at ?? (await readSentPrompt(ctx, h.unit, h.run_id, h.run_id))?.at;
+    if (last === undefined) return false;
+    return Date.parse(ctx.now()) - Date.parse(last) >= (this.opts.silentAfterMs ?? DEFAULT_KERNEL_CONFIG.silentAfterMs);
+  }
+
+  /**
+   * Stop a live but silent process and resume its session with the nudge. Whether it can resume is
+   * settled before the stop: a stopped agent that cannot come back is a death the nudge caused.
+   */
+  private async restartWith(handle: string, h: LaunchHandle, harness: Harness, id: string, resume: () => Promise<PluginResult<void>>): Promise<PluginResult<void>> {
+    const { ctx } = this.opts;
+    // a replay after the resume must not stop the resumed process
+    if ((await resumesOf(ctx, h.unit, h.run_id)).some((r) => r.id === id)) return ok(undefined);
+    const what = `${h.unit} run ${h.run_id} is silent and fires no hook to carry a nudge`;
+    if (harness.capabilities.resume !== true) return fail("unavailable", `${what}, and ${harness.name} cannot resume its session`, false);
+    if (reduceSession((await readEvents(ctx, h.unit, h.run_id)).events).harness_session === undefined)
+      return fail("unavailable", `${what}, and it never reported a harness session to resume`, false);
+    const stopped = await this.stop(handle);
+    if (!stopped.ok) return stopped;
+    return resume();
   }
 }

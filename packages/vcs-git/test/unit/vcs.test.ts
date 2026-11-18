@@ -42,6 +42,20 @@ describe("git vcs queries", () => {
     expect(h.cwds.every((c) => c === ROOT)).toBe(true);
   });
 
+  test("remoteRef names the remote's fetched copy of a branch, and null without the remote or the copy", async () => {
+    const h = gitHost([
+      ["remote", { stdout: "upstream\n" }],
+      ["rev-parse --verify --quiet --end-of-options refs/remotes/upstream/main^{commit}", { stdout: `${SHA}\n` }],
+      ["rev-parse --verify --quiet --end-of-options refs/remotes/upstream/fresh^{commit}", { code: 1 }],
+    ]);
+    const vcs = vcsOf(h.ctx, "upstream");
+    expect(await vcs.remoteRef?.("main")).toEqual({ ok: true, value: "upstream/main" });
+    expect(await vcs.remoteRef?.("fresh")).toEqual({ ok: true, value: null });
+    const bare = gitHost([["remote", { stdout: "" }]]);
+    expect(await vcsOf(bare.ctx).remoteRef?.("main")).toEqual({ ok: true, value: null });
+    expect(bare.calls.map((c) => c[1])).toEqual(["remote"]);
+  });
+
   test("a ref that reads as an option is refused before git runs", async () => {
     const h = gitHost([]);
     const r = await vcsOf(h.ctx).head("--output=/etc/passwd");
@@ -124,6 +138,49 @@ describe("git vcs merge", () => {
   });
 });
 
+describe("git vcs unfinished", () => {
+  const wtList = `worktree ${ROOT}\nHEAD ${SHA}\nbranch refs/heads/main\n\nworktree ${DATA}/worktrees/gh-12\nHEAD ${SHA}\nbranch refs/heads/gh-12-login\n\n`;
+  const WT = `${DATA}/worktrees/gh-12`;
+
+  test("names a merge stopped in a checkout with its unmerged paths, read in that checkout", async () => {
+    const h = gitHost([
+      ["worktree list", { stdout: wtList }],
+      ["rev-parse --verify --quiet --end-of-options MERGE_HEAD", { stdout: `${SHA}\n` }],
+      ["diff --name-only --diff-filter=U", { stdout: "b.ts\na.ts\n" }],
+    ]);
+    expect(await vcsOf(h.ctx).unfinished?.(WT)).toEqual({ ok: true, value: { operation: "merge", unmerged: ["a.ts", "b.ts"] } });
+    expect(h.cwds.slice(1).every((c) => c === WT)).toBe(true);
+  });
+
+  test("a merge resolved but not concluded is still unfinished; a rebase is named too", async () => {
+    const merging = gitHost([
+      ["worktree list", { stdout: wtList }],
+      ["rev-parse --verify --quiet --end-of-options MERGE_HEAD", { stdout: `${SHA}\n` }],
+      ["diff --name-only --diff-filter=U", { stdout: "" }],
+    ]);
+    expect(await vcsOf(merging.ctx).unfinished?.(WT)).toEqual({ ok: true, value: { operation: "merge", unmerged: [] } });
+    const rebasing = gitHost([
+      ["worktree list", { stdout: wtList }],
+      ["rev-parse --verify --quiet --end-of-options REBASE_HEAD", { stdout: `${SHA}\n` }],
+      ["rev-parse", { code: 1 }],
+      ["diff --name-only --diff-filter=U", { stdout: "a.ts\n" }],
+    ]);
+    expect(await vcsOf(rebasing.ctx).unfinished?.(WT)).toEqual({ ok: true, value: { operation: "rebase", unmerged: ["a.ts"] } });
+  });
+
+  test("null for a clean checkout, and for a path that is no checkout without running git there", async () => {
+    const h = gitHost([
+      ["worktree list", { stdout: wtList }],
+      ["rev-parse", { code: 1 }],
+    ]);
+    const vcs = vcsOf(h.ctx);
+    expect(await vcs.unfinished?.(WT)).toEqual({ ok: true, value: null });
+    const before = h.calls.length;
+    expect(await vcs.unfinished?.(`${DATA}/worktrees/gone`)).toEqual({ ok: true, value: null });
+    expect(h.calls.slice(before).map((c) => c[1])).toEqual(["worktree"]);
+  });
+});
+
 describe("git vcs push and fetch", () => {
   test("push names the branch on both sides, carries the lease, and is bounded", async () => {
     const exec = scriptedExec((argv) => (argv[1] === "remote" ? { stdout: "origin\n" } : argv[1] === "push" ? { code: 0 } : undefined));
@@ -152,6 +209,19 @@ describe("git vcs push and fetch", () => {
     expect((await vcs.push("b")).ok).toBe(true);
     expect((await vcs.fetch()).ok).toBe(true);
     expect(h.calls.map((c) => c[1])).toEqual(["remote", "remote"]);
+  });
+
+  test("remoteHead reads the fetched remote-tracking ref; no remote or no remote branch is null", async () => {
+    const h = gitHost([
+      ["remote", { stdout: "upstream\n" }],
+      [`rev-parse --verify --quiet --end-of-options refs/remotes/upstream/gh-12-login^{commit}`, { stdout: `${SHA}\n` }],
+      ["rev-parse", { code: 1 }],
+    ]);
+    const vcs = vcsOf(h.ctx, "upstream");
+    expect(await vcs.remoteHead?.("gh-12-login")).toEqual({ ok: true, value: SHA });
+    expect(await vcs.remoteHead?.("gh-13-other")).toEqual({ ok: true, value: null });
+    expect(await vcsOf(gitHost([["remote", { stdout: "" }]]).ctx).remoteHead?.("gh-12-login")).toEqual({ ok: true, value: null });
+    expect((await vcs.remoteHead?.("--all"))?.ok).toBe(false);
   });
 
   test("fetch prunes and takes no tags", async () => {

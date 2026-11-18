@@ -70,5 +70,6 @@ export function stepRunFact(record: StepRunRecord | null, run: { id: string; ste
   const fact: StepRunFacts = { kind: record.kind, running: record.running === true };
   if (record.outcome !== undefined) fact.outcome = record.outcome;
   if (record.error !== undefined) fact.error = record.error;
+  if (record.detail !== undefined) fact.detail = record.detail;
   return fact;
 }

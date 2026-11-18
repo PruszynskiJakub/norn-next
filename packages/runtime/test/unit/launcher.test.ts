@@ -19,6 +19,7 @@ import {
 } from "../../src/index.ts";
 
 const START = "2026-11-17T09:00:00.000Z";
+const SILENT_MS = 5 * 60_000;
 
 interface FakeHarness extends Harness {
   installs: { worktree: string; hookCommand: string }[];
@@ -109,6 +110,7 @@ function setup(opts: { bgHarness?: Partial<Harness["capabilities"]> } = {}) {
     ctx,
     executors: { pane: { harness: paneHarness, runner: pane }, bg: { harness: bgHarness, runner: bg } },
     hookCommand: ["/opt/my tools/norn", "hook"],
+    silentAfterMs: SILENT_MS,
     renderBrief: async (r) => {
       briefs.push(r.run_id);
       return ok(`# Brief for ${r.unit}`);
@@ -408,6 +410,67 @@ describe("harness launcher nudge and answer", () => {
       s.bg.live.clear();
       expect(await s.launcher.answer(started.value.handle, "q1", "go left")).toMatchObject({ ok: false, failure: { code: "unavailable" } });
       expect(s.bg.starts).toHaveLength(1);
+    }
+  });
+
+  test("without a pane, a nudge to a live session silent past the window stops it and resumes it with the nudge, as no hook would carry it", async () => {
+    const s = setup({ bgHarness: { resume: true } });
+    const unit = "gh-12/03";
+    const runId = "01JRUN0000000000000000000A";
+    const started = await s.launcher.start(run({ executor: "bg", attended: false }));
+    if (!started.ok) throw new Error("start failed");
+    const h = started.value.handle;
+    await appendEvents(s.ctx, unit, runId, [{ type: "session.started", run_id: runId, seq: 0, at: START, harness_session: "sess-1" }]);
+    s.clock.advance(SILENT_MS + 1000);
+    expect(await s.launcher.alive(h)).toBe(true);
+
+    const id = nudgePromptId("01JINTENT7");
+    expect(await s.launcher.nudge(h, "carry on", id)).toEqual(ok(undefined));
+    expect(s.bg.stopped).toEqual(["proc|1"]);
+    const resumed = s.bgHarness.launches[1] as LaunchRequest;
+    expect([resumed.resume, resumed.headless]).toEqual(["sess-1", true]);
+    expect(readPromptMark(resumed.prompt)).toEqual({ source: "nudge", id });
+    expect(resumed.prompt).toContain("carry on");
+    expect((await pendingInjections(s.ctx, unit, runId)).injections).toEqual([]);
+    expect(await s.launcher.alive(h)).toBe(true);
+
+    // a replay finds the resumed launch: it neither stops it nor starts a second agent
+    expect(await s.launcher.nudge(h, "carry on", id)).toEqual(ok(undefined));
+    expect(s.bg.stopped).toEqual(["proc|1"]);
+    expect(s.bg.starts).toHaveLength(2);
+  });
+
+  test("without a pane, a nudge to a live session with recent hook activity is queued for its next hook, the process left running", async () => {
+    const s = setup({ bgHarness: { resume: true } });
+    const unit = "gh-12/03";
+    const runId = "01JRUN0000000000000000000A";
+    const started = await s.launcher.start(run({ executor: "bg", attended: false }));
+    if (!started.ok) throw new Error("start failed");
+    s.clock.advance(SILENT_MS + 1000);
+    await appendEvents(s.ctx, unit, runId, [{ type: "session.started", run_id: runId, seq: 0, at: s.clock.now(), harness_session: "sess-1" }]);
+    const id = nudgePromptId("01JINTENT7");
+    expect(await s.launcher.nudge(started.value.handle, "carry on", id)).toEqual(ok(undefined));
+    expect(s.bg.stopped).toEqual([]);
+    expect(s.bg.starts).toHaveLength(1);
+    expect((await pendingInjections(s.ctx, unit, runId)).injections.map((p) => p.id)).toEqual([id]);
+  });
+
+  test("a nudge to a live silent session that cannot be resumed is refused and the process left running, so the nudge is not counted", async () => {
+    const unit = "gh-12/03";
+    const runId = "01JRUN0000000000000000000A";
+    for (const [caps, session] of [
+      [{ resume: false }, true],
+      [{ resume: true }, false],
+    ] as const) {
+      const s = setup({ bgHarness: caps });
+      const started = await s.launcher.start(run({ executor: "bg", attended: false }));
+      if (!started.ok) throw new Error("start failed");
+      if (session) await appendEvents(s.ctx, unit, runId, [{ type: "session.started", run_id: runId, seq: 0, at: START, harness_session: "sess-1" }]);
+      s.clock.advance(SILENT_MS + 1000);
+      expect(await s.launcher.nudge(started.value.handle, "carry on", nudgePromptId("01JINTENT7"))).toMatchObject({ ok: false, failure: { code: "unavailable" } });
+      expect(s.bg.stopped).toEqual([]);
+      expect(s.bg.starts).toHaveLength(1);
+      expect((await pendingInjections(s.ctx, unit, runId)).injections).toEqual([]);
     }
   });
 

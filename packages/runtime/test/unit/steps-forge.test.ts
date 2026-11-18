@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { memoryFiles, memoryHost, steppingClock } from "@norn/conformance";
-import { ok, type PluginResult, type StepKindInput, type Tracker, type Vcs } from "@norn/plugin-api";
+import { ok, type PluginResult, type StepKindInput, type Tracker, type Vcs, type VcsMergeOptions, type VcsMergeOutcome } from "@norn/plugin-api";
 import { awaitMerge, openPr, stepsForgePlugin } from "../../src/index.ts";
 import { memoryForge } from "../../../conformance/test/unit/reference/memory-forge.ts";
 
@@ -9,9 +9,13 @@ const HEAD = "1".repeat(40);
 const BASE = "2".repeat(40);
 const WT = "/machine/repo/worktrees/gh-12";
 
-/** A vcs over a commit graph given as child → parents; it pushes into `pushed`. */
-function fakeVcs(refs: Record<string, string>, parents: Record<string, string[]>, opts: { push?: boolean } = {}) {
+/**
+ * A vcs over a commit graph given as child → parents; it pushes into `pushed` and records every
+ * merge. `remote` is each branch's remote copy as last fetched; `merge` answers a merge.
+ */
+function fakeVcs(refs: Record<string, string>, parents: Record<string, string[]>, opts: { push?: boolean; remote?: Record<string, string>; merge?: VcsMergeOutcome } = {}) {
   const pushed: string[] = [];
+  const merges: { branch: string; from: string; opts?: VcsMergeOptions }[] = [];
   const reach = (from: string, to: string): boolean => from === to || (parents[from] ?? []).some((p) => reach(p, to));
   const vcs: Vcs = {
     name: "fake",
@@ -20,14 +24,18 @@ function fakeVcs(refs: Record<string, string>, parents: Record<string, string[]>
     head: async (ref) => ok(refs[ref] ?? null),
     isAncestor: async (a, b) => ok(reach(b, a)),
     mergeBase: async () => ok(null),
-    merge: async () => ok({ head: HEAD }),
+    merge: async (branch, from, o) => {
+      merges.push({ branch, from, ...(o ? { opts: o } : {}) });
+      return ok(opts.merge ?? { head: HEAD });
+    },
+    remoteHead: async (b) => ok(opts.remote?.[b] ?? null),
     push: async (b) => {
       pushed.push(b);
       return ok(undefined);
     },
     fetch: async () => ok(undefined),
   };
-  return { vcs, pushed };
+  return { vcs, pushed, merges };
 }
 
 const input = <C>(config: C, over: Partial<StepKindInput<C>> = {}): StepKindInput<C> => ({
@@ -120,6 +128,38 @@ describe("open-pr", () => {
     const { vcs, pushed } = fakeVcs({ "gh-12-login": HEAD }, {}, { push: false });
     expect(value(await openPr.run(input({}, { slots: { forge: world.forge, vcs } }), memoryHost())).outcome).toBe("done");
     expect(pushed).toEqual([]);
+  });
+
+  test("a person's push to the branch is merged in before the push, never forced, and the change shows the merge", async () => {
+    const PERSON = "5".repeat(40);
+    const MERGED = "6".repeat(40);
+    const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
+    const { vcs, pushed, merges } = fakeVcs({ "gh-12-login": HEAD }, {}, { remote: { "gh-12-login": PERSON }, merge: { head: MERGED } });
+    const r = value(await openPr.run(input({}, { slots: { forge: world.forge, vcs } }), memoryHost()));
+    expect(merges).toEqual([{ branch: "gh-12-login", from: PERSON, opts: { abortOnConflict: true } }]);
+    expect(pushed).toEqual(["gh-12-login"]);
+    expect(r.detail).toMatchObject({ head: MERGED, effect: "open" });
+  });
+
+  test("a remote copy the branch already holds is pushed over without a merge", async () => {
+    const OLD = "5".repeat(40);
+    const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
+    const { vcs, pushed, merges } = fakeVcs({ "gh-12-login": HEAD }, { [HEAD]: [OLD] }, { remote: { "gh-12-login": OLD } });
+    value(await openPr.run(input({}, { slots: { forge: world.forge, vcs } }), memoryHost()));
+    expect(merges).toEqual([]);
+    expect(pushed).toEqual(["gh-12-login"]);
+  });
+
+  test("a person's push that conflicts with the branch is refused for a person: nothing pushed, no change opened", async () => {
+    const PERSON = "5".repeat(40);
+    const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
+    const { vcs, pushed } = fakeVcs({ "gh-12-login": HEAD }, {}, { remote: { "gh-12-login": PERSON }, merge: { conflict: { files: ["src/a.ts"] } } });
+    const r = await openPr.run(input({}, { slots: { forge: world.forge, vcs } }), memoryHost());
+    expect(r.ok ? null : { code: r.failure.code, retryable: r.failure.retryable }).toEqual({ code: "conflict", retryable: false });
+    expect(r.ok ? "" : r.failure.message).toContain("src/a.ts");
+    expect(r.ok ? "" : r.failure.message).toContain("by hand");
+    expect(pushed).toEqual([]);
+    expect(value(await world.forge.findChanges(["gh-12-login"]))["gh-12-login"] ?? null).toBeNull();
   });
 });
 

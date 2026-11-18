@@ -30,6 +30,8 @@ export interface MachineOptions {
   env?: Record<string, string>;
   /** answers every command but `git rev-parse`; unscripted ones fail as a missing binary would */
   script?: ExecScript;
+  /** answers a `git rev-parse` before the checkout's own answer does, such as a ref in a unit's worktree */
+  revParse?: ExecScript;
   importer?: PluginImporter;
   signal?: AbortSignal;
   log?: (line: string) => void;
@@ -42,6 +44,8 @@ export function machine(opts: MachineOptions = {}): TestMachine {
   const cwd = opts.cwd ?? ROOT;
   const exec = scriptedExec((argv, o) => {
     if (argv[0] !== "git" || argv[1] !== "rev-parse") return opts.script?.(argv, o);
+    const answered = opts.revParse?.(argv, o);
+    if (answered !== undefined) return answered;
     if (common === null) return { code: 128, stderr: "fatal: not a git repository" };
     return { stdout: `${common}\n${cwd}\n` };
   });

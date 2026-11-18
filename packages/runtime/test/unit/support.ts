@@ -17,9 +17,11 @@ import {
   ok,
   type PluginResult,
   type StepKindDefinition,
+  type StepKindOutcome,
   type Tracker,
   type TrackerItem,
   type Vcs,
+  type VcsUnfinished,
 } from "@norn/plugin-api";
 import { deriveUlid } from "@norn/schema";
 import { localStorePlugin } from "@norn/store-local";
@@ -80,8 +82,11 @@ export interface VcsCall {
   args: unknown[];
 }
 
-/** A vcs with worktrees under the data dir, heads from a map, and every call recorded. */
-export function fakeVcs(ctx: HostContext, heads: Record<string, string>, calls: VcsCall[]): Vcs {
+/**
+ * A vcs with worktrees under the data dir, heads from a map, and every call recorded but `unfinished`,
+ * which answers from `stopped` by checkout path.
+ */
+export function fakeVcs(ctx: HostContext, heads: Record<string, string>, calls: VcsCall[], stopped: Record<string, VcsUnfinished> = {}): Vcs {
   const path = (unit: string) => `${ctx.repo.dataDir}/worktrees/${unit.replace("/", "-")}`;
   const call = <T>(op: string, args: unknown[], value: T): Promise<PluginResult<T>> => {
     calls.push({ op, args });
@@ -99,6 +104,7 @@ export function fakeVcs(ctx: HostContext, heads: Record<string, string>, calls: 
     isAncestor: (a, b) => call("isAncestor", [a, b], a === b),
     mergeBase: (a, b) => call("mergeBase", [a, b], null),
     merge: (branch, from) => call("merge", [branch, from], { head: `${branch}+${from}` }),
+    unfinished: (path) => Promise.resolve(ok(stopped[path] ?? null)),
     push: (branch) => call("push", [branch], undefined),
     fetch: () => call("fetch", [], undefined),
   };
@@ -176,8 +182,11 @@ export interface StepCall {
   input: unknown;
 }
 
+/** A queued step answer: an outcome, `!fail`, or an outcome with the detail the kind records with it. */
+export type StepAnswer = string | StepKindOutcome;
+
 /** Step kinds that answer from a queue per kind (the last answer repeats), recording each input. */
-export function fakeStepKinds(answers: Record<string, string[]>, calls: StepCall[]): Record<string, StepKindDefinition> {
+export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: StepCall[]): Record<string, StepKindDefinition> {
   const kind = (name: string, mode: "effect" | "wait", outcomes: string[]): StepKindDefinition => ({
     name,
     configSchema: Type.Object({ note: Type.Optional(Type.String()) }, { additionalProperties: false }),
@@ -186,9 +195,9 @@ export function fakeStepKinds(answers: Record<string, string[]>, calls: StepCall
     run: async (input) => {
       calls.push({ kind: name, input });
       const queue = answers[name] ?? [];
-      const answer = queue.length > 1 ? (queue.shift() as string) : (queue[0] ?? outcomes[0] as string);
+      const answer = queue.length > 1 ? (queue.shift() as StepAnswer) : (queue[0] ?? (outcomes[0] as string));
       if (answer === "!fail") return fail("unavailable", `${name} failed`);
-      return ok({ outcome: answer });
+      return ok(typeof answer === "string" ? { outcome: answer } : answer);
     },
   });
   return { probe: kind("probe", "effect", ["done", "conflict"]), "await-thing": kind("await-thing", "wait", ["ready"]) };
@@ -238,6 +247,18 @@ export const WORKFLOWS: Record<string, string> = {
     "    outcomes: { approve: $done, reject: $stuck }",
     "",
   ].join("\n"),
+  "gated.yaml": [
+    "name: gated",
+    "start: ready",
+    "steps:",
+    "  ready:",
+    "    gate: Ready?",
+    "    outcomes: { approve: $done, reject: build }",
+    "  build:",
+    "    agent: Build the thing.",
+    "    outcomes: { done: ready }",
+    "",
+  ].join("\n"),
   "sliced.yaml": "name: sliced\nstart: split\nsteps:\n  split:\n    slices:\n    outcomes: { done: $done, stuck: $stuck }\n",
   "based.yaml": [
     "name: based",
@@ -264,8 +285,10 @@ export interface Harnessed {
   changes: Record<string, ChangeRequest>;
   heads: Record<string, string>;
   vcsCalls: VcsCall[];
+  /** operations stopped half-way, by checkout path, as the fake vcs reports them */
+  stopped: Record<string, VcsUnfinished>;
   stepCalls: StepCall[];
-  stepAnswers: Record<string, string[]>;
+  stepAnswers: Record<string, StepAnswer[]>;
   launcher: FakeLauncher;
   sessions: FakeSessions;
   plugins: NornPlugin[];
@@ -324,8 +347,9 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
   const changes: Record<string, ChangeRequest> = {};
   const heads: Record<string, string> = {};
   const vcsCalls: VcsCall[] = [];
+  const stopped: Record<string, VcsUnfinished> = {};
   const stepCalls: StepCall[] = [];
-  const stepAnswers: Record<string, string[]> = {};
+  const stepAnswers: Record<string, StepAnswer[]> = {};
   const launcher = new FakeLauncher();
   const sessions = new FakeSessions();
   const providers = defineNornPlugin({
@@ -334,7 +358,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     provides: {
       tracker: { fake: { configSchema: Type.Object({}), create: () => fakeTracker(items) } },
       forge: { fake: { configSchema: Type.Object({}), create: () => fakeForge(changes) } },
-      vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls) } },
+      vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped) } },
       harness: { fake: HARNESS },
       stepKinds: fakeStepKinds(stepAnswers, stepCalls),
       packs: { test: { workflows: WORKFLOWS, shared: {}, skills: {} } },
@@ -363,7 +387,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     return id;
   };
   const runtime: Runtime = { tick: () => tick(env, nextId()) };
-  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
+  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stopped, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
 }
 
 export type Report = Awaited<ReturnType<Runtime["tick"]>>;

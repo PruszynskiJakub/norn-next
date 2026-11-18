@@ -131,7 +131,7 @@ describe("push over real git", () => {
     expect(await git(w.remote, "rev-parse", "refs/heads/gh-12-login")).toBe(theirs);
   });
 
-  test("a person's push fetched before ours is never forced over", async () => {
+  test("a person's push fetched before ours is merged in, never forced over", async () => {
     const w = await world();
     const wt = await story(w);
     await commit(wt, "story work", { "story.txt": "1\n" });
@@ -144,10 +144,11 @@ describe("push over real git", () => {
     // the tick fetches before the step, so the tracking ref already holds the person's commit
     value(await w.vcs.fetch());
     expect(await git(wt, "rev-parse", "refs/remotes/origin/gh-12-login")).toBe(theirs);
-    await commit(wt, "more", { "story.txt": "2\n" });
-    const refused = await push.run(input(w, wt, {}, { step: "push" }), w.ctx);
-    expect(refused.ok ? null : refused.failure.code).toBe("conflict");
-    expect(await git(w.remote, "rev-parse", "refs/heads/gh-12-login")).toBe(theirs);
+    const ours = await commit(wt, "more", { "story.txt": "2\n" });
+    expect(value(await push.run(input(w, wt, {}, { step: "push" }), w.ctx)).outcome).toBe("done");
+    const pushed = await git(w.remote, "rev-parse", "refs/heads/gh-12-login");
+    // a merge commit with both sides as parents: the person's commit kept, ours on top, nothing rebased
+    expect((await git(w.remote, "rev-list", "--parents", "-n", "1", pushed)).split(" ").slice(1).sort()).toEqual([ours, theirs].sort());
   });
 });
 

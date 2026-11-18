@@ -1,5 +1,6 @@
 /** Units on the in-memory machine's record, as a tick would have left them, for the agent and person verbs to act on. */
 import { newRunState, type RunState } from "@norn/kernel";
+import type { ExecScript } from "@norn/conformance";
 import { RUN_ENV } from "@norn/plugin-api";
 import { encodeLaunchHandle, type RuntimeEnv } from "@norn/runtime";
 import { CliContext, configPaths } from "../../src/index.ts";
@@ -15,11 +16,16 @@ export const AGENT_OUTCOMES = ["done", "replan"];
 /** An agent run's launch env, as the runner sets it. */
 export const runEnv = (unit = UNIT, run = RUN): Record<string, string> => ({ [RUN_ENV.unit]: unit, [RUN_ENV.run]: run });
 
-/** A machine with the local config; `env` is the process env the command runs with. */
-export function configured(opts: { env?: Record<string, string>; stdin?: string } = {}): TestMachine {
+/**
+ * A machine with the local config; `env` is the process env the command runs with. Git lists the
+ * repo's own checkout as its only worktree, so a unit's worktree has nothing in progress.
+ */
+export function configured(opts: { env?: Record<string, string>; stdin?: string; script?: ExecScript; revParse?: ExecScript } = {}): TestMachine {
   // the local tracker names its user from the config: no git answers `config user.email` here
   const config = LOCAL_CONFIG.replace("  intake: { label: norn }", "  intake: { label: norn }\n  user: me@box");
-  return machine({ seed: { [configPaths(HOME, ROOT).local]: config }, ...opts });
+  const script: ExecScript = (argv, o) =>
+    opts.script?.(argv, o) ?? (argv[0] === "git" && argv[1] === "worktree" && argv[2] === "list" ? { stdout: `worktree ${ROOT}\nHEAD ${"a".repeat(40)}\nbranch refs/heads/main\n\n` } : undefined);
+  return machine({ seed: { [configPaths(HOME, ROOT).local]: config }, ...opts, script });
 }
 
 /** The same files and git, with another process env: a person's shell beside the agent's. */

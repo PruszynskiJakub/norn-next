@@ -90,7 +90,8 @@ export function decidePluginStep(v: UnitView, mode: "effect" | "wait"): Decision
   if (sr?.running) return noop(v, "step.running", `${v.step.kind} run ${run.id} in progress`);
   if (sr?.outcome !== undefined && sr.outcome !== WAITING_OUTCOME) {
     const outcome = sr.outcome;
-    return applyOrPark(v, "step.finished", "step.finished.rejected", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: v.step.kind, outcome })]);
+    const detail = sr.detail === undefined ? {} : { detail: structuredClone(sr.detail) };
+    return applyOrPark(v, "step.finished", "step.finished.rejected", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: v.step.kind, outcome, ...detail })]);
   }
   if (mode === "wait") {
     // checked between polls: the host's base_stale already reads the workflow's base policy, which a step kind does not know

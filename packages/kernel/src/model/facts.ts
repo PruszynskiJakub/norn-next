@@ -24,6 +24,8 @@ export const StepRunFacts = Type.Object(
     outcome: Type.Optional(OutcomeName),
     /** why the last run failed without an outcome (the plugin's failure, a check that could not start), shown to a person */
     error: Type.Optional(Type.String()),
+    /** what the step kind recorded with its outcome (a conflict's base commit and paths); carried into the receipt, never routed on */
+    detail: Type.Optional(Type.Unknown()),
   },
   { ...closed, title: "StepRunFacts" },
 );

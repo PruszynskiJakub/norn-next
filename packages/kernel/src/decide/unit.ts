@@ -78,15 +78,18 @@ export function decideUnit(story: StoryFacts, unit: UnitFacts, ctx: DecideContex
 }
 
 /**
- * The answers waiting on a session that can no longer take them: it ended, and its executor cannot
- * resume a session to hand one over. Delivery would be refused on every tick and the unit would stay
- * parked for good; applied undelivered, the unit unparks, the ended session is judged dead and retried,
- * and the retry's brief carries the answers.
+ * The answers waiting on a session that can no longer take them: it ended and its executor cannot
+ * resume a session to hand one over, or none of its events are here (a story taken from another
+ * machine: its session and what a resume would start from stayed there). Delivery would be refused on
+ * every tick and the unit would stay parked for good; applied undelivered, the unit unparks, the
+ * session is judged dead and retried, and the retry's brief carries the answers.
  */
 function undeliverableAnswers(unit: UnitFacts, state: RunState, ctx: DecideContext): string[] {
   const run = state.run;
-  if (!run?.session || run.attended || unit.session?.activity !== "ended") return [];
-  if (ctx.facts.capabilities.executors[run.executor]?.resume === true) return [];
+  if (!run?.session || run.attended) return [];
+  const session = unit.session;
+  if (session !== null && session.activity !== "ended") return [];
+  if (session !== null && ctx.facts.capabilities.executors[run.executor]?.resume === true) return [];
   return unit.receipts.filter((r) => r.data.kind === "answer.sent").map((r) => r.id);
 }
 

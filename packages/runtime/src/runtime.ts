@@ -36,6 +36,7 @@ function launcherOf(deps: Omit<RuntimeDeps, "tickId">, slots: ResolvedSlots, env
     hookCommand: deps.hookCommand ?? DEFAULT_HOOK_COMMAND,
     ...(deps.hostPath !== undefined ? { hostPath: deps.hostPath } : {}),
     ...(deps.agentEnv !== undefined ? { agentEnv: deps.agentEnv } : {}),
+    silentAfterMs: deps.config.kernel.silentAfterMs,
     skills: slots.pack.skills,
     renderBrief: briefRenderer(envOf),
   });

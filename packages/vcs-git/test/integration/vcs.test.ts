@@ -43,6 +43,21 @@ describe("git vcs over real git", () => {
     expect(again.ok ? null : again.failure.code).toBe("conflict");
   });
 
+  test("unfinished names a stopped merge until it is concluded, and nothing for a clean or missing checkout", async () => {
+    const w = await world();
+    const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));
+    expect(value(await w.vcs.unfinished!(path))).toBeNull();
+    await commit(path, "story edit", { "shared.txt": "one\nstory\nthree\n" });
+    await moveBase(w, { "shared.txt": "one\nbase\nthree\n" });
+    value(await w.vcs.merge("gh-12-login", "origin/main"));
+    expect(value(await w.vcs.unfinished!(path))).toEqual({ operation: "merge", unmerged: ["shared.txt"] });
+    await git(path, "add", "-A");
+    expect(value(await w.vcs.unfinished!(path))).toEqual({ operation: "merge", unmerged: [] });
+    await git(path, "commit", "-q", "--no-edit");
+    expect(value(await w.vcs.unfinished!(path))).toBeNull();
+    expect(value(await w.vcs.unfinished!(join(w.dir, "machine", "worktrees", "gone")))).toBeNull();
+  });
+
   test("with abortOnConflict a conflicting merge reports its paths and leaves the branch and worktree as they were", async () => {
     const w = await world();
     const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));

@@ -377,7 +377,7 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `packs` | list of strings (one) | `["sdlc"]` |
 | `plugins.<name>` | string | none |
 | `base` | string | `"main"` |
-| `base_ref` | string | derived: `base` |
+| `base_ref` | string | derived: the remote's fetched copy of `base` (`origin/main`), else `base` |
 | `holder` | string | derived: user@host |
 | `kernel.mode` | `"manual"` or `"auto"` | `"manual"` |
 | `kernel.workflow` | string | `"story"` |

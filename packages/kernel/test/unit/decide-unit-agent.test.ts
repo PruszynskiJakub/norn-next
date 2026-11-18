@@ -11,6 +11,14 @@ describe("a ready agent step", () => {
     expect(d.intent.data).toEqual({ kind: "run.started", run_id: d.run_id, run_kind: "agent", executor: "claude", attended: false, step: "build", attempt: 1 });
   });
 
+  test("a step entered by work sent back briefs its run, and a retry of it, with the receipt that sent it back", () => {
+    const d = kindOf(decideCase({ state: stateAt("build", { rework_from: 5 }) }), "start_run");
+    expect(d.brief.rework_from).toBe(5);
+    expect(kindOf(decideCase({ state: stateAt("build") }), "start_run").brief.rework_from).toBeUndefined();
+    const retry = kindOf(decideCase({ state: stateAt("build", { rework_from: 5, run: run() }), session: session("ended") }), "retry_run");
+    expect(retry.brief.rework_from).toBe(5);
+  });
+
   test("the step's by: picks the executor over the config's", () => {
     const wf = loaded(graph({ build: { agent: agentSpec({ executor: "codex" }) } }));
     const d = kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf], executors: { claude: caps(), codex: caps() } }), "start_run");
@@ -325,6 +333,14 @@ describe("an answer to a session that cannot take it", () => {
     expect(d.state.parked).toBeUndefined();
     // the next tick judges the ended session dead and retries it, in a fresh session whose brief carries the answer
     expect(decideCase({ state: d.state, session: session("ended") })?.rule).toBe("agent.died.retry");
+  });
+
+  test("a run with no session seen on this machine gets the answer applied undelivered, even on an executor that can resume", () => {
+    // a story taken from another machine: the run's hook events stayed there, so nothing here can hand the answer over
+    const d = kindOf(decideCase({ state: at(), receipts: answered, session: null, executors: { claude: caps({ resume: true }) } }), "apply_receipts");
+    expect(d.rule).toBe("receipts.apply.undelivered");
+    expect(d.undelivered).toEqual(["r-7"]);
+    expect(d.state.parked).toBeUndefined();
   });
 
   test("a live session, a session that can be resumed, or an attended run takes the answer as usual", () => {

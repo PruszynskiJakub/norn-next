@@ -84,6 +84,27 @@ describe("the agent verbs act for the run in the launch env", () => {
     expect(await receiptsOf(m)).toEqual([]);
   });
 
+  test("done while a merge waits to be concluded in the unit's worktree is refused with how to conclude it; stuck still goes through", async () => {
+    const env = await envOf(configured());
+    const worktree = env.slots.vcs.worktree.path(UNIT);
+    const list = `worktree ${ROOT}\nHEAD ${"a".repeat(40)}\nbranch refs/heads/main\n\nworktree ${worktree}\nHEAD ${"a".repeat(40)}\nbranch refs/heads/lt-1-x\n\n`;
+    const m = configured({
+      env: runEnv(),
+      script: (argv) => (argv[1] === "worktree" ? { stdout: list } : argv[1] === "diff" ? { stdout: "a.txt\n" } : undefined),
+      revParse: (argv, o) => (o.cwd === worktree ? (argv.at(-1) === "MERGE_HEAD^{commit}" ? { stdout: `${"b".repeat(40)}\n` } : { code: 1 }) : undefined),
+    });
+    await seedUnit(m, { step: AGENT_STEP });
+    const r = await runCli(["done", "done", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.refused);
+    expect(json(r.stdout)).toEqual({
+      error: `a merge is still in progress in ${worktree} (unmerged: a.txt)`,
+      do_instead: "resolve what is left, conclude the merge with `git commit`, then report again; if a person must choose, `norn ask` with the merge kept in progress",
+      code: "merge_unfinished",
+    });
+    expect(await receiptsOf(m)).toEqual([]);
+    expect((await runCli(["stuck", "cannot tell which side wins", "--json"], m.io)).exit).toBe(ExitCode.ok);
+  });
+
   test("a retried report records once; its id comes from the flag, else NORN_REPORT_ID, else what it reports", async () => {
     const m = configured({ env: runEnv() });
     await seedUnit(m, { step: AGENT_STEP });
