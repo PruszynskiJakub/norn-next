@@ -95,6 +95,16 @@ export async function installSkills(files: HostFiles, worktree: string, skillsDi
 }
 
 /**
+ * The names, relative to a worktree, at which installSkills links the pack's skills into `skillsDir`:
+ * norn's alone, never the repo's work, whether or not a `.gitignore` there names them. Copies need no
+ * listing, as each holds its own ignore-all.
+ */
+export function skillLinks(skillsDir: string | undefined, skills: PackSkills): string[] {
+  if (skillsDir === undefined || skillsDir === SKILLS_DIR) return [];
+  return Object.keys(skills).map((name) => `${skillsDir}/${name}`);
+}
+
+/**
  * A git-ignored link is never committed, and a link cannot hold the `.gitignore` its target folder
  * does, so the harness's folder gets one naming them. A `.gitignore` there that is not norn's is the
  * repo's and is never rewritten.

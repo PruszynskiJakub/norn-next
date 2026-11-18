@@ -254,6 +254,8 @@ export function renderBrief(input: BriefRenderInput): string {
   out.push(
     "Report exactly once, from the worktree root, with the outcome whose meaning is true. A refused report says what to do instead: do exactly that, then report again. After a report succeeds, end your turn.",
     "",
+    `Commit your work before \`${c.done}\`: a done is refused while \`git status\` shows changes outside norn's own files, as only commits reach the next step.`,
+    "",
     `After a long session or a lost thread, run \`${c.brief}\` again: it is rendered from the unit's record each time.`,
     "",
   );

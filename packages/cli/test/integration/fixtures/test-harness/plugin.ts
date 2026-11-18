@@ -16,9 +16,11 @@ const AGENT = new URL("./agent.ts", import.meta.url).pathname;
 
 /**
  * Where install leaves the hook command in a worktree: a resumed launch runs in a later tick process
- * than the install, so the command cannot be kept in memory.
+ * than the install, so the command cannot be kept in memory. Its folder ignores itself, as a real
+ * harness keeps what it installs out of git: an untracked file would make a done refused.
  */
-export const HOOK_FILE = ".norn-test-hook";
+const HOOK_DIR = ".norn-test";
+export const HOOK_FILE = `${HOOK_DIR}/hook`;
 
 const WORKFLOW = [
   "name: e2e",
@@ -89,8 +91,9 @@ const harness: Harness = {
   name: "test",
   capabilities: { blockStop: true, denyTool: true, injectContext: true, subagents: false, limits: false, paneInput: false, promptMarks: true, resume: true },
   install: async ({ worktree, hookCommand }) => {
+    await Bun.write(`${worktree}/${HOOK_DIR}/.gitignore`, "*\n");
     await Bun.write(`${worktree}/${HOOK_FILE}`, `${hookCommand}\n`);
-    return { changed: [HOOK_FILE] };
+    return { changed: [`${HOOK_DIR}/.gitignore`, HOOK_FILE] };
   },
   uninstall: async () => ({ changed: [] }),
   launch: (req) => ({

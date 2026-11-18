@@ -115,6 +115,12 @@ export interface Harness {
    */
   readonly skillsDir?: string;
   /**
+   * The files, relative to a worktree, that install writes for that one checkout and that are never
+   * committed (`.claude/settings.local.json`), plugin API 1.10. A host never reads them as work left
+   * uncommitted, even where the repo's own `.gitignore` keeps the harness from ignoring them.
+   */
+  readonly localFiles?: readonly string[];
+  /**
    * Wire the agent's hooks in one worktree; idempotent, returns the files it changed. Every write is
    * atomic (temp file, fsync, rename): a torn config file would leave the agent with no hooks.
    */

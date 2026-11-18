@@ -322,6 +322,64 @@ describe("reporting", () => {
     expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
   });
 
+  test("a done while the worktree holds uncommitted work is refused, naming the paths and records nothing; ask and stuck still go through", async () => {
+    const { h, runId } = await running();
+    h.dirty[WORKTREE] = ["src/a.ts", "src/b.ts"];
+    const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
+    expect(r).toMatchObject({
+      ok: false,
+      refusal: { code: "dirty_worktree", error: expect.stringContaining("src/a.ts, src/b.ts"), do_instead: expect.stringMatching(/git status.*commit/) },
+    });
+    expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
+    expect(await reportRun(h.env, UNIT, runId, { verb: "ask", question: "keep src/a.ts?" }, "r2")).toMatchObject({ ok: true });
+  });
+
+  test("norn's own files in the worktree (its inputs and the story's spec folder) never count as uncommitted work", async () => {
+    const { h, runId } = await running();
+    h.dirty[WORKTREE] = [".agents/inputs/last_check.md", `.agents/specs/${UNIT}/spec.md`, `.agents/specs/${UNIT}/handoffs/${UNIT}.md`];
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
+  test("the files the run's harness keeps local and norn's skill links never count, even where the repo's own .gitignore leaves them showing; a repo's skill folder of that name does", async () => {
+    const { h, runId } = await running();
+    h.env.slots = { ...h.env.slots, executors: { claude: claudeHarness }, pack: { ...h.env.slots.pack, skills: { "norn-implement": { "SKILL.md": "x" } } } };
+    h.dirty[WORKTREE] = [".claude/settings.local.json", ".claude/skills/norn-implement", ".claude/skills/norn-implement/SKILL.md"];
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({
+      ok: false,
+      refusal: { code: "dirty_worktree", error: expect.stringMatching(/holds uncommitted work: \.claude\/skills\/norn-implement\/SKILL\.md$/) },
+    });
+    h.dirty[WORKTREE] = [".claude/settings.local.json", ".claude/skills/norn-implement"];
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
+  test("a refusal names the first ten paths and counts the rest", async () => {
+    const { h, runId } = await running();
+    h.dirty[WORKTREE] = Array.from({ length: 13 }, (_, i) => `src/f${String(i).padStart(2, "0")}.ts`);
+    const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
+    if (r.ok) throw new Error("the done was recorded");
+    expect(r.refusal.code).toBe("dirty_worktree");
+    expect(r.refusal.error).toEndWith("src/f09.ts and 3 more");
+    expect(r.refusal.error).not.toContain("src/f10.ts");
+  });
+
+  test("a done is refused when the vcs cannot tell whether the worktree holds uncommitted work, and nothing is recorded", async () => {
+    const { h, runId } = await running();
+    h.env.slots.vcs.uncommitted = async () => ({ ok: false, failure: { code: "unavailable", message: "index file corrupt", retryable: false } });
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({
+      ok: false,
+      refusal: { code: "unavailable", error: expect.stringContaining("cannot tell whether") },
+    });
+    expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
+  });
+
+  test("a done in a clean worktree goes through, and one whose work was committed after the refusal too", async () => {
+    const { h, runId } = await running();
+    h.dirty[WORKTREE] = ["notes.txt", `.agents/specs/${UNIT}/spec.md`];
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: false, refusal: { code: "dirty_worktree", error: expect.not.stringContaining(".agents/") } });
+    h.dirty[WORKTREE] = [];
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
   test("a unit with no run in progress is refused", async () => {
     const h = harness({ workflow: "agented" });
     expect(await reportRun(h.env, "lt-9", "r", { verb: "stuck", reason: "x" }, "r1")).toMatchObject({ ok: false, refusal: { code: "no_run" } });

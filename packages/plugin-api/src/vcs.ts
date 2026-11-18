@@ -88,6 +88,12 @@ export interface Vcs {
    * host cannot hold back a report made while a merge still waits to be concluded.
    */
   unfinished?(path: string): Promise<PluginResult<VcsUnfinished | null>>;
+  /**
+   * the paths in the checkout at `path` holding a change not committed (staged, unstaged, or
+   * untracked and not ignored), sorted; empty when it is clean or `path` is no checkout. Optional
+   * (plugin API 1.10); without it a host cannot hold back a report that would leave work behind.
+   */
+  uncommitted?(path: string): Promise<PluginResult<string[]>>;
   push(branch: string, opts?: VcsPushOptions): Promise<PluginResult<void>>;
   fetch(): Promise<PluginResult<void>>;
 }

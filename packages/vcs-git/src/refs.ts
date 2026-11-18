@@ -97,6 +97,33 @@ export async function unfinished(ctx: HostContext, root: string, path: string): 
 }
 
 /**
+ * The paths in the checkout at `path` with a change not committed, sorted; empty when it is clean or
+ * `path` is no checkout of this repo. Untracked files count unless a `.gitignore` or the exclude file
+ * keeps them out, which is how norn's own files in a worktree stay out of the answer. Read with `-z`
+ * so a path git would quote comes back as it is named; a rename names both of its sides.
+ */
+export async function uncommitted(ctx: HostContext, root: string, path: string): Promise<PluginResult<string[]>> {
+  const list = await worktreeList(ctx, root);
+  if (!list.ok) return list;
+  if (!list.value.some((w) => samePath(w.path, path))) return ok([]);
+  const st = await git(ctx, path, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]);
+  if (st.code !== 0) return gitFailure(st, "status");
+  const fields = st.stdout.split("\0");
+  const paths = new Set<string>();
+  for (let i = 0; i < fields.length; i++) {
+    const entry = fields[i] as string;
+    if (entry.length < 4) continue;
+    paths.add(entry.slice(3));
+    // a rename or copy, on either side, is followed by the path it came from, as a field of its own
+    if ([entry[0], entry[1]].some((x) => x === "R" || x === "C")) {
+      const from = fields[++i];
+      if (from) paths.add(from);
+    }
+  }
+  return ok([...paths].sort());
+}
+
+/**
  * Why `cwd` cannot take a merge now, or null when it can: someone's merge or rebase in progress (a
  * resolver's, never aborted or concluded here) or uncommitted changes.
  */
