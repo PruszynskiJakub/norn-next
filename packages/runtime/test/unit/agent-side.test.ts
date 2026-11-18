@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { claudeHarness } from "@norn/harness-claude";
-import { markPrompt, RUN_ENV } from "@norn/plugin-api";
+import { markPrompt, ok, RUN_ENV, type VcsConflictMarker } from "@norn/plugin-api";
 import {
   batchesDir,
   batchName,
@@ -372,6 +372,56 @@ describe("reporting", () => {
     expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
   });
 
+  test("a done whose commits since the unit's base left a conflict unresolved is refused, naming each file and line, and records nothing; ask still goes through", async () => {
+    const { h, runId } = await running();
+    Object.assign(h.heads, { main: "m".repeat(40), "norn/lt-1": "s".repeat(40) });
+    const asked: [string, string][] = [];
+    let found: VcsConflictMarker[] = [
+      { path: "src/a.ts", line: 4 },
+      { path: "src/b.ts", line: 12 },
+    ];
+    h.env.slots.vcs.conflictMarkers = async (base, head) => {
+      asked.push([base, head]);
+      return ok(found);
+    };
+    const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
+    expect(r).toMatchObject({
+      ok: false,
+      refusal: { code: "conflict_markers", error: expect.stringContaining("src/a.ts:4, src/b.ts:12"), do_instead: expect.stringContaining("commit") },
+    });
+    expect(asked).toEqual([["main", "norn/lt-1"]]);
+    expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
+    expect(await reportRun(h.env, UNIT, runId, { verb: "ask", question: "which side of src/a.ts wins?" }, "r2")).toMatchObject({ ok: true });
+    const fresh = await running();
+    Object.assign(fresh.h.heads, { main: "m".repeat(40), "norn/lt-1": "s".repeat(40) });
+    fresh.h.env.slots.vcs.conflictMarkers = async () => ok(found);
+    found = [];
+    expect(await reportRun(fresh.h.env, UNIT, fresh.runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
+  test("a unit without a branch of its own (run in the repo's own checkout) has no conflicts to read, and its done goes through", async () => {
+    const { h, runId } = await running();
+    h.heads.main = "m".repeat(40);
+    let read = false;
+    h.env.slots.vcs.conflictMarkers = async () => {
+      read = true;
+      return ok([{ path: "src/a.ts", line: 1 }]);
+    };
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+    expect(read).toBe(false);
+  });
+
+  test("a done is refused when the vcs cannot read the unit's conflicts, and nothing is recorded", async () => {
+    const { h, runId } = await running();
+    Object.assign(h.heads, { main: "m".repeat(40), "norn/lt-1": "s".repeat(40) });
+    h.env.slots.vcs.conflictMarkers = async () => ({ ok: false, failure: { code: "unavailable", message: "bad revision", retryable: false } });
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({
+      ok: false,
+      refusal: { code: "unavailable", error: expect.stringContaining("bad revision") },
+    });
+    expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
+  });
+
   test("a done in a clean worktree goes through, and one whose work was committed after the refusal too", async () => {
     const { h, runId } = await running();
     h.dirty[WORKTREE] = ["notes.txt", `.agents/specs/${UNIT}/spec.md`];
@@ -455,5 +505,63 @@ describe("brief", () => {
   test("no brief for a unit with no live agent run", async () => {
     const h = harness({ workflow: "agented" });
     expect(await briefOf(h.env, "lt-9")).toMatchObject({ ok: false, refusal: { code: "no_run" } });
+  });
+});
+
+describe("the resolve of a base update", () => {
+  const BASE_SHA = "b".repeat(40);
+
+  /** A story whose base update conflicted, at the resolve step that takes its base_side, with the run started. */
+  async function resolving(): Promise<{ h: Harnessed; runId: string }> {
+    const h = harness({ workflow: "resolving" });
+    h.stepAnswers["update-branch"] = [{ outcome: "conflict", detail: { base: { ref: "main", sha: BASE_SHA }, conflicts: ["a.txt"] } }];
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const state = (await record(h, UNIT)).state;
+    if (state?.step !== "resolve" || !state.run) throw new Error(`not at resolve: ${state?.step}`);
+    return { h, runId: state.run.id };
+  }
+
+  test("a done before the base commit is merged into the story branch is refused and records nothing; once it is, the done goes through", async () => {
+    const { h, runId } = await resolving();
+    const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
+    expect(r).toMatchObject({
+      ok: false,
+      refusal: { code: "merge_unfinished", error: expect.stringContaining(BASE_SHA.slice(0, 12)), do_instead: expect.stringContaining(`git merge ${BASE_SHA}`) },
+    });
+    expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
+    expect(await reportRun(h.env, UNIT, runId, { verb: "ask", question: "which side wins?" }, "r2")).toMatchObject({ ok: true });
+    const merged = await resolving();
+    merged.h.env.slots.vcs.isAncestor = async (a, b) => ok(a === BASE_SHA && b === "norn/lt-1");
+    expect(await reportRun(merged.h.env, UNIT, merged.runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
+  test("a resolve sent back after its base update ended resolved is not held to the base commit, which an earlier update named", async () => {
+    const h = harness({ workflow: "resolving" });
+    h.stepAnswers["update-branch"] = [{ outcome: "conflict", detail: { base: { ref: "main", sha: BASE_SHA }, conflicts: ["a.txt"] } }, "resolved"];
+    h.env.slots.vcs.isAncestor = async () => ok(true);
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const first = (await record(h, UNIT)).state?.run?.id ?? "";
+    expect(await reportRun(h.env, UNIT, first, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true });
+    await tickUntil(h, async () => {
+      const st = (await record(h, UNIT)).state;
+      return st?.step === "resolve" && st.run !== null && st.run.id !== first;
+    });
+    const again = (await record(h, UNIT)).state;
+    expect(again?.step).toBe("resolve");
+    h.env.slots.vcs.isAncestor = async () => ok(false);
+    expect(await reportRun(h.env, UNIT, again?.run?.id ?? "", { verb: "done", outcome: "done" }, "r2")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
+  test("a done is refused when the vcs cannot tell whether the base commit is merged", async () => {
+    const { h, runId } = await resolving();
+    h.env.slots.vcs.isAncestor = async () => ({ ok: false, failure: { code: "unavailable", message: "object store busy", retryable: true } });
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({
+      ok: false,
+      refusal: { code: "unavailable", error: expect.stringContaining("object store busy") },
+    });
   });
 });

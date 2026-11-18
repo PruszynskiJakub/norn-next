@@ -1,5 +1,6 @@
 export { GitVcsConfig } from "./config.ts";
 export { git, GIT_ENV } from "./git.ts";
+export { addedConflicts, conflictMarkers } from "./markers.ts";
 export { abortMerge, type MergeAttempt, mergeInto } from "./merge.ts";
 export { vcsGitPlugin } from "./plugin.ts";
 export { fetchRemote, pushBranch } from "./push.ts";

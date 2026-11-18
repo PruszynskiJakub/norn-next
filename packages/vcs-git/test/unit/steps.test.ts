@@ -21,6 +21,9 @@ function host(route: Router, files = memoryFiles()) {
 
 const input = <C>(config: C, over: Partial<StepKindInput<C>> = {}): StepKindInput<C> => ({ unit: "gh-12", story: "gh-12", step: "update", config, worktree: WT, ...over });
 const rev = (ref: string) => `rev-parse --verify --quiet --end-of-options ${ref}^{commit}`;
+const DIFF = "-c core.quotePath=false diff";
+/** A diff adding one whole conflict to src/a.ts at line 4, its markers built so no line here reads as one. */
+const CONFLICTED = ["diff --git a/src/a.ts b/src/a.ts", "--- a/src/a.ts", "+++ b/src/a.ts", "@@ -3,0 +4,3 @@", `+${"<".repeat(7)} HEAD`, `+${"=".repeat(7)}`, `+${">".repeat(7)} main`, ""].join("\n");
 
 describe("the light path", () => {
   const merge = (over: Partial<LightCommit> = {}): LightCommit => ({ sha: "m", parents: ["a", "b"], paths: [], fromBase: true, remerge: [], ...over });
@@ -52,6 +55,7 @@ function storyRouter(over: Router, state: { head: string }): Router {
     if (line === "remote") return { stdout: "origin\n" };
     if (line.startsWith("fetch")) return {};
     if (line.startsWith("status --porcelain")) return { stdout: "" };
+    if (line.startsWith(DIFF)) return { stdout: "" };
     if (line === rev("HEAD")) return { stdout: state.head };
     if (line === rev("origin/main")) return { stdout: BASE };
     if (line.startsWith("rev-parse")) return { code: 1 };
@@ -154,6 +158,7 @@ describe("integrate", () => {
       if (line === `merge-base --is-ancestor ${HEAD} HEAD`) return { code: 1 };
       if (line.startsWith("rev-parse")) return { code: 1 };
       if (line.startsWith("status --porcelain")) return { stdout: "" };
+      if (line.startsWith(DIFF)) return { stdout: "" };
       if (line.startsWith("merge --no-ff --no-edit")) {
         merged = true;
         return {};
@@ -177,6 +182,21 @@ describe("integrate", () => {
     });
     const r = await integrate.run(slice(), h.ctx);
     expect(r.ok && r.value).toEqual({ outcome: "done", detail: { story_branch: "gh-12-login", head: MERGED, merged: false } });
+  });
+
+  test("a slice whose commits left a conflict unresolved is refused, naming file and line, and nothing is merged", async () => {
+    const h = host((line, cwd) => {
+      if (line === "symbolic-ref --quiet --short HEAD") return { stdout: cwd === SLICE_WT ? "gh-12-03-form\n" : "gh-12-login\n" };
+      if (line === rev("HEAD")) return { stdout: cwd === SLICE_WT ? HEAD : BASE };
+      if (line === `merge-base --is-ancestor ${HEAD} HEAD`) return { code: 1 };
+      if (line.startsWith(DIFF)) return { stdout: CONFLICTED };
+      return undefined;
+    });
+    const r = await integrate.run(slice(), h.ctx);
+    expect(r.ok ? null : { code: r.failure.code, retryable: r.failure.retryable }).toEqual({ code: "conflict", retryable: false });
+    expect(r.ok ? "" : r.failure.message).toContain("src/a.ts:4");
+    expect(h.lines()).toContain(`${DIFF} -U0 --no-color --no-ext-diff --no-textconv --src-prefix=a/ --dst-prefix=b/ gh-12-login...${HEAD}`);
+    expect(h.lines().some((l) => l.startsWith("merge "))).toBe(false);
   });
 
   test("a story is never integrated into itself", async () => {
@@ -247,6 +267,37 @@ describe("push", () => {
     expect(r.ok ? "" : r.failure.message).toContain("src/a.ts");
     expect(h.lines()).toContain("merge --abort");
     expect(h.lines().some((l) => l.startsWith("push"))).toBe(false);
+  });
+});
+
+describe("push guard", () => {
+  test("a branch whose commits left a conflict unresolved since its base is refused, naming file and line; nothing is pushed", async () => {
+    const h = host(
+      storyRouter((line) => {
+        if (line.startsWith(DIFF)) return { stdout: CONFLICTED };
+        if (line.startsWith("push")) return {};
+        return undefined;
+      }, { head: HEAD }),
+    );
+    const r = await push.run(input({}, { step: "push", base: { branch: "main", ref: "origin/main" } }), h.ctx);
+    expect(r.ok ? null : { code: r.failure.code, retryable: r.failure.retryable }).toEqual({ code: "conflict", retryable: false });
+    expect(r.ok ? "" : r.failure.message).toContain("src/a.ts:4");
+    expect(h.lines().some((l) => l.startsWith(DIFF) && l.endsWith("origin/main...HEAD"))).toBe(true);
+    expect(h.lines().some((l) => l.startsWith("push"))).toBe(false);
+  });
+
+  test("a repo where no base resolves still pushes, with no base to read conflicts against", async () => {
+    const h = host(
+      storyRouter((line) => {
+        if (line === rev("origin/main")) return { code: 1 };
+        if (line.startsWith("push")) return {};
+        return undefined;
+      }, { head: HEAD }),
+    );
+    const r = await push.run(input({}, { step: "push" }), h.ctx);
+    expect(r.ok && r.value.outcome).toBe("done");
+    expect(h.lines().some((l) => l.startsWith(DIFF))).toBe(false);
+    expect(h.lines().some((l) => l.startsWith("push"))).toBe(true);
   });
 });
 

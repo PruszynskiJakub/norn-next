@@ -47,6 +47,15 @@ function conflictLine(r: UpdateFinished): string {
 }
 
 /**
+ * The base commit the unit's latest base update could not merge, or null when that update did not
+ * end `conflict` (or none ran): the commit a resolver is sent to merge.
+ */
+export function baseConflictOf(record: UnitJournal): { ref: string; sha: string } | null {
+  const last = record.receipts.findLast(isUpdate);
+  return last ? (conflictOf(last)?.base ?? null) : null;
+}
+
+/**
  * The base side of the conflict that sent the unit here: the latest base update's receipt, when it
  * ended `conflict`. The update aborted its merge, so the resolver merges the named commit itself.
  */

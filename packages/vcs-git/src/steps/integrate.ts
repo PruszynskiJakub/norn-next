@@ -2,14 +2,15 @@
  * `integrate`: merge a finished slice's branch into its story branch, in the story's worktree, never
  * rebasing the slice: a rebase would linearise a resolution the slice already made and bring its
  * conflict back. `conflict` aborts the merge and names the paths, so the slice's resolver takes the
- * story branch into the slice and the next integrate merges cleanly.
+ * story branch into the slice and the next integrate merges cleanly. A slice whose commits left a
+ * conflict unresolved is refused before anything merges.
  */
 import { fail, type HostContext, ok, type PluginResult, type StepKindDefinition, type StepKindInput, type StepKindOutcome } from "@norn/plugin-api";
 import { mergeInto } from "../merge.ts";
 import { currentBranch, isAncestor, revParse } from "../refs.ts";
 import { worktreePath } from "../worktree.ts";
 import { Type } from "@sinclair/typebox";
-import { stepPlace } from "./common.ts";
+import { stepPlace, unresolvedConflicts } from "./common.ts";
 
 /** Nothing to set: the slice and the story are the unit's, and nothing reaches the remote. */
 export const IntegrateConfig = Type.Object({}, { additionalProperties: false });
@@ -35,6 +36,8 @@ async function run(input: StepKindInput<Record<string, never>>, ctx: HostContext
     if (!head.ok) return head;
     return ok({ outcome: "done", detail: { story_branch: storyBranch.value, head: head.value, merged: false } });
   }
+  const clean = await unresolvedConflicts(ctx, slice.cwd, "integrate", storyBranch.value, sliceHead.value, "Nothing was merged");
+  if (!clean.ok) return clean;
   const m = await mergeInto(ctx, storyCwd, sliceHead.value, { message: `Integrate ${input.unit} (${slice.branch}) into ${storyBranch.value}` });
   if (!m.ok) return m;
   if ("conflict" in m.value) return ok({ outcome: "conflict", detail: { story_branch: storyBranch.value, slice_head: sliceHead.value, conflicts: m.value.conflict.files } });

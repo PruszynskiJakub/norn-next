@@ -13,8 +13,10 @@ import { type BriefInputs, checkCriteriaReport, renderBrief, type UnitJournal, v
 import type { HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
 import { STORE_ID_PATTERN } from "@norn/plugin-api";
 import type { CriterionVerdict, Finding, Note, Verdict } from "@norn/schema";
+import { branchOf, baseRefOf, cutFrom } from "./branches.ts";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
+import { baseConflictOf } from "./input-history.ts";
 import { INPUTS_DIR, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
@@ -150,6 +152,10 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     if (stopped) return stopped;
     const dirty = await uncommittedRefusal(env, unit, live.run.executor);
     if (dirty) return dirty;
+    const unmerged = await baseUnmergedRefusal(env, record, live);
+    if (unmerged) return unmerged;
+    const marked = await conflictMarkersRefusal(env, unit);
+    if (marked) return marked;
   }
   const text = textOf(req);
   const outcome = req.verb === "done" ? req.outcome : undefined;
@@ -236,6 +242,60 @@ async function unfinishedRefusal(env: RuntimeEnv, unit: string): Promise<Refusab
     `a ${operation} is still in progress in ${worktree} (${left})`,
     `resolve what is left, conclude the ${operation} with \`${conclude}\`, then report again; if a person must choose, \`norn ask\` with the ${operation} kept in progress`,
     "merge_unfinished",
+  );
+}
+
+/**
+ * Why the done of a step sent to merge the base cannot be recorded, or null when it can: the step
+ * takes the `base_side` input and the latest base update stopped on a conflict, yet the unit's branch
+ * does not contain that base commit, so the merge was never made (or was made on another branch).
+ * Read before the markers, as a merge never made leaves none to find.
+ */
+async function baseUnmergedRefusal(env: RuntimeEnv, record: UnitJournal, live: LiveStep): Promise<Refusable<never> | null> {
+  const inputs = record.state?.workflow.doc.steps[live.step]?.inputs ?? [];
+  if (!inputs.includes("base_side")) return null;
+  const base = baseConflictOf(record);
+  if (!base) return null;
+  const branch = branchOf(record.unit);
+  const short = base.sha.slice(0, 12);
+  const r = await env.slots.vcs.isAncestor(base.sha, branch);
+  if (!r.ok) return refuse(`cannot tell whether ${base.ref} at ${short} is merged into ${branch}: ${r.failure.message}`, "report again with the same command", r.failure.code);
+  if (r.value) return null;
+  return refuse(
+    `${base.ref} at ${short}, the base this step merges, is not merged into ${branch}: its head does not contain it`,
+    `merge it in the worktree with \`git merge ${base.sha}\` (a merge commit, never a rebase), resolve every conflict, commit, then report again; if a person must choose, \`norn ask\``,
+    "merge_unfinished",
+  );
+}
+
+/** How many conflicts a refusal names before it counts the rest. */
+const MARKERS_SHOWN = 10;
+
+/**
+ * Why a `done` cannot be recorded while the unit's commits since its base (a story's base, a slice's
+ * story branch) leave a conflict unresolved, or null when they do not: a marker the tests and the
+ * review miss would otherwise ship. Only commits are read, so it is checked after the worktree is
+ * known clean.
+ */
+async function conflictMarkersRefusal(env: RuntimeEnv, unit: string): Promise<Refusable<never> | null> {
+  const vcs = env.slots.vcs;
+  if (!vcs.conflictMarkers) return null;
+  const base = cutFrom(unit, await baseRefOf(env));
+  const branch = branchOf(unit);
+  // a unit run in the repo's own checkout (a vcs without worktrees) may have no branch of its own to read
+  for (const ref of [base, branch]) {
+    const at = await vcs.head(ref);
+    if (at.ok && at.value === null) return null;
+  }
+  const r = await vcs.conflictMarkers(base, branch);
+  if (!r.ok) return refuse(`cannot read the conflicts ${branch} left since ${base}: ${r.failure.message}`, "report again with the same command", r.failure.code);
+  if (r.value.length === 0) return null;
+  const where = r.value.map((m) => `${m.path}:${m.line}`);
+  const named = where.slice(0, MARKERS_SHOWN).join(", ") + (where.length > MARKERS_SHOWN ? ` and ${where.length - MARKERS_SHOWN} more` : "");
+  return refuse(
+    `${branch} holds conflict markers left unresolved since ${base}: ${named}`,
+    "resolve each conflict by the intent of both sides, remove its markers, commit, then report again; if a person must choose, `norn ask`",
+    "conflict_markers",
   );
 }
 

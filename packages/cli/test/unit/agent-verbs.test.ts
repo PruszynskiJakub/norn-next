@@ -129,6 +129,19 @@ describe("the agent verbs act for the run in the launch env", () => {
     expect((await runCli(["done", "done", "--json"], m.io)).exit).toBe(ExitCode.ok);
   });
 
+  test("done while the unit's commits leave a conflict unresolved is refused (exit 3) naming file and line; once resolved it goes through", async () => {
+    const conflicted = ["diff --git a/src/app.ts b/src/app.ts", "--- a/src/app.ts", "+++ b/src/app.ts", "@@ -1,0 +2,3 @@", `+${"<".repeat(7)} HEAD`, `+${"=".repeat(7)}`, `+${">".repeat(7)} main`, ""].join("\n");
+    let diff = conflicted;
+    const m = configured({ env: runEnv(), script: (argv) => (argv[0] === "git" && argv.includes("-U0") ? { stdout: diff } : undefined) });
+    await seedUnit(m, { step: AGENT_STEP });
+    const r = await runCli(["done", "done", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.refused);
+    expect(json(r.stdout)).toMatchObject({ code: "conflict_markers", error: expect.stringContaining("src/app.ts:2") });
+    expect(await receiptsOf(m)).toEqual([]);
+    diff = "";
+    expect((await runCli(["done", "done", "--json"], m.io)).exit).toBe(ExitCode.ok);
+  });
+
   test("a retried report records once; its id comes from the flag, else NORN_REPORT_ID, else what it reports", async () => {
     const m = configured({ env: runEnv() });
     await seedUnit(m, { step: AGENT_STEP });

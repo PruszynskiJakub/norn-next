@@ -76,6 +76,22 @@ describe("git vcs over real git", () => {
     expect(value(await w.vcs.uncommitted!(join(w.dir, "machine", "worktrees", "gone")))).toEqual([]);
   });
 
+  test("conflictMarkers names a conflict committed unresolved in a base merge, never a doc quoting part of one nor a marker the base holds", async () => {
+    const w = await world();
+    const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));
+    const [open, mid] = ["<".repeat(7), "=".repeat(7)];
+    await moveBase(w, { "base-doc.md": `${open} a\n${mid}\n${">".repeat(7)} b\n` });
+    await commit(path, "story edit", { "shared.txt": "one\nstory\nthree\n", "doc.md": `# How\n\n${open} ours\n${mid}\n` });
+    await moveBase(w, { "shared.txt": "one\nbase\nthree\n" });
+    expect(value(await w.vcs.conflictMarkers!("origin/main", "gh-12-login"))).toEqual([]);
+    value(await w.vcs.merge("gh-12-login", "origin/main"));
+    await git(path, "add", "-A");
+    await git(path, "commit", "-q", "--no-edit");
+    expect(value(await w.vcs.conflictMarkers!("origin/main", "gh-12-login"))).toEqual([{ path: "shared.txt", line: 2 }]);
+    await commit(path, "resolve", { "shared.txt": "one\nstory and base\nthree\n" });
+    expect(value(await w.vcs.conflictMarkers!("origin/main", "gh-12-login"))).toEqual([]);
+  });
+
   test("with abortOnConflict a conflicting merge reports its paths and leaves the branch and worktree as they were", async () => {
     const w = await world();
     const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));

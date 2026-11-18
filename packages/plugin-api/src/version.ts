@@ -1,5 +1,5 @@
 /** The plugin API this build of norn implements; a plugin states the range it was written against. */
-export const PLUGIN_API_VERSION = "1.10.0";
+export const PLUGIN_API_VERSION = "1.11.0";
 
 type Triple = [major: number, minor: number, patch: number];
 
