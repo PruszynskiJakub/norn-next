@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { reportReceiptId, SPEC_ARTIFACT, writeStoryDoc } from "@norn/runtime";
+import { INPUTS_DIR, reportReceiptId, SPEC_ARTIFACT, worktreeOf, writeStoryDoc } from "@norn/runtime";
 import type { RunState } from "@norn/kernel";
 import type { CriterionVerdict } from "@norn/schema";
 import { ExitCode, runCli } from "../../src/index.ts";
@@ -281,5 +281,188 @@ describe("done at a step with criteria: required", () => {
     expect(md).toContain("- `norn done unverified --criteria <file>`");
     expect(md).toContain("This step requires `--criteria <file>`");
     expect(md).toContain("`partial` only when it is `person`");
+  });
+});
+
+describe("done at a step whose outcome hands back findings", () => {
+  const REVIEW = "review";
+  const IMPLEMENT_RUN = "01JCCCCCCCCCCCCCCCCCCCCCCC";
+
+  async function atReview(): Promise<TestMachine> {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { step: REVIEW });
+    return m;
+  }
+
+  async function done(m: TestMachine, argv: string[], findings?: unknown) {
+    if (findings !== undefined) await m.files.write(`${ROOT}/findings.json`, typeof findings === "string" ? findings : JSON.stringify(findings));
+    const r = await runCli(["done", ...argv, "--json"], m.io);
+    return { exit: r.exit, out: json(r.stdout) as Record<string, unknown> };
+  }
+
+  /** The unit moved on to implement, as a tick applying the report would leave it, sent back by the report. */
+  async function reworked(m: TestMachine): Promise<string> {
+    const env = await envOf(m);
+    const read = await env.journal.readUnit(UNIT);
+    if (!read.ok || !read.value.state) throw new Error("no record");
+    const at = read.value.state;
+    const seq = read.value.receipts.at(-1)?.seq ?? 0;
+    const moved: RunState = { ...at, step: "implement", applied_through: seq, rework_from: seq, run: at.run && { ...at.run, id: IMPLEMENT_RUN, step: "implement" } };
+    const committed = await env.journal.commit(UNIT, moved, read.value.version);
+    if (!committed.ok) throw new Error(committed.failure.message);
+    return (await runCli(["brief"], withEnv(m, runEnv(UNIT, IMPLEMENT_RUN)).io)).stdout;
+  }
+
+  const REVIEW_FILE = {
+    summary: "2 findings, 1 blocking.",
+    findings: [
+      { id: "F1", axis: "spec", severity: "blocking", criterion: "AC2", file: "src/invites.ts", line: 42, title: "Expired invites are accepted", detail: "the expiry is never read", suggestion: "compare expires_at" },
+      { id: "F2", axis: "standards", severity: "nit", file: "src/invites.ts", line: 7, title: "A comment says what, not why" },
+    ],
+  };
+
+  test("an outcome that hands back findings, reported with none and no note, is refused naming --findings; nothing is recorded", async () => {
+    const m = await atReview();
+    const r = await done(m, ["changes_requested"]);
+    expect(r).toEqual({
+      exit: ExitCode.refused,
+      out: {
+        error: "step review hands back findings with outcome changes_requested (hand_back), and this report has none",
+        do_instead:
+          'write a JSON file {"findings": [{"severity": "blocking" | "major" | "minor" | "nit", "title": "...", "detail"?, "file"?, "line"?, "criterion"?, "repro"?}]} with at least one finding, then run: norn done changes_requested --findings <file>',
+        code: "hand_back_required",
+      },
+    });
+    const empty = await done(m, ["changes_requested", "--findings", "findings.json"], { findings: [] });
+    expect(empty.out).toMatchObject({ code: "hand_back_required" });
+    expect(await receiptsOf(m)).toEqual([]);
+  });
+
+  test("a findings file is validated: JSON, an array or {findings}, each with a title and a severity", async () => {
+    const m = await atReview();
+    expect((await done(m, ["changes_requested", "--findings", "findings.json"], "not json{")).out).toMatchObject({ code: "invalid_findings", error: expect.stringContaining("findings file findings.json") });
+    expect((await done(m, ["changes_requested", "--findings", "findings.json"], { summary: "x" })).out).toMatchObject({ code: "invalid_findings" });
+    expect((await done(m, ["changes_requested", "--findings", "findings.json"], [{ title: "no severity" }])).out).toMatchObject({
+      code: "invalid_findings",
+      error: "finding 1 in findings.json needs a title and a severity (blocking | major | minor | nit)",
+    });
+    expect((await done(m, ["changes_requested", "--findings", "missing.json"])).out).toMatchObject({ code: "invalid_findings", error: "findings file not found: missing.json" });
+    expect(await receiptsOf(m)).toEqual([]);
+  });
+
+  test("the findings are copied into the receipt, the review's extra keys folded into the detail", async () => {
+    const m = await atReview();
+    expect((await done(m, ["changes_requested", "--findings", "findings.json"], REVIEW_FILE)).exit).toBe(ExitCode.ok);
+    expect((await receiptsOf(m)).map((x) => x.data)).toEqual([
+      {
+        kind: "run.reported",
+        step: REVIEW,
+        attempt: 1,
+        run_id: RUN,
+        verb: "done",
+        outcome: "changes_requested",
+        findings: [
+          { id: "F1", severity: "blocking", criterion: "AC2", file: "src/invites.ts", line: 42, title: "Expired invites are accepted", detail: "the expiry is never read\nAxis: spec\nSuggestion: compare expires_at" },
+          { id: "F2", severity: "nit", file: "src/invites.ts", line: 7, title: "A comment says what, not why", detail: "Axis: standards" },
+        ],
+      },
+    ]);
+  });
+
+  test("a note alone still hands the work back", async () => {
+    const m = await atReview();
+    expect((await done(m, ["changes_requested", "--note", "F1: expired invites are accepted (src/invites.ts:42)"])).exit).toBe(ExitCode.ok);
+  });
+
+  test("the rework's brief lists the findings, blocking first, under Rework and in last_findings", async () => {
+    const m = await atReview();
+    await done(m, ["changes_requested", "--findings", "findings.json"], REVIEW_FILE);
+    const md = await reworked(m);
+    expect(md).toContain("## Rework");
+    expect(md).toContain("Blocking findings:");
+    expect(md).toContain("- `F1` Expired invites are accepted (src/invites.ts:42, AC2)");
+    expect(md).toContain("Other findings, notes for the person rather than rework:");
+    expect(md).toContain("- `F2` nit: A comment says what, not why (src/invites.ts:7)");
+    expect(md.indexOf("Blocking findings:")).toBeLessThan(md.indexOf("Other findings"));
+    expect(md).not.toContain("no findings sent this work back");
+  });
+
+  test("a findings-only report is the review of the rework's last_findings, written as the input file", async () => {
+    const m = await atReview();
+    await done(m, ["changes_requested", "--findings", "findings.json"], REVIEW_FILE);
+    const env = await envOf(m);
+    const read = await env.journal.readUnit(UNIT);
+    if (!read.ok || !read.value.state) throw new Error("no record");
+    // the rework is done and the story is back at review, which no rework_from names: last_findings is the round's latest findings
+    const implemented = await env.journal.record(UNIT, { id: "report-implement", data: { kind: "run.reported", step: "implement", attempt: 1, run_id: IMPLEMENT_RUN, verb: "done", outcome: "done" } });
+    if (!implemented.ok) throw new Error(implemented.failure.message);
+    const at = read.value.state;
+    const REVIEW_RUN = "01JDDDDDDDDDDDDDDDDDDDDDDD";
+    const back: RunState = { ...at, step: REVIEW, attempt: 2, applied_through: implemented.value.seq, run: at.run && { ...at.run, id: REVIEW_RUN, step: REVIEW, attempt: 2 } };
+    const committed = await env.journal.commit(UNIT, back, read.value.version);
+    if (!committed.ok) throw new Error(committed.failure.message);
+    expect((await runCli(["brief"], withEnv(m, runEnv(UNIT, REVIEW_RUN)).io)).exit).toBe(ExitCode.ok);
+    const file = (await m.files.read(`${worktreeOf(env, UNIT)}/${INPUTS_DIR}/last_findings.md`)) ?? "";
+    expect(file).toContain("`review` reported `done changes_requested`.");
+    expect(file).toContain("Blocking findings:");
+    expect(file).toContain("- `F1` Expired invites are accepted (src/invites.ts:42, AC2)");
+  });
+
+  test("an empty findings file at an outcome that hands nothing back is recorded without findings", async () => {
+    const m = await atReview();
+    expect((await done(m, ["approve", "--findings", "findings.json"], { findings: [] })).exit).toBe(ExitCode.ok);
+    expect((await receiptsOf(m)).map((x) => x.data)).toEqual([{ kind: "run.reported", step: REVIEW, attempt: 1, run_id: RUN, verb: "done", outcome: "approve" }]);
+  });
+
+  test("the brief names --findings on the outcome that hands findings back", async () => {
+    const m = await atReview();
+    const md = (await runCli(["brief"], m.io)).stdout;
+    expect(md).toContain("- `norn done changes_requested --findings <file>`");
+    expect(md).toContain("- `norn done approve` —");
+    expect(md).toContain('`--findings <file>` is a JSON file, `{"findings": [...]}` or an array');
+  });
+});
+
+describe("a criteria report's notes for a person", () => {
+  test("a verdict's note is kept on the receipt's notes, naming its criterion", async () => {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { step: "qa" });
+    const report: CriterionVerdict[] = [{ id: "AC1", verdict: "pass", evidence: "AC1.md", note: "the copy reads oddly on mobile; worth a look" }];
+    await m.files.write(`${ROOT}/criteria.json`, JSON.stringify(report));
+    expect((await runCli(["done", "pass", "--criteria", "criteria.json", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    expect((await receiptsOf(m)).map((x) => x.data)).toEqual([
+      { kind: "run.reported", step: "qa", attempt: 1, run_id: RUN, verb: "done", outcome: "pass", criteria: report, notes: [{ text: "the copy reads oddly on mobile; worth a look", criterion: "AC1" }] },
+    ]);
+  });
+});
+
+describe("an attended step's brief follows how its run was started", () => {
+  test("a run started headless is told no person reads the session and to ask through norn ask", async () => {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { workflow: "refinement", step: "refine", attended: false });
+    const md = (await runCli(["brief"], m.io)).stdout;
+    expect(md).toContain("You run unattended: no person reads this session. A question goes through `norn ask`");
+    expect(md).toContain('- `norn ask "<one self-contained question>"`');
+    expect(md).not.toContain("never through `norn ask`");
+  });
+
+  test("a launch not yet applied is briefed from its start receipt: headless asks through norn ask", async () => {
+    const m = configured({ env: runEnv() });
+    // the launch's brief renders after the start receipt is written and before a tick applies it
+    await seedUnit(m, { workflow: "refinement", step: "refine", run: null });
+    const env = await envOf(m);
+    const started = await env.journal.record(UNIT, { id: "launch", data: { kind: "run.started", step: "refine", attempt: 1, run_id: RUN, run_kind: "agent", executor: "claude", attended: false } });
+    if (!started.ok) throw new Error(started.failure.message);
+    const md = (await runCli(["brief"], m.io)).stdout;
+    expect(md).toContain("You run unattended: no person reads this session. A question goes through `norn ask`");
+    expect(md).not.toContain("never through `norn ask`");
+  });
+
+  test("a run started attended keeps the person in the session", async () => {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { workflow: "refinement", step: "refine", attended: true });
+    const md = (await runCli(["brief"], m.io)).stdout;
+    expect(md).toContain("A person works with you in this session");
+    expect(md).toContain("never through `norn ask`");
   });
 });

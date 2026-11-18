@@ -1,13 +1,14 @@
 /**
  * `norn story view <key>`: show one story: its units, runs, gates and asks, who moved its claim
  * between machines, the branch updates a person made, and for a unit waiting at a gate the criteria
- * its last report left unsettled, read-only. A key no store holds is refused, naming where to look; a story with a
+ * its last report left unsettled and the notes for a person not yet acknowledged, read-only. A key no store holds is refused, naming where to look; a story with a
  * corrupt unit is a corrupt error (exit 4).
  */
 import type { RuntimeEnv } from "@norn/runtime";
 import type { CriterionVerdict } from "@norn/schema";
 import { defineCommand } from "../command.ts";
 import { corruptError, failure, refuse, rendered } from "../output.ts";
+import { noteLine, type OpenNote, openNotesOf } from "../notes.ts";
 import { loadProjectView, type StoryView, storyHead, unitLine } from "../views.ts";
 
 /** One `norn story take` on the record of the story's own unit. */
@@ -46,13 +47,14 @@ interface PersonRecord {
   takeovers: TakeoverView[];
   branch_updates: BranchUpdateView[];
   criteria: CriteriaToCheck[];
+  notes: OpenNote[];
 }
 
 /** Every claim takeover and branch update on the story's own unit, oldest first, and what each unit at a gate leaves to check; the facts carry only receipts not yet applied, so the record is read whole. */
 async function recordOf(env: RuntimeEnv, key: string, story: StoryView): Promise<PersonRecord> {
   const read = await env.journal.readUnit(key);
   if (!read.ok) throw failure(`cannot read ${key}: ${read.failure.message}`, "try again", read.failure.code);
-  const out: PersonRecord = { takeovers: [], branch_updates: [], criteria: [] };
+  const out: PersonRecord = { takeovers: [], branch_updates: [], criteria: [], notes: [] };
   for (const r of read.value.receipts) {
     const d = r.data;
     if (d.kind === "claim.taken") out.takeovers.push({ at: r.at, from: d.from ?? null, to: d.to, by: d.by, reason: d.reason ?? null });
@@ -64,6 +66,7 @@ async function recordOf(env: RuntimeEnv, key: string, story: StoryView): Promise
     const receipts = u.id === key ? read.value.receipts : await receiptsOf(env, u.id);
     const left = unsettled(u.id, receipts);
     if (left) out.criteria.push(left);
+    out.notes.push(...openNotesOf(u.id, receipts));
   }
   return out;
 }
@@ -111,13 +114,14 @@ function takeoverLine(t: TakeoverView): string {
   return `- ${t.at}: taken${from} to ${t.to}${by}${t.reason ? ` — ${t.reason}` : ""}`;
 }
 
-function markdown(s: StoryView, { takeovers, branch_updates, criteria }: PersonRecord): string {
+function markdown(s: StoryView, { takeovers, branch_updates, criteria, notes }: PersonRecord): string {
   const out = [`# ${storyHead(s)}`, ""];
   if (s.url) out.push(`Item: ${s.url}`);
   if (s.change?.url) out.push(`Change: ${s.change.url}`);
   if (s.url || s.change?.url) out.push("");
   out.push("## Units", "", ...s.units.map((u) => `- ${unitLine(u)}${u.pending_receipts ? ` (${u.pending_receipts} receipts not applied yet)` : ""}`));
   if (criteria.length) out.push("", "## Criteria to check", "", ...criteria.flatMap(criteriaLines));
+  if (notes.length) out.push("", "## Notes for you", "", "Left by the agents' reports; an approve at the gate acknowledges them.", "", ...notes.map(noteLine));
   if (takeovers.length) out.push("", "## Claim taken", "", ...takeovers.map(takeoverLine));
   if (branch_updates.length) out.push("", "## Branch updated", "", ...branch_updates.map(updateLine));
   return out.join("\n");

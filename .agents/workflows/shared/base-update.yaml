@@ -52,4 +52,4 @@ steps:
     means:
       approve: "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger"
       redescribe: "the resolution is sound, but the merge danger pr.md describes changed"
-      changes_requested: "blocking findings on the resolution in the receipt"
+      changes_requested: "blocking findings on the resolution, handed back with --findings <file>"

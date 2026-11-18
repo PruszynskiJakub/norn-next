@@ -41,6 +41,10 @@
           "how": {
             "minLength": 1,
             "type": "string"
+          },
+          "note": {
+            "minLength": 1,
+            "type": "string"
           }
         }
       },
@@ -76,6 +80,10 @@
             "type": "string"
           },
           "how": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "note": {
             "minLength": 1,
             "type": "string"
           }
@@ -115,6 +123,10 @@
           "how": {
             "minLength": 1,
             "type": "string"
+          },
+          "note": {
+            "minLength": 1,
+            "type": "string"
           }
         }
       },
@@ -151,6 +163,10 @@
             "type": "string"
           },
           "how": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "note": {
             "minLength": 1,
             "type": "string"
           }

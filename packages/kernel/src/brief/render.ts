@@ -4,7 +4,7 @@
  * harness-neutral, so every harness gets the same text and the CLI's `brief` prints exactly what a
  * launch sent.
  */
-import type { Verdict } from "@norn/schema";
+import type { HandBack, Verdict } from "@norn/schema";
 import type { BriefInputs } from "../model/actions.ts";
 
 /** The commands an agent reports with; the CLI in front decides their spelling. */
@@ -66,6 +66,8 @@ export interface BriefRenderInput {
    * `verdict` maps an outcome to the worst verdict it may be reported with
    */
   criteria?: { required: boolean; verdict: Readonly<Record<string, Verdict>> };
+  /** outcome → what its `done` must hand back, as the step's `hand_back` says */
+  handBack?: Readonly<Record<string, HandBack>>;
   /** a person works in the session: questions go to them, and `done` waits for their agreement */
   attended?: boolean;
   /** answers given to earlier sessions of this step, which a fresh session would otherwise never see */
@@ -156,6 +158,9 @@ function answeredLines(answered: readonly AnsweredAsk[]): string[] {
 }
 
 const CRITERIA_FLAG = "--criteria <file>";
+const FINDINGS_FLAG = "--findings <file>";
+
+const FINDINGS_LINE = `- \`${FINDINGS_FLAG}\` is a JSON file, \`{"findings": [...]}\` or an array, each finding with a \`title\` and a \`severity\` (\`blocking\`, \`major\`, \`minor\`, \`nit\`), and where it can \`file\`, \`line\`, \`criterion\`, \`detail\` and \`repro\`; the step the work goes back to reads them. An outcome named with it needs findings, a \`--note\` saying what to rework, or a criteria report with a verdict short of \`pass\`: without one of them it is refused.`;
 
 function criteriaLine(criteria: NonNullable<BriefRenderInput["criteria"]>): string {
   const gated = Object.entries(criteria.verdict).map(([o, v]) => `\`${o}\` only when it is \`${v}\``);
@@ -170,9 +175,11 @@ function finishLines(input: BriefRenderInput, c: BriefCommands): string[] {
   for (const o of input.outcomes) {
     const means = input.means?.[o];
     const flag = criteria && (criteria.required || criteria.verdict[o] !== undefined) ? ` ${CRITERIA_FLAG}` : "";
-    out.push(`- \`${c.done} ${o}${flag}\`${means ? ` — ${means}` : ""}`);
+    const findings = input.handBack?.[o] === "findings" ? ` ${FINDINGS_FLAG}` : "";
+    out.push(`- \`${c.done} ${o}${flag}${findings}\`${means ? ` — ${means}` : ""}`);
   }
   if (criteria) out.push(criteriaLine(criteria));
+  if (input.outcomes.some((o) => input.handBack?.[o] === "findings")) out.push(FINDINGS_LINE);
   if (input.outcomes.length === 0) out.push(`- \`${c.done}\` — the step's work is finished`);
   if (input.attended) out.push("- A question goes to the person in this session, never through `" + c.ask + "`.");
   else out.push(`- \`${c.ask} "<one self-contained question>"\` — you need a person's decision; the step waits until it is answered.`);

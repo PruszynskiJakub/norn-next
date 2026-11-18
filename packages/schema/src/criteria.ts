@@ -45,6 +45,8 @@ const verdictEntry = <V extends Verdict, R extends Record<string, ReturnType<typ
       repro: Type.Optional(NonEmpty),
       reason: Type.Optional(NonEmpty),
       how: Type.Optional(NonEmpty),
+      /** for a person, not the next step: it never changes the verdict or the route, and is listed at the story's gates until a gate's `approve` */
+      note: Type.Optional(NonEmpty),
       ...required,
     },
     { additionalProperties: false, description: desc },

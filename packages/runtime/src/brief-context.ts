@@ -13,7 +13,7 @@ import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import type { RuntimeEnv } from "./env.ts";
 import { readEvents } from "./events/log.ts";
 import { historyOf, rulingsOf } from "./input-history.ts";
-import { INPUTS_NOTE, materializeInputs, unsettledCriteria, worktreeOf } from "./inputs.ts";
+import { findingsList, INPUTS_NOTE, materializeInputs, unsettledCriteria, worktreeOf } from "./inputs.ts";
 import { reportableOutcomes } from "./live-run.ts";
 import { readStepRun } from "./step-runs.ts";
 import { loadPinned } from "./workflows.ts";
@@ -40,7 +40,7 @@ async function reworkText(env: RuntimeEnv, unit: string, receipt: KernelReceipt 
     case "gate.decided":
       return `\`${d.step ?? "the gate"}\` was decided \`${d.outcome}\` by ${d.by}${d.reason ? `: ${d.reason}` : "."}`;
     case "run.reported":
-      return `\`${d.step ?? "a step"}\` reported \`${d.verb}${d.outcome ? ` ${d.outcome}` : ""}\`${d.text ? `: ${d.text}` : "."}${unsettledCriteria(d.criteria)}`;
+      return `\`${d.step ?? "a step"}\` reported \`${d.verb}${d.outcome ? ` ${d.outcome}` : ""}\`${d.text ? `: ${d.text}` : "."}${findingsList(d.findings)}${unsettledCriteria(d.criteria)}`;
     case "step.finished":
       return `\`${d.step ?? d.step_kind}\` ended \`${d.outcome}\`.`;
     default:
@@ -98,6 +98,19 @@ async function answeredAsks(env: RuntimeEnv, record: UnitJournal, runId: string)
   return out;
 }
 
+/**
+ * Whether a person works in the run's session: as its start receipt says, since an attended step may
+ * be started headless (no runner for a pane, or `norn run start` on a headless executor), and a
+ * session nobody reads must ask through the ask verb. The step's own word holds when the run is unknown.
+ */
+function attendedRun(record: UnitJournal, runId: string | undefined, step: boolean): boolean {
+  if (runId === undefined) return step;
+  if (record.state?.run?.id === runId) return record.state.run.attended;
+  // a launch not yet applied is on the record only as its start receipt
+  const own = record.receipts.findLast((r) => r.data.kind === "run.started" && r.data.run_id === runId);
+  return own?.data.kind === "run.started" ? own.data.attended : step;
+}
+
 function agentStep(workflow: LoadedWorkflow, step: string): CompiledStep | null {
   const s = workflow.graph.steps[step];
   return s?.agent ? s : null;
@@ -134,7 +147,8 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
     ...(step.description !== undefined && { description: step.description }),
     ...(Object.keys(means).length > 0 && { means }),
     ...(wantsCriteria(spec) && { criteria: { required: spec.criteria, verdict: { ...spec.verdict } } }),
-    ...(spec.attended && { attended: true }),
+    ...(attendedRun(record, runId, spec.attended) && { attended: true }),
+    ...(Object.keys(spec.hand_back).length > 0 && { handBack: { ...spec.hand_back } }),
     ...(rework !== undefined && { rework }),
     ...(answered.length > 0 && { answered }),
     ...(retry !== undefined && { retry }),

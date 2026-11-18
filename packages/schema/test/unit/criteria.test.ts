@@ -13,6 +13,7 @@ describe("CriteriaReport", () => {
       { id: "AC2", verdict: "unverified", reason: "no browser in this session", how: "open /today" },
       { id: "AC3", verdict: "person", how: "compare against Figma frame 12" },
       { id: "AC4", verdict: "fail", repro: "click save; nothing happens" },
+      { id: "AC5", verdict: "pass", evidence: "evidence/r/ac5.txt", note: "the label reads oddly; a person may want to reword it" },
     ]);
     expect(ok.ok).toBe(true);
     for (const [entry, missing] of [
@@ -30,7 +31,8 @@ describe("CriteriaReport", () => {
   test("an empty report, an unknown verdict or an unknown field is invalid", () => {
     expect(validate("criteria-report", []).ok).toBe(false);
     expect(validate("criteria-report", [{ id: "AC1", verdict: "partial", how: "x" }]).ok).toBe(false);
-    expect(validate("criteria-report", [{ id: "AC1", verdict: "pass", evidence: "e", note: "x" }]).ok).toBe(false);
+    expect(validate("criteria-report", [{ id: "AC1", verdict: "pass", evidence: "e", remark: "x" }]).ok).toBe(false);
+    expect(validate("criteria-report", [{ id: "AC1", verdict: "pass", evidence: "e", note: "" }]).ok).toBe(false);
     expect(validate("criteria-report", { criteria: [] }).ok).toBe(false);
   });
 });

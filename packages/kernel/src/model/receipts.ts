@@ -5,7 +5,7 @@
  * written for, so one written for an earlier visit is refused rather than routing the current one.
  */
 import { EndReason, ReportVerb } from "@norn/plugin-api";
-import { CriterionVerdict, IsoTime, Mode, NonEmpty, OutcomeName, PosInt, StepName, TaggedUnion } from "@norn/schema";
+import { CriterionVerdict, Finding, IsoTime, Mode, NonEmpty, Note, OutcomeName, PosInt, StepName, TaggedUnion } from "@norn/schema";
 import { type Static, type TProperties, Type } from "@sinclair/typebox";
 import { GraphCounterName, PinnedWorkflow } from "../workflow/graph.ts";
 import { Ended } from "./run-state.ts";
@@ -61,6 +61,10 @@ const KINDS = [
     text: Type.Optional(Type.String()),
     /** a `done`'s criteria report, one verdict per criterion: what a later step, a gate and a retro read back */
     criteria: Type.Optional(Type.Array(CriterionVerdict, { minItems: 1 })),
+    /** a `done`'s findings (`--findings`), what the step it sends the work back to reworks */
+    findings: Type.Optional(Type.Array(Finding, { minItems: 1 })),
+    /** notes for a person the report carried; they never block and never change the route */
+    notes: Type.Optional(Type.Array(Note, { minItems: 1 })),
   }),
   kind("run.ended", { run_id: Id, reason: RunEndReason }),
   /** an outcome the kernel read off the session (silent, died, ...), routed like a reported one */
