@@ -5,10 +5,8 @@
  * so the change shows the head this step saw.
  */
 import { fail, type ForgeEffect, type HostContext, ok, parseStoryKey, type PluginResult, type StepKindDefinition, type StepKindInput, type StepKindOutcome, type Vcs } from "@norn/plugin-api";
-import { SPECS_DIR } from "@norn/schema";
+import { PR_BODY_FILE, SPECS_DIR } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
-
-export const PR_BODY_FILE = "pr.md";
 
 export const OpenPrConfig = Type.Object(
   {

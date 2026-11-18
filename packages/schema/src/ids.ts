@@ -311,9 +311,6 @@ export const treeStoryRunStatePath = (story: RunStory): string => `${story.spec_
 export function sliceBranch(story: string, nn: string, slug: string): string {
   return `${story}/${sliceDirName(nn, slug)}`;
 }
-export function specDir(story: string, slug: string): string {
-  return `${SPECS_DIR}/${storyDirName(story, slug)}`;
-}
 /** The story's spec file in its spec folder: the mirrored issue, then the refined spec. */
 export const SPEC_FILE = "spec.md";
 /** The name older norn releases wrote; still read when a spec folder has no `spec.md`. */

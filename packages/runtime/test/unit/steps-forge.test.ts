@@ -99,7 +99,7 @@ describe("open-pr", () => {
     expect(effects.map((e) => (e.kind === "open" ? e.body : null))).toEqual(["# Login fix\n\nWhat changed.\n\n---\n\nCloses https://example.test/12\n\nDelivered by norn (story gh-12)."]);
   });
 
-  test("a slice unit's open-pr reads its story's pr.md, and an open change takes the re-described body", async () => {
+  test("an open change takes the re-described pr.md body when open-pr runs again", async () => {
     const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
     const effects = recorded(world);
     const { vcs } = fakeVcs({ "gh-12-login": HEAD }, {});
