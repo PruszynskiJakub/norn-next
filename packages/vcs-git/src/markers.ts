@@ -28,25 +28,31 @@ export function addedConflicts(diff: string): VcsConflictMarker[] {
   // 0: looking for an opening marker; 1: opened, looking for the separator; 2: looking for the close
   let state = 0;
   let opened = 0;
+  // a content line can read as a file header (an added `++ x` prints as `+++ x`), so headers are read only before a file's first hunk
+  let header = false;
   for (const l of diff.split("\n")) {
     if (l.startsWith("diff --git ")) {
       path = null;
       state = 0;
+      header = true;
       continue;
     }
-    if (l.startsWith("+++ ")) {
+    if (header && l.startsWith("+++ ")) {
       path = pathOf(l);
       continue;
     }
     const hunk = HUNK.exec(l);
     if (hunk) {
       line = Number(hunk[1]);
+      header = false;
       continue;
     }
+    if (header) continue;
     if (path === null) continue;
     if (l.startsWith(" ")) line++;
     if (!l.startsWith("+")) continue;
-    const text = l.slice(1);
+    // git writes the markers with the file's own line ending, so a CRLF file's carry a trailing CR
+    const text = l.slice(1).replace(/\r$/, "");
     if (OPEN.test(text)) {
       state = 1;
       opened = line;

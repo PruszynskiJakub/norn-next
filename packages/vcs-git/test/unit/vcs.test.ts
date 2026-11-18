@@ -283,6 +283,18 @@ describe("git vcs conflictMarkers", () => {
     expect(h.cwds).toEqual([ROOT]);
   });
 
+  test("a conflict git wrote with a CRLF file's own line endings is found", async () => {
+    const crlf = ["diff --git a/f.bat b/f.bat", "--- a/f.bat", "+++ b/f.bat", "@@ -2 +2,5 @@", "-old\r", `+${OPEN} HEAD\r`, "+ours\r", `+${MID}\r`, "+theirs\r", `+${CLOSE} main\r`, ""].join("\n");
+    const h = gitHost([["-c core.quotePath=false diff", { stdout: crlf }]]);
+    expect(await vcsOf(h.ctx).conflictMarkers?.("main", "side")).toEqual({ ok: true, value: [{ path: "f.bat", line: 2 }] });
+  });
+
+  test("an added line that reads as a file header inside a hunk is content, so a later conflict keeps its own file's path", async () => {
+    const diff = ["diff --git a/notes.md b/notes.md", "--- a/notes.md", "+++ b/notes.md", "@@ -0,0 +1,5 @@", "+++ x", `+${OPEN} HEAD`, "+a", `+${MID}`, `+${CLOSE} main`, ""].join("\n");
+    const h = gitHost([["-c core.quotePath=false diff", { stdout: diff }]]);
+    expect(await vcsOf(h.ctx).conflictMarkers?.("main", "side")).toEqual({ ok: true, value: [{ path: "notes.md", line: 2 }] });
+  });
+
   test("empty when the diff adds no conflict; a ref that reads as an option is refused before git runs; a failing diff is a failure", async () => {
     const h = gitHost([["-c core.quotePath=false diff", { stdout: "" }]]);
     expect(await vcsOf(h.ctx).conflictMarkers?.("main", "gh-12-login")).toEqual({ ok: true, value: [] });
