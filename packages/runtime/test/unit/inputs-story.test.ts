@@ -202,7 +202,7 @@ describe("the last findings", () => {
     expect(text ?? "").not.toContain("Rename the flag.");
   });
 
-  test("a step nothing sent back reads the findings of the latest send-back, and none when that was a red check", async () => {
+  test("a step nothing sent back reads the latest findings this round, and none once a later approval settled them", async () => {
     const h = await started();
     const answered = await lastFindings(h, withReceipts(await record(h, UNIT), reject));
     expect(answered.text).toContain("Rename the flag.");
@@ -210,6 +210,54 @@ describe("the last findings", () => {
     const settled = await lastFindings(h2, withReceipts(await record(h2, UNIT), reject, approve, red));
     expect(settled.view?.note).toBeDefined();
     expect(settled.text ?? "").not.toContain("Rename the flag.");
+  });
+
+  /** The journal with its review step handing `changes_requested` back as findings, as the slice workflow's review does. */
+  function reviewHandsBack(journal: UnitJournal): UnitJournal {
+    const out = structuredClone(journal);
+    const steps = out.state?.workflow.doc.steps as Record<string, { hand_back?: Record<string, string> }> | undefined;
+    if (!steps?.review) throw new Error("the workflow has no review step");
+    steps.review.hand_back = { changes_requested: "findings" };
+    return out;
+  }
+  const requested: ReceiptData = { kind: "run.reported", step: "review", attempt: 1, run_id: "r-review-1", verb: "done", outcome: "changes_requested", text: "Handle the empty input." };
+  const reviewed: ReceiptData = { kind: "run.reported", step: "review", attempt: 2, run_id: "r-review-2", verb: "done", outcome: "approve", text: "All criteria met." };
+  const green: ReceiptData = { kind: "check.finished", step: "test", attempt: 2, run_id: "r-test-2", exit: 0, outcome: "pass" };
+
+  test("a review of rework still reads the review findings it answers when a red check came between", async () => {
+    const h = await started();
+    const journal = withReceipts(reviewHandsBack(await record(h, UNIT)), requested, red, green);
+    const { text } = await lastFindings(h, journal);
+    expect(text).toContain("Handle the empty input.");
+  });
+
+  test("a red check after a later clean review never brings back the findings that review settled", async () => {
+    const h = await started();
+    const journal = withReceipts(reviewHandsBack(await record(h, UNIT)), requested, reviewed, red);
+    const sent = await lastFindings(h, journal, journal.receipts.at(-1)?.seq);
+    expect(sent.text ?? "").not.toContain("Handle the empty input.");
+    const h2 = await started();
+    const fallback = await lastFindings(h2, withReceipts(reviewHandsBack(await record(h2, UNIT)), requested, reviewed, red));
+    expect(fallback.text ?? "").not.toContain("Handle the empty input.");
+  });
+
+  test("findings of an earlier round are never shown in a new one", async () => {
+    const h = await started();
+    const before = await record(h, UNIT);
+    const workflow = before.state?.workflow;
+    if (!workflow) throw new Error("the unit has no workflow");
+    const round: ReceiptData = { kind: "round.started", workflow, at: "build", by: "jo" };
+    const { view, text } = await lastFindings(h, withReceipts(before, reject, round));
+    expect(text).toBeNull();
+    expect(view?.note).toBe("no findings sent this work back");
+  });
+
+  test("the note for a step a red check sent back names `last_check` only when the step reads it", async () => {
+    const h = await started();
+    const journal = withReceipts(await record(h, UNIT), red);
+    const { view } = await lastFindings(h, journal, journal.receipts.at(-1)?.seq);
+    expect(view?.note).toContain("under Rework");
+    expect(view?.note).not.toContain("last_check");
   });
 });
 

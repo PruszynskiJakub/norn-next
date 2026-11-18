@@ -25,7 +25,7 @@ const code = (s: string): string => `\`${s}\``;
 const quoted = (path: string): string => `'${path.replaceAll("'", "'\\''")}'`;
 
 /** The receipts of the unit's current round: those after its last `round.started`. */
-function roundOf(record: UnitJournal): KernelReceipt[] {
+export function roundOf(record: UnitJournal): KernelReceipt[] {
   const start = record.receipts.findLastIndex((r) => r.data.kind === "round.started");
   return record.receipts.slice(start + 1);
 }
