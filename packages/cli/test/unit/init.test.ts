@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
 import { parse } from "yaml";
 import { join } from "node:path";
-import { AGENTS_DIR, configPaths, ExitCode, OLD_REPO_CONFIG_FILE, runCli } from "../../src/index.ts";
+import { AGENTS_DIR, configPaths, REPO_LOCAL_FILE, ExitCode, OLD_REPO_CONFIG_FILE, runCli } from "../../src/index.ts";
 import { COMMON, HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
 
 const PATHS = configPaths(HOME, ROOT);
@@ -180,6 +180,14 @@ describe("norn init: what stays out of git", () => {
     const { m, body } = await init([], { seed: { [EXCLUDE]: ".agents/\n" } });
     expect(body.exclude).toBe("present");
     expect(await m.files.read(EXCLUDE)).toBe(".agents/\n");
+  });
+
+  test("a repo whose team commits .agents/ gets only the repo-local config excluded, so new specs and workflows stay visible to git", async () => {
+    const { m, body } = await init([], { seed: { [PATHS.repo]: "format: 1\n", [EXCLUDE]: "*.log\n" } });
+    expect({ exclude: body.exclude, excluded: body.excluded }).toEqual({ exclude: "added", excluded: REPO_LOCAL_FILE });
+    const lines = ((await m.files.read(EXCLUDE)) as string).split("\n");
+    expect(lines).toContain(REPO_LOCAL_FILE);
+    expect(lines).not.toContain(AGENTS_DIR);
   });
 
   test("--commit writes the committed config (team mode) and leaves the exclude alone", async () => {
