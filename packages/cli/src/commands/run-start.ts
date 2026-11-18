@@ -1,8 +1,8 @@
 /**
- * `norn run start <unit>`: start the agent of a step manual mode holds.
+ * `norn run start <unit>`: start the agent of a step manual mode holds, or of an attended step.
  * Records the kernel's `run.requested` for the unit's step and attempt; the next tick lifts the
- * `agent.ready.manual` park and starts the agent, for this visit only, so manual mode still holds
- * every later step. The receipt id carries the round, step and attempt, so a retried start records
+ * `agent.ready.manual` or `agent.ready.attended` park and starts the agent, for this visit only, so
+ * manual mode still holds every later step. The receipt id carries the round, step and attempt, so a retried start records
  * once and a stale one is refused by the kernel rather than starting a later visit.
  */
 import type { UnitJournal } from "@norn/kernel";
@@ -14,10 +14,12 @@ import { ambiguous, readable, receiptId, unitsOf } from "./person-support.ts";
 
 /** The park decide derives in manual mode at a ready agent step, by the rule that parks. */
 export const MANUAL_PARK = "agent.ready.manual";
+/** The park decide derives at an attended step, in either mode, until a person starts it. */
+export const ATTENDED_PARK = "agent.ready.attended";
 
 function heldByManual(u: UnitJournal): boolean {
   const s = u.state;
-  return !!s && s.ended === undefined && s.run === null && s.parked?.reason === MANUAL_PARK;
+  return !!s && s.ended === undefined && s.run === null && (s.parked?.reason === MANUAL_PARK || s.parked?.reason === ATTENDED_PARK);
 }
 
 function whereAre(units: readonly UnitJournal[]): string {
@@ -34,7 +36,7 @@ function whereAre(units: readonly UnitJournal[]): string {
 
 export const runStartCommand = defineCommand({
   name: "run start",
-  summary: "Start the agent of a step manual mode holds",
+  summary: "Start the agent of a step manual mode holds, or of an attended step",
   usage: "norn run start <unit>",
   positionals: { min: 1, max: 1 },
   async run(ctx, args) {
@@ -46,7 +48,7 @@ export const runStartCommand = defineCommand({
     const held = units.filter(heldByManual);
     if (held.length === 0)
       throw refuse(
-        `${key} has no agent step waiting for a person to start it (${MANUAL_PARK}): ${whereAre(units)}`,
+        `${key} has no agent step waiting for a person to start it (${MANUAL_PARK} or ${ATTENDED_PARK}): ${whereAre(units)}`,
         `norn story view ${key.split("/")[0]}; a step not parked yet is parked or started by the next tick (norn tick)`,
         "not_manual_parked",
       );

@@ -194,6 +194,14 @@ describe("run start", () => {
     expect(receipts.map((x) => x.data)).toEqual([{ kind: "run.requested", by: "me@box", step: AGENT_STEP, attempt: 1 }]);
   });
 
+  test("an attended step's park is started the same way", async () => {
+    const m = configured();
+    await seedUnit(m, { step: AGENT_STEP, run: null, extra: { parked: { reason: "agent.ready.attended", since: "2026-11-17T10:00:00.000Z" } } });
+    const r = await runCli(["run", "start", UNIT, "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect((await receiptsOf(m)).map((x) => x.data)).toEqual([{ kind: "run.requested", by: "me@box", step: AGENT_STEP, attempt: 1 }]);
+  });
+
   test("a unit not parked by manual mode refuses, saying where it is; a step agent may not start a run", async () => {
     const m = configured();
     await seedUnit(m, { step: AGENT_STEP });

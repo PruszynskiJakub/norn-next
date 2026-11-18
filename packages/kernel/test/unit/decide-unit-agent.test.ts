@@ -47,6 +47,15 @@ describe("a ready agent step", () => {
     expect(d).toMatchObject({ rule: "agent.ready.attended", inbox: { kind: "attended" } });
   });
 
+  test("a person's start lifts an attended step's park: in a pane the run is attended, headless it runs as an auto run", () => {
+    const wf = loaded(graph({ build: { agent: agentSpec({ attended: true }) } }));
+    const requested = { by: "ann", at: NOW };
+    const pane = kindOf(decideCase({ state: stateAt("build", { requested }, wf), workflows: [wf], executors: { claude: caps({ headless: true, attended: true }) } }), "start_run");
+    expect([pane.rule, pane.attended, pane.intent.data]).toMatchObject(["agent.start", true, { kind: "run.started", attended: true }]);
+    const headless = kindOf(decideCase({ state: stateAt("build", { requested }, wf), workflows: [wf], executors: { claude: caps({ headless: true, attended: false }) } }), "start_run");
+    expect([headless.rule, headless.attended]).toEqual(["agent.start", false]);
+  });
+
   test("auto mode on an executor that cannot run headless waits for a person", () => {
     expect(decideCase({ state: stateAt("build"), executors: { claude: caps({ headless: false }) } })?.rule).toBe("agent.ready.no_headless");
   });

@@ -65,7 +65,8 @@ function briefOf(v: UnitView, spec: AgentStepSpec) {
 }
 
 function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
-  if (spec.attended) return parkDecision(v, "agent.ready.attended", "attended", { text: spec.instructions });
+  // an attended step waits for the person who works beside it to start it (`run.requested`), in either mode
+  if (spec.attended && v.state.requested === undefined) return parkDecision(v, "agent.ready.attended", "attended", { text: spec.instructions });
   const executor = executorOf(v, spec);
   const caps = capsOf(v, executor);
   if (!caps) return parkDecision(v, "agent.no_executor", "stuck", { text: `executor '${executor}' is not configured` });
@@ -76,15 +77,17 @@ function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
   if (!caps.headless && !personStarted) return parkDecision(v, "agent.ready.no_headless", "manual", { text: `auto mode, but executor '${executor}' cannot run headless` });
   if (!takeAgentSlot(v.ctx)) return noop(v, "agent.queued", `queued: ${v.ctx.config.maxAgents} agent runs in use`);
   const run_id = v.ctx.nextId();
+  // attended only where the person can sit beside it (a pane); started headless, it is retried and nudged as an auto run
+  const attended = spec.attended === true && personStarted;
   return {
     kind: "start_run",
     unit: v.unit.id,
     rule: "agent.start",
     run_id,
     executor,
-    attended: false,
+    attended,
     brief: briefOf(v, spec),
-    intent: intentFor(v, { kind: "run.started", run_id, run_kind: "agent", executor, attended: false }),
+    intent: intentFor(v, { kind: "run.started", run_id, run_kind: "agent", executor, attended }),
   };
 }
 

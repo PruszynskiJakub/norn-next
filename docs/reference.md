@@ -246,7 +246,7 @@ Runs: start one manual mode holds, stop a live one, run a step again
 
 ##### `norn run start`
 
-Start the agent of a step manual mode holds
+Start the agent of a step manual mode holds, or of an attended step
 
 ```sh
 norn run start <unit>
