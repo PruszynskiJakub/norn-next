@@ -98,6 +98,19 @@ async function answeredAsks(env: RuntimeEnv, record: UnitJournal, runId: string)
   return out;
 }
 
+/**
+ * Whether a person works in the run's session: as its start receipt says, since an attended step may
+ * be started headless (no runner for a pane, or `norn run start` on a headless executor), and a
+ * session nobody reads must ask through the ask verb. The step's own word holds when the run is unknown.
+ */
+function attendedRun(record: UnitJournal, runId: string | undefined, step: boolean): boolean {
+  if (runId === undefined) return step;
+  if (record.state?.run?.id === runId) return record.state.run.attended;
+  // a launch not yet applied is on the record only as its start receipt
+  const own = record.receipts.findLast((r) => r.data.kind === "run.started" && r.data.run_id === runId);
+  return own?.data.kind === "run.started" ? own.data.attended : step;
+}
+
 function agentStep(workflow: LoadedWorkflow, step: string): CompiledStep | null {
   const s = workflow.graph.steps[step];
   return s?.agent ? s : null;
@@ -134,7 +147,7 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
     ...(step.description !== undefined && { description: step.description }),
     ...(Object.keys(means).length > 0 && { means }),
     ...(wantsCriteria(spec) && { criteria: { required: spec.criteria, verdict: { ...spec.verdict } } }),
-    ...(spec.attended && { attended: true }),
+    ...(attendedRun(record, runId, spec.attended) && { attended: true }),
     ...(rework !== undefined && { rework }),
     ...(answered.length > 0 && { answered }),
     ...(retry !== undefined && { retry }),

@@ -283,3 +283,22 @@ describe("done at a step with criteria: required", () => {
     expect(md).toContain("`partial` only when it is `person`");
   });
 });
+
+describe("an attended step's brief follows how its run was started", () => {
+  test("a run started headless is told no person reads the session and to ask through norn ask", async () => {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { workflow: "refinement", step: "refine", attended: false });
+    const md = (await runCli(["brief"], m.io)).stdout;
+    expect(md).toContain("You run unattended: no person reads this session. A question goes through `norn ask`");
+    expect(md).toContain('- `norn ask "<one self-contained question>"`');
+    expect(md).not.toContain("never through `norn ask`");
+  });
+
+  test("a run started attended keeps the person in the session", async () => {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { workflow: "refinement", step: "refine", attended: true });
+    const md = (await runCli(["brief"], m.io)).stdout;
+    expect(md).toContain("A person works with you in this session");
+    expect(md).toContain("never through `norn ask`");
+  });
+});

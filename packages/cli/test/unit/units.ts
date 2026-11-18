@@ -48,13 +48,18 @@ export interface SeedOptions {
   run?: string | null;
   /** fields the state carries beside the step and run, such as a park */
   extra?: Partial<RunState>;
+  /** the pack workflow the unit runs; the story workflow when absent */
+  workflow?: string;
+  /** whether the run on the record was started where a person works beside it */
+  attended?: boolean;
 }
 
 /** The same, through any runtime env: the integration tier seeds a real machine dir with it. */
 export async function seedIn(env: RuntimeEnv, opts: SeedOptions): Promise<RunState> {
   const unit = opts.unit ?? UNIT;
-  const load = env.workflows.story;
-  if (!load?.ok) throw new Error("the sdlc pack's story workflow does not load");
+  const name = opts.workflow ?? "story";
+  const load = env.workflows[name];
+  if (!load?.ok) throw new Error(`the sdlc pack's ${name} workflow does not load`);
   const base = newRunState({ unit, story: unit.split("/")[0] as string, workflow: load.workflow });
   const runId = opts.run === undefined ? RUN : opts.run;
   const state: RunState = {
@@ -70,7 +75,7 @@ export async function seedIn(env: RuntimeEnv, opts: SeedOptions): Promise<RunSta
             attempt: 1,
             started_at: "2026-11-17T10:00:00.000Z",
             executor: "claude",
-            attended: false,
+            attended: opts.attended ?? false,
             nudges: 0,
             session: encodeLaunchHandle({ executor: "claude", unit, run_id: runId, runner: "4242@boot" }),
           },
