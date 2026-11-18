@@ -52,7 +52,7 @@ export { byName, type ByName, type DeepMerge, deepMerge, getKey, isMapping, leaf
 export { lastSeqIn, unitInFacts, writeAndCommit, type Written } from "./record.ts";
 export { NO_REPO_WORKFLOWS, overlayRepoWorkflows, readRepoWorkflows, REPO_WORKFLOWS_DIR, type RepoWorkflows, repoFileOf, workflowNameOf } from "./repo-workflows.ts";
 export { collectStepKinds, findProvided, loadPackWorkflows, type ResolvedSlots, resolveSlots, type SlotName } from "./resolve.ts";
-export { DEFAULT_TRACE_RETAIN_MS, pruneTraces, removeUnitLogs, TRACE_PRUNE_PER_TICK } from "./retention.ts";
+export { DEFAULT_TRACE_RETAIN_MS, pruneTraces, removeUnitLogs, TRACE_PRUNE_PER_TICK } from "./lifecycle.ts";
 export { createRuntime, createRuntimeEnv } from "./runtime.ts";
 export { awaitMerge } from "./steps-forge/await-merge.ts";
 export { openPr } from "./steps-forge/open-pr.ts";

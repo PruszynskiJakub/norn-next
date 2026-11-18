@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { DecisionOf } from "@norn/kernel";
-import { act, CHECK_START_GRACE_MS, checkExitPath, checkPidPath, checkWrapperArgv, gatherFacts, readStepRun, type StepRunRecord, stepRunPath } from "../../src/index.ts";
+import { act, CHECK_START_GRACE_MS, checkExitPath, checkLogPath, checkPidPath, checkWrapperArgv, gatherFacts, readStepRun, type StepRunRecord, stepRunPath } from "../../src/index.ts";
 import { decisionOf, FakeProcesses, type Harnessed, has, harness, MINUTE, record, rulesOf, tickUntil, trackerItem } from "./support.ts";
 
 const kinds = async (h: Harnessed, unit: string) => (await record(h, unit)).receipts.map((r) => r.data.kind);
@@ -165,6 +165,23 @@ describe("detached checks", () => {
     const reports = await tickUntil(h, has("check.rerun"));
     expect(reports.flatMap(rulesOf)).toContain("lt-1 check.rerun");
     expect(procs.spawned).toHaveLength(1);
+  });
+
+  test("a rerun under the same run and attempt wipes the stale exit, pid and log files before it spawns", async () => {
+    const procs = new FakeProcesses();
+    procs.failSpawn = true;
+    const h = harness({ processes: procs });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("check.run"));
+    const failed = (await readStepRun(h.ctx, "lt-1")) as StepRunRecord;
+    const stale = [checkExitPath(h.ctx, "lt-1", failed.run_id, failed.attempt), checkPidPath(h.ctx, "lt-1", failed.run_id, failed.attempt), checkLogPath(h.ctx, "lt-1", failed.run_id, failed.attempt)];
+    for (const path of stale) await h.files.write(path, "stale\n");
+    procs.failSpawn = false;
+    await tickUntil(h, has("check.rerun"));
+    const rerun = (await readStepRun(h.ctx, "lt-1")) as StepRunRecord;
+    expect([rerun.run_id, rerun.attempt]).toEqual([failed.run_id, failed.attempt]);
+    expect(procs.spawned).toHaveLength(1);
+    for (const path of stale) expect(await h.files.read(path)).toBeNull();
   });
 
   test("a stopped run reaches its running check", async () => {

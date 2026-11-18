@@ -10,7 +10,7 @@ import type { RuntimeEnv, TickContext } from "./env.ts";
 import { gatherFacts } from "./facts.ts";
 import { mirrorSpec } from "./mount.ts";
 import { acquireTickLock } from "./lock.ts";
-import { DEFAULT_TRACE_RETAIN_MS, pruneTraces } from "./retention.ts";
+import { endOf } from "./lifecycle.ts";
 import { TickTrace } from "./trace.ts";
 import type { TickReport } from "./types.ts";
 
@@ -79,7 +79,8 @@ export async function tick(env: RuntimeEnv, tickId: string): Promise<TickReport>
     const lost = await trace.write(report);
     if (lost) problems.push(lost);
     // after the tick's own trace, which is the newest and never old enough to go
-    problems.push(...(await pruneTraces(env.ctx, tickId, env.config.traceRetainMs === undefined ? DEFAULT_TRACE_RETAIN_MS : env.config.traceRetainMs)));
+    const end = await endOf(env, "retention", { tickId });
+    if (end.ok) problems.push(...end.value.problems);
     return report;
   } finally {
     await lock.release();
