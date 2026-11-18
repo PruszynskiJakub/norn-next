@@ -515,6 +515,10 @@ describe("story take", () => {
     // a note an earlier approve acknowledged is no longer open
     await record("report-old", { kind: "run.reported", step: "qa", attempt: 1, run_id: RUN, verb: "done", outcome: "pass", notes: [{ text: "settled before" }] });
     await record("gate-old", { kind: "gate.decided", outcome: "approve", by: "me@box", step: "approve-slices", attempt: 1 });
+    // a report the journal rejected never stood, and neither did its note
+    await record("report-refused", { kind: "run.reported", step: "qa", attempt: 1, run_id: RUN, verb: "done", outcome: "pass", notes: [{ text: "from a report that never stood" }] });
+    const refused = (await receiptsOf(m)).at(-1)?.seq ?? 0;
+    await record("reject-refused", { kind: "receipt.rejected", seq: refused, reason: "the run had already reported" });
     await record("report-qa-1", { kind: "run.reported", step: "qa", attempt: 1, run_id: RUN, verb: "done", outcome: "partial", criteria, notes: [{ text: "the copy reads oddly on mobile", criterion: "AC1" }] });
     const note = { unit: UNIT, step: "qa", attempt: 1, at: expect.any(String), text: "the copy reads oddly on mobile", criterion: "AC1" };
     expect((json((await runCli(["story", "view", UNIT, "--json"], m.io)).stdout) as { notes: unknown[] }).notes).toEqual([note]);
@@ -522,6 +526,7 @@ describe("story take", () => {
     expect(md).toContain("## Notes for you");
     expect(md).toContain("- lt-1, from qa #1: `AC1` the copy reads oddly on mobile");
     expect(md).not.toContain("settled before");
+    expect(md).not.toContain("never stood");
     expect((json((await runCli(["status", "--json"], m.io)).stdout) as { notes: unknown[] }).notes).toEqual([note]);
     expect((await runCli(["status"], m.io)).stdout).toContain("(1 open note: norn story view lt-1)");
     await record("gate-ruled", { kind: "gate.decided", outcome: "approve", by: "me@box", step: "human-qa", attempt: 1 });

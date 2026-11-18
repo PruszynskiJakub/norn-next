@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { reportReceiptId, SPEC_ARTIFACT, writeStoryDoc } from "@norn/runtime";
+import { INPUTS_DIR, reportReceiptId, SPEC_ARTIFACT, worktreeOf, writeStoryDoc } from "@norn/runtime";
 import type { RunState } from "@norn/kernel";
 import type { CriterionVerdict } from "@norn/schema";
 import { ExitCode, runCli } from "../../src/index.ts";
@@ -387,6 +387,33 @@ describe("done at a step whose outcome hands back findings", () => {
     expect(md).not.toContain("no findings sent this work back");
   });
 
+  test("a findings-only report is the review of the rework's last_findings, written as the input file", async () => {
+    const m = await atReview();
+    await done(m, ["changes_requested", "--findings", "findings.json"], REVIEW_FILE);
+    const env = await envOf(m);
+    const read = await env.journal.readUnit(UNIT);
+    if (!read.ok || !read.value.state) throw new Error("no record");
+    // the rework is done and the story is back at review, which no rework_from names: last_findings is the round's latest findings
+    const implemented = await env.journal.record(UNIT, { id: "report-implement", data: { kind: "run.reported", step: "implement", attempt: 1, run_id: IMPLEMENT_RUN, verb: "done", outcome: "done" } });
+    if (!implemented.ok) throw new Error(implemented.failure.message);
+    const at = read.value.state;
+    const REVIEW_RUN = "01JDDDDDDDDDDDDDDDDDDDDDDD";
+    const back: RunState = { ...at, step: REVIEW, attempt: 2, applied_through: implemented.value.seq, run: at.run && { ...at.run, id: REVIEW_RUN, step: REVIEW, attempt: 2 } };
+    const committed = await env.journal.commit(UNIT, back, read.value.version);
+    if (!committed.ok) throw new Error(committed.failure.message);
+    expect((await runCli(["brief"], withEnv(m, runEnv(UNIT, REVIEW_RUN)).io)).exit).toBe(ExitCode.ok);
+    const file = (await m.files.read(`${worktreeOf(env, UNIT)}/${INPUTS_DIR}/last_findings.md`)) ?? "";
+    expect(file).toContain("`review` reported `done changes_requested`.");
+    expect(file).toContain("Blocking findings:");
+    expect(file).toContain("- `F1` Expired invites are accepted (src/invites.ts:42, AC2)");
+  });
+
+  test("an empty findings file at an outcome that hands nothing back is recorded without findings", async () => {
+    const m = await atReview();
+    expect((await done(m, ["approve", "--findings", "findings.json"], { findings: [] })).exit).toBe(ExitCode.ok);
+    expect((await receiptsOf(m)).map((x) => x.data)).toEqual([{ kind: "run.reported", step: REVIEW, attempt: 1, run_id: RUN, verb: "done", outcome: "approve" }]);
+  });
+
   test("the brief names --findings on the outcome that hands findings back", async () => {
     const m = await atReview();
     const md = (await runCli(["brief"], m.io)).stdout;
@@ -416,6 +443,18 @@ describe("an attended step's brief follows how its run was started", () => {
     const md = (await runCli(["brief"], m.io)).stdout;
     expect(md).toContain("You run unattended: no person reads this session. A question goes through `norn ask`");
     expect(md).toContain('- `norn ask "<one self-contained question>"`');
+    expect(md).not.toContain("never through `norn ask`");
+  });
+
+  test("a launch not yet applied is briefed from its start receipt: headless asks through norn ask", async () => {
+    const m = configured({ env: runEnv() });
+    // the launch's brief renders after the start receipt is written and before a tick applies it
+    await seedUnit(m, { workflow: "refinement", step: "refine", run: null });
+    const env = await envOf(m);
+    const started = await env.journal.record(UNIT, { id: "launch", data: { kind: "run.started", step: "refine", attempt: 1, run_id: RUN, run_kind: "agent", executor: "claude", attended: false } });
+    if (!started.ok) throw new Error(started.failure.message);
+    const md = (await runCli(["brief"], m.io)).stdout;
+    expect(md).toContain("You run unattended: no person reads this session. A question goes through `norn ask`");
     expect(md).not.toContain("never through `norn ask`");
   });
 
