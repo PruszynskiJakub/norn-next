@@ -96,7 +96,7 @@ describe("norn watch", () => {
 describe("norn status, story list and story view", () => {
   test("nothing yet: no stories; an item not yet taken shows as intake", async () => {
     const m = repo();
-    expect(json((await runCli(["status", "--json"], m.io)).stdout)).toEqual({ stories: [], intake: [], problems: [] });
+    expect(json((await runCli(["status", "--json"], m.io)).stdout)).toEqual({ stories: [], intake: [], problems: [], notes: [] });
     await addItem(m, "First");
     const v = json((await runCli(["status", "--json"], m.io)).stdout);
     expect(v.intake).toEqual([{ key: "lt-1", title: "First", url: null }]);

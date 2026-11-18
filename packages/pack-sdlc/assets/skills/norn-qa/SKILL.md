@@ -33,17 +33,17 @@ Exactly one per criterion:
 
 A person's earlier ruling or approval never turns a criterion into `pass`: it judged older code. Cite it in a `person` verdict's `how` so the person confirms it on the current head.
 
-A criterion that passed as written but that a person may read differently stays `pass`, with a **note** for a person, tied to that criterion, carrying the question. A note never replaces a verdict.
+A criterion that passed as written but that a person may read differently stays `pass`, with a **note** for a person (the entry's `note` field), tied to that criterion, carrying the question. A note never replaces a verdict.
 
 ## Files
 
 Write everything to one directory **outside the repository** (e.g. under `$TMPDIR`) unless told where: whatever is left in the worktree is committed when you report.
 
-- `criteria.json`, the criteria report, one entry per criterion. Required: `evidence` for `pass`, `repro` for `fail`, `how` for `person`, `reason` and `how` for `unverified`; `evidence` may go on any.
+- `criteria.json`, the criteria report, one entry per criterion. Required: `evidence` for `pass`, `repro` for `fail`, `how` for `person`, `reason` and `how` for `unverified`; `evidence` and `note` (for a person) may go on any.
 
   ```json
   [
-    { "id": "AC1", "verdict": "pass", "evidence": "AC1.md" },
+    { "id": "AC1", "verdict": "pass", "evidence": "AC1.md", "note": "the empty state reads 'Nothing here'; the spec does not say what it should read" },
     { "id": "AC2", "verdict": "fail", "repro": "Add 'buy milk p1' on /today. Expected a red flag; actual none.", "evidence": "AC2.png" },
     { "id": "AC3", "verdict": "unverified", "reason": "no browser in this session", "how": "open /today, add 'buy milk p1', expect a red flag" },
     { "id": "AC4", "verdict": "person", "how": "compare the dialog with Figma frame 12; screenshot in AC4.png" }
@@ -72,7 +72,7 @@ Write everything to one directory **outside the repository** (e.g. under `$TMPDI
 
 ## Report
 
-The worst verdict decides what you may report: fail > unverified > person > pass; a report that contradicts it is refused. Report with the criteria file: `norn done <outcome> --criteria <dir>/criteria.json` (or the report command your instructions name). A step that requires criteria refuses a report without it, and one that does not cover exactly the frontmatter `criteria` ids. On a `fail`, hand `findings.json` back with the report (`--findings <dir>/findings.json`): rework reads it. Put anything else the next step must know in `--note`, and name the evidence directory there.
+The worst verdict decides what you may report: fail > unverified > person > pass; a report that contradicts it is refused. Report with the criteria file: `norn done <outcome> --criteria <dir>/criteria.json` (or the report command your instructions name). A step that requires criteria refuses a report without it, and one that does not cover exactly the frontmatter `criteria` ids. On a `fail`, hand `findings.json` back with the report (`--findings <dir>/findings.json`): rework reads it. Put anything else the next step must know in `--note`, and name the evidence directory there. A verdict's `note` reaches the person at the story's gate, never the next step.
 
 ## Rules
 

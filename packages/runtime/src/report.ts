@@ -12,7 +12,7 @@
 import { type BriefInputs, checkCriteriaReport, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
 import type { HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
 import { STORE_ID_PATTERN } from "@norn/plugin-api";
-import type { CriterionVerdict, Finding, Verdict } from "@norn/schema";
+import type { CriterionVerdict, Finding, Note, Verdict } from "@norn/schema";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
 import { readBackDocs, worktreeOf } from "./inputs.ts";
@@ -159,6 +159,7 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     criteria = checked.value ?? undefined;
   }
   const findings = req.verb === "done" && req.findings !== undefined && req.findings.length > 0 ? req.findings : undefined;
+  const notes = notesOf(criteria?.report);
   const wrote = await env.journal.record(unit, {
     id: receiptId,
     data: {
@@ -171,6 +172,7 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
       ...(text !== undefined && { text }),
       ...(criteria !== undefined && { criteria: criteria.report }),
       ...(findings !== undefined && { findings }),
+      ...(notes.length > 0 && { notes }),
     },
   });
   if (!wrote.ok) return refuse(`cannot record the report: ${wrote.failure.message}`, "report again with the same report id", wrote.failure.code);
@@ -201,6 +203,11 @@ function handBackRefusal(live: LiveStep, req: Extract<ReportRequest, { verb: "do
     `write ${FINDINGS_SHAPE}, then run: norn done ${req.outcome}${criteria} --findings <file>`,
     "hand_back_required",
   );
+}
+
+/** The notes for a person a criteria report's verdicts carry, each naming its criterion. */
+function notesOf(report: readonly CriterionVerdict[] | undefined): Note[] {
+  return (report ?? []).flatMap((c) => (c.note !== undefined ? [{ text: c.note, criterion: c.id }] : []));
 }
 
 const CONCLUDE: Record<VcsUnfinished["operation"], string> = { merge: "git commit", rebase: "git rebase --continue", "cherry-pick": "git cherry-pick --continue" };

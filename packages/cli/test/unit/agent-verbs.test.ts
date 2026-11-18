@@ -284,25 +284,6 @@ describe("done at a step with criteria: required", () => {
   });
 });
 
-describe("an attended step's brief follows how its run was started", () => {
-  test("a run started headless is told no person reads the session and to ask through norn ask", async () => {
-    const m = configured({ env: runEnv() });
-    await seedUnit(m, { workflow: "refinement", step: "refine", attended: false });
-    const md = (await runCli(["brief"], m.io)).stdout;
-    expect(md).toContain("You run unattended: no person reads this session. A question goes through `norn ask`");
-    expect(md).toContain('- `norn ask "<one self-contained question>"`');
-    expect(md).not.toContain("never through `norn ask`");
-  });
-
-  test("a run started attended keeps the person in the session", async () => {
-    const m = configured({ env: runEnv() });
-    await seedUnit(m, { workflow: "refinement", step: "refine", attended: true });
-    const md = (await runCli(["brief"], m.io)).stdout;
-    expect(md).toContain("A person works with you in this session");
-    expect(md).toContain("never through `norn ask`");
-  });
-});
-
 describe("done at a step whose outcome hands back findings", () => {
   const REVIEW = "review";
   const IMPLEMENT_RUN = "01JCCCCCCCCCCCCCCCCCCCCCCC";
@@ -412,5 +393,37 @@ describe("done at a step whose outcome hands back findings", () => {
     expect(md).toContain("- `norn done changes_requested --findings <file>`");
     expect(md).toContain("- `norn done approve` —");
     expect(md).toContain('`--findings <file>` is a JSON file, `{"findings": [...]}` or an array');
+  });
+});
+
+describe("a criteria report's notes for a person", () => {
+  test("a verdict's note is kept on the receipt's notes, naming its criterion", async () => {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { step: "qa" });
+    const report: CriterionVerdict[] = [{ id: "AC1", verdict: "pass", evidence: "AC1.md", note: "the copy reads oddly on mobile; worth a look" }];
+    await m.files.write(`${ROOT}/criteria.json`, JSON.stringify(report));
+    expect((await runCli(["done", "pass", "--criteria", "criteria.json", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    expect((await receiptsOf(m)).map((x) => x.data)).toEqual([
+      { kind: "run.reported", step: "qa", attempt: 1, run_id: RUN, verb: "done", outcome: "pass", criteria: report, notes: [{ text: "the copy reads oddly on mobile; worth a look", criterion: "AC1" }] },
+    ]);
+  });
+});
+
+describe("an attended step's brief follows how its run was started", () => {
+  test("a run started headless is told no person reads the session and to ask through norn ask", async () => {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { workflow: "refinement", step: "refine", attended: false });
+    const md = (await runCli(["brief"], m.io)).stdout;
+    expect(md).toContain("You run unattended: no person reads this session. A question goes through `norn ask`");
+    expect(md).toContain('- `norn ask "<one self-contained question>"`');
+    expect(md).not.toContain("never through `norn ask`");
+  });
+
+  test("a run started attended keeps the person in the session", async () => {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { workflow: "refinement", step: "refine", attended: true });
+    const md = (await runCli(["brief"], m.io)).stdout;
+    expect(md).toContain("A person works with you in this session");
+    expect(md).toContain("never through `norn ask`");
   });
 });
