@@ -1,4 +1,4 @@
-import { chmod, link, mkdir, open, readdir, readFile, rename, unlink } from "node:fs/promises";
+import { chmod, link, lstat, mkdir, open, readdir, readFile, readlink, rename, symlink, unlink } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import type { HostFiles } from "@norn/plugin-api";
 
@@ -99,6 +99,33 @@ export function nodeFiles(root: string): HostFiles {
         return names.filter((n) => !n.endsWith(TEMP_SUFFIX)).sort();
       } catch (e) {
         if (errno(e) === "ENOENT") return [];
+        throw e;
+      }
+    },
+    // a temp link renamed over the name: a reader sees the old link or the new one, never none
+    symlink: async (target, path) => {
+      const p = at(path);
+      const there = await lstat(p).catch((e: unknown) => {
+        if (errno(e) === "ENOENT") return null;
+        throw e;
+      });
+      if (there && !there.isSymbolicLink()) throw new Error(`${p} is a ${there.isDirectory() ? "folder" : "file"}, not a link; it is left as it is`);
+      await mkdir(dirname(p), { recursive: true });
+      const tmp = tempName(p);
+      await symlink(target, tmp);
+      try {
+        await rename(tmp, p);
+      } catch (e) {
+        await unlink(tmp).catch(() => {});
+        throw e;
+      }
+      await fsyncDir(dirname(p));
+    },
+    readLink: async (path) => {
+      try {
+        return await readlink(at(path));
+      } catch (e) {
+        if (errno(e) === "ENOENT" || errno(e) === "EINVAL") return null;
         throw e;
       }
     },

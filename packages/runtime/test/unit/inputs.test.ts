@@ -66,37 +66,38 @@ describe("the story's spec", () => {
 });
 
 describe("readable inputs", () => {
-  test("the brief names the story and each input with a path in .norn/, which git ignores and which holds the item", async () => {
+  test("the brief names the story and each input under .agents/: the spec and handoff in its spec folder, the rest in .agents/inputs/, all ignored by git", async () => {
     const { h } = await started();
     const md = await brief(h);
     expect(md).toContain("## Story");
     expect(md).toContain("`lt-1`: Fix the typo in the help (https://tracker.example/1)");
-    expect(md).toContain("- `spec` — the story's spec: its tracker item, mirrored, and the sections later steps added: `.norn/spec.md`");
-    expect(md).toContain("- `handoff` — this unit's handoff, which you keep current: `.norn/handoff.md`");
+    expect(md).toContain("- `spec` — the story's spec: its tracker item, mirrored, and the sections later steps added: `.agents/specs/lt-1/spec.md`");
+    expect(md).toContain("- `handoff` — this unit's handoff, which you keep current: `.agents/specs/lt-1/handoffs/lt-1.md`");
     expect(md).toContain("- `last_check` — the last check's result. no check has run for this unit yet");
-    expect(md).toContain("`.norn/handoff.md` is this unit's current state");
+    expect(md).toContain("`.agents/specs/lt-1/handoffs/lt-1.md` is this unit's current state");
     expect(md).toContain("ignored by git");
-    expect(await h.files.read(`${WORKTREE}/.norn/.gitignore`)).toBe("*\n");
-    expect(await h.files.read(`${WORKTREE}/.norn/spec.md`)).toContain(ITEM.body);
-    expect(await h.files.read(`${WORKTREE}/.norn/handoff.md`)).toContain("# Handoff: lt-1");
+    expect(await h.files.read(`${WORKTREE}/.agents/inputs/.gitignore`)).toBe("*\n");
+    expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/.gitignore`)).toBe("*\n");
+    expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/spec.md`)).toContain(ITEM.body);
+    expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`)).toContain("# Handoff: lt-1");
   });
 
   test("a handoff the agent writes is read back when it reports, and the next step's inputs carry it from a fresh worktree", async () => {
     const { h, runId } = await started();
     await brief(h);
-    await h.files.write(`${WORKTREE}/.norn/handoff.md`, "# Handoff\n\nThe help string is fixed; the test is in help.test.ts.\n");
-    await h.files.write(`${WORKTREE}/.norn/spec.md`, `${await h.files.read(`${WORKTREE}/.norn/spec.md`)}\n## Plan\n\nFix it in one place.\n`);
+    await h.files.write(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`, "# Handoff\n\nThe help string is fixed; the test is in help.test.ts.\n");
+    await h.files.write(`${WORKTREE}/.agents/specs/lt-1/spec.md`, `${await h.files.read(`${WORKTREE}/.agents/specs/lt-1/spec.md`)}\n## Plan\n\nFix it in one place.\n`);
     expect((await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).ok).toBe(true);
     expect(await doc(h, handoffArtifact(UNIT))).toContain("the test is in help.test.ts");
     await tickUntil(h, async () => (await record(h, UNIT)).state?.run?.step === "review");
     // the next step may run in another checkout: only the story's documents carry the handoff there
-    await h.files.remove(`${WORKTREE}/.norn/handoff.md`);
-    await h.files.remove(`${WORKTREE}/.norn/.base/handoff.md`);
+    await h.files.remove(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`);
+    await h.files.remove(`${WORKTREE}/.agents/inputs/.base/specs/lt-1/handoffs/lt-1.md`);
     h.items[0] = trackerItem(1, { ...ITEM, body: "The help text says `teh` twice." });
     const md = await brief(h);
     expect(md).toContain("# norn brief — lt-1 · review #1");
-    expect(await h.files.read(`${WORKTREE}/.norn/handoff.md`)).toContain("the test is in help.test.ts");
-    const spec = (await h.files.read(`${WORKTREE}/.norn/spec.md`)) ?? "";
+    expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`)).toContain("the test is in help.test.ts");
+    const spec = (await h.files.read(`${WORKTREE}/.agents/specs/lt-1/spec.md`)) ?? "";
     expect(spec).toContain("says `teh` twice.");
     expect(spec).toContain("## Plan\n\nFix it in one place.");
     expect(md).toContain("- `diff` — the change so far. run `git diff main...HEAD` in this worktree");
@@ -109,6 +110,6 @@ describe("readable inputs", () => {
     const write = await h.env.slots.store.artifacts?.write(UNIT, handoffArtifact(UNIT), "# Handoff\n\nnewer, from elsewhere\n");
     expect(write?.ok).toBe(true);
     await brief(h);
-    expect(await h.files.read(`${WORKTREE}/.norn/handoff.md`)).toContain("newer, from elsewhere");
+    expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`)).toContain("newer, from elsewhere");
   });
 });

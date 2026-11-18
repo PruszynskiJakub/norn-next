@@ -46,6 +46,14 @@ export interface HostFiles {
    * files (a browser) is still a host; a caller without it does without the script.
    */
   writeExecutable?(path: string, data: string): Promise<void>;
+  /**
+   * Make `path` a symbolic link to `target`, a path relative to the link's folder, replacing a link
+   * already there but never a file or a folder (plugin API 1.7). Optional, with `readLink`: a host
+   * without links has a caller copy instead.
+   */
+  symlink?(target: string, path: string): Promise<void>;
+  /** the target the link at `path` names, as written; null when nothing is there or it is no link */
+  readLink?(path: string): Promise<string | null>;
 }
 
 export interface HostRepo {

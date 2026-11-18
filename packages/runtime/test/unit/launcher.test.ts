@@ -440,39 +440,64 @@ describe("shellQuote", () => {
 
 describe("the pack's skills", () => {
   const SKILLS = { "norn-implement": { "SKILL.md": "# implement\n", "refs/tdd.md": "red, green\n" }, norn: { "SKILL.md": "# norn\n" } };
+  const WT = "/wt/gh-12-03";
 
-  function withSkills(skillsDir: string | undefined) {
+  function withSkills(skillsDir: string | undefined, files?: ReturnType<typeof memoryFiles>) {
     const s = setup();
+    const ctx = files ? { ...s.ctx, files } : s.ctx;
     const harness = { ...fakeHarness(), ...(skillsDir !== undefined && { skillsDir }) };
-    const launcher = new HarnessLauncher({ ...s.launcher.opts, executors: { pane: { harness, runner: s.pane } }, skills: SKILLS });
-    return { ...s, launcher };
+    const launcher = new HarnessLauncher({ ...s.launcher.opts, ctx, executors: { pane: { harness, runner: s.pane } }, skills: SKILLS });
+    return { ...s, files: files ?? s.files, launcher };
   }
 
-  test("are written into the harness's skills folder in the worktree before the launch, each folder ignored by git", async () => {
-    const s = withSkills(".agent/skills");
+  test("land in .agents/skills, each folder ignored by git, and the harness's folder links to each", async () => {
+    const s = withSkills(".claude/skills");
     expect((await s.launcher.start(run())).ok).toBe(true);
-    const dir = "/wt/gh-12-03/.agent/skills";
-    expect(await s.files.read(`${dir}/norn-implement/SKILL.md`)).toBe("# implement\n");
-    expect(await s.files.read(`${dir}/norn-implement/refs/tdd.md`)).toBe("red, green\n");
-    expect(await s.files.read(`${dir}/norn/SKILL.md`)).toBe("# norn\n");
-    expect(await s.files.read(`${dir}/norn/.gitignore`)).toEndWith("\n*\n");
+    expect(await s.files.read(`${WT}/.agents/skills/norn-implement/SKILL.md`)).toBe("# implement\n");
+    expect(await s.files.read(`${WT}/.agents/skills/norn-implement/refs/tdd.md`)).toBe("red, green\n");
+    expect(await s.files.read(`${WT}/.agents/skills/norn/.gitignore`)).toEndWith("\n*\n");
+    expect(s.files.links()).toEqual({
+      [`${WT}/.claude/skills/norn`]: "../../.agents/skills/norn",
+      [`${WT}/.claude/skills/norn-implement`]: "../../.agents/skills/norn-implement",
+    });
+    // the links are files to git, so the harness's folder ignores them by name
+    expect(await s.files.read(`${WT}/.claude/skills/.gitignore`)).toEndWith("\n/.gitignore\n/norn-implement\n/norn\n");
   });
 
-  test("a skill the repo has of the same name is left as it is, and norn's own copy is brought up to date", async () => {
-    const s = withSkills(".agent/skills");
-    const dir = "/wt/gh-12-03/.agent/skills";
-    await s.files.write(`${dir}/norn/SKILL.md`, "# the repo's own norn skill\n");
+  test("a skill the repo keeps in .agents, or anything at a link's name, is left as it is", async () => {
+    const s = withSkills(".claude/skills");
+    await s.files.write(`${WT}/.agents/skills/norn/SKILL.md`, "# the repo's own norn skill\n");
+    await s.files.write(`${WT}/.claude/skills/norn-implement/SKILL.md`, "# the repo's own, for claude only\n");
     expect((await s.launcher.start(run())).ok).toBe(true);
-    expect(await s.files.read(`${dir}/norn/SKILL.md`)).toBe("# the repo's own norn skill\n");
-    expect(await s.files.read(`${dir}/norn/.gitignore`)).toBeNull();
-    await s.files.write(`${dir}/norn-implement/SKILL.md`, "# stale\n");
+    expect(await s.files.read(`${WT}/.agents/skills/norn/SKILL.md`)).toBe("# the repo's own norn skill\n");
+    expect(await s.files.read(`${WT}/.agents/skills/norn/.gitignore`)).toBeNull();
+    expect(await s.files.read(`${WT}/.claude/skills/norn-implement/SKILL.md`)).toBe("# the repo's own, for claude only\n");
+    // the repo's own skill in .agents is still linked for the agent; the name the repo filled is not
+    expect(s.files.links()).toEqual({ [`${WT}/.claude/skills/norn`]: "../../.agents/skills/norn" });
+  });
+
+  test("norn's own copy is brought up to date on the next launch", async () => {
+    const s = withSkills(".pi/skills");
+    expect((await s.launcher.start(run())).ok).toBe(true);
+    await s.files.write(`${WT}/.agents/skills/norn-implement/SKILL.md`, "# stale\n");
     expect((await s.launcher.start(run({ run_id: "01JRUN0000000000000000000B" }))).ok).toBe(true);
-    expect(await s.files.read(`${dir}/norn-implement/SKILL.md`)).toBe("# implement\n");
+    expect(await s.files.read(`${WT}/.agents/skills/norn-implement/SKILL.md`)).toBe("# implement\n");
+  });
+
+  test("a harness reading .agents/skills itself needs no links, and a host without links gets copies", async () => {
+    const direct = withSkills(".agents/skills");
+    expect((await direct.launcher.start(run())).ok).toBe(true);
+    expect(direct.files.links()).toEqual({});
+    const plain = memoryFiles();
+    const noLinks = { ...plain, symlink: undefined, readLink: undefined } as unknown as ReturnType<typeof memoryFiles>;
+    const copied = withSkills(".claude/skills", noLinks);
+    expect((await copied.launcher.start(run())).ok).toBe(true);
+    expect(await plain.read(`${WT}/.claude/skills/norn/SKILL.md`)).toBe("# norn\n");
   });
 
   test("a harness with no skills folder gets none", async () => {
     const s = withSkills(undefined);
     expect((await s.launcher.start(run())).ok).toBe(true);
-    expect((await s.files.list("/wt/gh-12-03")).length).toBe(0);
+    expect((await s.files.list(WT)).length).toBe(0);
   });
 });

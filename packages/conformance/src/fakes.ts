@@ -12,6 +12,10 @@ export interface MemoryFiles extends HostFiles {
   /** whether the file was last written by `writeExecutable` */
   executable(path: string): boolean;
   writeExecutable(path: string, data: string): Promise<void>;
+  symlink(target: string, path: string): Promise<void>;
+  readLink(path: string): Promise<string | null>;
+  /** every link and its target, by path */
+  links(): Record<string, string>;
 }
 
 const trim = (p: string): string => (p.length > 1 ? p.replace(/\/+$/, "") : p);
@@ -20,6 +24,7 @@ export function memoryFiles(seed: Record<string, string> = {}): MemoryFiles {
   const files = new Map<string, string>(Object.entries(seed).map(([p, d]) => [trim(p), d]));
   let failing = false;
   const executables = new Set<string>();
+  const links = new Map<string, string>();
   const guard = (op: string, path: string): void => {
     if (failing) throw new Error(`memoryFiles: ${op} ${path} failed (injected)`);
   };
@@ -46,13 +51,22 @@ export function memoryFiles(seed: Record<string, string> = {}): MemoryFiles {
     list: async (dir) => {
       const prefix = `${trim(dir)}/`;
       const names = new Set<string>();
-      for (const p of files.keys()) if (p.startsWith(prefix)) names.add(p.slice(prefix.length).split("/")[0] as string);
+      for (const p of [...files.keys(), ...links.keys()]) if (p.startsWith(prefix)) names.add(p.slice(prefix.length).split("/")[0] as string);
       return [...names].sort();
     },
+    symlink: async (target, path) => {
+      guard("symlink", path);
+      const p = trim(path);
+      if (files.has(p) || [...files.keys()].some((f) => f.startsWith(`${p}/`))) throw new Error(`memoryFiles: ${p} is not a link; it is left as it is`);
+      links.set(p, target);
+    },
+    readLink: async (path) => links.get(trim(path)) ?? null,
+    links: () => Object.fromEntries([...links.entries()].sort(([a], [b]) => a.localeCompare(b))),
     remove: async (path) => {
       guard("remove", path);
       files.delete(trim(path));
       executables.delete(trim(path));
+      links.delete(trim(path));
     },
     snapshot: () => Object.fromEntries([...files.entries()].sort(([a], [b]) => a.localeCompare(b))),
     failWrites: (on) => {

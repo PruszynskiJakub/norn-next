@@ -1,14 +1,16 @@
 /**
  * Making a step's inputs readable. The kernel's brief names its inputs by kind (`spec`, `handoff`,
  * `last_check`, ...); before a launch, and whenever `norn brief` renders, the host writes each one it
- * holds as a file in `.norn/` inside the unit's worktree and the brief lists the paths, short ones
- * inline. The folder holds a `.gitignore` of `*`, so git ignores it and nothing the agent reads is
- * ever committed.
+ * holds as a file under `.agents/` inside the unit's worktree and the brief lists the paths, short
+ * ones inline. The story's documents go to its spec folder, `.agents/specs/<story>/` (`spec.md`,
+ * `handoffs/<unit>.md`), the layout a repo keeping specs in `.agents` uses; every other input goes to
+ * `.agents/inputs/`. Each folder norn writes holds a `.gitignore` of `*`, so nothing the agent reads is
+ * ever committed, whether or not the repo commits the rest of `.agents/`.
  *
  * The spec and the handoff are documents the agent edits there: what it changed is read back into the
  * story's documents when it reports (and before the next materialization), so the next step reads it.
- * A copy of what norn last wrote sits in `.norn/.base/`, and only a file that differs from it is read
- * back, so a worktree that kept a stale, untouched copy never overwrites a newer document.
+ * A copy of what norn last wrote sits in `.agents/inputs/.base/`, and only a file that differs from it
+ * is read back, so a worktree that kept a stale, untouched copy never overwrites a newer document.
  */
 import type { BriefInputs, BriefInputView, BriefStory, KernelReceipt, UnitJournal } from "@norn/kernel";
 import { ok, type PluginResult, parseStoryKey, parseUnitId, type TrackerItem } from "@norn/plugin-api";
@@ -18,12 +20,17 @@ import { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 import { readStepRun } from "./step-runs.ts";
 import { handoffArtifact, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
 
-export const INPUTS_DIR = ".norn";
+const AGENTS_DIR = ".agents";
+/** the folder of each story's documents in a worktree: `.agents/specs/<story>/` */
+export const SPECS_DIR = `${AGENTS_DIR}/specs`;
+/** the folder of the inputs rewritten for every run */
+export const INPUTS_DIR = `${AGENTS_DIR}/inputs`;
 const BASE_DIR = `${INPUTS_DIR}/.base`;
+const IGNORE_ALL = "*\n";
 /** Text up to this long is shown in the brief itself as well as written to its file. */
 const INLINE_MAX = 1500;
 
-export const INPUTS_NOTE = `\`${INPUTS_DIR}/\` is norn's folder in this worktree, ignored by git. Edit the handoff there, and add your sections to the spec below its item block; norn reads both back when you report. The other files are rewritten for every run.`;
+export const INPUTS_NOTE = `norn's files in this worktree are under \`${AGENTS_DIR}/\` and ignored by git: the story's spec and this unit's handoff in \`${SPECS_DIR}/<story>/\`, the other inputs in \`${INPUTS_DIR}/\`. Edit the handoff, and add your sections to the spec below its item block; norn reads both back when you report. The other inputs are rewritten for every run.`;
 
 /** The worktree a unit's agent works in: its own with a vcs that makes worktrees, else the repo's checkout. */
 export function worktreeOf(env: RuntimeEnv, unit: string): string {
@@ -34,12 +41,24 @@ export function worktreeOf(env: RuntimeEnv, unit: string): string {
 interface Doc {
   name: "spec" | "handoff";
   artifact: string;
-  /** its file in `.norn/`, named for the input */
+  /** its file relative to the worktree: the artifact's own path in the story's spec folder */
   file: string;
+  /** what norn last wrote there, relative to the worktree */
+  base: string;
 }
 
-const doc = (name: Doc["name"], artifact: string): Doc => ({ name, artifact, file: `${name}.md` });
-const docsOf = (unit: string): Doc[] => [doc("spec", SPEC_ARTIFACT), doc("handoff", handoffArtifact(unit))];
+/** The story's spec folder in a worktree; `unit` may be a slice, whose story's folder it shares. */
+export function specFolder(unit: string): string {
+  const story = parseUnitId(unit)?.story;
+  if (!story) throw new RangeError(`not a unit id: ${JSON.stringify(unit)}`);
+  return `${SPECS_DIR}/${story}`;
+}
+
+function doc(name: Doc["name"], unit: string, artifact: string): Doc {
+  const file = `${specFolder(unit)}/${artifact}`;
+  return { name, artifact, file, base: `${BASE_DIR}/${file.slice(AGENTS_DIR.length + 1)}` };
+}
+const docsOf = (unit: string): Doc[] => [doc("spec", unit, SPEC_ARTIFACT), doc("handoff", unit, handoffArtifact(unit))];
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -84,14 +103,14 @@ export async function mirrorSpec(env: RuntimeEnv, unit: string, item: TrackerIte
 export async function readBackDocs(env: RuntimeEnv, unit: string, worktree = worktreeOf(env, unit)): Promise<string[]> {
   const back: string[] = [];
   for (const d of docsOf(unit)) {
-    const text = await readFile(env, `${worktree}/${INPUTS_DIR}/${d.file}`);
+    const text = await readFile(env, `${worktree}/${d.file}`);
     if (text === null) continue;
-    const base = await readFile(env, `${worktree}/${BASE_DIR}/${d.file}`);
+    const base = await readFile(env, `${worktree}/${d.base}`);
     if (text === base) continue;
     const wrote = await writeStoryDoc(env, unit, d.artifact, text);
     if (!wrote.ok) continue;
     try {
-      await env.ctx.files.write(`${worktree}/${BASE_DIR}/${d.file}`, text);
+      await env.ctx.files.write(`${worktree}/${d.base}`, text);
     } catch {
       // the document is kept; a missing base only reads it back once more, unchanged
     }
@@ -158,7 +177,8 @@ export interface MaterializedInputs {
 export async function materializeInputs(env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, worktree = worktreeOf(env, record.unit)): Promise<PluginResult<MaterializedInputs>> {
   const unit = record.unit;
   try {
-    await env.ctx.files.write(`${worktree}/${INPUTS_DIR}/.gitignore`, "*\n");
+    await env.ctx.files.write(`${worktree}/${INPUTS_DIR}/.gitignore`, IGNORE_ALL);
+    await env.ctx.files.write(`${worktree}/${specFolder(unit)}/.gitignore`, IGNORE_ALL);
     await readBackDocs(env, unit, worktree);
     const item = await storyItem(env, unit);
     const out: MaterializedInputs = { inputs: [] };
@@ -172,13 +192,13 @@ export async function materializeInputs(env: RuntimeEnv, record: UnitJournal, br
     }
     return ok(out);
   } catch (e) {
-    return { ok: false, failure: { code: "unavailable", message: `the inputs of ${unit} could not be written to ${worktree}/${INPUTS_DIR}: ${message(e)}`, retryable: true } };
+    return { ok: false, failure: { code: "unavailable", message: `the inputs of ${unit} could not be written under ${worktree}/${AGENTS_DIR}: ${message(e)}`, retryable: true } };
   }
 }
 
 async function materializeDoc(env: RuntimeEnv, worktree: string, d: Doc, text: string): Promise<void> {
-  await env.ctx.files.write(`${worktree}/${INPUTS_DIR}/${d.file}`, text);
-  await env.ctx.files.write(`${worktree}/${BASE_DIR}/${d.file}`, text);
+  await env.ctx.files.write(`${worktree}/${d.file}`, text);
+  await env.ctx.files.write(`${worktree}/${d.base}`, text);
 }
 
 async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, worktree: string, name: string, item: TrackerItem | null, out: MaterializedInputs): Promise<BriefInputView> {
@@ -190,13 +210,13 @@ async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: Brief
       const text = mirrored.ok ? mirrored.value : null;
       if (text === null) return { name, label: "the story's spec", note: "norn holds no spec for this story yet: the tracker item could not be read" };
       await materializeDoc(env, worktree, spec, text);
-      return { name, label: "the story's spec: its tracker item, mirrored, and the sections later steps added", path: `${INPUTS_DIR}/${spec.file}` };
+      return { name, label: "the story's spec: its tracker item, mirrored, and the sections later steps added", path: spec.file };
     }
     case "handoff": {
       const kept = await readStoryDoc(env, unit, handoff.artifact);
       const text = kept.ok && kept.value !== null ? kept.value : handoffTemplate(unit);
       await materializeDoc(env, worktree, handoff, text);
-      out.handoff = `${INPUTS_DIR}/${handoff.file}`;
+      out.handoff = handoff.file;
       return { name, label: "this unit's handoff, which you keep current", path: out.handoff };
     }
     case "last_check": {

@@ -16,7 +16,7 @@ export { toolKind } from "./normalize.ts";
 export const piHarness: Harness = Object.freeze({
   name: "pi",
   capabilities: Object.freeze({ blockStop: true, denyTool: true, injectContext: true, subagents: false, limits: false, paneInput: true, promptMarks: true, resume: true }),
-  // under `.pi`, which `--approve` trusts for norn's runs; `.agents/skills` may be the repo's own and committed
+  // pi reads `.agents/skills` itself too; the host links each skill from here, and pi loads a file it reaches twice once
   skillsDir: ".pi/skills",
   install,
   uninstall,

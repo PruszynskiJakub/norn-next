@@ -58,6 +58,23 @@ describe("files", () => {
     expect((await host().exec([path])).stdout).toBe("two\n");
   });
 
+  test("symlink makes a relative link, replaces a link, never a file or folder; readLink reads it back", async () => {
+    const { files } = host();
+    await files.write(join(root, ".agents", "skills", "a", "SKILL.md"), "# a");
+    const link = join(root, ".claude", "skills", "a");
+    expect(await files.readLink?.(link)).toBeNull();
+    await files.symlink?.("../../.agents/skills/b", link);
+    await files.symlink?.("../../.agents/skills/a", link);
+    expect(await files.readLink?.(link)).toBe("../../.agents/skills/a");
+    expect(readFileSync(join(link, "SKILL.md"), "utf8")).toBe("# a");
+    expect(readdirSync(join(root, ".claude", "skills"))).toEqual(["a"]);
+    expect(await files.list(join(root, ".claude", "skills"))).toEqual(["a"]);
+    // a real file or folder at the name is someone's, never replaced
+    expect(await files.readLink?.(join(root, ".agents", "skills", "a"))).toBeNull();
+    await expect(files.symlink?.("x", join(root, ".agents", "skills", "a"))).rejects.toThrow("not a link");
+    await expect(files.symlink?.("x", join(root, ".agents", "skills", "a", "SKILL.md"))).rejects.toThrow("not a link");
+  });
+
   test("write creates nested folders, replaces atomically and leaves no temp file", async () => {
     const { files } = host();
     const path = join(root, "a", "b", "c.json");
