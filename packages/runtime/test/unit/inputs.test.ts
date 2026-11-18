@@ -120,4 +120,15 @@ describe("readable inputs", () => {
     await brief(h);
     expect(await h.files.read(`${WORKTREE}/.agents/specs/lt-1/handoffs/lt-1.md`)).toContain("newer, from elsewhere");
   });
+
+  test("on report, an untouched copy leaves a newer document as it is and an edited one is read back", async () => {
+    const { h, runId } = await started();
+    await brief(h);
+    const write = await h.env.slots.store.artifacts?.write(UNIT, handoffArtifact(UNIT), "# Handoff\n\nnewer, from elsewhere\n");
+    expect(write?.ok).toBe(true);
+    await h.files.write(`${WORKTREE}/.agents/specs/lt-1/spec.md`, `${await h.files.read(`${WORKTREE}/.agents/specs/lt-1/spec.md`)}\n## Plan\n\nedited here\n`);
+    expect((await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).ok).toBe(true);
+    expect(await doc(h, handoffArtifact(UNIT))).toBe("# Handoff\n\nnewer, from elsewhere\n");
+    expect(await doc(h, SPEC_ARTIFACT)).toContain("## Plan\n\nedited here");
+  });
 });

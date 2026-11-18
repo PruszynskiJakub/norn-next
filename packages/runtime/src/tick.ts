@@ -8,7 +8,7 @@ import { ulid } from "@norn/schema";
 import { act } from "./act.ts";
 import type { RuntimeEnv, TickContext } from "./env.ts";
 import { gatherFacts } from "./facts.ts";
-import { mirrorSpec } from "./inputs.ts";
+import { mirrorSpec } from "./mount.ts";
 import { acquireTickLock } from "./lock.ts";
 import { endOf } from "./lifecycle.ts";
 import { TickTrace } from "./trace.ts";

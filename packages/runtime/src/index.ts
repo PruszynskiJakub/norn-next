@@ -1,6 +1,6 @@
 export { act } from "./act.ts";
 export { briefRenderInput, renderInputFrom } from "./brief-context.ts";
-export { INPUTS_DIR, INPUTS_NOTE, SPECS_DIR, specFolder, type MaterializedInputs, materializeInputs, mirrorSpec, readBackDocs, storyItem, worktreeOf } from "./inputs.ts";
+export { INPUTS_DIR, INPUTS_NOTE, SPECS_DIR, specFolder, type MaterializedInputs, materializeInputs, mirrorSpec, readBackDocs, storyItem, worktreeOf } from "./mount.ts";
 export { installSkills, type PackSkills, SKILLS_DIR } from "./skills.ts";
 export { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 export { HANDOFFS_DIR, handoffArtifact, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
@@ -48,6 +48,7 @@ export { branchOf, cutFrom, ensureWorktree } from "./branches.ts";
 export type { RuntimeEnv, TickContext } from "./env.ts";
 export { type GatherOptions, type GatheredFacts, gatherFacts } from "./facts.ts";
 export { acquireTickLock, DEFAULT_LOCK_STALE_MS, type TickLock, tickLockPath } from "./lock.ts";
+export { byName, type ByName, type DeepMerge, deepMerge, getKey, isMapping, leafKeys, type Overlaid, overlay, type OverlayLayer, type OverlayStrategy, type ReplaceWhole, replaceWhole } from "./overlay.ts";
 export { lastSeqIn, unitInFacts, writeAndCommit, type Written } from "./record.ts";
 export { NO_REPO_WORKFLOWS, overlayRepoWorkflows, readRepoWorkflows, REPO_WORKFLOWS_DIR, type RepoWorkflows, repoFileOf, workflowNameOf } from "./repo-workflows.ts";
 export { collectStepKinds, findProvided, loadPackWorkflows, type ResolvedSlots, resolveSlots, type SlotName } from "./resolve.ts";

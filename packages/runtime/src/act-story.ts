@@ -8,8 +8,8 @@ import { fail, ok, type PluginResult, parseStoryKey } from "@norn/plugin-api";
 import { deriveUlid } from "@norn/schema";
 import { ensureWorktree } from "./branches.ts";
 import type { TickContext } from "./env.ts";
-import { mirrorSpec } from "./inputs.ts";
 import { endOf } from "./lifecycle.ts";
+import { mirrorSpec } from "./mount.ts";
 
 /**
  * Ids the host derives for receipts no decision carries, offset past any decide can mint from the
