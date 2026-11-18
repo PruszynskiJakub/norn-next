@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { briefOf, handoffArtifact, mirrorItem, readStoryDoc, reportRun, SPEC_ARTIFACT } from "../../src/index.ts";
+import { briefOf, criteriaOf, handoffArtifact, mirrorItem, readStoryDoc, reportRun, SPEC_ARTIFACT } from "../../src/index.ts";
 import { has, harness, type Harnessed, record, tickUntil, trackerItem } from "./support.ts";
 
 const UNIT = "lt-1";
@@ -62,6 +62,14 @@ describe("the story's spec", () => {
     const rewritten = mirrorItem(trackerItem(1, ITEM), "My own notes.\n");
     expect(rewritten).toContain(ITEM.body);
     expect(rewritten).toContain("My own notes.");
+  });
+
+  test("a re-mirror rewrites norn's frontmatter keys and keeps the ones a step added, such as the criteria QA covers", () => {
+    const first = mirrorItem(trackerItem(1, ITEM), null);
+    const sliced = first.replace('url: "https://tracker.example/1"\n', 'url: "https://tracker.example/1"\ncriteria:\n  - { id: AC1, verifier: agent }\n  - id: 01.AC2\n    verifier: test\n');
+    const next = mirrorItem(trackerItem(1, { ...ITEM, title: "Fix two typos" }), sliced);
+    expect(next).toStartWith('---\nkey: "lt-1"\ntitle: "Fix two typos"\nlabels: ["docs", "norn"]\nurl: "https://tracker.example/1"\ncriteria:\n  - { id: AC1, verifier: agent }\n  - id: 01.AC2\n    verifier: test\n---\n');
+    expect(criteriaOf(next, "spec.md")).toEqual({ ok: true, value: { file: "spec.md", criteria: [{ id: "AC1", verifier: "agent" }, { id: "01.AC2", verifier: "test" }] } });
   });
 });
 

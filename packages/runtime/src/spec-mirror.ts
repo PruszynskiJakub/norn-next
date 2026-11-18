@@ -1,8 +1,9 @@
 /**
  * The story's spec as a document an agent reads and edits: the tracker item mirrored into a block
  * norn owns (frontmatter with the key, title, labels and link, then the title and body), and below it
- * whatever people and later steps write (a Plan, notes). Re-mirroring rewrites only norn's block, so a
- * section someone wrote survives every change to the item; decide never reads any of it.
+ * whatever people and later steps write (a Plan, notes). Re-mirroring rewrites only norn's block and
+ * its own frontmatter keys, so a section or a frontmatter key someone wrote survives every change to
+ * the item; decide never reads any of it.
  */
 import type { TrackerItem } from "@norn/plugin-api";
 
@@ -14,9 +15,31 @@ const END = "<!-- /norn:item -->";
 /** A YAML scalar that reads back as `s` whatever it holds: a JSON string is one. */
 const scalar = (s: string): string => JSON.stringify(s);
 
-function frontmatter(item: TrackerItem): string {
+/** The frontmatter keys norn writes from the item; every other key belongs to whoever wrote it. */
+const ITEM_KEYS: ReadonlySet<string> = new Set(["key", "title", "labels", "url"]);
+
+/**
+ * The lines of an existing frontmatter outside norn's keys (a top-level key and the indented or list
+ * lines under it), so a key a later step adds (the slices' `criteria`) survives every re-mirror.
+ */
+function keptLines(existing: string | null): string[] {
+  if (existing === null || !existing.startsWith("---\n")) return [];
+  const end = existing.indexOf("\n---\n", 3);
+  if (end < 0) return [];
+  const kept: string[] = [];
+  let keep = false;
+  for (const line of existing.slice(4, end).split("\n")) {
+    const top = /^([A-Za-z_][\w-]*)\s*:/.exec(line);
+    if (top) keep = !ITEM_KEYS.has(top[1] as string);
+    if (keep) kept.push(line);
+  }
+  return kept;
+}
+
+function frontmatter(item: TrackerItem, existing: string | null): string {
   const lines = [`key: ${scalar(item.key)}`, `title: ${scalar(item.title)}`, `labels: [${[...item.labels].sort().map(scalar).join(", ")}]`];
   if (item.url !== undefined) lines.push(`url: ${scalar(item.url)}`);
+  lines.push(...keptLines(existing));
   return `---\n${lines.join("\n")}\n---\n`;
 }
 
@@ -39,7 +62,7 @@ function withoutFrontmatter(text: string): string {
  * text below a fresh block, so nothing a person wrote is ever dropped.
  */
 export function mirrorItem(item: TrackerItem, existing: string | null): string {
-  const head = frontmatter(item);
+  const head = frontmatter(item, existing);
   const block = itemBlock(item);
   if (existing === null || existing.trim() === "") return `${head}${block}`;
   const rest = withoutFrontmatter(existing);

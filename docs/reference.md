@@ -308,9 +308,10 @@ norn brief
 Report the step done with an outcome
 
 ```sh
-norn done <outcome> [--note <text>] [--report-id <id>]
+norn done <outcome> [--criteria <file>] [--note <text>] [--report-id <id>]
 ```
 
+- `--criteria <file>`: the criteria report: a JSON array with one verdict per acceptance criterion; a step with `criteria: required` needs it
 - `--note <text>`: what the next step should know
 - `--report-id <id>`: the report's id; a retry with the same id records it once
 

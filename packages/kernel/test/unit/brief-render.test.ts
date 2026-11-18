@@ -26,6 +26,20 @@ describe("renderBrief", () => {
     expect(md).toContain('`norn stuck "<reason>"`');
   });
 
+  test("a step that needs a criteria report puts --criteria on the outcomes that need it and says what the report holds", () => {
+    const required = renderBrief(input({ outcomes: ["pass", "fail"], means: {}, criteria: { required: true, verdict: { pass: "pass", fail: "fail" } } }));
+    expect(required).toContain("- `norn done pass --criteria <file>`");
+    expect(required).toContain("- `norn done fail --criteria <file>`");
+    expect(required).toContain("This step requires `--criteria <file>`");
+    expect(required).toContain("`pass` only when it is `pass`, `fail` only when it is `fail`");
+    // only an outcome gated by a verdict needs the report when the step does not require one
+    const gated = renderBrief(input({ outcomes: ["done", "unsure"], means: {}, criteria: { required: false, verdict: { unsure: "unverified" } } }));
+    expect(gated).toContain("- `norn done done`\n");
+    expect(gated).toContain("- `norn done unsure --criteria <file>`");
+    expect(gated).toContain("An outcome gated by a verdict requires `--criteria <file>`");
+    expect(renderBrief(input())).not.toContain("--criteria");
+  });
+
   test("is deterministic", () => {
     expect(renderBrief(input())).toBe(renderBrief(structuredClone(input())));
   });

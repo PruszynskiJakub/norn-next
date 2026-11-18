@@ -1,9 +1,11 @@
 /**
  * `norn story view <key>`: show one story: its units, runs, gates and asks, who moved its claim
- * between machines, and the branch updates a person made, read-only. A key no store holds is refused, naming where to look; a story with a
+ * between machines, the branch updates a person made, and for a unit waiting at a gate the criteria
+ * its last report left unsettled, read-only. A key no store holds is refused, naming where to look; a story with a
  * corrupt unit is a corrupt error (exit 4).
  */
 import type { RuntimeEnv } from "@norn/runtime";
+import type { CriterionVerdict } from "@norn/schema";
 import { defineCommand } from "../command.ts";
 import { corruptError, failure, refuse, rendered } from "../output.ts";
 import { loadProjectView, type StoryView, storyHead, unitLine } from "../views.ts";
@@ -30,23 +32,72 @@ export interface BranchUpdateView {
   reason: string | null;
 }
 
+/** The criteria a unit's last report did not pass, for the person deciding the gate it waits at. */
+export interface CriteriaToCheck {
+  unit: string;
+  step: string | null;
+  attempt: number | null;
+  at: string;
+  /** every verdict but `pass`, with its repro, reason or how to check it */
+  verdicts: CriterionVerdict[];
+}
+
 interface PersonRecord {
   takeovers: TakeoverView[];
   branch_updates: BranchUpdateView[];
+  criteria: CriteriaToCheck[];
 }
 
-/** Every claim takeover and branch update on the story's own unit, oldest first; the facts carry only receipts not yet applied, so the record is read whole. */
-async function recordOf(env: RuntimeEnv, key: string): Promise<PersonRecord> {
+/** Every claim takeover and branch update on the story's own unit, oldest first, and what each unit at a gate leaves to check; the facts carry only receipts not yet applied, so the record is read whole. */
+async function recordOf(env: RuntimeEnv, key: string, story: StoryView): Promise<PersonRecord> {
   const read = await env.journal.readUnit(key);
   if (!read.ok) throw failure(`cannot read ${key}: ${read.failure.message}`, "try again", read.failure.code);
-  const out: PersonRecord = { takeovers: [], branch_updates: [] };
+  const out: PersonRecord = { takeovers: [], branch_updates: [], criteria: [] };
   for (const r of read.value.receipts) {
     const d = r.data;
     if (d.kind === "claim.taken") out.takeovers.push({ at: r.at, from: d.from ?? null, to: d.to, by: d.by, reason: d.reason ?? null });
     if (d.kind === "branch.updated")
       out.branch_updates.push({ at: r.at, base: d.base, base_sha: d.base_sha, merged: d.merged, head: d.head, pushed: d.pushed, by: d.by, reason: d.reason ?? null });
   }
+  for (const u of story.units) {
+    if (u.waiting?.for !== "gate") continue;
+    const receipts = u.id === key ? read.value.receipts : await receiptsOf(env, u.id);
+    const left = unsettled(u.id, receipts);
+    if (left) out.criteria.push(left);
+  }
   return out;
+}
+
+async function receiptsOf(env: RuntimeEnv, unit: string) {
+  const read = await env.journal.readUnit(unit);
+  if (!read.ok) throw failure(`cannot read ${unit}: ${read.failure.message}`, "try again", read.failure.code);
+  return read.value.receipts;
+}
+
+/**
+ * The unit's newest criteria report, when no gate was decided since and it left a verdict short of
+ * `pass`: what the gate's person checks. A report a gate already ruled on was settled there.
+ */
+function unsettled(unit: string, receipts: Awaited<ReturnType<typeof receiptsOf>>): CriteriaToCheck | null {
+  for (let i = receipts.length - 1; i >= 0; i--) {
+    const r = receipts[i] as (typeof receipts)[number];
+    const d = r.data;
+    if (d.kind === "gate.decided") return null;
+    if (d.kind !== "run.reported" || !d.criteria) continue;
+    const verdicts = d.criteria.filter((c) => c.verdict !== "pass");
+    return verdicts.length ? { unit, step: d.step ?? null, attempt: d.attempt ?? null, at: r.at, verdicts } : null;
+  }
+  return null;
+}
+
+function verdictLine(c: CriterionVerdict): string {
+  const said = [c.repro, c.reason && `(${c.reason})`, c.how && `how to check: ${c.how}`, c.evidence && `evidence: ${c.evidence}`].filter(Boolean).join("; ");
+  return `  - \`${c.id}\` ${c.verdict}${said ? `: ${said}` : ""}`;
+}
+
+function criteriaLines(c: CriteriaToCheck): string[] {
+  const from = `${c.step ?? "a step"}${c.attempt ? ` #${c.attempt}` : ""}`;
+  return [`- ${c.unit}, reported by ${from} at ${c.at}:`, ...c.verdicts.map(verdictLine)];
 }
 
 function updateLine(u: BranchUpdateView): string {
@@ -60,12 +111,13 @@ function takeoverLine(t: TakeoverView): string {
   return `- ${t.at}: taken${from} to ${t.to}${by}${t.reason ? ` — ${t.reason}` : ""}`;
 }
 
-function markdown(s: StoryView, { takeovers, branch_updates }: PersonRecord): string {
+function markdown(s: StoryView, { takeovers, branch_updates, criteria }: PersonRecord): string {
   const out = [`# ${storyHead(s)}`, ""];
   if (s.url) out.push(`Item: ${s.url}`);
   if (s.change?.url) out.push(`Change: ${s.change.url}`);
   if (s.url || s.change?.url) out.push("");
   out.push("## Units", "", ...s.units.map((u) => `- ${unitLine(u)}${u.pending_receipts ? ` (${u.pending_receipts} receipts not applied yet)` : ""}`));
+  if (criteria.length) out.push("", "## Criteria to check", "", ...criteria.flatMap(criteriaLines));
   if (takeovers.length) out.push("", "## Claim taken", "", ...takeovers.map(takeoverLine));
   if (branch_updates.length) out.push("", "## Branch updated", "", ...branch_updates.map(updateLine));
   return out.join("\n");
@@ -95,7 +147,7 @@ export const storyViewCommand = defineCommand({
         "a person restores or removes the unit's run state; norn never repairs it",
         { story },
       );
-    const record = await recordOf(env, key);
+    const record = await recordOf(env, key, story);
     return rendered({ ...story, ...record, problems: view.problems.filter((p) => p.startsWith(`${key}:`) || p.startsWith(`${key} `)) }, markdown(story, record));
   },
 });

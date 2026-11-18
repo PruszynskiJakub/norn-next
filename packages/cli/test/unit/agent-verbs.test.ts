@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { reportReceiptId } from "@norn/runtime";
+import { reportReceiptId, SPEC_ARTIFACT, writeStoryDoc } from "@norn/runtime";
+import type { RunState } from "@norn/kernel";
+import type { CriterionVerdict } from "@norn/schema";
 import { ExitCode, runCli } from "../../src/index.ts";
-import { machine } from "./support.ts";
-import { AGENT_STEP, configured, GATE_STEP, RUN, receiptsOf, runEnv, seedUnit, UNIT, withEnv } from "./units.ts";
+import { machine, ROOT, type TestMachine } from "./support.ts";
+import { AGENT_STEP, configured, envOf, GATE_STEP, RUN, receiptsOf, runEnv, seedUnit, UNIT, withEnv } from "./units.ts";
 
 const json = (stdout: string): unknown => Bun.JSONL.parse(stdout)[0];
 
@@ -114,5 +116,149 @@ describe("the agent verbs act for the run in the launch env", () => {
     await seedUnit(gate, { step: GATE_STEP });
     const r = await runCli(["done", "done", "--json"], gate.io);
     expect({ exit: r.exit, code: (json(r.stdout) as { code: string }).code }).toEqual({ exit: ExitCode.refused, code: "not_agent" });
+  });
+});
+
+describe("done at a step with criteria: required", () => {
+  const QA = "qa";
+  const SPEC = ["---", 'key: "lt-1"', "criteria:", "  - { id: AC1, verifier: agent }", "  - { id: 01.AC2, verifier: test }", "---", "# The story", ""].join("\n");
+  const pass: CriterionVerdict[] = [
+    { id: "AC1", verdict: "pass", evidence: "AC1.md" },
+    { id: "01.AC2", verdict: "pass", evidence: "test output" },
+  ];
+
+  async function atQa(spec: string | null = SPEC): Promise<TestMachine> {
+    const m = configured({ env: runEnv() });
+    await seedUnit(m, { step: QA });
+    if (spec !== null) {
+      const wrote = await writeStoryDoc(await envOf(m), UNIT, SPEC_ARTIFACT, spec);
+      if (!wrote.ok) throw new Error(wrote.failure.message);
+    }
+    return m;
+  }
+
+  async function done(m: TestMachine, argv: string[], report?: unknown) {
+    if (report !== undefined) await m.files.write(`${ROOT}/criteria.json`, typeof report === "string" ? report : JSON.stringify(report));
+    const r = await runCli(["done", ...argv, "--json"], m.io);
+    return { exit: r.exit, out: json(r.stdout) as Record<string, unknown> };
+  }
+
+  test("without --criteria it is refused with the full command, and nothing is recorded", async () => {
+    const m = await atQa();
+    const r = await done(m, ["pass"]);
+    expect(r.exit).toBe(ExitCode.refused);
+    expect(r.out).toEqual({
+      error: "step qa requires a criteria report (criteria: required): one verdict per criterion",
+      do_instead: "write the report (a JSON array of {id, verdict, ...} covering AC1, 01.AC2) and run: norn done pass --criteria <file>",
+      code: "criteria_required",
+    });
+    expect(await receiptsOf(m)).toEqual([]);
+  });
+
+  test("a report that is not JSON, or does not validate, is refused before anything is read or recorded", async () => {
+    const m = await atQa();
+    expect((await done(m, ["pass", "--criteria", "criteria.json"], "not json{")).out).toMatchObject({ code: "invalid_criteria", error: expect.stringContaining("criteria file criteria.json: not JSON") });
+    const noEvidence = await done(m, ["pass", "--criteria", "criteria.json"], [{ id: "AC1", verdict: "pass" }]);
+    expect(noEvidence.exit).toBe(ExitCode.refused);
+    expect(noEvidence.out).toMatchObject({ code: "invalid_criteria", error: expect.stringContaining("criteria file criteria.json: /0"), do_instead: expect.stringContaining("pass needs evidence") });
+    expect((await done(m, ["pass", "--criteria", "missing.json"])).out).toMatchObject({ code: "invalid_criteria", error: "criteria file not found: missing.json" });
+    expect(await receiptsOf(m)).toEqual([]);
+  });
+
+  test("the report covers exactly the spec's frontmatter criteria", async () => {
+    const m = await atQa();
+    const short = await done(m, ["pass", "--criteria", "criteria.json"], [pass[0]]);
+    expect(short).toEqual({
+      exit: ExitCode.refused,
+      out: {
+        error: "the criteria report must cover exactly the unit's criteria (AC1, 01.AC2): missing 01.AC2",
+        do_instead: "give one verdict for each of AC1, 01.AC2 and no other ids, then report again",
+        code: "invalid_criteria",
+      },
+    });
+    const extra = await done(m, ["pass", "--criteria", "criteria.json"], [...pass, { id: "AC9", verdict: "pass", evidence: "x" }]);
+    expect(extra.out).toMatchObject({ code: "invalid_criteria", error: expect.stringContaining("unknown AC9") });
+    const twice = await done(m, ["pass", "--criteria", "criteria.json"], [...pass, pass[0]]);
+    expect(twice.out).toMatchObject({ code: "invalid_criteria", error: "the criteria report lists AC1 more than once" });
+    expect(await receiptsOf(m)).toEqual([]);
+  });
+
+  test("an outcome that contradicts the worst verdict is refused, naming the outcome that matches", async () => {
+    const m = await atQa();
+    const report = [pass[0], { id: "01.AC2", verdict: "fail", repro: "run the test: it is red" }];
+    const r = await done(m, ["pass", "--criteria", "criteria.json"], report);
+    expect(r).toEqual({
+      exit: ExitCode.refused,
+      out: {
+        error: "outcome 'pass' needs the worst verdict to be 'pass', but it is 'fail' (01.AC2); the matching outcome is 'fail'",
+        do_instead: "norn done fail --criteria <file>",
+        code: "outcome_contradicts_verdicts",
+      },
+    });
+    expect(await receiptsOf(m)).toEqual([]);
+    expect((await done(m, ["fail", "--criteria", "criteria.json", "--note", "01.AC2 is red"])).exit).toBe(ExitCode.ok);
+  });
+
+  test("the findings a failing report hands back carry each criterion it did not pass, with its repro", async () => {
+    const m = await atQa();
+    await done(m, ["fail", "--criteria", "criteria.json"], [pass[0], { id: "01.AC2", verdict: "fail", repro: "run the test: it is red" }]);
+    // the unit moved on to implement, as a tick applying the report would leave it
+    const env = await envOf(m);
+    const read = await env.journal.readUnit(UNIT);
+    if (!read.ok || !read.value.state) throw new Error("no record");
+    const at = read.value.state;
+    const moved: RunState = { ...at, step: "implement", applied_through: read.value.receipts.at(-1)?.seq ?? 0, run: at.run && { ...at.run, id: "01JCCCCCCCCCCCCCCCCCCCCCCC", step: "implement" } };
+    const committed = await env.journal.commit(UNIT, moved, read.value.version);
+    if (!committed.ok) throw new Error(committed.failure.message);
+    const md = (await runCli(["brief"], withEnv(m, runEnv(UNIT, "01JCCCCCCCCCCCCCCCCCCCCCCC")).io)).stdout;
+    expect(md).toContain("Criteria not passed:");
+    expect(md).toContain("- `01.AC2` fail: run the test: it is red");
+    expect(md).not.toContain("- `AC1`");
+  });
+
+  test("a matching report is recorded on the receipt, where later steps read it", async () => {
+    const m = await atQa();
+    const r = await done(m, ["pass", "--criteria", "criteria.json"], pass);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(r.out).toMatchObject({ outcome: "pass", replayed: false, criteria: { worst: "pass", coverage: "checked", counts: { pass: 2, fail: 0, person: 0, unverified: 0 } } });
+    expect((await receiptsOf(m)).map((x) => x.data)).toEqual([{ kind: "run.reported", step: QA, attempt: 1, run_id: RUN, verb: "done", outcome: "pass", criteria: pass }]);
+  });
+
+  test("a retried done replays and prints the same criteria summary", async () => {
+    const m = await atQa();
+    const first = await done(m, ["pass", "--criteria", "criteria.json", "--report-id", "qa-1"], pass);
+    const again = await done(m, ["pass", "--criteria", "criteria.json", "--report-id", "qa-1"]);
+    expect(again.out).toMatchObject({ replayed: true, criteria: first.out.criteria as Record<string, unknown> });
+    expect(await receiptsOf(m)).toHaveLength(1);
+  });
+
+  test("a slice whose worktree has no slice file is checked against the slice file the story keeps", async () => {
+    const slice = `${UNIT}/01`;
+    const m = configured({ env: runEnv(slice) });
+    await seedUnit(m, { unit: slice, step: QA });
+    const file = ["---", `id: ${slice}`, "depends_on: []", "criteria:", "  - { id: AC1, verifier: test }", "---", "## Goal", ""].join("\n");
+    const wrote = await writeStoryDoc(await envOf(m), slice, "slices/01-parse.md", file);
+    if (!wrote.ok) throw new Error(wrote.failure.message);
+    const r = await done(m, ["pass", "--criteria", "criteria.json"], [{ id: "AC9", verdict: "pass", evidence: "x" }]);
+    expect(r.out).toMatchObject({ code: "invalid_criteria", error: expect.stringContaining("missing AC1") });
+    expect(await receiptsOf(m, slice)).toEqual([]);
+    expect((await done(m, ["pass", "--criteria", "criteria.json"], [{ id: "AC1", verdict: "pass", evidence: "x" }])).out).toMatchObject({ criteria: { coverage: "checked" } });
+  });
+
+  test("a spec that declares no criteria leaves coverage unchecked; a spec whose criteria do not validate is refused", async () => {
+    const none = await atQa(null);
+    expect((await done(none, ["pass", "--criteria", "criteria.json"], pass)).out).toMatchObject({ criteria: { worst: "pass", coverage: "unchecked" } });
+    const bad = await atQa(["---", "criteria:", "  - { id: AC1, verifier: robot }", "---", ""].join("\n"));
+    const r = await done(bad, ["pass", "--criteria", "criteria.json"], pass);
+    expect(r.out).toMatchObject({ code: "invalid_criteria", error: expect.stringContaining("criteria of .agents/specs/lt-1/spec.md do not validate") });
+  });
+
+  test("the brief names --criteria on every outcome and the verdict each one needs", async () => {
+    const m = await atQa();
+    const md = (await runCli(["brief"], m.io)).stdout;
+    expect(md).toContain("- `norn done pass --criteria <file>`");
+    expect(md).toContain("- `norn done unverified --criteria <file>`");
+    expect(md).toContain("This step requires `--criteria <file>`");
+    expect(md).toContain("`partial` only when it is `person`");
   });
 });

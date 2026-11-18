@@ -1,6 +1,6 @@
 /**
  * `norn story reject <key> --reason <text> [--gate <step>]`: reject the gate a story waits at, with the reason the next attempt gets.
- * Records a `gate.decided` receipt through the journal.
+ * Records a `gate.decided` receipt through the journal, or sends it to the machine holding the story.
  */
 import { defineCommand } from "../command.ts";
 import { decideGate } from "./gate-support.ts";

@@ -5,7 +5,7 @@
  * written for, so one written for an earlier visit is refused rather than routing the current one.
  */
 import { EndReason, ReportVerb } from "@norn/plugin-api";
-import { IsoTime, Mode, NonEmpty, OutcomeName, PosInt, StepName, TaggedUnion } from "@norn/schema";
+import { CriterionVerdict, IsoTime, Mode, NonEmpty, OutcomeName, PosInt, StepName, TaggedUnion } from "@norn/schema";
 import { type Static, type TProperties, Type } from "@sinclair/typebox";
 import { GraphCounterName, PinnedWorkflow } from "../workflow/graph.ts";
 import { Ended } from "./run-state.ts";
@@ -54,7 +54,14 @@ const KINDS = [
     /** the harness session, once the host knows it */
     session: Type.Optional(NonEmpty),
   }),
-  kind("run.reported", { run_id: Id, verb: ReportVerb, outcome: Type.Optional(OutcomeName), text: Type.Optional(Type.String()) }),
+  kind("run.reported", {
+    run_id: Id,
+    verb: ReportVerb,
+    outcome: Type.Optional(OutcomeName),
+    text: Type.Optional(Type.String()),
+    /** a `done`'s criteria report, one verdict per criterion: what a later step, a gate and a retro read back */
+    criteria: Type.Optional(Type.Array(CriterionVerdict, { minItems: 1 })),
+  }),
   kind("run.ended", { run_id: Id, reason: RunEndReason }),
   /** an outcome the kernel read off the session (silent, died, ...), routed like a reported one */
   kind("run.classified", {

@@ -194,7 +194,7 @@ export function fakeStepKinds(answers: Record<string, string[]>, calls: StepCall
   return { probe: kind("probe", "effect", ["done", "conflict"]), "await-thing": kind("await-thing", "wait", ["ready"]) };
 }
 
-/** The workflows the tests run: a check, an agent step, a plugin effect and wait, a gate. */
+/** The workflows the tests run: a check, an agent step, a plugin effect and wait, a gate, a slices step. */
 export const WORKFLOWS: Record<string, string> = {
   "checked.yaml": "name: checked\nstart: test\nsteps:\n  test:\n    check: bun test\n    timeout: 5m\n    exits: { 3: flaky }\n    outcomes: { pass: $done, fail: $stuck, flaky: $stuck }\n",
   "agented.yaml": [
@@ -238,6 +238,7 @@ export const WORKFLOWS: Record<string, string> = {
     "    outcomes: { approve: $done, reject: $stuck }",
     "",
   ].join("\n"),
+  "sliced.yaml": "name: sliced\nstart: split\nsteps:\n  split:\n    slices:\n    outcomes: { done: $done, stuck: $stuck }\n",
   "based.yaml": [
     "name: based",
     "start: ready",

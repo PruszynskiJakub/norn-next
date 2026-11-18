@@ -9,16 +9,18 @@
  * records once. It is refused, never guessed at, when the run is not the unit's live one or `done`
  * names an outcome the step does not route.
  */
-import { type BriefInputs, renderBrief, type UnitJournal } from "@norn/kernel";
+import { type BriefInputs, checkCriteriaReport, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
 import type { HarnessEvent } from "@norn/plugin-api";
 import { STORE_ID_PATTERN } from "@norn/plugin-api";
+import type { CriterionVerdict, Verdict } from "@norn/schema";
 import { renderInputFrom } from "./brief-context.ts";
+import { declaredCriteria } from "./criteria.ts";
 import { readBackDocs } from "./inputs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
 import { type LiveStep, liveStepOf, reportOnRecord } from "./live-run.ts";
 
-export type ReportRequest = { verb: "done"; outcome: string; text?: string } | { verb: "ask"; question: string } | { verb: "stuck"; reason: string };
+export type ReportRequest = { verb: "done"; outcome: string; text?: string; criteria?: CriterionVerdict[] } | { verb: "ask"; question: string } | { verb: "stuck"; reason: string };
 
 /** A refusal in the CLI's machine contract: what went wrong and what to do instead. */
 export interface ReportRefusal {
@@ -34,6 +36,18 @@ export interface ReportRecorded {
   seq: number;
   /** the same report id was recorded before; nothing new was written */
   replayed: boolean;
+  /** the criteria report as checked, when one came with the report */
+  criteria?: CriteriaSummary;
+}
+
+export interface CriteriaSummary {
+  worst: Verdict;
+  /**
+   * `checked` against the unit's declared criteria; `unchecked` when it declares none. Absent only on
+   * a replay whose declared criteria cannot be read now: the receipt holds the report, not the check.
+   */
+  coverage?: "checked" | "unchecked";
+  counts: Record<Verdict, number>;
 }
 
 export interface BriefShown {
@@ -105,7 +119,11 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   if (read.ok && read.value.corrupt === undefined) {
     // a retried command finds its first report, wherever the unit has moved since
     const earlier = read.value.receipts.find((r) => r.id === receiptId);
-    if (earlier) return { ok: true, value: { seq: earlier.seq, replayed: true } };
+    if (earlier) {
+      const kept = earlier.data.kind === "run.reported" ? earlier.data.criteria : undefined;
+      const summary = kept ? await replayedSummary(env, unit, kept) : undefined;
+      return { ok: true, value: { seq: earlier.seq, replayed: true, ...(summary !== undefined && { criteria: summary }) } };
+    }
   }
   const found = await liveAgent(env, unit);
   if (!found.ok) return found;
@@ -122,9 +140,24 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   const outcome = req.verb === "done" ? req.outcome : undefined;
   // before the receipt: once it is applied the next step may launch, and it must read what this run wrote
   await readBackDocs(env, unit);
+  let criteria: { report: CriterionVerdict[]; summary: CriteriaSummary } | undefined;
+  if (req.verb === "done") {
+    const checked = await checkCriteria(env, unit, live, req);
+    if (!checked.ok) return checked;
+    criteria = checked.value ?? undefined;
+  }
   const wrote = await env.journal.record(unit, {
     id: receiptId,
-    data: { kind: "run.reported", step: live.step, attempt: live.attempt, run_id: runId, verb: req.verb, ...(outcome !== undefined && { outcome }), ...(text !== undefined && { text }) },
+    data: {
+      kind: "run.reported",
+      step: live.step,
+      attempt: live.attempt,
+      run_id: runId,
+      verb: req.verb,
+      ...(outcome !== undefined && { outcome }),
+      ...(text !== undefined && { text }),
+      ...(criteria !== undefined && { criteria: criteria.report }),
+    },
   });
   if (!wrote.ok) return refuse(`cannot record the report: ${wrote.failure.message}`, "report again with the same report id", wrote.failure.code);
   if (!wrote.value.replayed) {
@@ -132,5 +165,43 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     const { next_seq } = await readEvents(env.ctx, unit, runId);
     await appendEvents(env.ctx, unit, runId, [{ ...eventOf(runId, req), seq: next_seq, at: env.ctx.now() }]);
   }
-  return { ok: true, value: { seq: wrote.value.seq, replayed: wrote.value.replayed } };
+  return { ok: true, value: { seq: wrote.value.seq, replayed: wrote.value.replayed, ...(criteria !== undefined && { criteria: criteria.summary }) } };
+}
+
+/**
+ * The `done`'s criteria report checked against the step and the unit's declared criteria; null when
+ * the step asks for none and none came. Declared criteria are read only when they can matter.
+ */
+async function checkCriteria(
+  env: RuntimeEnv,
+  unit: string,
+  live: LiveStep,
+  req: Extract<ReportRequest, { verb: "done" }>,
+): Promise<Refusable<{ report: CriterionVerdict[]; summary: CriteriaSummary } | null>> {
+  const report = req.criteria ?? null;
+  let declared = null;
+  if (report !== null || live.criteria) {
+    const read = await declaredCriteria(env, unit);
+    if (!read.ok)
+      return read.failure.code === "invalid"
+        ? refuse(`the unit's criteria cannot be checked: ${read.failure.message}`, `fix the frontmatter \`criteria\` (a list of {id, verifier}) in ${unit}'s spec or slice file, then report again`, "invalid_criteria")
+        : refuse(`cannot read the unit's criteria: ${read.failure.message}`, "report again with the same command", read.failure.code);
+    declared = read.value.criteria;
+  }
+  const c = checkCriteriaReport({ step: live.step, spec: { criteria: live.criteria, verdict: live.verdict }, outcomes: live.outcomes, outcome: req.outcome, report, criteria: declared });
+  if (!c.ok) return refuse(c.refusal.error, c.refusal.do_instead, c.refusal.code);
+  if (report === null || c.worst === null || c.coverage === null) return { ok: true, value: null };
+  return { ok: true, value: { report, summary: { worst: c.worst, coverage: c.coverage, counts: verdictCounts(report) } } };
+}
+
+/**
+ * The summary a retried `done` prints, rebuilt from the report its first call kept: the receipt was
+ * checked when written, so coverage is read again from the declared criteria rather than re-judged.
+ */
+async function replayedSummary(env: RuntimeEnv, unit: string, report: CriterionVerdict[]): Promise<CriteriaSummary | undefined> {
+  const worst = worstVerdict(report);
+  if (worst === null) return undefined;
+  const declared = await declaredCriteria(env, unit);
+  const coverage = declared.ok ? (declared.value.criteria ? "checked" : "unchecked") : undefined;
+  return { worst, ...(coverage !== undefined && { coverage }), counts: verdictCounts(report) };
 }

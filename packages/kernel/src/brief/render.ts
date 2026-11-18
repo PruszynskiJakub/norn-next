@@ -4,6 +4,7 @@
  * harness-neutral, so every harness gets the same text and the CLI's `brief` prints exactly what a
  * launch sent.
  */
+import type { Verdict } from "@norn/schema";
 import type { BriefInputs } from "../model/actions.ts";
 
 /** The commands an agent reports with; the CLI in front decides their spelling. */
@@ -60,6 +61,11 @@ export interface BriefRenderInput {
   description?: string;
   /** what each outcome means, as the workflow's `means:` says it */
   means?: Readonly<Record<string, string>>;
+  /**
+   * `done` comes with a criteria report (`criteria: required`, or an outcome gated by a verdict);
+   * `verdict` maps an outcome to the worst verdict it may be reported with
+   */
+  criteria?: { required: boolean; verdict: Readonly<Record<string, Verdict>> };
   /** a person works in the session: questions go to them, and `done` waits for their agreement */
   attended?: boolean;
   /** answers given to earlier sessions of this step, which a fresh session would otherwise never see */
@@ -143,12 +149,24 @@ function answeredLines(answered: readonly AnsweredAsk[]): string[] {
   return answered.map((a) => (a.question ? `- Asked: ${indent(a.question)}\n  Answered: ${indent(a.answer)}` : `- Answered: ${indent(a.answer)}`));
 }
 
+const CRITERIA_FLAG = "--criteria <file>";
+
+function criteriaLine(criteria: NonNullable<BriefRenderInput["criteria"]>): string {
+  const gated = Object.entries(criteria.verdict).map(([o, v]) => `\`${o}\` only when it is \`${v}\``);
+  const rule = gated.length > 0 ? ` The worst verdict decides the outcome (fail > unverified > person > pass): ${gated.join(", ")}.` : "";
+  const need = criteria.required ? "This step requires" : "An outcome gated by a verdict requires";
+  return `- ${need} \`${CRITERIA_FLAG}\`: a JSON array with one entry per acceptance criterion, \`{"id", "verdict", ...}\` (\`pass\` needs \`evidence\`, \`fail\` \`repro\`, \`person\` \`how\`, \`unverified\` \`reason\` and \`how\`), covering exactly the unit's frontmatter \`criteria\`.${rule} A report without it, or that contradicts it, is refused.`;
+}
+
 function finishLines(input: BriefRenderInput, c: BriefCommands): string[] {
   const out: string[] = [];
+  const criteria = input.criteria;
   for (const o of input.outcomes) {
     const means = input.means?.[o];
-    out.push(`- \`${c.done} ${o}\`${means ? ` — ${means}` : ""}`);
+    const flag = criteria && (criteria.required || criteria.verdict[o] !== undefined) ? ` ${CRITERIA_FLAG}` : "";
+    out.push(`- \`${c.done} ${o}${flag}\`${means ? ` — ${means}` : ""}`);
   }
+  if (criteria) out.push(criteriaLine(criteria));
   if (input.outcomes.length === 0) out.push(`- \`${c.done}\` — the step's work is finished`);
   if (input.attended) out.push("- A question goes to the person in this session, never through `" + c.ask + "`.");
   else out.push(`- \`${c.ask} "<one self-contained question>"\` — you need a person's decision; the step waits until it is answered.`);

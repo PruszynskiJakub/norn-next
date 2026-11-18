@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { memoryHost } from "@norn/conformance";
 import { parseJson } from "@norn/plugin-api";
 import { Type } from "@sinclair/typebox";
-import { acquireTickLock, createRuntime, tickLockPath, tracePath } from "../../src/index.ts";
-import { has, harness, MINUTE, type Report, record, rulesOf, session, START, tickUntil, trackerItem } from "./support.ts";
+import { acquireTickLock, createRuntime, readStoryDoc, tickLockPath, tracePath, writeStoryDoc } from "../../src/index.ts";
+import { type Harnessed, has, harness, MINUTE, type Report, record, rulesOf, session, START, tickUntil, trackerItem } from "./support.ts";
 
 const lastRules = (reports: Report[]) => reports.map(rulesOf);
 
@@ -63,6 +63,50 @@ describe("a story from intake to done", () => {
     expect(intents.at(-1)).toBeUndefined();
     expect([probe.slots.vcs?.name, probe.slots.forge?.name, probe.slots.tracker?.name]).toEqual(["fake", "fake", "fake"]);
     expect(h.stepCalls.filter((c) => c.kind === "await-thing")).toHaveLength(3);
+  });
+});
+
+describe("a slices step reads the plan from the story's slice files", () => {
+  const sliceFile = (id: string, deps: string[], status = "planned") => ["---", `id: ${id}`, `depends_on: [${deps.join(", ")}]`, `status: ${status}`, "---", "## Goal", ""].join("\n");
+  const sliced = () => {
+    const h = harness({ workflow: "sliced", kernel: { sliceWorkflow: "checked" } });
+    h.items.push(trackerItem(1));
+    return h;
+  };
+  const write = async (h: Harnessed, path: string, text: string) => {
+    const wrote = await writeStoryDoc(h.env, "lt-1", path, text);
+    if (!wrote.ok) throw new Error(wrote.failure.message);
+  };
+
+  test("slices start as their dependencies end done, and the step ends done with the last", async () => {
+    const h = sliced();
+    await write(h, "slices/01-parse.md", sliceFile("lt-1/01", []));
+    await write(h, "slices/02-render.md", sliceFile("lt-1/02", ["lt-1/01"]));
+    await write(h, "slices/03-dropped.md", sliceFile("lt-1/03", [], "dropped"));
+    const reports = await tickUntil(h, has("claim.release"), 40);
+    const starts = reports.flatMap((r) => r.outcomes.map((o) => o.decision)).filter((d) => d.kind === "start_slices");
+    expect(starts.map((d) => (d.kind === "start_slices" ? d.slices.map((x) => x.unit) : []))).toEqual([["lt-1/01"], ["lt-1/02"]]);
+    for (const unit of ["lt-1", "lt-1/01", "lt-1/02"]) expect((await record(h, unit)).state?.ended).toBe("done");
+  });
+
+  test("no slice files ends the step stuck; a file that fails validation parks it, naming the file", async () => {
+    const none = sliced();
+    await tickUntil(none, has("slices.none"));
+    expect((await record(none, "lt-1")).state?.ended).toBe("stuck");
+    const bad = sliced();
+    await write(bad, "slices/01-parse.md", sliceFile("lt-1/02", []));
+    const d = await tickUntil(bad, has("slices.plan_invalid"));
+    expect(JSON.stringify(d.at(-1)?.outcomes)).toContain("slices/01-parse.md has id");
+    const missing = sliced();
+    await write(missing, "slices/01-parse.md", sliceFile("lt-1/01", ["lt-1/04"]));
+    expect(JSON.stringify((await tickUntil(missing, has("slices.plan_invalid"))).at(-1)?.outcomes)).toContain("lt-1/01 depends on lt-1/04");
+  });
+
+  test("a slice file a person wrote in the story's worktree is read back before the plan", async () => {
+    const h = sliced();
+    await h.files.write("/machine/repo/worktrees/lt-1/.agents/specs/lt-1/slices/01-parse.md", sliceFile("lt-1/01", []));
+    await tickUntil(h, has("slices.start"));
+    expect(await readStoryDoc(h.env, "lt-1", "slices/01-parse.md")).toMatchObject({ value: expect.stringContaining("id: lt-1/01") });
   });
 });
 

@@ -4,6 +4,7 @@
  * flat workflow document it pins, so a hook process needs no loaded workflows to answer.
  */
 import { type KernelReceipt, OVERRIDABLE_OUTCOMES, type RunInfo, type RunState, type UnitJournal } from "@norn/kernel";
+import type { Verdict } from "@norn/schema";
 
 const CLASSIFIED: ReadonlySet<string> = new Set(OVERRIDABLE_OUTCOMES);
 
@@ -16,6 +17,10 @@ export interface LiveStep {
   attended: boolean;
   /** the outcomes an agent may report with `done`, in the order the workflow lists them */
   outcomes: string[];
+  /** `criteria: required`: `done` comes with a criteria report */
+  criteria: boolean;
+  /** outcome → the worst verdict of the report it may be reported with */
+  verdict: Record<string, Verdict>;
 }
 
 /** The outcomes a step routes that an agent may report: the ones norn classifies itself are left out. */
@@ -58,6 +63,8 @@ export function liveStepOf(state: RunState | null, unapplied: readonly KernelRec
     agent,
     attended: doc.attended === true,
     outcomes: agent ? reportableOutcomes(Object.keys(doc.outcomes ?? {})) : [],
+    criteria: agent && doc.criteria === "required",
+    verdict: agent ? { ...(doc.verdict ?? {}) } : {},
   };
 }
 

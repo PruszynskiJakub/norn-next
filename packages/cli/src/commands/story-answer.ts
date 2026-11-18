@@ -1,13 +1,15 @@
 /**
  * `norn story answer <key> <text>`: answer the question a story's agent asked.
- * Records an `answer.sent` receipt through the journal.
+ * Records an `answer.sent` receipt through the journal, or sends it to the machine holding the story
+ * through the mailbox (decision-route).
  */
 import type { UnitJournal } from "@norn/kernel";
 import type { RuntimeEnv } from "@norn/runtime";
 import { defineCommand } from "../command.ts";
 import type { CliContext } from "../context.ts";
-import { failure, refuse, rendered, usageError } from "../output.ts";
-import { ambiguous, readable, receiptId, stopParkId, unitsOf } from "./person-support.ts";
+import { refuse, rendered, usageError } from "../output.ts";
+import { deliverDecision, deliveredLine, routeDecision } from "./decision-route.ts";
+import { ambiguous, readable, receiptId, stopParkId, syncStore, unitsOf } from "./person-support.ts";
 
 interface OpenQuestion {
   unit: UnitJournal;
@@ -41,6 +43,8 @@ async function openQuestion(env: RuntimeEnv, u: UnitJournal): Promise<OpenQuesti
 
 async function answer(ctx: CliContext, key: string, text: string) {
   const env = await ctx.runtimeEnv();
+  const retry = `norn story answer ${key}`;
+  await syncStore(env, key, retry);
   const units = readable(await unitsOf(env, key), key);
   const open: OpenQuestion[] = [];
   for (const u of units) {
@@ -52,13 +56,13 @@ async function answer(ctx: CliContext, key: string, text: string) {
   const q = open[0] as OpenQuestion;
   const state = q.unit.state as NonNullable<UnitJournal["state"]>;
   const id = receiptId("answer", q.input_id);
-  const wrote = await env.journal.record(q.unit.unit, {
-    id,
-    data: { kind: "answer.sent", input_id: q.input_id, text, by: env.config.holder, step: state.step, attempt: state.attempt },
-  });
-  if (!wrote.ok) throw failure(`cannot record the answer on ${q.unit.unit}: ${wrote.failure.message}`, `norn story answer ${key} again`, wrote.failure.code);
-  const value = { unit: q.unit.unit, step: state.step, attempt: state.attempt, input_id: q.input_id, question: q.question, receipt_id: id, ...wrote.value };
-  return rendered(value, `Answered ${q.unit.unit} at ${state.step}${wrote.value.replayed ? " (recorded before)" : ""}. The next tick delivers it to the agent.`);
+  const route = await routeDecision(env, key.split("/")[0] as string, retry);
+  const data = { kind: "answer.sent" as const, input_id: q.input_id, text, by: env.config.holder, step: state.step, attempt: state.attempt };
+  const sent = await deliverDecision(env, route, q.unit.unit, { id, data }, retry);
+  const value = { unit: q.unit.unit, step: state.step, attempt: state.attempt, input_id: q.input_id, question: q.question, receipt_id: id, ...sent };
+  const again = sent.replayed ? " (recorded before)" : "";
+  const line = sent.via === "local" ? `Answered ${q.unit.unit} at ${state.step}${again}. The next tick delivers it to the agent.` : deliveredLine(sent, `the answer to ${q.unit.unit} at ${state.step}`);
+  return rendered(value, line);
 }
 
 export const storyAnswerCommand = defineCommand({

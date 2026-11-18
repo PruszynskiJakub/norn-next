@@ -52,3 +52,21 @@ export async function writeStoryDoc(env: RuntimeEnv, unit: string, path: string,
     return fail("unavailable", `writing ${clean} of ${story}: ${message(e)}`);
   }
 }
+
+/** The story's documents in `folder` (`slices`), as paths under it, sorted; one level only. */
+export async function listStoryDocs(env: RuntimeEnv, unit: string, folder: string): Promise<PluginResult<string[]>> {
+  const story = storyOf(unit);
+  const clean = normalizeArtifactPath(folder);
+  if (clean === null) return fail("invalid", `${JSON.stringify(folder)} cannot name a folder of story documents`, false);
+  const artifacts = env.slots.store.artifacts;
+  if (artifacts) {
+    const all = await artifacts.list(story);
+    if (!all.ok) return all;
+    return ok(all.value.filter((p) => p.startsWith(`${clean}/`) && !p.slice(clean.length + 1).includes("/")));
+  }
+  try {
+    return ok((await env.ctx.files.list(fallbackPath(env, story, clean))).map((n) => `${clean}/${n}`).sort());
+  } catch (e) {
+    return fail("unavailable", `listing ${clean} of ${story}: ${message(e)}`);
+  }
+}

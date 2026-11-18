@@ -37,3 +37,4 @@ export { decideUnit } from "./decide/unit.ts";
 export { decideIntake, decideStory, decideStoryTail } from "./decide/story.ts";
 export { loadProblem } from "./decide/story-unit.ts";
 export { RULE_IDS } from "./decide/rules.ts";
+export { type CriteriaCheck, type CriteriaCheckInput, type CriteriaRefusal, type CriteriaRefusalCode, checkCriteriaReport, verdictCounts, wantsCriteria, worstVerdict } from "./workflow/criteria.ts";
