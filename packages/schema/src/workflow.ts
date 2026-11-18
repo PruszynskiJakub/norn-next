@@ -51,9 +51,9 @@ function fixedOutcomes<const K extends string, S extends TSchema>(keys: readonly
  * Named input kinds of an agent step. `{ file }` is relative to the spec folder. `record`:
  * each unit's receipts and evidence folders in the machine dir, and the record path to link
  * evidence by. `resolution`: one `git show --remerge-diff <sha>` per merge commit since the round's
- * latest approval, from the git summary the last routed update recorded. `base_side`: per path a base
- * update conflicts in, the base commits that touched it since the merge base, with the story that landed
- * each and where that story's spec and PR body are on the base.
+ * latest approval, from the git summary the last routed update recorded. `base_side`: the commit a
+ * base update (or a slice's integrate) could not merge, and per path it conflicted in, the commands that
+ * show what that side changed there since the merge base.
  */
 export const InputKind = Type.Union([
   Type.Literal("spec"),

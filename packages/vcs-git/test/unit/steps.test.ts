@@ -202,6 +202,32 @@ describe("integrate", () => {
     expect(h.lines().some((l) => l.startsWith("merge "))).toBe(false);
   });
 
+  test("a conflict aborts the merge and names the story branch's commit and the paths, so the slice's resolver merges that commit", async () => {
+    let inMerge = false;
+    const h = host((line, cwd) => {
+      if (line === "symbolic-ref --quiet --short HEAD") return { stdout: cwd === SLICE_WT ? "gh-12-03-form\n" : "gh-12-login\n" };
+      if (line === rev("HEAD")) return { stdout: cwd === SLICE_WT ? HEAD : BASE };
+      if (line === `merge-base --is-ancestor ${HEAD} HEAD`) return { code: 1 };
+      if (line === rev("MERGE_HEAD")) return inMerge ? { stdout: HEAD } : { code: 1 };
+      if (line.startsWith("rev-parse")) return { code: 1 };
+      if (line.startsWith("status --porcelain")) return { stdout: "" };
+      if (line.startsWith(DIFF)) return { stdout: "" };
+      if (line.startsWith("merge --no-ff --no-edit")) {
+        inMerge = true;
+        return { code: 1 };
+      }
+      if (line.startsWith("diff --name-only --diff-filter=U")) return { stdout: "src/a.ts\nsrc/b.ts\n" };
+      if (line === "merge --abort") {
+        inMerge = false;
+        return {};
+      }
+      return undefined;
+    });
+    const r = await integrate.run(slice(), h.ctx);
+    expect(r).toEqual({ ok: true, value: { outcome: "conflict", detail: { story_branch: "gh-12-login", slice_head: HEAD, base: { ref: "gh-12-login", sha: BASE }, conflicts: ["src/a.ts", "src/b.ts"] } } });
+    expect(h.lines()).toContain("merge --abort");
+  });
+
   test("a story is never integrated into itself", async () => {
     const r = await integrate.run(slice({ unit: "gh-12" }), host(() => undefined).ctx);
     expect(r.ok ? null : r.failure.code).toBe("invalid");

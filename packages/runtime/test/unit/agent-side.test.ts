@@ -556,6 +556,28 @@ describe("the resolve of a base update", () => {
     expect(await reportRun(h.env, UNIT, again?.run?.id ?? "", { verb: "done", outcome: "done" }, "r2")).toMatchObject({ ok: true, value: { replayed: false } });
   });
 
+  test("a merge step's done after integrate conflicted is refused until the story branch's commit integrate named is merged", async () => {
+    const STORY_SHA = "d".repeat(40);
+    const integrating = async () => {
+      const h = harness({ workflow: "integrating" });
+      h.stepAnswers.integrate = [{ outcome: "conflict", detail: { story_branch: "norn/lt-0", slice_head: "c".repeat(40), base: { ref: "norn/lt-0", sha: STORY_SHA }, conflicts: ["a.txt"] } }];
+      h.items.push(trackerItem(1));
+      await tickUntil(h, has("agent.start"));
+      await tickUntil(h, has("receipts.apply"));
+      const state = (await record(h, UNIT)).state;
+      if (state?.step !== "merge" || !state.run) throw new Error(`not at merge: ${state?.step}`);
+      return { h, runId: state.run.id };
+    };
+    const { h, runId } = await integrating();
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({
+      ok: false,
+      refusal: { code: "merge_unfinished", error: expect.stringContaining(STORY_SHA.slice(0, 12)), do_instead: expect.stringContaining(`git merge ${STORY_SHA}`) },
+    });
+    const merged = await integrating();
+    merged.h.env.slots.vcs.isAncestor = async (a, b) => ok(a === STORY_SHA && b === "norn/lt-1");
+    expect(await reportRun(merged.h.env, UNIT, merged.runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
   test("a done is refused when the vcs cannot tell whether the base commit is merged", async () => {
     const { h, runId } = await resolving();
     h.env.slots.vcs.isAncestor = async () => ({ ok: false, failure: { code: "unavailable", message: "object store busy", retryable: true } });

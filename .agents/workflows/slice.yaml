@@ -35,9 +35,9 @@ steps:
     integrate:
     outcomes: { done: $done, conflict: merge }
   merge:
-    agent: "Integrating this slice into the story branch conflicted: resolve each conflict keeping the intent of both sides, and prove it with the tests."
+    agent: "Slice mode: integrating this slice into the story branch conflicted; merge the story branch's commit the base_side input names into this slice in this worktree, resolve each conflict keeping the intent of both sides, prove it with the tests and commit the merge; never rebase."
     skills: [norn-merge]
-    inputs: [slice, spec]
+    inputs: [slice, spec, base_side]
     outcomes: { done: integrate }
     means:
       done: "conflicts resolved keeping the intent of both sides; tests pass"
