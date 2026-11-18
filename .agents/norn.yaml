@@ -1,0 +1,16 @@
+# norn's team config for this repo (committed). It wins over each person's .agents/norn.local.yaml
+# and ~/.norn/config.yaml, so it holds only what the team shares; a key left out here (the mode, the
+# agent limit) is each person's. `norn config show` prints the merged result and which file set each key.
+format: 1
+# stories are GitHub issues labelled norn and assigned to you
+tracker:
+  use: github
+  intake: { label: norn }
+forge: { use: github }
+store: { use: local }
+executors:
+  claude: { harness: claude, runner: headless }
+base: main
+kernel:
+  # a new story starts in triage unless its issue names a workflow (label norn:wf:<name>)
+  workflow: triage

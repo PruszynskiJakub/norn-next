@@ -3,7 +3,7 @@
 # a bug `reproduce` confirmed. A story workflow without `slices`: every step works in the story
 # worktree. Sync, implement, update, check, review, describe, open the draft PR, wait for its CI, and
 # wait for a person at ready, then at merge until the person merges the PR. The local check runs the unit tier and the
-# type check; CI runs every tier, integration and e2e sharded.
+# type check; CI runs the integration tier sharded.
 name: quick
 description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
 start: catch-up
@@ -21,8 +21,8 @@ steps:
       the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before
       changing any code, then fix the cause.
       Test your change with `bun packages/cli/src/main.ts …`, never the installed `norn`.
-      Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (its .norn-unit marker) and a dev build run there would act on its claim and on its run state (state.json, receipts) in the checkout's machine dir.
-      Run `bun run test` (the unit tier) after each change, and the type check; the integration and e2e tiers run in CI, which the `ci` check waits for, so do not run them before handing back.
+      Run that dev build only in a throwaway git repo under $TMPDIR, never in this worktree: it is a live norn unit (norn runs its agent with NORN_UNIT set) and a dev build run there would act on its claim and on its run state (state.json, receipts) in the checkout's machine dir.
+      Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in CI, which the `ci` check waits for, so do not run them before handing back.
     skills: [norn-implement]
     inputs: [spec, handoff, last_check, last_findings]
     outcomes:
@@ -57,7 +57,7 @@ steps:
     outcomes: { passed: ready, failed: { to: implement, max: 3 }, stale: { to: update, counter: stale_loop } }
   land:
     use: land
-    outcomes: { rejected: implement, stale: { to: update, counter: stale_loop } }
+    outcomes: { rejected: implement, stale: { to: update, counter: stale_loop }, unpushed: open-pr }
 counters:
   # a stale re-entry is progress from outside (a sibling merged), bounded by the sibling merges
   stale_loop: { max: 10 }

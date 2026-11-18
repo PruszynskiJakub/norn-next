@@ -305,8 +305,8 @@ describe("commands and flags the docs name exist (B35)", () => {
   });
 
   test("the table read from Reference has the noun verbs and their flags", () => {
-    expect(table.get("story edit")?.has("workflow")).toBe(true);
-    expect(table.get("status")?.has("watch")).toBe(true);
+    expect(table.get("story create")?.has("workflow")).toBe(true);
+    expect(table.get("watch")?.has("interval")).toBe(true);
   });
 
   test("every norn command and flag in the user docs exists", () => {
@@ -318,7 +318,7 @@ describe("commands and flags the docs name exist (B35)", () => {
 
   // The bundled skills print commands an agent runs as written
   test("every norn command and flag in the bundled skills exists", () => {
-    const dir = join(ROOT, "packages/cli/assets/skills");
+    const dir = join(ROOT, "packages/pack-sdlc/assets/skills");
     const files = readdirSync(dir).flatMap((s) => readdirSync(join(dir, s)).filter((f) => f.endsWith(".md")).map((f) => join(dir, s, f)));
     const mentions = files.flatMap((f) => codeOf(read(f)).map(([n, code]) => [f, n, code] as const));
     const hits = mentions.flatMap(([f, n, code]) => commandHits(code, table).map((h) => `${rel(f)}:${n} → ${h}: ${code.trim()}`));

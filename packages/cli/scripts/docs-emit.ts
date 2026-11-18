@@ -1,20 +1,17 @@
 /** Rewrites the generated block of docs/reference.md. Run: bun run docs:emit */
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { SDLC_PACK } from "@norn/pack-sdlc";
 import { COMMANDS, NOUNS } from "../src/commands/index.ts";
+import { CONFIG_DEFAULTS } from "../src/config/schema.ts";
 import { REFERENCE_FILE, renderReference, replaceReference } from "../src/reference.ts";
 
 export const ROOT = join(import.meta.dir, "..", "..", "..");
-const WORKFLOWS = join(import.meta.dir, "..", "assets", "workflows");
 
-export function shippedWorkflows(): string[] {
-  return readdirSync(WORKFLOWS)
-    .filter((n) => n.endsWith(".yaml"))
-    .map((n) => readFileSync(join(WORKFLOWS, n), "utf8"));
-}
-
+/** The pack `norn init` configures, and the workflows it ships. */
 export function freshReference(): string {
-  return renderReference({ commands: COMMANDS, nouns: NOUNS, workflows: shippedWorkflows() });
+  const pack = CONFIG_DEFAULTS.packs?.[0] ?? "sdlc";
+  return renderReference({ commands: COMMANDS, nouns: NOUNS, pack, workflows: Object.values(SDLC_PACK.workflows) });
 }
 
 if (import.meta.main) {

@@ -1,46 +1,43 @@
 /**
- * `norn story view [<story|slice>] [--web] [--json]`: one story at a glance — its
- * slices with their workflow and step, the PR and its state, open notes, what waits for the person
- * (@norn/view orientReport). Read only: no receipt, run or claim. Markdown by default, `--json`
- * for data: the orient report extended with the slice steps and PR state. In a slice worktree
- * it views that slice's story. The chat agent (`norn story chat`, `NORN_ORIENT=1`) sees its
- * rules first. `--web` opens the story's PR in the browser, or its issue when there is no PR. A story
- * another machine holds shows its claim, branch, PR and record.
+ * `norn story view <key>`: show one story: its units, runs, gates and asks, read-only. A key no store
+ * holds is refused, naming where to look; a story with a corrupt unit is a corrupt error (exit 4).
  */
-import { cmd } from "@norn/core";
-import { formatElsewhere, formatStoryView, orientReport } from "@norn/view";
-import { defineCommand, opt } from "../command.ts";
-import { failure, refuse, rendered } from "../output.ts";
-import { ORIENT_ENV } from "../runtime/agent-unit.ts";
-import { parseUnitKey } from "../runtime/args.ts";
-import { projectView } from "../runtime/human.ts";
-import { openLink } from "../runtime/open-link.ts";
-import { aStory, targetKey } from "../runtime/target.ts";
+import { defineCommand } from "../command.ts";
+import { corruptError, refuse, rendered } from "../output.ts";
+import { loadProjectView, type StoryView, storyHead, unitLine } from "../views.ts";
+
+function markdown(s: StoryView): string {
+  const out = [`# ${storyHead(s)}`, ""];
+  if (s.url) out.push(`Item: ${s.url}`);
+  if (s.change?.url) out.push(`Change: ${s.change.url}`);
+  if (s.url || s.change?.url) out.push("");
+  out.push("## Units", "", ...s.units.map((u) => `- ${unitLine(u)}${u.pending_receipts ? ` (${u.pending_receipts} receipts not applied yet)` : ""}`));
+  return out.join("\n");
+}
 
 export const storyViewCommand = defineCommand({
   name: "story view",
-  version: "reads",
-  summary: "One story: slices with their steps, the PR, open notes, what waits for you; --web opens the PR or issue",
-  usage: "norn story view [<story|slice>] [--web] [--json]",
-  markdown: true,
-  options: { web: { type: "boolean" } },
-  positionals: { max: 1 },
+  summary: "Show one story: its units, runs, gates and asks",
+  usage: "norn story view <key>",
+  positionals: { min: 1, max: 1 },
   async run(ctx, args) {
-    const raw = await targetKey(ctx, args.positionals[0], args.json === true, aStory("story view", cmd.storyView));
-    const { key, story, slice } = parseUnitKey(raw);
-    const view = await projectView(ctx);
-    const report = orientReport(view, key, ctx.config.provider);
-    // A story another machine holds, from its claim, branch and record ref as fetched last
-    const elsewhere = report ? null : view.elsewhere.find((e) => e.key === story);
-    if (elsewhere && !opt.bool(args, "web")) return rendered(elsewhere, formatElsewhere(elsewhere));
-    if (!report) throw refuse(`unknown story ${story}`, cmd.status(), "unknown_unit");
-    if (slice && !report.slices.some((s) => s.key === slice)) throw refuse(`no slice ${slice} in story ${story}`, cmd.storyView(story), "unknown_unit");
-    if (!opt.bool(args, "web")) return rendered(report, formatStoryView(report, ctx.clock.now(), { rules: ctx.env[ORIENT_ENV] === "1" }));
-
-    const url = report.pr?.url ?? report.url;
-    if (!url) throw refuse(`${story} has no PR and no issue link to open`, report.pr_command, "no_url");
-    const r = await openLink(ctx, url);
-    if (r.code !== 0) throw failure(`could not open ${url}: ${r.stderr.trim().split("\n")[0] || `exit ${r.code}`}`, url, "open_failed");
-    return rendered({ story, opened: url }, `Opened ${url}`);
+    const key = args.positionals[0] as string;
+    const view = await loadProjectView(await ctx.runtimeEnv());
+    const story = view.stories.find((s) => s.key === key);
+    if (!story) {
+      const queued = view.intake.find((i) => i.key === key);
+      throw queued
+        ? refuse(`${key} is in the intake but no tick has taken it yet`, "norn tick", "story_not_started", { key })
+        : refuse(`no story ${key}`, "norn story list", "story_not_found", { key });
+    }
+    const corrupt = story.units.filter((u) => u.corrupt !== undefined);
+    // a record that fails validation is shown as what it is, never as a story at some step
+    if (corrupt.length > 0)
+      throw corruptError(
+        `${key} is corrupt: ${corrupt.map((u) => `${u.id}: ${u.corrupt}`).join("; ")}`,
+        "a person restores or removes the unit's run state; norn never repairs it",
+        { story },
+      );
+    return rendered({ ...story, problems: view.problems.filter((p) => p.startsWith(`${key}:`) || p.startsWith(`${key} `)) }, markdown(story));
   },
 });

@@ -4,7 +4,5 @@ dist/
 .DS_Store
 .idea/
 # norn (machine-local)
-.env.norn
-.norn-unit
-.agents/norn.config.local.yaml
+.agents/norn.local.yaml
 .claude/worktrees/

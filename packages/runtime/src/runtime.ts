@@ -8,6 +8,7 @@ import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import { briefRenderInput } from "./brief-context.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { createHarnessLauncher, DEFAULT_HOOK_COMMAND } from "./executors.ts";
+import { NO_REPO_WORKFLOWS, overlayRepoWorkflows } from "./repo-workflows.ts";
 import { loadPackWorkflows, type ResolvedSlots, resolveSlots } from "./resolve.ts";
 import { newTickId, tick } from "./tick.ts";
 import type { AgentLauncher, AgentRunRequest, Runtime, RuntimeDeps } from "./types.ts";
@@ -44,7 +45,8 @@ function launcherOf(deps: Omit<RuntimeDeps, "tickId">, slots: ResolvedSlots, env
 export function createRuntimeEnv(deps: Omit<RuntimeDeps, "tickId">): PluginResult<RuntimeEnv> {
   const slots = resolveSlots(deps.ctx, deps.plugins, deps.config);
   if (!slots.ok) return slots;
-  const workflows = loadPackWorkflows(slots.value.pack, slots.value.stepKinds, deps.config.kernel);
+  const repoWorkflows = deps.repoWorkflows ?? NO_REPO_WORKFLOWS;
+  const workflows = loadPackWorkflows(overlayRepoWorkflows(slots.value.pack, repoWorkflows), slots.value.stepKinds, deps.config.kernel);
   if (!workflows.ok) return workflows;
   let env: RuntimeEnv | undefined;
   const launcher = launcherOf(deps, slots.value, () => env);
@@ -58,6 +60,7 @@ export function createRuntimeEnv(deps: Omit<RuntimeDeps, "tickId">): PluginResul
     launcher: launcher.value,
     sessions,
     workflows: workflows.value,
+    repoWorkflows,
   };
   return ok(env);
 }

@@ -1,5 +1,6 @@
-# A person reads the draft PR at ready, then merges it. Exits: `rejected` (the person wants changes),
-# `stale` (the base moved under the story: it goes back through its base update).
+# A person reads the draft PR at ready, then merges it; the merge ends the story. Exits: `rejected`
+# (the person wants changes), `stale` (the base moved under the story: it goes back through its base
+# update), `unpushed` (the story branch holds commits its PR lacks: they go out through open-pr).
 description: Wait for a person at ready, then for the PR's merge.
 start: ready
 steps:
@@ -9,9 +10,12 @@ steps:
       approve: merge
       reject:  { exit: rejected }
       stale:   { exit: stale }
+      unpushed: { exit: unpushed }
   # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
-  # move it counts as stale (base.stale) sends it back through update by itself
+  # move it counts as stale (base.stale) leaves through `stale` by itself
   merge:
     await-merge:
     outcomes:
+      merged: $done
       stale: { exit: stale }
+      unpushed: { exit: unpushed }

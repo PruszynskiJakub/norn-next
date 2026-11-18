@@ -34,8 +34,7 @@ const UPDATE_CONFLICT = c(2, "update.done", "update.clean", "update.resolved");
 const SYNC_CONFLICT = c(2, "sync.done", "sync.clean", "sync.resolved");
 
 /**
- * The counters the old engine derives for each shipped workflow (packages/core/src/derive-counters.ts
- * run over packages/store's flattening), pinned. Only `sync.conflict`'s resets differ, by the edits,
+ * The counters the old engine derived for each shipped workflow, pinned so the kernel keeps its bounds. Only `sync.conflict`'s resets differ, by the edits,
  * and the edits' `unpushed` routes back to open-pr, which the old engine took with no edge and no
  * counter, each get a counter bounded as a stale one is.
  */
@@ -116,7 +115,7 @@ const OLD_COUNTERS: Record<string, { edges: Record<string, string>; counters: Re
 };
 
 describe("the shipped workflows", () => {
-  const edited = shipped(true);
+  const edited = shipped();
   const files = Object.keys(edited.workflows);
 
   test("every shipped workflow has pinned counters here", () => {
@@ -142,25 +141,12 @@ describe("the shipped workflows", () => {
     expect(again.graph).toEqual(w.graph);
   });
 
-  test("unedited, they are refused exactly where the mechanical edits apply", () => {
-    const raw = shipped(false);
-    const refused: Record<string, string[]> = {};
-    for (const file of files) {
-      const paths = errorsOf(loadWorkflow(raw.workflows[file], opts({ sharedFiles: raw.shared }))).map((e) => e.path);
-      if (paths.length) refused[file] = paths;
-    }
-    expect(refused).toEqual({
-      "quick.yaml": ["/steps/sync/outcomes", "/steps/sync/outcomes", "/steps/merge/outcomes"],
-      "refinement.yaml": ["/steps/sync/outcomes", "/steps/sync/outcomes"],
-      "story.yaml": ["/steps/sync/outcomes", "/steps/sync/outcomes", "/steps/merge/outcomes"],
-    });
-  });
-
-  test("a refusal inside a shared file names the file", () => {
-    const raw = shipped(false);
-    const errors = errorsOf(loadWorkflow(raw.workflows["quick.yaml"], opts({ sharedFiles: raw.shared })));
-    expect(errors.map((e) => e.shared)).toEqual(["sync", "sync", "ship"]);
-    expect(errors[2]?.message).toBe("shared/ship.yaml: step 'merge' can end with 'merged' but routes it nowhere");
+  test("an unrouted outcome inside a shared file is refused, naming the file", () => {
+    const shared = structuredClone(edited.shared) as Record<string, { steps: Record<string, { outcomes: Record<string, unknown> }> }>;
+    delete shared.ship?.steps.merge?.outcomes.merged;
+    const errors = errorsOf(loadWorkflow(edited.workflows["quick.yaml"], opts({ sharedFiles: shared })));
+    expect(errors.map((e) => e.shared)).toEqual(["ship"]);
+    expect(errors[0]?.message).toBe("shared/ship.yaml: step 'merge' can end with 'merged' but routes it nowhere");
   });
 
   test("a story workflow's graph: use steps brought in, entered at their file's start, exits routed", () => {

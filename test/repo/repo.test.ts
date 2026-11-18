@@ -1,23 +1,16 @@
 /** Repo-wide rules: dependency direction and banned glossary synonyms. */
 import { describe, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
-import { protocolLines } from "@norn/core";
-import { loadWorkflow, loadWorkflows, workflowsDir } from "../../packages/store/src/index.ts";
 import { allDocs, CODE_SPAN, textFiles, URL } from "../support/docs.ts";
 
 const ROOT = join(import.meta.dir, "..", "..");
 const PKGS = join(ROOT, "packages");
 
-/** schema ← core ← store ← adapters ← cli; view reads schema/core/store. */
+/** schema ← plugin-api ← kernel ← runtime ← cli; every plugin reads only schema and plugin-api; cli wires them all. */
 const ALLOWED: Record<string, string[]> = {
   schema: [],
-  core: ["schema"],
-  store: ["schema", "core"],
-  adapters: ["schema", "core", "store"],
-  view: ["schema", "core", "store"],
-  cli: ["schema", "core", "store", "adapters", "view"],
   "plugin-api": ["schema"],
   kernel: ["schema", "plugin-api"],
   "harness-claude": ["schema", "plugin-api"],
@@ -34,7 +27,7 @@ const ALLOWED: Record<string, string[]> = {
   "pack-sdlc": ["plugin-api"],
   "runner-headless": ["schema", "plugin-api"],
   "runner-herdr": ["schema", "plugin-api"],
-  "cli-thin": [
+  cli: [
     "schema",
     "plugin-api",
     "kernel",
@@ -108,10 +101,12 @@ describe("dependency direction", () => {
     writeFileSync(join(root, "package.json"), JSON.stringify({ devDependencies: { "@norn/schema": "workspace:*" } }));
     for (const d of ["test", "scripts"]) mkdirSync(join(root, d));
     writeFileSync(join(root, "test", "ok.test.ts"), `import { ulid } from "@norn/schema";\n`);
-    writeFileSync(join(root, "scripts", "x.ts"), `import { decide } from "@norn/core";\nconst s = await import("@norn/store");\n`);
+    // the undeclared names are spelled in pieces so this file is not itself a hit
+    const [a, b] = ["@norn/" + "gone", "@norn/" + "never"];
+    writeFileSync(join(root, "scripts", "x.ts"), `import { decide } from "${a}";\nconst s = await import("${b}");\n`);
     expect(undeclaredRootImports(root)).toEqual([
-      { file: join("scripts", "x.ts"), dep: "@norn/core" },
-      { file: join("scripts", "x.ts"), dep: "@norn/store" },
+      { file: join("scripts", "x.ts"), dep: a },
+      { file: join("scripts", "x.ts"), dep: b },
     ]);
   });
 });
@@ -140,11 +135,10 @@ function glossaryHits(line: string, file: string): string[] {
 const DOCS = [".md", ".yaml", ".yml", ".json"];
 const GLOSSARY_FILES = (): string[] => [
   ...files(PKGS).filter((p) => p.includes("/src/")),
-  ...textFiles(join(PKGS, "cli", "assets"), DOCS),
-  ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
+  ...textFiles(join(PKGS, "pack-sdlc", "assets"), DOCS),
   ...textFiles(join(PKGS, "schema", "json"), DOCS),
-  // Every doc (README, CONTRIBUTING, docs/, the Herdr plugin README, AGENTS.md)
-  ...allDocs(ROOT).filter((f) => !f.includes("/plugins/")),
+  // Every doc (README, CONTRIBUTING, docs/, AGENTS.md)
+  ...allDocs(ROOT),
 ];
 
 /**
@@ -155,16 +149,14 @@ const GLOSSARY_FILES = (): string[] => [
 // `notifiers` only as the key (`notifiers:`, `notifiers[]`, in backticks): as a noun it names the O3 concept
 const REMOVED_KEYS = /\bcapability this session lacks\b|\bcapability gating\b|\bnotifiers(?=[:[`])|`notifiers\b|\b(default_mode|default_agent|default_workflow|default_slice_workflow|max_checks|watch_interval|attended_wait|ports_per_slot|sync_interval)\b|\blimits\.(deadline|nudges|retries|stalled)\b|\bremote\.(provider|label|git_remote|host)\b|\bcapabilities: \[/;
 const CONFIG_DOCS = (): string[] => [
-  ...textFiles(join(PKGS, "cli", "assets"), DOCS),
-  ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
+  ...textFiles(join(PKGS, "pack-sdlc", "assets"), DOCS),
   join(PKGS, "cli", "src", "commands", "help.ts"),
-  ...textFiles(join(PKGS, "view", "src"), [".ts"]),
-  // The README, CONTRIBUTING, docs/, the Herdr plugin README and AGENTS.md
+  // The README, CONTRIBUTING, docs/ and AGENTS.md
   ...allDocs(ROOT),
 ];
 
 describe("config docs", () => {
-  test("help, the view, every doc, the init templates and skills name no removed config key or check", () => {
+  test("help, every doc and the shipped skills and workflows name no removed config key or check", () => {
     const hits: string[] = [];
     for (const f of CONFIG_DOCS())
       readFileSync(f, "utf8")
@@ -188,7 +180,7 @@ describe("glossary", () => {
     expect(glossaryHits("throw refuse(`no job here`)", "a.ts")).toEqual(["story / slice"]);
   });
 
-  test("no banned synonyms in sources, assets, plugin, JSON schemas and every doc", () => {
+  test("no banned synonyms in sources, assets, JSON schemas and every doc", () => {
     const hits: string[] = [];
     for (const f of GLOSSARY_FILES()) {
       readFileSync(f, "utf8")
@@ -237,102 +229,11 @@ function tierSelection(config: string): string[] {
   return testFilesUnder(ROOT).filter((f) => f.startsWith(under) && !ignored(f));
 }
 
-/** This file, repo-relative: B16 exempts it alone (it names the helpers in fixtures), wherever it lives. */
-const THIS_FILE = relative(ROOT, import.meta.path);
-const PINNED_HELPERS = ["test/support/transcript.ts", "test/support/observe-snapshot.ts"];
-/** `from "x"` (import, export … from), side-effect `import "x"` and dynamic `import("x")` */
-const IMPORT_SPEC = /(?:\bfrom\s+|\bimport\s*\(?\s*)["']([^"']+)["']/g;
-
-/** The relative imports of repo-relative `file` under `root`, resolved to repo-relative paths. */
-function relativeImports(root: string, file: string): Array<{ spec: string; path: string }> {
-  return [...readFileSync(join(root, file), "utf8").matchAll(IMPORT_SPEC)]
-    .map((m) => m[1] as string)
-    .filter((spec) => spec.startsWith("."))
-    .map((spec) => ({ spec, path: relative(root, join(root, file, "..", spec)) }));
-}
-
-/** `seeds` and every test/support/ helper under `root` that imports one of them, transitively. */
-function supportClosure(root: string, seeds: readonly string[]): Set<string> {
-  const closure = new Set(seeds);
-  const support = existsSync(join(root, "test/support")) ? files(join(root, "test/support")).map((f) => relative(root, f)).filter((f) => f.endsWith(".ts")) : [];
-  for (let grew = true; grew; ) {
-    const more = support.filter((f) => !closure.has(f) && relativeImports(root, f).some((i) => closure.has(i.path)));
-    for (const f of more) closure.add(f);
-    grew = more.length > 0;
-  }
-  return closure;
-}
-
-/** The cli harness, which spawns real git; the transcript and observe snapshot helpers import it. */
-const SPAWNING_HELPERS = ["test/support/harness.ts", ...PINNED_HELPERS];
-/** store's git functions: the module, by path, and the names `@norn/store` exports from it that run git. */
-const STORE_GIT = "packages/store/src/git.ts";
-const STORE_GIT_EXPORTS = ["fetchNornRefs", "onlyNornCommitsSince"];
-/** `import { a, b as c } from "@norn/store"`: the names imported */
-const STORE_NAMED = /\bimport\s*(?:type\s+)?\{([^}]*)\}\s*from\s*["']@norn\/store["']/g;
-
-/**
- * Imports in unit tests (packages/<pkg>/test/unit/, test/repo/) under `root` of the cli harness, a
- * helper that imports it, or store's git functions. Fake herdr and the golden harvest stay allowed.
- */
-function spawningUnitImports(root: string): Array<{ file: string; import: string }> {
-  const banned = supportClosure(root, SPAWNING_HELPERS);
-  banned.add(STORE_GIT);
-  return testFilesUnder(root)
-    .filter((f) => /^packages\/[^/]+\/test\/unit\//.test(f) || f.startsWith("test/repo/"))
-    // the file holding this rule names the helpers in its own fixtures
-    .filter((f) => f !== THIS_FILE)
-    .flatMap((f) => {
-      const byPath = relativeImports(root, f)
-        .filter((i) => banned.has(i.path))
-        .map((i) => ({ file: f, import: i.spec }));
-      const byName = [...readFileSync(join(root, f), "utf8").matchAll(STORE_NAMED)]
-        .flatMap((m) => (m[1] as string).split(",").map((n) => n.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0] as string))
-        .filter((n) => STORE_GIT_EXPORTS.includes(n))
-        .map((n) => ({ file: f, import: `${n} from @norn/store` }));
-      return [...byPath, ...byName];
-    });
-}
-
-/**
- * Imports of the transcript recorder or the observe snapshot helpers outside test/e2e/ (and the
- * helpers' own folder, test/support/), in package tests and root test code under `root`. An import is
- * matched by the path it resolves to; a support helper that imports a pinned one (transitively) is pinned too.
- */
-function pinnedHelperImports(root: string): Array<{ file: string; import: string }> {
-  const pinned = supportClosure(root, PINNED_HELPERS);
-  const pkgTests = existsSync(join(root, "packages")) ? readdirSync(join(root, "packages")).map((p) => join(root, "packages", p, "test")) : [];
-  const dirs = [...pkgTests, join(root, "test")].filter((d) => existsSync(d));
-  return dirs
-    .flatMap((d) => files(d))
-    .map((f) => relative(root, f))
-    .filter((f) => f.endsWith(".ts"))
-    // the file holding this rule names the helpers in its own fixtures; test/repo/ is still a unit tier
-    .filter((f) => !f.startsWith("test/e2e/") && !f.startsWith("test/support/") && f !== THIS_FILE)
-    .sort()
-    .flatMap((f) =>
-      relativeImports(root, f)
-        .filter((i) => pinned.has(i.path))
-        .map((i) => ({ file: f, import: i.spec })),
-    );
-}
-
-/** Adapters (folders of packages/adapters/src under `root`) with no `*.test .ts` in test/unit/<adapter>/ nor test/integration/<adapter>/. */
-function adaptersWithoutTests(root: string): string[] {
-  const test = join(root, "packages", "adapters", "test");
-  const hasTests = (dir: string) => existsSync(dir) && testFilesUnder(dir).length > 0;
-  return readdirSync(join(root, "packages", "adapters", "src"), { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
-    .filter((a) => !hasTests(join(test, "unit", a)) && !hasTests(join(test, "integration", a)))
-    .sort();
-}
-
-const TIER_FOLDERS = "unit/, integration/, test/e2e/, test/repo/";
+const TIER_FOLDERS = "unit/, integration/, test/repo/";
 
 /** Every `*.test .ts` under `root` that sits in no tier folder, as the repo rule's message. */
 function untieredTests(root: string): string[] {
-  const tiered = (f: string) => /^packages\/[^/]+\/test\/(unit|integration)\//.test(f) || /^test\/(e2e|repo)\//.test(f);
+  const tiered = (f: string) => /^packages\/[^/]+\/test\/(unit|integration)\//.test(f) || f.startsWith("test/repo/");
   return testFilesUnder(root)
     .filter((f) => !tiered(f))
     .map((f) => `${f} is not in a tier folder (${TIER_FOLDERS})`);
@@ -343,34 +244,10 @@ describe("test layout (AGENTS.md)", () => {
     const inSrc = files(PKGS)
       .filter((p) => p.includes("/src/") && p.endsWith(".test.ts"))
       .map((p) => relative(ROOT, p));
-    const fixtureDirs = readdirSync(join(PKGS, "adapters", "src")).filter((n) => {
-      try {
-        return statSync(join(PKGS, "adapters", "src", n, "fixtures")).isDirectory();
-      } catch {
-        return false;
-      }
-    });
+    const fixtureDirs = files(PKGS)
+      .filter((p) => /\/src\/(?:.*\/)?fixtures\//.test(p))
+      .map((p) => relative(ROOT, p));
     expect({ inSrc, fixtureDirs }).toEqual({ inSrc: [], fixtureDirs: [] });
-  });
-
-  test("every adapter has its tests in packages/adapters/test/unit/<adapter>/ or test/integration/<adapter>/", () => {
-    expect(adaptersWithoutTests(ROOT)).toEqual([]);
-  });
-
-  test("an adapter whose tests sit in either tier has tests; one with none, or only outside a tier, is named", () => {
-    const root = mkdtempSync(join(tmpdir(), "norn-adapter-tests-"));
-    const put = (rel: string) => {
-      mkdirSync(join(root, rel, ".."), { recursive: true });
-      writeFileSync(join(root, rel), "");
-    };
-    for (const a of ["pure", "real", "both", "none", "old"]) mkdirSync(join(root, "packages/adapters/src", a), { recursive: true });
-    put("packages/adapters/test/unit/pure/pure.test.ts");
-    put("packages/adapters/test/integration/real/real.test.ts");
-    put("packages/adapters/test/unit/both/both.test.ts");
-    put("packages/adapters/test/integration/both/both.test.ts");
-    put("packages/adapters/test/unit/none/fixtures/x.json");
-    put("packages/adapters/test/old/old.test.ts");
-    expect(adaptersWithoutTests(root)).toEqual(["none", "old"]);
   });
 
   test("gh-118 B14: every test file sits in a tier folder", () => {
@@ -383,21 +260,22 @@ describe("test layout (AGENTS.md)", () => {
       mkdirSync(join(root, rel, ".."), { recursive: true });
       writeFileSync(join(root, rel), "");
     };
-    put("packages/store/test/unit/a.test.ts");
-    put("packages/store/test/integration/b.test.ts");
-    put("packages/adapters/test/unit/gh/gh.test.ts");
-    put("packages/adapters/test/contract/suite.ts");
-    put("test/e2e/c.test.ts");
+    put("packages/kernel/test/unit/a.test.ts");
+    put("packages/runtime/test/integration/b.test.ts");
+    put("packages/runner-herdr/test/unit/herdr/herdr.test.ts");
+    put("packages/conformance/test/contract/suite.ts");
     put("test/repo/d.test.ts");
-    put("packages/view/test/foo.test.ts");
-    put("packages/core/test/fixtures/x.test.ts");
+    put("test/e2e/c.test.ts");
+    put("packages/cli/test/foo.test.ts");
+    put("packages/kernel/test/fixtures/x.test.ts");
     put("test/support/e.test.ts");
     put("test/f.test.ts");
     expect(untieredTests(root)).toEqual([
-      "packages/core/test/fixtures/x.test.ts is not in a tier folder (unit/, integration/, test/e2e/, test/repo/)",
-      "packages/view/test/foo.test.ts is not in a tier folder (unit/, integration/, test/e2e/, test/repo/)",
-      "test/f.test.ts is not in a tier folder (unit/, integration/, test/e2e/, test/repo/)",
-      "test/support/e.test.ts is not in a tier folder (unit/, integration/, test/e2e/, test/repo/)",
+      "packages/cli/test/foo.test.ts is not in a tier folder (unit/, integration/, test/repo/)",
+      "packages/kernel/test/fixtures/x.test.ts is not in a tier folder (unit/, integration/, test/repo/)",
+      "test/e2e/c.test.ts is not in a tier folder (unit/, integration/, test/repo/)",
+      "test/f.test.ts is not in a tier folder (unit/, integration/, test/repo/)",
+      "test/support/e.test.ts is not in a tier folder (unit/, integration/, test/repo/)",
     ]);
   });
 
@@ -414,7 +292,7 @@ describe("test layout (AGENTS.md)", () => {
       join(ROOT, "CONTRIBUTING.md"),
       ...textFiles(join(ROOT, ".agents", "workflows"), exts),
       ...textFiles(join(ROOT, ".github"), exts),
-      ...textFiles(join(PKGS, "cli", "assets", "skills"), exts),
+      ...textFiles(join(PKGS, "pack-sdlc", "assets", "skills"), exts),
       ...textFiles(join(ROOT, ".agents", "skills"), exts),
       ...textFiles(join(ROOT, "scripts"), exts),
       ...textFiles(join(ROOT, "test"), exts),
@@ -428,33 +306,8 @@ describe("test layout (AGENTS.md)", () => {
     expect(hits).toEqual([]);
   });
 
-  type Step = { type: string; run?: string; timeout?: string; instructions?: string };
-  const workflowSteps = (wf: string) =>
-    repoWorkflow<{ steps: Record<string, Step> }>(wf).steps;
-  const DELIVERY = ["quick", "story", "slice"];
-
-  const UNIT_ONLY = "bun install --frozen-lockfile && bun run test && bun run typecheck";
-
-  test("AC2: the test check of quick, story and slice runs the unit tier, then the type check, in 15 m; the integration tier runs only in CI (bypass #259)", () => {
-    const checks = DELIVERY.map((wf) => ({ wf, run: workflowSteps(wf).test?.run, timeout: workflowSteps(wf).test?.timeout }));
-    expect(checks).toEqual(DELIVERY.map((wf) => ({ wf, run: UNIT_ONLY, timeout: "15m" })));
-  });
-
-  test("AC3: the implement step of quick, story and slice names bun run test as the loop, and the integration and e2e tiers in CI", () => {
-    const says = DELIVERY.map((wf) => {
-      const text = workflowSteps(wf).implement?.instructions ?? "";
-      return {
-        wf,
-        loop: /`bun run test`[^.]*after each change/.test(text),
-        integration: /integration and e2e tiers run in CI/.test(text),
-        e2e: /e2e tiers? (runs? )?in CI/.test(text),
-      };
-    });
-    expect(says).toEqual(DELIVERY.map((wf) => ({ wf, loop: true, integration: true, e2e: true })));
-  });
-
   test("AC4 (B10): the shipped norn-implement skill asks for the fast suite after each change, slower tiers in their own check, never the full suite", () => {
-    const skill = readFileSync(join(PKGS, "cli", "assets", "skills", "norn-implement", "SKILL.md"), "utf8");
+    const skill = readFileSync(join(PKGS, "pack-sdlc", "assets", "skills", "norn-implement", "SKILL.md"), "utf8");
     expect({
       fastAfterEachChange: /fast suite after each change/.test(skill),
       slowerTiers: /slower tiers run in their own check/i.test(skill),
@@ -467,35 +320,30 @@ describe("test layout (AGENTS.md)", () => {
   const ciJobs = (file: string) => (Bun.YAML.parse(readFileSync(join(ROOT, ".github", "workflows", file), "utf8")) as { jobs: Record<string, CiJob> }).jobs;
   const runs = (job: CiJob) => job.steps.flatMap((s) => (s.run ?? "").split("\n").map((l) => l.trim()).filter(Boolean));
 
-  test("AC5 (B11, B12): ci.yml runs unit and the type check first; 4 integration shards and 3 e2e shards, none with fail-fast so a red run reports every failing shard, and package need it; git-spawning jobs set an identity", () => {
+  test("AC5 (B11, B12): ci.yml runs unit and the type check first; 4 integration shards, without fail-fast so a red run reports every failing shard, and package need it; git-spawning jobs set an identity", () => {
     const jobs = ciJobs("ci.yml");
     const unit = jobs.unit;
     expect(unit && runs(unit).filter((r) => r.startsWith("bun run"))).toEqual(["bun run test", "bun run typecheck"]);
     const needs = (j?: CiJob) => [j?.needs ?? []].flat();
-    expect(["integration", "e2e", "package"].map((n) => ({ n, needs: needs(jobs[n]) }))).toEqual(
-      ["integration", "e2e", "package"].map((n) => ({ n, needs: ["unit"] })),
-    );
+    expect(["integration", "package"].map((n) => ({ n, needs: needs(jobs[n]) }))).toEqual(["integration", "package"].map((n) => ({ n, needs: ["unit"] })));
     const integration = jobs.integration;
     expect({ failFast: integration?.strategy?.["fail-fast"], shards: integration?.strategy?.matrix?.shard }).toEqual({ failFast: false, shards: [1, 2, 3, 4] });
     expect(integration && runs(integration)).toContain("bun run test:integration --shard=${{ matrix.shard }}/4");
-    const e2e = jobs.e2e;
-    expect({ failFast: e2e?.strategy?.["fail-fast"], shards: e2e?.strategy?.matrix?.shard }).toEqual({ failFast: false, shards: [1, 2, 3] });
-    expect(e2e && runs(e2e)).toContain("bun run test:e2e --shard=${{ matrix.shard }}/3");
-    const identity = ["integration", "e2e", "package"].map((n) => ({
+    const identity = ["integration", "package"].map((n) => ({
       n,
       name: runs(jobs[n] as CiJob).some((r) => r.startsWith("git config --global user.name")),
       email: runs(jobs[n] as CiJob).some((r) => r.startsWith("git config --global user.email")),
     }));
-    expect(identity).toEqual(["integration", "e2e", "package"].map((n) => ({ n, name: true, email: true })));
+    expect(identity).toEqual(["integration", "package"].map((n) => ({ n, name: true, email: true })));
   });
 
   test("the latest released norn loads every PR's tree but a release's, in a workflow of its own so a story's ci check never waits on it", () => {
     const wf = Bun.YAML.parse(readFileSync(join(ROOT, ".github", "workflows", "released-norn.yml"), "utf8")) as { on: Record<string, unknown>; jobs: Record<string, CiJob & { if?: string }> };
     expect(Object.keys(wf.on)).toEqual(["pull_request"]);
     const job = wf.jobs["released-norn"] as CiJob & { if?: string };
-    // a release PR is told by the norn version it records, never by its title (norn names the version after opening it)
+    // a release PR is told by the cli version it bumps, never by its title (norn names the version after opening it)
     expect(job.if).toBeUndefined();
-    expect(runs(job)).toContain("recorded=$(sed -n 's/^norn_version: *//p' .agents/norn.config.yaml)");
+    expect(runs(job)).toContain("recorded=$(jq -r .version packages/cli/package.json)");
     expect(runs(job)).toContain('if [ "$recorded" != "${tag#v}" ]; then');
     expect(runs(job)).toContainEqual(expect.stringContaining("gh release download --repo \"$GITHUB_REPOSITORY\" --pattern norn-linux-x64"));
     expect(runs(job)).toContainEqual(expect.stringContaining("norn-linux-x64\" doctor --repo"));
@@ -510,11 +358,11 @@ describe("test layout (AGENTS.md)", () => {
     expect(steps.some((s) => /test:integration|test:e2e/.test(s.run ?? ""))).toBe(false);
   });
 
-  test("AC7 (B21): AGENTS.md lists the three tier commands and hands back on the unit tier and the type check, and every path it and docs/development.md name exists; the README names no test command (gh-162 B3: AGENTS.md holds them)", () => {
+  test("AC7 (B21): AGENTS.md lists the two tier commands and hands back on the unit tier and the type check, and every path it and docs/development.md name exists; the README names no test command (gh-162 B3: AGENTS.md holds them)", () => {
     const agents = readFileSync(join(ROOT, "AGENTS.md"), "utf8");
     const commands = section(agents, "Commands");
     const named = (cmd: string) => new RegExp(`^${cmd.replace(/[:]/g, "\\$&")}\\s+#`, "m").test(commands);
-    expect(["bun run test", "bun run test:integration", "bun run test:e2e"].map(named)).toEqual([true, true, true]);
+    expect(["bun run test", "bun run test:integration"].map(named)).toEqual([true, true]);
     expect(commands).toMatch(/The unit tier \(`bun run test`\) and the type check must pass before you hand work back/);
     // AGENTS.md is a map: most of the paths an agent is sent to are named in the contributor reference
     const devDocs = agents + readFileSync(join(ROOT, "docs", "development.md"), "utf8");
@@ -528,19 +376,18 @@ describe("test layout (AGENTS.md)", () => {
     expect(readme).toEqual([]);
   });
 
-  test("B1, B2, B4: the root bunfig preloads the unit guard, ignores exactly the integration and e2e tiers, and the test script is exactly bun test", () => {
+  test("B1, B2, B4: the root bunfig preloads the unit guard, ignores exactly the integration tier, and the test script is exactly bun test", () => {
     const scripts = rootScripts();
     expect(scripts.test).toBe("bun test");
     expect(bunfig("bunfig.toml").preload).toEqual(["./test/preload.ts", "./test/support/unit-guard-preload.ts"]);
-    expect(bunfig("bunfig.toml").pathIgnorePatterns).toEqual(["**/integration/**", "test/e2e/**"]);
-    expect(tierSelection("bunfig.toml").filter((f) => f.includes("/integration/") || f.startsWith("test/e2e/"))).toEqual([]);
+    expect(bunfig("bunfig.toml").pathIgnorePatterns).toEqual(["**/integration/**"]);
+    expect(tierSelection("bunfig.toml").filter((f) => f.includes("/integration/"))).toEqual([]);
   });
 
   test.each([
     // integration is spawn-bound: past 6 workers system CPU time eats the gain (bypass #259)
     ["test:integration", "bunfig.integration.toml", "--parallel=6", (f: string) => /^packages\/[^/]+\/test\/integration\//.test(f)],
-    ["test:e2e", "bunfig.e2e.toml", "--parallel", (f: string) => f.startsWith("test/e2e/")],
-  ] as const)("B5, B6: %s runs bun test with %s, in parallel (%s) with a 20 s timeout, passing extra arguments through, and selects only its tier", (script, config, parallel, inTier) => {
+  ] as const)("B5: %s runs bun test with %s, in parallel (%s) with a 20 s timeout, passing extra arguments through, and selects only its tier", (script, config, parallel, inTier) => {
     const scripts = rootScripts();
     // ends in flags, so `bun run <script> <file>` appends the file as bun test's own path filter
     expect(scripts[script]).toBe(`bun test --config=${config} ${parallel} --timeout=20000`);
@@ -551,188 +398,9 @@ describe("test layout (AGENTS.md)", () => {
     expect(selected.length).toBeGreaterThan(0);
     expect(selected).toEqual(all.filter(inTier));
   });
-
-  test("B16: only test/e2e/ imports the transcript recorder and the observe snapshot helpers", () => {
-    expect(pinnedHelperImports(ROOT)).toEqual([]);
-  });
-
-  test("AC7: no test source tells a person to rewrite a transcript or snapshot with plain bun test, which skips test/e2e/", () => {
-    const stale = new RegExp(["NORN_TRANSCRIPT_UPDATE=1", "bun test"].join(" "));
-    const dirs = [join(ROOT, "test"), ...readdirSync(PKGS).map((p) => join(PKGS, p, "test"))].filter((d) => existsSync(d));
-    const offenders = dirs
-      .flatMap((d) => files(d))
-      .filter((f) => f.endsWith(".ts") && stale.test(readFileSync(f, "utf8")))
-      .map((f) => relative(ROOT, f));
-    expect(offenders).toEqual([]);
-  });
-
-  test("B16: an integration or unit test importing them fails, naming the file and the import", () => {
-    const root = mkdtempSync(join(tmpdir(), "norn-pinned-"));
-    const put = (rel: string, text: string) => {
-      mkdirSync(join(root, rel, ".."), { recursive: true });
-      writeFileSync(join(root, rel), text);
-    };
-    put("packages/cli/test/integration/a.test.ts", `import { recordTranscript } from "../../../../test/support/transcript.ts";\n`);
-    put("packages/store/test/unit/b.test.ts", `import { snap } from "../../../../test/support/observe-snapshot.ts";\n`);
-    put("test/e2e/ok.test.ts", `import { t } from "../support/transcript.ts";\nimport { s } from "../support/observe-snapshot.ts";\n`);
-    put("test/support/observe-snapshot.ts", `import { t } from "./transcript.ts";\n`);
-    put("test/support/records.ts", `export { s } from "./observe-snapshot.ts";\n`);
-    put("test/support/harness.ts", `export const h = 1;\n`);
-    put("packages/cli/test/integration/c.test.ts", `import "../../../../test/support/transcript.ts";\nimport { h } from "../../../../test/support/harness.ts";\n`);
-    put("packages/cli/test/integration/d.test.ts", `import { s } from "../../../../test/support/records.ts";\n`);
-    // only the support helpers count: an adapter's own transcript .ts is another module
-    put("packages/adapters/test/claude/e.test.ts", `import { t } from "../../src/agent-hooks/transcript.ts";\n`);
-    // test/repo/ is a unit tier: only the file holding this rule is exempt, not its folder
-    put("test/repo/f.test.ts", `import { t } from "../support/transcript.ts";\n`);
-    expect(pinnedHelperImports(root)).toEqual([
-      { file: "packages/cli/test/integration/a.test.ts", import: "../../../../test/support/transcript.ts" },
-      { file: "packages/cli/test/integration/c.test.ts", import: "../../../../test/support/transcript.ts" },
-      { file: "packages/cli/test/integration/d.test.ts", import: "../../../../test/support/records.ts" },
-      { file: "packages/store/test/unit/b.test.ts", import: "../../../../test/support/observe-snapshot.ts" },
-      { file: "test/repo/f.test.ts", import: "../support/transcript.ts" },
-    ]);
-  });
-
-  test("B15: no unit test imports the cli harness, a helper that imports it, or store's git functions", () => {
-    expect(spawningUnitImports(ROOT)).toEqual([]);
-  });
-
-  test("B15: a unit test importing the harness, the transcript or snapshot helpers, or store's git functions fails, naming the file and the import", () => {
-    const root = mkdtempSync(join(tmpdir(), "norn-unit-imports-"));
-    const put = (rel: string, text: string) => {
-      mkdirSync(join(root, rel, ".."), { recursive: true });
-      writeFileSync(join(root, rel), text);
-    };
-    put("test/support/harness.ts", `export const h = 1;\n`);
-    put("test/support/transcript.ts", `import { h } from "./harness.ts";\n`);
-    put("test/support/observe-snapshot.ts", `import { h } from "./harness.ts";\n`);
-    put("test/support/stories.ts", `export { h } from "./harness.ts";\n`);
-    put("test/support/fake-herdr.ts", `export const f = 1;\n`);
-    put("test/support/golden-harvest.ts", `export const g = 1;\n`);
-    put("packages/store/src/git.ts", `export const git = 1;\n`);
-    put("packages/cli/test/unit/a.test.ts", `import { h } from "../../../../test/support/harness.ts";\n`);
-    put("packages/cli/test/unit/b.test.ts", `import { t } from "../../../../test/support/transcript.ts";\nimport { s } from "../../../../test/support/observe-snapshot.ts";\n`);
-    put("packages/cli/test/unit/c.test.ts", `import { h } from "../../../../test/support/stories.ts";\n`);
-    put("packages/store/test/unit/d.test.ts", `import { git } from "../../src/git.ts";\n`);
-    put("packages/view/test/unit/e.test.ts", `import { readTrace, fetchNornRefs } from "@norn/store";\nimport {\n  type CasResult,\n  onlyNornCommitsSince as only,\n} from "@norn/store";\n`);
-    put("test/repo/f.test.ts", `import { h } from "../support/harness.ts";\n`);
-    // allowed: the pure helpers, store's pure exports, and every import outside the unit tier
-    put("packages/cli/test/unit/ok.test.ts", `import { f } from "../../../../test/support/fake-herdr.ts";\nimport { g } from "../../../../test/support/golden-harvest.ts";\nimport { gitTimeoutMs } from "@norn/store";\n`);
-    put("packages/cli/test/integration/ok.test.ts", `import { h } from "../../../../test/support/harness.ts";\nimport { fetchNornRefs } from "@norn/store";\n`);
-    put("test/e2e/ok.test.ts", `import { t } from "../support/transcript.ts";\n`);
-    expect(spawningUnitImports(root)).toEqual([
-      { file: "packages/cli/test/unit/a.test.ts", import: "../../../../test/support/harness.ts" },
-      { file: "packages/cli/test/unit/b.test.ts", import: "../../../../test/support/transcript.ts" },
-      { file: "packages/cli/test/unit/b.test.ts", import: "../../../../test/support/observe-snapshot.ts" },
-      { file: "packages/cli/test/unit/c.test.ts", import: "../../../../test/support/stories.ts" },
-      { file: "packages/store/test/unit/d.test.ts", import: "../../src/git.ts" },
-      { file: "packages/view/test/unit/e.test.ts", import: "fetchNornRefs from @norn/store" },
-      { file: "packages/view/test/unit/e.test.ts", import: "onlyNornCommitsSince from @norn/store" },
-      { file: "test/repo/f.test.ts", import: "../support/harness.ts" },
-    ]);
-  });
-
-  test("quick and story wait for the PR's CI after open-pr, send a red run back to implement and a conflicting PR to update", () => {
-    for (const wf of ["quick", "story"]) {
-      const { steps, counters } = repoWorkflow<{
-        steps: Record<string, { type: string; run?: string; outcomes: Record<string, unknown> }>;
-        counters: Record<string, unknown>;
-      }>(wf);
-      expect(steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
-      expect(steps.ci?.type).toBe("check");
-      expect(steps.ci?.run).toBe(ciScript("release"));
-      expect(steps.ci?.outcomes).toEqual({ pass: "ready", fail: { to: "implement", counter: "ship.failed" }, stale: { to: "update", counter: "stale_loop" } });
-      expect(counters["ship.failed"]).toEqual({ max: 3 });
-    }
-  });
-
-  test("release goes prepare → open-pr → ci → ready → merge, a red CI goes $stuck, and a base commit or a conflicting PR makes it stale", () => {
-    const { start, steps, counters, base } = repoWorkflow<{
-      start: string;
-      steps: Record<string, { type: string; run?: string; outcomes: Record<string, unknown> }>;
-      counters: Record<string, unknown>;
-      base: unknown;
-    }>("release");
-    expect(start).toBe("prepare");
-    expect(Object.keys(steps).sort()).toEqual(["ci", "merge", "open-pr", "prepare", "ready", "resolve", "update"]);
-    expect(steps.prepare?.outcomes.done).toMatchObject({ to: "open-pr" });
-    expect(steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
-    expect(steps.ci?.type).toBe("check");
-    expect(steps.ci?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: { to: "update", counter: "stale_loop" } });
-    expect(steps.ready?.outcomes.reject).toEqual({ to: "prepare", counter: "ready.reject" });
-    expect(counters["ready.reject"]).toEqual({ max: 2 });
-    expect(steps.ready?.outcomes.approve).toBe("merge");
-    expect(steps.merge).toEqual({ type: "merge", outcomes: { stale: { to: "update", counter: "stale_loop" } } });
-    expect(counters.version_loop).toBeUndefined();
-    expect(base).toEqual({ stale: "behind" });
-  });
-});
-
-/** A repo workflow as norn runs it: through the store's loader, its shared files brought in. */
-function repoWorkflow<T = Record<string, unknown>>(wf: string): T {
-  const r = loadWorkflow(ROOT, wf);
-  if (!r.ok) throw new Error(`.agents/workflows/${wf}.yaml did not load: ${JSON.stringify(r)}`);
-  return r.value.workflow as T;
-}
-
-/** The `ci` check script of a repo workflow, as norn runs it (`sh -c`, packages/cli/src/runtime/shell .ts). */
-function ciScript(wf: string): string {
-  const { steps } = repoWorkflow<{ steps: Record<string, { run?: string }> }>(wf);
-  return steps.ci?.run ?? "";
-}
-
-describe("the ci check waits for the ci.yml run of the PR's head commit (#125)", () => {
-  // The script's behaviour runs through `sh` in packages/cli/test/integration/ci-check.test .ts (the unit tier cannot spawn, B4).
-  test("quick, story and release run the same script", () => {
-    expect(ciScript("quick")).toContain("gh run watch");
-    expect([ciScript("story"), ciScript("release")]).toEqual([ciScript("quick"), ciScript("quick")]);
-  });
 });
 
 describe("intake by kind", () => {
-  type Wf = { start: string; steps: Record<string, { type: string; skills?: string[]; instructions?: string; outcomes: Record<string, unknown> }>; counters?: Record<string, unknown> };
-  const workflow = (wf: string) => repoWorkflow<Wf>(wf);
-
-  const targets = (wf: string, step: string) => Object.fromEntries(Object.entries(workflow(wf).steps[step]?.outcomes ?? {}).map(([k, v]) => [k, (v as { to: string }).to]));
-
-  test("triage is one norn-triage step that ends the round with done: the recommendation is only in its comment", () => {
-    const { steps } = workflow("triage");
-    expect(Object.keys(steps)).toEqual(["explore"]);
-    expect(steps.explore?.skills).toEqual(["norn-triage"]);
-    expect(targets("triage", "explore")).toEqual({ done: "$done" });
-  });
-
-  test("reproduce is one norn-diagnose agent step whose reproduced or cannot_reproduce ends the round", () => {
-    const { start, steps } = workflow("reproduce");
-    expect(start).toBe("reproduce");
-    expect(Object.keys(steps)).toEqual(["reproduce"]);
-    expect(steps.reproduce?.skills).toEqual(["norn-diagnose"]);
-    expect(targets("reproduce", "reproduce")).toEqual({ reproduced: "$done", cannot_reproduce: "$done" });
-  });
-
-  test("the repo's copies of the shipped workflows have the same steps and edges", () => {
-    // as norn loads them once `norn init` copied them: their shared files flattened in
-    const root = mkdtempSync(join(tmpdir(), "norn-shipped-"));
-    cpSync(join(PKGS, "cli", "assets", "workflows"), workflowsDir(root), { recursive: true });
-    const listing = loadWorkflows(root);
-    const shipped = (wf: string) => listing.workflows[wf]?.workflow as unknown as Wf;
-    // a counter's name follows the exit its edge leaves by, and the copies name their exits apart: compare its bound
-    const bounded = (w: Wf, outcomes: Record<string, unknown>) =>
-      Object.fromEntries(
-        Object.entries(outcomes).map(([o, e]) => {
-          if (typeof e !== "object" || e === null || !("counter" in e)) return [o, e];
-          const { counter, ...rest } = e as { counter: string };
-          return [o, { ...rest, bound: w.counters?.[counter] }];
-        }),
-      );
-    const shape = (w: Wf) => ({ start: w.start, steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { type: step.type, skills: step.skills, outcomes: bounded(w, step.outcomes) }])) });
-    for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(workflow(wf)) }).toEqual({ wf, ...shape(shipped(wf)) });
-  });
-
-  test("quick's implement turns a red loop from reproduce into a failing test first", () => {
-    expect(workflow("quick").steps.implement?.instructions).toContain("## Reproduce");
-  });
-
   test("the bug report template applies norn:wf:reproduce", () => {
     const text = readFileSync(join(ROOT, ".github", "ISSUE_TEMPLATE", "bug_report.md"), "utf8");
     const fm = Bun.YAML.parse(text.match(/^---\n([\s\S]*?)\n---\n/)?.[1] ?? "") as { labels: string[] };
@@ -754,17 +422,9 @@ describe("release metadata", () => {
  * anywhere in a line: prose, comments, code spans, strings and scripts alike. Prose that names a thing
  * with an article ("a norn workflow", "the norn cockpit") is not a command and is left out first. Also
  * hit: `norn status <key>` (now `story view`) and the flags that changed what an old command did
- * (`cockpit --next`, `approve --reject`, …), with or without `norn`. The list is core's
- * REMOVED_COMMANDS, read as text (the root tests cannot import a workspace package).
+ * (`cockpit --next`, `approve --reject`, …), with or without `norn`.
  */
-function removedCommands(source: string): string[] {
-  const list = /export const REMOVED_COMMANDS = (\[[^\]\n]*\])/.exec(source)?.[1];
-  const names: unknown = list === undefined ? [] : JSON.parse(list);
-  // a lint with no names would pass on anything: fail loudly instead
-  if (!Array.isArray(names) || names.length === 0) throw new Error("REMOVED_COMMANDS not found in packages/core/src/commands.ts: update the lint's reader");
-  return names as string[];
-}
-const REMOVED_COMMANDS = removedCommands(readFileSync(join(PKGS, "core", "src", "commands.ts"), "utf8"));
+const REMOVED_COMMANDS = ["drop", "inbox", "cockpit", "orient", "open", "answer", "approve", "unstick", "update", "mode", "workflow", "take", "release", "trace", "why"];
 const OLD_COMMAND = new RegExp(`(?:\\bnorn|"\\$NORN")\\s+(${REMOVED_COMMANDS.join("|")})(?![\\w-])`);
 const OLD_STATUS_KEY = /\bnorn status (?:<(?:key|story|unit|slice)>|g[hl]-\d+)/;
 const OLD_FLAG = /\b(?:cockpit --(?:next|open|interval)|approve --reject|unstick --to|orient --open|workflow --to)\b/;
@@ -779,7 +439,6 @@ function oldCommandHits(line: string): string[] {
 /** Lines allowed to match, by file and exact text, with why: a quoted name of a thing, not a command. */
 const OLD_COMMAND_ALLOW: Array<[file: string, text: string, why: string]> = [
   ["packages/schema/src/workflow.ts", `title: "norn workflow",`, "the Workflow schema's title (a norn workflow file)"],
-  ["packages/schema/src/trace.ts", `title: "norn trace event (one JSONL line)",`, "the TraceEvent schema's title"],
 ];
 
 const OLD_COMMAND_FILES = (): string[] => [
@@ -802,13 +461,7 @@ describe("removed commands (B71)", () => {
     expect(oldCommandHits("`norn workflow-run` and `norn opening`")).toEqual([]);
   });
 
-  test("the list of removed commands is read from core, or the lint fails loudly", () => {
-    expect(REMOVED_COMMANDS).toContain("unstick");
-    expect(() => removedCommands("export const REMOVED_COMMANDS = [\n  \"drop\",\n] as const;")).toThrow("REMOVED_COMMANDS not found");
-    expect(() => removedCommands("export const OLD = [];")).toThrow("REMOVED_COMMANDS not found");
-  });
-
-  test("no removed command in sources, assets, plugins, skills, README, CONTRIBUTING, AGENTS.md and docs/", () => {
+  test("no removed command in sources, assets, skills, README, CONTRIBUTING, AGENTS.md and docs/", () => {
     const hits: string[] = [];
     for (const f of OLD_COMMAND_FILES()) {
       const rel = relative(ROOT, f);
@@ -825,7 +478,7 @@ describe("removed commands (B71)", () => {
 
 /**
  * No product doc or shipped text sends anyone to the old `.agents/norn/` folder. Scanned:
- * README, everything under packages/cli/assets, package sources (`norn help` and every message
+ * README, everything under packages/pack-sdlc/assets, package sources (`norn help` and every message
  * are built there), and AGENTS.md's Layout and "Where the contracts live". Not scanned, until the
  * follow-up story migrates this repo: AGENTS.md's other sections, CONTRIBUTING.md and the
  * `.agents/skills/norn*` copies (this repo's own process text).
@@ -833,9 +486,7 @@ describe("removed commands (B71)", () => {
 const OLD_DIR = /\.agents\/(norn|\*)\//;
 
 /** Lines allowed to name the old folder, by file and a substring of the line, with why. */
-const OLD_DIR_ALLOW: Array<[file: string, text: string, why: string]> = [
-  ["packages/store/src/paths.ts", "export const OLD_", "the old layout's places, only refused and moved from"],
-];
+const OLD_DIR_ALLOW: Array<[file: string, text: string, why: string]> = [];
 
 /** The text of `## <title>` up to the next `## ` heading. */
 function section(text: string, title: string): string {
@@ -848,7 +499,7 @@ function section(text: string, title: string): string {
 function productDocs(): Array<[file: string, text: string]> {
   const agents = readFileSync(join(ROOT, "AGENTS.md"), "utf8");
   return [
-    ...[...allDocs(ROOT).filter((f) => !f.endsWith("AGENTS.md")), ...textFiles(join(PKGS, "cli", "assets"), [...DOCS, ".txt"])].map(
+    ...[...allDocs(ROOT).filter((f) => !f.endsWith("AGENTS.md")), ...textFiles(join(PKGS, "pack-sdlc", "assets"), [...DOCS, ".txt"])].map(
       (f): [string, string] => [relative(ROOT, f), readFileSync(f, "utf8")],
     ),
     ...files(PKGS)
@@ -885,18 +536,7 @@ describe("the new layout in product docs (B22)", () => {
     const concepts = readFileSync(join(ROOT, "docs", "concepts.md"), "utf8").split("\n");
     const reference = readFileSync(join(ROOT, "docs", "reference.md"), "utf8").split("\n");
     expect(concepts.find((l) => l.startsWith("**Workflows are data.**"))).toContain("`.agents/workflows/`");
-    expect(reference.find((l) => l.startsWith("| `.agents/norn.config.yaml`"))).toBeDefined();
-  });
-
-  test("the brief's protocol puts only runs/ off limits; workflows and config are ordinary files", () => {
-    const rules = protocolLines({ handoff_file: ".agents/specs/gh-1-x/handoffs/story.md", attended: false });
-    const never = rules.filter((l) => /\bnever edit\b/i.test(l));
-    expect(never).toHaveLength(1);
-    const offLimits = (never[0] as string).split(/\.\s| — /)[0] as string; // the rule, before its reason
-    expect([...offLimits.matchAll(CODE_SPAN)].map((m) => m[0])).toEqual(["`runs/`"]);
-    expect(offLimits).not.toContain("handoff");
-    expect(never[0]).toContain("`.agents/workflows/`");
-    expect(never[0]).toContain("norn config");
+    expect(reference.find((l) => l.startsWith("| `.agents/norn.yaml`"))).toBeDefined();
   });
 });
 
@@ -932,29 +572,10 @@ function countHits(re: RegExp, keep: (file: string) => boolean): Counts {
   return out;
 }
 
-/** Imports and calls, in cli/src, of store's raw `git` (as `rawGit` or `git`). Store no longer exports it (4.2): the allowlist is empty and stays so. */
-function rawGitCalls(): Counts {
-  const out: Counts = {};
-  for (const f of SRC().filter((p) => p.startsWith("packages/cli/src/"))) {
-    const text = readFileSync(join(ROOT, f), "utf8");
-    for (const m of text.matchAll(/import\s*\{([^}]*)\}\s*from\s*["']@norn\/store["']/g)) {
-      for (const spec of (m[1] as string).split(",").map((s) => s.trim())) {
-        const named = /^git(?:\s+as\s+(\w+))?$/.exec(spec);
-        if (!named) continue;
-        const local = named[1] ?? "git";
-        // an import with no call still counts once: it is the door the lint is closing
-        out[f] = (out[f] ?? 0) + Math.max(1, [...text.matchAll(new RegExp(`(?<![\\w.])${local}\\s*\\(`, "g"))].length);
-      }
-    }
-  }
-  return out;
-}
-
 const FS_WRITE = /\b(?:writeFileSync|appendFileSync|renameSync|cpSync|copyFileSync|writeFile|appendFile|copyFile)\s*\(|\bBun\.write\s*\(/g;
 
-/** (a) S1: every file norn writes goes through store (atomic temp → fsync → rename). */
+/** (a) S1: every file norn writes goes through host-node's files (atomic temp → fsync → rename). */
 const FS_WRITE_ALLOW: Counts = {
-  "packages/cli/src/runtime/assets.ts": 2,
   // the harness plugin writes the agent's own config file itself, temp → fsync → rename: it may not depend on store
   "packages/harness-claude/src/files.ts": 1,
   // the same for pi: the harness writes the extension pi loads, temp → fsync → rename
@@ -963,32 +584,18 @@ const FS_WRITE_ALLOW: Counts = {
   "packages/host-node/src/files.ts": 1,
 };
 
-/** (b) raw git from store in cli: commands and runtime go through GitPort (4.1, 4.2). */
-const RAW_GIT_ALLOW: Counts = {};
-
 /**
- * (c) S2: every JSON read is validated against @norn/schema, through store. Each entry says what it
- * parses: a norn file read unvalidated (the 1.4 target), tool output (stdout of herdr/gh/glab/a hook),
- * a file another tool owns, or a clone (stringify round-trip, not a read).
+ * (c) S2: every JSON read is validated against @norn/schema. Each entry says what it parses: tool
+ * output (stdout of a CLI or a hook), or a file another tool owns.
  */
 const JSON_PARSE_ALLOW: Record<string, [number, string]> = {
-  "packages/adapters/src/agent-hooks/index.ts": [3, "files claude owns: settings.json, transcript jsonl"],
-  "packages/adapters/src/exec.ts": [1, "tool output: gh/glab --json stdout"],
-  "packages/adapters/src/herdr/call.ts": [2, "tool output: herdr stdout and error stderr"],
-  // added by main 0.9.x (orient workspace order): one reply line from herdr's socket API
-  "packages/adapters/src/herdr/cockpit.ts": [1, "tool output: herdr socket API reply line"],
-  "packages/cli/src/commands/done.ts": [2, "agent-written findings / criteria files (validated after)"],
-  "packages/cli/src/commands/hook.ts": [2, "tool output: hook payload on stdin, hook command stdout"],
-  "packages/cli/src/commands/run-view.ts": [1, "clone: canonical JSON for the replay diff"],
-  "packages/cli/src/runtime/detect.ts": [1, "file another tool owns: the repo's package.json"],
-  "packages/cli/src/runtime/tick.ts": [1, "clone: trace-safe copy of facts"],
   "packages/harness-claude/src/files.ts": [1, "file claude owns: .claude/settings.local.json"],
   "packages/harness-pi/src/extension.ts": [1, "text the harness writes, run inside pi: the extension reading the hook command's stdout"],
   // plugins cannot reach store and schema parses no text, so this helper is their one JSON read, validated against a schema at once
   "packages/plugin-api/src/json.ts": [1, "tool output: the validated parse helper provider plugins use for CLI stdout and their own files"],
 };
 
-/** (d) processes are spawned by store and adapters only (ports perform effects), and in the new architecture by host-node alone. */
+/** (d) processes are spawned by host-node alone: every other package starts them through the HostContext it builds. */
 const SPAWN_ALLOW: Counts = {
   // the new architecture's one IO boundary: every new package starts processes only through the HostContext this builds
   "packages/host-node/src/exec.ts": 1,
@@ -997,28 +604,21 @@ const SPAWN_ALLOW: Counts = {
 };
 
 /**
- * (g) B1, B2, B5: norn's paths under a repo are spelled only by store's path module (paths .ts), so a
- * layout change is a change there. Counts lines of package sources and tests (root test/support and test/e2e too) that spell `.agents/norn`
- * (or join `".agents", "norn"`) outside a comment; messages name paths through its `REPO_CONFIG_FILE` and
- * `WORKFLOWS_DIR`. Allowed: tests asserting text a person sees.
+ * (g) B1, B2, B5: norn's paths under a repo are spelled only by the path modules (the cli's config
+ * paths and schema's config files), so a layout change is a change there. Counts lines of package
+ * sources and tests (root test/support too) that spell `.agents/norn` (or join `".agents", "norn"`)
+ * outside a comment. Allowed: tests asserting text a person sees.
  */
 const NORN_PATH = /\.agents\/norn\b|["'`]\.agents["'`]\s*,\s*["'`]norn["'`]/;
 const NORN_PATH_ALLOW: Record<string, [number, string]> = {
-  "packages/store/src/paths.ts": [2, "the path module"],
-  "packages/schema/src/config.ts": [2, "the config files as messages name them (gh-64 B5: an error names the right file)"],
-  "packages/cli-thin/src/config/paths.ts": [3, "the thin cli's path module: its config files and plugin lock, as messages name them"],
-  "packages/cli-thin/test/unit/config.test.ts": [3, "the thin cli's config files where a person sees them: the paths and the config error's message"],
-  "packages/cli-thin/test/unit/plugins.test.ts": [1, "the thin cli's committed plugin lock, where a person sees it in team mode"],
-  "test/support/harness.ts": [1, "the old layout's places as a person had them, spelled independently of store"],
-  "packages/cli/test/integration/config.test.ts": [9, "messages: the config errors and `norn config` name the files as a person sees them (gh-64 B5–B7, B39, B54)"],
-  "test/e2e/slice-workflow.test.ts": [5, "message: init's config row; the files init writes, as a person sees them (B50, B55)"],
-  "packages/cli/test/integration/layout.test.ts": [1, "the layout test: the repo config file as a person sees it"],
-  "packages/core/test/unit/printed-commands.test.ts": [1, "not a path read: a string the removed-command matcher must pass"],
+  "packages/cli/src/config/paths.ts": [4, "the cli's path module: its config files, plugin lock and the old norn's config init moves off, as messages name them"],
+  "packages/cli/test/unit/config.test.ts": [3, "the cli's config files where a person sees them: the paths and the config error's message"],
+  "packages/cli/test/unit/plugins.test.ts": [1, "the cli's committed plugin lock, where a person sees it in team mode"],
 };
 
 function nornPathLines(): Counts {
   const out: Counts = {};
-  const all = [...files(PKGS), ...files(join(ROOT, "test", "support")), ...files(join(ROOT, "test", "e2e"))]
+  const all = [...files(PKGS), ...files(join(ROOT, "test", "support"))]
     .map((p) => relative(ROOT, p))
     .filter((p) => p.includes("/src/") || p.includes("/test/") || p.startsWith("test/"));
   for (const f of all) {
@@ -1030,92 +630,39 @@ function nornPathLines(): Counts {
   return out;
 }
 
-/** Action kinds: the `kind` literals of actions .ts; emitted ones appear as `kind: "…"` in decide. */
-function literalKinds(text: string): Set<string> {
-  return new Set([...text.matchAll(/\bkind:\s*"([a-z_]+)"/g)].map((m) => m[1] as string));
-}
-
-/** `case "…":` labels inside every `switch (a.kind) { … }` of a file (brace-matched). */
-function switchedKinds(text: string): Set<string> {
-  const out = new Set<string>();
-  for (const m of text.matchAll(/switch\s*\(\s*a\.kind\s*\)\s*\{/g)) {
-    let depth = 1;
-    let i = (m.index ?? 0) + m[0].length;
-    const start = i;
-    for (; i < text.length && depth > 0; i++) depth += text[i] === "{" ? 1 : text[i] === "}" ? -1 : 0;
-    for (const c of text.slice(start, i).matchAll(/case\s+"([a-z_]+)"\s*:/g)) out.add(c[1] as string);
-  }
-  return out;
-}
-
-/** decide's sources: every file of packages/core/src/decide/. */
-function decideText(): string {
-  return files(join(PKGS, "core", "src", "decide"))
-    .map((p) => readFileSync(p, "utf8"))
-    .join("\n");
-}
-
-/** act sources: act .ts before 6.3, an act/ folder after. */
-function actText(): string {
-  const runtime = join(PKGS, "cli", "src", "runtime");
-  const dir = join(runtime, "act");
-  const parts = existsSync(dir) ? files(dir) : [];
-  if (existsSync(join(runtime, "act.ts"))) parts.push(join(runtime, "act.ts"));
-  return parts.map((p) => readFileSync(p, "utf8")).join("\n");
-}
-
-/** (f) kinds act handles that decide never emits: dead branches, kept only until their removal item. */
-const ACT_ONLY_KINDS: string[] = [];
-
 describe("ratchet lints", () => {
   test("matcher: a new hit and a stale allowlist entry both fail", () => {
     expect(ratchet({ a: 1 }, { a: 1 })).toEqual([]);
     expect(ratchet({ a: 2, b: 1 }, { a: 1 })).toHaveLength(2);
     expect(ratchet({}, { a: 1 })).toEqual(["a: 0 hits, allowlist 1 → lower the allowlist to 0"]);
-    expect(switchedKinds('switch (a.kind) { case "x": { if (y) {} } case "y": } case "z":')).toEqual(new Set(["x", "y"]));
   });
 
-  test("(a) S1: fs writes only in packages/store/src", () => {
-    expect(ratchet(countHits(FS_WRITE, (f) => !f.startsWith("packages/store/src/")), FS_WRITE_ALLOW)).toEqual([]);
+  test("(a) S1: fs writes only in host-node's files", () => {
+    expect(ratchet(countHits(FS_WRITE, () => true), FS_WRITE_ALLOW)).toEqual([]);
   });
 
-  test("(b) cli does not call store's raw git", () => {
-    expect(ratchet(rawGitCalls(), RAW_GIT_ALLOW)).toEqual([]);
-  });
-
-  test("(c) S2: JSON.parse only in store and schema", () => {
+  test("(c) S2: JSON.parse only in schema", () => {
     const allow = Object.fromEntries(Object.entries(JSON_PARSE_ALLOW).map(([f, [n]]) => [f, n]));
-    expect(ratchet(countHits(/\bJSON\.parse\s*\(/g, (f) => !/^packages\/(store|schema)\/src\//.test(f)), allow)).toEqual([]);
+    expect(ratchet(countHits(/\bJSON\.parse\s*\(/g, (f) => !f.startsWith("packages/schema/src/")), allow)).toEqual([]);
   });
 
-  test("(d) Bun.spawn only in store and adapters", () => {
-    expect(ratchet(countHits(/\bBun\.spawn(?:Sync)?\s*\(/g, (f) => !/^packages\/(store|adapters)\/src\//.test(f)), SPAWN_ALLOW)).toEqual([]);
+  test("(d) Bun.spawn only in host-node", () => {
+    expect(ratchet(countHits(/\bBun\.spawn(?:Sync)?\s*\(/g, () => true), SPAWN_ALLOW)).toEqual([]);
   });
 
-  test("(e) core is pure: no node:fs, Bun.spawn, Date.now, Math.random", () => {
-    expect(countHits(/node:fs|\bBun\.spawn|\bDate\.now\b|\bMath\.random\b/g, (f) => f.startsWith("packages/core/src/"))).toEqual({});
+  test("(e) the kernel is pure: no node:fs, Bun.spawn, Date.now, Math.random", () => {
+    expect(countHits(/node:fs|\bBun\.spawn|\bDate\.now\b|\bMath\.random\b/g, (f) => f.startsWith("packages/kernel/src/"))).toEqual({});
   });
 
-  test("(g) B1, B2, B5: `.agents/norn` paths are spelled only in store's path module", () => {
+  test("(g) B1, B2, B5: `.agents/norn` paths are spelled only in the path modules", () => {
     const allow = Object.fromEntries(Object.entries(NORN_PATH_ALLOW).map(([f, [n]]) => [f, n]));
     expect(ratchet(nornPathLines(), allow)).toEqual([]);
-  });
-
-  test("(f) act handles exactly the action kinds decide emits", () => {
-    const kinds = literalKinds(readFileSync(join(PKGS, "core", "src", "actions.ts"), "utf8"));
-    const emitted = [...literalKinds(decideText())].filter((k) => kinds.has(k));
-    const handled = [...switchedKinds(actText())];
-    expect({
-      unhandled: emitted.filter((k) => !handled.includes(k)).sort(),
-      notAnAction: handled.filter((k) => !kinds.has(k)).sort(),
-      neverEmitted: handled.filter((k) => kinds.has(k) && !emitted.includes(k)).sort(),
-    }).toEqual({ unhandled: [], notAnAction: [], neverEmitted: [...ACT_ONLY_KINDS].sort() });
   });
 });
 
 describe("one resolver for a unit's record folder (B30, B36)", () => {
-  /** Where a unit's record path may be named: the pure name in schema and store's path module. */
-  const RESOLVERS = ["packages/schema/src/ids.ts", "packages/store/src/paths.ts"];
+  /** Where a unit's record path may be named: the pure name in schema. */
+  const RESOLVERS = ["packages/schema/src/ids.ts"];
   /** A `runs` path segment built by hand: the bare literal (`join(…, "runs", …)`) or `runs/${…}` in a template. */
   const BY_HAND = /["'`]runs["'`]|\bruns\/\$\{/;
   const isComment = (line: string) => /^\s*(\*|\/\/|\/\*)/.test(line);
@@ -1146,8 +693,8 @@ describe("one resolver for a unit's record folder (B30, B36)", () => {
 });
 
 describe("the run-state resolver takes the checkout, the story and the unit (gh-195 prefactor 1)", () => {
-  /** The resolver: its pure half in schema (paths relative to a root), its on-disk half in store. */
-  const RESOLVER = ["packages/schema/src/ids.ts", "packages/store/src/run-state.ts"];
+  /** The resolver: schema's pure names, paths relative to a root. */
+  const RESOLVER = ["packages/schema/src/ids.ts"];
   /** The record's names: the folder, the unit's and round's record paths, decide's observed record. */
   const NAMES = String.raw`\b(?:RUNS_DIR|unitRecordPath|roundRecordPath|recordOf)\b|["'\x60]runs["'\x60/]`;
   /** A spec folder: `spec_dir`, `specDir`, `specPath`, `spec`, as a name or a field. */
@@ -1309,7 +856,7 @@ describe("the run-state resolver takes the checkout, the story and the unit (gh-
 
 describe("the running version is a dependency (Prefactor 1)", () => {
   // only the default wiring reads the package version; every command takes `ctx.version`, so a test can run the CLI as any binary
-  const WIRING = "packages/cli/src/context.ts";
+  const WIRING = "packages/cli/src/main.ts";
   const readsConstant = (text: string) => /\bNORN_VERSION\b|["']\.{1,2}\/(?:\.\.\/)*version\.ts["']|["'](?:\.\.\/)+package\.json["']/.test(text);
 
   test("matcher: an import of version.ts, of the cli package.json or the constant itself is a read", () => {
@@ -1328,8 +875,8 @@ describe("the running version is a dependency (Prefactor 1)", () => {
 });
 
 describe("one resolver for a unit's handoff (gh-195 prefactor 2, B6, B39)", () => {
-  /** Where a unit's handoff path may be named: the pure name in schema and store's path module. */
-  const RESOLVERS = ["packages/schema/src/ids.ts", "packages/store/src/paths.ts"];
+  /** Where a unit's handoff path may be named: the pure name in schema and the runtime's story documents. */
+  const RESOLVERS = ["packages/schema/src/ids.ts", "packages/runtime/src/story-docs.ts"];
   /**
    * A handoff path derived from a record folder: the bare `handoff.md` literal (`join(record, "handoff.md")`),
    * the old record-keyed helpers, or a `dirname` of a handoff path (the story's handoff sat above its round folders).
@@ -1374,12 +921,11 @@ describe("superseded records replace unpushed runs and orphaned/ (B27, AC4)", ()
     const GONE = /unpushed_runs|unpushedRuns|UnpushedRuns|orphaned\/|copyToOrphaned|orphanedDir\b|work (?:on \S+ is )?not in the record/;
     const scanned = [
       ...files(PKGS).filter((p) => p.includes("/src/") || p.endsWith("/test/rule-cases.ts")),
-      ...readdirSync(join(PKGS, "core", "test", "golden")).map((n) => join(PKGS, "core", "test", "golden", n)),
+      ...readdirSync(join(PKGS, "kernel", "test", "golden")).map((n) => join(PKGS, "kernel", "test", "golden", n)),
       join(ROOT, "docs", "reference.md"),
-      // the shipped assets (skills, workflows), the plugins and the emitted schemas a person or agent reads
-      ...textFiles(join(PKGS, "cli", "assets"), DOCS),
-      ...textFiles(join(ROOT, "plugins"), [...DOCS, ".toml", ".sh"]),
-      ...textFiles(join(PKGS, "schema", "json"), DOCS),
+      // the shipped assets (skills, workflows) and the emitted schemas a person or agent reads
+      ...textFiles(join(PKGS, "pack-sdlc", "assets"), DOCS),
+          ...textFiles(join(PKGS, "schema", "json"), DOCS),
       // and every doc
       ...allDocs(ROOT),
     ];

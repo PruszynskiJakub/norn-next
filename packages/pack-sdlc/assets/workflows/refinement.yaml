@@ -1,9 +1,8 @@
-# Refinement workflow — example installed by `norn init`; edit freely.
+# Refinement workflow — shipped in the sdlc pack; a repo copy under .agents/workflows/ replaces it.
 # Brings the story up to date with its base, so the spec and plan are written against the current
 # code, then refines the spec, settles its open questions and plans it, all with a person (attended).
-# It cuts no slices and has no gate: starting the next round (`norn story edit <story> --workflow story`
-# or `--workflow quick`) is the person's approval of the plan. To rework the plan, start a new
-# refinement round at plan (`--workflow refinement --at plan`).
+# It cuts no slices and has no gate: opening the delivery item (label norn:wf:story or norn:wf:quick)
+# is the person's approval of the plan. To rework the plan, open a new refinement item.
 name: refinement
 description: Agree a story's spec and plan with a person, against the current base; no code.
 start: sync

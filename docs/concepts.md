@@ -1,162 +1,141 @@
 # Concepts
 
-How norn works, for someone who has run a first story (the [README](../README.md) shows how). Every command and key named here is listed in [Reference](reference.md).
+How norn works, for someone who has run a first story (the [README](../README.md) shows how). Every command named here is listed in [Reference](reference.md).
 
 ## Code decides, agents do
 
 norn splits delivering a story into steps. An agent does one step at a time and reports how it ended: `norn done <outcome>`, `norn ask "<question>"` or `norn stuck "<reason>"`. It never names the next step. Plain code, the **tick**, reads the report and the workflow and decides what happens next.
 
-- **Pull, don't trust.** Every tick observes the agents, git, the files and the remote again. A notification is never taken as truth, and a restarted heartbeat behaves the same.
+- **Pull, don't trust.** Every tick gathers the facts again: the run data, the agents' hook events, git, the tracker's items and the forge's changes. A notification is never taken as truth, and a restarted heartbeat behaves the same.
 - **Bounded everything.** Every retry, nudge and loop has a counter with a max. Going past it is a visible `stuck`, never an endless loop.
-- **Receipts before effects.** Every action with an effect outside norn writes a numbered receipt first, so a repeated tick never repeats the action, and every decision can be explained afterwards (`norn run view --why`).
+- **Receipts before effects, state last.** Every action with an effect outside norn writes a numbered receipt first, so a repeated tick never repeats the action; a unit's state is committed last, and a tick cut short at any point leaves either the old record or the new one, never a mix.
+
+## A thin kernel and its plugins
+
+norn is a small **kernel** (the workflow model, decide, the journal's write rules) and **plugins** that fill **slots**. A plugin reports facts and performs one effect per call; it never decides.
+
+| Slot | What it is | Bundled |
+|---|---|---|
+| tracker | where stories come from | `github` (issues), `local` (markdown files on this machine) |
+| forge | where a change is reviewed and merged | `github` (pull requests), `none` (a local record; you merge with git) |
+| store | where run data lives | `local` (the machine dir), `refs` (git refs shared through the remote) |
+| vcs | branches and worktrees | `git` |
+| harness | the agent tool | `claude` (Claude Code), `pi` |
+| runner | where an agent process runs | `headless` (a detached process), `herdr` (a Herdr pane) |
+| step kinds | workflow steps beyond `agent`, `check`, `gate` and `slices` | `update-branch`, `integrate`, `push`, `verify-base`, `open-pr`, `await-merge` |
+| pack | workflows and skills shipped together | `sdlc` |
+
+An **executor** is a harness in a runner, under a name: `claude` in `headless`, say, or `pi` in `herdr`. A workflow step picks one with `by:`; without it, the config's default executor runs it. The bundled plugins ship in the binary; `norn plugin add <spec>` installs another (an npm spec, a git URL or a local path), and `norn plugin list` shows each plugin and what it provides.
+
+The **runtime** hosts both: each tick it takes the lock, gathers the facts through the plugins, asks the kernel to decide, carries out each decision through the plugins, and writes the trace.
 
 ## Stories, slices and units
 
-A **story** is a GitHub or GitLab issue that carries the label `norn` and is assigned to you. `norn sync` takes it in: one spec folder (`.agents/specs/gh-N-<slug>/`), one story branch, one worktree, and later one draft PR. Its key is `gh-N` (`gl-N` on GitLab).
+A **story** is a tracker item that carries the intake label (`norn`): on GitHub an issue assigned to you, with the local tracker any open item. A tick takes it in: a story branch, a worktree, and later a change (a draft PR on GitHub). Its key is the tracker's prefix and the item's number: `gh-12` on GitHub, `lt-3` with the local tracker.
 
-A **slice** is a piece of a story, cut from the story's plan. It has its own branch and worktree and is merged back into the story branch when it is done. Its key is the story's plus a number: `gh-18/02`.
+A **slice** is a piece of a story, cut from the story's plan. It has its own branch and worktree and is merged back into the story branch when it is done. Its key is the story's plus a number: `gh-12/02`.
 
-A **unit** is a story or a slice: anything that runs a workflow. Commands that act on work take a unit (`norn story answer gh-18/02 "…"`, `norn run list gh-18`).
+A **unit** is a story or a slice: anything that runs a workflow. Commands that act on a running step take a unit (`norn run start gh-12/02`); the person's decisions take the story (`norn story approve gh-12`).
 
-## Workflows, rounds and steps
+## Workflows and steps
 
-**Workflows are data.** A workflow is a YAML file in `.agents/workflows/`: its steps, and for each step the outcomes it may end with and where each one leads. `norn init` writes six of them (`quick` and `story` take their sync, base update and shipping steps from shared files in `.agents/workflows/shared/`), and you can edit them or add your own (see [Recipes](recipes.md#write-your-own-workflow)). A unit pins its workflow when it starts, so editing a file never changes a story already in flight.
+**Workflows are data.** A workflow is a YAML file: its steps, and for each step the outcomes it may end with and where each one leads. The pack ships them (`sdlc`: `triage`, `reproduce`, `refinement`, `story`, `slice`, `quick`, with the steps several share in `shared/`); a file in `.agents/workflows/` (or `.agents/workflows/shared/`) replaces the pack's file of the same name or adds a new one, and goes through the same checks. A story takes its workflow at intake, from its label `norn:wf:<name>`, else the config's default (`kernel.workflow`, `story` when unset). A unit pins its workflow when it starts, so editing a file never changes a story already in flight.
 
-Each workflow does one thing, and a story goes through them as **rounds**, one after another on the same branch. A new story starts with the default workflow (`triage`), or the one its issue label names (`norn:wf:<name>`). A round ends at `$done`; only a person starts the next one, with `norn story edit <story> --workflow <name>`. The usual paths are a feature `triage → refinement → story`, a small change `triage → quick`, and a bug `reproduce → quick`.
-
-A **step** is one node of a workflow. Its first key says what happens there: `agent: <orientation>`, `check: <command>`, `gate: <what the person decides>`, or a built-in verb with no value (`update-branch:`, `open-pr:`, `integrate:`, `push:`, `await-merge:`, `slices:`); a step written `use:` brings in shared steps. A step has exactly one such head key. The kinds:
+A **step** is one node of a workflow. Its head key says what happens there:
 
 | Step | What happens |
 |---|---|
-| `agent:` | an agent does the step, told what it is for by the orientation and, when the step lists `skills:`, with those skills (`norn-implement`, `norn-review`, …); `by:` picks which configured agent runs it, else the config's default; it reports an outcome |
+| `agent:` | an agent does the step, told what it is for by the head's text and, when the step lists `skills:`, with those skills; `by:` picks the executor; it reports an outcome |
 | `check:` | norn runs a command, such as your tests; the exit code is the outcome (`pass` on 0, else `fail`, unless `exits` names another outcome for that code) |
-| `update-branch:`, `integrate:`, `open-pr:`, `push:` | norn does a git action: merge the base into the story, integrate a slice into the story branch, open the draft PR (or rewrite its body), push the branch |
 | `gate:` | a person decides: `approve` or `reject` |
-| `slices:` | the story waits while its slices run, each with its own workflow |
-| `await-merge:` | the story waits for a person to merge its PR; the merge ends the story. A person gives no `approve` or `reject` there: its one outcome, `stale`, is taken by norn when the base moved under the story (see `base.stale`, and `base.verify` for a base move without a conflict that breaks the merged tree) and routes it back through `update` with a counter |
+| `slices:` | the story waits while its slices run, each with the slice workflow |
+| `update-branch:`, `integrate:`, `push:`, `verify-base:` | git work by the vcs plugin: merge the base into the story (never a rebase), integrate a slice into the story branch, push, check the merged tree after the base moved |
+| `open-pr:`, `await-merge:` | forge work: open the change (or rewrite its body), then wait for a person to merge it; the merge ends the story |
 
-An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). A step's `outcomes:` maps each outcome to the next step, `outcome: target`, or `{ to, max }` for a route back with its own bound. Every route back (a failed test sends the story back to `implement`) carries a **counter** with a max, derived from the kind of edge and named after it, `<step>.<outcome>`: a check's `fail` 5, a gate's `reject` 2, a `conflict` 2 (reset when the step ends any other way), `stale` 10, an agent sending work back on an otherwise uncounted loop 3. `counter:` names one counter shared by several edges or reset on chosen ones; see [Recipes: Bound a loop](recipes.md#bound-a-loop). An agent step says what each outcome it routes means in a sibling `means:` map, and may give a criteria `verdict:` per outcome in another, both keyed by outcome; the brief shows them in its finish lines. The overridable routes (`silent`, `died`, `timeout`, `stalled`, `ask`, `stuck`) need no meaning. A workflow in the old wording (`type:`, `skill:`, `instructions:`, `run:`, `prompt:`, `action:`, or `means`/`verdict` inside a route) is refused in the main checkout, naming `norn upgrade`, which rewrites it; see [Recipes: Write your own workflow](recipes.md#write-your-own-workflow).
-
-## Labels
-
-norn reads and writes a few labels on your issues. `norn init` and `norn upgrade` create each one that is missing on the remote, in norn's colour (`#5319E7`) with a description; they never change or delete a label that is there. `norn doctor` warns about a missing one and names `norn upgrade`. A `norn:wf:<name>` label that names no workflow is listed as unused, with the command to delete it: norn deletes nothing, because deleting a label strips it from every issue. When the remote cannot be reached or written (no git remote, `gh`/`glab` missing or logged out, no permission), `init` and `upgrade` still finish and say what to run.
-
-| Label | Meaning |
-|---|---|
-| `norn` | norn takes in the issue once it is assigned to you |
-| `norn:wf:<name>` | the first workflow the story runs; one per valid workflow in `.agents/workflows/` |
-| `norn:kind:bug`, `feature`, `security`, `chore`, `docs` | what the issue is: something broken, new or changed behaviour, a vulnerability or hardening, maintenance, documentation only |
-| `norn:risk:low`, `medium`, `high` | how much the change could break: a two-way door with a small blast radius, one touching shared code or behaviour, a one-way door or a wide blast radius |
-| `norn:priority:low`, `medium`, `high`, `extreme` | can wait, soon, next (it blocks work now), drop other work |
-
-The kind, risk and priority labels are for you, to filter and sort the backlog: the triage agent puts one of each on the issue and gives its reasons in the `## Triage` comment, and keeps a label that is already there (yours, or an earlier triage's), saying in the comment what it would pick instead. norn itself never reads them.
+A step written `use:` brings in a shared file's steps, and `like:` copies another step. An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). A step's `outcomes:` maps each outcome to the next step, `$done` or `$stuck`. Every route back (a failed test sends the story back to `implement`) carries a **counter** with a max, derived from the kind of edge and named `<step>.<outcome>`: a check's `fail` 5, a gate's `reject` 2, a `conflict` 2, `stale` 10, an agent sending work back 3. `max:` on an edge changes its bound, and the `kernel.counters` config keys change the defaults.
 
 ## Who does what: attended steps, gates and modes
 
-Three things decide where a person comes in:
+- An **attended step** (`attended: true`) is an agent step done *with* a person in the agent's pane. A person always starts it.
+- A **gate** is a step with no agent: a person approves it (`norn story approve <story>`) or rejects it with what to change (`norn story reject <story> --reason "…"`), and the reason goes into the next attempt's brief.
+- The **mode** says who starts the other agent steps. In **auto** mode norn starts the agent itself. In **manual** mode the step waits for a person, and `norn run start <unit>` starts it, for that step only. `norn init` picks auto with the headless runner, where nobody sits beside the agent, and manual with Herdr; a workflow's `mode` and `kernel.mode` in the config set it too.
 
-- An **attended step** (`attended: true`, such as refine and plan) is an agent step done *with* a person in the agent's pane. A person always starts it.
-- A **gate** is a step with no agent: a person approves it or rejects it with what to change. The `ready` gate near the end of a delivery workflow is where you look at the PR; after you approve it, the story waits at the `merge` step until you merge the PR.
-- The **mode** of a story says who starts its other agent steps. In **manual** mode (the default) the inbox shows the step as ready and how to start it. In **auto** mode norn starts the agent itself through the runner it detects: Herdr when norn runs inside Herdr or `herdr` is installed, otherwise headless. A story's mode is, nearest first: its own (`norn story edit <story> --auto|--manual` switches it), its workflow's `mode`, `mode` in your local or user config, then `manual`. The mode decides only who starts an agent step: in either mode the heartbeat ([One tick](#one-tick)) moves every step on, so an agent's `norn done` changes nothing until a tick applies it.
+Checks and the git and forge steps always run on their own. Gates, attended steps and a waiting merge always wait for a person, in either mode.
 
-Check steps and the git verbs always run on their own. Gates, `await-merge:` steps and attended steps always wait for a person, in either mode.
+## What needs you
 
-## The inbox
-
-`norn status` is the inbox: everything that needs you, grouped by what you do about it, each item with its age and the exact command that resolves it.
-
-| Group | What it holds |
-|---|---|
-| Your turn | an attended step to start or to come back to, or a manual step that is ready |
-| Answer | an agent asked a question, or a permission prompt blocks it |
-| Approve | a gate waits for you |
-| Unblock | a step is stuck, an action failed, a counter ran out, or the base refused a merged story's done record |
-| Check | something to look at: a story that conflicts with its base, a PR to merge |
-| Unclaimed | a story no checkout drives |
-| Running | agent steps in progress, for reference |
-| Notes | questions an agent left without stopping the work |
-
-For example, an Approve item shows the gate's instruction and `norn story approve gh-17`, because the workflow's gate waits for a person. `norn status --watch` keeps the inbox on screen as a cockpit that acts on items by key.
+`norn status` shows every story and unit, the ones that wait for a person first: a gate to decide, a question to answer (`norn story answer <story> "…"`), a manual step to start, a stuck unit. `norn story list` lists the stories and `norn story view <story>` shows one: its units, runs, gates and questions. An agent that asks waits; a person's answer goes to the same session when it is still there, or to a fresh one with the answer in its brief.
 
 ## One tick
 
-`norn watch` runs the heartbeat: a tick every 30 seconds (`norn tick` runs one by hand), and the next one at once when a tick leaves it something to do, such as starting the step a reported outcome led to (up to 3 ticks in a row). A receipt written while it waits (an agent's `norn done`, your `norn story answer`, a finished check) wakes it within about a second. Each tick:
+`norn watch` runs the heartbeat: a tick every 30 seconds (`--interval` changes it), until Ctrl-C, which lets the tick in flight finish. `norn tick` runs one by hand. Each tick:
 
-1. **observes** the facts: the units' state files and receipts, the agents' hooks and runner panes, git, and every few minutes the remote's issues and PRs;
-2. **decides**, with one pure function, the next action for each unit: start an agent, nudge a silent one, run a check, take a reported outcome to the next step, push, notify;
-3. **acts**: writes a receipt, then does the action, then writes the unit's `state.json` last.
+1. **gathers** the facts: each unit's state and receipts from the store, the claims, the agents' hook events, git, the tracker's items and the forge's changes;
+2. **decides**, with one pure function, the next action for each unit: take in a story, start an agent, nudge a silent one, run a check, take a reported outcome to the next step, push, open the change, finish the story;
+3. **acts**: writes a receipt, then does the action through the plugin, then commits the unit's state last.
 
-An agent that dies is classified `died` and retried; one that goes quiet is nudged; one that runs past its deadline is stopped. Each of these is bounded by a counter, and the last one lands in the inbox.
+An agent that dies is retried; one that goes quiet is nudged; one that runs past its deadline is stopped. Each of these is bounded, and the last one leaves the unit stuck for a person.
 
-## What gets committed, and where run state lives
+## The agent's worktree
 
-A step boundary commits only the agent's work and the unit's handoff, `handoffs/<unit>.md` in the spec folder (`story.md` for the story, `<nn>-<slug>.md` for a slice), and pushes the unit's branch. A story's PR holds the code, the spec and the handoffs, nothing of norn's own. A handoff is prose only and holds the unit's current state (Goal, Proof, Easy to miss, Not proven yet, Notes, Resume), at most 8 KB: `norn done` refuses a larger one. norn never writes into it; the unit's status is printed by `norn brief` and `norn story checkout` above it, and what happened is in the receipts, which the brief lists as History. Each boundary commit carries trailers naming the story, slice and step; one that ends a step also names its outcome and the step it led to (`Norn-Outcome`, `Norn-Next`), which is what another machine reads as the story's last boundary.
+Each unit works in its own git worktree, made by the vcs plugin in the machine dir. Before a launch, norn puts there what the agent needs, all under `.agents/` and all ignored by git:
 
-A unit's **run state** (`state.json`, the numbered receipts, the pinned workflow, logs of failed checks and QA evidence) lives on the machine that runs the story, in the checkout's machine dir: `~/.norn/repos/<id>/runs/<story>/<unit>/`. It is in no worktree and on no branch, so removing a worktree or running `git clean -fdx` leaves the story where it was, and it leaves the machine only as the story's record, when norn pushes it to the record ref. The unit worktrees live beside it, in the same machine dir's `worktrees/` folder: a story's at `~/.norn/repos/<id>/worktrees/<story>-<slug>`, each slice's next to it at `…/worktrees/<story>-<slug>--<nn>-<slug>`. Nothing norn makes sits beside your repository.
+- **Skills.** The pack's skills go to `.agents/skills/<name>/`, linked from the harness's own folder (`.claude/skills/<name>`, `.pi/skills/<name>`). A skill folder the repo commits under the same name is the repo's own and wins over the pack's.
+- **The spec and the handoff.** The story's spec is `.agents/specs/<story>/spec.md`, mirrored from the tracker item; each unit's **handoff** is `.agents/specs/<story>/handoffs/<unit>.md`, the unit's current state in prose (goal, proof, what is easy to miss, notes, the next action), rewritten by whoever works on it. The agent edits both in place; norn reads them back when it reports, and keeps them with the run data, never on the branch.
+- **Other inputs.** The last check's output, a rejection's findings and the like go to `.agents/inputs/`, rewritten for every run.
+- **Hooks.** The harness wires norn's hooks into the tool's local settings in that worktree (`.claude/settings.local.json` for Claude Code, an extension for pi). They feed norn the agent's events, keep it from ending a turn without a report, and refuse a file write outside the worktree or into norn's run state.
 
-When the record has to leave the machine, norn packs the story's whole run state into one commit on the ref `refs/norn/runs/<story>` on the remote, which no branch and no normal clone carries. The team config's **record policy** (`record.policy`) says when:
+The branch, and the PR, hold only the code.
 
-- `local` (the default): when the claim is released (`norn story handoff`, a clean `norn watch` exit, `norn story close`), each time the `open-pr` step opens or updates the PR (so the PR body can link QA evidence at that record commit), and once at the end, when the PR merges or the story closes without one.
-- `remote`: as well, whenever the record changed since its last push (so at least at every step boundary, right after the branch); a push that fails is tried again at a later tick (one refused because another checkout pushed the ref waits until the ref this checkout sees changes). Another machine then sees the current step and attempt, and can take the story over with its record as last pushed even if the holder dies.
+## Run data, claims and the end of a story
 
-Under either policy, every push of the story branch also puts the story's head on `refs/norn/heads/<story>`, in the same push. It is neither branch nor tag, so it starts no CI run; the record names its commit (`Norn-Branch-Commit`), and a takeover resumes the story worktree from it, merged with the remote story branch (never rebased), so a holder that crashed after a boundary loses no committed work. It goes when the story merges or closes, and `norn tidy` removes one left behind.
+A unit's **run data** (its state, the numbered receipts, the pinned workflow, the story's spec and handoffs) lives in the configured **store**. With `local` it is in the checkout's machine dir, `~/.norn/repos/<id>/`, outside every worktree: removing a worktree or running `git clean -fdx` leaves the story where it was. With `refs` it is on git refs under `refs/norn/v2/`, pushed to the remote, so another machine sees the story and can take it over.
 
-Once the story's PR is open (a draft counts), every push to the story branch starts a CI run, so norn pushes the branch only at the `open-pr` step and at `norn story close`. Every other step boundary, an `update-branch:` merge of the base, a gate approval, a finished slice and a claim release (`norn story handoff`, a clean `norn watch` exit) put the story's head on `refs/norn/heads/<story>` alone. A rework loop then starts one CI run, the one the `ci` step waits on, and the PR's head stays the commit that run checked. A person's push to the story branch meanwhile is merged with norn's boundaries at the next branch push, never rebased.
+A **claim** gives one checkout the right to drive a story; the holder renews it each tick, and an expired claim can be taken. A **mailbox** carries a person's answer or decision to the holder when it is sent from somewhere else.
 
-A finished story's record stays on its ref, so `norn run list` and `norn run view` read it on any machine; the base branch never receives run state. Per-tick detail (the trace, locks and caches) stays in the machine dir too; `norn run view --why` reads it.
+When a story's last unit ends `done`, its tick **finishes** it: it closes the tracker item (when the tracker can), removes the worktrees of the units that ended done, and gives up the claim. A unit that ended stuck keeps its worktree for you to look into, and a stuck story's item stays open. `norn story close <story>` closes a story by hand and stops its runs.
 
-On a machine that does not hold the story, `norn status` and `norn story view` show what that machine can know: under `remote`, the step, attempt and counters read from the ref; under `local`, the claim, the branch, the PR and its CI and the last boundary step, with a line saying whose machine holds the record. A ref no longer kept current is shown with its age ("record as of …"). An answer or approval sent from such a machine goes through the mailbox and is checked on the holder; one the holder turns away (the story moved on) shows there as a Check item.
+## Config
 
-How handover and takeover work, with and without a record on the ref, is in [Recipes: Hand a story over](recipes.md#hand-a-story-over).
+Config comes in layers, each overriding the one before:
 
-## Skills
+1. norn's defaults;
+2. `~/.norn/config.yaml`: you, on this machine, for every repository;
+3. `.agents/norn.local.yaml`: you, in this repository (kept out of git);
+4. `.agents/norn.yaml`: the team's, committed.
 
-A step's craft is in a skill: `norn init` copies norn's skills into `.agents/skills/` and links them from each agent's skill folder. The brief carries the protocol every step follows (work in scope, keep the handoff, report once) and names the step's skills, if it lists any, above its orientation; the `norn` skill only sends an agent to the brief, and the others do one kind of step each. To change how a step is done, write your own skill under another name and list it in the step (`skills: [my-review]`; see [Recipes: Name your own skill in a step](recipes.md#name-your-own-skill-in-a-step)). A step steered by its orientation alone lists no skill. `norn doctor` reports skills that are missing or not linked, and fails on a bundled skill that differs from the running norn's copy. The `norn-review` skill also reads `REVIEW.md` at the repo root: paths a review ignores, what counts as failure in this repo and what not to report. `norn init` writes a short starter when the repo has none and never changes yours.
-
-A bundled skill (a `norn`-prefixed folder in `.agents/skills/`) that differs from the running norn's copy is **drift**. A unit keeps running on the skills its worktree holds, as it keeps its pinned workflow: its agent steps start, and `norn brief`, `norn story start` and `norn story chat` work there. The inbox shows the difference as a Check item, and the new copies arrive when the story branch merges its base. When the main checkout drifted, the inbox names `norn upgrade` and a commit. Your own skills, without the `norn-` prefix, are never checked.
-
-## The repo's norn version
-
-The team config records **the repo's norn version** (`norn_version: X.Y.Z` in `.agents/norn.config.yaml`): the norn the repo was set up with or last upgraded to. A binary matches it when it is the same minor (before 1.0; the same major from 1.0 on) and at least that patch: a repo at `X.Y.Z` takes `X.Y.Z` and any later patch of `X.Y`, never an earlier patch, never another minor. A patch upgrade of the binary needs no commit; a new minor, which may change how norn reads the config, the workflows or the run state, needs `norn upgrade` and a commit.
-
-The version is read from the main checkout's team config, so it changes for you when you pull the base branch, not before. With a binary that does not match:
-
-- every command that acts is refused with exit code 3 (`refused`) and the norn to install, or `norn upgrade` when your binary is newer: `tick`, `watch` (each tick), `sync`, `brief`, `tidy`, `config set|unset`, every `story` verb that changes something, and `run rerun|cancel|attach`. Nothing is written, launched or pushed.
-- the commands that only read run and show the mismatch: `help`, `--version`, `doctor`, `status` (a top Unblock item, and the tab bar line), `story list|view|wait`, `run list|view`, `config list|get`.
-- `init`, `upgrade`, `uninstall`, and the reports an agent already in a step makes (`done`, `ask`, `stuck`, `hook`, and the check runs a tick started), are never refused for it, so a session already started can always report.
-
-A repo without the key, or one recording a version below 0.30, is refused the same way by every command that acts and by `init`, with code `version_missing` or `version_too_old`; `doctor` fails its version check with the same words, and `status` shows it as a top Unblock item pointing to `norn doctor`. Run `norn init` if norn was never set up there; for a repo from an older norn, install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with this norn. How to move a team to a new norn is in [Recipes: Roll out a new norn to a team](recipes.md#roll-out-a-new-norn-to-a-team).
+`norn init` writes `.agents/norn.local.yaml` (or `.agents/norn.yaml` with `--commit`) with every slot named: tracker, forge, store, the executors, the base branch and the mode. `norn config show` prints the merged config and which file set each key, `norn config get <key>` one key, and `norn config set <key> <value>` changes one (in the local file, the committed one with `--commit`, the user file with `--user`). Each slot is `{use: <plugin name>, …}` with that plugin's own keys beside `use`; the plugin checks them. `norn doctor` checks the config, the plugins it picks, the workflows, the harness hooks and the tools on PATH, and says what to fix first.
 
 ## Glossary
 
 | Term | Meaning |
 |---|---|
-| story | A remote issue (GitHub or GitLab) assigned to you with the label `norn`. One spec folder, one story branch, one story worktree, one draft PR. |
+| story | A tracker item with the intake label, taken in by a tick. One story branch, one story worktree, one change. |
 | slice | A piece of a story with its own branch and worktree, merged back into the story. |
-| unit | A story or a slice: anything that runs a workflow and has its own run state and handoff. |
-| workflow | A YAML (or JSON) graph of steps, in `.agents/workflows/`. |
-| round | One workflow applied to a story, from its start step to `$done`. A story goes through one or more rounds; a slice runs one workflow. |
-| step | One node of a workflow, named by its head key: `agent`, `check`, `gate`, a built-in verb (`update-branch`, `open-pr`, `integrate`, `push`, `await-merge`, `slices`), or `use`. |
+| unit | A story or a slice: anything that runs a workflow and has its own run data and handoff. |
+| workflow | A YAML graph of steps, shipped in a pack or written in `.agents/workflows/`. |
+| step | One node of a workflow, named by its head key: `agent`, `check`, `gate`, `slices`, or a plugin's step kind. |
 | run | One attempt at a step; it produces receipts. |
 | outcome | How a step ended, spelled as its reporter types it (`done`, `approve`, `stuck`, …). |
-| counter | A bound on a retry, nudge or loop; past its max the unit is stuck. A loop's counter is named under `counters:` or derived from its edge, `<step>.<outcome>` (`<use step>.<exit>` for a shared file's exit). |
-| gate | A step where a person approves or rejects, or a supervisor they delegated to. |
-| supervisor | An agent in the main checkout that takes the stories a person names through their rounds with norn's commands only (`norn-fsd-round`, `norn-fsd`); its gate decisions, answers and round starts are recorded as delegated, with their reason. |
+| counter | A bound on a retry, nudge or loop; past its max the unit is stuck. |
+| gate | A step where a person approves or rejects. |
 | check | A step that runs a command; its exit code is the outcome. |
 | attended step | An agent step done with a person in the pane. |
 | mode | Who starts a story's unattended agent steps: a person (`manual`) or norn (`auto`). |
 | receipt | An immutable, numbered record of something that happened to a unit, written before its effect. |
-| claim | A git ref that gives one checkout the right to drive a story. |
-| handoff | `handoffs/<unit>.md` in the spec folder, on the unit's branch: the unit's current state (goal, proof, what is easy to miss or not proven yet, notes, the next action), rewritten by whoever works on it, so anyone can continue. What happened is in the receipts. |
-| run state | A unit's state, receipts, pinned workflow, logs and evidence, kept in the checkout's machine dir (`~/.norn/repos/<id>/runs/`), never in a worktree or on a branch; it leaves the machine only as the record. |
-| record | A story's run state packed into one commit on `refs/norn/runs/<story>` on the remote: pushed on a claim release, by `open-pr`, at the end, and under `remote` whenever it changed. |
-| brief | What `norn brief` tells the agent of a step: the work and its skill, why this attempt, how to report, what to read, the handoff and the unit's history, and how to work. |
-| inbox | Everything that needs a person, with the command that resolves each item (`norn status`). |
-| tick | One pass of the heartbeat: observe, decide, act. |
-| worktree | The git worktree a unit works in, in the checkout's machine dir under `worktrees/` (`~/.norn/repos/<id>/worktrees/<story>-<slug>`, a slice's with `--<nn>-<slug>` added). |
-| norn version | The norn version a repo was set up with or last upgraded to (`norn_version` in the team config); a binary of another minor, or an earlier patch, refuses to act on the repo. |
-| slot | A numbered port range a running unit gets, so parallel units do not collide. |
+| claim | The right of one checkout to drive a story, kept in the store and renewed each tick. |
+| mailbox | Where a person's answer or decision waits for the checkout that holds the claim. |
+| handoff | `.agents/specs/<story>/handoffs/<unit>.md` in the worktree: the unit's current state, rewritten by whoever works on it, so anyone can continue. |
+| brief | What `norn brief` tells the agent of a step: the work and its skills, why this attempt, how to report, what to read, and the rules. |
+| tick | One pass of the heartbeat: gather facts, decide, act. |
+| worktree | The git worktree a unit works in, made by the vcs plugin. |
+| kernel | The pure core: the workflow model, decide and the journal's write rules. |
+| plugin | A package that fills one or more slots. |
+| slot | A kind of part a plugin provides: harness, tracker, forge, store, vcs, runner, step kind or pack. |
+| pack | Workflows, shared files and skills shipped together as one plugin. |
+| harness | The plugin for one agent tool (Claude Code, pi): its hooks, its launch, its events. |
+| runner | Where an agent process runs: headless or a Herdr pane. |
+| executor | A named harness in a runner, which an agent step runs on. |
+| store | Where run data, claims and the mailbox live: the machine dir or git refs. |
 | trace | The per-tick record of facts and decisions, kept outside the repository. |
-| mailbox | A git ref through which another checkout sends an answer or approval to the one that holds the claim. |
 | verdict | How one acceptance criterion fared in QA: `pass`, `fail`, `person` or `unverified`. |
-| note | A question for a person left with a `norn done` report; it never stops the work. |

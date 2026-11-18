@@ -1,4 +1,4 @@
-# Shared steps — installed by `norn init`; edit freely. A workflow brings them in with `use: ship`.
+# Shared steps — shipped in the sdlc pack; a repo copy under .agents/workflows/shared/ replaces it. A workflow brings them in with `use: ship`.
 # Opens the draft PR (or rewrites the body of the open one), waits for the PR's CI, waits for a person
 # at ready, then waits at merge until a person merges the PR.
 # Exits: `ci-failed` (a red CI check), `rejected` (a person rejected at ready), `stale` (the base moved

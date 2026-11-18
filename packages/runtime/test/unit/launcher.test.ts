@@ -198,7 +198,7 @@ describe("harness launcher start", () => {
 });
 
 describe("the norn a launched agent runs", () => {
-  const CLI = ["/opt/my tools/bun", "/src/cli-thin/main.ts"];
+  const CLI = ["/opt/my tools/bun", "/src/cli/main.ts"];
   const withShim = (s: ReturnType<typeof setup>, over: Partial<HarnessLauncher["opts"]> = {}) =>
     new HarnessLauncher({ ...s.launcher.opts, hookCommand: [...CLI, "hook"], hostPath: "/usr/local/bin:/usr/bin", ...over });
 
@@ -210,8 +210,8 @@ describe("the norn a launched agent runs", () => {
     expect(s.pane.starts[0]?.env).toMatchObject({ PATH: "/m/runtime/bin:/usr/local/bin:/usr/bin", AGENT_MODE: "x" });
     expect(s.files.executable("/m/runtime/bin/norn")).toBe(true);
     expect(await s.files.read("/m/runtime/bin/norn")).toBe(shimScript(CLI));
-    expect(shimScript(CLI)).toContain(`exec '/opt/my tools/bun' /src/cli-thin/main.ts "$@"\n`);
-    expect(s.paneHarness.installs[0]?.hookCommand).toBe("'/opt/my tools/bun' /src/cli-thin/main.ts hook fake");
+    expect(shimScript(CLI)).toContain(`exec '/opt/my tools/bun' /src/cli/main.ts "$@"\n`);
+    expect(s.paneHarness.installs[0]?.hookCommand).toBe("'/opt/my tools/bun' /src/cli/main.ts hook fake");
   });
 
   test("the configured agent env goes with every launch, so a pane's shell and the agent's hooks find the same norn home", async () => {

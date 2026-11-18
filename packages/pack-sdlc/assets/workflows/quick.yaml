@@ -1,4 +1,4 @@
-# Quick workflow — example installed by `norn init`; edit freely.
+# Quick workflow — shipped in the sdlc pack; a repo copy under .agents/workflows/ replaces it.
 # For refactors, docs, chores, other small changes and the fix of a bug a reproduce round confirmed.
 # A story workflow without `slices`: every step works in the story worktree. Bring the story up
 # to date with its base, implement, bring it up to date again, check, review, describe, open the

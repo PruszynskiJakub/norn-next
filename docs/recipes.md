@@ -1,99 +1,93 @@
 # Recipes
 
-What to do when something happens. Each recipe names the inbox item you see in `norn status` and the command that resolves it; the [cockpit](../plugins/herdr/README.md#the-cockpit) (`norn status --watch`) runs the same commands by key. Terms are explained in [Concepts](concepts.md), every flag in [Reference](reference.md).
+What to do when something happens, and how to set norn up the way you work. Each recipe names what you see in `norn status` and the command that resolves it. Terms are explained in [Concepts](concepts.md), every flag in [Reference](reference.md).
 
 ## An agent asked a question
 
-**You see:** an Answer item with the agent's question and `norn story answer <unit> "…"`.
+**You see:** the unit under "Needs you", waiting on the agent's question; `norn story view <story>` shows it in full.
 
 ```sh
-norn story answer gh-18/02 "Keep the old endpoint and mark it deprecated in the docs"
+norn story answer gh-18 "Keep the old endpoint and mark it deprecated in the docs"
 ```
 
-The next tick types your answer into the same session, or starts a fresh session on the step's handoff when the agent is gone. If the answer needs a conversation, open the agent's pane (`norn run attach gh-18/02`), but give the decision through `norn story answer` too, or norn has no record of it.
+The next tick delivers your answer to the same session, or starts a fresh session with the answer in its brief when the agent is gone. When several units of the story wait on an answer, the refusal names each one: answer by unit (`norn story answer gh-18/02 "…"`).
 
 ## A permission prompt blocks an agent
 
-**You see:** an Answer item that quotes a prompt with numbered options.
+**You see:** a question that quotes the agent tool's prompt with its options.
 
 ```sh
-norn story answer gh-18/02 "1"
+norn story answer gh-18 "1"
 ```
 
-norn types the key the prompt expects. If the prompt went away and came back with a new id, the first answer is refused: run `norn status` again and answer the new item.
+Claude Code runs in its `auto` permission mode by default, so this is rare; an executor's `args` replaces that default whole ([Use another agent tool or model](#use-another-agent-tool-or-model)).
 
 ## A gate waits for you
 
-**You see:** an Approve item with the gate's instruction, for example to review the slice files or the PR.
+**You see:** the unit waiting at a gate, with the gate's text: review the slice files, the PR, the QA verdicts.
 
 ```sh
 norn story approve gh-17
 norn story reject gh-17 --reason "Split slice 02: the migration and the endpoint are separate"
 ```
 
-A rejection sends the unit back with your reason in the next attempt's brief, counted by the route's counter. At `human-qa`, the item lists each criterion QA left to you and how to check it: approving records that you checked it.
+A rejection sends the unit back by the gate's `reject` route with your reason in the next attempt's brief, counted by the route's counter. When the story waits at more than one gate, name it with `--gate <step>`; `--reason` on an approval is kept with the decision.
 
-## An agent died, hung or ran out of retries
+## A step waits for you to start it
 
-norn handles most of this itself: an agent that dies is classified `died` and retried, one that goes quiet is nudged, one past its deadline is stopped. You only see it when the retries run out.
-
-**You see:** an Unblock item with the reason (`died`, `stalled`, `timeout`, a counter at its max) and `norn run rerun <unit>`.
-
-1. Read what happened: `norn run list gh-18/02` shows the step timeline, `norn run view gh-18/02 --why` the decision and the rule behind it.
-2. Fix the cause if it is outside the agent (a broken test command, a missing tool).
-3. Resume it in a fresh session:
+**You see:** an agent step ready to start, in manual mode.
 
 ```sh
-norn run rerun gh-18/02
-norn run rerun gh-18/02 --step implement --reset test_loop --reason "test command fixed"
+norn run start gh-18/02
 ```
 
-To stop an agent that is still running, `norn run cancel gh-18/02`; the work stays, and `norn run rerun` resumes it.
+The next tick starts the agent for this step only; manual mode holds every later step again. An attended step always waits for this, in either mode, because a person works in the agent's pane.
 
-A check that failed on a glitch (a CI hiccup, machine load, a flaky test) sends the unit back to implement, where an agent starts at once. To run the check again on the same code, `norn run rerun gh-18/02 --step test`: it is accepted while the unit is at the step that check's fail sent it to, and the next tick stops that step's agent. `norn run view gh-18/02 --json` tells you first: its `check_retry` names the check, the rerun, and `code_changed`, whether any commit or uncommitted change since the fail touched more than the spec's `handoffs/`.
+## Stop an agent and steer it
 
-## An agent is stuck
+```sh
+norn run stop gh-18/02
+norn story answer gh-18/02 "Stop rewriting the parser; only fix the off-by-one in tokenize()"
+```
 
-**You see:** an Unblock item with the agent's own reason from `norn stuck`.
+`norn run stop` parks the unit before it stops the run, so the stopped session is not read as died and retried. Your answer lifts the park and goes into the session.
 
-Do what the reason asks (grant access, fix the environment, settle a contradiction in the spec, ideally in the spec file itself), then `norn run rerun <unit>`. If the step should go somewhere else, add `--step <step>`.
+## An agent died, hung or went quiet
 
-## `norn status` keeps asking you to start the same step
+norn handles this itself: an agent that dies is retried in a fresh session, one that goes quiet is nudged, one that runs past its deadline is stopped. Each is bounded (`kernel.max_retries`, `kernel.max_nudges`, `kernel.silent_after`, `kernel.deadline` in the config, or `retries`, `nudges` and `deadline` on the step). You only see it when the bound is reached and the unit is stuck.
 
-**You see:** a manual step stays "ready: start an agent", and each agent you start runs `norn brief` and ends at once, refused with `already_reported`.
+## A unit is stuck
 
-No heartbeat runs on this checkout, so the agent's `norn brief` and `norn done` wait for a tick that never comes. Run `norn tick` once to apply them, then keep `norn watch` running (or a cron tick, below) while you work. `norn status` shows the step as waiting for the heartbeat, with an Unblock item that names `norn watch`, whenever receipts wait for a tick and no heartbeat runs.
+**You see:** the unit stuck, with its reason: the agent's own words from `norn stuck`, a counter at its max, or the runs that ran out.
+
+Read `norn story view <story>` and fix the cause where it lies: a broken check command, a missing tool, a contradiction in the spec. A stuck unit keeps its worktree, and a stuck story keeps its item open. There is no command yet that sends a stuck unit back to a step ([Limitations](limitations.md)): close it with `norn story close <story>` and open a new item for the work that is left.
+
+## Nothing moves
+
+**You see:** an agent reported (`norn done`), but the story stays at the same step.
+
+Nothing runs between ticks. Keep `norn watch` running while you work, or run `norn tick` once by hand. `norn doctor` says when the config, a plugin or a workflow keeps ticks from running, and what to fix first.
+
+## Keep the heartbeat alive without a terminal
+
+Run a tick from cron every minute in the repository:
+
+```sh
+* * * * * cd /path/to/repo && /usr/local/bin/norn tick >> /tmp/norn-tick.log 2>&1
+```
+
+A tick takes a lock, so a cron tick and `norn watch` take turns. cron has a minimal `PATH`: give full paths to `norn`, `gh` and your agent tool, or set `PATH` in the crontab.
 
 ## The base moved under a story
 
-norn merges the base into the story branch in an `update` step, never by rebasing. When the merge conflicts, a `resolve` step has an agent resolve it, and the story goes on.
+norn merges the base into the story branch in an `update-branch:` step, never by rebasing. When the merge conflicts, the shipped workflows send it to an agent step that resolves it, and the story goes on. A story waiting at a gate or at `await-merge:` goes back through its update step when the base moves under it in a way that conflicts (`base.stale` in the workflow). A base move without a conflict can still break the story; `base.verify: <check step>` runs that check on the merge of the base into the story head, once per base move, and sends the story back through update when it fails.
 
-Two kinds of conflict need no agent. When every conflicting path is a generated file the team's `regenerate` key maps (see [Reference: Config](reference.md#config)), norn takes the base's version of each, runs the mapped commands, and commits the merge with a `Norn-Regenerated` trailer; the story then goes through its test step as after any merge. A command that fails or times out, or a path still conflicted after the commands ran, aborts the merge and goes to `resolve`, with what the commands printed in the resolver's brief. A story branch that holds nothing but its own spec folder (a story waiting in triage or refinement) takes the base's version of every conflicting file outside that folder, with no key needed; it is still a merge. On the light path, a regenerated merge counts as clean when everything it changed over git's own merge is a mapped file.
-
-A story waiting at a gate or a `merge` step with a `stale` route goes back through update by itself. In the shipped `story` and `quick` workflows a story past the `ready` gate waits at the `merge` step until you merge its PR, so a conflicting base move while the PR waits needs nothing from you. When git merged the base by itself (a clean merge) and test and CI then pass, your earlier `ready` approval carries over: norn gives the `approve` and History shows `approval carried: clean base merge`. When a merge needed a resolution, you approve `ready` again; its item, the brief and the PR body list one `git show --remerge-diff <sha>` per merge, which shows only what the resolver changed. When the story has a PR, norn first waits for the next sync to fetch it: if the base moved because that PR merged, the story ends through the merge path and no second PR is opened.
-
-A base move without a conflict can still break the story: a rename on the base that the story's new code still calls. With `base.verify: <check step>` in the workflow, set to `test` in the shipped `story` and `quick`, norn runs that check on the merge of the base into the story head when the base moves under a story waiting at `ready` or `merge` without a conflict. It runs once per base move, detached in a temporary worktree like any check step and taking a check slot, and it pushes nothing, starts no CI and asks no approval. Green leaves the story waiting. Red sends it back, from whichever of `ready` or `merge` it waits at when the run ends (a person may approve `ready` while it runs), through update by the waiting step's `stale` route and counter, with the failing output as the next step's `last_check`. A workflow without `base.verify` verifies nothing, and one with `base.stale: behind` cannot set it: there every base move goes through update already.
-
-**You see:** a Check item such as `gh-3 conflicts with main in a.ts, b.ts (4 behind)` when the story waits at a gate without a `stale` route, is stuck, or is done with its PR not merged yet (a workflow without a `merge` step).
-
-```sh
-norn story update-branch gh-3
-```
-
-The story goes back through its update step; you approve the `ready` gate again afterwards, since the head changed. A finished story with a conflicting PR is updated this way, never with a new round: `norn story edit gh-3 --workflow <the workflow its round ran>` is refused there and names `norn story update-branch gh-3`. Starting a new round, with another workflow or `--at <step>`, is for new work. You may also push to the story branch yourself at any time: norn merges your push in and never loses it.
-
-## The base refused a merged story's done record
-
-Once a story PR merges, norn marks the story's `spec.md` `status: done` on the base branch. It pushes fast-forward only and never forces the push. A fetch that fails or a push that hits the network only waits for the next try, about every 5 minutes with the sync. If the base refuses the record 3 times (a protected branch, a spec that will not patch), norn stops retrying.
-
-**You see:** an Unblock item such as `gh-3 merged, but main refused its status: done record 3 times`, with the last refusal in its detail.
-
-Set `status: done` in the story's `spec.md` on the base yourself and commit it, by a PR if the branch is protected. The item clears once norn sees the base read done, within one sync under `watch` or right away with `norn sync`. If the story's spec is gone from the base, `norn tidy` drops the record.
+You may also push to the story branch yourself at any time: norn merges your push in and never loses it.
 
 ## Write your own workflow
 
-1. Copy one of the workflows in `.agents/workflows/` under a new name, for example `docs.yaml`, and change its `name:`.
-2. Edit the steps. Each opens with one head key that says what happens (`agent:`, `check:`, `gate:` or a verb with no value such as `open-pr:`), then says where each outcome goes in `outcomes:`. A route back is bounded by a counter norn derives from the kind of edge, so you write one only when its default is wrong ([Bound a loop](#bound-a-loop)). An agent step's head is its orientation, what the step is for; `skills:` (optional) lists the skills it uses, `by:` picks a configured agent, and `means:` says what each routed outcome means (with `verdict:` beside it when the outcome judges the criteria):
+1. Put a YAML file in `.agents/workflows/`. A file with the name of one of the pack's (`quick.yaml`) replaces it; a new name (`docs.yaml`) adds a workflow. Start from the pack's file of the same name.
+2. Edit the steps. Each opens with one head key that says what happens (`agent:`, `check:`, `gate:`, `slices:`, or a step kind with no value such as `open-pr:`), then says where each outcome goes in `outcomes:`. An agent step's head is its orientation, what the step is for; `skills:` (optional) lists the skills it uses, `by:` picks an executor, `inputs:` what its brief gives it, and `means:` says what each routed outcome means:
 
 ```yaml
   implement:
@@ -113,217 +107,109 @@ Set `status: done` in the story's `spec.md` on the base yourself and commit it, 
     outcomes: { approve: merge, reject: implement }
 ```
 
-   norn refuses at load a step with two head keys or none, a verb given a value (`open-pr: now`), an agent step with no orientation, a skill listed twice, a routed outcome with no meaning, a meaning or verdict for an outcome the step does not route, and `means:` or `verdict:` on a step that is not an agent step.
+3. Commit it, or keep it local: norn loads the files in `.agents/workflows/` of the main checkout. `norn doctor` shows a workflow that does not load, naming the file and the step.
+4. Use it: label an item `norn:wf:docs`, or `norn story create "…" --workflow docs` with the local tracker.
 
-   An agent step whose outcome sends work back can require what comes with it: `hand_back: { changes_requested: findings }` makes `norn done changes_requested` refuse a report without `--findings <file>` (code `hand_back_required`), and `evidence` requires `--evidence <dir>`; the brief's finish line shows the flag. norn refuses at load a `hand_back` key the step does not route, or one that is an overridable route. The shipped workflows require findings on `review.changes_requested`, `resolution-review.changes_requested` and `qa.fail`.
-
-   A file in the old wording (`type: agent` with `skill:` and `instructions:`, `type: check` with `run:`, `type: gate` with `prompt:`, `type: git` with `action:`, `means`/`verdict` inside a route) is refused in the main checkout. Run `norn upgrade`: it rewrites each such file in place, keeping its comments and layout. A story already in flight keeps running on its pinned workflow.
-
-   An `await-merge:` step after the last gate keeps a story past that gate in its workflow until its PR merges: `merge: { await-merge: null, outcomes: { stale: update } }`. Its one outcome is `stale`; the merge itself ends the story.
-
-   Once `open-pr` has run, every route from a step that changes code (an agent step or `update-branch:`) to a gate or merge step the round can end from must pass `open-pr` again: then the PR head a person merges is the commit CI checked. norn refuses a workflow that skips it and names the path. At run time, a story waiting at such a gate or merge step whose local head changes a path outside its spec folder that the PR lacks goes back to `open-pr` on its own. Changes inside the spec folder stay local.
-
-   A check ends in `pass` (exit 0) or `fail` (any other exit). One that can end another way names the outcome per exit code in `exits` and routes it like any other: the shipped `ci` check exits 3 on a PR that conflicts with its base, and `exits: { 3: stale }` with `stale: update` sends the story to take the base instead of to `implement`.
-
-3. Write a step once and reuse it, when the same steps appear in several workflows or a step differs from another only in its routes (below).
-4. Commit it. norn validates a workflow before a unit uses it and refuses one that does not hold together, naming what is wrong.
-5. Run `norn upgrade` once: it creates the `norn:wf:docs` label on the remote. Then use it: label an issue `norn:wf:docs`, or start the next round of a story with `norn story edit gh-12 --workflow docs`.
-
-A unit pins its workflow when it starts, with every `use` and `like` already filled in, so your edit, to a shared file too, applies to rounds that start after it.
+A unit pins its workflow when it starts, so your edit applies to stories that start after it.
 
 ### Share steps between workflows
 
-Steps that several workflows run the same way (the CI wait, the base update, opening the PR) go in a shared file, `.agents/workflows/shared/<name>.yaml`. It holds `start` (its first step), `steps` and an optional `description`, and nothing else. A shared file is never a workflow: it is not listed, gets no label and cannot be started.
-
-A route inside a shared file names one of the file's own steps, `$done` or `$stuck`, or leaves the file through a named exit, `{ exit: <name> }`; the file's named exits are the names its routes give. A named exit is not a check's `exits`, which turns an exit code into an outcome: below, the `ci` check's `exits: { 3: stale }` makes exit code 3 the outcome `stale`, and the route for `stale` leaves the shared file through its named exit `behind`.
+Steps that several workflows run the same way (the CI wait, the base update, opening the PR) go in a shared file, `.agents/workflows/shared/<name>.yaml`, which holds `start`, `steps` and an optional `description`. A route inside it names one of its own steps, `$done` or `$stuck`, or leaves through a named exit, `{ exit: <name> }`. A workflow brings it in with a step that holds only `use: <name>` and the routes for its exits:
 
 ```yaml
-# .agents/workflows/shared/ship.yaml
-description: Open or update the PR, then wait for its CI.
-start: open-pr
-steps:
-  open-pr:
-    open-pr:
-    outcomes: { done: ci }
-  ci:
-    check: ./scripts/wait-for-ci.sh
-    timeout: 30m
-    exits: { 3: stale }
-    outcomes:
-      pass:  { exit: green }
-      fail:  { exit: red }
-      stale: { exit: behind }
-```
-
-A workflow brings the file in with a step that holds only `use: <name>` and the routes for the file's named exits. The `use` step routes each named exit like an outcome, `max:` and `counter:` included:
-
-```yaml
-  describe:
-    agent: Write the PR body to pr.md in the spec folder.
-    skills: [norn-pr]
-    outcomes: { done: ship }
-    means: { done: "pr.md describes the branch as it is now" }
   ship:
     use: ship
     outcomes:
-      green:  ready
-      red:    { to: implement, max: 3 }
-      behind: update
+      ci-failed: { to: implement, max: 3 }
+      rejected:  implement
+      stale:     update
 ```
 
-The shared steps keep their own names, so the brief, receipts, history and `--at` show `open-pr` and `ci`, never `ship`. A route, `start` or `base.step` that names the `use` step enters the file at its `start`; any route, `base.step` or `base.verify` can name an included step to enter the file in the middle. A named exit the `use` step does not route goes to `$stuck`. A route inside the shared file can name a counter the workflow declares, and the workflow's `defaults:` apply to the included steps as to its own.
+The shared steps keep their own names, so the brief and the record show `open-pr` and `ci`, never `ship`.
 
 ### Copy a step with `like:`
 
-A step written `like: <step>` copies that step of the same file and replaces each key it writes, whole. It works in a workflow and in a shared file alike:
+A step written `like: <step>` copies that step of the same file and replaces each key it writes, whole:
 
 ```yaml
-  test:
-    check: npm ci && npm test
-    timeout: 15m
-    outcomes: { pass: qa, fail: implement }
   test-merge:
     like: test
     outcomes: { pass: open-pr, fail: implement }
 ```
 
-`test-merge` runs the same command with the same timeout; only its `outcomes` differ. A key is replaced whole, never merged: `test-merge` above writes both of its routes. A copy inherits its target's head key and may not write another one (that is two head keys). The same holds for `means:` and `verdict:`: a copy that writes `means:` replaces the whole map, so it must give a meaning for every outcome it routes, inherited ones included, or it is refused.
-
 ### Bound a loop
 
-Every route back to an earlier step is counted, and a unit whose counter passes its max is stuck. You write none of these counters yourself: norn derives one from the kind of each edge when it loads the workflow.
+Every route back to an earlier step is counted, and a unit whose counter passes its max is stuck. norn derives each counter from the kind of edge, named `<step>.<outcome>`:
 
 | Edge | Default max | Resets |
 |---|---|---|
-| a check's `fail`, or an outcome its `exits` names for an exit code, other than `stale` | 5 | never |
+| a check's `fail`, or an outcome its `exits` names, other than `stale` | 5 | never |
 | a gate's `reject` | 2 | never |
 | a `conflict` | 2 | on any other outcome of the same step |
 | `stale`, on any kind of step | 10 | never |
-| an agent outcome other than `done`, `pass` or `approve` that lies on a loop the rows above leave uncounted (`review.changes_requested → implement`) | 3 | never |
+| an agent outcome that sends work back on an otherwise uncounted loop | 3 | never |
 
-Only an edge to a step is counted; an edge to `$done` or `$stuck` ends the round. The first four rows count their edge even where it lies on no loop. A `done`, `pass` or `approve` edge, and an agent outcome on no loop that is still uncounted, get no counter: forward progress is never counted.
-
-**Names.** A derived counter is named after the edge it counts, `<step>.<outcome>` (`test.fail`, `review.changes_requested`), the spelling `reset_on` uses for an edge. A route that leaves a [shared file](#share-steps-between-workflows) through a named exit is counted by one counter, `<use step>.<exit>` (`ship.stale`, `base-update.broken`), shared by every edge inside the file that leaves through that exit; its default comes from the kind of those edges. The name is what the brief's last-round warning (`Last round on review.changes_requested (2/3)`), `norn status`, `norn story view` and the Unblock item show, and what `norn run rerun <unit> --reset review.changes_requested` takes.
-
-**Change the bound with `max:` on the edge.** `fail: { to: implement, max: 3 }` replaces the default max and keeps the name and the reset. On an edge that would derive no counter (a gate's `approve` or an agent's `done` that leads back), `max:` counts it as `<step>.<outcome>` with that max and no reset. On a `use` step's route, `max:` bounds the exit's counter: `ci-failed: { to: implement, max: 3 }`.
-
-**When you still name a counter.** Write `counter: <name>` on the edges and declare it under `counters:` when several edges share one budget, or when a counter resets on edges you choose:
-
-```yaml
-steps:
-  qa:
-    # …
-    outcomes: { pass: describe, fail: { to: implement, counter: qa_loop } }
-  human-qa:
-    # …
-    outcomes: { approve: describe, reject: { to: implement, counter: qa_loop } }
-counters:
-  # QA's fail and the person's reject share one budget of 2
-  qa_loop: { max: 2 }
-  # or reset it whenever the person approves: { max: 2, reset_on: human-qa.approve }
-```
-
-An edge with `counter:` gets no derived counter. A name under `counters:` has no dot; a dotted name is always derived, so `counter: review.changes_requested` is refused as not declared. A workflow written before derived counters, every route with its `counter:` and a `counters:` block, loads and runs as it did.
-
-norn refuses at load, and `norn doctor` reports with the edge or exit it is about:
-
-- `max:` and `counter:` on one edge: a named counter's max goes under `counters:`;
-- `max:` on an edge to `$done` or `$stuck`: there is no loop to bound;
-- a shared exit fed by edges of different kinds (a check's `fail` and a gate's `reject`) when the `use` step's route gives no `max:`: the message names the exit and the edges of each kind;
-- a loop still uncounted after derivation (`cycle without a counter`, naming its edges).
-
-### What norn refuses
-
-norn refuses the workflow when it loads, naming the file and the step, and shows it as broken wherever a broken workflow shows (`norn doctor`, the workflow listing, `norn story create`, `norn story edit --workflow`):
-
-- a `use:` naming a shared file that does not exist: the message names the file and the folder it looked in, `.agents/workflows/shared/`;
-- an included step with the same name as a workflow step, a step of another shared file or the `use` step itself, and a shared file used twice in one workflow: the message names the step and both places it comes from;
-- a `use` step routing a named exit the shared file does not have, a misspelt one included: the message names it and lists the file's named exits;
-- a `use:` inside a shared file: a shared file cannot use another shared file;
-- `name`, `counters`, `defaults`, `mode` or `base` in a shared file: that key belongs in the workflow;
-- a route in a shared file naming a step outside it: a shared file leaves through a named exit (`{ exit: <name> }`);
-- `reset_on` or `base.verify` naming a `use` step: name the included step instead;
-- a `like:` naming a step that does not exist, the step itself, another `like` step, a `use` step or a step of another file, and a `use` step that carries `like`.
-
-An included step that breaks an ordinary rule (an unknown counter, a loop no counter bounds) is refused with a message that names its shared file and the step in it.
+`max:` on an edge replaces its default. To share one budget between edges, or reset it on chosen edges, write `counter: <name>` on them and declare it under `counters:` (`qa_loop: { max: 2, reset_on: human-qa.approve }`). The defaults for every workflow are the config's `kernel.counters` keys (`check_fail`, `gate_reject`, `conflict`, `stale`, `agent_back`).
 
 ## Name your own skill in a step
 
-Write the skill under a name without the `norn-` prefix in `.agents/skills/<name>/SKILL.md`, link it into each agent's skill folder, and list it in the step: `skills: [my-review]`. A step may list several (`skills: [my-review, norn-tdd]`); the brief then says "Use the `my-review` and `norn-tdd` skills." above the step's orientation. A step with no `skills:` gets only its orientation. A skill that is not installed, or not visible to the agent `by:` picks, is refused at load (`unknown_skill`), and `norn doctor` reports it.
+Write the skill under a name without the `norn-` prefix in `.agents/skills/<name>/SKILL.md`, commit it, and list it in the step: `skills: [my-review]`. To change how a pack skill works, commit your own folder under the pack skill's name: norn finds no mark of its own in it and leaves it alone, so your version is the one the agent loads.
 
-## Hand a story over
-
-On your machine, when you stop working on the story:
+## Run without GitHub
 
 ```sh
-norn story handoff gh-12
+norn init --tracker local --forge none
+norn story create "Add CSV export of orders" --body "Orders page, a button, all columns"
 ```
 
-It pushes the branches (with the handoffs on them), then the story's record to `refs/norn/runs/gh-12`, and only then releases the claim; it names the record commit and the story branch commit it matches. If the record push fails, nothing is released: check the remote and run it again. A clean `norn watch` exit and `norn story close` push the record the same way before they release a claim. While a resolve step waits at a question with its base merge in progress, the unfinished merge lives only in your worktree and cannot be pushed: `norn story handoff` refuses the story (`merge_in_progress`) until the question is answered and the merge concluded, and a clean `norn watch` exit keeps that story's claim, so a restart on the same machine resumes the merge. On the colleague's machine:
+With the local tracker an item is a markdown file in the machine dir (or the folder its `dir` key names), and every open item with the intake label is a story, whoever wrote it. With forge `none`, the open-PR step writes a local record of the change; you review it and merge the story branch into the base with git, and the next tick sees the merge and finishes the story.
+
+## Use another agent tool or model
+
+An executor is a harness in a runner, under a name. Add one, make it the default, or pick it per step:
 
 ```sh
-norn story checkout gh-12
+norn config set executors.pi "{harness: pi, runner: headless}"
+norn config set executor pi
+norn config set executors.claude.model opus
 ```
 
-It claims the story, checks out its branches, fetches the record into their machine dir and prints the status and the handoff, and their heartbeat drives it from there at the same step, attempt and counters. Commits pushed on top of the branch after the record are fine. If the branch was rewritten since the record (the commit it matches is gone), the record is kept and the current step restarts as a new attempt, with the reason in the brief.
+In a workflow, `by: pi` on an agent step runs that step on the `pi` executor. `args` on an executor replaces its harness's default arguments whole (Claude Code's are `--permission-mode auto`).
 
-If your machine is gone and still holds the claim, wait for the claim to expire or run `norn story checkout gh-12 --force`; the takeover is recorded. Under the `local` record policy your machine pushed the record only when it released a claim and each time `open-pr` opened or updated the PR, so what happened after the last such push is lost: when the ref holds an older record, checkout resumes from that one. When the ref holds none (the story never released a claim and never reached `open-pr`), checkout says the record was lost and starts a new round of the story's workflow, pinned from the branch, at the step its last boundary commit led to, with fresh counters; the brief tells the agent to check the branch for what is already done. Under the `remote` policy (`norn config set record.policy remote --repo`) the record is pushed whenever it changes, so a takeover finds it as of the last tick that pushed it. The same `--force` checkout recovers a story on your own machine after its `~/.norn` was wiped.
-
-When your machine comes back after a takeover without a release, its next tick sets its copy of the record aside as superseded (`~/.norn/repos/<id>/superseded/`), never pushes it, and shows one Check item; `norn tidy` deletes it after `trace.retain`. After a clean `norn story handoff` your copy is already on the ref and is removed quietly.
-
-## Keep the heartbeat alive without a terminal
-
-Run a tick from cron every minute in the repository:
+## Watch agents in Herdr panes
 
 ```sh
-* * * * * cd /path/to/repo && /usr/local/bin/norn tick --interval 1m >> /tmp/norn-tick.log 2>&1
+norn config set executors.claude.runner herdr
+norn config set kernel.mode manual
 ```
 
-`--interval` tells norn how often the tick runs: it is recorded for the checkout and sets when the heartbeat counts as down and how long a claim lasts. Match it to the cron schedule; without it, norn assumes 30 seconds. Every tick on one checkout shares one heartbeat id, so each recognises the claim the previous one renewed. cron has a minimal `PATH`: give full paths to `norn`, `gh` and your agent, or set `PATH` in the crontab.
+The herdr runner opens one Herdr workspace per story and one tab per run, with the agent in its pane: you can watch it and type into it. With a person beside the agent, manual mode fits: start each agent step with `norn run start <unit>`. A decision given by typing into the pane is not on norn's record; give it with `norn story answer` too.
 
-## Explain a slow tick
-
-`norn story list` and the cockpit header show how long the last tick took. Each tick's record in the trace (one JSON line per tick in the day file `~/.norn/repos/<id>/<day>.jsonl`) says where it spent its time. Its `tick.end` line names the slowest phase, so a slow tick is one `jq` away:
+## Share run data with a team
 
 ```sh
-jq -c 'select(.type == "tick.end" and .duration_ms > 8000) | {tick_id, duration_ms, slowest}' ~/.norn/repos/<id>/<day>.jsonl
+norn config set store.use refs --commit
 ```
 
-The full `tick` record with that `tick_id` holds the rest. `sync` says whether a remote sync ran and how it ended. `timing` gives `observe_ms`, `decide_ms`, `act_ms` and `after_ms`, observe's phases in `timing.observe` (`base_fetch`, `local`, `sync.norn_refs`, `sync.issues`, `sync.stories`, `runner`, `stories`, …), and the remote calls the sync made in `timing.calls`. Process liveness probes have no phase of their own: they count under `local` (the claims' leases) and `stories` (each story's sessions). `act_ms` includes writing the `tick.start` line. Each decision's `result.ms` is the time its action took; claim renewals are pushed in one batch, so each one shows the batch's time, and `slowest` names the batch once (`act claim renew (N claims)`). Older records have none of these fields.
+The `refs` store keeps run data, claims and the mailbox on git refs under `refs/norn/v2/`, pushed to the remote, so every clone sees each story's step and who holds it. Commit the config (`norn init --commit` writes `.agents/norn.yaml`) so the team runs the same tracker, forge, store and plugins; the plugin lock `.agents/norn.plugins.lock` pins the version of each installed plugin beside it.
 
-## Roll out a new norn to a team
+## Write a plugin
 
-The repo's norn version (`norn_version` in `.agents/norn.config.yaml`, see [Concepts](concepts.md#the-repos-norn-version)) says which norn every machine runs. Moving it is one commit by one person; everyone else pulls and installs. `norn upgrade` moves a repo from norn 0.30 on: a repo that records no `norn_version`, or one below 0.30, is refused (`version_missing`, `version_too_old`) with the path forward: install norn 0.30.x, run `norn upgrade`, commit, then run `norn upgrade` again with the new norn (and `norn init` first if norn was never set up there).
+A plugin is a package whose module exports one value made with `defineNornPlugin` from `@norn/plugin-api`:
 
-**The person who upgrades**, in the main checkout:
+```ts
+import { defineNornPlugin } from "@norn/plugin-api";
+import { linearTrackerFactory } from "./tracker.ts";
 
-1. Install the new norn ([README: Install](../README.md#install)) and check it with `norn --version`.
-2. Stop `norn watch` (and any cron tick) on this checkout: `norn upgrade` refuses while a tick runs.
-3. Run `norn upgrade`. It rewrites each workflow and shared file in `.agents/workflows/` still in the old wording to the new one, keeping its comments and layout; a file holding a comment the rewrite cannot place is left as written and listed with its line, for you to edit by hand, and the rest still move. It rewrites the bundled `norn*` skills in `.agents/skills/` to its copies and relinks them into each configured agent's skill folder, then moves `norn_version` to the running binary's version, last, so a run cut short leaves the old version and a rerun finishes it. Everything is staged and nothing committed; it ends with the commit to make, which names the new version (or says only the skills were refreshed). It also creates any label norn uses that is missing on the remote, and a remote it cannot reach is reported without failing the upgrade. With nothing to do it prints `already on norn <version>: nothing to upgrade` and stages nothing.
-4. Review `git diff --staged`, commit it and push it to the base branch (through a PR if your base branch takes only PRs).
-
-`norn upgrade` never moves the version backward: a binary older than the repo's version is refused with the norn to install. To really go back, edit the key in the team file by hand, where review sees it.
-
-**Teammates**, once the commit is on the base branch: pull it into the main checkout, install the same minor (any patch at or after the recorded one), and restart `norn watch`. Until they install, the commands that act refuse with `this repo needs norn X.Y.x (you run …)` and the norn to install; `norn status` shows the same at the top. A `norn watch` started before the pull keeps running: it skips each tick it may not run, sends one notification ("ticks paused"), and resumes by itself once the version matches again. A tick run from cron exits 3 each time instead.
-
-**`norn init` is for a new repo or a new machine**, never for moving the version. On a repo with no team file it records the running norn's version; a team file with no `norn_version`, or one below 0.30, is an older norn's repo and init refuses it (`version_missing`, `version_too_old`) with the 0.30 path, writing nothing. On a repo from 0.30 on it sets up your machine and leaves `norn_version` and the bundled skills alone; when they differ from your binary it says so and points at `norn upgrade`. A missing bundled skill is copied in either way.
-
-**Units in flight** wait for their branch to take in the base. A story branch cut before the upgrade still holds the old skills, so after you install the new norn its next agent step is held as drift (the inbox names `norn story update-branch <story>`) until the next base sync, or that command, brings the new skills in; then it launches. Its pinned workflow does not change. A claim held by a machine that is now refused is not handed over: it expires as when a machine stops ticking, and a matching machine takes it over.
-
-**A norn from before this check** does not know the key: on a repo that records a `norn_version` it refuses every command with a config error, `` unknown key `norn_version` ``, exit code 6 (`config`), and writes nothing. The fix is the same: install the norn the repo records.
-
-**Check it in CI.** `norn doctor --repo` checks the repo's norn version against the installed norn, the bundled skills against its copies, and the workflows and config, with no agent, runner or remote. Installing the latest release makes a PR red when the repo is behind it or when someone hand-edited a bundled skill:
-
-```yaml
-  norn:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install the latest norn
-        run: |
-          curl -fsSLO https://github.com/PruszynskiJakub/norn-next/releases/latest/download/norn-linux-x64
-          sudo install -m 755 norn-linux-x64 /usr/local/bin/norn
-      - run: norn doctor --repo
+export const linearPlugin = defineNornPlugin({ name: "norn-linear", api: "^1", provides: { tracker: { linear: linearTrackerFactory } } });
 ```
 
-To check only the skills, workflows and config, and not lag behind the latest release, install the version the repo records instead: `releases/download/v$(sed -n 's/^norn_version: *//p' .agents/norn.config.yaml)/norn-linux-x64`.
+It may fill any slot: `harness`, `tracker`, `forge`, `store`, `vcs`, `runners`, `stepKinds`, `packs`. A tracker, forge, store, vcs or runner is a factory with a `configSchema` and `create(ctx, config)`; it does its IO only through the `HostContext` it is given, and every call returns a `PluginResult`. Run the slot's suite from `@norn/conformance` (`trackerContract`, `forgeContract`, `storeContract`, `harnessConformance`) against it. Then:
+
+```sh
+norn plugin add ../norn-linear       # or an npm spec or a git URL
+norn config set tracker.use linear
+norn doctor
+```
+
+`norn plugin add` installs it into `~/.norn/plugins/` and pins it in the lock; a local path is linked, so your edits take effect at once. `norn plugin update <name>` moves it to the newest version its spec allows, `norn plugin remove <name>` unpins it.

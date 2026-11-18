@@ -1,15 +1,18 @@
-/** gh-162 B8–B13: docs/reference.md's generated block is rendered from the cli and kept up to date. */
+/** docs/reference.md's generated block is rendered from the cli and kept up to date. */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { CONFIG_SCHEMAS, ExitCode } from "@norn/schema";
+import { SDLC_PACK } from "@norn/pack-sdlc";
+import { ExitCode } from "@norn/schema";
+import { parse } from "yaml";
 import { freshReference, ROOT } from "../../scripts/docs-emit.ts";
 import { COMMANDS, NOUNS } from "../../src/commands/index.ts";
-import { currentReference, FILE_LABEL, REFERENCE_END, REFERENCE_FILE, REFERENCE_START, replaceReference } from "../../src/reference.ts";
+import { KernelKnobs } from "../../src/config/schema.ts";
+import { configKeys, currentReference, durationText, KEY_DEFAULTS, REFERENCE_END, REFERENCE_FILE, REFERENCE_START, replaceReference } from "../../src/reference.ts";
 
 const fresh = freshReference();
 
-describe("Reference render (B13)", () => {
+describe("reference render", () => {
   test("every command and every noun verb has a heading with its usage, every option is listed", () => {
     for (const c of [...COMMANDS, ...NOUNS.flatMap((n) => n.verbs)]) {
       expect(fresh).toContain(`##### \`norn ${c.name}\`\n`);
@@ -19,59 +22,40 @@ describe("Reference render (B13)", () => {
     for (const n of NOUNS) expect(fresh).toContain(`##### \`norn ${n.name}\` (noun)`);
   });
 
-  test("spec ids are stripped from summaries, as norn help does", () => {
-    expect(fresh).not.toMatch(/\(B30–B32, MO1, W9, S7\)/);
+  test("every config key appears with its type, and the defaults come from the cli, the kernel and the runtime", () => {
+    const { rows } = configKeys();
+    for (const r of rows) expect(fresh).toMatch(new RegExp(`^\\| \`${r.key.replace(/[.<>]/g, "\\$&")}\` \\| `, "m"));
+    expect(fresh).toContain('| `kernel.mode` | `"manual"` or `"auto"` | `"manual"` |');
+    expect(fresh).toContain('| `vcs.use` | string | `"git"` |');
+    expect(fresh).toContain('| `packs` | list of strings (one) | `["sdlc"]` |');
+    expect(fresh).toContain('| `kernel.silent_after` | duration | `"15m"` |');
+    expect(fresh).toContain('| `kernel.deadline` | duration or `"none"` | `"1h"` |');
+    expect(fresh).toContain("| `executors.<name>.harness` | string | none |");
+    expect(fresh).toContain("| `executor` | string | derived: the only executor |");
+    expect(fresh).toMatch(/^Beside `use`, `tracker`, `forge`, `store`, `vcs`/m);
   });
 
-  test("every key of the three config files appears with the files that take it", () => {
-    const keys = (schema: unknown, prefix = ""): string[] =>
-      Object.entries((schema as { properties?: Record<string, unknown> }).properties ?? {})
-        .filter(([k]) => k !== "$schema")
-        .flatMap(([k, child]) => {
-          const nested = keys(child, `${prefix}${k}.`);
-          return nested.length ? nested : [`${prefix}${k}`];
-        });
-    for (const [kind, schema] of Object.entries(CONFIG_SCHEMAS)) {
-      for (const key of keys(schema)) expect(fresh).toMatch(new RegExp(`^\\| \`${key.replace(/\./g, "\\.")}\` \\| [^|\n]*${FILE_LABEL[kind as keyof typeof FILE_LABEL]}`, "m"));
-    }
+  test("every kernel knob has a default, and every default names a key the schema has", () => {
+    const keys = new Set(configKeys().rows.map((r) => r.key));
+    for (const k of Object.keys(KernelKnobs.properties).filter((k) => k !== "counters")) expect(KEY_DEFAULTS, k).toHaveProperty([`kernel.${k}`]);
+    expect(Object.keys(KEY_DEFAULTS).filter((k) => !keys.has(k))).toEqual([]);
   });
 
-  test("types and defaults come from the file schemas and the built-in config", () => {
-    expect(fresh).toContain('| `mode` | user, local | `"manual"` or `"auto"` | `"manual"` |');
-    expect(fresh).toContain("| `max_agents` | user | integer 1–9 | `9` |");
-    expect(fresh).toContain('| `agents.claude.args` | user, local | list of strings | `["--permission-mode","auto"]` |');
-    // Derived when unset, never a fixed default
-    expect(fresh).toContain('| `provider` | team | `"gh"` or `"glab"` | derived from the remote URL |');
-    expect(fresh).toContain("| `base_branch` | team | string or null | derived: the remote's default branch |");
-    expect(fresh).toContain('| `trace.retain` | user | duration | `"14d"` |');
-    expect(fresh).toContain("| `notify.os` | user | boolean | `true` |");
-    expect(fresh).toContain("| `notify.ntfy` | user | URL | none |");
-    expect(fresh).not.toContain("$schema");
+  test("a duration is spelled in the largest unit that divides it", () => {
+    expect([durationText(900_000), durationText(3_600_000), durationText(400_000), durationText(1_500)]).toEqual(["15m", "1h", "400s", "1500ms"]);
   });
 
-  test("the repo's norn version key and norn upgrade are listed, with upgrade's 0.30 starting point; no norn migrate", () => {
-    expect(fresh).toContain("| `norn_version` | team | string | `null` |");
-    expect(fresh).toContain("##### `norn upgrade`\n\nMove this repo's norn_version, bundled skills and workflow wording to this norn, from norn 0.30 on");
-    expect(fresh).not.toContain("migrate");
-  });
-
-  test("no key gh-64 removed is listed (B52)", () => {
-    for (const k of ["runner", "remote.", "default_mode", "default_agent", "default_workflow", "default_slice_workflow", "limits.", "slots.", "notifiers", "claim.", "watch_interval", "max_checks", "capabilities"])
-      expect(fresh).not.toMatch(new RegExp(`^\\| \`${k.replace(/\./g, "\\.")}`, "m"));
-  });
-
-  test("the shipped workflows and every exit code", () => {
-    for (const w of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect(fresh).toMatch(new RegExp(`^- \`${w}\`: \\S`, "m"));
-    for (const [k, v] of Object.entries(ExitCode)) expect(fresh).toContain(`| ${v} | \`${k}\` |`);
-    expect(fresh).toContain("| 3 | `refused` |");
+  test("the shipped workflows and every exit code with its meaning", () => {
+    for (const text of Object.values(SDLC_PACK.workflows)) expect(fresh).toMatch(new RegExp(`^- \`${(parse(text) as { name: string }).name}\`: \\S`, "m"));
+    for (const [k, v] of Object.entries(ExitCode)) expect(fresh).toMatch(new RegExp(`^\\| ${v} \\| \`${k}\` \\| \\S`, "m"));
   });
 });
 
-describe("the generated block in the file (B10, B11, B12)", () => {
+describe("the generated block in the file", () => {
   test("replaceReference keeps the prose around the markers and replaces only the block", () => {
-    const doc = `# Reference\n\nprose before\n\n${REFERENCE_START}\nold\n${REFERENCE_END}\n\nExit codes: prose after\n`;
+    const doc = `# Reference\n\nprose before\n\n${REFERENCE_START}\nold\n${REFERENCE_END}\n\nprose after\n`;
     const out = replaceReference(doc, `${REFERENCE_START}\nnew\n${REFERENCE_END}`);
-    expect(out).toBe(`# Reference\n\nprose before\n\n${REFERENCE_START}\nnew\n${REFERENCE_END}\n\nExit codes: prose after\n`);
+    expect(out).toBe(`# Reference\n\nprose before\n\n${REFERENCE_START}\nnew\n${REFERENCE_END}\n\nprose after\n`);
     expect(() => replaceReference("# no markers", "x")).toThrow("no generated block");
   });
 

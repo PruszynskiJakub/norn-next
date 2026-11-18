@@ -3,8 +3,9 @@
 # unable to start a round, release included, until a norn built from the change is installed.
 # Its own workflow, never a job of ci.yml: a story's `ci` check waits on the ci.yml run, and such a
 # change is meant, not a failure to send back. A release PR passes without the check: it moves the
-# norn version the repo records past the latest release, which that norn refuses by design. It is told
-# by that version, never by its title: norn opens it titled `Release` and names the version later.
+# version in packages/cli/package.json past the latest release, and the tree it brings is the next
+# binary's, not this one's. It is told by that version, never by its title: norn opens it titled
+# `Release` and names the version later.
 name: released norn
 
 on:
@@ -34,9 +35,9 @@ jobs:
       - name: The released norn reads this tree
         run: |
           tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
-          recorded=$(sed -n 's/^norn_version: *//p' .agents/norn.config.yaml)
+          recorded=$(jq -r .version packages/cli/package.json)
           if [ "$recorded" != "${tag#v}" ]; then
-            echo "::notice title=released norn::this PR records norn $recorded, the latest release is ${tag#v}: a release, which that norn refuses by design"
+            echo "::notice title=released norn::this PR builds norn $recorded, the latest release is ${tag#v}: a release, which the next binary reads"
             exit 0
           fi
           if ! NORN_HOME_DIR="$RUNNER_TEMP/norn-home" "$RUNNER_TEMP/norn/norn-linux-x64" doctor --repo; then

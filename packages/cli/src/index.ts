@@ -1,19 +1,17 @@
-/**
- * @norn/cli — wiring and commands. `main.ts` is the `norn` bin; `runCli` runs a command
- * in-process (tests, embedding). Command files live in `src/commands/` (see commands/index.ts).
- */
-export { type CliResult, helpFor, nounHelp, parseCommandArgs, runCli } from "./cli.ts";
-export { type Command, defineCommand, opt, type OptionSpec, type ParsedArgs } from "./command.ts";
+export { type CliResult, runCli, versionInfo } from "./cli.ts";
+export { type Command, defineCommand, defineNoun, type Noun, opt, type ParsedArgs } from "./command.ts";
 export { COMMANDS, findCommand, findNoun, NOUNS } from "./commands/index.ts";
-export { type CliDeps, Context, findUnitMarker, type Located, locateRepo, runningVersion, systemClock } from "./context.ts";
-export { busyError, CliFailure, corruptError, failure, isRendered, isWithExit, refuse, render, rendered, toFailure, usageError, withExit } from "./output.ts";
-export { type ActRecord, Actor } from "./runtime/act/index.ts";
-export { heartbeatId, markNotified, readNotified, readRemoteCache } from "@norn/store";
-export { type Observed, observe, type ObserveOptions, type StoryLoc, type SyncMode, type UnitLoc } from "./runtime/observe/index.ts";
-export { type Interaction, type InteractionChoice, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
-export { releaseHeldClaims, releaseStory } from "./runtime/release.ts";
-export { runShell, tailLines } from "./runtime/shell.ts";
-export { runTick, type TickOptions, type TickReport, traceRecord } from "./runtime/tick.ts";
-export { type AssetsSources, assetsDir, resolveAssetsDir } from "./runtime/assets.ts";
-export { agentSkills, bundledSkills, repoWorkflows } from "./runtime/workflows.ts";
-export { buildPorts, defaultRegistry } from "./wiring.ts";
+export { durationMs, kernelConfigOf, runtimeConfigOf, slotChoice } from "./config/derive.ts";
+export { type ConfigLoad, type ConfigProblem, configError, type LoadedConfig, loadConfig, mergeConfig, parseLayer, problemText } from "./config/load.ts";
+export { getKey, mergeLayers } from "./config/merge.ts";
+export * from "./config/paths.ts";
+export * from "./config/schema.ts";
+export { parseValue, planSet, setKeyInText, writeLayer } from "./config/write.ts";
+export { CliContext, type CliIo } from "./context.ts";
+export * from "./home.ts";
+export * from "./output.ts";
+export { BUNDLED_PLUGINS, bundledNames } from "./plugins/bundled.ts";
+export { importFromPluginsDir, type InstalledLoad, loadInstalled, type PluginImporter } from "./plugins/installed.ts";
+export * from "./plugins/lock.ts";
+export { missingStepKinds, picks, type Resolution, resolvePlugins } from "./plugins/resolve.ts";
+export * from "./wiring.ts";

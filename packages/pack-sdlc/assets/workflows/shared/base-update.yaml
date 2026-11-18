@@ -1,4 +1,4 @@
-# Shared steps — installed by `norn init`; edit freely. A workflow brings them in with `use: base-update`.
+# Shared steps — shipped in the sdlc pack; a repo copy under .agents/workflows/shared/ replaces it. A workflow brings them in with `use: base-update`.
 # Brings the story branch up to date with its base after the work, tests the merged tree, and takes
 # the light path when only the base moved.
 # Change the `test` step's `check:` to your repo's test command; the light path's test steps copy it (`like: test`).

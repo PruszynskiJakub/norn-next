@@ -166,7 +166,7 @@ describe("kernel schemas", () => {
 
 describe("workflow documents", () => {
   /** Shipped workflows, both the bundled copies and this repo's own. */
-  const dirs = [join(ROOT, "packages", "cli", "assets", "workflows"), join(ROOT, ".agents", "workflows")];
+  const dirs = [join(ROOT, "packages", "pack-sdlc", "assets", "workflows"), join(ROOT, ".agents", "workflows")];
   const yamls = (dir: string) => readdirSync(dir).filter((n) => n.endsWith(".yaml")).map((n) => join(dir, n));
 
   test.each(dirs.flatMap(yamls).map((f) => [f.slice(ROOT.length + 1), f]))("%s fits the workflow document schema", (_name, file) => {

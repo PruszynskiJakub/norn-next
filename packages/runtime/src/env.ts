@@ -4,6 +4,7 @@
  */
 import type { Journal, KernelFacts, KernelWorkflows } from "@norn/kernel";
 import type { HostContext } from "@norn/plugin-api";
+import type { RepoWorkflows } from "./repo-workflows.ts";
 import type { ResolvedSlots } from "./resolve.ts";
 import type { AgentLauncher, RuntimeConfig, SessionSource } from "./types.ts";
 
@@ -14,8 +15,10 @@ export interface RuntimeEnv {
   journal: Journal;
   launcher: AgentLauncher;
   sessions: SessionSource;
-  /** the pack's workflows by name; pinned ones a unit runs under are added per tick from its state */
+  /** the pack's workflows by name, the repo's laid over them; pinned ones a unit runs under are added per tick from its state */
   workflows: KernelWorkflows["byName"];
+  /** the repo files the workflows were laid over with, so a failure names the repo's file rather than the pack's */
+  repoWorkflows: RepoWorkflows;
 }
 
 /** One tick as act sees it: the facts decide read, so an act checks the record against what was decided from. */

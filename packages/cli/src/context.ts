@@ -1,222 +1,100 @@
 /**
- * Command context: where we are (repo root, unit worktree), resolved config, ports built
- * from the adapter registry, clock and `~/.norn` home (NORN_HOME_DIR overrides it).
- *
- * Repo root discovery works from the main checkout and from any story/slice worktree: a
- * `.norn-unit` marker found walking up from cwd names the repo; otherwise git's common dir.
+ * What a command runs with. Everything a command may need is built on first use and kept, so a
+ * command that never touches the repo (help, --version) runs anywhere, and one that does refuses
+ * with the CliError of the first piece that does not resolve.
  */
-import { existsSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
-import type { herdr } from "@norn/adapters";
-import type { AdapterContext, AdapterRegistry, Clock, GitPort, Ports } from "@norn/core";
-import { DEFAULT_CONFIG, type ResolvedConfig } from "@norn/schema";
-import { bindNornHome, type LoadedConfig, loadConfig, nornHome, readUnitMarker, type UnitMarker } from "@norn/store";
-import { configError, refuse } from "./output.ts";
-import { type Interaction, isAgentSession, terminalInteraction } from "./runtime/interaction.ts";
-import { abortableSleep } from "./runtime/tick-lock.ts";
-import { NORN_VERSION } from "./version.ts";
-import { buildPorts, defaultRegistry } from "./wiring.ts";
+import { hostname } from "node:os";
+import type { HostContext } from "@norn/plugin-api";
+import type { Runtime, RuntimeEnv } from "@norn/runtime";
+import type { LoadedConfig } from "./config/load.ts";
+import { nornHome } from "./home.ts";
+import { packFailure } from "./plugins/pack-check.ts";
+import type { PluginImporter } from "./plugins/installed.ts";
+import { defaultHolder, type HostFactory, type WiredPlugins, type WiredRepo, wireConfig, wirePlugins, wireRepo, wireRepoWorkflows, wireRuntime, wireRuntimeEnv } from "./wiring.ts";
 
-/** Everything a command may get injected; all optional (tests pass fakes). */
-export interface CliDeps {
-  cwd?: string;
-  env?: Record<string, string | undefined>;
-  clock?: Clock;
-  /** `~/.norn` override (else NORN_HOME_DIR, else ~/.norn) */
-  home?: string;
-  /** replace whole ports (fake remote, fake runner, …) */
-  ports?: Partial<Ports>;
-  registry?: AdapterRegistry;
-  /** progress lines for long-running commands (watch); never stdout */
-  log?: (line: string) => void;
-  /** stops `watch` after the current tick, and `story wait` */
+/** The process as the entry hands it over; a test passes its own, so the CLI runs in-process with no child. */
+export interface CliIo {
+  env: Readonly<Record<string, string | undefined>>;
+  cwd: string;
+  /** the user's home folder, beneath which `~/.norn` sits */
+  userHome: string;
+  /** the whole of stdin; called only by a command that reads it */
+  stdin(): Promise<string>;
+  /** aborted on the first SIGINT or SIGTERM: `watch` ends its tick and stops */
   signal?: AbortSignal;
-  /** stdin text for commands that read it (`norn hook`); else the process stdin */
-  stdin?: string;
-  /** Raw key chunks for `norn status --watch`; else the process stdin in raw mode */
-  input?: AsyncIterable<string>;
-  /** Herdr for the cockpit; null = none; absent = the real one when `HERDR_ENV=1` */
-  herdr?: herdr.HerdrCockpit | null;
-  /** an outside command a front end starts for the person (`norn status --watch` opens a PR or issue link); default Bun.spawn */
-  shell?: (argv: string[], cwd: string) => Promise<{ code: number; stderr: string }>;
-  /** The terminal a person answers prompts in; null = none (no TTY); absent = the process terminal */
-  interaction?: Interaction | null;
-  /** a tick started a detached `norn check-run`; `exited` settles when it ends (tests wait on it) */
-  onCheckStarted?: (exited: Promise<void>) => void;
-  /** the running norn's version (`X.Y.Z`); default this package's version. Tests run the CLI as any binary */
-  version?: string;
-  /** the pause between polls of `story wait`, and while a person command waits for a running tick; default a real timer ended early by `signal` (tests advance a fake clock) */
-  sleep?: (ms: number, signal?: AbortSignal) => Promise<void>;
+  /** a line for a person on stderr; never data */
+  log?(line: string): void;
+  /** how this binary is invoked, so a launched agent's hooks call the same build: `[bun, main.ts]` or `[norn]` */
+  self: readonly string[];
+  /** this binary's version; the entry passes the package's */
+  version: string;
+  hosts: HostFactory;
+  importer: PluginImporter;
+  /** this machine's name, for the default claim holder */
+  hostname?: string;
 }
 
-/** The running norn's version: the injected one, else the package's (`NORN_VERSION`). The one reader of that constant. */
-export const runningVersion = (deps: CliDeps): string => deps.version ?? NORN_VERSION;
-
-export const systemClock: Clock = {
-  now: () => Date.now(),
-  iso: () => new Date().toISOString(),
-};
-
-export interface Located {
-  /** main checkout (realpath) */
-  root: string;
-  /** worktree containing cwd, when it carries a `.norn-unit` marker */
-  worktree: string | null;
-  unit: UnitMarker | null;
-}
-
-/** Walk up from `cwd` for a `.norn-unit` marker. */
-export function findUnitMarker(cwd: string): { worktree: string; marker: UnitMarker } | null {
-  let dir = cwd;
-  for (;;) {
-    const m = readUnitMarker(dir);
-    if (m.exists && m.marker) return { worktree: dir, marker: m.marker };
-    if (existsSync(join(dir, ".git"))) return null; // top of a checkout or worktree
-    const up = dirname(dir);
-    if (up === dir) return null;
-    dir = up;
-  }
-}
-
-export async function locateRepo(cwd: string, git: GitPort): Promise<Located> {
-  const real = safeRealpath(cwd);
-  const found = findUnitMarker(real);
-  if (found && existsSync(found.marker.repo)) return { root: safeRealpath(found.marker.repo), worktree: found.worktree, unit: found.marker };
-  let root: string;
-  try {
-    root = await git.repoRoot(real);
-  } catch {
-    throw refuse(`not inside a git repository: ${cwd}`, "cd into your repository (or a norn worktree) and run the command again", "not_in_repo");
-  }
-  return { root: safeRealpath(root), worktree: null, unit: null };
-}
-
-/** The real path of `p`, or `p` itself when it cannot be resolved (missing, no access). */
-export function safeRealpath(p: string): string {
-  try {
-    return realpathSync(p);
-  } catch {
-    return p;
-  }
-}
-
-export class Context {
-  readonly cwd: string;
-  readonly env: Record<string, string | undefined>;
-  readonly clock: Clock;
-  readonly home: string;
-  readonly registry: AdapterRegistry;
-  /** the running norn's version (`runningVersion`): `--version`, tick traces, replay labels */
-  readonly version: string;
-  readonly deps: CliDeps;
-  /** lines for a person on stderr (a one-time notice), returned in `CliResult.stderr`; never data */
+export class CliContext {
+  private repoP?: Promise<WiredRepo>;
+  private configP?: Promise<LoadedConfig>;
+  private pluginsP?: Promise<WiredPlugins>;
+  private envP?: Promise<RuntimeEnv>;
   readonly stderr: string[] = [];
-  private located: Located | null = null;
-  private loadedConfig: LoadedConfig | null = null;
-  private builtPorts: Ports | null = null;
-  private bootGit: GitPort | null = null;
 
-  constructor(deps: CliDeps = {}) {
-    this.deps = deps;
-    this.cwd = deps.cwd ?? process.cwd();
-    this.env = deps.env ?? process.env;
-    this.clock = deps.clock ?? systemClock;
-    this.home = nornHome(deps.home, this.env);
-    this.registry = deps.registry ?? defaultRegistry();
-    this.version = runningVersion(deps);
+  constructor(readonly io: CliIo) {}
+
+  get env() {
+    return this.io.env;
+  }
+  get version(): string {
+    return this.io.version;
+  }
+  get home(): string {
+    return nornHome(this.io.env, this.io.userHome);
+  }
+  /** a line for a person, on stderr after the command's output */
+  note(line: string): void {
+    this.stderr.push(line);
   }
 
-  /** Git before config is known (root discovery, init). */
-  get git(): GitPort {
-    if (this.builtPorts) return this.builtPorts.git;
-    if (!this.bootGit) this.bootGit = this.deps.ports?.git ?? this.registry.git(this.adapterContext("", DEFAULT_CONFIG));
-    return this.bootGit;
+  /** the checkout, its machine dir and the host over both */
+  repo(): Promise<WiredRepo> {
+    this.repoP ??= wireRepo(this.home, this.io.cwd, this.io.hosts);
+    return this.repoP;
+  }
+  async host(): Promise<HostContext> {
+    return (await this.repo()).ctx;
+  }
+  /** the merged, validated config; a config error otherwise */
+  config(): Promise<LoadedConfig> {
+    this.configP ??= this.repo().then(wireConfig);
+    return this.configP;
+  }
+  /** bundled and installed plugins, every pick resolved */
+  plugins(): Promise<WiredPlugins> {
+    this.pluginsP ??= Promise.all([this.repo(), this.config()]).then(([w, c]) => wirePlugins(w, c, this.io.importer));
+    return this.pluginsP;
+  }
+  /** the runtime env the agent verbs and views read */
+  runtimeEnv(): Promise<RuntimeEnv> {
+    this.envP ??= this.parts().then(wireRuntimeEnv);
+    return this.envP;
+  }
+  /** the runtime env, refused when the workflows (the pack's and the repo's) cannot run: what a tick needs */
+  async workflowEnv(): Promise<RuntimeEnv> {
+    const [env, p] = await Promise.all([this.runtimeEnv(), this.plugins()]);
+    const failure = packFailure(env.workflows, { pack: env.config.pack, plugins: p.plugins, installedAs: p.installedAs, repo: env.repoWorkflows });
+    if (failure) throw failure;
+    return env;
+  }
+  /** the tick host */
+  async runtime(): Promise<Runtime> {
+    return wireRuntime(await this.workflowEnv());
   }
 
-  /** Resolve the repo; commands with `repo: true` get this before `run`. */
-  async locate(): Promise<Located> {
-    if (!this.located) {
-      const located = await locateRepo(this.cwd, this.git);
-      // The checkout's machine dir lives in this command's norn home, not the process env's
-      bindNornHome(located.root, this.home);
-      this.located = located;
-    }
-    return this.located;
-  }
-
-  /** Main checkout root. Throws if `locate()` has not run. */
-  get root(): string {
-    if (!this.located) throw new Error("Context.root used before locate()");
-    return this.located.root;
-  }
-
-  /** Marker of the worktree the command runs in, if any. */
-  get unit(): UnitMarker | null {
-    return this.located?.unit ?? null;
-  }
-  get worktree(): string | null {
-    return this.located?.worktree ?? null;
-  }
-
-  /** Raw config load result (both layers). */
-  get loaded(): LoadedConfig {
-    if (!this.loadedConfig) this.loadedConfig = loadConfig({ repoRoot: this.root, home: this.home, env: this.env });
-    return this.loadedConfig;
-  }
-
-  /** The config that loaded, with its entries; refuses with exit `config` when a file has a problem. */
-  get resolved(): Extract<LoadedConfig, { ok: true }> {
-    const l = this.loaded;
-    if (!l.ok) throw configError(l.problems, { ...l.paths });
-    return l;
-  }
-
-  /** Resolved config; refuses like `resolved`. */
-  get config(): ResolvedConfig {
-    return this.resolved.config;
-  }
-
-  /** The file a setting in effect came from, for adapter errors; null when built in or derived. */
-  sourceOf(key: string): string | null {
-    const l = this.loaded;
-    const entries = l.ok ? l.entries : l.fallback.entries;
-    const e = entries.find((x) => x.key === key || x.key.startsWith(`${key}.`));
-    return e && (e.source === "user" || e.source === "local" || e.source === "repo") ? l.paths[e.source] : null;
-  }
-
-  /** Forget cached config and ports (after `init` writes config). */
-  reload(): void {
-    this.loadedConfig = null;
-    this.builtPorts = null;
-  }
-
-  adapterContext(root = this.located?.root ?? "", config: ResolvedConfig = this.loadedConfig?.ok ? this.loadedConfig.config : DEFAULT_CONFIG): AdapterContext {
-    return { repoRoot: root, home: this.home, config, clock: this.clock, env: this.env };
-  }
-
-  /** Ports selected by config, built once per context. */
-  async ports(): Promise<Ports> {
-    if (!this.builtPorts) this.builtPorts = await this.portsFor(this.config);
-    return this.builtPorts;
-  }
-
-  /** Ports for a given config (doctor's fallback), built afresh and not cached for later callers. */
-  portsFor(config: ResolvedConfig, overrides: Partial<Ports> = {}): Promise<Ports> {
-    return buildPorts(this.registry, this.adapterContext(this.root, config), config, { git: this.git, ...this.deps.ports, ...overrides }, (k) => this.sourceOf(k));
-  }
-
-  /** The terminal to prompt in — a TTY, no `--json`, not an agent session — else null. */
-  terminal(json: boolean): Interaction | null {
-    const t = this.deps.interaction === undefined ? terminalInteraction() : this.deps.interaction;
-    return t?.tty && !json && !isAgentSession(this.env) ? t : null;
-  }
-
-  log(line: string): void {
-    this.deps.log?.(line);
-  }
-
-  /** Pause `ms` (an injected sleep in tests, which advances a fake clock); ends early when `signal` aborts. */
-  sleep(ms: number, signal?: AbortSignal): Promise<void> {
-    return (this.deps.sleep ?? abortableSleep)(ms, signal);
+  private async parts() {
+    const [w, loaded, p] = await Promise.all([this.repo(), this.config(), this.plugins()]);
+    const repoWorkflows = await wireRepoWorkflows(w);
+    return { w, loaded, plugins: p.plugins, repoWorkflows, holder: defaultHolder(this.io.env, this.io.hostname ?? hostname()), self: this.io.self, ...(this.io.env.PATH !== undefined ? { path: this.io.env.PATH } : {}), ...(this.io.env.NORN_HOME_DIR ? { home: this.io.env.NORN_HOME_DIR } : {}) };
   }
 }

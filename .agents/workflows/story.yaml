@@ -2,7 +2,7 @@
 # ci.yml wait, its common steps taken from this repo's shared/ files. Delivers a story a refinement
 # round planned: sync, cut slices against the current base, approve them, run the slices, update, check, QA the whole story once, describe, open the draft PR,
 # wait for its CI, wait for a person at ready, then at merge for the PR's merge. The local check runs the unit tier and the type
-# check; CI runs every tier, integration and e2e sharded. Story-level rework is reviewed before it is
+# check; CI runs the integration tier sharded. Story-level rework is reviewed before it is
 # checked again.
 # A story waiting at human-qa, ready or merge goes back through update when the base moved under it in a way
 # that conflicts (base.stale: conflict).
@@ -30,7 +30,7 @@ steps:
       replan: $stuck
     means:
       done: "slice files written against the current base; every user story is covered by some slice's acceptance"
-      replan: "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans with `norn story edit <story> --workflow refinement --at plan`"
+      replan: "spec.md has no Plan, or the base no longer fits it: what no longer holds is in the handoff; the person replans in a new item labelled norn:wf:refinement"
   approve-slices:
     gate: "Review the slice files in the spec folder (edit them if needed). Approve to start the slices, or reject with what to change."
     outcomes: { approve: slices, reject: { to: slice, max: 3 } }
@@ -68,7 +68,7 @@ steps:
       reject:  { to: implement, counter: qa_loop }
       stale:   { to: update, counter: stale_loop }
   implement:
-    agent: "Run `bun run test` (the unit tier) after each change, and the type check; the integration and e2e tiers run in CI, which the `ci` check waits for, so do not run them before handing back."
+    agent: "Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in CI, which the `ci` check waits for, so do not run them before handing back."
     skills: [norn-implement]
     inputs: [spec, handoff, last_check, last_findings]
     outcomes:
@@ -102,7 +102,7 @@ steps:
     outcomes: { passed: ready, failed: { to: implement, max: 3 }, stale: { to: update, counter: stale_loop } }
   land:
     use: land
-    outcomes: { rejected: implement, stale: { to: update, counter: stale_loop } }
+    outcomes: { rejected: implement, stale: { to: update, counter: stale_loop }, unpushed: open-pr }
 counters:
   # QA's fail and the person's reject at human-qa share one budget
   qa_loop: { max: 2 }

@@ -5,6 +5,7 @@
  */
 import type { BriefInputs, Decision, KernelConfig, SessionFacts } from "@norn/kernel";
 import type { HostContext, IntakeQuery, NornPlugin, PluginResult } from "@norn/plugin-api";
+import type { RepoWorkflows } from "./repo-workflows.ts";
 
 /** One slot as the config selects it: the provider's name and the config its factory validates. */
 export interface SlotChoice {
@@ -118,6 +119,8 @@ export interface RuntimeDeps {
   agentEnv?: Readonly<Record<string, string>>;
   /** mints each tick's id; a test passes a fixed sequence so its traces and ids repeat */
   tickId?: () => string;
+  /** the repo's own workflow files, laid over the pack's (repo-workflows.ts); absent: the pack's alone */
+  repoWorkflows?: RepoWorkflows;
 }
 
 /** How carrying out one decision went. A failure is recorded and the tick goes on with the next unit. */

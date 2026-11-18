@@ -1,6 +1,6 @@
 # Development
 
-The contributor reference for norn's own code: the commands, the test tiers and CI, the test corpora that pin behaviour, where each contract lives, how a release runs, and the design decisions behind the code. The short map an agent reads first is [`AGENTS.md`](../AGENTS.md); the person's side of contributing is [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+The contributor reference for norn's own code: the commands, the test tiers and CI, the plugin contract and the suites that hold every plugin to it, where each contract lives, how a release runs, and the design decisions behind the code. The short map an agent reads first is [`AGENTS.md`](../AGENTS.md); the person's side of contributing is [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 ## Commands
 
@@ -8,160 +8,170 @@ The contributor reference for norn's own code: the commands, the test tiers and 
 bun install
 bun run test        # the unit tier, in seconds: your loop after each change; a plain `bun test` runs exactly this
 bun run test:integration  # the integration tier (packages/*/test/integration/), 6 workers: CI runs it in shards, never a local check
-bun run test:e2e    # the e2e tier (test/e2e/), in parallel: CI runs it in shards; `bun run test:e2e <file>` runs one file
-bun run test:stress [N]  # the three tiers N times (default 10), side by side; prints each failing test and its pass rate (--tier, --serial, --limit)
-bun run typecheck   # tsc --noEmit over every package
+bun run typecheck   # tsc --noEmit over every package and scripts/
 bun run schema:emit # regenerate packages/schema/json/*.schema.json after changing a schema
-bun run docs:emit   # regenerate docs/reference.md's generated block after changing a command, flag, config key or shipped workflow
-bun run build       # dist/npm/: bundled norn.js + assets/ + package.json; build:bin [<target>…] builds the binaries
+bun run docs:emit   # regenerate docs/reference.md's generated block after changing a command, flag, config key or the pack's workflows
+bun run build       # dist/npm/: one bundled norn.js + package.json; build:bin [<target>…] builds the binaries
 bun run golden -- --update  # behaviour change: re-decide every golden case, rewrite only its decisions
-bun run golden      # add golden cases harvested from the cli integration tests' ticks for under-covered rules
+bun run golden      # add the golden cases the scenarios in packages/kernel/scripts/golden/ produce
 ```
+
+To run the integration tests of one package, as you do after changing it: `bun test --config=bunfig.integration.toml --timeout=60000 packages/<pkg>`.
 
 ## Layout
 
+norn is a thin kernel with a plugin contract. The kernel decides; plugins fill **slots** and do one effect per call; the runtime hosts both; the cli wires the plugins a config picks and offers the commands.
+
 ```
-packages/schema    @norn/schema    JSON Schemas (TypeBox) + types + ajv validators, ids, config merge
-packages/core      @norn/core      pure logic: ports (adapter interfaces), Facts, Action, decide, briefing — no IO
-packages/store     @norn/store     .agents/ files, run state (runs/<story>/<unit>/ JSON in the machine dir, run-state.ts) and its record ref refs/norn/runs/<story> (record-ref.ts: pack, unpack, push), handoffs/<unit>.md, claim + mailbox refs, ~/.norn leases, worktree.ts (.env.norn, .norn-unit, info/exclude), the checkout's machine-local files in its machine dir ~/.norn/repos/<id>/ (local.ts, heartbeat.ts, inbox-history.ts; paths in paths.ts)
-packages/adapters  @norn/adapters  src/{git,gh,glab,herdr,headless,claude,codex,opencode,gemini,notify,process} + src/exec.ts (one Exec on spawnBounded, one portError) + src/agent-hooks/ (hook config merge, hook facts, transcripts shared by the agent adapters)
-packages/view      @norn/view      read model loadProjectView()
-packages/cli       @norn/cli       wiring + commands; bin `norn` → src/main.ts
+packages/schema           @norn/schema           JSON Schemas (TypeBox) + types + ajv validators, ids, the CliError and ExitCode contract
+packages/plugin-api       @norn/plugin-api       the plugin contract: defineNornPlugin, the slots, HostContext, PluginResult, harness events, story keys, the plugin API version
+packages/kernel           @norn/kernel           pure: workflow loader and counters, the model (facts, actions, receipts, run state), decide, the journal's write rules, the session reducer and classifier, the brief
+packages/runtime          @norn/runtime          the host: tick (lock, gather facts, decide, act, trace), slot resolution, the launcher (executor = harness + runner), hook ingest and event log, inputs and skills in worktrees, detached checks, the open-pr and await-merge step kinds
+packages/host-node        @norn/host-node        the HostContext over Bun and node: atomic file writes, exec with a bound, detached processes
+packages/vcs-git          @norn/vcs-git          the vcs slot over git (worktrees, merge, push, refs) and the update-branch, integrate, push and verify-base step kinds
+packages/tracker-local    @norn/tracker-local    a tracker over one markdown file per item
+packages/plugin-github    @norn/plugin-github    a tracker over issues and a forge over pull requests, through gh
+packages/forge-none       @norn/forge-none       a forge for a repo with no code host: a local record of each change, merged with git
+packages/store-local      @norn/store-local      a store in the machine dir (runs-v2/stories/<story>/…)
+packages/store-refs       @norn/store-refs       a store on git refs (refs/norn/v2/…) shared through the remote
+packages/harness-claude   @norn/harness-claude   the Claude Code harness: hooks in .claude/settings.local.json, launch, normalize, respond
+packages/harness-pi       @norn/harness-pi       the pi harness: an extension pi loads, launch, normalize, respond
+packages/runner-headless  @norn/runner-headless  agents as detached processes, output to a log
+packages/runner-herdr     @norn/runner-herdr     agents in Herdr panes, one workspace per story and one tab per run
+packages/pack-sdlc        @norn/pack-sdlc        the sdlc pack: workflows, shared files and skills, imported as text
+packages/conformance      @norn/conformance      contract suites (store, tracker, forge, harness), in-memory fakes, recorded-session replay
+packages/cli              @norn/cli              wiring + commands, the layered config, plugin install and lock, init and doctor; bin `norn` → src/main.ts
 ```
 
-Dependencies point one way only: `schema ← core ← store ← adapters ← cli`; `view` depends on `schema`, `core`, `store`; `cli` may use `view`. `test/repo/repo.test.ts` enforces this: every `@norn/*` import must be allowed **and** declared in the package's `package.json`. Bun's isolated linker also hides undeclared packages.
+Dependencies point one way only: `schema ← plugin-api ← kernel ← runtime ← cli`. A plugin package reads only `schema` and `plugin-api` (`pack-sdlc` only `plugin-api`), so a third-party plugin needs nothing a bundled one does not; `conformance` adds `kernel`, since its harness suite replays through the kernel's reducer; `cli` wires them all. `test/repo/repo.test.ts` enforces this: every `@norn/*` import must be allowed **and** declared in the package's `package.json`. Bun's isolated linker also hides undeclared packages.
 
-**One adapters package.** Rather than one package per adapter (`@norn/adapter-git`, …), we ship one `@norn/adapters` package with a subfolder per adapter, each exported as a namespace (`import { claude } from "@norn/adapters"`). Third-party adapters still implement the interfaces in `packages/core/src/ports.ts`. Split later only if distribution needs it.
+### The slots
+
+A plugin is one value made with `defineNornPlugin({ name, api, provides })`; `api` is the plugin API range it was written against, and the cli refuses a plugin whose range this norn does not satisfy. `provides` fills any of these slots, each keyed by the name a config picks it by:
+
+| Slot | Contract | Bundled |
+|---|---|---|
+| `harness` | the agent tool: install its hooks in a worktree, launch it, normalize its hook payloads into harness events, render norn's answer back | `claude`, `pi` |
+| `tracker` | where stories come from: list items, intake label, comments, close | `github`, `local` |
+| `forge` | changes for review: open or update a change, read its state and checks | `github`, `none` |
+| `store` | run data: numbered receipts, state by compare-and-swap, claims, mailbox, artifacts | `local`, `refs` |
+| `vcs` | branches and worktrees: merge (never rebase), conflicts, push | `git` |
+| `runners` | where an agent process runs | `headless`, `herdr` |
+| `stepKinds` | a workflow head key beyond the kernel's own `agent`, `check`, `gate`, `slices` | `update-branch`, `integrate`, `push`, `verify-base` (vcs-git), `open-pr`, `await-merge` (runtime) |
+| `packs` | workflows, shared files and skills shipped together | `sdlc` |
+
+Every slot call returns a `PluginResult` and never throws. A plugin gets a `HostContext` (files, exec, processes, clock, the repo's root and data dir) and touches the machine only through it. A tracker, forge or store is never a state store for the kernel's decisions: labels and comments they write are display for people.
 
 ## Test tiers and CI
 
-Tests come in three tiers, by folder:
+Tests come in two tiers, by folder:
 
-- **unit**: `packages/<pkg>/test/unit/`, `test/repo/` and the rest of the root `test/` but `test/e2e/` and `test/support/`. In-process only: a preload fails a unit test that starts a child process.
-- **integration**: `packages/<pkg>/test/integration/`. Real git, real processes, the cli harness.
-- **e2e**: `test/e2e/`. Multi-tick stories, effect transcripts, observe snapshots.
+- **unit**: `packages/<pkg>/test/unit/`, `test/repo/` and the rest of the root `test/` but `test/support/`. In-process only: a preload fails a unit test that starts a child process.
+- **integration**: `packages/<pkg>/test/integration/`. Real git, real processes, the binary from source.
 
-Shared helpers sit in `test/support/`. Tests never sit in `src/`. Adapters are tested against recorded fixtures in `packages/adapters/test/unit/<adapter>/` (or `packages/adapters/test/integration/<adapter>/` when they need real processes), core by replaying traces. `test/repo/repo.test.ts` enforces the layout.
+Shared helpers sit in `test/support/` and in each package's test folder. Tests never sit in `src/`. `test/repo/repo.test.ts` enforces the layout.
 
 The unit tier (`bun run test`) and the type check must pass before you hand work back. **Commit only when `bun run test` and `bun run typecheck` are green**, and run both before every commit, not only before handing back. There is no `bun run lint`: the lints run inside the unit tier, so a red `bun run test` is a red lint too. They are:
 
-- dependency direction, layout, glossary and path spelling in `test/repo/repo.test.ts`;
+- dependency direction, layout, glossary, path spelling and the IO ratchets in `test/repo/repo.test.ts`: file writes only in `@norn/host-node`, `JSON.parse` only in schema (and the few allowlisted tool-output reads), `Bun.spawn` only in host-node, and a pure kernel;
 - the docs lint in `test/repo/docs.test.ts` (doc set in `test/support/docs.ts`);
-- printed commands in `packages/core/test/unit/printed-commands.test.ts`.
+- the repo's skills in `test/repo/process.test.ts`.
 
-The docs lint fails on a rules file coming back, a link or anchor that does not resolve, a `norn` command or flag the CLI does not have, a version named outside the README badge and the changelog, and a handoff tracked anywhere but a spec folder's `handoffs/<unit>.md` (or an older norn's `runs/<unit>/handoff.md`, moved at the unit's next boundary). A test also fails if the emitted JSON schemas or the generated block of `docs/reference.md` are stale.
+The docs lint fails on a rules file coming back, a link or anchor that does not resolve, a `norn` command or flag the CLI does not have, a version named outside the README badge and the changelog, and a handoff tracked in the repo outside a spec folder's `handoffs/`. A test also fails if the emitted JSON schemas or the generated block of `docs/reference.md` (`packages/cli/test/unit/reference.test.ts`) are stale.
 
-A workflow's `test` check runs the unit tier and the type check. The integration tier is too heavy to run beside other stories' checks and agents, so it runs only in CI. `quick` and `story` then wait for the PR's CI in a `ci` check, which sends a red run back to `implement`. `release` waits for it too, with no local test, and goes `$stuck` on a red run.
-
-CI (`.github/workflows/ci.yml`) runs the unit tier and the type check on every PR. Once they pass, it runs the integration tier in four shards, the e2e tier in three shards, and the npm package and a binary built and checked with `scripts/smoke.sh`. The release run tests only the unit tier and the type check, since the release PR's CI ran every tier. A release also smokes each binary on its own OS (macOS arm64/x64, Linux arm64).
+CI (`.github/workflows/ci.yml`) runs the unit tier and the type check on every PR. Once they pass, it runs the integration tier in four shards, and builds the npm package and a binary and checks both with `scripts/smoke.sh`. The release run tests only the unit tier and the type check, since the release PR's CI ran every tier.
 
 ## Writing a test
 
-Read `test/support/` first. `test/support/harness.ts` is the cli harness (`createHarness`: a temp repo with a bare remote, a fake clock, and the fakes `FakeRemote`, `FakeRunner`, `FakeNotifier`, `FakeInteraction`, plus layout and issue helpers). `test/support/transcript.ts`, `test/support/observe-snapshot.ts`, `test/support/fake-herdr.ts` and `test/support/golden-harvest.ts` hold the rest.
+Read `test/support/` first, then the support of the layer you test:
 
-Take ref names and shapes from the code, never by hand: `claimRef`, `mailboxPrefix` and `mailboxRef` in `packages/schema/src/ids.ts` (`refs/norn/claims/<story>`, `refs/norn/inbox/<story>/<id>`), and state, receipt and config shapes from `@norn/schema` (validate with `assertValid`).
+- `packages/conformance/src/fakes.ts`: `memoryHost`, `memoryFiles`, `scriptedExec`, `manualClock` and `steppingClock`, an in-memory `HostContext` any plugin or the runtime runs on.
+- `packages/runtime/test/unit/support.ts`: a tick host over the real local store on memory files and recording fakes for tracker, forge, vcs, harness and launcher, so a test reads as the moments of a story.
+- `packages/cli/test/unit/support.ts`: the cli in-process on an in-memory machine; `packages/cli/test/integration/world.ts`: a temp repo cloned from a bare remote, a temp norn home, and every call a subprocess of the binary from source, with the test harness plugin in `packages/cli/test/integration/fixtures/` installed through `norn plugin add`.
+
+Take ref names and shapes from the code, never by hand: story keys and unit ids from `@norn/plugin-api` (`parseStoryKey`, `parseUnitId`), store refs from `packages/store-refs/src/layout.ts`, and receipt, run-state and config shapes from the kernel's model and `@norn/schema` (validate with `assertValid`).
 
 ## Golden cases
 
-`packages/core/test/unit/golden.test.ts` replays every golden case through `decide` and wants exactly the decisions the tick recorded. It also checks that every rule id decide can emit fires in a golden case or a hand-built one (`packages/core/test/rule-cases.ts`).
+`packages/kernel/test/unit/golden.test.ts` replays every case in `packages/kernel/test/golden/` through `decide` and wants exactly the decisions recorded. The corpus fires every rule id in `RULE_IDS` at least once; `packages/kernel/test/unit/parity.test.ts` holds `packages/kernel/test/parity.md`, the map from the old engine's rules to the kernel's, to that list.
 
 A change that keeps behaviour leaves the corpus alone. For an intended change in what decide decides, run `bun run golden -- --update`. It decides each existing case again and rewrites only its `decisions` (names, facts, workflows and config stay), printing the decisions that went and came per case, so the diff is exactly the behaviour change; review it.
 
-`bun run golden` alone only adds cases. It runs the harness tests (cli integration and `test/e2e/`, each with its tier's config) with `NORN_GOLDEN_OUT` set, and adds, never replaces, harvested cases that bring a rule fewer than two cases fire.
+`bun run golden` alone only adds cases: it plays every scenario in `packages/kernel/scripts/golden/` through the model host and writes each case whose name is not in the corpus yet, never touching an existing one.
 
-Cases are named by a hash of decide's inputs (facts, workflows, config, not the decisions), with run-specific values (ulids, shas, pids, wall-clock times) normalised. So a rerun with nothing new to cover changes nothing, and `--update` keeps every name.
+## Conformance suites
 
-## Effect transcripts
+A slot's contract is a suite in `@norn/conformance` that every implementation runs, so a third-party plugin is held to the same reads as a bundled one:
 
-Effect transcripts pin what three harness flows do to the world:
+- `storeContract`, `trackerContract` and `forgeContract` state what a store, tracker or forge must do (idempotent effects by receipt id, compare-and-swap that never lets two racing writers both win, refusals as `PluginResult` failures). Each bundled plugin runs its suite: `packages/store-local/test/unit/contract.test.ts`, `packages/store-refs/test/integration/contract.test.ts`, `packages/tracker-local/test/unit/contract.test.ts`, `packages/plugin-github/test/unit/contract.test.ts`, `packages/forge-none/test/unit/contract.test.ts`. Reference implementations in memory sit in `packages/conformance/test/unit/reference/`.
+- `harnessConformance` replays a recording of each scenario in one catalogue through the harness's `normalize` into the kernel's reducer and classifier, and asserts the read each capability implies. It reads `capabilities`, never `name`. The recordings are in `packages/conformance/test/unit/fixtures/`, run by `packages/conformance/test/unit/claude.test.ts` and `packages/conformance/test/unit/pi.test.ts`.
+- The live canary, `packages/conformance/test/integration/live-canary.test.ts`, runs one real headless turn per harness and replays its hook calls the same way. It starts a real agent and costs money, so it runs only with `NORN_TEST_LIVE=1`, never in CI.
 
-- the child processes norn spawns (store's `setSpawnObserver` hook, off by default: `spawnBounded`, store's git calls and each spawn that calls `noteSpawn`, which includes check commands; the `ps`/`lsof` pid probes are not recorded);
-- every call on the fake ports;
-- every run-state file (under the checkout's machine dir `runs/`) that appears, changes or goes away, with the content of each one added or changed (JSON as one line, other text as a hash).
-
-All of it is normalised (temp dirs, ulids, shas, timestamps). The recorder is `test/support/transcript.ts`. The flows are the last test of `test/e2e/slice-workflow.test.ts` (slice workflow), `test/e2e/base-sync.test.ts` (base sync) and `test/e2e/recovery.test.ts` (claim lost), against `test/e2e/transcripts/*.txt`.
-
-A change that keeps behaviour leaves them alone. For an intended change, rewrite them with `NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e <file>` and review the diff.
-
-## Observe snapshots
-
-Observe snapshots pin what `observe` sees at five points of one story in `test/e2e/observe-snapshots.test.ts` (fresh intake, running slice, parked ask, gate waiting, merged): the Facts, normalised the same way, against `test/e2e/observe-snapshots/*.json`. At each point the test also checks inbox parity: the inbox `norn status` shows (`loadProjectView`) must equal `buildInbox` over observe's Facts. The helpers are in `test/support/observe-snapshot.ts`.
-
-Rewrite the snapshots with `NORN_TRANSCRIPT_UPDATE=1 bun run test:e2e test/e2e/observe-snapshots.test.ts`, again only for an intended change.
-
-## Port contract suites
-
-Port contract suites state what every implementation of a port must do, in `packages/adapters/test/contract/` (`processContract`, `gitContract`, `runnerContract`, `remoteContract`).
-
-- `packages/adapters/test/integration/contract/contract.test.ts` runs them against the real adapters offline: real processes (a real zombie included), real git repos, the headless runner, gh and glab over scripted CLIs. Store's `localProcess` runs them too.
-- `packages/cli/test/integration/contract-fakes.test.ts` runs them against the harness's `FakeRunner` and `FakeRemote`.
-
-A known break is listed in the suite's `failing` option with its reason and runs as `test.failing`; fixing it means removing the entry. A new port implementation or harness fake gets a contract run.
+A new plugin gets a contract run; a known break is listed in the suite's options with its reason, and fixing it means removing the entry.
 
 ## Where the contracts live
 
-- **Persisted formats**: `packages/schema/src/*.ts`. `Workflow`, `StoryFrontmatter`, `SliceFrontmatter`, `UnitState` (state.json: one variant per status, written as `UnitState` and read as `UnitStateRecord`, the flat shape older norns wrote, which core `normalizeUnitState` turns into a `UnitState`), `Receipt` (15 kinds), `CriteriaReport` (`norn done --criteria`), `TraceEvent`, `HookFact`, `ClaimBlob`, `LeaseFile`, `UserConfig`/`LocalConfig`/`RepoConfig` (the three config files, checked by `checkConfigFile`) and `ResolvedConfig` (`resolveConfig`), `CliError`, `ExitCode`. Validate with `validate(name, value)` / `assertValid(name, value)`; never hand-roll checks of these shapes. Build a trace event that carries `id` and `at` with `traceEvent(type, now, fields)` (`@norn/store`).
-- **Ids and names**: `packages/schema/src/ids.ts`. `ulid`, `deriveUlid` (deterministic ids for pure decide), story/slice keys, `slugify`, branch/dir/ref names, `SPECS_DIR` and the spec folder / slice file name parsers (`parseSpecDirName`, `parseSliceFileName`), receipt file names, `isGitSha` (`GitSha` in `common.ts`), `parseDuration`.
-- **Paths under a root**: `packages/store/src/paths.ts`. Team config `.agents/norn.config.yaml` (`REPO_CONFIG_FILE`), your config for this repo `.agents/norn.config.local.yaml` (`LOCAL_CONFIG_FILE`, gitignored), their schema copies (`REPO_CONFIG_SCHEMA_FILE`, `LOCAL_CONFIG_SCHEMA_FILE`), workflows `.agents/workflows/` (`WORKFLOWS_DIR`), and the checkout's machine dir `~/.norn/repos/<id>/` (`machineDir`, `checkoutOf` for the id).
-- **Adapter ports**: `packages/core/src/ports.ts`.
-- **Observe output**: `packages/core/src/facts.ts` (`Facts`). Its local part (files only: snapshot, leases, hook facts, caches, what each unit's receipts say) is `loadLocalFacts` in `packages/store/src/local-facts.ts`, which cli `observe` extends with git, runner, process and remote facts and `@norn/view`'s `loadProjectView` reads as it is. Unit worktrees on disk: observe lists them with `git worktree`; the view and `loadTraceView` find them with store `scanWorktrees` (folder shape + `.norn-unit` marker). This machine's `user@host` is store `machineHolder` (`packages/store/src/machine.ts`).
-- **Decide output**: `packages/core/src/actions.ts` (`Action`, `Decision`, `ActionResult`). Its header defines the act ordering and which kinds carry a `Transition`; `legacyAction` reads a decision an older norn recorded in a trace.
-- **decide itself**: `packages/core/src/decide/`. `index.ts` (entry, repo-level intake), `story.ts` (story level and per-unit dispatch), `agent.ts`, `steps.ts` (check, git, slices), `receipts.ts` (the tick `Ctx` and the receipt/commit helpers they share).
+- **The plugin contract**: `packages/plugin-api/src/`. `plugin.ts` (`defineNornPlugin`, `PluginProvides`, the checks a plugin passes when it loads), one file per slot (`harness.ts`, `tracker.ts`, `forge.ts`, `store.ts`, `vcs.ts`, `runner.ts`, `step-kind.ts`, `pack.ts`), `host.ts` (`HostContext`), `result.ts` (`PluginResult`, `ok`, `fail`), `events.ts` (the normalized harness events the kernel reads), `story-key.ts`, `version.ts` (`PLUGIN_API_VERSION`, `apiSatisfies`). A slot joins as an optional member, so a plugin written against an older plugin API stays valid.
+- **The kernel's model**: `packages/kernel/src/model/`. `facts.ts` (`KernelFacts`, what a tick gathers), `actions.ts` (`Decision` and every action kind), `receipts.ts` (every receipt kind), `run-state.ts`, `session.ts`, `config.ts` (`KernelConfig`, the counter defaults), `capabilities.ts` (what the configured slots can do, as decide sees it).
+- **decide**: `packages/kernel/src/decide/`. `index.ts` (entry), `story.ts` (intake, claims, the story's tail: flush, finish, release), `unit.ts` with `unit-agent.ts` and `unit-steps.ts`, `rules.ts` (`RULE_IDS`).
+- **The journal**: `packages/kernel/src/journal/`. `journal.ts` holds the write rules (receipts before effects, state last by compare-and-swap, a lost race read again, anything failing validation read as corrupt); `apply.ts` turns receipts into run state; `format.ts` reads older run-state formats forward.
+- **Workflows**: `packages/kernel/src/workflow/`. `load.ts` (the loader and its refusals), `counters.ts` (derived counters), `flatten.ts` (`use` and `like`), `steps.ts` (head keys and step kinds).
+- **Persisted formats and ids**: `packages/schema/src/*.ts`, `packages/schema/src/ids.ts` (`ulid`, `deriveUlid`, keys, slugs, `parseDuration`). Validate with `validate(name, value)` / `assertValid(name, value)`; never hand-roll checks of these shapes.
+- **The config**: `packages/cli/src/config/schema.ts` (`NornConfig`, `ConfigLayer`, `CONFIG_DEFAULTS`), `packages/cli/src/config/paths.ts` (the layers and their files, the plugin lock), `packages/cli/src/config/derive.ts` (the kernel's and runtime's config from the person's). The norn home (`NORN_HOME_DIR`, else `~/.norn`) and the machine dir `~/.norn/repos/<id>/`, keyed by git's common dir: `packages/cli/src/home.ts`.
+- **What an agent finds in its worktree**: `packages/runtime/src/inputs.ts` (the spec, the handoff and the other inputs under `.agents/`), `packages/runtime/src/skills.ts` (pack skills in `.agents/skills/`, linked from the harness's folder), `packages/runtime/src/story-docs.ts` (the spec and handoffs kept as store artifacts).
 
-Change a contract only together with its tests and every user of it.
+Change a contract only together with its tests, its conformance suite and every user of it.
 
 ## Code rules
 
 [`AGENTS.md`](../AGENTS.md#rules) has them in short; here they are in full.
 
-- **Glossary** (definitions in [Concepts](concepts.md#glossary)). Use the core nouns: story, slice, unit, workflow, step, run, claim, receipt, outcome, counter, gate, check, handoff, brief, inbox, tick, mode, worktree, slot, trace, mailbox. Banned synonyms: `task`/`job`/`ticket` → story/slice; state (for a workflow node) → step; lease (for ownership) → claim (machine slot files *are* leases); result/status (for how a step ended) → outcome; `interactive step` → attended step. Outcomes are spelled as typed (`approve`, never `approved`). `test/repo/repo.test.ts` lints the unambiguous ones in package sources, `packages/cli/assets`, `plugins/`, `packages/schema/json` and every doc (the README, `CONTRIBUTING.md`, `docs/`, the Herdr plugin README, `AGENTS.md`). It matches whole words only and skips URLs, and in docs (not `.ts`) it skips inline code spans, so quote a banned word in backticks only when naming it on purpose.
-- **Machine contract is JSON + exit codes.** Every CLI command prints one JSON value on stdout with `--json` (commands read by an agent or a person print markdown without it: see [Decisions](#decisions)). Failures and refusals print a `CliError` `{error, do_instead, code?}` and exit with an `ExitCode` (`refused` = 3 when a rule says no). No prose in JSON output; human hints go in `do_instead`. Never parse prose (handoffs, spec bodies) in decide.
-- **Atomic writes.** Every file norn writes goes through store: temp file in the same dir → fsync → rename. Lease files are created with `O_EXCL`. Every JSON read is validated against `@norn/schema`; a failing file makes the unit `corrupt`, never a guess or a fresh start.
-- **Receipts before effects, state last.** Receipts are immutable, numbered `NNNN-<kind>.json`; `state.json` is written last and is the commit point.
-- **Core is pure.** No `fs`, `Bun.spawn`, `Date.now()` or random ids in `@norn/core`; use `facts.now` and `deriveUlid(facts.tick_id, i)` so `norn run view --why` replays exactly.
-- **Ports never decide.** Adapters report facts and perform one effect each.
-- **Front ends read through `@norn/view` and act through CLI verbs.** The cockpit, the Herdr plugin and any panel never read run state or call store directly.
+- **Glossary** (definitions in [Concepts](concepts.md#glossary)). Use the core nouns: story, slice, unit, workflow, step, run, claim, receipt, outcome, counter, gate, check, handoff, brief, tick, mode, worktree, plugin, slot, pack, harness, runner, executor, trace, mailbox. Banned synonyms: `task`/`job`/`ticket` → story/slice; state (for a workflow node) → step; lease (for ownership) → claim; result/status (for how a step ended) → outcome; `interactive step` → attended step. Outcomes are spelled as typed (`approve`, never `approved`). `test/repo/repo.test.ts` lints the unambiguous ones in package sources, `packages/pack-sdlc/assets`, `packages/schema/json` and every doc (the README, `CONTRIBUTING.md`, `docs/`, `AGENTS.md`). It matches whole words only and skips URLs, and in docs (not `.ts`) it skips inline code spans, so quote a banned word in backticks only when naming it on purpose.
+- **Machine contract is JSON + exit codes.** Every CLI command prints one JSON value on stdout with `--json`, markdown without it. Failures and refusals print a `CliError` `{error, do_instead, code?}` and exit with an `ExitCode` (`refused` = 3 when a rule says no). No prose in JSON output; human hints go in `do_instead`. Never parse prose (handoffs, spec bodies) in decide.
+- **Receipts before effects, state last.** Receipts are immutable and numbered; the journal writes the receipt of an effect before the effect, and commits the unit's state last, by compare-and-swap, as the commit point. A commit that lost a race is read again, never forced. Every record is validated on read; one that fails makes the unit `corrupt`, never a guess or a fresh start.
+- **One IO boundary.** `@norn/host-node` builds the `HostContext`, and only it writes files (temp file → fsync → rename) or starts processes. The two harness plugins write the agent tool's own config file the same way, temp → fsync → rename; that is the one allowlisted exception.
+- **The kernel is pure.** No `node:fs`, `Bun.spawn`, `Date.now()` or `Math.random` in `@norn/kernel`; use `facts.now` and `deriveUlid(tick_id, i)`, so a golden case replays exactly. The journal is the kernel's only IO, and only through the `Store`.
+- **Plugins never decide.** A plugin reports facts and performs one effect per call, idempotent by its receipt id. A step kind performs and reports an outcome; the host records it as a receipt and decide picks the next step.
 - **Comments say why, never what or when.** Write one only for what the code cannot say: an invariant, an ordering that must hold, a hazard, why the obvious way is wrong. No issue numbers, spec item ids or history in comments; that lives in the PR and the spec folder.
 - **Code style.** TypeScript strict ESM, `.ts` import suffixes inside a package, `@norn/<pkg>` across packages, no default exports, small modules. Tests sit in their tier's folder (see [Test tiers and CI](#test-tiers-and-ci)).
-- **No run state in the repo.** Do not commit generated trace data or run state: both live outside the repo, in the checkout's machine dir `~/.norn/repos/<id>/`.
+- **No run state in the repo.** Do not commit trace data or run state: both live outside the repo, in the checkout's machine dir `~/.norn/repos/<id>/` (or on the store's refs).
 
 ## Process
 
 norn develops norn. The person's side of the loop is in [`CONTRIBUTING.md`](../CONTRIBUTING.md#the-loop); the rules an agent must follow are in [`AGENTS.md`](../AGENTS.md#process). The detail behind them:
 
 - **Where an agent changes the repo.** Only inside a norn step: after `norn brief`, in that unit's worktree. An ad-hoc session reads, explores, discusses and drafts issues; it never commits or creates a branch. To hand work over, the person runs `/issue`. Exceptions, each only when the person asks: the bypass and the one-time bootstrap.
-- **The CI process check** passes a PR only from a story branch `gh-N-<slug>` that closes #N, a valid bypass, or Dependabot, and refuses one that edits the installed skill copies `.agents/skills/norn*` unless it is a release PR (titled `Release X.Y.Z`), since `norn upgrade` overwrites them.
-- **What a step may change.** Inside a step, `.agents/workflows/` and `.agents/norn.config.yaml` are ordinary repo files a story may change. A running unit keeps its pinned workflow; norn validates them when it loads them, and `norn doctor` shows the problems. Only norn's run state (in the checkout's machine dir, never in the worktree) is off limits. A unit's handoff (`handoffs/<unit>.md` in its spec folder) is prose the agent keeps current.
-- **Released binary vs code under change.** The process (`norn brief`, `norn done`, hooks, `watch`) always runs the latest released `norn`, never a build of this repo. To exercise your change, run `bun packages/cli/src/main.ts …`, never `norn …`, and only in a throwaway git repo under `$TMPDIR`. A unit worktree is a live norn unit (its `.norn-unit` marker), and a dev build run there would act on its claim and on its run state (`state.json`, receipts) in the checkout's machine dir. A broken release: the person reinstalls the previous release binary; the fix goes through the bypass if norn cannot deliver it.
-- **Workflows.** A story goes through workflows as rounds on one branch: `$done` ends a round, a person merging the PR ends the story. The chains between them are in [`CONTRIBUTING.md`'s loop](../CONTRIBUTING.md#the-loop), which workflow is for what in [its workflows table](../CONTRIBUTING.md#workflows). Every workflow here is a story workflow (a story without `slices` works in the story worktree). They live in `.agents/workflows/`, and the label `norn:wf:<name>` picks the first. Only a person starts the next round (`norn story edit gh-N --workflow <name> [--at <step>]`).
+- **The CI process check** (`scripts/process-check.ts`) passes a PR only from a story branch `norn/gh-N` (or `gh-N-<slug>`, the one older releases open) that closes #N, a valid bypass, or Dependabot, and refuses one that edits the skill copies `.agents/skills/norn*` unless it is a release PR (titled `Release X.Y.Z`).
+- **What a step may change.** Inside a step, `.agents/workflows/` and the norn config files are ordinary repo files a story may change. A running unit keeps its pinned workflow; norn validates workflows when it loads them, and `norn doctor` shows the problems. Only norn's run state (in the machine dir or the store's refs, never in the worktree) is off limits. The spec and the unit's handoff are the files under `.agents/specs/<story>/` in the worktree: the agent edits them there and norn reads them back when it reports.
+- **Released binary vs code under change.** The process (`norn brief`, `norn done`, hooks, `watch`) always runs the latest released `norn`, never a build of this repo. To exercise your change, run `bun packages/cli/src/main.ts …`, never `norn …`, and only in a throwaway git repo under `$TMPDIR` with its own `NORN_HOME_DIR`. A unit worktree is a live norn unit, and a dev build run there would act on its claim and run state. A broken release: the person reinstalls the previous release binary; the fix goes through the bypass if norn cannot deliver it.
+- **Workflows.** A story runs the workflow its issue label `norn:wf:<name>` names, else the config's default. The shipped ones are in `packages/pack-sdlc/assets/workflows/`; this repo's own, with its check commands and its CI wait, are in `.agents/workflows/`, each replacing the pack's file of the same name, plus `release`.
 - **Changelog.** Do not edit `CHANGELOG.md` in a PR. The `release` step writes it from the squash commits (see [Decisions](#decisions)).
 - **The bypass, from an agent's side.** Only when the person asks, and only when norn cannot deliver the change. The person opens an issue labelled `bypass` that links the norn issue for the norn problem behind it. Work on branch `bypass/<issue>-<slug>`; the PR is labelled `bypass` and says `Closes #<bypass issue>`.
 - **Friction.** When norn gets in the way while working here, say so in the handoff; the person files it with `/issue` and the `friction` label.
-- **Known quirk: `norn init` from a git worktree** sets up the main checkout, not the worktree it runs in (seen during the bootstrap; to be filed as a `friction` issue). Run it from the checkout you mean to set up.
 
 ## Skills
 
-- **Bundled skills.** `.agents/skills/norn*` are copies written by `norn init`: edit the source in `packages/cli/assets/skills/`, never the copy.
+- **Bundled skills.** The pack's skills are in `packages/pack-sdlc/assets/skills/`: edit them there. `.agents/skills/norn*` are this repo's committed copies, refreshed by the release step; never edit a copy.
 - **Repo-local skills.** Skills without the `norn-` prefix (`release`, `release-start`, `issue`) are repo-local: edit them in place in `.agents/skills/<name>/SKILL.md` (linked from `.claude/skills/<name>`). `issue` and `release-start` are person-only (`disable-model-invocation: true`); an agent never runs them.
 - **Exact or principled.** A bundled skill is exact in two places only: where code reads what the agent produces (report outcomes, the criteria and findings JSON, a file's fixed layout), because a reworded field breaks the reader; and where it is tuned to the agent tool (such as `norn-fsd-round`'s timeouts), because the number comes from how the tool behaves, not from judgement. Everywhere else a skill states the failure it prevents and the outcome to reach, and gives principles with their reasons, so the model can fit the work to the change in front of it; it keeps numbered steps only where order matters (check earlier findings before the diff, verify a finding before deciding). A fixed prompt to paste into a subagent or a word cap is procedure in place of judgement: say what the subagent must cover and why instead.
 - **The `norn` skill** stays short and holds no workflow logic or step names: the brief carries the process, step skills carry the craft.
 
 ## Releases
 
-A person runs `/release-start`. It opens the release issue. The `release` workflow rebuilds `CHANGELOG.md` from the squash commits since the last tag, bumps `version` in `packages/cli/package.json` and the README release badge, opens the PR and waits for its CI. The person judges the version and the changelog at `ready`. Merging that PR smokes every binary on its own OS, tags `vX.Y.Z` and publishes in one CI run. See [Process](#process), and the decisions on publishing and the changelog below.
+A person runs `/release-start`. It opens the release issue. The `release` workflow rebuilds `CHANGELOG.md` from the squash commits since the last tag, bumps `version` in `packages/cli/package.json` and the README release badge, refreshes `.agents/skills/norn*` from `packages/pack-sdlc/assets/skills/`, opens the PR and waits for its CI. The person judges the version and the changelog at `ready`. Merging that PR smokes every binary on its own OS, tags `vX.Y.Z` and publishes in one CI run. See [Process](#process), and the decisions on publishing and the changelog below.
 
 ## Decisions
 
 Deliberate choices that diverge from the obvious design.
 
-- **One adapters package.** See "One adapters package" under [Layout](#layout): one `@norn/adapters` package with a subfolder per adapter instead of separate `@norn/adapter-*` packages.
-- **Published as `@pruszynskijakub/norn` on GitHub Packages.** The workspace package stays `@norn/cli`; GitHub's npm registry only takes a package under its owner's scope, so the release build renames it (`bun scripts/build.ts --name … --registry …`). Merging the release PR runs one CI workflow that creates tag `vX.Y.Z` (from `packages/cli/package.json`, with a matching `## [X.Y.Z]` section in `CHANGELOG.md`), tests, publishes the package and attaches the binaries to a GitHub release with that section as notes. Tag and publish share one run because a tag pushed with `GITHUB_TOKEN` triggers no other workflow.
-- **`heartbeat_id` is per checkout, not per `watch` process.** We keep one per checkout in `heartbeat.json` in the checkout's machine dir (`~/.norn/repos/<id>/`) (created on first use, `heartbeatId` in `packages/store/src/heartbeat.ts`), shared by `watch` and every `tick`. Reason: ticks run from cron (or by hand) are separate processes; with a per-process id each one would see the claim it renewed a minute ago as someone else's heartbeat. One id per checkout lets every tick recognise its own claim. The same id alone decides who holds a claim, for decide, the verbs and the view alike: two clones of the same `user@host` are two holders, and `user@host` only names who holds it.
-- **Claude sessions run in `auto` permission mode by default.** Permission profiles per step are not built ([Limitations](limitations.md)), and every permission prompt surfaces as an implicit ask. The built-in config instead gives `agents.claude` `args: ["--permission-mode", "auto"]` (`BUILT_IN_AGENTS`, `packages/schema/src/config.ts`), so unattended sessions in herdr or headless park far less often. A file's `agents.claude` entry merges field by field over it: setting `model` keeps the args; setting `args` replaces the list, permission mode included. The start command shown to a person (`startCommandFor`) carries the same args.
-- **The shim lives in norn's machine home, not under the launch env's `NORN_HOME`.** The `NORN_HOME` an agent sees is the repo root. The shim is `~/.norn/bin/norn` (`NORN_HOME_DIR`) (one per machine) and its launchers `~/.norn/launch/<hash>.sh` (one per launched `PATH` and shim; an orient agent's are in `~/.norn/orient/launch/`), outside every checkout's machine dir `~/.norn/repos/<id>/`; the shim is rewritten by each launch to exec the launching norn (`packages/cli/src/runtime/shim.ts`); `NORN_BIN` names it. An orient agent (`norn story chat`) gets its own shim, `~/.norn/orient/bin/norn`, so opening one never changes the norn that launched agents' hooks call.
-- **Commands read by an agent or a person print markdown.** Agents follow instructions better as markdown and people read a summary faster than JSON, so a command whose reader is an agent (`brief`, `done`, `ask`, `stuck`) or a person (`help`, `init`, `doctor`, `status`, `story list|view`, `run list|view`) sets `markdown: true` and returns `rendered(value, markdown)`; its refusals print as markdown too. Every command takes `--json` and then prints one JSON value (`CliError` on refusal), and the exit codes are the same either way, so code branches on the exit code and `--json` data, never on markdown. Commands a program reads (`tick`, `watch`, `hook`, `sync`, …) print JSON, except that `watch --human` prints plain lines for a person at the terminal (`rendered(…, { asked: true })`; `--json` still wins). `runCli` picks the format (`packages/cli/src/cli.ts`); its `value` is always the data.
-- **`norn status --segment` writes Herdr presentation (a prototype).** Besides printing the tab bar line, the segment command writes a `norn` sidebar token on each `<story> orient` workspace and moves those workspaces (only norn's, inside the slots they hold) so the ones that need the person come first (`packages/cli/src/runtime/segment.ts`). It is the one command Herdr already runs every few seconds, so it carries this presentation side effect instead of `tick` or a separate loop. Tokens and order are never facts. A prototype choice: revisit if the cockpit gets its own long-running presenter.
-- **An answer from the mailbox is typed by the holder's tick.** `norn story answer` on the checkout that holds the claim and runs the session types first and writes the receipt (`delivered: true`) only after, so a failed delivery leaves no answer receipt. A mailbox answer already is a receipt; the holder's tick types it before writing state, so a failed delivery leaves the unit parked and the next tick tries again.
+- **A thin kernel, everything else a plugin.** The kernel holds only what must be the same for every repo: the workflow model, decide, the journal's write rules and the session reducer. Where stories come from, where changes are reviewed, where run data lives, which agent tool runs and where it runs are slots, so a repo with no code host (tracker `local`, forge `none`) and a team on GitHub run the same kernel. The bundled plugins ship in the binary; `norn plugin add` installs others into `~/.norn/plugins/` and pins them in a lock.
+- **One package per plugin.** Each bundled plugin is its own package that reads only `schema` and `plugin-api`, so the dependency lint proves a bundled plugin uses nothing a third-party one could not.
+- **The committed config wins.** The layers merge as built-in defaults, then `~/.norn/config.yaml`, then `.agents/norn.local.yaml`, then `.agents/norn.yaml`, the last one winning. A team that commits its config (`norn init --commit`) gets the same tracker, forge, store and workflows on every machine; a key it leaves unset is still each person's.
+- **The spec and handoffs live with the run data, not on the branch.** A story's documents are store artifacts. Before a launch, and whenever `norn brief` renders, norn writes them into the worktree under `.agents/specs/<story>/` (and every other input under `.agents/inputs/`), each folder with a `.gitignore` of `*`, and reads back what the agent changed when it reports. A PR then holds only code, and nothing the agent reads is ever committed by accident.
+- **Pack skills are written before every launch.** Each pack skill goes to `.agents/skills/<name>/` in the worktree, ignored by git, and the harness's own folder (`.claude/skills/`, `.pi/skills/`) gets a link to it. A folder of that name the repo commits itself carries no norn mark and is left alone, so a repo overrides a pack skill by committing its own.
+- **Hooks go in the agent tool's local settings only.** The claude harness writes `.claude/settings.local.json` in each worktree at launch, never the committed `settings.json`, so a machine-specific hook command never follows the branch into a clone where it does not exist.
+- **Claude sessions run in `auto` permission mode by default.** Permission profiles per step are not built ([Limitations](limitations.md)), and every permission prompt surfaces as an ask. The claude harness's default args are `--permission-mode auto` (`DEFAULT_ARGS`); an executor's `args` replaces them whole, permission mode included.
+- **Published as `@pruszynskijakub/norn` on GitHub Packages.** The workspace package stays `@norn/cli`; GitHub's npm registry only takes a package under its owner's scope, so the release build renames it (`bun scripts/build.ts --name … --registry …`). The packs and harnesses import their assets as text, so the bundle and the binary carry every workflow, skill and extension. Merging the release PR runs one CI workflow that creates tag `vX.Y.Z`, tests, publishes the package and attaches the binaries to a GitHub release. Tag and publish share one run because a tag pushed with `GITHUB_TOKEN` triggers no other workflow.
+- **The machine dir is keyed by git's common dir.** Every worktree of one clone, a unit's included, shares `~/.norn/repos/<id>/`, and two clones never do, so two clones on one machine are two holders of a claim.
 - **norn develops norn (self-hosting).** Every change to a file in the repo starts as a norn issue and lands through a norn workflow; an agent changes the repo only inside a norn step (see [Process](#process)). Outside norn: Dependabot PRs, GitHub settings, backlog triage, the bypass, and the one-time bootstrap. Enforced by these docs and the CI process check, not by an editor hook.
-- **Squash-only merges; the changelog is written at release.** Every merge to `main` is a squash whose message is the PR title and description, so each commit is one PR (`Closes #N`). PRs do not edit `CHANGELOG.md` and there is no `## [Unreleased]` section: the `release` step writes `## [X.Y.Z] - <date>` from the commits since the last tag, with the section taken from the closed issue's workflow (a story that started in `reproduce` → Fixed, `story` → Added or Changed, `quick` → judged, `release` → omitted).
-- **Only `release` is repo-local, not shipped.** `norn init` ships `triage`, `reproduce`, `refinement`, `story`, `slice` and `quick` (`packages/cli/assets/workflows/`, with the shared files `quick` and `story` use in its `shared/`); `.agents/workflows/` holds copies of them with this repo's check commands, its `ci.yml` wait and its instructions (the dev build), plus `release`. Their common steps (the sync, the base update, the CI wait, ready and merge) are written once, in `.agents/workflows/shared/`: a fix to this repo's CI wait is one file. Change a shipped workflow in both places. The skills `release`, `release-start` and `issue` live in `.agents/skills/`; ship one only through its own story.
+- **Squash-only merges; the changelog is written at release.** Every merge to `main` is a squash whose message is the PR title and description, so each commit is one PR (`Closes #N`). PRs do not edit `CHANGELOG.md` and there is no `## [Unreleased]` section: the `release` step writes `## [X.Y.Z] - <date>` from the commits since the last tag.
