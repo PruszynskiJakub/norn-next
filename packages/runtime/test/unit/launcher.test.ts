@@ -514,6 +514,53 @@ describe("the pack's skills", () => {
     expect({ files: inWorktree(plain.snapshot()), links: plain.links() }).toMatchSnapshot("a host without links");
   });
 
+  test("the harness's hooks are installed before the skills are written, and a failed install refuses the launch", async () => {
+    const s = withSkills(".claude/skills");
+    const seen: string[][] = [];
+    const harness = { ...fakeHarness(), skillsDir: ".claude/skills", install: async () => (seen.push(await s.files.list(`${WT}/.agents/skills`)), { changed: [] }) };
+    const ordered = new HarnessLauncher({ ...s.launcher.opts, executors: { pane: { harness, runner: s.pane } } });
+    expect((await ordered.start(run())).ok).toBe(true);
+    expect(seen).toEqual([[]]);
+    expect((await s.files.list(`${WT}/.agents/skills`)).sort()).toEqual(["norn", "norn-implement"]);
+
+    const t = withSkills(".claude/skills");
+    const broken = {
+      ...fakeHarness(),
+      skillsDir: ".claude/skills",
+      install: async () => {
+        throw new Error("settings.json is not JSON");
+      },
+    };
+    const refusing = new HarnessLauncher({ ...t.launcher.opts, executors: { pane: { harness: broken, runner: t.pane } } });
+    const got = await refusing.start(run());
+    expect(got.ok).toBe(false);
+    expect(!got.ok && got.failure).toMatchObject({ code: "unavailable", message: `fake: installing hooks in ${WT} failed: settings.json is not JSON` });
+    expect(await t.files.list(`${WT}/.agents/skills`)).toEqual([]);
+    expect(t.pane.starts).toEqual([]);
+  });
+
+  test("on a host without links, a skill the repo keeps in .agents gets no pack copy in the harness's folder", async () => {
+    const plain = memoryFiles();
+    const noLinks = { ...plain, symlink: undefined, readLink: undefined } as unknown as ReturnType<typeof memoryFiles>;
+    const s = withSkills(".claude/skills", noLinks);
+    await plain.write(`${WT}/.agents/skills/norn/SKILL.md`, "# the repo's own norn skill\n");
+    expect((await s.launcher.start(run())).ok).toBe(true);
+    expect(await plain.read(`${WT}/.agents/skills/norn/SKILL.md`)).toBe("# the repo's own norn skill\n");
+    expect(await plain.read(`${WT}/.claude/skills/norn/SKILL.md`)).toBeNull();
+    expect(await plain.read(`${WT}/.claude/skills/norn-implement/SKILL.md`)).toBe("# implement\n");
+  });
+
+  test("a copy a crash cut short after its mark is still norn's and is completed on the next launch", async () => {
+    const s = withSkills(".claude/skills");
+    const MARK = "# norn: pack skills, rewritten before every launch; edit the pack, not these copies\n*\n";
+    await s.files.write(`${WT}/.agents/skills/norn-implement/.gitignore`, MARK);
+    await s.files.write(`${WT}/.agents/skills/norn-implement/SKILL.md`, "# impl");
+    expect((await s.launcher.start(run())).ok).toBe(true);
+    expect(await s.files.read(`${WT}/.agents/skills/norn-implement/SKILL.md`)).toBe("# implement\n");
+    expect(await s.files.read(`${WT}/.agents/skills/norn-implement/refs/tdd.md`)).toBe("red, green\n");
+    expect(s.files.links()[`${WT}/.claude/skills/norn-implement`]).toBe("../../.agents/skills/norn-implement");
+  });
+
   test("a harness with no skills folder gets none", async () => {
     const s = withSkills(undefined);
     expect((await s.launcher.start(run())).ok).toBe(true);
