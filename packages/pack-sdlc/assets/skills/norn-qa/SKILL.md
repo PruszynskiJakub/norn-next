@@ -37,7 +37,7 @@ A criterion that passed as written but that a person may read differently stays 
 
 ## Files
 
-Write everything to one directory **outside the repository** (e.g. under `$TMPDIR`) unless told where: whatever is left in the worktree is committed when you report.
+Write everything to one directory **outside the repository** (e.g. under `$TMPDIR`) unless told where: `norn done` is refused while the worktree holds uncommitted work, and QA files do not belong in the branch.
 
 - `criteria.json`, the criteria report, one entry per criterion. Required: `evidence` for `pass`, `repro` for `fail`, `how` for `person`, `reason` and `how` for `unverified`; `evidence` and `note` (for a person) may go on any.
 
