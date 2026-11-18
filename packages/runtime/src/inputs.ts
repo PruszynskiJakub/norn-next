@@ -20,7 +20,7 @@ import { baseRefOf, cutFrom } from "./branches.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 import { readStepRun } from "./step-runs.ts";
-import { baseSideOf, recordOf, type Resolved, resolutionOf, standing, storyUnits } from "./input-history.ts";
+import { baseSideOf, recordOf, type Resolved, resolutionOf, roundOf, standing, storyUnits } from "./input-history.ts";
 import { handoffArtifact, listStoryDocs, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
 
 const AGENTS_DIR = ".agents";
@@ -142,19 +142,47 @@ function handoffTemplate(unit: string): string {
   return `# Handoff: ${unit}\n\nThis unit's current state, for the next agent and the person. Rewrite it in place.\n\n## State\n\n## Notes\n`;
 }
 
-/** What sent the work back, or the last finding on the record: newest first, the brief's own rework receipt winning. */
+/**
+ * The receipt whose findings the step reads: the one that sent this visit back, else (a review of
+ * rework) the latest this round that carried findings, unless a clean judgement settled it since.
+ * Only that one: older findings were answered by the rework since, and showing them again would send
+ * the agent after problems already fixed. A red check is skipped in the search, never a stop: it has
+ * no findings of its own, and the review findings before it are still the ones the rework answers.
+ */
 function findingsReceipt(record: UnitJournal, reworkFrom: number | undefined): KernelReceipt | undefined {
   if (reworkFrom !== undefined) {
     const r = record.receipts.find((x) => x.seq === reworkFrom);
-    if (r && r.data.kind !== "check.finished") return r;
+    return r && r.data.kind !== "check.finished" ? r : undefined;
   }
-  const handsBackFindings = (step: string | undefined, outcome: string | undefined): boolean =>
-    step !== undefined && outcome !== undefined && record.state?.workflow.doc.steps[step]?.hand_back?.[outcome] === "findings";
-  return record.receipts.findLast((r) => {
-    const d = r.data;
-    if (d.kind === "gate.decided") return d.outcome === "reject";
-    return d.kind === "run.reported" && d.verb === "done" && (d.text !== undefined || d.criteria !== undefined) && handsBackFindings(d.step, d.outcome);
-  });
+  const round = roundOf(record);
+  const at = round.findLastIndex((x) => carriesFindings(record, x));
+  const found = round[at];
+  if (!found) return undefined;
+  return round.slice(at + 1).some((x) => settles(record, found, x)) ? undefined : found;
+}
+
+const handsBackFindings = (record: UnitJournal, step: string | undefined, outcome: string | undefined): boolean =>
+  step !== undefined && outcome !== undefined && record.state?.workflow.doc.steps[step]?.hand_back?.[outcome] === "findings";
+
+function carriesFindings(record: UnitJournal, r: KernelReceipt): boolean {
+  const d = r.data;
+  if (d.kind === "gate.decided") return d.outcome === "reject";
+  if (d.kind !== "run.reported" || d.verb !== "done" || (d.text === undefined && d.criteria === undefined)) return false;
+  return handsBackFindings(record, d.step, d.outcome);
+}
+
+/** Whether `later` judged the work clean after `found`: a gate decided `approve`, or the step that sent the findings reported an outcome that hands none back. */
+function settles(record: UnitJournal, found: KernelReceipt, later: KernelReceipt): boolean {
+  const d = later.data;
+  if (d.kind === "gate.decided") return d.outcome === "approve" || (d.step === found.data.step && d.outcome !== "reject");
+  return d.kind === "run.reported" && d.verb === "done" && d.step === found.data.step && !handsBackFindings(record, d.step, d.outcome);
+}
+
+function noFindingsNote(record: UnitJournal, brief: BriefInputs): string {
+  const by = brief.rework_from !== undefined ? record.receipts.find((x) => x.seq === brief.rework_from) : undefined;
+  if (by?.data.kind !== "check.finished") return "no findings sent this work back";
+  const where = brief.inputs.includes("last_check") ? "under Rework and in `last_check`" : "under Rework";
+  return `the check \`${by.data.step ?? "check"}\` sent the work back, with no findings: its output is ${where}`;
 }
 
 /** The criteria a report did not pass, one line each, with the repro or how to check it. */
@@ -254,7 +282,11 @@ async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: Brief
     case "last_findings": {
       const r = findingsReceipt(record, brief.rework_from);
       const text = r ? findingsText(r) : null;
-      if (text === null) return { name, label: "the last findings", note: "no findings are recorded for this unit yet" };
+      if (text === null) {
+        // a file an earlier visit was given would still read as findings to an agent that opens it
+        await env.ctx.files.remove(`${worktree}/${INPUTS_DIR}/last_findings.md`);
+        return { name, label: "the last findings", note: noFindingsNote(record, brief) };
+      }
       return written(env, worktree, name, "last_findings.md", "the last findings sent back", text);
     }
     case "diff":

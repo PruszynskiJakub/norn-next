@@ -164,6 +164,39 @@ describe("agent runs", () => {
     expect(renderBrief(input.value)).toContain("## Rework");
     expect(input.value.rework).toBe("`ready` was decided `reject` by person: Make the button blue");
   });
+
+  test("a brief carries what the unit's steps did this round, and the ruling it reworks under Rework only", async () => {
+    const h = harness({ workflow: "gated" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    const st = (await record(h, "lt-1")).state;
+    await h.env.journal.record("lt-1", { id: "01JD5G0000REJECT0000000000", data: { kind: "gate.decided", outcome: "reject", by: "person", reason: "Make the button blue", step: st?.step, attempt: st?.attempt } });
+    await tickUntil(h, has("agent.start"));
+    const run = h.launcher.of("start").at(-1)?.[0] as AgentRunRequest;
+    const input = await briefRenderInput(h.env, "lt-1", run.brief, run.run_id);
+    if (!input.ok) throw new Error(input.failure.message);
+    expect(input.value.rework).toContain("Make the button blue");
+    expect(input.value.rulings).toBeUndefined();
+    expect(input.value.history).toEqual(["`ready #1` decided `reject` by person"]);
+    expect(input.value.retry).toBeUndefined();
+  });
+
+  test("a retry's brief says how the session it replaces ended", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const first = (await record(h, "lt-1")).state?.run?.id as string;
+    const before = await briefRenderInput(h.env, "lt-1", (h.launcher.of("start").at(-1)?.[0] as AgentRunRequest).brief, first);
+    expect(before.ok ? before.value.retry : "unread").toBeUndefined();
+    h.sessions.byUnit.set("lt-1", session("ended"));
+    await tickUntil(h, has("agent.died.retry"));
+    const retry = h.launcher.of("start").at(-1)?.[0] as AgentRunRequest;
+    const input = await briefRenderInput(h.env, "lt-1", retry.brief, retry.run_id);
+    if (!input.ok) throw new Error(input.failure.message);
+    expect(input.value.retry).toBe(`run \`${first}\``);
+    expect(renderBrief(input.value)).toContain("## Retry");
+  });
 });
 
 describe("checks and plugin steps", () => {

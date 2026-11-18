@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { type BriefInputs, type KernelReceipt, type ReceiptData, renderBrief, type UnitJournal } from "@norn/kernel";
-import { materializeInputs, readBackDocs, readStoryDoc } from "../../src/index.ts";
+import { materializeInputs, readBackDocs, readStoryDoc, renderInputFrom } from "../../src/index.ts";
 import { has, harness, type Harnessed, record, tickUntil, trackerItem } from "./support.ts";
 
 const UNIT = "lt-1";
@@ -171,6 +171,96 @@ describe("the resolution to review", () => {
   });
 });
 
+describe("the last findings", () => {
+  const reject: ReceiptData = { kind: "gate.decided", step: "ready", attempt: 1, outcome: "reject", by: "jo", reason: "Rename the flag." };
+  const approve: ReceiptData = { kind: "gate.decided", step: "ready", attempt: 2, outcome: "approve", by: "jo" };
+  const red: ReceiptData = { kind: "check.finished", step: "test", attempt: 1, run_id: "r-test", exit: 1, outcome: "fail" };
+
+  async function lastFindings(h: Harnessed, journal: UnitJournal, reworkFrom?: number) {
+    const brief = { ...briefWith(["last_findings"]), ...(reworkFrom !== undefined && { rework_from: reworkFrom }) };
+    const made = await materializeInputs(h.env, journal, brief);
+    if (!made.ok) throw new Error(made.failure.message);
+    const text = await h.files.read(`${WORKTREE}/.agents/inputs/last_findings.md`);
+    return { view: made.value.inputs[0], text };
+  }
+
+  test("are the findings of the receipt that sent the unit back", async () => {
+    const h = await started();
+    const journal = withReceipts(await record(h, UNIT), reject);
+    const { view, text } = await lastFindings(h, journal, journal.receipts.at(-1)?.seq);
+    expect(view?.path).toBe(".agents/inputs/last_findings.md");
+    expect(text).toContain("Rename the flag.");
+  });
+
+  test("a red check that sent the unit back after a later approval never brings back the findings that approval settled", async () => {
+    const h = await started();
+    const rejected = withReceipts(await record(h, UNIT), reject);
+    expect((await lastFindings(h, rejected, rejected.receipts.at(-1)?.seq)).text).toContain("Rename the flag.");
+    const journal = withReceipts(rejected, approve, red);
+    const { view, text } = await lastFindings(h, journal, journal.receipts.at(-1)?.seq);
+    expect(view?.note).toContain("the check");
+    expect(text ?? "").not.toContain("Rename the flag.");
+  });
+
+  test("a step nothing sent back reads the latest findings this round, and none once a later approval settled them", async () => {
+    const h = await started();
+    const answered = await lastFindings(h, withReceipts(await record(h, UNIT), reject));
+    expect(answered.text).toContain("Rename the flag.");
+    const h2 = await started();
+    const settled = await lastFindings(h2, withReceipts(await record(h2, UNIT), reject, approve, red));
+    expect(settled.view?.note).toBeDefined();
+    expect(settled.text ?? "").not.toContain("Rename the flag.");
+  });
+
+  /** The journal with its review step handing `changes_requested` back as findings, as the slice workflow's review does. */
+  function reviewHandsBack(journal: UnitJournal): UnitJournal {
+    const out = structuredClone(journal);
+    const steps = out.state?.workflow.doc.steps as Record<string, { hand_back?: Record<string, string> }> | undefined;
+    if (!steps?.review) throw new Error("the workflow has no review step");
+    steps.review.hand_back = { changes_requested: "findings" };
+    return out;
+  }
+  const requested: ReceiptData = { kind: "run.reported", step: "review", attempt: 1, run_id: "r-review-1", verb: "done", outcome: "changes_requested", text: "Handle the empty input." };
+  const reviewed: ReceiptData = { kind: "run.reported", step: "review", attempt: 2, run_id: "r-review-2", verb: "done", outcome: "approve", text: "All criteria met." };
+  const green: ReceiptData = { kind: "check.finished", step: "test", attempt: 2, run_id: "r-test-2", exit: 0, outcome: "pass" };
+
+  test("a review of rework still reads the review findings it answers when a red check came between", async () => {
+    const h = await started();
+    const journal = withReceipts(reviewHandsBack(await record(h, UNIT)), requested, red, green);
+    const { text } = await lastFindings(h, journal);
+    expect(text).toContain("Handle the empty input.");
+  });
+
+  test("a red check after a later clean review never brings back the findings that review settled", async () => {
+    const h = await started();
+    const journal = withReceipts(reviewHandsBack(await record(h, UNIT)), requested, reviewed, red);
+    const sent = await lastFindings(h, journal, journal.receipts.at(-1)?.seq);
+    expect(sent.text ?? "").not.toContain("Handle the empty input.");
+    const h2 = await started();
+    const fallback = await lastFindings(h2, withReceipts(reviewHandsBack(await record(h2, UNIT)), requested, reviewed, red));
+    expect(fallback.text ?? "").not.toContain("Handle the empty input.");
+  });
+
+  test("findings of an earlier round are never shown in a new one", async () => {
+    const h = await started();
+    const before = await record(h, UNIT);
+    const workflow = before.state?.workflow;
+    if (!workflow) throw new Error("the unit has no workflow");
+    const round: ReceiptData = { kind: "round.started", workflow, at: "build", by: "jo" };
+    const { view, text } = await lastFindings(h, withReceipts(before, reject, round));
+    expect(text).toBeNull();
+    expect(view?.note).toBe("no findings sent this work back");
+  });
+
+  test("the note for a step a red check sent back names `last_check` only when the step reads it", async () => {
+    const h = await started();
+    const journal = withReceipts(await record(h, UNIT), red);
+    const { view } = await lastFindings(h, journal, journal.receipts.at(-1)?.seq);
+    expect(view?.note).toContain("under Rework");
+    expect(view?.note).not.toContain("last_check");
+  });
+});
+
 describe("the story's record", () => {
   test("names each unit's outcomes, gate rulings and criteria reports with their evidence", async () => {
     const h = await started();
@@ -212,3 +302,55 @@ describe("the brief", () => {
     expect(baseMd).toContain("- `base_side` — the base side of the conflict: the base commit to merge and what it changed in each conflicting path: `.agents/inputs/base_side.md`");
   });
 });
+
+describe("the brief's history, rulings and retry notice", () => {
+  async function rendered(h: Harnessed, journal: UnitJournal, brief: BriefInputs = briefWith([]), runId?: string) {
+    const got = await renderInputFrom(h.env, journal, { ...brief, hash: journal.state?.workflow.hash ?? brief.hash }, runId, WORKTREE);
+    if (!got.ok) throw new Error(got.failure.message);
+    return got.value;
+  }
+  const checked = (attempt: number): ReceiptData => ({ kind: "check.finished", step: "test", attempt, run_id: `r-test-${attempt}`, exit: 1, outcome: "fail" });
+  const ruled = (attempt: number, reason: string): ReceiptData => ({ kind: "gate.decided", step: "ready", attempt, outcome: "reject", by: "jo", reason });
+
+  test("a long history keeps its newest lines and counts the ones it left out", async () => {
+    const h = await started();
+    const journal = withReceipts(await record(h, UNIT), ...Array.from({ length: 25 }, (_, i) => checked(i + 1)));
+    const history = (await rendered(h, journal)).history ?? [];
+    expect(history).toHaveLength(20);
+    expect(history[0]).toMatch(/^… \d+ earlier$/);
+    expect(history.at(-1)).toBe("`test #25` check exited 1 (`fail`)");
+  });
+
+  test("a retry's notice counts the nudges the session it replaces was sent", async () => {
+    const h = await started();
+    const journal = withReceipts(
+      await record(h, UNIT),
+      { kind: "nudge.sent", run_id: "r-old", reason: "quiet" },
+      { kind: "nudge.sent", run_id: "r-old", reason: "quiet" },
+      { kind: "run.started", run_id: "r-new", run_kind: "agent", executor: "claude", attended: false, retry_of: "r-old" },
+    );
+    expect((await rendered(h, journal, briefWith([]), "r-new")).retry).toBe("run `r-old`, nudged 2 times");
+  });
+
+  test("the record says where a person moved the unit and why", async () => {
+    const h = await started();
+    const journal = withReceipts(await record(h, UNIT), { kind: "step.moved", to: "build", by: "jo", reason: "Try the parser again." });
+    await h.env.journal.record(UNIT, { id: "01JD5G0000MOVED00000000000", data: { kind: "step.moved", to: "build", by: "jo", reason: "Try the parser again." } });
+    const v = await only(h, await record(h, UNIT), "record");
+    expect(await h.files.read(`${WORKTREE}/${v.path}`)).toContain("- moved to `build` by jo: Try the parser again.");
+    expect((await rendered(h, journal)).history?.at(-1)).toBe("moved to `build` by jo");
+  });
+
+  test("rulings keep the newest few, and leave out the one already under Rework", async () => {
+    const h = await started();
+    for (let i = 1; i <= 12; i++) await h.env.journal.record(UNIT, { id: `01JD5G0000RULING${String(i).padStart(10, "0")}`, data: ruled(i, `Ruling ${i}.`) });
+    const journal = await record(h, UNIT);
+    const rulings = (await rendered(h, journal, { ...briefWith([]), rework_from: journal.receipts.at(-1)?.seq as number })).rulings ?? [];
+    expect(rulings.some((r) => r.includes("Ruling 12."))).toBe(false);
+    expect(rulings.some((r) => r.includes("Ruling 11."))).toBe(true);
+    expect(rulings.some((r) => r.includes("Ruling 1."))).toBe(false);
+    expect(rulings[0]).toMatch(/^… \d+ earlier/);
+    expect(rulings.length).toBeLessThanOrEqual(11);
+  });
+});
+
