@@ -11,6 +11,14 @@ describe("a ready agent step", () => {
     expect(d.intent.data).toEqual({ kind: "run.started", run_id: d.run_id, run_kind: "agent", executor: "claude", attended: false, step: "build", attempt: 1 });
   });
 
+  test("a step entered by work sent back briefs its run, and a retry of it, with the receipt that sent it back", () => {
+    const d = kindOf(decideCase({ state: stateAt("build", { rework_from: 5 }) }), "start_run");
+    expect(d.brief.rework_from).toBe(5);
+    expect(kindOf(decideCase({ state: stateAt("build") }), "start_run").brief.rework_from).toBeUndefined();
+    const retry = kindOf(decideCase({ state: stateAt("build", { rework_from: 5, run: run() }), session: session("ended") }), "retry_run");
+    expect(retry.brief.rework_from).toBe(5);
+  });
+
   test("the step's by: picks the executor over the config's", () => {
     const wf = loaded(graph({ build: { agent: agentSpec({ executor: "codex" }) } }));
     const d = kindOf(decideCase({ state: stateAt("build", {}, wf), workflows: [wf], executors: { claude: caps(), codex: caps() } }), "start_run");

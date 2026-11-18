@@ -206,6 +206,44 @@ describe("applyReceipts: counters", () => {
   });
 });
 
+describe("applyReceipts: rework", () => {
+  /** The graph with its send-back edges uncounted, so only the outcome's kind says it sends the work back. */
+  function uncounted(): WorkflowGraph {
+    const g = graphOf();
+    const review = g.steps.review as CompiledStep;
+    g.steps.review = { ...review, routes: { ...review.routes, changes: { to: "implement" } }, agent: spec({ hand_back: { changes: "findings" } }) };
+    const ready = g.steps.ready as CompiledStep;
+    g.steps.ready = { ...ready, routes: { ...ready.routes, reject: { to: "implement" } } };
+    return g;
+  }
+
+  test("an outcome that sends the work back names its receipt as the rework of the step it enters", () => {
+    const failed = apply(atTest(), journal(4, checked("c1", "fail")));
+    expect(failed.state).toMatchObject({ step: "implement", rework_from: 4 });
+    const g = uncounted();
+    const atReview: RunState = { ...fresh(), step: "review" };
+    const handedBack = apply(atReview, journal(1, started("v1"), { kind: "run.reported", run_id: "v1", verb: "done", outcome: "changes", text: "rename it" }), g);
+    expect(handedBack.state).toMatchObject({ step: "implement", rework_from: 2 });
+    const atReady: RunState = { ...fresh(), step: "ready" };
+    const rejected = apply(atReady, journal(1, { kind: "gate.decided", outcome: "reject", by: "a-person", reason: "make it blue", step: "ready", attempt: 1 }), g);
+    expect(rejected.state).toMatchObject({ step: "implement", rework_from: 1 });
+  });
+
+  test("a forward route, a counted edge into a step no agent runs, and a person's move name no rework", () => {
+    const atReady: RunState = { ...fresh(), step: "ready" };
+    const stale = apply(atReady, journal(1, { kind: "step.finished", step_kind: "gate", outcome: "stale", step: "ready", attempt: 1 }));
+    expect(stale.state.step).toBe("test");
+    expect(stale.state.rework_from).toBeUndefined();
+    const failed = apply(atTest(), journal(4, checked("c1", "fail"))).state;
+    const forward = apply(failed, journal(5, started("a2"), reported("a2", "done")));
+    expect(forward.state.step).toBe("test");
+    expect(forward.state.rework_from).toBeUndefined();
+    const moved = apply(failed, journal(5, { kind: "step.moved", to: "review", by: "a-person", step: "implement", attempt: 2 }));
+    expect(moved.state.step).toBe("review");
+    expect(moved.state.rework_from).toBeUndefined();
+  });
+});
+
 describe("applyReceipts: parks", () => {
   test("a unit.parked receipt parks the unit from its time; one written for another step is refused, and an answer lifts it", () => {
     const parked = apply(fresh(), journal(1, { kind: "unit.parked", reason: "gate.park", step: "implement", attempt: 1 }));

@@ -80,15 +80,18 @@ async function liveAgent(env: RuntimeEnv, unit: string): Promise<Refusable<{ rec
 
 function briefInputsOf(record: UnitJournal, live: LiveStep, spec: { skills: string[]; inputs: BriefInputs["inputs"]; model?: string }): BriefInputs {
   const state = record.state as NonNullable<UnitJournal["state"]>;
-  const brief: BriefInputs = {
+  // the state's rework belongs to the visit it is at; a live run of any other visit was not sent back by it
+  const sameVisit = state.step === live.step && state.attempt === live.attempt;
+  return {
     workflow: state.workflow.name,
     hash: state.workflow.hash,
     step: live.step,
     attempt: live.attempt,
     skills: [...spec.skills],
     inputs: structuredClone(spec.inputs),
+    ...(spec.model !== undefined && { model: spec.model }),
+    ...(sameVisit && state.rework_from !== undefined && { rework_from: state.rework_from }),
   };
-  return spec.model === undefined ? brief : { ...brief, model: spec.model };
 }
 
 export async function briefOf(env: RuntimeEnv, unit: string): Promise<Refusable<BriefShown>> {

@@ -1065,7 +1065,8 @@
           "ci": 1,
           "ready": 1,
           "implement": 1
-        }
+        },
+        "rework_from": 7
       },
       "expect_version": 8,
       "rejected": []

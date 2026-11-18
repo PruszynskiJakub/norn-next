@@ -67,10 +67,29 @@ export function applyReceipts(state: RunState, receipts: readonly KernelReceipt[
     out.state = { ...one.state, applied_through: r.seq };
     if (one.taken) {
       const { outcome, to, counter, exhausted, reset } = one.taken;
+      if (out.state.ended === undefined && out.state.step === to && graph.steps[to]?.agent && sendsBack(graph, from, outcome, r)) out.state.rework_from = r.seq;
       out.routes.push({ seq: r.seq, from, outcome, to, ...(counter ? { counter } : {}), ...(exhausted ? { exhausted } : {}), reset });
     }
   }
   return out;
+}
+
+/**
+ * Whether outcome `outcome` of step `from`, recorded by `r`, sends the work back for the step it
+ * enters to rework (only an agent step's brief reads it, so only an agent step is given one): a counted edge (a loop the workflow bounds), a gate's reject, a check that did not
+ * pass, or an agent outcome that must hand back findings. Read from the graph and the receipt, so a
+ * workflow's own outcome names need no list here.
+ */
+function sendsBack(graph: WorkflowGraph, from: string, outcome: string, r: KernelReceipt): boolean {
+  const d = r.data;
+  // a session norn classified (quiet, dead, past its deadline) failed to work; nothing was judged and sent back
+  if (d.kind === "run.classified") return false;
+  const step = graph.steps[from];
+  if (step?.routes[outcome]?.counter !== undefined) return true;
+  if (d.kind === "gate.decided") return d.outcome === "reject";
+  if (d.kind === "check.finished") return d.outcome !== "pass";
+  if (d.kind === "run.reported") return step?.agent?.hand_back[outcome] === "findings";
+  return false;
 }
 
 export interface NewRunStateInput {

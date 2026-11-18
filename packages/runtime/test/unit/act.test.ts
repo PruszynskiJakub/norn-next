@@ -150,6 +150,20 @@ describe("agent runs", () => {
     expect(input.value.answered).toEqual([{ question: "Which way?", answer: "left" }]);
     expect(renderBrief(input.value)).toContain("- Asked: Which way?\n  Answered: left");
   });
+
+  test("a step a gate's reject sent back to is briefed with the person's reason under Rework", async () => {
+    const h = harness({ workflow: "gated" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    const st = (await record(h, "lt-1")).state;
+    await h.env.journal.record("lt-1", { id: "01JD5G0000REJECT0000000000", data: { kind: "gate.decided", outcome: "reject", by: "person", reason: "Make the button blue", step: st?.step, attempt: st?.attempt } });
+    await tickUntil(h, has("agent.start"));
+    const run = h.launcher.of("start").at(-1)?.[0] as AgentRunRequest;
+    const input = await briefRenderInput(h.env, "lt-1", run.brief, run.run_id);
+    if (!input.ok) throw new Error(input.failure.message);
+    expect(renderBrief(input.value)).toContain("## Rework");
+    expect(input.value.rework).toBe("`ready` was decided `reject` by person: Make the button blue");
+  });
 });
 
 describe("checks and plugin steps", () => {

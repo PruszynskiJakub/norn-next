@@ -381,6 +381,19 @@ describe("brief", () => {
     expect((await record(h, UNIT)).state?.ended).toBe("done");
   });
 
+  test("the brief of a step a gate's reject sent back to carries the person's reason under Rework", async () => {
+    const h = harness({ workflow: "gated" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    const st = (await record(h, UNIT)).state;
+    await h.env.journal.record(UNIT, { id: "01JD5G0000REJECT0000000000", data: { kind: "gate.decided", outcome: "reject", by: "person", reason: "Make the button blue", step: st?.step, attempt: st?.attempt } });
+    await tickUntil(h, has("agent.start"));
+    const r = await briefOf(h.env, UNIT);
+    if (!r.ok) throw new Error(r.refusal.error);
+    expect(r.value.markdown).toContain("## Rework");
+    expect(r.value.markdown).toContain("`ready` was decided `reject` by person: Make the button blue");
+  });
+
   test("no brief for a unit with no live agent run", async () => {
     const h = harness({ workflow: "agented" });
     expect(await briefOf(h.env, "lt-9")).toMatchObject({ ok: false, refusal: { code: "no_run" } });

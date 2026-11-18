@@ -1072,7 +1072,8 @@
           "update": 1,
           "test": 1,
           "review": 1
-        }
+        },
+        "rework_from": 22
       },
       "expect_version": 24,
       "rejected": []

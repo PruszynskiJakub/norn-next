@@ -247,6 +247,18 @@ export const WORKFLOWS: Record<string, string> = {
     "    outcomes: { approve: $done, reject: $stuck }",
     "",
   ].join("\n"),
+  "gated.yaml": [
+    "name: gated",
+    "start: ready",
+    "steps:",
+    "  ready:",
+    "    gate: Ready?",
+    "    outcomes: { approve: $done, reject: build }",
+    "  build:",
+    "    agent: Build the thing.",
+    "    outcomes: { done: ready }",
+    "",
+  ].join("\n"),
   "sliced.yaml": "name: sliced\nstart: split\nsteps:\n  split:\n    slices:\n    outcomes: { done: $done, stuck: $stuck }\n",
   "based.yaml": [
     "name: based",
