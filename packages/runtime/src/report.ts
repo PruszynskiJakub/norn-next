@@ -15,7 +15,7 @@ import { STORE_ID_PATTERN } from "@norn/plugin-api";
 import type { CriterionVerdict, Verdict } from "@norn/schema";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
-import { readBackDocs } from "./inputs.ts";
+import { readBackDocs } from "./mount.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
 import { type LiveStep, liveStepOf, reportOnRecord } from "./live-run.ts";

@@ -10,7 +10,7 @@ import { check, Criterion } from "@norn/schema";
 import { Type } from "@sinclair/typebox";
 import { parse } from "yaml";
 import type { RuntimeEnv } from "./env.ts";
-import { specFolder, worktreeOf } from "./inputs.ts";
+import { specFolder, worktreeOf } from "./mount.ts";
 import { SPEC_ARTIFACT } from "./spec-mirror.ts";
 import { listStoryDocs, readStoryDoc } from "./story-docs.ts";
 
