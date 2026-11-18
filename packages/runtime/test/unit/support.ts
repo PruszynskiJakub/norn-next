@@ -205,7 +205,7 @@ export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: Step
     probe: kind("probe", "effect", ["done", "conflict"]),
     "await-thing": kind("await-thing", "wait", ["ready"]),
     // named as the vcs plugin's kind, so the inputs that read the base update's receipts find it
-    "update-branch": kind("update-branch", "effect", ["done", "conflict"]),
+    "update-branch": kind("update-branch", "effect", ["done", "conflict", "resolved"]),
   };
 }
 
@@ -271,7 +271,7 @@ export const WORKFLOWS: Record<string, string> = {
     "steps:",
     "  update:",
     "    update-branch: null",
-    "    outcomes: { done: $done, conflict: resolve }",
+    "    outcomes: { done: $done, conflict: resolve, resolved: { to: resolve, max: 3 } }",
     "  resolve:",
     "    agent: Merge the base commit the base_side input names.",
     "    inputs: [base_side]",

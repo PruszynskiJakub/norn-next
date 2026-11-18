@@ -537,6 +537,25 @@ describe("the resolve of a base update", () => {
     expect(await reportRun(merged.h.env, UNIT, merged.runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
   });
 
+  test("a resolve sent back after its base update ended resolved is not held to the base commit, which an earlier update named", async () => {
+    const h = harness({ workflow: "resolving" });
+    h.stepAnswers["update-branch"] = [{ outcome: "conflict", detail: { base: { ref: "main", sha: BASE_SHA }, conflicts: ["a.txt"] } }, "resolved"];
+    h.env.slots.vcs.isAncestor = async () => ok(true);
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const first = (await record(h, UNIT)).state?.run?.id ?? "";
+    expect(await reportRun(h.env, UNIT, first, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true });
+    await tickUntil(h, async () => {
+      const st = (await record(h, UNIT)).state;
+      return st?.step === "resolve" && st.run !== null && st.run.id !== first;
+    });
+    const again = (await record(h, UNIT)).state;
+    expect(again?.step).toBe("resolve");
+    h.env.slots.vcs.isAncestor = async () => ok(false);
+    expect(await reportRun(h.env, UNIT, again?.run?.id ?? "", { verb: "done", outcome: "done" }, "r2")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
   test("a done is refused when the vcs cannot tell whether the base commit is merged", async () => {
     const { h, runId } = await resolving();
     h.env.slots.vcs.isAncestor = async () => ({ ok: false, failure: { code: "unavailable", message: "object store busy", retryable: true } });
