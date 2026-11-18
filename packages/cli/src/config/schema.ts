@@ -85,7 +85,7 @@ export const NornConfig = Type.Object(
     /** non-bundled plugins by name: the spec `norn plugin add` installs */
     plugins: Type.Record(Name, NonEmpty),
     base: NonEmpty,
-    /** the ref the base is measured at, such as `origin/main`; absent: `base` */
+    /** the ref the base is measured at, such as `origin/main`; absent: the remote's fetched copy of `base`, else `base` */
     base_ref: Type.Optional(NonEmpty),
     /** who this machine claims as; absent: user@host */
     holder: Type.Optional(NonEmpty),

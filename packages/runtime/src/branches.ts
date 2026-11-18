@@ -21,12 +21,25 @@ export function cutFrom(unit: string, base: string): string {
 }
 
 /**
+ * The ref the base is measured at: `base_ref` when the config names one, else the remote's fetched
+ * copy of the base, else the local base. Never the local base while a remote copy exists: the person's
+ * checkout moves only when they pull, so measuring at it would cut, sync and judge staleness against
+ * a base older than the one the change will merge into. A vcs that cannot answer leaves the local base.
+ */
+export async function baseRefOf(env: RuntimeEnv): Promise<string> {
+  const { base, baseRef } = env.config;
+  if (baseRef !== undefined) return baseRef;
+  const remote = await env.slots.vcs.remoteRef?.(base);
+  return remote?.ok && remote.value !== null ? remote.value : base;
+}
+
+/**
  * The unit's checkout, made when missing. A vcs without worktrees runs every unit in the repo's own
  * checkout. Ensuring is idempotent, so every run asks again rather than trusting a folder made earlier.
  */
 export async function ensureWorktree(env: RuntimeEnv, unit: string): Promise<PluginResult<string>> {
   const vcs = env.slots.vcs;
   if (!vcs.capabilities.worktrees) return ok(env.ctx.repo.root);
-  const made = await vcs.worktree.ensure(unit, branchOf(unit), cutFrom(unit, env.config.base));
+  const made = await vcs.worktree.ensure(unit, branchOf(unit), cutFrom(unit, await baseRefOf(env)));
   return made.ok ? ok(made.value.path) : made;
 }

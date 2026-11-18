@@ -16,7 +16,7 @@
 import { outcomeReceiptId, type ReceiptDataOf, type UnitJournal } from "@norn/kernel";
 import { type ChangeRequest, fail, ok, parseUnitId, RUN_ENV, type Vcs } from "@norn/plugin-api";
 import { ulid } from "@norn/schema";
-import { acquireTickLock, branchOf, ensureWorktree, newTickId, type RuntimeEnv, type TickLock } from "@norn/runtime";
+import { acquireTickLock, baseRefOf, branchOf, ensureWorktree, newTickId, type RuntimeEnv, type TickLock } from "@norn/runtime";
 import { defineCommand, opt } from "../command.ts";
 import { busyError, corruptError, failure, refuse, rendered } from "../output.ts";
 import { syncStore, unitsOf } from "./person-support.ts";
@@ -134,7 +134,7 @@ async function planUpdate(env: RuntimeEnv, key: string, change: ChangeRequest, p
   const changeHead = known.ok && known.value !== null ? change.head_sha : null;
   // commits on the change this branch lacks (a person's push, another machine's) come in first, or the push would be refused
   const took = changeHead && !(await contains(vcs, changeHead, branch)) ? changeHead : undefined;
-  const base = env.config.baseRef ?? env.config.base;
+  const base = await baseRefOf(env);
   const baseSha = await headOf(vcs, base, "the base");
   const merge = !(await contains(vcs, baseSha, branch));
   if (!merge && took === undefined && from === change.head_sha) return null;

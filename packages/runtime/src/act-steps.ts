@@ -9,7 +9,7 @@
  */
 import type { DecisionOf, ReceiptIntent } from "@norn/kernel";
 import { fail, ok, type PluginResult, stepKindAnswerProblem, type StepKindOutcome } from "@norn/plugin-api";
-import { branchOf, ensureWorktree } from "./branches.ts";
+import { baseRefOf, branchOf, ensureWorktree } from "./branches.ts";
 import { canDetach, checkOutcome, OUTPUT_TAIL, startDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
 import { unitInFacts } from "./record.ts";
@@ -91,7 +91,6 @@ export async function runStep(t: TickContext, d: DecisionOf<"run_step">): Promis
   const worktree = await ensureWorktree(t.env, unit);
   if (!worktree.ok) return worktree;
   const { vcs, forge, tracker } = t.env.slots;
-  const { base: baseBranch, baseRef } = t.env.config;
   // a kind over the provider-neutral slots cannot learn the branch, the base or the receipt any other way
   const input = {
     unit,
@@ -101,7 +100,7 @@ export async function runStep(t: TickContext, d: DecisionOf<"run_step">): Promis
     worktree: worktree.value,
     slots: { vcs, forge, tracker },
     branch: branchOf(unit),
-    base: { branch: baseBranch, ref: baseRef ?? baseBranch },
+    base: { branch: t.env.config.base, ref: await baseRefOf(t.env) },
     ...(d.intent ? { receipt_id: d.intent.id } : {}),
   };
   return underIntent(t, unit, d.intent, async () => {

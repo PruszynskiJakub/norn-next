@@ -42,6 +42,20 @@ describe("git vcs queries", () => {
     expect(h.cwds.every((c) => c === ROOT)).toBe(true);
   });
 
+  test("remoteRef names the remote's fetched copy of a branch, and null without the remote or the copy", async () => {
+    const h = gitHost([
+      ["remote", { stdout: "upstream\n" }],
+      ["rev-parse --verify --quiet --end-of-options refs/remotes/upstream/main^{commit}", { stdout: `${SHA}\n` }],
+      ["rev-parse --verify --quiet --end-of-options refs/remotes/upstream/fresh^{commit}", { code: 1 }],
+    ]);
+    const vcs = vcsOf(h.ctx, "upstream");
+    expect(await vcs.remoteRef?.("main")).toEqual({ ok: true, value: "upstream/main" });
+    expect(await vcs.remoteRef?.("fresh")).toEqual({ ok: true, value: null });
+    const bare = gitHost([["remote", { stdout: "" }]]);
+    expect(await vcsOf(bare.ctx).remoteRef?.("main")).toEqual({ ok: true, value: null });
+    expect(bare.calls.map((c) => c[1])).toEqual(["remote"]);
+  });
+
   test("a ref that reads as an option is refused before git runs", async () => {
     const h = gitHost([]);
     const r = await vcsOf(h.ctx).head("--output=/etc/passwd");

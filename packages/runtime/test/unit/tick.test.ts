@@ -66,6 +66,37 @@ describe("a story from intake to done", () => {
   });
 });
 
+describe("the ref the base is measured at", () => {
+  const withRemote = (h: Harnessed, copies: Record<string, string | null>) => {
+    h.env.slots.vcs.remoteRef = async (branch) => ({ ok: true, value: copies[branch] ?? null });
+  };
+  const cutAndStep = async (h: Harnessed) => {
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("step.finished"));
+    const probe = h.stepCalls.find((c) => c.kind === "probe")?.input as { base: unknown };
+    return { cut: h.vcsCalls.find((c) => c.op === "ensure")?.args, base: probe.base };
+  };
+
+  test("a vcs with the remote's fetched copy of the base: the branch is cut from it and step kinds take it, never the local base", async () => {
+    const h = harness({ workflow: "stepped" });
+    withRemote(h, { main: "origin/main" });
+    expect(await cutAndStep(h)).toEqual({ cut: ["lt-1", "norn/lt-1", "origin/main"], base: { branch: "main", ref: "origin/main" } });
+  });
+
+  test("without a remote copy the local base serves", async () => {
+    const h = harness({ workflow: "stepped" });
+    withRemote(h, {});
+    expect(await cutAndStep(h)).toEqual({ cut: ["lt-1", "norn/lt-1", "main"], base: { branch: "main", ref: "main" } });
+  });
+
+  test("a base_ref the config names wins over the remote copy", async () => {
+    const h = harness({ workflow: "stepped" });
+    withRemote(h, { main: "origin/main" });
+    h.env.config.baseRef = "upstream/trunk";
+    expect(await cutAndStep(h)).toEqual({ cut: ["lt-1", "norn/lt-1", "upstream/trunk"], base: { branch: "main", ref: "upstream/trunk" } });
+  });
+});
+
 describe("a slices step reads the plan from the story's slice files", () => {
   const sliceFile = (id: string, deps: string[], status = "planned") => ["---", `id: ${id}`, `depends_on: [${deps.join(", ")}]`, `status: ${status}`, "---", "## Goal", ""].join("\n");
   const sliced = () => {

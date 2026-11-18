@@ -63,6 +63,12 @@ export interface Vcs {
    * that conflicts from a clean one, and reports neither as stale.
    */
   conflicts?(into: string, from: string): Promise<PluginResult<string[]>>;
+  /**
+   * the ref holding the remote's copy of `branch` as last fetched (`origin/main`), or null when there
+   * is no remote or it lacks the branch. Optional; without it a host measures the base at the local
+   * branch, which moves only when the person pulls.
+   */
+  remoteRef?(branch: string): Promise<PluginResult<string | null>>;
   push(branch: string, opts?: VcsPushOptions): Promise<PluginResult<void>>;
   fetch(): Promise<PluginResult<void>>;
 }
