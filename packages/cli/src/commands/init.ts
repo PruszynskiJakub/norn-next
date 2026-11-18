@@ -137,11 +137,13 @@ export const initCommand = defineCommand({
     if (!merged.ok) throw configError(merged.problems, { ...layers, [layer]: {} }, paths);
     await wirePlugins(w, merged.value, ctx.io.importer);
 
+    // a team that commits .agents/ keeps its specs and workflows there: hiding the folder would hide them from git
+    const excluded = (await files.read(paths.repo)) === null ? AGENTS_DIR : REPO_LOCAL_FILE;
     await files.write(paths[layer], text);
     let exclude: "added" | "present" | "committed" = "committed";
     if (!commit) {
       const path = join(w.repo.common, "info", "exclude");
-      const next = withExcluded(await files.read(path), AGENTS_DIR);
+      const next = withExcluded(await files.read(path), excluded);
       if (next !== null) await files.write(path, next);
       exclude = next === null ? "present" : "added";
     }
@@ -158,6 +160,7 @@ export const initCommand = defineCommand({
       detected,
       offered,
       exclude,
+      ...(!commit && { excluded }),
       ...(migrated && { migrated }),
       ...(userMigrated && { user_migrated: { file: paths.user, ...userMigrated } }),
       doctor,
@@ -173,7 +176,7 @@ export const initCommand = defineCommand({
       `- executor: ${choices.executor} in ${choices.runner}${flags.executor || (choices.executor === "pi" ? detected.pi : detected.claude) ? "" : ` (${choices.executor} is not on PATH)`}`,
       `- mode: ${choices.mode}${flags.mode ? "" : choices.mode === "auto" ? ` (the ${choices.runner} runner has nobody beside the agent: agent steps start on their own)` : ` (agents run in ${choices.runner} beside a person: start each agent step with norn run start <unit>)`}`,
       `- base: ${choices.base}`,
-      `- .git/info/exclude: ${exclude === "added" ? `added ${AGENTS_DIR}` : exclude === "present" ? `${AGENTS_DIR} already there` : "untouched (team mode)"}`,
+      `- .git/info/exclude: ${exclude === "added" ? `added ${excluded}` : exclude === "present" ? `${excluded} already there` : "untouched (team mode)"}`,
       ...offered.map((o) => offerLine(o, choices)),
       ...(old ? oldConfigLines(old) : []),
       ...(userMigrated ? oldUserConfigLines(userMigrated) : []),
