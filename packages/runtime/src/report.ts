@@ -16,6 +16,7 @@ import type { CriterionVerdict, Finding, Note, Verdict } from "@norn/schema";
 import { branchOf, baseRefOf, cutFrom } from "./branches.ts";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
+import { baseConflictOf } from "./input-history.ts";
 import { INPUTS_DIR, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
@@ -151,6 +152,8 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     if (stopped) return stopped;
     const dirty = await uncommittedRefusal(env, unit, live.run.executor);
     if (dirty) return dirty;
+    const unmerged = await baseUnmergedRefusal(env, record, live);
+    if (unmerged) return unmerged;
     const marked = await conflictMarkersRefusal(env, unit);
     if (marked) return marked;
   }
@@ -238,6 +241,29 @@ async function unfinishedRefusal(env: RuntimeEnv, unit: string): Promise<Refusab
   return refuse(
     `a ${operation} is still in progress in ${worktree} (${left})`,
     `resolve what is left, conclude the ${operation} with \`${conclude}\`, then report again; if a person must choose, \`norn ask\` with the ${operation} kept in progress`,
+    "merge_unfinished",
+  );
+}
+
+/**
+ * Why the done of a step sent to merge the base cannot be recorded, or null when it can: the step
+ * takes the `base_side` input and the latest base update stopped on a conflict, yet the unit's branch
+ * does not contain that base commit, so the merge was never made (or was made on another branch).
+ * Read before the markers, as a merge never made leaves none to find.
+ */
+async function baseUnmergedRefusal(env: RuntimeEnv, record: UnitJournal, live: LiveStep): Promise<Refusable<never> | null> {
+  const inputs = record.state?.workflow.doc.steps[live.step]?.inputs ?? [];
+  if (!inputs.includes("base_side")) return null;
+  const base = baseConflictOf(record);
+  if (!base) return null;
+  const branch = branchOf(record.unit);
+  const short = base.sha.slice(0, 12);
+  const r = await env.slots.vcs.isAncestor(base.sha, branch);
+  if (!r.ok) return refuse(`cannot tell whether ${base.ref} at ${short} is merged into ${branch}: ${r.failure.message}`, "report again with the same command", r.failure.code);
+  if (r.value) return null;
+  return refuse(
+    `${base.ref} at ${short}, the base this step merges, is not merged into ${branch}: its head does not contain it`,
+    `merge it in the worktree with \`git merge ${base.sha}\` (a merge commit, never a rebase), resolve every conflict, commit, then report again; if a person must choose, \`norn ask\``,
     "merge_unfinished",
   );
 }

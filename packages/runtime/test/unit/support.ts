@@ -201,7 +201,12 @@ export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: Step
       return ok(typeof answer === "string" ? { outcome: answer } : answer);
     },
   });
-  return { probe: kind("probe", "effect", ["done", "conflict"]), "await-thing": kind("await-thing", "wait", ["ready"]) };
+  return {
+    probe: kind("probe", "effect", ["done", "conflict"]),
+    "await-thing": kind("await-thing", "wait", ["ready"]),
+    // named as the vcs plugin's kind, so the inputs that read the base update's receipts find it
+    "update-branch": kind("update-branch", "effect", ["done", "conflict"]),
+  };
 }
 
 /** The workflows the tests run: a check, an agent step, a plugin effect and wait, a gate, a slices step. */
@@ -258,6 +263,19 @@ export const WORKFLOWS: Record<string, string> = {
     "  build:",
     "    agent: Build the thing.",
     "    outcomes: { done: ready }",
+    "",
+  ].join("\n"),
+  "resolving.yaml": [
+    "name: resolving",
+    "start: update",
+    "steps:",
+    "  update:",
+    "    update-branch: null",
+    "    outcomes: { done: $done, conflict: resolve }",
+    "  resolve:",
+    "    agent: Merge the base commit the base_side input names.",
+    "    inputs: [base_side]",
+    "    outcomes: { done: update }",
     "",
   ].join("\n"),
   "sliced.yaml": "name: sliced\nstart: split\nsteps:\n  split:\n    slices:\n    outcomes: { done: $done, stuck: $stuck }\n",

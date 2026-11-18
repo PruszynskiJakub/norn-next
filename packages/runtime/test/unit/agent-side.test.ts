@@ -507,3 +507,42 @@ describe("brief", () => {
     expect(await briefOf(h.env, "lt-9")).toMatchObject({ ok: false, refusal: { code: "no_run" } });
   });
 });
+
+describe("the resolve of a base update", () => {
+  const BASE_SHA = "b".repeat(40);
+
+  /** A story whose base update conflicted, at the resolve step that takes its base_side, with the run started. */
+  async function resolving(): Promise<{ h: Harnessed; runId: string }> {
+    const h = harness({ workflow: "resolving" });
+    h.stepAnswers["update-branch"] = [{ outcome: "conflict", detail: { base: { ref: "main", sha: BASE_SHA }, conflicts: ["a.txt"] } }];
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const state = (await record(h, UNIT)).state;
+    if (state?.step !== "resolve" || !state.run) throw new Error(`not at resolve: ${state?.step}`);
+    return { h, runId: state.run.id };
+  }
+
+  test("a done before the base commit is merged into the story branch is refused and records nothing; once it is, the done goes through", async () => {
+    const { h, runId } = await resolving();
+    const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
+    expect(r).toMatchObject({
+      ok: false,
+      refusal: { code: "merge_unfinished", error: expect.stringContaining(BASE_SHA.slice(0, 12)), do_instead: expect.stringContaining(`git merge ${BASE_SHA}`) },
+    });
+    expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
+    expect(await reportRun(h.env, UNIT, runId, { verb: "ask", question: "which side wins?" }, "r2")).toMatchObject({ ok: true });
+    const merged = await resolving();
+    merged.h.env.slots.vcs.isAncestor = async (a, b) => ok(a === BASE_SHA && b === "norn/lt-1");
+    expect(await reportRun(merged.h.env, UNIT, merged.runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
+  test("a done is refused when the vcs cannot tell whether the base commit is merged", async () => {
+    const { h, runId } = await resolving();
+    h.env.slots.vcs.isAncestor = async () => ({ ok: false, failure: { code: "unavailable", message: "object store busy", retryable: true } });
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({
+      ok: false,
+      refusal: { code: "unavailable", error: expect.stringContaining("object store busy") },
+    });
+  });
+});
