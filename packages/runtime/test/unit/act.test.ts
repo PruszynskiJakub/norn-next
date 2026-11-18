@@ -177,6 +177,16 @@ describe("checks and plugin steps", () => {
     expect(await readStepRun(h.ctx, "lt-1")).toMatchObject({ outcome: "fail", output: expect.stringContaining("timed out") });
   });
 
+  test("a step kind's detail reaches its step.finished receipt, where a resolver's brief reads the conflict from", async () => {
+    const h = harness({ workflow: "stepped" });
+    h.items.push(trackerItem(1));
+    const detail = { base: { ref: "origin/main", sha: "b".repeat(40) }, conflicts: ["a.txt"] };
+    h.stepAnswers.probe = [{ outcome: "conflict", detail }];
+    await tickUntil(h, has("step.finished"));
+    const finished = (await record(h, "lt-1")).receipts.findLast((r) => r.data.kind === "step.finished");
+    expect(finished?.data).toMatchObject({ kind: "step.finished", step_kind: "probe", outcome: "conflict", detail });
+  });
+
   test("a step kind that fails leaves its error, and decide runs it again under its run", async () => {
     const h = harness({ workflow: "stepped" });
     h.items.push(trackerItem(1));

@@ -17,6 +17,7 @@ import {
   ok,
   type PluginResult,
   type StepKindDefinition,
+  type StepKindOutcome,
   type Tracker,
   type TrackerItem,
   type Vcs,
@@ -181,8 +182,11 @@ export interface StepCall {
   input: unknown;
 }
 
+/** A queued step answer: an outcome, `!fail`, or an outcome with the detail the kind records with it. */
+export type StepAnswer = string | StepKindOutcome;
+
 /** Step kinds that answer from a queue per kind (the last answer repeats), recording each input. */
-export function fakeStepKinds(answers: Record<string, string[]>, calls: StepCall[]): Record<string, StepKindDefinition> {
+export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: StepCall[]): Record<string, StepKindDefinition> {
   const kind = (name: string, mode: "effect" | "wait", outcomes: string[]): StepKindDefinition => ({
     name,
     configSchema: Type.Object({ note: Type.Optional(Type.String()) }, { additionalProperties: false }),
@@ -191,9 +195,9 @@ export function fakeStepKinds(answers: Record<string, string[]>, calls: StepCall
     run: async (input) => {
       calls.push({ kind: name, input });
       const queue = answers[name] ?? [];
-      const answer = queue.length > 1 ? (queue.shift() as string) : (queue[0] ?? outcomes[0] as string);
+      const answer = queue.length > 1 ? (queue.shift() as StepAnswer) : (queue[0] ?? (outcomes[0] as string));
       if (answer === "!fail") return fail("unavailable", `${name} failed`);
-      return ok({ outcome: answer });
+      return ok(typeof answer === "string" ? { outcome: answer } : answer);
     },
   });
   return { probe: kind("probe", "effect", ["done", "conflict"]), "await-thing": kind("await-thing", "wait", ["ready"]) };
@@ -272,7 +276,7 @@ export interface Harnessed {
   /** operations stopped half-way, by checkout path, as the fake vcs reports them */
   stopped: Record<string, VcsUnfinished>;
   stepCalls: StepCall[];
-  stepAnswers: Record<string, string[]>;
+  stepAnswers: Record<string, StepAnswer[]>;
   launcher: FakeLauncher;
   sessions: FakeSessions;
   plugins: NornPlugin[];
@@ -333,7 +337,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
   const vcsCalls: VcsCall[] = [];
   const stopped: Record<string, VcsUnfinished> = {};
   const stepCalls: StepCall[] = [];
-  const stepAnswers: Record<string, string[]> = {};
+  const stepAnswers: Record<string, StepAnswer[]> = {};
   const launcher = new FakeLauncher();
   const sessions = new FakeSessions();
   const providers = defineNornPlugin({

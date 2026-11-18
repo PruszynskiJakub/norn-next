@@ -13,9 +13,9 @@ steps:
     # a branch that already held its base (clean) or took it in after a resolve (resolved) goes on to refine too
     outcomes: { done: refine, conflict: sync-resolve, clean: refine, resolved: refine }
   sync-resolve:
-    agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase."
+    agent: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase."
     skills: [norn-merge]
-    inputs: [spec, handoff]
+    inputs: [spec, handoff, base_side]
     outcomes:
       done: sync
     means:
