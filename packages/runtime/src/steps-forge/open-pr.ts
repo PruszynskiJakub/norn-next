@@ -5,10 +5,8 @@
  * so the change shows the head this step saw.
  */
 import { fail, type ForgeEffect, type HostContext, ok, parseStoryKey, type PluginResult, type StepKindDefinition, type StepKindInput, type StepKindOutcome, type Vcs } from "@norn/plugin-api";
-import { SPECS_DIR } from "@norn/schema";
+import { PR_BODY_FILE, SPECS_DIR } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
-
-export const PR_BODY_FILE = "pr.md";
 
 export const OpenPrConfig = Type.Object(
   {
@@ -43,18 +41,8 @@ async function readText(ctx: HostContext, path: string): Promise<string | null> 
 async function bodyText(ctx: HostContext, input: StepKindInput<OpenPrConfig>): Promise<string> {
   const wt = input.worktree;
   if (wt === undefined) return "";
-  if (input.config.body_file !== undefined) return ((await readText(ctx, `${wt}/${input.config.body_file}`)) ?? "").trim();
-  let dirs: string[];
-  try {
-    dirs = await ctx.files.list(`${wt}/${SPECS_DIR}`);
-  } catch {
-    return "";
-  }
-  for (const d of dirs.filter((n) => n.startsWith(`${input.story}-`))) {
-    const text = await readText(ctx, `${wt}/${SPECS_DIR}/${d}/${PR_BODY_FILE}`);
-    if (text !== null) return text.trim();
-  }
-  return "";
+  const file = input.config.body_file ?? `${SPECS_DIR}/${input.story}/${PR_BODY_FILE}`;
+  return ((await readText(ctx, `${wt}/${file}`)) ?? "").trim();
 }
 
 /** The story's title and link from the tracker; a tracker that cannot answer leaves the body's heading as the title. */

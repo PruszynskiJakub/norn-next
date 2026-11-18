@@ -7,8 +7,8 @@ import { DEFAULT_COUNTER_DEFAULTS } from "@norn/kernel";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { recordPath } from "@norn/forge-none";
-import { SPECS_DIR } from "@norn/schema";
-import { checkExitsDir, checkLogsDir, runEventsDir, sessionLogPath, TRACE_DIR, unitEventsDir } from "../../src/index.ts";
+import { PR_BODY_FILE } from "@norn/schema";
+import { checkExitsDir, checkLogsDir, runEventsDir, sessionLogPath, specFolder, TRACE_DIR, unitEventsDir } from "../../src/index.ts";
 import { type AgentScript, commit, decideGate, git, type Machine, machine, personMerges, rulesOf, type Team, team, tickUntil, unitRecord } from "./world.ts";
 
 const quickAgent: AgentScript = (step, visit, run) => {
@@ -18,7 +18,7 @@ const quickAgent: AgentScript = (step, visit, run) => {
     case "review":
       return { outcome: "approve" };
     case "describe":
-      return { commit: { [`${SPECS_DIR}/${run.unit}-story/pr.md`]: "# Add the feature\n\nfeature.txt holds the feature.\n" }, outcome: "done" };
+      return { commit: { [`${specFolder(run.unit)}/${PR_BODY_FILE}`]: "# Add the feature\n\nfeature.txt holds the feature.\n" }, outcome: "done" };
     default:
       throw new Error(`the quick agent has no script for ${step}`);
   }
