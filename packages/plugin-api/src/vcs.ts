@@ -20,6 +20,13 @@ export interface VcsCapabilities {
 /** A merge that went through (the branch's new head), or one that stopped on conflicts; a conflict is data, never a failure. */
 export type VcsMergeOutcome = { head: string } | { conflict: { files: string[] } };
 
+/** An operation stopped half-way in a checkout, waiting for someone to conclude or abort it. */
+export interface VcsUnfinished {
+  operation: "merge" | "rebase" | "cherry-pick";
+  /** the paths still unmerged, sorted; empty once every conflict is resolved but the operation is not concluded */
+  unmerged: string[];
+}
+
 export interface VcsMergeOptions {
   /**
    * on a conflict, abort the merge so the branch and its worktree are as they were before it began;
@@ -75,6 +82,12 @@ export interface Vcs {
    * pushed to the branch, and a push after theirs is refused.
    */
   remoteHead?(branch: string): Promise<PluginResult<string | null>>;
+  /**
+   * the operation stopped half-way in the checkout at `path` (a unit's worktree, or the repo's own
+   * checkout), or null when none is or `path` is no checkout. Optional (plugin API 1.9); without it a
+   * host cannot hold back a report made while a merge still waits to be concluded.
+   */
+  unfinished?(path: string): Promise<PluginResult<VcsUnfinished | null>>;
   push(branch: string, opts?: VcsPushOptions): Promise<PluginResult<void>>;
   fetch(): Promise<PluginResult<void>>;
 }

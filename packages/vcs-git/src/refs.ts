@@ -1,5 +1,5 @@
 /** Reading refs and checkouts: answers about the repo, never a change to it. */
-import { fail, type HostContext, ok, type PluginResult } from "@norn/plugin-api";
+import { fail, type HostContext, ok, type PluginResult, type VcsUnfinished } from "@norn/plugin-api";
 import { git, gitFailure, lines } from "./git.ts";
 
 /** A ref git would read as an option is never passed on, whatever names it. */
@@ -65,20 +65,45 @@ export async function remoteIfAny(ctx: HostContext, cwd: string, name: string): 
   return r.ok ? ok(r.value.includes(name) ? name : null) : r;
 }
 
+const STOPPED = [
+  ["MERGE_HEAD", "merge"],
+  ["REBASE_HEAD", "rebase"],
+  ["CHERRY_PICK_HEAD", "cherry-pick"],
+] as const;
+
+/** The operation git stopped half-way in `cwd`, or null when none is. */
+export async function stoppedOperation(ctx: HostContext, cwd: string): Promise<PluginResult<VcsUnfinished["operation"] | null>> {
+  for (const [ref, operation] of STOPPED) {
+    const r = await revParse(ctx, cwd, ref);
+    if (!r.ok) return r;
+    if (r.value !== null) return ok(operation);
+  }
+  return ok(null);
+}
+
+/**
+ * The operation stopped half-way in the checkout at `path` and the paths it left unmerged, or null
+ * when none is or `path` is no checkout of this repo: a folder that is gone has nothing in progress.
+ */
+export async function unfinished(ctx: HostContext, root: string, path: string): Promise<PluginResult<VcsUnfinished | null>> {
+  const list = await worktreeList(ctx, root);
+  if (!list.ok) return list;
+  if (!list.value.some((w) => samePath(w.path, path))) return ok(null);
+  const op = await stoppedOperation(ctx, path);
+  if (!op.ok) return op;
+  if (op.value === null) return ok(null);
+  const unmerged = await unmergedPaths(ctx, path);
+  return unmerged.ok ? ok({ operation: op.value, unmerged: unmerged.value }) : unmerged;
+}
+
 /**
  * Why `cwd` cannot take a merge now, or null when it can: someone's merge or rebase in progress (a
  * resolver's, never aborted or concluded here) or uncommitted changes.
  */
 export async function notReady(ctx: HostContext, cwd: string): Promise<PluginResult<string | null>> {
-  for (const [ref, what] of [
-    ["MERGE_HEAD", "a merge"],
-    ["REBASE_HEAD", "a rebase"],
-    ["CHERRY_PICK_HEAD", "a cherry-pick"],
-  ] as const) {
-    const r = await revParse(ctx, cwd, ref);
-    if (!r.ok) return r;
-    if (r.value !== null) return ok(`${what} is in progress in ${cwd}`);
-  }
+  const op = await stoppedOperation(ctx, cwd);
+  if (!op.ok) return op;
+  if (op.value !== null) return ok(`a ${op.value} is in progress in ${cwd}`);
   const st = await git(ctx, cwd, ["status", "--porcelain", "--untracked-files=normal"]);
   if (st.code !== 0) return gitFailure(st, "status");
   return ok(st.stdout.trim() === "" ? null : `${cwd} has uncommitted changes`);

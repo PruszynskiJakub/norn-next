@@ -3,6 +3,8 @@
  * with an outcome. The unit and run come from NORN_UNIT and NORN_RUN_ID. A criteria report is
  * validated against `CriteriaReport` here; the runtime checks it against the step (`criteria:
  * required`, the outcome's `verdict`) and the unit's declared criteria, and keeps it on the receipt.
+ * The runtime also refuses a done while a merge waits to be concluded in the unit's worktree
+ * (`merge_unfinished`); this command only renders that refusal.
  */
 import { isAbsolute, resolve } from "node:path";
 import { parseJson } from "@norn/plugin-api";
