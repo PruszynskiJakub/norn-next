@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { memoryFiles, memoryHost, steppingClock } from "@norn/conformance";
-import { ok, type PluginResult, type StepKindInput, type Tracker, type Vcs, type VcsMergeOptions, type VcsMergeOutcome } from "@norn/plugin-api";
+import { type ForgeEffect, ok, type PluginResult, type StepKindInput, type Tracker, type Vcs, type VcsMergeOptions, type VcsMergeOutcome } from "@norn/plugin-api";
 import { awaitMerge, openPr, stepsForgePlugin } from "../../src/index.ts";
 import { memoryForge } from "../../../conformance/test/unit/reference/memory-forge.ts";
 
@@ -62,6 +62,17 @@ function tracker(): Tracker {
   };
 }
 
+/** The forge's effects as performed, so a test can read the body open-pr sent. */
+function recorded(world: ReturnType<typeof memoryForge>) {
+  const effects: ForgeEffect[] = [];
+  const perform = world.forge.perform;
+  world.forge.perform = (effect, meta) => {
+    effects.push(effect);
+    return perform(effect, meta);
+  };
+  return effects;
+}
+
 const value = <T>(r: PluginResult<T>): T => {
   if (!r.ok) throw new Error(`${r.failure.code}: ${r.failure.message}`);
   return r.value;
@@ -77,13 +88,28 @@ describe("open-pr", () => {
   test("pushes the branch and opens a draft change from pr.md, titled by the tracker, closing the story", async () => {
     const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
     const { vcs, pushed } = fakeVcs({ "gh-12-login": HEAD }, {});
-    const files = memoryFiles({ [`${WT}/.agents/specs/gh-12-login/pr.md`]: "# Login fix\n\nWhat changed.\n" });
+    const effects = recorded(world);
+    const files = memoryFiles({ [`${WT}/.agents/specs/gh-12/pr.md`]: "# Login fix\n\nWhat changed.\n" });
     const ctx = memoryHost({ files });
     const r = value(await openPr.run(input({}, { slots: { forge: world.forge, vcs, tracker: tracker() } }), ctx));
     expect(r.outcome).toBe("done");
     expect(pushed).toEqual(["gh-12-login"]);
     const change = value(await world.forge.findChanges(["gh-12-login"]))["gh-12-login"];
     expect(change).toMatchObject({ state: "open", draft: true, base_branch: "main", title: "Fix login" });
+    expect(effects.map((e) => (e.kind === "open" ? e.body : null))).toEqual(["# Login fix\n\nWhat changed.\n\n---\n\nCloses https://example.test/12\n\nDelivered by norn (story gh-12)."]);
+  });
+
+  test("a slice unit's open-pr reads its story's pr.md, and an open change takes the re-described body", async () => {
+    const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
+    const effects = recorded(world);
+    const { vcs } = fakeVcs({ "gh-12-login": HEAD }, {});
+    const files = memoryFiles({ [`${WT}/.agents/specs/gh-12/pr.md`]: "# First\n" });
+    const ctx = memoryHost({ files });
+    value(await openPr.run(input({}, { slots: { forge: world.forge, vcs } }), ctx));
+    await files.write(`${WT}/.agents/specs/gh-12/pr.md`, "# Second\n\nMerge danger changed.\n");
+    const again = value(await openPr.run(input({}, { unit: "gh-12/01-form", slots: { forge: world.forge, vcs }, receipt_id: "01JD0000000000000000000002" }), ctx));
+    expect(again.detail).toMatchObject({ effect: "update" });
+    expect(effects.map((e) => (e.kind === "open" || e.kind === "update" ? e.body?.split("\n\n---")[0] : null))).toEqual(["# First", "# Second\n\nMerge danger changed."]);
   });
 
   test("open is idempotent by receipt id: the same run again opens no second change", async () => {
