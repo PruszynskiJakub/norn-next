@@ -222,6 +222,78 @@ describe("git vcs uncommitted", () => {
   });
 });
 
+describe("git vcs conflictMarkers", () => {
+  // built, never written out, so no line of this file reads as a conflict marker itself
+  const OPEN = "<".repeat(7);
+  const MID = "=".repeat(7);
+  const CLOSE = ">".repeat(7);
+  const DIFF = [
+    "diff --git a/src/a.ts b/src/a.ts",
+    "index 1111111..2222222 100644",
+    "--- a/src/a.ts",
+    "+++ b/src/a.ts",
+    "@@ -3,0 +4 @@ export const x = 1;",
+    `+${OPEN} HEAD`,
+    "@@ -5 +6,3 @@",
+    "-ours",
+    `+${MID}`,
+    "+theirs",
+    `+${CLOSE} origin/main`,
+    "diff --git a/docs/merge.md b/docs/merge.md",
+    "--- a/docs/merge.md",
+    "+++ b/docs/merge.md",
+    "@@ -1,0 +2,2 @@",
+    `+${OPEN} ours`,
+    `+${MID}`,
+    "diff --git a/README.md b/README.md",
+    "--- a/README.md",
+    "+++ b/README.md",
+    "@@ -9,0 +10,2 @@",
+    "+Title",
+    `+${MID}`,
+    "diff --git a/new file.txt b/new file.txt",
+    "new file mode 100644",
+    "--- /dev/null",
+    "+++ b/new file.txt",
+    "@@ -0,0 +1,7 @@",
+    `+${OPEN}`,
+    "+a",
+    `+${MID}`,
+    "+b",
+    `+${CLOSE}`,
+    `+${OPEN}${OPEN} not a marker`,
+    `+${CLOSE} x`,
+    "",
+  ].join("\n");
+
+  test("names the opening line of each conflict the head's commits added whole (open, separator, close), never a file that only quotes a marker or a setext heading, read from the diff since the merge base", async () => {
+    const h = gitHost([["-c core.quotePath=false diff", { stdout: DIFF }]]);
+    expect(await vcsOf(h.ctx).conflictMarkers?.("origin/main", "gh-12-login")).toEqual({
+      ok: true,
+      value: [
+        { path: "new file.txt", line: 1 },
+        { path: "src/a.ts", line: 4 },
+      ],
+    });
+    const call = h.calls[0] as string[];
+    expect(call.slice(-1)).toEqual(["origin/main...gh-12-login"]);
+    expect(call).toContain("-U0");
+    expect(call).toContain("--no-ext-diff");
+    expect(call).toContain("--no-textconv");
+    expect(h.cwds).toEqual([ROOT]);
+  });
+
+  test("empty when the diff adds no conflict; a ref that reads as an option is refused before git runs; a failing diff is a failure", async () => {
+    const h = gitHost([["-c core.quotePath=false diff", { stdout: "" }]]);
+    expect(await vcsOf(h.ctx).conflictMarkers?.("main", "gh-12-login")).toEqual({ ok: true, value: [] });
+    const refused = await vcsOf(h.ctx).conflictMarkers?.("--output=/tmp/x", "gh-12-login");
+    expect(refused?.ok ? null : refused?.failure.code).toBe("invalid");
+    expect(h.calls).toHaveLength(1);
+    const broken = gitHost([["-c core.quotePath=false diff", { code: 128, stderr: "fatal: bad revision" }]]);
+    expect((await vcsOf(broken.ctx).conflictMarkers?.("main", "gone"))?.ok).toBe(false);
+  });
+});
+
 describe("git vcs push and fetch", () => {
   test("push names the branch on both sides, carries the lease, and is bounded", async () => {
     const exec = scriptedExec((argv) => (argv[1] === "remote" ? { stdout: "origin\n" } : argv[1] === "push" ? { code: 0 } : undefined));

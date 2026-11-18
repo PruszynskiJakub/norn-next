@@ -27,6 +27,13 @@ export interface VcsUnfinished {
   unmerged: string[];
 }
 
+/** A conflict left unresolved in a file: where its opening marker line is. */
+export interface VcsConflictMarker {
+  path: string;
+  /** the opening marker's line in the file as `head` holds it, from 1 */
+  line: number;
+}
+
 export interface VcsMergeOptions {
   /**
    * on a conflict, abort the merge so the branch and its worktree are as they were before it began;
@@ -94,6 +101,14 @@ export interface Vcs {
    * (plugin API 1.10); without it a host cannot hold back a report that would leave work behind.
    */
   uncommitted?(path: string): Promise<PluginResult<string[]>>;
+  /**
+   * the conflicts the commits on `head` since it left `base` (from their merge base) added and left
+   * unresolved: an opening, a separating and a closing marker line, in that order, all added by those
+   * commits, sorted by path and line. A file that only quotes a marker or two is never one. Empty when
+   * there are none. Optional (plugin API 1.11); without it a host cannot hold back a report that
+   * leaves a conflict in the work.
+   */
+  conflictMarkers?(base: string, head: string): Promise<PluginResult<VcsConflictMarker[]>>;
   push(branch: string, opts?: VcsPushOptions): Promise<PluginResult<void>>;
   fetch(): Promise<PluginResult<void>>;
 }

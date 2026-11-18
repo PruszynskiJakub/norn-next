@@ -2,6 +2,7 @@
 import { fail, type HostContext, ok, type PluginResult, type StepKindInput } from "@norn/plugin-api";
 import { type Static, Type } from "@sinclair/typebox";
 import { git, gitFailure } from "../git.ts";
+import { conflictMarkers } from "../markers.ts";
 import { mergeInto } from "../merge.ts";
 import { currentBranch, isAncestor, remoteIfAny, revParse } from "../refs.ts";
 import { DEFAULT_REMOTE } from "../vcs.ts";
@@ -100,4 +101,17 @@ async function defaultBases(ctx: HostContext, cwd: string, remote: string): Prom
   const head = await git(ctx, cwd, ["symbolic-ref", "--quiet", "--short", `refs/remotes/${remote}/HEAD`]);
   const named = head.code === 0 ? head.stdout.trim() : "";
   return [...(named ? [named] : []), `${remote}/main`, "main"];
+}
+
+/**
+ * A failure naming every conflict the commits on `head` since `base` left unresolved, or ok when
+ * there is none: a marker the tests and the review missed would otherwise reach the branch it lands
+ * on. The work is the resolver's to finish, so it is never retried as it is.
+ */
+export async function unresolvedConflicts(ctx: HostContext, cwd: string, step: string, base: string, head: string, effect: string): Promise<PluginResult<void>> {
+  const found = await conflictMarkers(ctx, cwd, base, head);
+  if (!found.ok) return found;
+  if (found.value.length === 0) return ok(undefined);
+  const where = found.value.map((m) => `${m.path}:${m.line}`).join(", ");
+  return fail("conflict", `${step}: conflict markers left unresolved since ${base}: ${where}. ${effect}: resolve them by intent in ${cwd}, commit, and the step runs again`, false);
 }

@@ -1,6 +1,7 @@
 /** The git vcs: branches, merges and pushes through `git`, never rebasing a story branch. */
 import { fail, type HostContext, ok, type Vcs, type VcsFactory } from "@norn/plugin-api";
 import { GitVcsConfig } from "./config.ts";
+import { conflictMarkers } from "./markers.ts";
 import { mergeInto } from "./merge.ts";
 import { fetchRemote, pushBranch } from "./push.ts";
 import { isAncestor, mergeBase, remoteIfAny, revParse, trialConflicts, uncommitted, unfinished, worktreeList } from "./refs.ts";
@@ -29,6 +30,7 @@ export function createGitVcs(ctx: HostContext, config: GitVcsConfig): Vcs {
     },
     unfinished: (path) => unfinished(ctx, root, path),
     uncommitted: (path) => uncommitted(ctx, root, path),
+    conflictMarkers: (base, head) => conflictMarkers(ctx, root, base, head),
     async merge(branch, from, opts) {
       const list = await worktreeList(ctx, root);
       if (!list.ok) return list;
