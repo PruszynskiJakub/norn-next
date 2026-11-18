@@ -8,6 +8,7 @@ import { check } from "@norn/schema";
 import { parse } from "yaml";
 import { configFailure } from "../output.ts";
 import { isMapping, mergeLayers } from "./merge.ts";
+import { isOldUserConfig } from "./migrate-user.ts";
 import { type ConfigPaths, LAYERS, type Layer, layerFileName } from "./paths.ts";
 import { CONFIG_DEFAULTS, ConfigLayer, NornConfig } from "./schema.ts";
 
@@ -17,6 +18,8 @@ export interface ConfigProblem {
   /** a JSON pointer into that file's document */
   path: string;
   message: string;
+  /** the file is the old norn's, which `norn init` rewrites */
+  old?: true;
 }
 
 /** A config every command may run on: the merged file, the default executor named, and each layer as written. */
@@ -76,8 +79,11 @@ export async function loadConfig(files: HostFiles, paths: ConfigPaths): Promise<
   const layers = { user: null, local: null, repo: null } as Record<Layer, ConfigLayer | null>;
   const problems: ConfigProblem[] = [];
   for (const layer of LAYERS) {
-    const parsed = parseLayer(layer, await files.read(paths[layer]));
+    const text = await files.read(paths[layer]);
+    const parsed = parseLayer(layer, text);
     if (parsed.ok) layers[layer] = parsed.value;
+    else if (layer === "user" && isOldUserConfig(text))
+      problems.push({ layer, path: "", message: "is the old norn's user config, whose keys this norn spells otherwise (max_agents is kernel.max_agents)", old: true });
     else problems.push(...parsed.problems);
   }
   if (problems.length > 0) return { ok: false, problems, layers };
@@ -95,6 +101,15 @@ export function problemText(p: ConfigProblem): string {
  */
 export function configError(problems: readonly ConfigProblem[], layers?: Partial<Record<Layer, unknown>>, paths?: ConfigPaths) {
   const first = problems[0];
+  if (problems.some((p) => p.old)) {
+    const details = problems.map((p) => ({ ...p, ...(paths && p.layer !== "merged" ? { file: paths[p.layer] } : {}) }));
+    return configFailure(
+      problems.map(problemText).join("; "),
+      `norn init, which rewrites ${layerFileName("user")} in this norn's keys and keeps the old file as config.yaml.old`,
+      "config_old",
+      details,
+    );
+  }
   const nothing = layers !== undefined && problems.every((p) => p.layer === "merged") && LAYERS.every((l) => layers[l] === null || layers[l] === undefined);
   const doInstead = nothing ? "norn init" : first && first.layer !== "merged" ? `fix ${layerFileName(first.layer)}` : "norn config show";
   const details = problems.map((p) => ({ ...p, ...(paths && p.layer !== "merged" ? { file: paths[p.layer] } : {}) }));

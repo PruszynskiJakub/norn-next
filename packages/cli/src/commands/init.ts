@@ -9,9 +9,11 @@
  * the repo still holds it, gives the keys it can map (migrate.ts) and init says which it ignored.
  */
 import { join } from "node:path";
+import type { HostFiles } from "@norn/plugin-api";
 import { defineCommand, opt } from "../command.ts";
 import { configError, loadConfig, mergeConfig, parseLayer } from "../config/load.ts";
 import { mapOldConfig, type OldConfig } from "../config/migrate.ts";
+import { isOldUserConfig, mapOldUserConfig, OLD_USER_BACKUP_SUFFIX, type OldUserConfig, oldUserConfigText } from "../config/migrate-user.ts";
 import { AGENTS_DIR, configPaths, type Layer, layerFileName, OLD_REPO_CONFIG_FILE, REPO_COMMITTED_FILE, REPO_LOCAL_FILE } from "../config/paths.ts";
 import type { ConfigLayer } from "../config/schema.ts";
 import { CliContext } from "../context.ts";
@@ -32,6 +34,32 @@ function oldConfigLines(old: OldConfig): string[] {
     `- ${OLD_REPO_CONFIG_FILE} (the old norn's config): took ${list(old.mapped)}; ignored ${list(old.ignored)}`,
     ...old.notes.map((n) => `- ${n}`),
     `- this norn never reads ${OLD_REPO_CONFIG_FILE}: delete it once the new config holds what you need`,
+  ];
+}
+
+/**
+ * The old norn's user config rewritten in this norn's keys, the old text kept beside it under a name
+ * not yet taken. Done first and on its own: it is the machine's file, not this repo's, and every
+ * command refuses until it is rewritten, a repo already set up included.
+ */
+async function migrateOldUserConfig(files: HostFiles, path: string): Promise<(OldUserConfig & { backup: string }) | null> {
+  const text = await files.read(path);
+  if (text === null || !isOldUserConfig(text)) return null;
+  const m = mapOldUserConfig(text);
+  let backup = `${path}${OLD_USER_BACKUP_SUFFIX}`;
+  for (let n = 2; (await files.read(backup)) !== null; n++) backup = `${path}${OLD_USER_BACKUP_SUFFIX}-${n}`;
+  // the old text is kept before the file is rewritten, so a crash between the two loses nothing
+  await files.write(backup, text);
+  await files.write(path, oldUserConfigText(m, backup.split("/").pop() ?? backup));
+  return { ...m, backup };
+}
+
+function oldUserConfigLines(m: OldUserConfig & { backup: string }): string[] {
+  const list = (keys: string[]) => (keys.length > 0 ? keys.join(", ") : "none");
+  return [
+    `- ${layerFileName("user")} was the old norn's user config: rewrote it, the old text kept as ${m.backup}`,
+    `  - took ${list(m.mapped)}`,
+    ...m.ignored.map((i) => `  - ignored ${i}`),
   ];
 }
 
@@ -65,10 +93,18 @@ export const initCommand = defineCommand({
     const commit = opt.bool(args, "commit");
     const layer: Layer = commit ? "repo" : "local";
     const paths = configPaths(w.home, w.repo.root);
+    const userMigrated = await migrateOldUserConfig(files, paths.user);
     const current = await files.read(paths[layer]);
     const existing = current === null ? null : parseLayer(layer, current);
-    if (current !== null && !(existing?.ok && completable(existing.value)))
+    if (current !== null && !(existing?.ok && completable(existing.value))) {
+      // set up already, but its user config was the old norn's: rewriting that was the work to do
+      if (userMigrated)
+        return rendered(
+          { root: w.repo.root, user_migrated: { file: paths.user, ...userMigrated } },
+          [`# norn init in ${w.repo.root}`, "", `${layerFileName(layer)} exists already; left as it is.`, "", ...oldUserConfigLines(userMigrated)].join("\n"),
+        );
       throw refuse(`norn is set up here already: ${layerFileName(layer)} exists`, "norn doctor, or norn config set <key> <value>", "already_initialized", { file: paths[layer] });
+    }
 
     const given = opt.str(args, "mode");
     if (given !== undefined && given !== "auto" && given !== "manual") throw usageError(`--mode ${given}: the mode is auto or manual`, "norn init --mode auto, or norn init --mode manual");
@@ -113,7 +149,19 @@ export const initCommand = defineCommand({
     // a fresh context: this one may hold the "no config" it saw before the file was written
     const doctor = await runDoctor(new CliContext(ctx.io));
     const migrated = old && { file: OLD_REPO_CONFIG_FILE, mapped: old.mapped, ignored: old.ignored, notes: old.notes };
-    const value = { root: w.repo.root, file: paths[layer], layer, team: commit, chose: choices, detected, offered, exclude, ...(migrated && { migrated }), doctor };
+    const value = {
+      root: w.repo.root,
+      file: paths[layer],
+      layer,
+      team: commit,
+      chose: choices,
+      detected,
+      offered,
+      exclude,
+      ...(migrated && { migrated }),
+      ...(userMigrated && { user_migrated: { file: paths.user, ...userMigrated } }),
+      doctor,
+    };
     const md = [
       `# norn init in ${w.repo.root}`,
       "",
@@ -128,6 +176,7 @@ export const initCommand = defineCommand({
       `- .git/info/exclude: ${exclude === "added" ? `added ${AGENTS_DIR}` : exclude === "present" ? `${AGENTS_DIR} already there` : "untouched (team mode)"}`,
       ...offered.map((o) => offerLine(o, choices)),
       ...(old ? oldConfigLines(old) : []),
+      ...(userMigrated ? oldUserConfigLines(userMigrated) : []),
       "",
       `## norn doctor: ${doctor.ok ? "all checks pass" : "some checks fail"}`,
       "",
