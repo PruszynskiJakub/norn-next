@@ -114,8 +114,8 @@ export async function uncommitted(ctx: HostContext, root: string, path: string):
     const entry = fields[i] as string;
     if (entry.length < 4) continue;
     paths.add(entry.slice(3));
-    // a rename or copy is followed by the path it came from, as a field of its own
-    if (entry[0] === "R" || entry[0] === "C") {
+    // a rename or copy, on either side, is followed by the path it came from, as a field of its own
+    if ([entry[0], entry[1]].some((x) => x === "R" || x === "C")) {
       const from = fields[++i];
       if (from) paths.add(from);
     }

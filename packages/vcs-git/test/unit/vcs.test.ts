@@ -195,6 +195,15 @@ describe("git vcs uncommitted", () => {
     expect(h.cwds.slice(1).every((c) => c === WT)).toBe(true);
   });
 
+  test("a rename on the worktree's side (after `git add -N`) names its from-path whole too", async () => {
+    const status = [" R src/moved.ts", "src/old.ts", " M src/c.ts", ""].join("\0");
+    const h = gitHost([
+      ["worktree list", { stdout: wtList }],
+      ["status --porcelain=v1 -z --untracked-files=all", { stdout: status }],
+    ]);
+    expect(await vcsOf(h.ctx).uncommitted?.(WT)).toEqual({ ok: true, value: ["src/c.ts", "src/moved.ts", "src/old.ts"] });
+  });
+
   test("empty for a clean checkout, and for a path that is no checkout without running git there; a failing status is a failure", async () => {
     const h = gitHost([
       ["worktree list", { stdout: wtList }],
