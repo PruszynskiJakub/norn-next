@@ -48,6 +48,7 @@ export { branchOf, cutFrom, ensureWorktree } from "./branches.ts";
 export type { RuntimeEnv, TickContext } from "./env.ts";
 export { type GatherOptions, type GatheredFacts, gatherFacts } from "./facts.ts";
 export { acquireTickLock, DEFAULT_LOCK_STALE_MS, type TickLock, tickLockPath } from "./lock.ts";
+export { byName, type ByName, type DeepMerge, deepMerge, getKey, isMapping, leafKeys, type Overlaid, overlay, type OverlayLayer, type OverlayStrategy, type ReplaceWhole, replaceWhole } from "./overlay.ts";
 export { lastSeqIn, unitInFacts, writeAndCommit, type Written } from "./record.ts";
 export { NO_REPO_WORKFLOWS, overlayRepoWorkflows, readRepoWorkflows, REPO_WORKFLOWS_DIR, type RepoWorkflows, repoFileOf, workflowNameOf } from "./repo-workflows.ts";
 export { collectStepKinds, findProvided, loadPackWorkflows, type ResolvedSlots, resolveSlots, type SlotName } from "./resolve.ts";

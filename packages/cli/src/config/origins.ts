@@ -1,26 +1,21 @@
 /**
- * Which file set each key of the merged config: the highest layer holding the key's leaf, else the
- * defaults. A slot whose `use` a higher layer changed drops its plugin's keys below, so such a leaf
+ * Which file set each key of the merged config: the layer the overlay names for the key's leaf, else
+ * the defaults. A slot whose `use` a higher layer changed drops its plugin's keys below, so such a leaf
  * only a lower layer holds never appears in the merged config to be attributed.
  */
-import { getKey, isMapping } from "./merge.ts";
+import { leafKeys, overlay } from "@norn/runtime";
+import { CONFIG_MERGE } from "./merge.ts";
 import { LAYERS, type Layer } from "./paths.ts";
 
 export type Origin = Layer | "default";
 
-/** Every leaf of a mapping as a dotted key; a list is one leaf. */
-export function leafKeys(value: unknown, prefix = ""): string[] {
-  if (!isMapping(value)) return prefix ? [prefix] : [];
-  const keys = Object.keys(value);
-  if (keys.length === 0) return prefix ? [prefix] : [];
-  return keys.flatMap((k) => leafKeys(value[k], prefix ? `${prefix}.${k}` : k));
-}
-
 export function originsOf(merged: unknown, layers: Readonly<Record<Layer, unknown>>): Record<string, Origin> {
+  const resolved = overlay(
+    LAYERS.map((label) => ({ label, value: layers[label] })),
+    CONFIG_MERGE,
+  );
   const out: Record<string, Origin> = {};
-  for (const key of leafKeys(merged)) {
-    const from = [...LAYERS].reverse().find((l) => getKey(layers[l], key) !== undefined);
-    out[key] = from ?? "default";
-  }
+  // the merged config shown may hold keys no layer sets (a failed load's, or one the schema filled): those are the defaults'
+  for (const key of leafKeys(merged)) out[key] = resolved.originOf(key) ?? "default";
   return out;
 }
