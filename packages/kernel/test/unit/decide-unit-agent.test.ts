@@ -335,6 +335,14 @@ describe("an answer to a session that cannot take it", () => {
     expect(decideCase({ state: d.state, session: session("ended") })?.rule).toBe("agent.died.retry");
   });
 
+  test("a run with no session seen on this machine gets the answer applied undelivered, even on an executor that can resume", () => {
+    // a story taken from another machine: the run's hook events stayed there, so nothing here can hand the answer over
+    const d = kindOf(decideCase({ state: at(), receipts: answered, session: null, executors: { claude: caps({ resume: true }) } }), "apply_receipts");
+    expect(d.rule).toBe("receipts.apply.undelivered");
+    expect(d.undelivered).toEqual(["r-7"]);
+    expect(d.state.parked).toBeUndefined();
+  });
+
   test("a live session, a session that can be resumed, or an attended run takes the answer as usual", () => {
     for (const c of [
       { state: at(), session: session("working") },
