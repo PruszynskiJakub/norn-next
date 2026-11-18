@@ -61,10 +61,12 @@ async function linkSkill(files: HostFiles & Linker, dir: string, name: string, t
 }
 
 /**
- * The repo's layer: each folder under `.agents/skills/` that holds something without the mark. Its
- * value is never read, only its name, since a winner the repo holds is left where it is.
+ * The repo's layer: each folder under `.agents/skills/` of a pack skill's name that holds something
+ * without the mark. Only the pack's names are read, since only they can contend, and anything else
+ * there (a README, the repo's own skills) is no folder norn may look into. Its value is never read,
+ * only its name, since a winner the repo holds is left where it is.
  */
-async function repoSkills(files: HostFiles, own: string): Promise<Record<string, true>> {
+async function repoSkills(files: HostFiles, own: string, packNames: readonly string[]): Promise<Record<string, true>> {
   let names: string[];
   try {
     names = await files.list(own);
@@ -72,7 +74,7 @@ async function repoSkills(files: HostFiles, own: string): Promise<Record<string,
     return {};
   }
   const out: Record<string, true> = {};
-  for (const name of names) if (!(await skillMark.mayWriteFolder(files, `${own}/${name}`))) out[name] = true;
+  for (const name of packNames) if (names.includes(name) && !(await skillMark.mayWriteFolder(files, `${own}/${name}`))) out[name] = true;
   return out;
 }
 
@@ -81,7 +83,7 @@ async function packWinners(files: HostFiles, own: string, skills: PackSkills): P
   const won = overlay<"pack" | "repo", unknown>(
     [
       { label: "pack", value: skills },
-      { label: "repo", value: await repoSkills(files, own) },
+      { label: "repo", value: await repoSkills(files, own, Object.keys(skills)) },
     ],
     byName((name) => name),
   );

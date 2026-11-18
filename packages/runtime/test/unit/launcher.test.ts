@@ -550,6 +550,26 @@ describe("the pack's skills", () => {
     expect(await plain.read(`${WT}/.claude/skills/norn-implement/SKILL.md`)).toBe("# implement\n");
   });
 
+  test("a file or a skill of the repo's own under .agents/skills, not named by the pack, leaves the launch as it was", async () => {
+    const plain = memoryFiles();
+    // the real host refuses to list a file, as a directory read of it fails with ENOTDIR
+    const strict = {
+      ...plain,
+      list: async (dir: string) => {
+        if ((await plain.read(dir)) !== null) throw new Error(`ENOTDIR: not a directory, scandir '${dir}'`);
+        return plain.list(dir);
+      },
+    };
+    const s = withSkills(".claude/skills", strict);
+    await plain.write(`${WT}/.agents/skills/README.md`, "# our skills\n");
+    await plain.write(`${WT}/.agents/skills/ours/SKILL.md`, "# ours\n");
+    expect((await s.launcher.start(run())).ok).toBe(true);
+    expect(await plain.read(`${WT}/.agents/skills/README.md`)).toBe("# our skills\n");
+    expect(await plain.read(`${WT}/.agents/skills/ours/SKILL.md`)).toBe("# ours\n");
+    expect(await plain.read(`${WT}/.agents/skills/ours/.gitignore`)).toBeNull();
+    expect(await plain.read(`${WT}/.agents/skills/norn/SKILL.md`)).toBe("# norn\n");
+  });
+
   test("a copy a crash cut short after its mark is still norn's and is completed on the next launch", async () => {
     const s = withSkills(".claude/skills");
     const MARK = "# norn: pack skills, rewritten before every launch; edit the pack, not these copies\n*\n";
