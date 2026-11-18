@@ -83,10 +83,10 @@ export interface VcsCall {
 }
 
 /**
- * A vcs with worktrees under the data dir, heads from a map, and every call recorded but `unfinished`,
- * which answers from `stopped` by checkout path.
+ * A vcs with worktrees under the data dir, heads from a map, and every call recorded but `unfinished`
+ * and `uncommitted`, which answer from `stopped` and `dirty` by checkout path.
  */
-export function fakeVcs(ctx: HostContext, heads: Record<string, string>, calls: VcsCall[], stopped: Record<string, VcsUnfinished> = {}): Vcs {
+export function fakeVcs(ctx: HostContext, heads: Record<string, string>, calls: VcsCall[], stopped: Record<string, VcsUnfinished> = {}, dirty: Record<string, string[]> = {}): Vcs {
   const path = (unit: string) => `${ctx.repo.dataDir}/worktrees/${unit.replace("/", "-")}`;
   const call = <T>(op: string, args: unknown[], value: T): Promise<PluginResult<T>> => {
     calls.push({ op, args });
@@ -105,6 +105,7 @@ export function fakeVcs(ctx: HostContext, heads: Record<string, string>, calls: 
     mergeBase: (a, b) => call("mergeBase", [a, b], null),
     merge: (branch, from) => call("merge", [branch, from], { head: `${branch}+${from}` }),
     unfinished: (path) => Promise.resolve(ok(stopped[path] ?? null)),
+    uncommitted: (path) => Promise.resolve(ok(dirty[path] ?? [])),
     push: (branch) => call("push", [branch], undefined),
     fetch: () => call("fetch", [], undefined),
   };
@@ -287,6 +288,8 @@ export interface Harnessed {
   vcsCalls: VcsCall[];
   /** operations stopped half-way, by checkout path, as the fake vcs reports them */
   stopped: Record<string, VcsUnfinished>;
+  /** paths holding uncommitted changes, by checkout path, as the fake vcs reports them */
+  dirty: Record<string, string[]>;
   stepCalls: StepCall[];
   stepAnswers: Record<string, StepAnswer[]>;
   launcher: FakeLauncher;
@@ -348,6 +351,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
   const heads: Record<string, string> = {};
   const vcsCalls: VcsCall[] = [];
   const stopped: Record<string, VcsUnfinished> = {};
+  const dirty: Record<string, string[]> = {};
   const stepCalls: StepCall[] = [];
   const stepAnswers: Record<string, StepAnswer[]> = {};
   const launcher = new FakeLauncher();
@@ -358,7 +362,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     provides: {
       tracker: { fake: { configSchema: Type.Object({}), create: () => fakeTracker(items) } },
       forge: { fake: { configSchema: Type.Object({}), create: () => fakeForge(changes) } },
-      vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped) } },
+      vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped, dirty) } },
       harness: { fake: HARNESS },
       stepKinds: fakeStepKinds(stepAnswers, stepCalls),
       packs: { test: { workflows: WORKFLOWS, shared: {}, skills: {} } },
@@ -387,7 +391,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     return id;
   };
   const runtime: Runtime = { tick: () => tick(env, nextId()) };
-  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stopped, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
+  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stopped, dirty, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
 }
 
 export type Report = Awaited<ReturnType<Runtime["tick"]>>;

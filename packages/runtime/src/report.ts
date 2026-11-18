@@ -15,7 +15,7 @@ import { STORE_ID_PATTERN } from "@norn/plugin-api";
 import type { CriterionVerdict, Finding, Note, Verdict } from "@norn/schema";
 import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
-import { readBackDocs, worktreeOf } from "./inputs.ts";
+import { INPUTS_DIR, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
 import { type LiveStep, liveStepOf, reportOnRecord } from "./live-run.ts";
@@ -147,6 +147,8 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     if (handBack) return handBack;
     const stopped = await unfinishedRefusal(env, unit);
     if (stopped) return stopped;
+    const dirty = await uncommittedRefusal(env, unit);
+    if (dirty) return dirty;
   }
   const text = textOf(req);
   const outcome = req.verb === "done" ? req.outcome : undefined;
@@ -233,6 +235,33 @@ async function unfinishedRefusal(env: RuntimeEnv, unit: string): Promise<Refusab
     `a ${operation} is still in progress in ${worktree} (${left})`,
     `resolve what is left, conclude the ${operation} with \`${conclude}\`, then report again; if a person must choose, \`norn ask\` with the ${operation} kept in progress`,
     "merge_unfinished",
+  );
+}
+
+/** How many uncommitted paths a refusal names before it counts the rest. */
+const DIRTY_SHOWN = 10;
+
+/**
+ * Why a `done` cannot be recorded while the unit's checkout holds work not committed, or null when
+ * it can: the steps after it (a branch update, a push, a pull request) carry commits only, so what
+ * is left in the worktree would be lost or make them fail. norn's own files there (the inputs and
+ * the story's spec folder, which it reads back itself) never count, though a repo that commits its
+ * specs tracks them. An ask or stuck is never held back: the work is not handed on.
+ */
+async function uncommittedRefusal(env: RuntimeEnv, unit: string): Promise<Refusable<never> | null> {
+  const vcs = env.slots.vcs;
+  if (!vcs.uncommitted) return null;
+  const worktree = worktreeOf(env, unit);
+  const r = await vcs.uncommitted(worktree);
+  if (!r.ok) return refuse(`cannot tell whether ${worktree} holds uncommitted work: ${r.failure.message}`, "report again with the same command", r.failure.code);
+  const owned = [`${INPUTS_DIR}/`, `${specFolder(unit)}/`];
+  const left = r.value.filter((p) => !owned.some((o) => p.startsWith(o)));
+  if (left.length === 0) return null;
+  const named = left.slice(0, DIRTY_SHOWN).join(", ") + (left.length > DIRTY_SHOWN ? ` and ${left.length - DIRTY_SHOWN} more` : "");
+  return refuse(
+    `${worktree} holds uncommitted work: ${named}`,
+    "run `git status` in the worktree, commit the work this step made, then report again; ask a person about a change you cannot tell whether to commit",
+    "dirty_worktree",
   );
 }
 

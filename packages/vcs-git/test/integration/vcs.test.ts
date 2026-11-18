@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { commit, git, moveBase, value, world } from "./world.ts";
 
@@ -56,6 +56,24 @@ describe("git vcs over real git", () => {
     await git(path, "commit", "-q", "--no-edit");
     expect(value(await w.vcs.unfinished!(path))).toBeNull();
     expect(value(await w.vcs.unfinished!(join(w.dir, "machine", "worktrees", "gone")))).toBeNull();
+  });
+
+  test("uncommitted names a change or a new file git does not ignore, never what a .gitignore keeps out, and nothing once committed", async () => {
+    const w = await world();
+    const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));
+    expect(value(await w.vcs.uncommitted!(path))).toEqual([]);
+    mkdirSync(join(path, ".agents", "inputs"), { recursive: true });
+    writeFileSync(join(path, ".agents", "inputs", ".gitignore"), "*\n");
+    writeFileSync(join(path, ".agents", "inputs", "spec.md"), "norn's copy\n");
+    expect(value(await w.vcs.uncommitted!(path))).toEqual([]);
+    writeFileSync(join(path, "shared.txt"), "edited\n");
+    mkdirSync(join(path, "src"));
+    writeFileSync(join(path, "src", "new.ts"), "export {};\n");
+    expect(value(await w.vcs.uncommitted!(path))).toEqual(["shared.txt", "src/new.ts"]);
+    await git(path, "add", "-A");
+    await git(path, "commit", "-q", "-m", "work");
+    expect(value(await w.vcs.uncommitted!(path))).toEqual([]);
+    expect(value(await w.vcs.uncommitted!(join(w.dir, "machine", "worktrees", "gone")))).toEqual([]);
   });
 
   test("with abortOnConflict a conflicting merge reports its paths and leaves the branch and worktree as they were", async () => {

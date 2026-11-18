@@ -181,6 +181,38 @@ describe("git vcs unfinished", () => {
   });
 });
 
+describe("git vcs uncommitted", () => {
+  const wtList = `worktree ${ROOT}\nHEAD ${SHA}\nbranch refs/heads/main\n\nworktree ${DATA}/worktrees/gh-12\nHEAD ${SHA}\nbranch refs/heads/gh-12-login\n\n`;
+  const WT = `${DATA}/worktrees/gh-12`;
+
+  test("names every path git does not ignore with a change not committed (staged, unstaged, untracked, both sides of a rename), sorted, read in that checkout", async () => {
+    const status = [" M src/b.ts", "A  src/new.ts", "?? notes/todo.md", "R  src/moved.ts", "src/old.ts", "?? a file.txt", ""].join("\0");
+    const h = gitHost([
+      ["worktree list", { stdout: wtList }],
+      ["status --porcelain=v1 -z --untracked-files=all", { stdout: status }],
+    ]);
+    expect(await vcsOf(h.ctx).uncommitted?.(WT)).toEqual({ ok: true, value: ["a file.txt", "notes/todo.md", "src/b.ts", "src/moved.ts", "src/new.ts", "src/old.ts"] });
+    expect(h.cwds.slice(1).every((c) => c === WT)).toBe(true);
+  });
+
+  test("empty for a clean checkout, and for a path that is no checkout without running git there; a failing status is a failure", async () => {
+    const h = gitHost([
+      ["worktree list", { stdout: wtList }],
+      ["status", { stdout: "" }],
+    ]);
+    const vcs = vcsOf(h.ctx);
+    expect(await vcs.uncommitted?.(WT)).toEqual({ ok: true, value: [] });
+    const before = h.calls.length;
+    expect(await vcs.uncommitted?.(`${DATA}/worktrees/gone`)).toEqual({ ok: true, value: [] });
+    expect(h.calls.slice(before).map((c) => c[1])).toEqual(["worktree"]);
+    const broken = gitHost([
+      ["worktree list", { stdout: wtList }],
+      ["status", { code: 128, stderr: "fatal: index file corrupt" }],
+    ]);
+    expect((await vcsOf(broken.ctx).uncommitted?.(WT))?.ok).toBe(false);
+  });
+});
+
 describe("git vcs push and fetch", () => {
   test("push names the branch on both sides, carries the lease, and is bounded", async () => {
     const exec = scriptedExec((argv) => (argv[1] === "remote" ? { stdout: "origin\n" } : argv[1] === "push" ? { code: 0 } : undefined));

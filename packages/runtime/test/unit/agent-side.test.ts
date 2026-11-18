@@ -322,6 +322,32 @@ describe("reporting", () => {
     expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
   });
 
+  test("a done while the worktree holds uncommitted work is refused, naming the paths and records nothing; ask and stuck still go through", async () => {
+    const { h, runId } = await running();
+    h.dirty[WORKTREE] = ["src/a.ts", "src/b.ts"];
+    const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
+    expect(r).toMatchObject({
+      ok: false,
+      refusal: { code: "dirty_worktree", error: expect.stringContaining("src/a.ts, src/b.ts"), do_instead: expect.stringMatching(/git status.*commit/) },
+    });
+    expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
+    expect(await reportRun(h.env, UNIT, runId, { verb: "ask", question: "keep src/a.ts?" }, "r2")).toMatchObject({ ok: true });
+  });
+
+  test("norn's own files in the worktree (its inputs and the story's spec folder) never count as uncommitted work", async () => {
+    const { h, runId } = await running();
+    h.dirty[WORKTREE] = [".agents/inputs/last_check.md", `.agents/specs/${UNIT}/spec.md`, `.agents/specs/${UNIT}/handoffs/${UNIT}.md`];
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
+  test("a done in a clean worktree goes through, and one whose work was committed after the refusal too", async () => {
+    const { h, runId } = await running();
+    h.dirty[WORKTREE] = ["notes.txt", `.agents/specs/${UNIT}/spec.md`];
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: false, refusal: { code: "dirty_worktree", error: expect.not.stringContaining(".agents/") } });
+    h.dirty[WORKTREE] = [];
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
   test("a unit with no run in progress is refused", async () => {
     const h = harness({ workflow: "agented" });
     expect(await reportRun(h.env, "lt-9", "r", { verb: "stuck", reason: "x" }, "r1")).toMatchObject({ ok: false, refusal: { code: "no_run" } });

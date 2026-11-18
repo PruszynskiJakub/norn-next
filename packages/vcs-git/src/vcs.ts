@@ -3,7 +3,7 @@ import { fail, type HostContext, ok, type Vcs, type VcsFactory } from "@norn/plu
 import { GitVcsConfig } from "./config.ts";
 import { mergeInto } from "./merge.ts";
 import { fetchRemote, pushBranch } from "./push.ts";
-import { isAncestor, mergeBase, remoteIfAny, revParse, trialConflicts, unfinished, worktreeList } from "./refs.ts";
+import { isAncestor, mergeBase, remoteIfAny, revParse, trialConflicts, uncommitted, unfinished, worktreeList } from "./refs.ts";
 import { gitWorktrees } from "./worktree.ts";
 
 export const DEFAULT_REMOTE = "origin";
@@ -28,6 +28,7 @@ export function createGitVcs(ctx: HostContext, config: GitVcsConfig): Vcs {
       return ok(sha.value === null ? null : `${remote}/${branch}`);
     },
     unfinished: (path) => unfinished(ctx, root, path),
+    uncommitted: (path) => uncommitted(ctx, root, path),
     async merge(branch, from, opts) {
       const list = await worktreeList(ctx, root);
       if (!list.ok) return list;

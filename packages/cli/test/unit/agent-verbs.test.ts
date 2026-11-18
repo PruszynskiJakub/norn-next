@@ -105,6 +105,30 @@ describe("the agent verbs act for the run in the launch env", () => {
     expect((await runCli(["stuck", "cannot tell which side wins", "--json"], m.io)).exit).toBe(ExitCode.ok);
   });
 
+  test("done while the unit's worktree holds uncommitted work is refused (exit 3) with how to commit it; norn's own files alone are not", async () => {
+    const env = await envOf(configured());
+    const worktree = env.slots.vcs.worktree.path(UNIT);
+    const list = `worktree ${ROOT}\nHEAD ${"a".repeat(40)}\nbranch refs/heads/main\n\nworktree ${worktree}\nHEAD ${"a".repeat(40)}\nbranch refs/heads/lt-1-x\n\n`;
+    const norns = [" M .agents/specs/lt-1/spec.md", "?? .agents/inputs/last_check.md"];
+    let status = [...norns, " M src/app.ts", "?? notes.txt", ""].join("\0");
+    const m = configured({
+      env: runEnv(),
+      script: (argv) => (argv[1] === "worktree" ? { stdout: list } : argv[1] === "status" ? { stdout: status } : undefined),
+      revParse: (_argv, o) => (o.cwd === worktree ? { code: 1 } : undefined),
+    });
+    await seedUnit(m, { step: AGENT_STEP });
+    const r = await runCli(["done", "done", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.refused);
+    expect(json(r.stdout)).toEqual({
+      error: `${worktree} holds uncommitted work: notes.txt, src/app.ts`,
+      do_instead: "run `git status` in the worktree, commit the work this step made, then report again; ask a person about a change you cannot tell whether to commit",
+      code: "dirty_worktree",
+    });
+    expect(await receiptsOf(m)).toEqual([]);
+    status = [...norns, ""].join("\0");
+    expect((await runCli(["done", "done", "--json"], m.io)).exit).toBe(ExitCode.ok);
+  });
+
   test("a retried report records once; its id comes from the flag, else NORN_REPORT_ID, else what it reports", async () => {
     const m = configured({ env: runEnv() });
     await seedUnit(m, { step: AGENT_STEP });

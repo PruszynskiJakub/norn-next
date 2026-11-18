@@ -40,6 +40,13 @@ describe("renderBrief", () => {
     expect(renderBrief(input())).not.toContain("--criteria");
   });
 
+  test("says to commit the work before reporting done, as a done over uncommitted changes is refused", () => {
+    const md = renderBrief(input());
+    const finish = md.slice(md.indexOf("## Finish with exactly one of"));
+    expect(finish).toContain("Commit your work before `norn done`");
+    expect(finish).toContain("`git status`");
+  });
+
   test("is deterministic", () => {
     expect(renderBrief(input())).toBe(renderBrief(structuredClone(input())));
   });
