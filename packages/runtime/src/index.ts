@@ -1,6 +1,6 @@
 export { act } from "./act.ts";
 export { briefRenderInput, renderInputFrom } from "./brief-context.ts";
-export { INPUTS_DIR, INPUTS_NOTE, SPECS_DIR, specFolder, type MaterializedInputs, materializeInputs, mirrorSpec, readBackDocs, storyItem, worktreeOf } from "./inputs.ts";
+export { INPUTS_DIR, INPUTS_NOTE, SPECS_DIR, specFolder, type MaterializedInputs, materializeInputs, mirrorSpec, readBackDocs, storyItem, worktreeOf } from "./mount.ts";
 export { installSkills, type PackSkills, SKILLS_DIR } from "./skills.ts";
 export { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 export { HANDOFFS_DIR, handoffArtifact, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
