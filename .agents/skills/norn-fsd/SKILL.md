@@ -18,7 +18,7 @@ A subagent returns with its round report when the round ended: every unit of the
   - refinement's plan has several seams across packages or a new contract → `story`;
   - the same plan with one seam and no new contract → `quick`;
   - `reproduce` confirmed a cause → `quick`.
-- **Starting it is the person's.** norn has no command that starts a story's next round, so escalate once: "gh-203: triage ended; recommended next: `quick`, because the comment shows a one-file docs change with low risk." When the person has started it and the story shows a unit that has not ended, start a new subagent with the same brief.
+- **Starting it is the person's.** Escalate once, with the command that starts it: "gh-203: triage ended; recommended next: `quick`, because the comment shows a one-file docs change with low risk: `norn story round gh-203 --workflow quick`." Run `norn story round` yourself only when the person asked you to start the next round, with `--reason "fsd: <evidence>"`; never on your own judgement, and never with `--force`. When the round has started and the story shows a unit that has not ended, start a new subagent with the same brief.
 - **Escalate instead of recommending** when triage recommends closing the issue ("triage recommends closing gh-204 because …"), when a repo-local workflow the skill does not know would fit (name it as a suggestion), and for a plan that amends the rules file.
 
 ## Refinement on the person's behalf

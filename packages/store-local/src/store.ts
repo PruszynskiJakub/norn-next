@@ -76,6 +76,8 @@ export function createLocalStore(ctx: HostContext, _config: LocalStoreConfig = {
       read: (story) => checked([badStory(story)], `read claim ${story}`, () => c.read(story)),
       acquire: (story, holder, ttlMs, expectVersion) =>
         checked([badStory(story), badName("holder", holder), badTtl(ttlMs), expectVersion === undefined ? null : badVersion(expectVersion, true)], `acquire ${story}`, () => c.acquire(story, holder, ttlMs, expectVersion)),
+      takeOver: (story, holder, ttlMs, expectVersion) =>
+        checked([badStory(story), badName("holder", holder), badTtl(ttlMs), badVersion(expectVersion, true)], `take over ${story}`, () => c.takeOver(story, holder, ttlMs, expectVersion)),
       renew: (story, holder, ttlMs) => checked([badStory(story), badName("holder", holder), badTtl(ttlMs)], `renew ${story}`, () => c.renew(story, holder, ttlMs)),
       release: (story, holder) => checked([badStory(story), badName("holder", holder)], `release ${story}`, () => c.release(story, holder)),
     },

@@ -4,7 +4,14 @@
  * claim, and only the machine holding it runs anything for the story.
  */
 import { describe, expect, test } from "bun:test";
-import { type AgentScript, decideGate, git, type Machine, MINUTE, machine, personMerges, type Report, rulesOf, team, unitRecord } from "./world.ts";
+import type { PluginResult } from "@norn/plugin-api";
+import { type AgentScript, decideGate, git, type Machine, MINUTE, machine, personMerges, type Report, rulesOf, team, tickUntil, unitRecord } from "./world.ts";
+
+function valueOf<T>(r: PluginResult<T> | undefined): T {
+  if (!r) throw new Error("the store offers no such call");
+  if (!r.ok) throw new Error(r.failure.message);
+  return r.value;
+}
 
 const builder: AgentScript = () => ({ commit: { "thing.txt": "the thing\n" }, outcome: "done" });
 
@@ -71,5 +78,41 @@ describe("two machines racing one story over the refs store", () => {
     expect((await unitRecord(loser, unit)).state?.ended).toBe("done");
     expect(after.flat().flatMap((r) => r.decisions).filter((d) => d.kind !== "noop")).toEqual([]);
     expect(loser.agents.starts).toHaveLength(0);
+  }, 60_000);
+
+  test("a person on the other machine takes the story over; from then on that machine carries it and the first acts on nothing", async () => {
+    const t = await team();
+    const a = await machine(t, { name: "a", workflow: "short", store: "refs", script: builder });
+    const b = await machine(t, { name: "b", workflow: "short", store: "refs", script: builder });
+    await a.env.slots.tracker.perform({ kind: "create", title: "Build it", body: "", labels: ["norn"], assignee: "me" }, { receipt_id: "create-1" });
+    const unit = "lt-1";
+    await tickUntil(a, async () => (await unitRecord(a, unit)).state?.parked !== undefined);
+    // a's work reaches the remote before the takeover; b's worktree is cut from that copy, so its push builds on it
+    await git(a.repo, "push", "-q", "origin", `norn/${unit}`);
+
+    // what norn story take --force does on b: fetch, move the claim from the version read, fetch again, record it
+    const store = b.env.slots.store;
+    expect(store.capabilities.takeover).toBe(true);
+    valueOf(await store.sync?.());
+    const held = valueOf(await store.claims.read(unit));
+    expect(held?.holder).toBe("a");
+    const taken = valueOf(await store.claims.takeOver?.(unit, "b", b.env.config.kernel.claimTtlMs, held?.version ?? null));
+    valueOf(await store.sync?.());
+    valueOf(await b.journal.record(unit, { id: `claim-taken.v${taken?.version}`, data: { kind: "claim.taken", from: "a", from_expires_at: held?.expires_at, to: "b", version: taken?.version ?? 0, by: "b" } }));
+
+    await decideGate(b, unit, "approve");
+    const carried = await race([a, b], async () => (await unitRecord(b, unit)).state?.step === "merge");
+    await personMerges(b, unit);
+    const finished = await race([a, b], async () => (await unitRecord(b, unit)).state?.ended === "done" && (await a.env.slots.store.claims.read(unit)).ok && valueOf(await a.env.slots.store.claims.read(unit)) === null);
+
+    const [ofA, ofB] = [0, 1].map((j) => [...(carried[j] ?? []), ...(finished[j] ?? [])]);
+    expect(acted(ofA ?? [], unit).map((o) => o.decision.rule)).toEqual([]);
+    expect(acted(ofB ?? [], unit).length).toBeGreaterThan(2);
+    expect([...(ofA ?? []), ...(ofB ?? [])].flatMap(rulesOf).filter((r) => r.includes("!"))).toEqual([]);
+    const record = await unitRecord(a, unit);
+    expect(record.state?.ended).toBe("done");
+    expect(record.receipts.filter((r) => r.data.kind === "claim.taken").map((r) => r.data)).toEqual([
+      { kind: "claim.taken", from: "a", from_expires_at: held?.expires_at, to: "b", version: taken?.version, by: "b" },
+    ]);
   }, 60_000);
 });

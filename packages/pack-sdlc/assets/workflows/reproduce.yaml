@@ -1,10 +1,10 @@
 # Reproduce workflow — shipped in the sdlc pack; a repo copy under .agents/workflows/ replaces it.
-# Select it with the issue label norn:wf:reproduce, or after triage in a new item with that label.
+# Select it with the issue label norn:wf:reproduce, or after triage with `norn story round <story> --workflow reproduce`.
 # An unattended agent follows the report through the real interface, builds a loop that goes red on
 # the symptom, minimises it, confirms the cause and names the seam for a regression test. It posts
 # all of that as an issue comment and changes no code. Every outcome ends the round ($done): the fix
-# is a new item labelled norn:wf:quick, whose implement turns the red loop into a failing test first,
-# or norn:wf:refinement when the fix needs a design.
+# is the story's next round, `norn story round <story> --workflow quick`, whose implement turns the red
+# loop into a failing test first, or `--workflow refinement` when the fix needs a design.
 # Reproduce changes no code and opens no PR, so it has no base sync.
 name: reproduce
 description: Reproduce a bug through the real interface, confirm its cause and the seam for a regression test; change no code.

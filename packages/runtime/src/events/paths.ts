@@ -14,10 +14,15 @@ import type { HostContext } from "@norn/plugin-api";
 
 export const EVENTS_DIR = "events-v2";
 
+/** The folders a run's hook folder holds; everything else in it is a file. */
+export const RUN_EVENT_FOLDERS: readonly string[] = ["events", "sent", "received", "outbox", "delivered", "stop-blocks", "resumes"];
+
 const unitSegment = (unit: string): string => unit.replace("/", "-");
 
+export const unitEventsDir = (ctx: HostContext, unit: string): string => `${ctx.repo.dataDir}/${EVENTS_DIR}/${unitSegment(unit)}`;
+
 export function runEventsDir(ctx: HostContext, unit: string, runId: string): string {
-  return `${ctx.repo.dataDir}/${EVENTS_DIR}/${unitSegment(unit)}/${runId}`;
+  return `${unitEventsDir(ctx, unit)}/${runId}`;
 }
 
 export const batchesDir = (ctx: HostContext, unit: string, runId: string): string => `${runEventsDir(ctx, unit, runId)}/events`;

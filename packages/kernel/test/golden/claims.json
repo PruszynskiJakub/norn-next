@@ -854,13 +854,13 @@
       "kind": "noop",
       "unit": "gh-61",
       "rule": "claim.held_elsewhere",
-      "reason": "the claim of machine-b expired at 2026-11-17T08:55:00.000Z; a person takes it over"
+      "reason": "the claim of machine-b expired at 2026-11-17T08:55:00.000Z; a person takes it over (norn story take gh-61 --force)"
     },
     {
       "kind": "noop",
       "unit": "gh-62",
       "rule": "claim.none",
-      "reason": "in progress and unclaimed; a person takes it over"
+      "reason": "in progress and unclaimed; a person takes it over (norn story take gh-62)"
     },
     {
       "kind": "claim",

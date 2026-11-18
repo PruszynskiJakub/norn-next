@@ -9,7 +9,9 @@ export {
   CHECK_START_GRACE_MS,
   canDetach,
   checkExitPath,
+  checkExitsDir,
   checkLogPath,
+  checkLogsDir,
   checkPidPath,
   checkWrapperArgv,
   type DetachedCheckRead,
@@ -32,7 +34,7 @@ export {
   recordSentPrompt,
   SentPrompt,
 } from "./events/outbox.ts";
-export { batchesDir, batchName, batchSeq, deliveredDir, EVENTS_DIR, outboxDir, receivedDir, runEventsDir, sentDir } from "./events/paths.ts";
+export { batchesDir, batchName, batchSeq, deliveredDir, EVENTS_DIR, outboxDir, RUN_EVENT_FOLDERS, receivedDir, runEventsDir, sentDir, unitEventsDir } from "./events/paths.ts";
 export { EventLogSessionSource, type EventLogSessionSourceOptions } from "./events/session-source.ts";
 export { AGENT_BIN_NAME, agentBinDir, agentBinEnv, cliOfHookCommand, shimScript } from "./agent-bin.ts";
 export { createHarnessLauncher, DEFAULT_HOOK_COMMAND, resolveExecutors } from "./executors.ts";
@@ -49,6 +51,7 @@ export { acquireTickLock, DEFAULT_LOCK_STALE_MS, type TickLock, tickLockPath } f
 export { lastSeqIn, unitInFacts, writeAndCommit, type Written } from "./record.ts";
 export { NO_REPO_WORKFLOWS, overlayRepoWorkflows, readRepoWorkflows, REPO_WORKFLOWS_DIR, type RepoWorkflows, repoFileOf, workflowNameOf } from "./repo-workflows.ts";
 export { collectStepKinds, findProvided, loadPackWorkflows, type ResolvedSlots, resolveSlots, type SlotName } from "./resolve.ts";
+export { DEFAULT_TRACE_RETAIN_MS, pruneTraces, removeUnitLogs, TRACE_PRUNE_PER_TICK } from "./retention.ts";
 export { createRuntime, createRuntimeEnv } from "./runtime.ts";
 export { awaitMerge } from "./steps-forge/await-merge.ts";
 export { openPr } from "./steps-forge/open-pr.ts";

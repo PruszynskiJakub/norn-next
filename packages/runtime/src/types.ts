@@ -47,6 +47,8 @@ export interface RuntimeConfig {
   holder: string;
   /** how long a tick lock may sit before another tick takes it over as left by a crash */
   lockStaleMs?: number;
+  /** how old a tick trace may grow before a tick removes it; null keeps every trace; absent: DEFAULT_TRACE_RETAIN_MS */
+  traceRetainMs?: number | null;
 }
 
 /** What the launcher needs to start one agent run; the brief is the kernel's inputs, rendered by the launcher. */

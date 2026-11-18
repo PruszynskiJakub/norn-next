@@ -219,8 +219,18 @@ describe("the runtime config derived from the person's", () => {
     expect({ intake: r.intake, holder: r.holder }).toEqual({ intake: { label: "norn", assignee: null }, holder: "ci" });
   });
 
+  test("trace.retain: a duration in milliseconds, keep as null, absent left to the runtime's default", async () => {
+    const of = async (extra: string) => runtimeConfigOf(await loaded({ local: `${LOCAL_CONFIG}${extra}` }), "me@box");
+    expect((await of("trace: { retain: 3d }\n")).traceRetainMs).toBe(259_200_000);
+    expect((await of("trace: { retain: keep }\n")).traceRetainMs).toBeNull();
+    expect("traceRetainMs" in (await of(""))).toBe(false);
+    const c = await loaded({ local: LOCAL_CONFIG });
+    expect(planSet(c, LOCAL_CONFIG, "local", "trace.retain", "0").ok).toBe(false);
+    expect(planSet(c, LOCAL_CONFIG, "local", "trace.retain", "forever").ok).toBe(false);
+  });
+
   test("durations", () => {
-    expect([durationMs("250ms"), durationMs("30s"), durationMs("15m"), durationMs("2h")]).toEqual([250, 30_000, 900_000, 7_200_000]);
+    expect([durationMs("250ms"), durationMs("30s"), durationMs("15m"), durationMs("2h"), durationMs("7d")]).toEqual([250, 30_000, 900_000, 7_200_000, 604_800_000]);
     expect(() => durationMs("15 m")).toThrow();
   });
 });

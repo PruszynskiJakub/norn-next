@@ -18,6 +18,7 @@ import { pluginAddCommand } from "./plugin-add.ts";
 import { pluginListCommand } from "./plugin-list.ts";
 import { pluginRemoveCommand } from "./plugin-remove.ts";
 import { pluginUpdateCommand } from "./plugin-update.ts";
+import { runRerunCommand } from "./run-rerun.ts";
 import { runStartCommand } from "./run-start.ts";
 import { runStopCommand } from "./run-stop.ts";
 import { statusCommand } from "./status.ts";
@@ -27,6 +28,9 @@ import { storyCloseCommand } from "./story-close.ts";
 import { storyCreateCommand } from "./story-create.ts";
 import { storyListCommand } from "./story-list.ts";
 import { storyRejectCommand } from "./story-reject.ts";
+import { storyRoundCommand } from "./story-round.ts";
+import { storyTakeCommand } from "./story-take.ts";
+import { storyUpdateBranchCommand } from "./story-update-branch.ts";
 import { storyViewCommand } from "./story-view.ts";
 import { stuckCommand } from "./stuck.ts";
 import { tickCommand } from "./tick.ts";
@@ -47,8 +51,8 @@ export const COMMANDS: readonly Command[] = [
 ];
 
 export const NOUNS: readonly Noun[] = [
-  defineNoun({ name: "story", summary: "Stories: list, view, create, and the person's decisions", verbs: [storyListCommand, storyViewCommand, storyCreateCommand, storyApproveCommand, storyRejectCommand, storyAnswerCommand, storyCloseCommand] }),
-  defineNoun({ name: "run", summary: "Agent runs: start one manual mode holds, stop a live one", verbs: [runStartCommand, runStopCommand] }),
+  defineNoun({ name: "story", summary: "Stories: list, view, create, the person's decisions, the next round, taking one to this machine, and updating a finished one's branch", verbs: [storyListCommand, storyViewCommand, storyCreateCommand, storyApproveCommand, storyRejectCommand, storyAnswerCommand, storyRoundCommand, storyTakeCommand, storyUpdateBranchCommand, storyCloseCommand] }),
+  defineNoun({ name: "run", summary: "Runs: start one manual mode holds, stop a live one, run a step again", verbs: [runStartCommand, runStopCommand, runRerunCommand] }),
   defineNoun({ name: "config", summary: "Read and change the config", verbs: [configGetCommand, configSetCommand, configShowCommand] }),
   defineNoun({ name: "plugin", summary: "Install, list, update and remove plugins", verbs: [pluginAddCommand, pluginListCommand, pluginRemoveCommand, pluginUpdateCommand] }),
 ];

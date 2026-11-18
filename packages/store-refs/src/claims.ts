@@ -58,6 +58,21 @@ export function refsClaims(rc: RefsContext): StoreClaims {
         return ok({ result: next, writes: write(next) });
       });
     },
+    takeOver: async (story, holder, ttlMs, expectVersion) => {
+      if (!isStoryUnit(story)) return invalid(`not a story: ${JSON.stringify(story)}`);
+      if (typeof holder !== "string" || holder === "") return invalid("a claim needs a holder");
+      if (badTtl(ttlMs)) return invalid(`bad claim duration ${ttlMs}`);
+      return mutate(rc, cell(story), async (snap) => {
+        const file = await claimFile(rc, snap, story);
+        if (!file.ok) return file;
+        const held = isHeld(file.value) ? file.value : null;
+        if ((held?.version ?? null) !== expectVersion) return conflict(`the claim on ${story} is at ${held?.version ?? null}`);
+        const at = rc.now();
+        const mine = held !== null && held.holder === holder && !expired(held, at);
+        const next: ClaimRecord = { story, holder, acquired_at: mine ? held.acquired_at : at, expires_at: plus(at, ttlMs), version: (file.value?.version ?? 0) + 1 };
+        return ok({ result: next, writes: write(next) });
+      });
+    },
     renew: async (story, holder, ttlMs) => {
       if (!isStoryUnit(story)) return invalid(`not a story: ${JSON.stringify(story)}`);
       if (badTtl(ttlMs)) return invalid(`bad claim duration ${ttlMs}`);

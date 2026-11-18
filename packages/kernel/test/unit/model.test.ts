@@ -143,6 +143,10 @@ describe("kernel schemas", () => {
       { kind: "stop.sent", run_id: "r", reason: "timeout" },
       { kind: "run.limited", run_id: "r", resets_at: "2026-11-17T10:00:00.000Z" },
       { kind: "round.started", workflow: pinned },
+      { kind: "step.moved", to: "work", by: "a-person" },
+      { kind: "claim.taken", from: "machine-a", from_expires_at: "2026-11-17T10:00:00.000Z", to: "machine-b", version: 4, by: "machine-b", reason: "a is off" },
+      { kind: "branch.update", base: "origin/main", base_sha: "b".repeat(40), from: "a".repeat(40), took: "d".repeat(40), merge: true, by: "a-person", reason: "the base moved" },
+      { kind: "branch.updated", base: "origin/main", base_sha: "b".repeat(40), merged: true, from: "a".repeat(40), head: "c".repeat(40), pushed: true, by: "a-person" },
       { kind: "unit.marked", ended: "stuck", reason: "counter qa_loop ran out" },
       { kind: "unit.parked", reason: "gate.park" },
       { kind: "mode.changed", mode: "auto", by: "a-person" },
@@ -153,6 +157,10 @@ describe("kernel schemas", () => {
     for (const s of samples) expect({ kind: s.kind, errors: errorsOf(validateReceiptData(s)) }).toEqual({ kind: s.kind, errors: [] });
     expect(validateReceiptData({ kind: "run.guessed", run_id: "r" }).ok).toBe(false);
     expect(validateReceiptData({ kind: "gate.decided", outcome: "approved", by: "p" }).ok).toBe(false);
+    expect(validateReceiptData({ kind: "step.moved", to: "work", by: "p", reset: ["work.back", "work.back"] }).ok).toBe(false);
+    expect(validateReceiptData({ kind: "claim.taken", to: "machine-b", by: "machine-b" }).ok).toBe(false);
+    expect(validateReceiptData({ kind: "branch.updated", base: "main", base_sha: "b", from: "a", head: "c", by: "p" }).ok).toBe(false);
+    expect(validateReceiptData({ kind: "branch.update", base: "main", base_sha: "b", from: "a", by: "p" }).ok).toBe(false);
   });
 
   test("a decision carries its unit and rule, and names one of the known action kinds", () => {

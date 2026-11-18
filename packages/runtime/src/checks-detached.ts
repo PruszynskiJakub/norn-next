@@ -43,12 +43,16 @@ export function checkOutcome(exits: Readonly<Record<string, string>>, code: numb
   return exits[String(code)] ?? "fail";
 }
 
+/** A unit's check exits and logs, each file named `<run>-<attempt>`, so a run's files are found by its id. */
+export const checkExitsDir = (ctx: HostContext, unit: string): string => `${ctx.repo.dataDir}/runtime/check-exits/${unit.replace("/", "-")}`;
+export const checkLogsDir = (ctx: HostContext, unit: string): string => `${ctx.repo.dataDir}/runtime/check-logs/${unit.replace("/", "-")}`;
+
 export function checkExitPath(ctx: HostContext, unit: string, runId: string, attempt: number): string {
-  return `${ctx.repo.dataDir}/runtime/check-exits/${unit.replace("/", "-")}/${runId}-${attempt}.json`;
+  return `${checkExitsDir(ctx, unit)}/${runId}-${attempt}.json`;
 }
 
 export function checkLogPath(ctx: HostContext, unit: string, runId: string, attempt: number): string {
-  return `${ctx.repo.dataDir}/runtime/check-logs/${unit.replace("/", "-")}/${runId}-${attempt}.log`;
+  return `${checkLogsDir(ctx, unit)}/${runId}-${attempt}.log`;
 }
 
 export function checkPidPath(ctx: HostContext, unit: string, runId: string, attempt: number): string {

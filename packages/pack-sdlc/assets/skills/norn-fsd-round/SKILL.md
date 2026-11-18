@@ -39,9 +39,9 @@ You supervise the stories the person named, in this checkout, until each one's c
 - **Manual step** (`parked` is `agent.ready.manual`): `norn run start <unit>` once, only when the request named manual steps as yours; otherwise escalate it as the person's turn.
 - **Attended step** (a person works in the pane): escalate as the person's turn ("gh-203: refine needs you: `norn run start <unit>`") and wait for the round to move on.
 
-## What norn cannot do for you, so escalate
+## Sending work back: the person's, unless handed to you
 
-norn has no command to rerun a step, reset a counter or start a round, so these are always the person's, with what you found:
+`norn run rerun <unit> [--step <step>] [--reset <counter>]` runs a unit's step again or moves it to another step of its workflow (a slice included); `norn story round` starts a new round. A new round is always the person's. A rerun is the person's too unless the request handed reruns to you: then run it yourself, once per failure, with `--reason "fsd: <evidence>"` (`norn run rerun gh-201/02 --step test` after a suspected flake, `--step <to> --reset <counter>` for an exhausted loop). Otherwise escalate each case below with what you found and the rerun that would fix it:
 
 - **A stuck unit** (`parked` with any reason but `agent.ready.manual`, or `ended` with anything but `done`): read the unit's handoff and the check's output, find the cause, and escalate with it and a recommended fix.
 - **A loop exhausted**: escalate with each round's findings.
@@ -50,9 +50,9 @@ norn has no command to rerun a step, reset a counter or start a round, so these 
 
 ## Allowed and forbidden commands
 
-- Allowed: `norn story view`, `norn story list`, `norn status --json`, `norn story answer`, `norn story approve`, `norn story reject`, `norn run start` on a manual step the request named, `gh run cancel` on a hung run, `gh run rerun --failed`, and reading with `gh`; when the request named them, `gh pr merge --squash` and installing norn, pulling and restarting the watch.
+- Allowed: `norn story view`, `norn story list`, `norn status --json`, `norn story answer`, `norn story approve`, `norn story reject`, `norn run start` on a manual step the request named, `norn run rerun` when the request handed reruns to you, `gh run cancel` on a hung run, `gh run rerun --failed`, and reading with `gh`; when the request named them, `gh pr merge --squash` and installing norn, pulling and restarting the watch.
 - Forbidden: `norn brief`, `norn tick`, `norn watch` (unless the request named a watch restart), `norn run stop` (never to serialise work), `norn story close`, typing into a step pane, editing run data or a unit worktree, running tests in a unit worktree.
-- A command the agent's permission classifier refuses: never retry it another way. Hand the person the exact command (`! norn story approve gh-201 --reason "…"`) and the allow rule that lets you run it, e.g. for Claude Code `Bash(norn story approve:*)`, `Bash(norn story reject:*)`, `Bash(norn story answer:*)`, `Bash(norn run start:*)`. You never edit settings yourself.
+- A command the agent's permission classifier refuses: never retry it another way. Hand the person the exact command (`! norn story approve gh-201 --reason "…"`) and the allow rule that lets you run it, e.g. for Claude Code `Bash(norn story approve:*)`, `Bash(norn story reject:*)`, `Bash(norn story answer:*)`, `Bash(norn run start:*)`, `Bash(norn run rerun:*)`. You never edit settings yourself.
 
 ## What only the person decides (escalate)
 
@@ -61,8 +61,10 @@ Escalate, never act:
 - a merge, a release, an install or a watch restart the request did not name ("deliver gh-201" stops once `ready` has its `approve` and waits for the person's merge; "… and merge it" merges with a squash once CI is green on the final head);
 - force pushes, deleting a branch, a base conflict from rewritten history or a stale intake;
 - a spec question nothing written settles, and any change to the rules file (a plan that amends it is escalated before its gate gets an `approve`);
-- a stuck unit, an exhausted loop, a suspected flake, and anything else that needs a rerun;
+- a stuck unit, an exhausted loop, a suspected flake, and anything else that needs a rerun, unless the request handed reruns to you (then one `norn run rerun` per failure, as above); a new round (`norn story round`) always;
 - machine settings: config, the executors, the watch — escalate with the change and why;
+- a story another machine holds (its `claim` in `norn story view <story> --json` names another holder, or is null while a unit is still under way): moving it here is the person's, escalated with `norn story take <story> --force --reason "…"`; never take a claim yourself;
+- an open PR of a story whose round ended that conflicts with its base or lags it: updating it is the person's, escalated with `norn story update-branch <story> --reason "…"` (a conflict there is refused with its paths, and resolved by the round its `do_instead` names); never run it yourself;
 - closing an issue, and a workflow the skill does not know;
 - `release`'s `ready`: always the person's, with the version, its reason and the changelog section. When the request names install and restart: approve on their answer → wait for the merge and the publish → install → pull → restart the watch.
 

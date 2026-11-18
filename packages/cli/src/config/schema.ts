@@ -13,7 +13,11 @@ const Count = Type.Integer({ minimum: 0 });
 const NAME_PATTERN = "^[a-z0-9][a-z0-9._-]*$";
 const Name = Type.String({ pattern: NAME_PATTERN });
 
-export const Duration = Type.String({ pattern: "^[1-9][0-9]*(ms|s|m|h)$" });
+export const Duration = Type.String({ pattern: "^[1-9][0-9]*(ms|s|m|h|d)$" });
+
+/** How long tick traces are kept: a duration, or `keep` for every trace, forever. */
+export const TraceRetain = Type.Union([Duration, Type.Literal("keep")]);
+export const TraceKnobs = Type.Object({ retain: Type.Optional(TraceRetain) }, closed);
 
 /** `{use, ...its plugin's config}` */
 export const Slot = Type.Object({ use: Name }, open);
@@ -86,6 +90,7 @@ export const NornConfig = Type.Object(
     /** who this machine claims as; absent: user@host */
     holder: Type.Optional(NonEmpty),
     kernel: Type.Optional(KernelKnobs),
+    trace: Type.Optional(TraceKnobs),
   },
   { ...closed, title: "NornConfig" },
 );
@@ -121,6 +126,7 @@ export const ConfigLayer = Type.Object(
     base_ref: Type.Optional(NonEmpty),
     holder: Type.Optional(NonEmpty),
     kernel: Type.Optional(KernelKnobs),
+    trace: Type.Optional(TraceKnobs),
   },
   { ...closed, title: "NornConfigLayer" },
 );

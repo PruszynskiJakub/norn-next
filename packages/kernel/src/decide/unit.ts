@@ -47,8 +47,9 @@ export function decideUnit(story: StoryFacts, unit: UnitFacts, ctx: DecideContex
   // a unit's first run state comes from its story: the round start, or the slices step
   if (!state) return unit.id === story.key ? null : { kind: "noop", unit: unit.id, rule: "slice.not_started", reason: "started by the story's slices step" };
   if (state.ended === "corrupt") return { kind: "noop", unit: unit.id, rule: "unit.corrupt.held", reason: state.ended_reason ?? "corrupt" };
-  // a new round is applied by the story rules, which pin its workflow
-  if (unit.receipts.some((r) => r.data.kind === "round.started")) return null;
+  // a new round is applied by the story rules, which pin its workflow, and so is a person's move,
+  // which stops a live run before it applies
+  if (unit.receipts.some((r) => r.data.kind === "round.started" || r.data.kind === "step.moved")) return null;
   const graph = ctx.workflows.byHash[state.workflow.hash]?.graph;
   if (!graph) return markCorrupt(unit, "unit.workflow_missing", `pinned workflow ${state.workflow.name} (${state.workflow.hash}) is not loaded`, ctx);
   const step = graph.steps[state.step];

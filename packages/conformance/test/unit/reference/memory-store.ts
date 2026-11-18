@@ -112,7 +112,7 @@ function makeStore(b: Backing, now: () => string, racy: boolean): Store {
 
   const store: Store = {
     name: "memory",
-    capabilities: { shared: false, claims: "local", mailbox: true, artifacts: true },
+    capabilities: { shared: false, claims: "local", mailbox: true, artifacts: true, takeover: true },
     listUnits: async (q = {}) => {
       if (q.story !== undefined && !isStoryUnit(q.story)) return invalid(`not a story: ${q.story}`);
       await yieldOnce();
@@ -189,6 +189,24 @@ function makeStore(b: Backing, now: () => string, racy: boolean): Store {
             if (expectVersion !== undefined && (c?.version ?? null) !== expectVersion) return conflict<ClaimRecord | null>(`claim is at ${c?.version ?? null}`);
             if (c && c.holder !== holder && !expired(c, now())) return conflict<ClaimRecord | null>(`${c.holder} holds ${story}`);
             return ok(c);
+          },
+          (c) => {
+            const at = now();
+            const mine = c !== null && c.holder === holder && !expired(c, at);
+            const next: ClaimRecord = { story, holder, acquired_at: mine ? c.acquired_at : at, expires_at: plus(at, ttlMs), version: (c?.version ?? 0) + 1 };
+            b.claims.set(story, next);
+            return ok({ ...next });
+          },
+        );
+      },
+      takeOver: async (story, holder, ttlMs, expectVersion) => {
+        if (!isStoryUnit(story)) return invalid(`not a story: ${story}`);
+        if (typeof holder !== "string" || !holder) return invalid("a claim needs a holder");
+        if (badTtl(ttlMs)) return invalid(`bad claim duration ${ttlMs}`);
+        return guarded(
+          () => {
+            const c = b.claims.get(story) ?? null;
+            return (c?.version ?? null) === expectVersion ? ok(c) : conflict<ClaimRecord | null>(`claim is at ${c?.version ?? null}`);
           },
           (c) => {
             const at = now();

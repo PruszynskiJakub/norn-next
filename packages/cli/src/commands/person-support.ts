@@ -4,8 +4,8 @@
  * the next tick applies it, so routing stays in the kernel.
  */
 import type { UnitJournal } from "@norn/kernel";
-import { STORE_ID_PATTERN } from "@norn/plugin-api";
-import type { RuntimeEnv } from "@norn/runtime";
+import { parseStoryKey, STORE_ID_PATTERN } from "@norn/plugin-api";
+import { branchOf, type RuntimeEnv } from "@norn/runtime";
 import { corruptError, failure, refuse } from "../output.ts";
 
 /** `gh-12` names the story and its slices; `gh-12/03` names that one unit. */
@@ -44,6 +44,18 @@ export function receiptId(...parts: string[]): string {
   return STORE_ID.test(id) ? id : `r${id.slice(0, 127)}`;
 }
 
+/**
+ * Fetch other machines' writes before a person verb reads a story's record or claim and writes beside
+ * it: a clone behind the remote would refuse on a round that ended there, or append at a seq the remote
+ * already used, and its later flushes would be refused for good. `retry` is the verb to run again.
+ */
+export async function syncStore(env: RuntimeEnv, key: string, retry: string): Promise<void> {
+  const store = env.slots.store;
+  if (!store.capabilities.shared || !store.sync) return;
+  const got = await store.sync();
+  if (!got.ok) throw failure(`cannot sync the run data of ${key}: ${got.failure.message}`, `${retry} again once the remote is reachable`, got.failure.code);
+}
+
 /** Several units match: the person names the one meant. */
 export function ambiguous(what: string, units: readonly string[], retry: (unit: string) => string): never {
   throw refuse(`${what}: ${units.join(", ")}`, units.map(retry).join(" | "), "ambiguous", { units });
@@ -51,3 +63,18 @@ export function ambiguous(what: string, units: readonly string[], retry: (unit: 
 
 /** The park `norn run stop` records; an answer to it is what sets the stopped run going again. */
 export const stopParkId = (runId: string): string => receiptId("park", "stop", runId);
+
+/** A merged change or a closed item ends any round at once, and any unit taken up again, so new work there is a new story. */
+export async function refuseFinished(env: RuntimeEnv, key: string, what = "a new round"): Promise<void> {
+  const changes = await env.slots.forge.findChanges([branchOf(key)]);
+  if (!changes.ok) throw failure(`cannot read the change of ${key}: ${changes.failure.message}`, "try again", changes.failure.code);
+  const change = changes.value[branchOf(key)];
+  if (change?.state === "merged")
+    throw refuse(`the change of ${key}${change.url ? ` (${change.url})` : ""} merged; ${what} would end at once`, 'norn story create "<title>" for the new work', "change_merged");
+  const tracker = env.slots.tracker;
+  const parsed = parseStoryKey(key, tracker.keyPrefix);
+  if (!parsed) return;
+  const item = await tracker.get(parsed.id);
+  if (!item.ok) throw failure(`cannot read ${key}: ${item.failure.message}`, "try again", item.failure.code);
+  if (item.value && !item.value.open) throw refuse(`the item of ${key} is closed; ${what} would end at once`, 'norn story create "<title>" for the new work', "item_closed");
+}

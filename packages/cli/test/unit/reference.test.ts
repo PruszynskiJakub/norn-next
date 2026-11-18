@@ -42,7 +42,7 @@ describe("reference render", () => {
   });
 
   test("a duration is spelled in the largest unit that divides it", () => {
-    expect([durationText(900_000), durationText(3_600_000), durationText(400_000), durationText(1_500)]).toEqual(["15m", "1h", "400s", "1500ms"]);
+    expect([durationText(900_000), durationText(3_600_000), durationText(400_000), durationText(1_500), durationText(604_800_000)]).toEqual(["15m", "1h", "400s", "1500ms", "7d"]);
   });
 
   test("the shipped workflows and every exit code with its meaning", () => {

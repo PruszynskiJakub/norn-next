@@ -178,6 +178,18 @@ describe("git vcs worktrees", () => {
     expect(h.calls.at(-1)).toEqual(["git", "worktree", "add", "--quiet", "-b", "gh-12-login", `${DATA}/worktrees/gh-12`, "origin/main"]);
   });
 
+  test("ensure cuts a branch this clone lacks from the remote's copy, which another machine pushed", async () => {
+    const h = gitHost([
+      ["worktree prune", {}],
+      ["worktree list", listing()],
+      ["rev-parse --verify --quiet --end-of-options refs/heads/", { code: 1 }],
+      ["rev-parse --verify --quiet --end-of-options refs/remotes/upstream/gh-12-login", { stdout: SHA }],
+      ["worktree add", {}],
+    ]);
+    expect((await vcsOf(h.ctx, "upstream").worktree.ensure("gh-12", "gh-12-login", "origin/main")).ok).toBe(true);
+    expect(h.calls.at(-1)).toEqual(["git", "worktree", "add", "--quiet", "-b", "gh-12-login", `${DATA}/worktrees/gh-12`, "refs/remotes/upstream/gh-12-login"]);
+  });
+
   test("ensure checks out an existing branch as it is, and finds a worktree already there", async () => {
     const add = gitHost([
       ["worktree prune", {}],

@@ -35,4 +35,5 @@ export { type DecideContext, decideContext, Decisions } from "./decide/context.t
 export { decide } from "./decide/index.ts";
 export { decideUnit } from "./decide/unit.ts";
 export { decideIntake, decideStory, decideStoryTail } from "./decide/story.ts";
+export { loadProblem } from "./decide/story-unit.ts";
 export { RULE_IDS } from "./decide/rules.ts";

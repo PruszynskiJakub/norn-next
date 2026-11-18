@@ -103,6 +103,10 @@ export function storeProblems(value: unknown): string[] {
     if (caps[part] === true) out.push(...partProblems(v, part));
     else if (caps[part] === false && v[part] !== undefined) out.push(`offers ${part} its capabilities deny`);
   }
+  if (caps.takeover !== undefined && typeof caps.takeover !== "boolean") out.push("capability takeover must be a boolean");
+  const takeOver = (v.claims as Loose | null | undefined)?.takeOver;
+  if (caps.takeover === true && typeof takeOver !== "function") out.push("claims lacks takeOver its capabilities offer");
+  else if (caps.takeover !== true && takeOver !== undefined) out.push("offers claims.takeOver its capabilities deny");
   for (const m of ["sync", "flush"] as const) {
     if (v[m] !== undefined && typeof v[m] !== "function") out.push(`${m} must be a function`);
     else if (caps.shared === true && typeof v[m] !== "function") out.push(`a shared store lacks ${m}`);

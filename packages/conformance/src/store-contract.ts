@@ -50,6 +50,8 @@ export type StoreContractTest =
   | "claims: another holder is refused until the claim expires"
   | "claims: expectVersion guards acquire"
   | "racing acquirers: exactly one holds the claim"
+  | "claims: takeOver moves a claim at the expected version, live or not"
+  | "racing takeovers: exactly one holds the claim"
   | "mailbox: send is idempotent by id, receive keeps send order, ack removes"
   | "racing senders all land, once each"
   | "artifacts round-trip, list sorted and normalized, remove a missing one is fine"
@@ -313,6 +315,39 @@ export function storeContract(name: string, makeWorld: () => StoreWorld | Promis
       const read = valueOf(await st.claims.read(UNIT));
       const retake = await Promise.all(Array.from({ length: RACERS }, (_, i) => racer(i).claims.acquire(UNIT, `late-${i}`, 60_000, read?.version)));
       expect(retake.filter((r) => r.ok)).toHaveLength(1);
+    });
+
+    t("claims: takeOver moves a claim at the expected version, live or not", async () => {
+      const { world, st, claim } = await made();
+      if (!st.capabilities.takeover) return;
+      const takeOver = need("claims.takeOver", st.claims.takeOver);
+      expect(failureOf(await takeOver(UNIT, "machine-a", 60_000, 1)).code).toBe("conflict");
+      const free = claim(valueOf(await takeOver(UNIT, "machine-a", 60_000, null)));
+      expect(free).toMatchObject({ holder: "machine-a", acquired_at: world.now() });
+      world.advance(1_000);
+      expect(failureOf(await takeOver(UNIT, "machine-b", 60_000, null)).code).toBe("conflict");
+      expect(failureOf(await takeOver(UNIT, "machine-b", 60_000, free.version + 1)).code).toBe("conflict");
+      expect(valueOf(await st.claims.read(UNIT))).toEqual(free);
+      const live = claim(valueOf(await takeOver(UNIT, "machine-b", 30_000, free.version)));
+      expect(live).toMatchObject({ holder: "machine-b", acquired_at: world.now(), expires_at: plusMs(world.now(), 30_000) });
+      expect(live.version).toBeGreaterThan(free.version);
+      expect(failureOf(await st.claims.renew(UNIT, "machine-a", 60_000)).code).toBe("conflict");
+      world.advance(1_000);
+      const mine = claim(valueOf(await takeOver(UNIT, "machine-b", 30_000, live.version)));
+      expect(mine.acquired_at).toBe(live.acquired_at);
+      world.advance(60_000);
+      expect(claim(valueOf(await takeOver(UNIT, "machine-a", 60_000, mine.version))).acquired_at).toBe(world.now());
+    });
+
+    t("racing takeovers: exactly one holds the claim", async () => {
+      const { st, racer } = await made();
+      if (!st.capabilities.takeover) return;
+      const held = valueOf(await st.claims.acquire(UNIT, "machine-a", 60_000));
+      const answers = await Promise.all(Array.from({ length: RACERS }, (_, i) => need("claims.takeOver", racer(i).claims.takeOver)(UNIT, `person-${i}`, 60_000, held.version)));
+      const won = answers.flatMap((r, i) => (r.ok ? [i] : []));
+      expect(won).toHaveLength(1);
+      for (const r of answers) if (!r.ok) expect(r.failure.code).toBe("conflict");
+      expect(valueOf(await st.claims.read(UNIT))?.holder).toBe(`person-${won[0]}`);
     });
 
     t("mailbox: send is idempotent by id, receive keeps send order, ack removes", async () => {

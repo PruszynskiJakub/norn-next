@@ -139,7 +139,7 @@ norn status
 
 ##### `norn story` (noun)
 
-Stories: list, view, create, and the person's decisions
+Stories: list, view, create, the person's decisions, the next round, taking one to this machine, and updating a finished one's branch
 
 ##### `norn story list`
 
@@ -198,6 +198,40 @@ Answer the question a story's agent asked
 norn story answer <key> <text>
 ```
 
+##### `norn story round`
+
+Start a story's next round on a workflow
+
+```sh
+norn story round <key> --workflow <name> [--at <step>] [--force] [--reason <text>]
+```
+
+- `--workflow <name>`: the workflow the round runs, pinned as it loads now
+- `--at <step>`: the step the round starts at (default: the workflow's start)
+- `--force`: end the round still under way first
+- `--reason <text>`: why, kept on the record
+
+##### `norn story take`
+
+Take a story's claim to this machine, so its next tick carries the story on
+
+```sh
+norn story take <key> [--force] [--reason <text>]
+```
+
+- `--force`: take over a claim another machine holds, live or expired
+- `--reason <text>`: why, kept on the record
+
+##### `norn story update-branch`
+
+Merge the base into a finished story's branch and push it, for its open change
+
+```sh
+norn story update-branch <key> [--reason <text>]
+```
+
+- `--reason <text>`: why, kept on the record
+
 ##### `norn story close`
 
 Close a story and stop its runs
@@ -208,7 +242,7 @@ norn story close <key>
 
 ##### `norn run` (noun)
 
-Agent runs: start one manual mode holds, stop a live one
+Runs: start one manual mode holds, stop a live one, run a step again
 
 ##### `norn run start`
 
@@ -225,6 +259,18 @@ Stop a unit's live run
 ```sh
 norn run stop <unit>
 ```
+
+##### `norn run rerun`
+
+Run a unit's step again, or move it to another step, counters reset
+
+```sh
+norn run rerun <unit> [--step <step>] [--reset <counter>]... [--reason <text>]
+```
+
+- `--step <step>`: the step of the unit's pinned workflow to run (default: the step it is at)
+- `--reset <counter>`: set a counter of the workflow back to 0 (repeatable)
+- `--reason <text>`: why, kept on the record
 
 #### Background: run by a person, cron or a terminal multiplexer
 
@@ -349,6 +395,7 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `kernel.counters.conflict` | integer ≥ 1 | `2` |
 | `kernel.counters.stale` | integer ≥ 1 | `10` |
 | `kernel.counters.agent_back` | integer ≥ 1 | `3` |
+| `trace.retain` | duration or `"keep"` | `"7d"` |
 
 Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner` take the keys of the plugin they name; that plugin checks them.
 

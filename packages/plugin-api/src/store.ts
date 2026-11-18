@@ -151,6 +151,8 @@ export interface StoreCapabilities {
   mailbox: boolean;
   /** the store offers `artifacts` */
   artifacts: boolean;
+  /** `claims.takeOver` is offered (plugin API 1.8): a person can move a story's claim from another holder to this machine */
+  takeover?: boolean;
 }
 
 export interface ListUnitsQuery {
@@ -182,6 +184,13 @@ export interface StoreClaims {
   renew(story: string, holder: string, ttlMs: number): Promise<PluginResult<ClaimRecord>>;
   /** Give the claim up; `conflict` when another holds it, and releasing a claim nobody holds is not an error. */
   release(story: string, holder: string): Promise<PluginResult<null>>;
+  /**
+   * A person's takeover: give the claim to `holder` for `ttlMs` from now whoever holds it and whether
+   * or not it expired, as long as it is still at `expectVersion` (null: no claim held); otherwise
+   * `conflict`. `acquired_at` is now unless `holder` already held a live claim. Offered exactly when
+   * `capabilities.takeover` is true.
+   */
+  takeOver?(story: string, holder: string, ttlMs: number, expectVersion: number | null): Promise<PluginResult<ClaimRecord>>;
 }
 
 export interface NewMessage {

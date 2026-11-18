@@ -43,6 +43,17 @@ describe("git vcs over real git", () => {
     expect(again.ok ? null : again.failure.code).toBe("conflict");
   });
 
+  test("with abortOnConflict a conflicting merge reports its paths and leaves the branch and worktree as they were", async () => {
+    const w = await world();
+    const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));
+    const own = await commit(path, "story edit", { "shared.txt": "one\nstory\nthree\n" });
+    await moveBase(w, { "shared.txt": "one\nbase\nthree\n" });
+    expect(value(await w.vcs.merge("gh-12-login", "origin/main", { abortOnConflict: true }))).toEqual({ conflict: { files: ["shared.txt"] } });
+    expect(await git(path, "rev-parse", "--git-path", "MERGE_HEAD").then((p) => existsSync(join(path, p)) || existsSync(p))).toBe(false);
+    expect(await git(path, "rev-parse", "HEAD")).toBe(own);
+    expect(await git(path, "status", "--porcelain")).toBe("");
+  });
+
   test("push with a lease lands on the bare remote, and a stale lease never overwrites a person's push", async () => {
     const w = await world();
     const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));

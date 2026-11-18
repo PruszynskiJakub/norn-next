@@ -41,12 +41,12 @@ back as the unit's `corrupt_marked` fact.
 | `claim.reacquire` | `claim` | `claim.reacquire` | `claim` (expect_version of this machine's expired claim), with `claim.pending` for every unit |
 | `claim.reacquire.merged` | `claim` | dropped: a merged change ends the story (`story.change_merged`), which needs no claim to read | |
 | `claim.renew` | `claim` | `claim.renew` | `renew_claim` (a story action: the units keep their action of the tick) |
-| `claim.other` | `noop` | `claim.held_elsewhere` | `noop` for every unit; another holder's expired claim is left to a person too |
+| `claim.other` | `noop` | `claim.held_elsewhere` | `noop` for every unit; another holder's expired claim is left to a person too, who moves it with `norn story take --force` (the store's `claims.takeOver`, recorded as a `claim.taken` receipt on the story's own unit, applied as a no-op to the run state wherever the unit stands) |
 | `claim.corrupt` | `noop` | dropped: a store validates its own claim envelope and answers a failure, never a corrupt claim | |
-| `claim.unclaimed` | `noop` | `claim.none` | `noop` for every unit (in progress and unclaimed: a person takes it over) |
+| `claim.unclaimed` | `noop` | `claim.none` | `noop` for every unit (in progress and unclaimed: a person takes it over with `norn story take`, recorded as `claim.taken`) |
 | (none) | | `claim.pending` | `noop` (the claim is taken or reacquired this tick; units wait for it) |
 | (none) | | `claim.release` | `release_claim` (nothing of the story is left open) |
-| (none) | | `story.finish` | `finish_story` before `release_claim`: remove the worktrees of units that ended done; close the item when the story ended done, the item is open and `capabilities.tracker.close` |
+| (none) | | `story.finish` | `finish_story` before `release_claim`: remove the worktrees of units that ended done; close the item when the story ended done, its change merged, the item is open and `capabilities.tracker.close` |
 | `story.finished` | `noop` | `story.ended` | `noop` |
 | `story.corrupt` | `mark_corrupt` | `unit.corrupt` | `mark_corrupt` (each unit whose record fails validation, once: its `unit.marked` receipt is read back as `corrupt_marked`; there is no story-wide record to fail) |
 | `story.record_only` | `noop` | dropped: a record without a branch is an old-layout case; the store holds the record | |
@@ -78,9 +78,12 @@ back as the unit's `corrupt_marked` fact.
 |---|---|---|---|
 | `mailbox.import` | `import_mailbox` | `mailbox.import` | `import_mailbox` (letters that validate and name a unit of the story) |
 | `mailbox.reject` | `reject_receipt` | `mailbox.reject` | `import_mailbox` (a letter failing `MailboxLetter` is acknowledged and recorded as `receipt.rejected`) |
-| `round.start` | `round_start` | `round.start` | `apply_receipts` (`round.started` and the new run state) |
+| `round.start` | `round_start` | `round.start` | `apply_receipts` (`round.started` and the new run state, entered at its `at` step or the workflow's start, an `at` the workflow lacks refused onto the record; written by `norn story round`, which first records `unit.marked` stuck when `--force` ends a round under way) |
 | `round.reject` | `reject_receipt` | `receipts.reject` | `apply_receipts` (rejected: a `round.started` written for another step or attempt) |
 | `round.workflow_changed` | `reject_receipt` | `round.workflow_invalid` | `apply_receipts` (rejected: the round pins a workflow decide cannot load) |
+| (none) | | `unit.move` | `apply_receipts` (a person's `step.moved`, written by `norn run rerun`: the unit enters the step as a fresh visit with no run and no park, the named counters at 0, a unit that ended stuck taken up again; a `stop.sent` that follows it for the run it takes off the record is applied with it) |
+| (none) | | `unit.move.stop` | `stop_run` (with a `stop.sent` intent) when the unit's run may still be going, before the move is applied the next tick; a move apply would refuse (a unit that ended done, another visit, a step or counter the pinned workflow lacks, a story whose change merged or item closed) is refused at once as `receipts.reject` |
+| (none: the old `norn story update-branch` sent the story back through its update step) | | `receipts.apply` | `apply_receipts` (a person's `branch.update` intent and its `branch.updated` outcome, written by `norn story update-branch` under the story's claim through the act protocol: the intent before it merges the base into the branch of a story whose round ended, the outcome after the push; both applied as no-ops wherever the unit stands, so the story finishes again, the worktree of a unit that ended done removed, and gives its claim up. An intent with no outcome is an update cut short, which the next run of the verb finishes under the same intent) |
 | `story.start` | `start_unit` | `round.start` | `apply_receipts` (`round.started`, `newRunState`) |
 | `start.workflow_invalid` | `mark_corrupt` | `round.workflow_invalid` | `park` (inbox `workflow`: the workflow fails to load, a `missing_kind` named) |
 | `start.no_worktree` | `noop` | dropped: the host makes the worktree as part of the act; decide does not see worktrees | |
@@ -266,7 +269,7 @@ New rule ids: `agent.died.route`, `agent.died.manual`, `agent.died.retry`, `agen
 | `notify` | `notify` (declared for the host's inbox; no rule emits it yet, since every inbox item travels on the `park` that raises it) |
 | `update_story_mirror` | dropped: tracker display, mirrored by the host after a commit |
 | `retitle_pr` | dropped: forge display, set by the `open-pr` step kind |
-| `cleanup_merged_story` | `mark_done`, then `finish_story` (done worktrees removed, the item closed) and `release_claim` |
+| `cleanup_merged_story` | `mark_done`, then `finish_story` (done worktrees removed, the item closed) and `release_claim`; a round that ends done with no merged change is finished too, its item left open for the next round |
 | `close_story` | `apply_receipts` (`unit.marked`), then `release_claim`; a stuck unit keeps its worktree |
 | `round_migrate` | dropped: old on-disk layout |
 | `round_start` | `apply_receipts` (`round.started`) |

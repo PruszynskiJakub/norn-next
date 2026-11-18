@@ -9,6 +9,7 @@ import { deriveUlid } from "@norn/schema";
 import { ensureWorktree } from "./branches.ts";
 import type { TickContext } from "./env.ts";
 import { mirrorSpec } from "./inputs.ts";
+import { removeUnitLogs } from "./retention.ts";
 
 /**
  * Ids the host derives for receipts no decision carries, offset past any decide can mint from the
@@ -95,8 +96,8 @@ export async function flush(t: TickContext, d: DecisionOf<"flush">): Promise<Plu
 }
 
 /**
- * The item is closed first and the worktrees after: a closed item is what a person sees, and a
- * worktree left behind by a failure is only disk. Both are idempotent (closing a closed item,
+ * The item is closed first, the worktrees after and the units' logs last: a closed item is what a
+ * person sees, and a worktree left behind by a failure is only disk. Both are idempotent (closing a closed item,
  * removing a missing worktree), so a failure is carried out again whole next tick under that
  * tick's id; the tick keeps the claim until it succeeds.
  */
@@ -119,5 +120,13 @@ export async function finishStory(t: TickContext, d: DecisionOf<"finish_story">)
       removed.push(unit);
     }
   }
-  return ok({ closed, removed });
+  // the logs last, once no worktree is left whose agent could still write them; a log left behind is
+  // only disk, so it is reported and never fails the finish, which would keep the claim for it
+  let logs = 0;
+  for (const unit of d.worktrees) {
+    const gone = await removeUnitLogs(env, unit);
+    logs += gone.removed;
+    t.problems?.push(...gone.problems);
+  }
+  return ok({ closed, removed, logs_removed: logs });
 }

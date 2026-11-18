@@ -20,6 +20,14 @@ export interface VcsCapabilities {
 /** A merge that went through (the branch's new head), or one that stopped on conflicts; a conflict is data, never a failure. */
 export type VcsMergeOutcome = { head: string } | { conflict: { files: string[] } };
 
+export interface VcsMergeOptions {
+  /**
+   * on a conflict, abort the merge so the branch and its worktree are as they were before it began;
+   * the outcome still names the conflicting paths. For a one-off update nobody stands by to resolve
+   */
+  abortOnConflict?: boolean;
+}
+
 export interface VcsPushOptions {
   /**
    * the commit the remote branch is expected at; the push refuses (`conflict`) when it has moved, so
@@ -29,7 +37,7 @@ export interface VcsPushOptions {
 }
 
 export interface VcsWorktrees {
-  /** make the unit's worktree on `branch` (cut from `base` when the branch is new), or find the one there */
+  /** make the unit's worktree on `branch` (when the branch is new, cut from the remote's copy of it if there is one, else from `base`), or find the one there */
   ensure(unit: string, branch: string, base: string): Promise<PluginResult<{ path: string }>>;
   /** remove the unit's worktree; removing a missing one is not an error */
   remove(unit: string): Promise<PluginResult<void>>;
@@ -47,8 +55,8 @@ export interface Vcs {
   isAncestor(a: string, b: string): Promise<PluginResult<boolean>>;
   /** the newest commit both refs reach, or null when they share none */
   mergeBase(a: string, b: string): Promise<PluginResult<string | null>>;
-  /** merge `from` into `branch` in the branch's worktree, never rebasing; a conflict leaves the merge in progress */
-  merge(branch: string, from: string): Promise<PluginResult<VcsMergeOutcome>>;
+  /** merge `from` into `branch` in the branch's worktree, never rebasing; a conflict leaves the merge in progress unless `abortOnConflict` */
+  merge(branch: string, from: string, opts?: VcsMergeOptions): Promise<PluginResult<VcsMergeOutcome>>;
   /**
    * the paths merging `from` into `into` would conflict on, empty when it merges clean: a trial that
    * moves no branch and touches no worktree. Optional; without it a host cannot tell a base move

@@ -6,7 +6,7 @@
 import type { KernelReceipt, ReceiptData, ReceiptDataOf } from "../model/receipts.ts";
 import type { RunState } from "../model/run-state.ts";
 import { type CompiledStep, OVERRIDABLE_OUTCOMES, type WorkflowGraph } from "../workflow/graph.ts";
-import { endStuck, takeRoute, type Taken } from "./route.ts";
+import { endStuck, enterStep, takeRoute, type Taken } from "./route.ts";
 
 export type OneApplied = { reject: string } | { state: RunState; taken?: { outcome: string } & Taken };
 
@@ -17,9 +17,11 @@ const UNBOUND: ReadonlySet<ReceiptData["kind"]> = new Set(["mode.changed", "roun
 
 export function applyOne(state: RunState, r: KernelReceipt, graph: WorkflowGraph): OneApplied {
   const d = r.data;
-  if (d.kind === "receipt.rejected") return { state };
-  if (d.kind === "round.started") return { state: roundStarted(state, d, graph) };
+  // records of who holds the story and of a person's update of its branch, applied wherever the unit stands, ended or corrupt
+  if (d.kind === "receipt.rejected" || d.kind === "claim.taken" || d.kind === "branch.update" || d.kind === "branch.updated") return { state };
+  if (d.kind === "round.started") return roundStarted(state, d, graph);
   if (state.ended === "corrupt") return { reject: "the unit is corrupt" };
+  if (d.kind === "step.moved") return stepMoved(state, d, graph);
   if (d.kind === "mode.changed") return { state: { ...state, mode: d.mode } };
   if (d.kind === "unit.marked") return { state: marked(state, d) };
   if (state.ended !== undefined) return { reject: `the unit ended ${state.ended}` };
@@ -202,14 +204,19 @@ function marked(state: RunState, d: ReceiptDataOf<"unit.marked">): RunState {
   return next;
 }
 
-/** A new round: the workflow the receipt pins, entered at its start with every counter at 0. */
-function roundStarted(state: RunState, d: ReceiptDataOf<"round.started">, graph: WorkflowGraph): RunState {
+/**
+ * A new round: the workflow the receipt pins, entered at its `at` step (its start step when absent)
+ * with every counter at 0. An `at` the workflow has no step of is refused, never moved to the start.
+ */
+function roundStarted(state: RunState, d: ReceiptDataOf<"round.started">, graph: WorkflowGraph): OneApplied {
+  const step = d.at ?? graph.start;
+  if (!graph.steps[step]) return { reject: `workflow ${graph.name} has no step ${step}` };
   const next: RunState = {
     format: state.format,
     unit: state.unit,
     story: state.story,
     workflow: structuredClone(d.workflow),
-    step: graph.start,
+    step,
     attempt: 1,
     counters: Object.fromEntries(Object.keys(graph.counters).map((name) => [name, 0])),
     retries_used: 0,
@@ -217,5 +224,28 @@ function roundStarted(state: RunState, d: ReceiptDataOf<"round.started">, graph:
     applied_through: state.applied_through,
   };
   if (state.mode !== undefined) next.mode = state.mode;
-  return next;
+  return { state: next };
+}
+
+/**
+ * A person's move: the unit enters step `to` as a new visit, with no run, no park and the named
+ * counters at 0, and a unit that ended stuck is taken up again. One that ended done is refused: what
+ * it finished is on the record, and new work there is a new round. A step or counter the pinned
+ * workflow lacks is refused, never guessed at, and so is a move written for another visit, since the
+ * person chose it from where the unit stood.
+ */
+function stepMoved(state: RunState, d: ReceiptDataOf<"step.moved">, graph: WorkflowGraph): OneApplied {
+  if (state.ended === "done") return { reject: "the unit ended done; a new round takes it further" };
+  if ((d.step !== undefined && d.step !== state.step) || (d.attempt !== undefined && d.attempt !== state.attempt))
+    return { reject: `stale: written for ${d.step ?? state.step}#${d.attempt ?? state.attempt}, the unit is at ${state.step}#${state.attempt}` };
+  if (!graph.steps[d.to]) return { reject: `workflow ${graph.name} has no step ${d.to}` };
+  const reset = d.reset ?? [];
+  const unknown = reset.filter((name) => !graph.counters[name]);
+  if (unknown.length) return { reject: `workflow ${graph.name} has no counter ${unknown.join(", ")}` };
+  const counters = { ...state.counters, ...Object.fromEntries(reset.map((name) => [name, 0])) };
+  const next = enterStep({ ...state, counters }, d.to);
+  delete next.ended;
+  delete next.ended_reason;
+  delete next.exhausted;
+  return { state: next };
 }

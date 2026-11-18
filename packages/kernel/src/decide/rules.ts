@@ -31,6 +31,8 @@ export const RULE_IDS: readonly string[] = [
   "story.change_closed",
   "round.start",
   "round.workflow_invalid",
+  "unit.move",
+  "unit.move.stop",
   "slices.start",
   "slices.wait",
   "slices.done",

@@ -39,6 +39,7 @@ storeContract("memory reference that checks before it yields", () => memoryStore
     "racing appends of one id land once": "one id lands twice",
     "racing committers against one version: exactly one wins": "every committer wins",
     "racing acquirers: exactly one holds the claim": "every acquirer holds the claim",
+    "racing takeovers: exactly one holds the claim": "every person takes the claim",
     "racing senders all land, once each": "a message lands twice",
   },
 });

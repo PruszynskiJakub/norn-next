@@ -261,6 +261,29 @@ describe("applyReceipts: refusals", () => {
     expect(res.applied).toEqual([2, 3]);
   });
 
+  test("a claim takeover is applied as the record it is, wherever the unit stands, ended or corrupt", () => {
+    const taken: ReceiptData = { kind: "claim.taken", from: "machine-a", to: "machine-b", version: 3, by: "machine-b" };
+    const going = apply(fresh(), journal(1, started("a1"))).state;
+    const res = apply(going, journal(2, taken));
+    expect(res).toMatchObject({ rejected: [], applied: [2] });
+    expect(res.state).toEqual({ ...going, applied_through: 2 });
+    for (const ended of ["stuck", "done", "corrupt"] as const) {
+      const state = apply(fresh(), journal(1, { kind: "unit.marked", ended })).state;
+      expect(apply(state, journal(2, taken))).toMatchObject({ rejected: [], applied: [2], state: { ended, applied_through: 2 } });
+    }
+  });
+
+  test("a person's branch update, its intent and its outcome, is applied as the record it is, wherever the unit stands, ended or corrupt", () => {
+    const intent: ReceiptData = { kind: "branch.update", base: "origin/main", base_sha: "b1", from: "h1", merge: true, by: "ann" };
+    const updated: ReceiptData = { kind: "branch.updated", base: "origin/main", base_sha: "b1", merged: true, from: "h1", head: "h2", pushed: true, by: "ann" };
+    const going = apply(fresh(), journal(1, started("a1"))).state;
+    expect(apply(going, journal(2, intent, updated))).toMatchObject({ rejected: [], applied: [2, 3], state: { ...going, applied_through: 3 } });
+    for (const ended of ["stuck", "done", "corrupt"] as const) {
+      const state = apply(fresh(), journal(1, { kind: "unit.marked", ended })).state;
+      expect(apply(state, journal(2, intent, updated))).toMatchObject({ rejected: [], applied: [2, 3], state: { ended, applied_through: 3 } });
+    }
+  });
+
   test("a second run on the same attempt is refused; only a counted retry replaces a run", () => {
     const state = apply(fresh(), journal(1, started("a1"))).state;
     const res = apply(state, journal(2, started("a2"), started("a3", { retry_of: "a1" })));
@@ -376,8 +399,70 @@ describe("applyReceipts: replay and workflows", () => {
     expect(res.state.ended_reason).toBeUndefined();
   });
 
+  test("a new round names the step it enters; one the workflow has no step of is refused", () => {
+    const next = graphOf(OTHER_HASH);
+    const ended = apply(atTest(), journal(4, { kind: "unit.marked", ended: "done" })).state;
+    const pinned = workflowOf(next).pinned;
+    const res = apply(ended, journal(5, { kind: "round.started", workflow: pinned, at: "review", by: "a-person", reason: "rework the review" }), next);
+    expect(res.state).toMatchObject({ step: "review", attempt: 1, counters: { "test.fail": 0 }, workflow: { hash: OTHER_HASH } });
+    const bad = apply(ended, journal(5, { kind: "round.started", workflow: pinned, at: "nowhere" }), next);
+    expect(bad.rejected).toEqual([{ seq: 5, reason: "workflow story has no step nowhere" }]);
+    expect(bad.state).toMatchObject({ ended: "done", workflow: { hash: HASH } });
+  });
+
   test("the story's mode follows a mode change wherever the unit is", () => {
     expect(apply(fresh(), journal(1, { kind: "mode.changed", mode: "auto", by: "a-person" })).state.mode).toBe("auto");
+  });
+});
+
+describe("applyReceipts: a person's move", () => {
+  const moved = (to: string, at: { step: string; attempt: number }, extra: { reset?: string[]; reason?: string } = {}): ReceiptData => ({ kind: "step.moved", to, by: "a-person", ...extra, ...at });
+
+  /** The check failed until test.fail ran out: the unit ended stuck at test attempt 3. */
+  function stuckOnCounter(): RunState {
+    const res = apply(
+      atTest(),
+      journal(4, checked("c1", "fail"), started("a2"), reported("a2", "done"), checkRun("c2"), checked("c2", "fail"), started("a3"), reported("a3", "done"), checkRun("c3"), checked("c3", "fail")),
+    );
+    expect(res.state).toMatchObject({ step: "test", attempt: 3, ended: "stuck", exhausted: "test.fail", counters: { "test.fail": 2 } });
+    return res.state;
+  }
+
+  test("a stuck unit goes to the step named as a fresh visit, the counters named back to 0", () => {
+    const stuck = stuckOnCounter();
+    const res = apply(stuck, journal(13, moved("implement", { step: "test", attempt: 3 }, { reset: ["test.fail"], reason: "the flake is fixed" })));
+    expect(res.rejected).toEqual([]);
+    expect(res.state).toMatchObject({ step: "implement", attempt: 4, run: null, retries_used: 0, counters: { "test.fail": 0 }, applied_through: 13 });
+    expect(res.state.ended).toBeUndefined();
+    expect(res.state.ended_reason).toBeUndefined();
+    expect(res.state.exhausted).toBeUndefined();
+  });
+
+  test("a counter not named keeps its value; the unit's own step again is its next attempt", () => {
+    const stuck = stuckOnCounter();
+    const res = apply(stuck, journal(13, moved("test", { step: "test", attempt: 3 })));
+    expect(res.state).toMatchObject({ step: "test", attempt: 4, counters: { "test.fail": 2 }, run: null });
+    expect(res.state.ended).toBeUndefined();
+  });
+
+  test("a run on the record and a park are taken off with the move", () => {
+    const parked = apply(fresh(), journal(1, started("a1"), { kind: "unit.parked", reason: "agent.asking.park" }, { kind: "nudge.sent", run_id: "a1", reason: "silent" })).state;
+    const res = apply(parked, journal(4, moved("implement", { step: "implement", attempt: 1 })));
+    expect(res.state).toMatchObject({ step: "implement", attempt: 2, run: null, retries_used: 0 });
+    expect(res.state.parked).toBeUndefined();
+  });
+
+  test("refused, never guessed at: a unit that ended done or corrupt, another visit, a step or counter the workflow lacks", () => {
+    const done = apply(atTest(), journal(4, { kind: "unit.marked", ended: "done" })).state;
+    expect(apply(done, journal(5, moved("implement", { step: "test", attempt: 1 }))).rejected).toEqual([{ seq: 5, reason: "the unit ended done; a new round takes it further" }]);
+    const corrupt = apply(atTest(), journal(4, { kind: "unit.marked", ended: "corrupt", reason: "bad record" })).state;
+    expect(apply(corrupt, journal(5, moved("implement", { step: "test", attempt: 1 }))).rejected).toEqual([{ seq: 5, reason: "the unit is corrupt" }]);
+    const at = atTest();
+    expect(apply(at, journal(4, moved("implement", { step: "implement", attempt: 1 }))).rejected).toEqual([{ seq: 4, reason: "stale: written for implement#1, the unit is at test#1" }]);
+    expect(apply(at, journal(4, moved("deploy", { step: "test", attempt: 1 }))).rejected).toEqual([{ seq: 4, reason: "workflow story has no step deploy" }]);
+    const unknown = apply(at, journal(4, moved("implement", { step: "test", attempt: 1 }, { reset: ["test.fail", "qa.loop"] })));
+    expect(unknown.rejected).toEqual([{ seq: 4, reason: "workflow story has no counter qa.loop" }]);
+    expect(unknown.state).toMatchObject({ step: "test", attempt: 1, run: { id: "c1" }, applied_through: 4 });
   });
 });
 

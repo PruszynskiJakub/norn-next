@@ -271,7 +271,7 @@ describe("the plugin", () => {
     const made = valueOf(createStore(factory, memoryHost(), {}));
     expect(storeProblems(made)).toEqual([]);
     expect(made.name).toBe("local");
-    expect(made.capabilities).toEqual({ shared: false, claims: "local", mailbox: true, artifacts: true });
+    expect(made.capabilities).toEqual({ shared: false, claims: "local", mailbox: true, artifacts: true, takeover: true });
   });
 
   test("an unknown config key is refused", () => {

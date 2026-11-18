@@ -419,6 +419,24 @@ export const MATRIX: Scenario[] = [
     ["agent.unobserved", "agent.died.retry", "agent.timeout", "agent.timeout.stopping", "agent.limited.record", "agent.limited.wait", "agent.limited.unknown"],
     3,
   ),
+  scenario(
+    "unit-moved",
+    "A person's move to a step: a unit stuck on a spent counter goes back to implement with the counter reset and its agent starts the tick after; a rerun of a step whose agent is still at work stops the run first, the order recorded, then applies the move with that order; a move on a unit that ended done, and one to a step the pinned workflow lacks, are refused onto the record.",
+    SLICE(),
+    (w) => {
+      seed(w, "gh-210", { workflow: "slice", step: "test", state: { counters: { "test.fail": 5, "integrate.conflict": 0, "review.changes_requested": 0 }, ended: "stuck", ended_reason: "counter test.fail ran out (5/5) at test.fail", exhausted: "test.fail" } });
+      w.append("gh-210", { kind: "step.moved", to: "implement", reset: ["test.fail"], by: "person", step: "test", attempt: 1 });
+      seed(w, "gh-211", { workflow: "slice", step: "implement", run: {} });
+      w.unit("gh-211").session = session("working");
+      w.append("gh-211", { kind: "step.moved", to: "implement", by: "person", reason: "the agent misread the slice", step: "implement", attempt: 1 });
+      seed(w, "gh-212", { workflow: "slice", step: "integrate", state: { ended: "done" } });
+      w.append("gh-212", { kind: "step.moved", to: "implement", by: "person", step: "integrate", attempt: 1 });
+      seed(w, "gh-213", { workflow: "slice", step: "review", state: { ended: "stuck", ended_reason: "review: the agent reported stuck" } });
+      w.append("gh-213", { kind: "step.moved", to: "deploy", by: "person", step: "review", attempt: 1 });
+    },
+    ["unit.move", "unit.move.stop", "receipts.reject", "agent.start"],
+    3,
+  ),
   {
     name: "agent-manual-start",
     build(): GoldenCase[] {

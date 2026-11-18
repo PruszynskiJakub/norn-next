@@ -152,6 +152,15 @@ describe("storeProblems and createStore", () => {
     expect(storeProblems(inertStore({ mailbox }))).toEqual(["offers mailbox its capabilities deny"]);
   });
 
+  test("the takeover capability and claims.takeOver agree both ways", () => {
+    const takeOver = async () => ok({} as never);
+    const claims = { ...inertStore().claims, takeOver };
+    const caps = { shared: false, claims: "local" as const, mailbox: false, artifacts: false, takeover: true };
+    expect(storeProblems(inertStore({ capabilities: caps, claims }))).toEqual([]);
+    expect(storeProblems(inertStore({ capabilities: caps }))).toEqual(["claims lacks takeOver its capabilities offer"]);
+    expect(storeProblems(inertStore({ claims }))).toEqual(["offers claims.takeOver its capabilities deny"]);
+  });
+
   test("a shared store must sync and flush", () => {
     const caps = { shared: true, claims: "distributed" as const, mailbox: false, artifacts: false };
     expect(storeProblems(inertStore({ capabilities: caps }))).toEqual(["a shared store lacks sync", "a shared store lacks flush"]);

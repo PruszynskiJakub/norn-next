@@ -15,4 +15,4 @@ export const DEFAULT_REMOTE = "origin";
 /** A namespace of its own, so the old store's `refs/norn/*` refs are never read or moved. */
 export const REFS_NAMESPACE = "refs/norn/v2";
 
-export const REFS_STORE_CAPABILITIES: Readonly<StoreCapabilities> = Object.freeze({ shared: true, claims: "distributed", mailbox: true, artifacts: true });
+export const REFS_STORE_CAPABILITIES: Readonly<StoreCapabilities> = Object.freeze({ shared: true, claims: "distributed", mailbox: true, artifacts: true, takeover: true });

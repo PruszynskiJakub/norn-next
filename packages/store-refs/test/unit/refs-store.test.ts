@@ -224,7 +224,7 @@ describe("plugin", () => {
     const ctx = memoryHost();
     const made = createStore(refsStoreFactory, ctx, { remote: "team" });
     expect(made.ok && storeProblems(made.value)).toEqual([]);
-    expect(made.ok && made.value.capabilities).toEqual({ shared: true, claims: "distributed", mailbox: true, artifacts: true });
+    expect(made.ok && made.value.capabilities).toEqual({ shared: true, claims: "distributed", mailbox: true, artifacts: true, takeover: true });
     expect(code(createStore(refsStoreFactory, ctx, { remote: "--upload-pack=evil" }))).toBe("invalid");
     expect(code(createStore(refsStoreFactory, ctx, { branch: "x" }))).toBe("invalid");
   });

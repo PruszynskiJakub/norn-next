@@ -7,7 +7,7 @@
 import { EndReason, ReportVerb } from "@norn/plugin-api";
 import { IsoTime, Mode, NonEmpty, OutcomeName, PosInt, StepName, TaggedUnion } from "@norn/schema";
 import { type Static, type TProperties, Type } from "@sinclair/typebox";
-import { PinnedWorkflow } from "../workflow/graph.ts";
+import { GraphCounterName, PinnedWorkflow } from "../workflow/graph.ts";
 import { Ended } from "./run-state.ts";
 
 const closed = { additionalProperties: false } as const;
@@ -83,7 +83,69 @@ const KINDS = [
   kind("stop.sent", { run_id: Id, reason: NonEmpty }),
   /** the session hit a usage limit that resets at `resets_at`; the run's deadline counts from the reset */
   kind("run.limited", { run_id: Id, resets_at: IsoTime }),
-  kind("round.started", { workflow: PinnedWorkflow, by: Type.Optional(NonEmpty) }),
+  /**
+   * a round of the pinned workflow; `at` is the step it enters (its start step when absent), and
+   * `by` and `reason` say who started it and why, for a person's round
+   */
+  kind("round.started", { workflow: PinnedWorkflow, at: Type.Optional(StepName), by: Type.Optional(NonEmpty), reason: Type.Optional(NonEmpty) }),
+  /**
+   * a person sends the unit to step `to` of its pinned workflow (its own step to run it again) as a
+   * fresh visit, with the counters in `reset` back to 0; a unit that ended stuck is taken up again
+   */
+  kind("step.moved", {
+    to: StepName,
+    reset: Type.Optional(Type.Array(GraphCounterName, { uniqueItems: true })),
+    by: NonEmpty,
+    reason: Type.Optional(NonEmpty),
+  }),
+  /**
+   * a person moved the story's claim to `to`: from holder `from` (whose claim expired at or after
+   * `from_expires_at`), or a claim nobody held when `from` is absent. Kept on the story's own unit as
+   * the record of who moved the story between machines; it changes nothing in the run state
+   */
+  kind("claim.taken", {
+    from: Type.Optional(NonEmpty),
+    from_expires_at: Type.Optional(IsoTime),
+    to: NonEmpty,
+    /** the version of the claim the takeover wrote */
+    version: PosInt,
+    by: NonEmpty,
+    reason: Type.Optional(NonEmpty),
+  }),
+  /**
+   * a person is about to bring the story's branch up to date with its base: the intent written before
+   * the merge, naming the branch's head `from`, the base commit `base_sha` it merges (`merge` false when
+   * the branch already holds it) and the change's head `took` it takes in first. Its `branch.updated`
+   * outcome follows the effect; an intent without one is an update cut short, which the next
+   * `norn story update-branch` finishes under the same intent. It changes nothing in the run state
+   */
+  kind("branch.update", {
+    base: NonEmpty,
+    base_sha: NonEmpty,
+    from: NonEmpty,
+    took: Type.Optional(NonEmpty),
+    merge: Type.Boolean(),
+    by: NonEmpty,
+    reason: Type.Optional(NonEmpty),
+  }),
+  /**
+   * a person brought the story's branch up to date with its base after its round ended: `base` at
+   * commit `base_sha` merged in (`merged` false when the branch already held it), the branch moved
+   * from `from` to `head`, taking in the open change's head `took` first when the branch lacked it,
+   * and `pushed` when the vcs pushed the result. A record of a person's one-off effect; it changes
+   * nothing in the run state
+   */
+  kind("branch.updated", {
+    base: NonEmpty,
+    base_sha: NonEmpty,
+    merged: Type.Boolean(),
+    from: NonEmpty,
+    head: NonEmpty,
+    took: Type.Optional(NonEmpty),
+    pushed: Type.Boolean(),
+    by: NonEmpty,
+    reason: Type.Optional(NonEmpty),
+  }),
   kind("unit.marked", { ended: Ended, reason: Type.Optional(NonEmpty) }),
   /** the unit waits for a person; `reason` names the rule that parked it, or why, and becomes the state's park */
   kind("unit.parked", { reason: NonEmpty }),

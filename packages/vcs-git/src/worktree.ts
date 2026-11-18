@@ -12,10 +12,12 @@ export function worktreePath(ctx: HostContext, unit: string): string {
 }
 
 /**
- * Make the unit's worktree on `branch`, or find the one already there. A new branch is cut from
+ * Make the unit's worktree on `branch`, or find the one already there. A branch this clone lacks is
+ * cut from the remote's copy when `remote` has one (the unit was carried on by another machine, whose
+ * pushed work a branch cut from `base` would drop, and whose push would then be refused), else from
  * `base`; an existing one is checked out as it is, so a re-run after a crash never moves it.
  */
-export async function ensureWorktree(ctx: HostContext, unit: string, branch: string, base: string): Promise<PluginResult<{ path: string }>> {
+export async function ensureWorktree(ctx: HostContext, unit: string, branch: string, base: string, remote?: string): Promise<PluginResult<{ path: string }>> {
   if (branch.startsWith("-") || base.startsWith("-")) return fail("invalid", `git: ${branch} or ${base} is not a ref`, false);
   const path = worktreePath(ctx, unit);
   const root = ctx.repo.root;
@@ -33,7 +35,13 @@ export async function ensureWorktree(ctx: HostContext, unit: string, branch: str
   if (elsewhere) return fail("conflict", `${branch} is checked out at ${elsewhere.path}: one branch has one worktree`, false);
   const exists = await revParse(ctx, root, `refs/heads/${branch}`);
   if (!exists.ok) return exists;
-  const args = exists.value === null ? ["worktree", "add", "--quiet", "-b", branch, path, base] : ["worktree", "add", "--quiet", path, branch];
+  let start = base;
+  if (exists.value === null && remote !== undefined && !remote.startsWith("-")) {
+    const copy = await revParse(ctx, root, `refs/remotes/${remote}/${branch}`);
+    if (!copy.ok) return copy;
+    if (copy.value !== null) start = `refs/remotes/${remote}/${branch}`;
+  }
+  const args = exists.value === null ? ["worktree", "add", "--quiet", "-b", branch, path, start] : ["worktree", "add", "--quiet", path, branch];
   const added = await git(ctx, root, args);
   return added.code === 0 ? ok({ path }) : gitFailure(added, "worktree add", "invalid");
 }
@@ -52,10 +60,10 @@ export async function removeWorktree(ctx: HostContext, unit: string): Promise<Pl
   return pruned.code === 0 ? ok(undefined) : gitFailure(pruned, "worktree prune");
 }
 
-export function gitWorktrees(ctx: HostContext): VcsWorktrees {
+export function gitWorktrees(ctx: HostContext, remote?: string): VcsWorktrees {
   return {
     path: (unit) => worktreePath(ctx, unit),
-    ensure: (unit, branch, base) => ensureWorktree(ctx, unit, branch, base),
+    ensure: (unit, branch, base) => ensureWorktree(ctx, unit, branch, base, remote),
     remove: (unit) => removeWorktree(ctx, unit),
   };
 }

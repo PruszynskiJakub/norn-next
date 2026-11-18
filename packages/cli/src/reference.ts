@@ -6,7 +6,7 @@
  * it between the markers; a unit test fails when the file is stale.
  */
 import { DEFAULT_KERNEL_CONFIG } from "@norn/kernel";
-import { DEFAULT_LOCK_STALE_MS } from "@norn/runtime";
+import { DEFAULT_LOCK_STALE_MS, DEFAULT_TRACE_RETAIN_MS } from "@norn/runtime";
 import { ExitCode } from "@norn/schema";
 import { parse } from "yaml";
 import type { Command, Noun } from "./command.ts";
@@ -68,7 +68,7 @@ function typeName(s: Schema): string {
   if ("const" in s) return `\`${JSON.stringify(s.const)}\``;
   if (s.type === "null") return "null";
   if (s.type === "boolean") return "boolean";
-  if (s.type === "string") return typeof s.pattern === "string" && s.pattern.includes("(ms|s|m|h)") ? "duration" : "string";
+  if (s.type === "string") return typeof s.pattern === "string" && s.pattern.includes("(ms|s|m|h|d)") ? "duration" : "string";
   if (s.type === "integer") return typeof s.minimum === "number" ? `integer ≥ ${s.minimum}` : "integer";
   if (s.type === "array") {
     const items = s.items as Schema;
@@ -102,6 +102,7 @@ function configRows(s: Schema, path: string[], open: string[]): ConfigRow[] {
 }
 
 const UNITS: ReadonlyArray<[string, number]> = [
+  ["d", 86_400_000],
   ["h", 3_600_000],
   ["m", 60_000],
   ["s", 1_000],
@@ -140,6 +141,7 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   "kernel.claim_ttl": durationText(d.claimTtlMs),
   "kernel.claim_renew_before": durationText(d.claimRenewBeforeMs),
   "kernel.lock_stale": durationText(DEFAULT_LOCK_STALE_MS),
+  "trace.retain": durationText(DEFAULT_TRACE_RETAIN_MS),
   "kernel.counters.check_fail": d.counterDefaults.checkFail,
   "kernel.counters.gate_reject": d.counterDefaults.gateReject,
   "kernel.counters.conflict": d.counterDefaults.conflict,

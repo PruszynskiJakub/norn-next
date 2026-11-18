@@ -7,7 +7,8 @@
 # CI smokes every binary on its own OS, tags and publishes on that merge.
 # Any commit on the base makes the changelog incomplete (base.stale: behind): a release
 # waiting at `ready` or `merge` goes back through update and prepare. A red CI means the base is
-# broken: the story goes $stuck; fix the base in its own story, then open a new release issue.
+# broken: the story goes $stuck; fix the base in its own story, then send the release back through
+# the base update: `norn run rerun gh-N --step update`.
 name: release
 description: Write the changelog and propose the version, open the draft PR, wait for its CI, and let a person judge it at ready.
 start: prepare

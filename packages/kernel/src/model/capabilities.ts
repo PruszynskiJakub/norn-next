@@ -20,6 +20,7 @@ export const StoreCapabilitiesSchema = Type.Object(
     claims: Type.Union([Type.Literal("local"), Type.Literal("distributed")]),
     mailbox: Type.Boolean(),
     artifacts: Type.Boolean(),
+    takeover: Type.Optional(Type.Boolean()),
   },
   closed,
 );

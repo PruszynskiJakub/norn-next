@@ -10,6 +10,7 @@ import type { RuntimeEnv, TickContext } from "./env.ts";
 import { gatherFacts } from "./facts.ts";
 import { mirrorSpec } from "./inputs.ts";
 import { acquireTickLock } from "./lock.ts";
+import { DEFAULT_TRACE_RETAIN_MS, pruneTraces } from "./retention.ts";
 import { TickTrace } from "./trace.ts";
 import type { TickReport } from "./types.ts";
 
@@ -44,7 +45,7 @@ async function run(env: RuntimeEnv, tickId: string, trace: TickTrace, problems: 
   problems.push(...gathered.value.problems);
   trace.facts = gathered.value.facts;
   await mirrorSpecs(env, gathered.value.facts, problems);
-  const t: TickContext = { env, tickId, facts: gathered.value.facts, workflows: gathered.value.workflows };
+  const t: TickContext = { env, tickId, facts: gathered.value.facts, workflows: gathered.value.workflows, problems };
   // decide is handed a copy: the act handlers read the facts it decided from, and decide must not be able to change them
   const decisions = decide(structuredClone(t.facts), t.workflows, env.config.kernel);
   // in order, one at a time: a story's claim comes before its units' actions, its flush, finish and release after them
@@ -77,6 +78,8 @@ export async function tick(env: RuntimeEnv, tickId: string): Promise<TickReport>
     const report: TickReport = { tick_id: tickId, decisions, outcomes: trace.entries, problems };
     const lost = await trace.write(report);
     if (lost) problems.push(lost);
+    // after the tick's own trace, which is the newest and never old enough to go
+    problems.push(...(await pruneTraces(env.ctx, tickId, env.config.traceRetainMs === undefined ? DEFAULT_TRACE_RETAIN_MS : env.config.traceRetainMs)));
     return report;
   } finally {
     await lock.release();

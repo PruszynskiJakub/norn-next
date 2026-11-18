@@ -29,8 +29,8 @@ describe("a story from intake to done", () => {
     expect(h.exec.calls.map((c) => [c.argv, c.opts.cwd, c.opts.timeoutMs])).toEqual([[["sh", "-c", "bun test"], "/machine/repo/worktrees/lt-1", 300_000]]);
     const claim = await h.env.slots.store.claims.read("lt-1");
     expect(claim.ok && claim.value).toBeNull();
-    // finishing a done story closes its item and removes its worktree
-    expect(h.items[0]?.open).toBe(false);
+    // finishing a round that ended done removes its worktree; with no merged change the item stays open for a next round
+    expect(h.items[0]?.open).toBe(true);
     expect(h.vcsCalls.filter((c) => c.op === "remove").map((c) => c.args)).toEqual([["lt-1"]]);
   });
 
@@ -63,6 +63,70 @@ describe("a story from intake to done", () => {
     expect(intents.at(-1)).toBeUndefined();
     expect([probe.slots.vcs?.name, probe.slots.forge?.name, probe.slots.tracker?.name]).toEqual(["fake", "fake", "fake"]);
     expect(h.stepCalls.filter((c) => c.kind === "await-thing")).toHaveLength(3);
+  });
+});
+
+describe("a person's rerun", () => {
+  /** Record what `norn done` or `norn stuck` records for the unit's current run. */
+  async function report(h: ReturnType<typeof harness>, verb: "done" | "stuck", outcome?: string) {
+    const state = (await record(h, "lt-1")).state;
+    const run = state?.run;
+    if (!state || !run) throw new Error("no run on the record");
+    const data = { kind: "run.reported" as const, run_id: run.id, verb, ...(outcome ? { outcome } : {}), step: state.step, attempt: state.attempt };
+    const wrote = await h.env.journal.record("lt-1", { id: `report-${run.id}`, data });
+    if (!wrote.ok) throw new Error(wrote.failure.message);
+  }
+
+  async function move(h: ReturnType<typeof harness>, to: string) {
+    const state = (await record(h, "lt-1")).state;
+    if (!state) throw new Error("no run state");
+    const wrote = await h.env.journal.record("lt-1", { id: `move-${state.step}-${state.attempt}`, data: { kind: "step.moved", to, by: "a-person", step: state.step, attempt: state.attempt } });
+    if (!wrote.ok) throw new Error(wrote.failure.message);
+  }
+
+  test("a stuck unit moved back to an earlier step runs that step on the next ticks", async () => {
+    const h = harness({ workflow: "handed" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    await report(h, "done", "done");
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    expect((await record(h, "lt-1")).state).toMatchObject({ step: "review", attempt: 1 });
+    await report(h, "stuck");
+    await tickUntil(h, has("claim.release"));
+    expect((await record(h, "lt-1")).state).toMatchObject({ step: "review", ended: "stuck" });
+
+    await move(h, "build");
+    const reports = await tickUntil(h, has("agent.start"));
+    expect(lastRules(reports)).toEqual([["- claim.take", "lt-1 claim.pending"], ["lt-1 unit.move"], ["lt-1 agent.start"]]);
+    const unit = await record(h, "lt-1");
+    expect(unit.state).toMatchObject({ step: "build", attempt: 2 });
+    expect(unit.state?.ended).toBeUndefined();
+    expect(unit.receipts.at(-1)?.data).toMatchObject({ kind: "run.started", step: "build", attempt: 2 });
+    const starts = h.launcher.of("start").map(([run]) => (run as { step: string }).step);
+    expect(starts).toEqual(["build", "review", "build"]);
+  });
+
+  test("a rerun of a step whose agent is at work stops its session before the move, then starts the step again", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const handle = (await record(h, "lt-1")).state?.run?.session;
+    h.sessions.byUnit.set("lt-1", session("working"));
+    await move(h, "build");
+    const stopped = await tickUntil(h, has("unit.move.stop"));
+    // the session is stopped before the move is applied: the unit is still at its visit with the run on the record
+    expect(h.launcher.of("stop")).toEqual([[handle]]);
+    expect((await record(h, "lt-1")).state).toMatchObject({ step: "build", attempt: 1, run: { session: handle } });
+    const reports = [...stopped, ...(await tickUntil(h, has("agent.start")))];
+    expect(lastRules(reports).map((rs) => rs.filter((r) => r !== "- claim.renew"))).toEqual([["lt-1 unit.move.stop"], ["lt-1 unit.move"], ["lt-1 agent.start"]]);
+    // committing the move stops the replaced run again, as every commit that takes a run off the record does
+    expect(new Set(h.launcher.of("stop").flat())).toEqual(new Set([handle]));
+    const unit = await record(h, "lt-1");
+    expect(unit.state).toMatchObject({ step: "build", attempt: 2 });
+    expect(unit.receipts.map((r) => r.data.kind)).toEqual(["round.started", "run.started", "run.started", "step.moved", "stop.sent", "run.started", "run.started"]);
   });
 });
 

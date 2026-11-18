@@ -27,4 +27,6 @@ export interface TickContext {
   tickId: string;
   facts: KernelFacts;
   workflows: KernelWorkflows;
+  /** where an act puts what went wrong without failing its decision, such as logs left behind; the tick reports them */
+  problems?: string[];
 }

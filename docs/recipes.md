@@ -33,6 +33,18 @@ norn story reject gh-17 --reason "Split slice 02: the migration and the endpoint
 
 A rejection sends the unit back by the gate's `reject` route with your reason in the next attempt's brief, counted by the route's counter. When the story waits at more than one gate, name it with `--gate <step>`; `--reason` on an approval is kept with the decision.
 
+## Start a story's next round
+
+**You see:** a round ended without a change to merge. A triage or reproduce round posted its recommendation, a refinement round agreed the plan, or a delivery round ended stuck with `replan`.
+
+```sh
+norn story round gh-17 --workflow refinement
+norn story round gh-17 --workflow refinement --at plan --reason "the base no longer fits the plan"
+norn story round gh-17 --workflow story --force   # end the round under way first
+```
+
+The workflow is pinned as it loads now, from the pack and `.agents/workflows/`. `--at` names the step the round starts at, and counters start at 0. The next tick takes the story up again, makes its worktree again from the story branch, and starts the step. Refused: a round still under way without `--force`, and with `--force` while an agent runs (`norn run stop` it first) or a slice is unfinished. Also refused: a story whose change merged or whose item is closed (create a new story for new work), and a story another machine holds.
+
 ## A step waits for you to start it
 
 **You see:** an agent step ready to start, in manual mode.
@@ -60,13 +72,42 @@ norn handles this itself: an agent that dies is retried in a fresh session, one 
 
 **You see:** the unit stuck, with its reason: the agent's own words from `norn stuck`, a counter at its max, or the runs that ran out.
 
-Read `norn story view <story>` and fix the cause where it lies: a broken check command, a missing tool, a contradiction in the spec. A stuck unit keeps its worktree, and a stuck story keeps its item open. There is no command yet that sends a stuck unit back to a step ([Limitations](limitations.md)): close it with `norn story close <story>` and open a new item for the work that is left.
+Read `norn story view <story>` and fix the cause where it lies: a broken check command, a missing tool, a contradiction in the spec. A stuck unit keeps its worktree, and a stuck story keeps its item open. Then run its step again, or send it to an earlier step with the counter that ran out back at 0:
+
+```sh
+norn run rerun gh-18/02
+norn run rerun gh-18/02 --step implement --reset test.fail --reason "test command fixed"
+```
+
+The unit keeps the workflow it pinned: `--step` names one of its steps and `--reset` one of its counters (both are refused otherwise, naming the ones it has). The next tick takes the story up again and the unit enters the step as a new attempt. When a slice stuck, its story usually ended stuck at its `slices` step too: rerun the slice first, then the story at that step (`norn run rerun gh-18 --step slices`), so the story waits for the slice instead of seeing it stuck again. To start over on another workflow, start a new round instead ([Start a story's next round](#start-a-storys-next-round)).
+
+## Run a step again
+
+```sh
+norn run rerun gh-18/02                          # the step it is at, as a new attempt
+norn run rerun gh-18 --step review --reason "review the rebased diff"
+```
+
+Any unit that has not ended done takes a rerun: a stuck one, a parked one, one at a gate, one whose agent is still at work. A live run (an agent session, a running check) is stopped by the next tick before the move, so nothing goes on working at a step the unit left; the tick after applies the move. Counters keep their values unless you name them with `--reset`, so a loop at its max ends stuck again on the same outcome. Refused: a unit that ended done (new work on the story is a new round), a corrupt one, a story whose change merged or whose item is closed, a story another machine holds, and a unit with receipts the next tick has not applied yet (`norn tick`, then rerun).
 
 ## Nothing moves
 
 **You see:** an agent reported (`norn done`), but the story stays at the same step.
 
 Nothing runs between ticks. Keep `norn watch` running while you work, or run `norn tick` once by hand. `norn doctor` says when the config, a plugin or a workflow keeps ticks from running, and what to fix first.
+
+## Keep traces longer, or for good
+
+**You see:** the trace of a tick you want to read back is gone from `~/.norn/repos/<id>/trace-v2/`.
+
+Every tick removes the traces older than a week. Keep more with a longer duration, or all of them with `keep`:
+
+```sh
+norn config set trace.retain 30d
+norn config set trace.retain keep
+```
+
+A done story's hook events and session and check logs go when the story is finished, whatever `trace.retain` says; a stuck unit keeps them with its worktree.
 
 ## Keep the heartbeat alive without a terminal
 
@@ -83,6 +124,18 @@ A tick takes a lock, so a cron tick and `norn watch` take turns. cron has a mini
 norn merges the base into the story branch in an `update-branch:` step, never by rebasing. When the merge conflicts, the shipped workflows send it to an agent step that resolves it, and the story goes on. A story waiting at a gate or at `await-merge:` goes back through its update step when the base moves under it in a way that conflicts (`base.stale` in the workflow). A base move without a conflict can still break the story; `base.verify: <check step>` runs that check on the merge of the base into the story head, once per base move, and sends the story back through update when it fails.
 
 You may also push to the story branch yourself at any time: norn merges your push in and never loses it.
+
+## Update a finished story's branch
+
+**You see:** a story's round ended (`done` or `stuck`) with its change still open, and the change now conflicts with its base or lags it.
+
+```sh
+norn story update-branch gh-17 --reason "main moved under the open PR"
+```
+
+norn merges the base (`base_ref`, else `base`, after a fetch) into the story branch with a merge commit, never a rebase, and pushes it. Commits on the change the branch lacks, such as an "update branch" pressed on the forge, are merged in first, so the push goes through. It works under the story's claim, taken when nobody holds it and given up again when done, and under the tick lock, so no tick finishes the story mid-merge. The update is on the story's record, as an intent written before the merge and its outcome after the push: `norn story view gh-17` lists it, and the next tick applies that record. For a story that ended done that tick removes the worktree again; a stuck story keeps it until the story ends done. If the update is cut short after the intent (a crash, a failed push), run the verb again: it finishes that update under the same intent, so it is recorded even when the branch already holds the base.
+
+When the merge conflicts, norn aborts it and refuses with the conflicting paths (`code: conflict`). A conflict a trial merge finds is refused before anything moves or is recorded. One found only by the real merge, after the change's head was merged in first, leaves that first merge on the local branch, unpushed, and says so (`details.moved_to`); the remote stays as it was. Its `do_instead` names a round whose update step resolves conflicts with an agent (the norn-merge skill), such as `norn story round gh-17 --workflow story --at update`. Refused too: a round under way (its own update steps keep the branch current), a story with no open change, a merged or closed change, and a story another machine holds (`norn story take` it first).
 
 ## Write your own workflow
 
@@ -192,6 +245,21 @@ norn config set store.use refs --commit
 ```
 
 The `refs` store keeps run data, claims and the mailbox on git refs under `refs/norn/v2/`, pushed to the remote, so every clone sees each story's step and who holds it. Commit the config (`norn init --commit` writes `.agents/norn.yaml`) so the team runs the same tracker, forge, store and plugins; the plugin lock `.agents/norn.plugins.lock` pins the version of each installed plugin beside it.
+
+## Move a story to another machine
+
+```sh
+# on the machine that holds it, when you can reach it
+norn run stop gh-12             # only if an agent is at work there
+git push origin norn/gh-12      # what it built, if its last step did not push it
+
+# on the machine that takes it over
+norn story take gh-12 --force --reason "carrying it on at home"
+```
+
+`norn story take` moves the story's claim to this machine, and its next tick carries the story on from where the record says it stands. It needs a store both machines read, which is the `refs` store above. A claim nobody holds (`claim.none` in `norn status`, a story released in progress) is taken without `--force`, and one this machine already holds is left as it is. Another holder's claim, live or expired, takes `--force`, since that machine may still be acting on the story. The store compares the claim's version, so when two people take a story at once, one wins and the other is refused with `claim_moved`. The takeover is on the story's record: `norn story view gh-12` lists who took it, from whom, and why.
+
+The worktree on the new machine is cut from the story branch as the remote has it. Commits the old machine never pushed stay there, so push its branch first when you can.
 
 ## Write a plugin
 

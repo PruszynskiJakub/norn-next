@@ -1,7 +1,7 @@
 /**
  * Story rules: what holds or ends a story's units as a whole, and what is decided per story rather
  * than per unit. Claims (take, renew, reacquire, expiry, release), slices (start, blocked, stuck), a
- * new round, a merged change ending the story, a closed item closing it (a live run stopped before
+ * new round, a person moving a unit to a step, a merged change ending the story, a closed item closing it (a live run stopped before
  * either mark), corrupt units, a pinned
  * workflow missing or invalid, importing the mailbox, and flushing a shared store. A tracker or forge
  * is read for facts only, never as a record of where a story stands.
@@ -10,11 +10,10 @@ import type { TrackerItem } from "@norn/plugin-api";
 import type { Decision } from "../model/actions.ts";
 import { DEFAULT_WORKFLOW_LABEL_PREFIX } from "../model/config.ts";
 import type { StoryFacts, UnitFacts } from "../model/facts.ts";
-import type { RunInfo, RunState } from "../model/run-state.ts";
 import type { DecideContext } from "./context.ts";
 import { hasPendingUnitWork, held, isOpen, mailboxDecisions, unitIds } from "./story-claim.ts";
 import { decideSlices } from "./story-slices.ts";
-import { applyWith, corruptRule, endedRule, park, roundRule, startRule } from "./story-unit.ts";
+import { applyWith, corruptRule, endedRule, liveRun, moveRule, park, roundRule, startRule } from "./story-unit.ts";
 
 /**
  * The story's decisions: story-wide ones (`unit: null`) and at most one per unit. A unit given a
@@ -31,14 +30,14 @@ export function decideStory(story: StoryFacts, ctx: DecideContext): Decision[] {
   if (claim === null) {
     // a story nobody holds is taken only when no round of it is under way; one in progress was released on purpose
     if (story.units.some((u) => u.corrupt !== undefined || (u.state !== null && u.state.ended === undefined)))
-      return held(story, "claim.none", "in progress and unclaimed; a person takes it over");
+      return held(story, "claim.none", `in progress and unclaimed; a person takes it over (norn story take ${story.key})`);
     out.push({ kind: "claim", unit: null, rule: "claim.take", story: story.key, expect_version: null });
     return [...out, ...held(story, "claim.pending", "waiting for the claim taken this tick")];
   }
   const expired = now >= Date.parse(claim.expires_at);
   if (claim.holder !== facts.holder) {
     // another holder's expired claim is left to it: taking it over could split the story's record across two machines
-    const why = expired ? `the claim of ${claim.holder} expired at ${claim.expires_at}; a person takes it over` : `held by ${claim.holder} until ${claim.expires_at}`;
+    const why = expired ? `the claim of ${claim.holder} expired at ${claim.expires_at}; a person takes it over (norn story take ${story.key} --force)` : `held by ${claim.holder} until ${claim.expires_at}`;
     return held(story, "claim.held_elsewhere", why);
   }
   if (expired) {
@@ -78,13 +77,16 @@ export function decideStoryTail(story: StoryFacts, ctx: DecideContext): Decision
 /**
  * What an ended story leaves to tidy, decided once, as its claim is given up. Only work that ended
  * done is tidied: a stuck unit keeps its worktree for the person to look into, and a stuck story's
- * item stays open as the record that it is unfinished. With no tracker that can close, the item is
- * left to the person.
+ * item stays open as the record that it is unfinished. The item closes only once the story's change
+ * merged: a round that ends done without one (a triage, a refinement) leaves the item open for the
+ * person's next round, which a closed item would end at once. With no tracker that can close, the
+ * item is left to the person.
  */
 function finishRule(story: StoryFacts, ctx: DecideContext): Decision | null {
   const worktrees = story.units.filter((u) => u.state?.ended === "done").map((u) => u.id);
   const own = story.units.find((u) => u.id === story.key);
-  const closeItem = own?.state?.ended === "done" && story.item?.open === true && ctx.facts.capabilities.tracker?.close === true;
+  const landed = story.change?.state === "merged";
+  const closeItem = own?.state?.ended === "done" && landed && story.item?.open === true && ctx.facts.capabilities.tracker?.close === true;
   if (worktrees.length === 0 && !closeItem) return null;
   return { kind: "finish_story", unit: null, rule: "story.finish", story: story.key, worktrees, close_item: closeItem, effect_id: ctx.nextId() };
 }
@@ -118,19 +120,6 @@ function intakeWorkflow(item: TrackerItem, ctx: DecideContext): string | null {
   return null;
 }
 
-/**
- * The run on the record when it may still be going and no stop was ordered for it: an agent whose
- * session has not ended (or was never seen), or a check or plugin step the host reports running.
- */
-function liveRun(u: UnitFacts, state: RunState, ctx: DecideContext): RunInfo | null {
-  const run = state.run;
-  if (!run || run.stopped_at !== undefined) return null;
-  if (u.receipts.some((r) => r.data.kind === "stop.sent" && r.data.run_id === run.id)) return null;
-  const kind = ctx.workflows.byHash[state.workflow.hash]?.graph.steps[run.step]?.kind;
-  if (kind === "agent") return u.session?.activity === "ended" ? null : run;
-  return u.step_run?.running === true ? run : null;
-}
-
 function endedNoop(story: StoryFacts, id: string): Decision[] {
   const u = story.units.find((x) => x.id === id);
   if (!u) return [];
@@ -153,6 +142,8 @@ function unitRule(story: StoryFacts, id: string, u: UnitFacts | null, ctx: Decid
   }
   const round = roundRule(u, state, ctx);
   if (round) return round;
+  const move = moveRule(story, u, state, ctx);
+  if (move) return move;
   if (state.ended) return endedRule(u);
 
   if (merged || itemClosed) {

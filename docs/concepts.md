@@ -91,9 +91,17 @@ The branch, and the PR, hold only the code.
 
 A unit's **run data** (its state, the numbered receipts, the pinned workflow, the story's spec and handoffs) lives in the configured **store**. With `local` it is in the checkout's machine dir, `~/.norn/repos/<id>/`, outside every worktree: removing a worktree or running `git clean -fdx` leaves the story where it was. With `refs` it is on git refs under `refs/norn/v2/`, pushed to the remote, so another machine sees the story and can take it over.
 
-A **claim** gives one checkout the right to drive a story; the holder renews it each tick, and an expired claim can be taken. A **mailbox** carries a person's answer or decision to the holder when it is sent from somewhere else.
+Beside the run data, the machine dir keeps what is only for reading back: each tick's **trace** under `trace-v2/`, the hook events of each run under `events-v2/`, and session and check logs under `runtime/`. None of it needs a command to clean up. Every tick removes the traces older than `trace.retain` (a duration such as `12h` or `7d`; default `7d`; `keep` keeps them all), a bounded number per tick, so a long backlog drains over a few ticks. A finished story takes its units' logs with it. Folders left empty stay.
 
-When a story's last unit ends `done`, its tick **finishes** it: it closes the tracker item (when the tracker can), removes the worktrees of the units that ended done, and gives up the claim. A unit that ended stuck keeps its worktree for you to look into, and a stuck story's item stays open. `norn story close <story>` closes a story by hand and stops its runs.
+A **claim** gives one checkout the right to drive a story; the holder renews it each tick, and a checkout whose own claim expired takes it again. Another holder's claim, even an expired one, is never taken by a tick, since that checkout may still be acting on the story; a person moves it with `norn story take <story> --force`, and the takeover is kept on the story's record as a receipt. A **mailbox** carries a person's answer or decision to the holder when it is sent from somewhere else.
+
+When a story's last unit ends `done`, its tick **finishes** it: it removes the worktrees of the units that ended done and those units' logs (hook events, session logs, check logs), closes the tracker item once the story's change merged (when the tracker can), and gives up the claim. A unit that ended stuck keeps its worktree for you to look into, and a stuck story's item stays open. `norn story close <story>` closes a story by hand and stops its runs.
+
+A **round** is one run of a workflow over a story, from its first step to its end. A story's first round runs the workflow it took at intake. When a round ends without the change merging (a triage, a refinement, a reproduce round, or a stuck delivery), the item stays open, and you start the next round with `norn story round <story> --workflow <name>` (`--at <step>` to start at a step other than the workflow's first). The workflow is pinned as it loads at that moment. Counters start again at 0, and the next tick takes the claim again and makes the worktree again from the story's branch. A round still under way is refused unless you pass `--force`, which ends it first, on the record in your name. A story whose change merged or whose item is closed takes no new round: new work there is a new story.
+
+Within a round, `norn run rerun <unit>` runs one unit's step again as a new attempt, and `--step <step>` sends it to another step of the workflow it pinned, a slice as well as a story. It takes up a unit that ended stuck, and stops a run still going before the move, so no agent works on at a step the unit left. Counters keep their values unless you name them with `--reset <counter>`. A unit that ended done takes no rerun: new work there is a new round.
+
+Between rounds, a story whose change is still open can fall behind its base. `norn story update-branch <story>` merges the base into the story branch (never a rebase) and pushes it, as a person's one-off act rather than a round. It holds the story's claim and the tick lock while it works, and records the update on the story's own unit through the act protocol, a `branch.update` intent before the merge and a `branch.updated` outcome after the push, neither of which changes the run state. An update cut short is finished by running the verb again. A conflicting merge is aborted and refused with its paths: resolving it is a round's work, through the workflow's update step. While a round is under way the verb is refused, since the round's own update steps keep the branch current.
 
 ## Config
 
@@ -116,6 +124,7 @@ Config comes in layers, each overriding the one before:
 | workflow | A YAML graph of steps, shipped in a pack or written in `.agents/workflows/`. |
 | step | One node of a workflow, named by its head key: `agent`, `check`, `gate`, `slices`, or a plugin's step kind. |
 | run | One attempt at a step; it produces receipts. |
+| round | One run of a workflow over a story, from its first step to its end; a person starts the next with `norn story round`. |
 | outcome | How a step ended, spelled as its reporter types it (`done`, `approve`, `stuck`, …). |
 | counter | A bound on a retry, nudge or loop; past its max the unit is stuck. |
 | gate | A step where a person approves or rejects. |

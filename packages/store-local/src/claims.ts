@@ -9,7 +9,7 @@ const plus = (at: string, ms: number): string => new Date(Date.parse(at) + ms).t
 const conflict = <T>(why: string): PluginResult<T> => fail("conflict", `local store: ${why}`, false);
 
 /** The claims part; arguments are validated by the store before they reach here. */
-export function claims(ctx: HostContext, at: Layout, tuning: LockTuning): StoreClaims {
+export function claims(ctx: HostContext, at: Layout, tuning: LockTuning): Required<StoreClaims> {
   async function readFile(story: string): Promise<PluginResult<ClaimFile | null>> {
     const path = at.claim(story);
     const r = await readRecord(ctx, path, ClaimFileSchema);
@@ -43,6 +43,14 @@ export function claims(ctx: HostContext, at: Layout, tuning: LockTuning): StoreC
       change<ClaimRecord>(story, (cur, version, now) => {
         if (expectVersion !== undefined && (cur?.version ?? null) !== expectVersion) return conflict(`claim on ${story} is at ${cur?.version ?? null}, not ${expectVersion}`);
         if (cur && cur.holder !== holder && !expired(cur, now)) return conflict(`${cur.holder} holds ${story} until ${cur.expires_at}`);
+        const mine = cur !== null && cur.holder === holder && !expired(cur, now);
+        const next: ClaimRecord = { story, holder, acquired_at: mine ? cur.acquired_at : now, expires_at: plus(now, ttlMs), version: version + 1 };
+        return ok({ next, answer: next });
+      }),
+
+    takeOver: (story, holder, ttlMs, expectVersion) =>
+      change<ClaimRecord>(story, (cur, version, now) => {
+        if ((cur?.version ?? null) !== expectVersion) return conflict(`claim on ${story} is at ${cur?.version ?? null}, not ${expectVersion}`);
         const mine = cur !== null && cur.holder === holder && !expired(cur, now);
         const next: ClaimRecord = { story, holder, acquired_at: mine ? cur.acquired_at : now, expires_at: plus(now, ttlMs), version: version + 1 };
         return ok({ next, answer: next });

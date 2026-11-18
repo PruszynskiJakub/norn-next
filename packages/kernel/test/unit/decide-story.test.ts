@@ -3,6 +3,7 @@ import { decideContext, decideIntake, type DecisionOf, type SlicePlan, type Unit
 import {
   CONFIG,
   caps,
+  decideAll,
   change,
   claim,
   facts,
@@ -132,8 +133,8 @@ describe("finishing an ended story", () => {
   const finishOf = (s: ReturnType<typeof story>, over: Parameters<typeof storyDecisions>[1] = {}) =>
     storyDecisions(s, over).find((d): d is DecisionOf<"finish_story"> => d.kind === "finish_story") ?? null;
 
-  test("a story that ended done has every done unit's worktree removed and its open item closed, before the release", () => {
-    const s = story({ units: [unit("gh-1", state("gh-1", "split", { ended: "done" })), unit("gh-1/01", state("gh-1/01", "build", { ended: "done" }))] });
+  test("a story whose change merged has every done unit's worktree removed and its open item closed, before the release", () => {
+    const s = story({ change: change({ state: "merged" }), units: [unit("gh-1", state("gh-1", "split", { ended: "done" })), unit("gh-1/01", state("gh-1/01", "build", { ended: "done" }))] });
     expect(finishOf(s)).toMatchObject({ kind: "finish_story", unit: null, rule: "story.finish", story: "gh-1", worktrees: ["gh-1", "gh-1/01"], close_item: true });
     expect(finishOf(s)?.effect_id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
   });
@@ -144,13 +145,34 @@ describe("finishing an ended story", () => {
     expect(finishOf(story({ units: [unit("gh-1", state("gh-1", "split", { ended: "stuck" }))] }))).toBeNull();
   });
 
+  test("a round that ended done with no merged change keeps the item open for the next round, and its worktree goes", () => {
+    const done = [unit("gh-1", state("gh-1", "split", { ended: "done" }))];
+    expect(finishOf(story({ units: done }))).toMatchObject({ worktrees: ["gh-1"], close_item: false });
+    expect(finishOf(story({ units: done, change: change({ state: "open" }) }))?.close_item).toBe(false);
+  });
+
   test("an item already closed, or a tracker that cannot close, leaves the item alone", () => {
     const done = [unit("gh-1", state("gh-1", "split", { ended: "done" }))];
-    expect(finishOf(story({ units: done, item: item(1, { open: false }) }))?.close_item).toBe(false);
-    expect(finishOf(story({ units: done }), { capabilities: caps({}, false) })?.close_item).toBe(false);
+    const merged = change({ state: "merged" });
+    expect(finishOf(story({ units: done, change: merged, item: item(1, { open: false }) }))?.close_item).toBe(false);
+    expect(finishOf(story({ units: done, change: merged }), { capabilities: caps({}, false) })?.close_item).toBe(false);
     const noClose = caps();
     if (noClose.tracker) noClose.tracker.close = false;
-    expect(finishOf(story({ units: done }), { capabilities: noClose })?.close_item).toBe(false);
+    expect(finishOf(story({ units: done, change: merged }), { capabilities: noClose })?.close_item).toBe(false);
+  });
+
+  test("a person's branch update on a finished story is taken up, applied as a record, and the story finished again", () => {
+    const intent = { kind: "branch.update" as const, base: "origin/main", base_sha: "b1", from: "h1", merge: true, by: "ann" };
+    const updated = { kind: "branch.updated" as const, base: "origin/main", base_sha: "b1", merged: true, from: "h1", head: "h2", pushed: true, by: "ann" };
+    const ended = state("gh-1", "split", { ended: "done", applied_through: 2 });
+    const recorded = [unit("gh-1", ended, { receipts: [receipt(3, intent), receipt(4, updated)] })];
+    expect(rules(storyDecisions(story({ claim: null, units: recorded, change: change({ state: "open" }) })))).toEqual(["claim.take", "claim.pending"]);
+    const applied = decideAll(facts([story({ units: recorded, change: change({ state: "open" }) })]));
+    const apply = applied.find((d): d is DecisionOf<"apply_receipts"> => d.kind === "apply_receipts");
+    expect(apply).toMatchObject({ unit: "gh-1", rejected: [], state: { ended: "done", applied_through: 4 } });
+    expect(rules(applied)).not.toContain("claim.release");
+    const after = [unit("gh-1", { ...ended, applied_through: 4 })];
+    expect(finishOf(story({ units: after, change: change({ state: "open" }) }))).toMatchObject({ worktrees: ["gh-1"], close_item: false });
   });
 
   test("nothing is finished while the story is open or once its claim is given up", () => {
@@ -329,6 +351,18 @@ describe("round start", () => {
     expect(started.state.applied_through).toBe(3);
   });
 
+  test("a claim takeover recorded before the first round is kept as applied, never refused onto the record", () => {
+    const taken = { kind: "claim.taken" as const, from: "machine-a", to: HOLDER, version: 2, by: HOLDER };
+    const first = storyDecisions(story({ units: [unit("gh-1", null, { receipts: [receipt(1, taken)] })] }))[0] as DecisionOf<"apply_receipts">;
+    expect(first).toMatchObject({ rule: "round.start", rejected: [] });
+    expect(first.receipts.map((r) => r.data.kind)).toEqual(["round.started"]);
+    expect(first.state.applied_through).toBe(2);
+    const pinned = unit("gh-1", null, { receipts: [receipt(1, taken), receipt(2, { kind: "round.started", workflow: NEXT_WF.pinned })] });
+    const second = storyDecisions(story({ units: [pinned] }))[0] as DecisionOf<"apply_receipts">;
+    expect(second).toMatchObject({ rule: "round.start", receipts: [], rejected: [] });
+    expect(second.state.applied_through).toBe(2);
+  });
+
   test("an invalid workflow parks the story naming the step kind no plugin provides", () => {
     const bad: WorkflowLoad = { ok: false, errors: [{ path: "/steps/ship", message: "unknown step kind open-pr", missing_kind: "open-pr" }] };
     const d = storyDecisions(story({ units: [unit("gh-1", null)] }), {}, workflows({ story: bad }))[0] as DecisionOf<"park">;
@@ -343,6 +377,34 @@ describe("round start", () => {
     expect(d.state).toMatchObject({ step: "polish", attempt: 1, mode: "auto", applied_through: 7 });
     expect(d.state.ended).toBeUndefined();
     expect(d.state.workflow.hash).toBe(NEXT_HASH);
+  });
+
+  test("a person's new round enters the step it names", () => {
+    const u = unit("gh-1", state("gh-1", "split", { ended: "done", applied_through: 6 }), { receipts: [receipt(7, { kind: "round.started", workflow: STORY_WF.pinned, at: "split", by: "ann" })] });
+    const d = storyDecisions(story({ units: [u] }))[0] as DecisionOf<"apply_receipts">;
+    expect(d).toMatchObject({ rule: "round.start", rejected: [] });
+    expect(d.state).toMatchObject({ step: "split", attempt: 1, applied_through: 7, workflow: { hash: STORY_HASH } });
+  });
+
+  test("a round under way that a person ends first is marked, then the new round starts", () => {
+    const end = { kind: "unit.marked" as const, ended: "stuck" as const, reason: "ended by ann for a new polish round", step: "plan", attempt: 1 };
+    const round = { kind: "round.started" as const, workflow: NEXT_WF.pinned, by: "ann", step: "plan", attempt: 1 };
+    const u = unit("gh-1", state("gh-1", "plan", { applied_through: 2 }), { receipts: [receipt(3, end), receipt(4, round)] });
+    const marked = storyDecisions(story({ units: [u] }))[0] as DecisionOf<"apply_receipts">;
+    expect(marked.rule).toBe("receipts.apply");
+    expect(marked.state).toMatchObject({ ended: "stuck", ended_reason: "ended by ann for a new polish round", applied_through: 3 });
+    const next = unit("gh-1", marked.state, { receipts: [receipt(4, round)] });
+    const started = storyDecisions(story({ units: [next] }))[0] as DecisionOf<"apply_receipts">;
+    expect(started).toMatchObject({ rule: "round.start", rejected: [] });
+    expect(started.state).toMatchObject({ step: "polish", attempt: 1, applied_through: 4, workflow: { hash: NEXT_HASH } });
+    expect(started.state.ended).toBeUndefined();
+  });
+
+  test("a round on the record of a story not started yet enters the step it names", () => {
+    const u = unit("gh-1", null, { receipts: [receipt(1, { kind: "round.started", workflow: STORY_WF.pinned, at: "split" })] });
+    const d = storyDecisions(story({ units: [u] }))[0] as DecisionOf<"apply_receipts">;
+    expect(d).toMatchObject({ rule: "round.start", rejected: [] });
+    expect(d.state).toMatchObject({ step: "split", applied_through: 1 });
   });
 
   test("a round written for another step is refused onto the record", () => {
@@ -370,6 +432,70 @@ describe("round start", () => {
     const d = storyDecisions(story({ units: [u] }))[0] as DecisionOf<"apply_receipts">;
     expect(d.rule).toBe("receipts.apply");
     expect(d.state).toMatchObject({ step: "plan", mode: "auto", applied_through: 1 });
+  });
+});
+
+describe("a person's move to a step", () => {
+  const live = { id: "run-1", step: "plan", attempt: 1, started_at: minutesAgo(5), executor: "claude", attended: false, nudges: 0 };
+  const working = { activity: "working" as const, silent: false, pending_tools: 0, subagents: 0, pane_answers: 0, errors: [] };
+  const moved = (to: string, step = "plan", attempt = 1) => ({ kind: "step.moved" as const, to, by: "ann", step, attempt });
+
+  test("a unit that ended stuck is taken up again at the step named, on the next tick's agent start", () => {
+    const u = unit("gh-1", state("gh-1", "split", { ended: "stuck", ended_reason: "slices stuck", visits: { plan: 1, split: 1 }, applied_through: 4 }), { receipts: [receipt(5, moved("plan", "split"))] });
+    const d = storyDecisions(story({ units: [u] }))[0] as DecisionOf<"apply_receipts">;
+    expect(d).toMatchObject({ kind: "apply_receipts", rule: "unit.move", receipts: [], rejected: [] });
+    expect(d.state).toMatchObject({ step: "plan", attempt: 2, run: null, applied_through: 5 });
+    expect(d.state.ended).toBeUndefined();
+    expect(forUnit(decideAll(facts([story({ units: [unit("gh-1", d.state)] })]), workflows(), { ...CONFIG, mode: "auto" }), "gh-1")?.rule).toBe("agent.start");
+  });
+
+  test("a run that may still be going is stopped first, the order recorded; the move follows with the order applied", () => {
+    const u = unit("gh-1", state("gh-1", "plan", { run: live, applied_through: 1 }), { session: working, receipts: [receipt(2, moved("plan"))] });
+    const d = storyDecisions(story({ units: [u] }))[0] as DecisionOf<"stop_run">;
+    expect({ kind: d.kind, rule: d.rule, run: d.run_id, intent: d.intent?.data }).toEqual({
+      kind: "stop_run",
+      rule: "unit.move.stop",
+      run: "run-1",
+      intent: { kind: "stop.sent", run_id: "run-1", reason: "moved to plan by a person", step: "plan", attempt: 1 },
+    });
+    const ordered = unit("gh-1", u.state, { session: working, receipts: [receipt(2, moved("plan")), receipt(3, { kind: "stop.sent", run_id: "run-1", reason: "moved to plan by a person", step: "plan", attempt: 1 })] });
+    const next = storyDecisions(story({ units: [ordered] }))[0] as DecisionOf<"apply_receipts">;
+    expect(next).toMatchObject({ rule: "unit.move", receipts: [], rejected: [] });
+    expect(next.state).toMatchObject({ step: "plan", attempt: 2, run: null, applied_through: 3 });
+  });
+
+  test("a move apply would refuse is refused at once, before any run is stopped", () => {
+    const u = unit("gh-1", state("gh-1", "plan", { run: live, applied_through: 1 }), { session: working, receipts: [receipt(2, moved("deploy"))] });
+    const d = storyDecisions(story({ units: [u] }))[0] as DecisionOf<"apply_receipts">;
+    expect(d.rule).toBe("receipts.reject");
+    expect(d.rejected).toEqual([{ seq: 2, reason: "workflow story has no step deploy" }]);
+    expect(d.state).toMatchObject({ run: { id: "run-1" }, applied_through: 3 });
+  });
+
+  test("a story whose change merged or whose item closed takes no move", () => {
+    const stuck = state("gh-1", "plan", { ended: "stuck", applied_through: 1 });
+    for (const [over, why] of [
+      [{ change: change({ state: "merged" }) }, "the story's change merged"],
+      [{ item: item(1, { open: false }) }, "the story's item closed"],
+    ] as const) {
+      const d = storyDecisions(story({ ...over, units: [unit("gh-1", stuck, { receipts: [receipt(2, moved("plan"))] })] }))[0] as DecisionOf<"apply_receipts">;
+      expect({ rule: d.rule, rejected: d.rejected, ended: d.state.ended }).toEqual({ rule: "receipts.reject", rejected: [{ seq: 2, reason: why }], ended: "stuck" });
+    }
+  });
+
+  test("a slice is moved by the story rules, which the unit rules leave it to", () => {
+    const s = unit("gh-1/01", state("gh-1/01", "build", { ended: "stuck", applied_through: 2 }), { receipts: [receipt(3, moved("build", "build"))] });
+    const ds = storyDecisions(story({ units: [unit("gh-1", state("gh-1", "split", { applied_through: 1 })), s] }));
+    const d = forUnit(ds, "gh-1/01") as DecisionOf<"apply_receipts">;
+    expect(d).toMatchObject({ rule: "unit.move", rejected: [] });
+    expect(d.state).toMatchObject({ step: "build", attempt: 2, applied_through: 3 });
+  });
+
+  test("the receipts before a move are applied first", () => {
+    const u = unit("gh-1", state("gh-1", "plan"), { receipts: [receipt(1, { kind: "mode.changed", mode: "auto", by: "ann" }), receipt(2, moved("plan"))] });
+    const d = storyDecisions(story({ units: [u] }))[0] as DecisionOf<"apply_receipts">;
+    expect(d.rule).toBe("receipts.apply");
+    expect(d.state).toMatchObject({ step: "plan", attempt: 1, mode: "auto", applied_through: 1 });
   });
 });
 

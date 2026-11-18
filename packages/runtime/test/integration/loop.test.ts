@@ -8,7 +8,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { recordPath } from "@norn/forge-none";
 import { SPECS_DIR } from "@norn/schema";
-import { TRACE_DIR } from "../../src/index.ts";
+import { checkExitsDir, checkLogsDir, runEventsDir, sessionLogPath, TRACE_DIR, unitEventsDir } from "../../src/index.ts";
 import { type AgentScript, commit, decideGate, git, type Machine, machine, personMerges, rulesOf, type Team, team, tickUntil, unitRecord } from "./world.ts";
 
 const quickAgent: AgentScript = (step, visit, run) => {
@@ -58,6 +58,16 @@ describe("a local tracker item through the quick workflow", () => {
     await tickUntil(m, () => true, 2);
     expect((await unitRecord(m, unit)).state?.ended).toBeUndefined();
 
+    // the logs a real run leaves, for each run the record started: hook events, launch record, session log
+    const runs = (await unitRecord(m, unit)).receipts.flatMap((r) => (r.data.kind === "run.started" ? [r.data.run_id] : []));
+    for (const run of runs) {
+      await m.ctx.files.write(`${runEventsDir(m.ctx, unit, run)}/events/000000000001.json`, "[]\n");
+      await m.ctx.files.write(`${runEventsDir(m.ctx, unit, run)}/launch.json`, "{}\n");
+      await m.ctx.files.write(sessionLogPath(m.ctx, run), "agent output\n");
+    }
+    const filesUnder = (dir: string): string[] => (existsSync(dir) ? readdirSync(dir, { recursive: true, withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name) : []);
+    expect(filesUnder(checkLogsDir(m.ctx, unit)).length).toBeGreaterThan(0);
+
     await personMerges(m, unit);
     await tickUntil(m, async () => (await unitRecord(m, unit)).state?.ended === "done");
     await tickUntil(m, async () => {
@@ -70,6 +80,10 @@ describe("a local tracker item through the quick workflow", () => {
     expect(existsSync(worktree)).toBe(false);
     const item = await m.env.slots.tracker.get(1);
     expect(item.ok && item.value?.open).toBe(false);
+    // and its logs gone with it: hook events, session logs, check logs and exits
+    expect(filesUnder(unitEventsDir(m.ctx, unit))).toEqual([]);
+    expect(runs.filter((run) => existsSync(sessionLogPath(m.ctx, run)))).toEqual([]);
+    expect([...filesUnder(checkLogsDir(m.ctx, unit)), ...filesUnder(checkExitsDir(m.ctx, unit))]).toEqual([]);
     // every tick left its trace
     expect(readdirSync(join(t.dir, "a-machine", TRACE_DIR)).length).toBeGreaterThan(10);
   }, 60_000);

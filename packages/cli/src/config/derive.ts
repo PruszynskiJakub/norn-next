@@ -7,11 +7,11 @@ import type { ExecutorChoice, RuntimeConfig, SlotChoice } from "@norn/runtime";
 import type { LoadedConfig } from "./load.ts";
 import type { NornConfig } from "./schema.ts";
 
-const UNIT_MS = { ms: 1, s: 1_000, m: 60_000, h: 3_600_000 } as const;
+const UNIT_MS = { ms: 1, s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 } as const;
 
 /** `15m` → 900000. The schema admits only what this reads. */
 export function durationMs(text: string): number {
-  const m = /^([1-9][0-9]*)(ms|s|m|h)$/.exec(text);
+  const m = /^([1-9][0-9]*)(ms|s|m|h|d)$/.exec(text);
   if (!m) throw new RangeError(`not a duration: ${text}`);
   return Number(m[1]) * UNIT_MS[m[2] as keyof typeof UNIT_MS];
 }
@@ -60,6 +60,7 @@ export function runtimeConfigOf(loaded: LoadedConfig, holder: string): RuntimeCo
   for (const [name, e] of Object.entries(config.executors))
     executors[name] = { name: e.harness, runner: runnerChoice(e.runner), ...(e.model !== undefined && { model: e.model }), ...(e.args !== undefined && { args: [...e.args] }) };
   const lockStale = config.kernel?.lock_stale;
+  const retain = config.trace?.retain;
   return {
     tracker: slotChoice(config.tracker, ["intake"]),
     forge: slotChoice(config.forge),
@@ -73,5 +74,6 @@ export function runtimeConfigOf(loaded: LoadedConfig, holder: string): RuntimeCo
     ...(config.base_ref ? { baseRef: config.base_ref } : {}),
     holder: config.holder ?? holder,
     ...(lockStale ? { lockStaleMs: durationMs(lockStale) } : {}),
+    ...(retain ? { traceRetainMs: retain === "keep" ? null : durationMs(retain) } : {}),
   };
 }
