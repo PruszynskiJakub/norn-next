@@ -24,7 +24,7 @@ The person decides; you run things and record. Without this, an agent copies its
    ]
    ```
 
-7. **Report once the person agrees** with the report: pass the criteria file, the findings file and the evidence folder to the report command your instructions name, matching the worst verdict.
+7. **Report once the person agrees** with the report, with the outcome matching the worst verdict: `norn done <outcome> --criteria <dir>/criteria.json` (or the report command your instructions name). In `--note`, give each failing criterion's repro and the paths of `findings.json` and the evidence folder.
 
 **Redact every secret** the person shows you: write `<REDACTED>` in its place, and crop or blur it in screenshots. Evidence is pushed with the story's record to the shared remote.
 
