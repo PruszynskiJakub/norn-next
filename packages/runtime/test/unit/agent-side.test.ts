@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { claudeHarness } from "@norn/harness-claude";
-import { markPrompt, RUN_ENV } from "@norn/plugin-api";
+import { markPrompt, ok, RUN_ENV, type VcsConflictMarker } from "@norn/plugin-api";
 import {
   batchesDir,
   batchName,
@@ -368,6 +368,56 @@ describe("reporting", () => {
     expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({
       ok: false,
       refusal: { code: "unavailable", error: expect.stringContaining("cannot tell whether") },
+    });
+    expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
+  });
+
+  test("a done whose commits since the unit's base left a conflict unresolved is refused, naming each file and line, and records nothing; ask still goes through", async () => {
+    const { h, runId } = await running();
+    Object.assign(h.heads, { main: "m".repeat(40), "norn/lt-1": "s".repeat(40) });
+    const asked: [string, string][] = [];
+    let found: VcsConflictMarker[] = [
+      { path: "src/a.ts", line: 4 },
+      { path: "src/b.ts", line: 12 },
+    ];
+    h.env.slots.vcs.conflictMarkers = async (base, head) => {
+      asked.push([base, head]);
+      return ok(found);
+    };
+    const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
+    expect(r).toMatchObject({
+      ok: false,
+      refusal: { code: "conflict_markers", error: expect.stringContaining("src/a.ts:4, src/b.ts:12"), do_instead: expect.stringContaining("commit") },
+    });
+    expect(asked).toEqual([["main", "norn/lt-1"]]);
+    expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
+    expect(await reportRun(h.env, UNIT, runId, { verb: "ask", question: "which side of src/a.ts wins?" }, "r2")).toMatchObject({ ok: true });
+    const fresh = await running();
+    Object.assign(fresh.h.heads, { main: "m".repeat(40), "norn/lt-1": "s".repeat(40) });
+    fresh.h.env.slots.vcs.conflictMarkers = async () => ok(found);
+    found = [];
+    expect(await reportRun(fresh.h.env, UNIT, fresh.runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
+  test("a unit without a branch of its own (run in the repo's own checkout) has no conflicts to read, and its done goes through", async () => {
+    const { h, runId } = await running();
+    h.heads.main = "m".repeat(40);
+    let read = false;
+    h.env.slots.vcs.conflictMarkers = async () => {
+      read = true;
+      return ok([{ path: "src/a.ts", line: 1 }]);
+    };
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+    expect(read).toBe(false);
+  });
+
+  test("a done is refused when the vcs cannot read the unit's conflicts, and nothing is recorded", async () => {
+    const { h, runId } = await running();
+    Object.assign(h.heads, { main: "m".repeat(40), "norn/lt-1": "s".repeat(40) });
+    h.env.slots.vcs.conflictMarkers = async () => ({ ok: false, failure: { code: "unavailable", message: "bad revision", retryable: false } });
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({
+      ok: false,
+      refusal: { code: "unavailable", error: expect.stringContaining("bad revision") },
     });
     expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
   });

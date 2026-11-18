@@ -6,8 +6,9 @@
  * validated against `CriteriaReport` here; the runtime checks it against the step (`criteria:
  * required`, the outcome's `verdict`) and the unit's declared criteria, and keeps it on the receipt.
  * The runtime also refuses a done while a merge waits to be concluded in the unit's worktree
- * (`merge_unfinished`) or while the worktree holds uncommitted work (`dirty_worktree`); this command
- * only renders those refusals.
+ * (`merge_unfinished`), while the worktree holds
+ * uncommitted work (`dirty_worktree`), or while the unit's commits leave a conflict unresolved
+ * (`conflict_markers`); this command only renders those refusals.
  */
 import { isAbsolute, resolve } from "node:path";
 import { parseJson } from "@norn/plugin-api";
