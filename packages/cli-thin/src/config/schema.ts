@@ -28,7 +28,9 @@ export const Intake = Type.Object(
 export const TrackerSlot = Type.Object({ use: Name, intake: Intake }, open);
 /** a runner by name, or `{use, ...its config}` */
 export const RunnerChoice = Type.Union([Name, Slot]);
-export const Executor = Type.Object({ harness: Name, runner: RunnerChoice, model: Type.Optional(NonEmpty) }, closed);
+/** the agent's extra arguments; they replace the harness's defaults whole (claude's are `--permission-mode auto`) */
+const AgentArgs = Type.Array(NonEmpty);
+export const Executor = Type.Object({ harness: Name, runner: RunnerChoice, model: Type.Optional(NonEmpty), args: Type.Optional(AgentArgs) }, closed);
 
 export const Counters = Type.Object(
   {
@@ -104,7 +106,13 @@ export const ConfigLayer = Type.Object(
     store: Type.Optional(partial(Slot, "open")),
     vcs: Type.Optional(partial(Slot, "open")),
     executors: Type.Optional(
-      Type.Record(Name, Type.Object({ harness: Type.Optional(Name), runner: Type.Optional(Type.Union([Name, partial(Slot, "open")])), model: Type.Optional(NonEmpty) }, closed)),
+      Type.Record(
+        Name,
+        Type.Object(
+          { harness: Type.Optional(Name), runner: Type.Optional(Type.Union([Name, partial(Slot, "open")])), model: Type.Optional(NonEmpty), args: Type.Optional(AgentArgs) },
+          closed,
+        ),
+      ),
     ),
     executor: Type.Optional(Name),
     packs: Type.Optional(Type.Array(Name, { minItems: 1, maxItems: 1 })),

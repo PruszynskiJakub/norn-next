@@ -19,7 +19,7 @@ function briefRenderer(envOf: () => RuntimeEnv | undefined) {
   return async (run: AgentRunRequest): Promise<PluginResult<string>> => {
     const env = envOf();
     if (!env) return fail("unavailable", "the runtime env is not ready", false);
-    const input = await briefRenderInput(env, run.unit, run.brief, run.run_id);
+    const input = await briefRenderInput(env, run.unit, run.brief, run.run_id, run.worktree);
     if (!input.ok) return input;
     try {
       return ok(renderBrief(input.value));
@@ -33,6 +33,7 @@ function launcherOf(deps: Omit<RuntimeDeps, "tickId">, slots: ResolvedSlots, env
   if (deps.launcher) return ok(deps.launcher);
   return createHarnessLauncher(deps.ctx, deps.plugins, deps.config, slots.executors, {
     hookCommand: deps.hookCommand ?? DEFAULT_HOOK_COMMAND,
+    ...(deps.hostPath !== undefined ? { hostPath: deps.hostPath } : {}),
     renderBrief: briefRenderer(envOf),
   });
 }

@@ -10,6 +10,7 @@ import type { AnsweredAsk, BriefInputs, BriefRenderInput, CompiledStep, KernelRe
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import type { RuntimeEnv } from "./env.ts";
 import { readEvents } from "./events/log.ts";
+import { INPUTS_NOTE, materializeInputs, worktreeOf } from "./inputs.ts";
 import { reportableOutcomes } from "./live-run.ts";
 import { readStepRun } from "./step-runs.ts";
 import { loadPinned } from "./workflows.ts";
@@ -89,9 +90,12 @@ function agentStep(workflow: LoadedWorkflow, step: string): CompiledStep | null 
 
 /**
  * The render input for `brief` at the unit as `record` reads, for run `runId` when known (a retry's
- * brief then carries the answers its replaced runs were given); refused when its workflow or step is gone.
+ * brief then carries the answers its replaced runs were given); refused when its workflow or step is
+ * gone. The step's inputs are written into the unit's worktree first (inputs.ts), so the brief names
+ * paths the agent can read; when they cannot be written the brief falls back to their bare names
+ * rather than holding the run back.
  */
-export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, runId?: string): Promise<PluginResult<BriefRenderInput>> {
+export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, runId?: string, worktree?: string): Promise<PluginResult<BriefRenderInput>> {
   const workflow = workflowOf(env, record.state, brief);
   if (!workflow) return fail("not_found", `workflow ${brief.workflow} (${brief.hash}) is neither loaded nor pinned by ${record.unit}`, false);
   const step = agentStep(workflow, brief.step);
@@ -102,6 +106,8 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
   for (const o of outcomes) if (spec.means[o] !== undefined) means[o] = spec.means[o];
   const rework = brief.rework_from === undefined ? undefined : await reworkText(env, record.unit, record.receipts.find((r) => r.seq === brief.rework_from));
   const answered = runId === undefined ? [] : await answeredAsks(env, record, runId);
+  const made = await materializeInputs(env, record, brief, worktree ?? worktreeOf(env, record.unit));
+  const inputs = made.ok ? made.value : null;
   return ok({
     brief,
     unit: record.unit,
@@ -112,12 +118,15 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
     ...(spec.attended && { attended: true }),
     ...(rework !== undefined && { rework }),
     ...(answered.length > 0 && { answered }),
+    ...(inputs?.story !== undefined && { story: inputs.story }),
+    ...(inputs !== null && inputs.inputs.length > 0 && { inputs: inputs.inputs, inputsNote: INPUTS_NOTE }),
+    ...(inputs?.handoff !== undefined && { handoff: inputs.handoff }),
   });
 }
 
-export async function briefRenderInput(env: RuntimeEnv, unit: string, brief: BriefInputs, runId?: string): Promise<PluginResult<BriefRenderInput>> {
+export async function briefRenderInput(env: RuntimeEnv, unit: string, brief: BriefInputs, runId?: string, worktree?: string): Promise<PluginResult<BriefRenderInput>> {
   const read = await env.journal.readUnit(unit);
   if (!read.ok) return read;
   if (read.value.corrupt !== undefined) return fail("invalid", `${unit} is corrupt: ${read.value.corrupt}`, false);
-  return renderInputFrom(env, read.value, brief, runId);
+  return renderInputFrom(env, read.value, brief, runId, worktree);
 }

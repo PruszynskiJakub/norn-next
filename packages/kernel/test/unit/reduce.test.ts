@@ -123,6 +123,12 @@ describe("reduceSession", () => {
     expect(reduceSession(stream(BRIEF, { type: "turn.ended", last_message: "a" }, BRIEF, { type: "turn.ended", last_message: "b" })).last_message).toBe("b");
   });
 
+  test("the error a turn stopped on stays until a later turn ends without one", () => {
+    const failed = { type: "turn.ended", last_message: "pi stopped on an error: overloaded", error: "pi stopped on an error: overloaded" } as const;
+    expect(reduceSession(stream(BRIEF, failed)).error).toBe("pi stopped on an error: overloaded");
+    expect(reduceSession(stream(BRIEF, failed, BRIEF, { type: "turn.ended", last_message: "fixed" })).error).toBeUndefined();
+  });
+
   describe("input requests", () => {
     const ask = { type: "tool.requested", id: "q1", kind: "ask", tool: "AskUserQuestion" } as const;
     const input: Body = { type: "input.requested", id: "q1", question: "Which one?", options: ["a", "b"] };

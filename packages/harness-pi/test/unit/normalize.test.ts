@@ -76,9 +76,11 @@ describe("pi normalize: runs", () => {
     expect(body("agent_before_settle", silent)).toEqual([{ type: "turn.ended" }]);
   });
   test("a run pi will not continue (an error settle) ends its turn at agent_settled, with the error as its words", () => {
-    expect(body("agent_settled", payloads.agent_settled_error)).toEqual([{ type: "turn.ended", last_message: "pi stopped on an error: 429 rate_limit_error" }]);
+    const named = "pi stopped on an error: 429 rate_limit_error";
+    expect(body("agent_settled", payloads.agent_settled_error)).toEqual([{ type: "turn.ended", last_message: named, error: named }]);
     const { error_message: _, ...unnamed } = payloads.agent_settled_error;
-    expect(body("agent_settled", unnamed)).toEqual([{ type: "turn.ended", last_message: "pi stopped on an error: pi stopped on a provider error" }]);
+    const generic = "pi stopped on an error: pi stopped on a provider error";
+    expect(body("agent_settled", unnamed)).toEqual([{ type: "turn.ended", last_message: generic, error: generic }]);
   });
   test("an aborted settle ends at agent_settled with the last words it had", () => {
     const aborted = { ...payloads.agent_settled_error, outcome: "aborted", stop_reason: "aborted", error_message: undefined };

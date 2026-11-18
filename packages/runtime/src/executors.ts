@@ -22,7 +22,7 @@ export function resolveExecutors(ctx: HostContext, plugins: readonly NornPlugin[
     if (!factory.ok) return factory;
     const runner = createRunner(factory.value, ctx, runnerChoice.config ?? {});
     if (!runner.ok) return fail(runner.failure.code, `executor ${JSON.stringify(name)}: runner ${JSON.stringify(runnerChoice.name)}: ${runner.failure.message}`, runner.failure.retryable);
-    out[name] = { harness, runner: runner.value, ...(choice.model !== undefined && { model: choice.model }) };
+    out[name] = { harness, runner: runner.value, ...(choice.model !== undefined && { model: choice.model }), ...(choice.args !== undefined && { args: [...choice.args] }) };
   }
   return ok(out);
 }

@@ -67,6 +67,8 @@ describe("a story from intake to merged, through the CLI alone", () => {
   test("the agent ran its hooks and reports through the real binary: a brief, the guard, and one report", () => {
     expect(agentNotes(w).map((n) => n.run).filter((r, i, all) => all.indexOf(r) === i)).toHaveLength(1);
     expect(noteOf(w, "prompt")).toEqual({ kind: "allow" });
+    // the bare `norn` the agent ran is the launcher's shim, never another norn on the PATH
+    expect(noteOf(w, "norn")).toMatch(/\/runtime\/bin\/norn$/);
     const brief = noteOf(w, "brief") as { code: number; text: string };
     expect(brief.code).toBe(0);
     expect(brief.text).toContain("Build the thing.");

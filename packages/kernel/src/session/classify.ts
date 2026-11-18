@@ -43,5 +43,6 @@ export function classifySession(view: SessionView, now: string, opts: ClassifyOp
   if (activity === "limited" && view.limit) facts.limit = { ...view.limit };
   if (view.report) facts.report = { ...view.report };
   if (view.last_message !== undefined) facts.last_message = view.last_message;
+  if (view.error !== undefined) facts.error = view.error;
   return facts;
 }

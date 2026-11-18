@@ -7,6 +7,11 @@ import { type LaunchRequest, type LaunchSpec, RUN_ENV } from "@norn/plugin-api";
  * (print mode) when no terminal will show the session. `--session-id` opens the worktree's session
  * with that id, the id the extension reports on `session_start`. `--` ends the options, so a
  * variadic flag in the extra args cannot swallow the prompt.
+ *
+ * No permission flag, unlike claude's `--permission-mode auto`: pi asks no approval before a tool
+ * call (its docs/security.md: tools run with the OS permissions of the pi process), so an
+ * unattended `pi -p` runs `norn` and every other command as it is. Its only prompt is project trust,
+ * which `--approve` answers. Configured args are added as they are.
  */
 export function launch(req: LaunchRequest): LaunchSpec {
   const argv = ["pi", "--approve"];

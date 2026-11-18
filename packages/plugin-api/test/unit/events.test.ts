@@ -45,6 +45,12 @@ describe("HarnessEvent", () => {
       expect({ type: e.type, ok: isHarnessEvent(e) }).toEqual({ type: e.type, ok: true });
   });
 
+  test("a turn that stopped on an error names it, never as an empty string", () => {
+    const e = { ...env, type: "turn.ended" as const, last_message: "pi stopped on an error: model not supported", error: "pi stopped on an error: model not supported" };
+    expect(validateHarnessEvent(e)).toEqual({ ok: true, value: e });
+    expect(isHarnessEvent({ ...e, error: "" })).toBe(false);
+  });
+
   test("an unknown type is refused", () => {
     expect(isHarnessEvent({ ...env, type: "tool.cancelled", id: "t1" })).toBe(false);
   });

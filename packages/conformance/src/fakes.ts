@@ -9,6 +9,9 @@ export interface MemoryFiles extends HostFiles {
   snapshot(): Record<string, string>;
   /** while on, every write, create and remove rejects and changes nothing, as a full disk would */
   failWrites(on: boolean): void;
+  /** whether the file was last written by `writeExecutable` */
+  executable(path: string): boolean;
+  writeExecutable(path: string, data: string): Promise<void>;
 }
 
 const trim = (p: string): string => (p.length > 1 ? p.replace(/\/+$/, "") : p);
@@ -16,6 +19,7 @@ const trim = (p: string): string => (p.length > 1 ? p.replace(/\/+$/, "") : p);
 export function memoryFiles(seed: Record<string, string> = {}): MemoryFiles {
   const files = new Map<string, string>(Object.entries(seed).map(([p, d]) => [trim(p), d]));
   let failing = false;
+  const executables = new Set<string>();
   const guard = (op: string, path: string): void => {
     if (failing) throw new Error(`memoryFiles: ${op} ${path} failed (injected)`);
   };
@@ -24,7 +28,14 @@ export function memoryFiles(seed: Record<string, string> = {}): MemoryFiles {
     write: async (path, data) => {
       guard("write", path);
       files.set(trim(path), data);
+      executables.delete(trim(path));
     },
+    writeExecutable: async (path, data) => {
+      guard("write", path);
+      files.set(trim(path), data);
+      executables.add(trim(path));
+    },
+    executable: (path) => executables.has(trim(path)),
     create: async (path, data) => {
       guard("create", path);
       const p = trim(path);
@@ -41,6 +52,7 @@ export function memoryFiles(seed: Record<string, string> = {}): MemoryFiles {
     remove: async (path) => {
       guard("remove", path);
       files.delete(trim(path));
+      executables.delete(trim(path));
     },
     snapshot: () => Object.fromEntries([...files.entries()].sort(([a], [b]) => a.localeCompare(b))),
     failWrites: (on) => {

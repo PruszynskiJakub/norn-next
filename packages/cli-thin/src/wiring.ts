@@ -15,7 +15,7 @@ import { configFailure, refuse } from "./output.ts";
 import { BUNDLED_PLUGINS } from "./plugins/bundled.ts";
 import { type PluginImporter, loadInstalled } from "./plugins/installed.ts";
 import { type PluginLock, readLock } from "./plugins/lock.ts";
-import { missingStepKinds, resolvePlugins } from "./plugins/resolve.ts";
+import { resolvePlugins } from "./plugins/resolve.ts";
 
 export interface WiredRepo {
   home: string;
@@ -50,6 +50,8 @@ export const isTeamMode = (loaded: LoadedConfig): boolean => loaded.layers.repo 
 
 export interface WiredPlugins {
   plugins: NornPlugin[];
+  /** plugin name to its lock entry's name, for every installed plugin that loads */
+  installedAs: Record<string, string>;
   lock: PluginLock;
   lockPath: string;
 }
@@ -61,7 +63,9 @@ export async function wirePlugins(w: WiredRepo, loaded: LoadedConfig, importer: 
   const installed = await Promise.all(lock.plugins.map((e) => loadInstalled(e, pluginsDir, importer, PLUGIN_API_VERSION)));
   const r = resolvePlugins({ config: loaded.config, bundled: BUNDLED_PLUGINS, lock, installed });
   if (!r.ok) throw r.failure;
-  return { plugins: r.plugins, lock, lockPath: path };
+  const installedAs: Record<string, string> = {};
+  for (const load of installed) if (load.ok) installedAs[load.plugin.name] = load.entry.name;
+  return { plugins: r.plugins, installedAs, lock, lockPath: path };
 }
 
 /** Who claims from this machine when the config names nobody. */
@@ -84,6 +88,8 @@ export interface RuntimeParts {
   holder: string;
   /** how a launched agent's hooks call back into this binary, before `hook <harness>` */
   self: readonly string[];
+  /** this process's PATH, which launched agents get with a `norn` running `self` in front */
+  path?: string;
 }
 
 function runtimeDeps(p: RuntimeParts): Parameters<typeof createRuntimeEnv>[0] {
@@ -93,12 +99,17 @@ function runtimeDeps(p: RuntimeParts): Parameters<typeof createRuntimeEnv>[0] {
     plugins: p.plugins,
     config,
     hookCommand: [...p.self, "hook"],
+    ...(p.path !== undefined ? { hostPath: p.path } : {}),
     sessions: (launcher) =>
       new EventLogSessionSource({ ctx: p.w.ctx, classify: { silentAfterMs: config.kernel.silentAfterMs }, alive: (h) => launcher.alive?.(h) ?? Promise.resolve(null) }),
   };
 }
 
-/** What the agent verbs and read-only views need: the resolved slots, the journal and the workflows. */
+/**
+ * What the agent verbs and read-only views need: the resolved slots, the journal and the workflows.
+ * A workflow that does not load is kept as its failure here; the commands that run workflows refuse
+ * it through `packFailure`, so a broken pack leaves the rest working.
+ */
 export function wireRuntimeEnv(p: RuntimeParts): RuntimeEnv {
   const built = createRuntimeEnv(runtimeDeps(p));
   // a factory refusing its slot's config is the person's config to fix, not a rule saying no
@@ -106,8 +117,6 @@ export function wireRuntimeEnv(p: RuntimeParts): RuntimeEnv {
     throw built.failure.code === "invalid"
       ? configFailure(built.failure.message, "norn doctor", "slot_config_invalid", { failure: built.failure })
       : refuse(built.failure.message, "norn doctor", "runtime_unresolved", { failure: built.failure });
-  const missing = missingStepKinds(built.value.workflows);
-  if (missing) throw missing;
   return built.value;
 }
 

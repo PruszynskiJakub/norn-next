@@ -18,6 +18,8 @@ export interface ExecutorChoice extends SlotChoice {
   runner?: SlotChoice;
   /** the model its agents launch on when the step names none; absent: the harness's default */
   model?: string;
+  /** the agent's extra arguments, replacing the harness's defaults whole; absent: the harness's defaults */
+  args?: string[];
 }
 
 export interface RuntimeConfig {
@@ -110,6 +112,8 @@ export interface RuntimeDeps {
   sessions: SessionSource | ((launcher: AgentLauncher) => SessionSource);
   /** the built launcher's hook command prefix; default `["norn", "hook"]` */
   hookCommand?: readonly string[];
+  /** the host's PATH, which the built launcher hands its agents with its own `norn` first (agent-bin.ts) */
+  hostPath?: string;
   /** mints each tick's id; a test passes a fixed sequence so its traces and ids repeat */
   tickId?: () => string;
 }

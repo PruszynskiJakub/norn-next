@@ -419,4 +419,26 @@ export const MATRIX: Scenario[] = [
     ["agent.unobserved", "agent.died.retry", "agent.timeout", "agent.timeout.stopping", "agent.limited.record", "agent.limited.wait", "agent.limited.unknown"],
     3,
   ),
+  {
+    name: "agent-manual-start",
+    build(): GoldenCase[] {
+      const name = "agent-manual-start";
+      const description =
+        "A person starts the agent of a step manual mode holds: the park lifts on their `run.requested`, the agent starts on the next tick, and its run is retried as an auto run would be; a request at a step that runs no agent is refused on the record.";
+      const w = world({ files: shippedFiles("slice"), config: config({ mode: "manual" }) });
+      seed(w, "gh-196", { workflow: "slice", step: "implement" });
+      w.manual.add("gh-196");
+      seed(w, "gh-197", { workflow: "slice", step: "test", run: { executor: "check" } });
+      w.unit("gh-197").step_run = { kind: "check", running: true };
+      w.tick();
+      w.append("gh-196", { kind: "run.requested", by: "person", step: "implement", attempt: 1 });
+      w.append("gh-197", { kind: "run.requested", by: "person", step: "test", attempt: 1 });
+      w.tick();
+      w.tick();
+      const fired = new Set(w.ticks.flatMap((t) => t.decisions.map((d) => d.rule)));
+      const missing = ["agent.ready.manual", "receipts.apply", "receipts.reject", "agent.start"].filter((r) => !fired.has(r));
+      if (missing.length) throw new Error(`${name}: expected ${missing.join(", ")} to fire; fired ${[...fired].join(", ")}`);
+      return w.ticks.map((t) => caseOf(w, t, `${name}-${t.n}`, `${description} Tick ${t.n}.`));
+    },
+  },
 ];

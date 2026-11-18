@@ -40,6 +40,8 @@ export interface SeedOptions {
   unit?: string;
   step: string;
   run?: string | null;
+  /** fields the state carries beside the step and run, such as a park */
+  extra?: Partial<RunState>;
 }
 
 /** The same, through any runtime env: the integration tier seeds a real machine dir with it. */
@@ -51,6 +53,7 @@ export async function seedIn(env: RuntimeEnv, opts: SeedOptions): Promise<RunSta
   const runId = opts.run === undefined ? RUN : opts.run;
   const state: RunState = {
     ...base,
+    ...opts.extra,
     step: opts.step,
     run:
       runId === null

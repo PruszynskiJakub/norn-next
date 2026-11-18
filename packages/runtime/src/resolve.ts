@@ -3,7 +3,7 @@
  * configured plugins, and a name no plugin provides is a refusal that names it, so a typo in the
  * config fails before the first tick rather than as a missing effect midway through a run.
  */
-import { DEFAULT_KERNEL_CONFIG, type KernelWorkflows, loadWorkflow, type WorkflowLoad } from "@norn/kernel";
+import { DEFAULT_KERNEL_CONFIG, type KernelWorkflows, loadWorkflow, type WorkflowError, type WorkflowLoad } from "@norn/kernel";
 import {
   createForge,
   createStore,
@@ -92,17 +92,20 @@ export function resolveSlots(ctx: HostContext, plugins: readonly NornPlugin[], c
   return ok({ tracker: tracker.value, forge: forge.value, store: store.value, vcs: vcs.value, executors, stepKinds: stepKinds.value, pack: pack.value });
 }
 
-function parseYaml(file: string, text: string): PluginResult<unknown> {
+function parseYaml(text: string): { ok: true; value: unknown } | { ok: false; message: string } {
   try {
-    return ok(parse(text) as unknown);
+    return { ok: true, value: parse(text) as unknown };
   } catch (e) {
-    return fail("invalid", `${file}: ${e instanceof Error ? e.message : String(e)}`, false);
+    return { ok: false, message: e instanceof Error ? e.message : String(e) };
   }
 }
 
 /**
  * Load every workflow of a pack by its file name without the extension. A workflow that fails to load
- * is kept as its failure, not dropped: decide parks a story that asks for it and says why.
+ * is kept as its failure, not dropped, and so is one whose file does not parse: decide parks a story
+ * that asks for it and says why, and the host names the file to the person rather than refusing every
+ * command over one file. A shared file that does not parse is named in the failure of every workflow
+ * that does not load without it.
  */
 export function loadPackWorkflows(
   pack: Pack,
@@ -110,16 +113,22 @@ export function loadPackWorkflows(
   config: Pick<RuntimeConfig["kernel"], "counterDefaults" | "maxNudges" | "maxRetries" | "deadlineMs"> = DEFAULT_KERNEL_CONFIG,
 ): PluginResult<KernelWorkflows["byName"]> {
   const sharedFiles: Record<string, unknown> = {};
+  const sharedBroken: WorkflowError[] = [];
   for (const [file, text] of Object.entries(pack.shared)) {
-    const doc = parseYaml(`shared/${file}`, text);
-    if (!doc.ok) return doc;
-    sharedFiles[file.replace(/\.ya?ml$/, "")] = doc.value;
+    const doc = parseYaml(text);
+    if (doc.ok) sharedFiles[file.replace(/\.ya?ml$/, "")] = doc.value;
+    else sharedBroken.push({ path: "", message: `shared/${file} does not parse: ${doc.message}`, shared: file.replace(/\.ya?ml$/, "") });
   }
   const byName: Record<string, WorkflowLoad> = {};
   for (const [file, text] of Object.entries(pack.workflows)) {
-    const doc = parseYaml(file, text);
-    if (!doc.ok) return doc;
-    byName[file.replace(/\.ya?ml$/, "")] = loadWorkflow(doc.value, { stepKinds, sharedFiles, config });
+    const name = file.replace(/\.ya?ml$/, "");
+    const doc = parseYaml(text);
+    if (!doc.ok) {
+      byName[name] = { ok: false, errors: [{ path: "", message: `${file} does not parse: ${doc.message}` }] };
+      continue;
+    }
+    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config });
+    byName[name] = load.ok || sharedBroken.length === 0 ? load : { ok: false, errors: [...sharedBroken, ...load.errors] };
   }
   return ok(byName);
 }

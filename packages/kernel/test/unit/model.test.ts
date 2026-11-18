@@ -146,6 +146,7 @@ describe("kernel schemas", () => {
       { kind: "unit.marked", ended: "stuck", reason: "counter qa_loop ran out" },
       { kind: "unit.parked", reason: "gate.park" },
       { kind: "mode.changed", mode: "auto", by: "a-person" },
+      { kind: "run.requested", by: "a-person", step: "work", attempt: 1 },
       { kind: "receipt.rejected", seq: 3, reason: "outcome nope is not declared by work" },
     ];
     expect(samples.map((s) => s.kind).sort()).toEqual([...RECEIPT_KINDS].sort());

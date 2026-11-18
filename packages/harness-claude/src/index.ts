@@ -6,7 +6,7 @@ import { respond } from "./respond.ts";
 
 export { CLAUDE_HOOKS, type ClaudeHook } from "./hooks.ts";
 export { settingsLocalPath } from "./install.ts";
-export { RUN_ID_ENV } from "./launch.ts";
+export { DEFAULT_ARGS, RUN_ID_ENV } from "./launch.ts";
 export { PROMPT_SOURCE_ENV } from "./normalize.ts";
 export { hookCommandFor, mergeNornHooks, NORN_MARKER, removeNornHooks } from "./settings.ts";
 

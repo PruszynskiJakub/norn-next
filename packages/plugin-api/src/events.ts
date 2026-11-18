@@ -44,7 +44,15 @@ const VARIANTS = [
   variant("input.received", { id: Type.Optional(Id), by: InputBy }),
   variant("limit.hit", { kind: LimitKind, resets_at: Type.Optional(IsoTime) }),
   variant("context.compacted", {}),
-  variant("turn.ended", { last_message: Type.Optional(Type.String()) }),
+  variant("turn.ended", {
+    last_message: Type.Optional(Type.String()),
+    /**
+     * Set when the turn stopped on the agent's own or its provider's error rather than the agent
+     * choosing to stop (plugin API 1.6): the run that ends there unreported names it, as the agent's
+     * last words may say nothing of it.
+     */
+    error: Type.Optional(Type.String({ minLength: 1 })),
+  }),
   variant("report.made", { verb: ReportVerb, outcome: Type.Optional(Type.String()) }),
   variant("session.ended", { reason: EndReason }),
   variant("hook.error", { hook: Type.String(), message: Type.String() }),

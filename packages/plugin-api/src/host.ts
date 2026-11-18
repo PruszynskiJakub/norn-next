@@ -40,6 +40,12 @@ export interface HostFiles {
   list(dir: string): Promise<string[]>;
   /** remove the file; removing a missing file is not an error */
   remove(path: string): Promise<void>;
+  /**
+   * `write`, and the file is executable by its owner (plugin API 1.6): a script handed to another
+   * program, found on its PATH, is run only with the bit set. Optional, as a host with no executable
+   * files (a browser) is still a host; a caller without it does without the script.
+   */
+  writeExecutable?(path: string, data: string): Promise<void>;
 }
 
 export interface HostRepo {

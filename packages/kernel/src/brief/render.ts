@@ -22,6 +22,28 @@ export interface AnsweredAsk {
   answer: string;
 }
 
+/**
+ * An input as the host resolved it for the agent: where it reads it (a path relative to the worktree),
+ * the text itself when it is short, or a note saying how to get it or that nothing is recorded.
+ */
+export interface BriefInputView {
+  /** the workflow's name for it (`spec`, `last_check`) or the file it names */
+  name: string;
+  /** what it is, in a few words */
+  label?: string;
+  path?: string;
+  /** shown in the brief itself */
+  text?: string;
+  note?: string;
+}
+
+/** The story the unit delivers, as its tracker item names it. */
+export interface BriefStory {
+  key: string;
+  title: string;
+  url?: string;
+}
+
 export interface BriefRenderInput {
   brief: BriefInputs;
   /** `gh-12` or `gh-12/03` */
@@ -42,6 +64,11 @@ export interface BriefRenderInput {
   attended?: boolean;
   /** answers given to earlier sessions of this step, which a fresh session would otherwise never see */
   answered?: readonly AnsweredAsk[];
+  /** the inputs as the host made them readable; absent: the bare names the step lists */
+  inputs?: readonly BriefInputView[];
+  /** a line under the inputs on how the host keeps their files (what it reads back, what git ignores) */
+  inputsNote?: string;
+  story?: BriefStory;
 }
 
 /** What a hook's stop block and a nudge say about reporting: the one line every harness repeats. */
@@ -88,6 +115,23 @@ function inputLine(input: BriefInputs["inputs"][number]): string {
   return input.label ? `- ${input.label}: \`${input.file}\`` : `- \`${input.file}\``;
 }
 
+function fenced(text: string, indent: string): string[] {
+  const body = text.trimEnd();
+  // a fence longer than any backtick run inside keeps the text from closing it early
+  const longest = Math.max(2, ...[...body.matchAll(/`+/g)].map((m) => m[0].length));
+  const fence = "`".repeat(longest + 1);
+  return [`${indent}${fence}`, ...body.split("\n").map((l) => (l ? `${indent}${l}` : "")), `${indent}${fence}`];
+}
+
+function inputViewLines(v: BriefInputView): string[] {
+  const what = v.label ? ` — ${v.label}` : "";
+  const where = v.path ? `: \`${v.path}\`` : "";
+  const note = v.note ? `${v.path || v.label ? ". " : " — "}${v.note}` : "";
+  const out = [`- \`${v.name}\`${what}${where}${note}`];
+  if (v.text !== undefined && v.text.trim() !== "") out.push(...fenced(v.text, "  "));
+  return out;
+}
+
 function skillLine(skills: readonly string[]): string {
   const named = skills.map((s) => `\`${s}\``);
   const list = named.length === 1 ? named[0] : `${named.slice(0, -1).join(", ")} and ${named.at(-1)}`;
@@ -126,6 +170,10 @@ export function renderBrief(input: BriefRenderInput): string {
       : `- You run unattended: no person reads this session. A question goes through \`${c.ask}\`, which parks the step until a person answers it.`,
     "",
   );
+  if (input.story) {
+    const s = input.story;
+    out.push("## Story", "", `\`${s.key}\`: ${s.title.trim() || "(untitled)"}${s.url ? ` (${s.url})` : ""}`, "");
+  }
   out.push("## Your work", "");
   if (input.instructions) out.push(input.instructions.trim(), "");
   if (input.description) out.push(input.description.trim(), "");
@@ -141,7 +189,11 @@ export function renderBrief(input: BriefRenderInput): string {
       ...answeredLines(input.answered),
       "",
     );
-  if (b.inputs.length > 0) out.push("## Inputs", "", "Read these before you change anything:", "", ...b.inputs.map(inputLine), "");
+  if (input.inputs && input.inputs.length > 0) {
+    out.push("## Inputs", "", "Read these before you change anything:", "", ...input.inputs.flatMap(inputViewLines), "");
+    if (input.inputsNote) out.push(input.inputsNote.trim(), "");
+  }
+  else if (b.inputs.length > 0) out.push("## Inputs", "", "Read these before you change anything:", "", ...b.inputs.map(inputLine), "");
   if (input.handoff)
     out.push(
       "## Handoff",

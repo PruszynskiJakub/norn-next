@@ -8,6 +8,7 @@ import type { HostContext } from "@norn/plugin-api";
 import type { Runtime, RuntimeEnv } from "@norn/runtime";
 import type { LoadedConfig } from "./config/load.ts";
 import { nornHome } from "./home.ts";
+import { packFailure } from "./plugins/pack-check.ts";
 import type { PluginImporter } from "./plugins/installed.ts";
 import { defaultHolder, type HostFactory, type WiredPlugins, type WiredRepo, wireConfig, wirePlugins, wireRepo, wireRuntime, wireRuntimeEnv } from "./wiring.ts";
 
@@ -79,13 +80,20 @@ export class CliContext {
     this.envP ??= this.parts().then(wireRuntimeEnv);
     return this.envP;
   }
+  /** the runtime env, refused when the pack's workflows cannot run: what a tick needs */
+  async workflowEnv(): Promise<RuntimeEnv> {
+    const [env, p] = await Promise.all([this.runtimeEnv(), this.plugins()]);
+    const failure = packFailure(env.workflows, { pack: env.config.pack, plugins: p.plugins, installedAs: p.installedAs });
+    if (failure) throw failure;
+    return env;
+  }
   /** the tick host */
   async runtime(): Promise<Runtime> {
-    return wireRuntime(await this.runtimeEnv());
+    return wireRuntime(await this.workflowEnv());
   }
 
   private async parts() {
     const [w, loaded, p] = await Promise.all([this.repo(), this.config(), this.plugins()]);
-    return { w, loaded, plugins: p.plugins, holder: defaultHolder(this.io.env, this.io.hostname ?? hostname()), self: this.io.self };
+    return { w, loaded, plugins: p.plugins, holder: defaultHolder(this.io.env, this.io.hostname ?? hostname()), self: this.io.self, ...(this.io.env.PATH !== undefined ? { path: this.io.env.PATH } : {}) };
   }
 }

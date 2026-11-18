@@ -1,6 +1,6 @@
 /**
  * The test harness's agent: started by the headless runner in the unit's worktree, it acts as a
- * coding agent does through its hooks and reports through the real `norn` binary, as subprocesses.
+ * coding agent does through its hooks and reports through the `norn` on its PATH, as subprocesses.
  * Each thing it saw is appended as one JSON line to `$TEST_AGENT_NOTES/<run id>.jsonl` for the test.
  *
  * Plans (TEST_AGENT_PLAN):
@@ -20,8 +20,8 @@ import { HOOK_FILE } from "./plugin.ts";
 
 const cwd = process.cwd();
 const hookCommand = (await Bun.file(join(cwd, HOOK_FILE)).text()).trim();
-// the hook command is `<norn> hook test`: the same binary answers the agent's reports
-const norn = hookCommand.replace(/ hook test$/, "");
+// a bare `norn`, as the brief tells an agent to run it: the launcher's PATH must make it this build
+const norn = "norn";
 const plan = process.env.TEST_AGENT_PLAN ?? "work";
 const notesDir = process.env.TEST_AGENT_NOTES as string;
 const runId = process.env.NORN_RUN_ID as string;
@@ -107,6 +107,7 @@ if (resumed) {
   note("answered", { session: resumed, prompt });
   await work();
 } else {
+  note("norn", (await sh("command -v norn")).stdout.trim());
   const brief = await sh(`${norn} brief`);
   note("brief", { code: brief.code, text: brief.stdout });
   if (plan === "ask") {

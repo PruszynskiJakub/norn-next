@@ -88,6 +88,10 @@ export interface ResumeInput {
   id: string;
   /** already marked */
   text: string;
+  /** what the launch adds to the agent's env beside the run's own (agent-bin.ts's PATH) */
+  env?: Record<string, string>;
+  /** the executor's extra arguments, as the first launch had them */
+  args?: readonly string[];
 }
 
 /**
@@ -106,11 +110,20 @@ export async function resumeWith(input: ResumeInput): Promise<PluginResult<void>
   if (session === undefined) return fail("unavailable", `${what}: its session has ended and never reported a harness session to resume`, false);
   const launch = await readLaunch(ctx, h.unit, h.run_id);
   if (!launch.ok) return launch;
-  const env = { [RUN_ENV.unit]: h.unit, [RUN_ENV.run]: h.run_id };
+  const env = { ...input.env, [RUN_ENV.unit]: h.unit, [RUN_ENV.run]: h.run_id };
   let spec: ReturnType<Harness["launch"]>;
   try {
     const model = launch.value.model;
-    spec = harness.launch({ cwd: launch.value.cwd, prompt: text, run_id: h.run_id, env, resume: session, headless: true, ...(model !== undefined ? { model } : {}) });
+    spec = harness.launch({
+      cwd: launch.value.cwd,
+      prompt: text,
+      run_id: h.run_id,
+      env: { ...env },
+      resume: session,
+      headless: true,
+      ...(model !== undefined ? { model } : {}),
+      ...(input.args !== undefined ? { args: [...input.args] } : {}),
+    });
   } catch (e) {
     return fail("invalid", `${harness.name}: resume could not be built: ${message(e)}`, false);
   }

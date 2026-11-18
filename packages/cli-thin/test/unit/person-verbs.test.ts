@@ -101,6 +101,39 @@ describe("run stop", () => {
   });
 });
 
+describe("run start", () => {
+  const parked = { parked: { reason: "agent.ready.manual", since: "2026-11-17T10:00:00.000Z" } };
+
+  test("records run.requested for the parked step and attempt, once however often it is sent", async () => {
+    const m = configured();
+    await seedUnit(m, { step: AGENT_STEP, run: null, extra: parked });
+    const r = await runCli(["run", "start", UNIT, "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(json(r.stdout)).toMatchObject({ unit: UNIT, step: AGENT_STEP, attempt: 1, replayed: false });
+    const again = await runCli(["run", "start", "lt-1", "--json"], m.io);
+    expect(json(again.stdout)).toMatchObject({ replayed: true });
+    const receipts = await receiptsOf(m);
+    expect(receipts.map((x) => x.data)).toEqual([{ kind: "run.requested", by: "me@box", step: AGENT_STEP, attempt: 1 }]);
+  });
+
+  test("a unit not parked by manual mode refuses, saying where it is; a step agent may not start a run", async () => {
+    const m = configured();
+    await seedUnit(m, { step: AGENT_STEP });
+    const r = await runCli(["run", "start", UNIT, "--json"], m.io);
+    expect(refusal(r)).toEqual({ exit: ExitCode.refused, code: "not_manual_parked" });
+    expect((json(r.stdout) as { error: string }).error).toContain(`runs ${RUN} at ${AGENT_STEP}`);
+    const agent = withEnv(m, runEnv());
+    expect(refusal(await runCli(["run", "start", UNIT, "--json"], agent.io))).toEqual({ exit: ExitCode.refused, code: "agent_start" });
+    expect(await receiptsOf(m)).toEqual([]);
+  });
+
+  test("help lists the verb under run", async () => {
+    const m = configured();
+    const r = await runCli(["help", "run", "start"], m.io);
+    expect(r.stdout).toContain("norn run start <unit>");
+  });
+});
+
 describe("story create and close on the local tracker", () => {
   test("create makes an item intake takes in; close closes it", async () => {
     const m = configured();

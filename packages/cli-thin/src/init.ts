@@ -30,6 +30,7 @@ export interface InitFlags {
   store?: string;
   executor?: string;
   runner?: string;
+  mode?: "auto" | "manual";
   yes: boolean;
 }
 
@@ -40,6 +41,8 @@ export interface Choices {
   /** the executor's harness, which also names it */
   executor: string;
   runner: string;
+  /** how stories run: a headless runner has nobody beside the agent, so it starts on its own */
+  mode: "auto" | "manual";
   base: string;
 }
 
@@ -65,6 +68,14 @@ export async function detect(host: HostContext, env: Readonly<Record<string, str
   return { origin, github, gh, claude, pi, herdr, base };
 }
 
+/**
+ * The kernel's default mode is manual, which parks every agent step for a person: right where a
+ * person works beside the agent's pane, a dead end with a headless runner nobody watches.
+ */
+export function modeFor(runner: string): "auto" | "manual" {
+  return runner === "headless" ? "auto" : "manual";
+}
+
 export function choose(d: Detected, f: InitFlags): { choices: Choices; offered: string[] } {
   const onGithub = d.github && d.gh;
   const runner = f.runner ?? (d.herdr && f.yes ? "herdr" : "headless");
@@ -74,6 +85,7 @@ export function choose(d: Detected, f: InitFlags): { choices: Choices; offered: 
     store: f.store ?? "local",
     executor: f.executor ?? (d.pi && !d.claude ? "pi" : "claude"),
     runner,
+    mode: f.mode ?? modeFor(runner),
     base: d.base ?? "main",
   };
   const offered = [
@@ -101,6 +113,7 @@ export function initLayer(c: Choices): ConfigLayer {
     store: { use: c.store },
     executors: { [c.executor]: { harness: c.executor, runner: c.runner } },
     base: c.base,
+    kernel: { mode: c.mode },
   };
 }
 

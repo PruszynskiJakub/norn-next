@@ -58,7 +58,8 @@ function usageLimit(...texts: Array<string | undefined>): Draft {
 /**
  * A turn that ended on an API error. A usage limit is a limit, not a stuck agent: Claude Code
  * continues the session at the reset. A failed login leaves the session unable to act on any
- * prompt until a person runs `/login`, so it asks. Any other error ends the turn like Stop would.
+ * prompt until a person runs `/login`, so it asks. Any other error ends the turn like Stop would,
+ * naming the error, which a run that ends there unreported keeps in its stuck reason.
  */
 export function stopFailure(payload: unknown): Draft[] {
   const error = str(payload, "error");
@@ -67,7 +68,8 @@ export function stopFailure(payload: unknown): Draft[] {
   if (error === "rate_limit") return [usageLimit(details, last)];
   if (error === "authentication_failed")
     return [{ type: "input.requested", id: stableId("login", str(payload, "session_id")), question: "agent logged out: run /login in the pane" }];
-  return [{ type: "turn.ended", ...(last && { last_message: last }) }];
+  const named = [error, details].filter((t): t is string => t !== undefined && t !== "").join(": ");
+  return [{ type: "turn.ended", ...(last && { last_message: last }), error: `claude stopped on an error: ${named || last || "an unnamed API error"}` }];
 }
 
 /**

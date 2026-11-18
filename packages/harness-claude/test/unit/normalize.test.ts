@@ -222,7 +222,11 @@ describe("claude normalize: waits and limits", () => {
   });
   test("a failed login asks the person to run /login; another API error ends the turn", () => {
     expect(body("StopFailure", payloads.StopFailureAuth)).toEqual([{ type: "input.requested", id: expect.stringMatching(/^login-/), question: "agent logged out: run /login in the pane" }]);
-    expect(body("StopFailure", { ...payloads.StopFailureAuth, error: "server_error" })).toEqual([{ type: "turn.ended", last_message: "API Error: 401" }]);
+    expect(body("StopFailure", { ...payloads.StopFailureAuth, error: "server_error" })).toEqual([
+      { type: "turn.ended", last_message: "API Error: 401", error: "claude stopped on an error: server_error: 401 Invalid authentication credentials" },
+    ]);
+    const { error: _e, error_details: _d, ...unnamed } = payloads.StopFailureAuth;
+    expect(body("StopFailure", unnamed)).toEqual([{ type: "turn.ended", last_message: "API Error: 401", error: "claude stopped on an error: API Error: 401" }]);
   });
 });
 

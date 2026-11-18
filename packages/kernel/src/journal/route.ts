@@ -23,13 +23,14 @@ export function endStuck(state: RunState, reason: string, exhausted?: string): R
   return next;
 }
 
-/** Enter `to` as a new visit: attempt from its visits, the step's limits fresh, no run, no park. */
+/** Enter `to` as a new visit: attempt from its visits, the step's limits fresh, no run, no park, no start a person asked for. */
 export function enterStep(state: RunState, to: string): RunState {
   const visits = { ...(state.visits ?? { [state.step]: state.attempt }) };
   const attempt = (visits[to] ?? 0) + 1;
   visits[to] = attempt;
   const next: RunState = { ...state, step: to, attempt, visits, retries_used: 0, run: null };
   delete next.parked;
+  delete next.requested;
   return next;
 }
 

@@ -11,15 +11,19 @@
  *   (`injectContext`), or, when the run's process has ended (a headless agent exits as its turn
  *   ends), handed to a resumed launch of its session (launcher-resume.ts). With none of these,
  *   refused: a nudge is never dropped silently.
+ * - every launch, resumed ones too, puts agent-bin.ts's folder first on the agent's PATH, so the
+ *   `norn` the brief tells the agent to run is the build that launched it.
  * - stop / alive: the runner, on the run's newest process (its latest resume, else the first).
  * The handle is launcher-handle.ts's: executor, unit, run and the runner's own handle.
  */
 import type { Harness, HostContext, NornPromptSource, PluginResult, Runner } from "@norn/plugin-api";
 import { fail, markPrompt, ok, RUN_ENV } from "@norn/plugin-api";
+import { agentBinEnv, cliOfHookCommand } from "./agent-bin.ts";
 import { markDelivered, pendingInjections, queueInjection, recordSentPrompt } from "./events/outbox.ts";
 import { receivedDir } from "./events/paths.ts";
 import { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
 import { currentRunnerHandle, recordLaunch, resumesOf, resumeWith } from "./launcher-resume.ts";
+import { shellQuote } from "./shell.ts";
 import type { AgentLauncher, AgentRunRequest, ExecutorModes, LauncherModes } from "./types.ts";
 
 export interface Executor {
@@ -27,6 +31,8 @@ export interface Executor {
   runner: Runner;
   /** the model a launch asks for when the step names none */
   model?: string;
+  /** the agent's extra arguments, in place of the harness's own defaults */
+  args?: readonly string[];
 }
 
 export interface HarnessLauncherOptions {
@@ -37,6 +43,11 @@ export interface HarnessLauncherOptions {
    * the shell-quoted line. The CLI passes `["norn", "hook"]`, so hooks run `norn hook claude`.
    */
   hookCommand: readonly string[];
+  /**
+   * The PATH this host's processes run with. A launched agent gets it with a folder in front that
+   * holds a `norn` running this CLI (agent-bin.ts); absent, the agent's PATH is left alone.
+   */
+  hostPath?: string;
   /** the brief for a run, as brief-context.ts renders it */
   renderBrief(run: AgentRunRequest): Promise<PluginResult<string>>;
   /** where a run's output goes when no pane shows it; default `<dataDir>/runtime/sessions/<run>.log` */
@@ -47,12 +58,7 @@ export function sessionLogPath(ctx: HostContext, runId: string): string {
   return `${ctx.repo.dataDir}/runtime/sessions/${runId}.log`;
 }
 
-const SAFE_WORD = /^[A-Za-z0-9_@%+=:,./-]+$/;
-
-/** One POSIX shell word: hook configs hold a command line, and a path with a space must stay one argument. */
-export function shellQuote(argv: readonly string[]): string {
-  return argv.map((a) => (SAFE_WORD.test(a) ? a : `'${a.replaceAll("'", `'\\''`)}'`)).join(" ");
-}
+export { shellQuote };
 
 const PROMPT_ID_CHAR = /[^A-Za-z0-9._:-]/g;
 
@@ -76,6 +82,11 @@ const message = (e: unknown): string => (e instanceof Error ? e.message : String
 
 export class HarnessLauncher implements AgentLauncher {
   constructor(readonly opts: HarnessLauncherOptions) {}
+
+  /** The env every launch adds for the agent beside the run's own: agent-bin.ts's PATH. */
+  private agentEnv(): Promise<PluginResult<Record<string, string>>> {
+    return agentBinEnv(this.opts.ctx, cliOfHookCommand(this.opts.hookCommand), this.opts.hostPath);
+  }
 
   /** Any executor that can run headless or attended makes the launcher able to. */
   get modes(): LauncherModes {
@@ -106,14 +117,18 @@ export class HarnessLauncher implements AgentLauncher {
     if (!recorded.ok) return recorded;
     const headless = !e.runner.capabilities.attended;
     const model = run.brief.model ?? e.model;
+    const agentEnv = await this.agentEnv();
+    if (!agentEnv.ok) return agentEnv;
+    const env = { ...agentEnv.value, [RUN_ENV.unit]: run.unit, [RUN_ENV.run]: run.run_id };
     let spec: ReturnType<Harness["launch"]>;
     try {
       spec = e.harness.launch({
         cwd: run.worktree,
         prompt: markPrompt(brief.value, { source: "brief", id: run.run_id }),
         run_id: run.run_id,
-        env: { [RUN_ENV.unit]: run.unit, [RUN_ENV.run]: run.run_id },
+        env: { ...env },
         ...(model !== undefined ? { model } : {}),
+        ...(e.args !== undefined ? { args: [...e.args] } : {}),
         ...(run.resume !== undefined ? { resume: run.resume } : {}),
         ...(headless ? { headless: true } : {}),
       });
@@ -128,7 +143,7 @@ export class HarnessLauncher implements AgentLauncher {
     };
     const launched = await recordLaunch(ctx, run.unit, run.run_id, { executor: run.executor, ...where, ...(model !== undefined ? { model } : {}) });
     if (!launched.ok) return launched;
-    const started = await e.runner.start({ key: run.run_id, argv: spec.argv, env: { ...spec.env, [RUN_ENV.unit]: run.unit, [RUN_ENV.run]: run.run_id }, ...where });
+    const started = await e.runner.start({ key: run.run_id, argv: spec.argv, env: { ...spec.env, ...env }, ...where });
     if (!started.ok) return started;
     return ok({ handle: encodeLaunchHandle({ executor: run.executor, unit: run.unit, run_id: run.run_id, runner: started.value.handle }) });
   }
@@ -195,7 +210,11 @@ export class HarnessLauncher implements AgentLauncher {
       if (!recorded.value.recorded && (await ctx.files.read(`${receivedDir(ctx, h.unit, h.run_id)}/${id}`)) !== null) return ok(undefined);
       return executor.runner.send(h.runner, marked);
     }
-    const resume = () => resumeWith({ ctx, handle: h, harness: executor.harness, runner: executor.runner, id, text: marked });
+    const resume = async (): Promise<PluginResult<void>> => {
+      const agentEnv = await this.agentEnv();
+      if (!agentEnv.ok) return agentEnv;
+      return resumeWith({ ctx, handle: h, harness: executor.harness, runner: executor.runner, id, text: marked, env: agentEnv.value, ...(executor.args !== undefined ? { args: executor.args } : {}) });
+    };
     if ((await this.alive(handle)) === false) return resume();
     const queued = await queueInjection(ctx, h.unit, h.run_id, { id, source, text: marked, at, ...extra });
     if (!queued.ok) return queued;

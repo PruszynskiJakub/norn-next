@@ -144,6 +144,8 @@ function apply(acc: Acc, e: HarnessEvent): void {
       v.active = true;
       v.turn_ended = true;
       if (e.last_message !== undefined) v.last_message = e.last_message;
+      if (e.error !== undefined) v.error = e.error;
+      else delete v.error;
       // a turn cannot end while a call or a foreground subagent runs, so any left are hooks that never
       // fired; background subagents outlive the turn and report back later
       dropTools(acc);

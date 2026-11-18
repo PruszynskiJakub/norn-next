@@ -1,5 +1,8 @@
 export { act } from "./act.ts";
 export { briefRenderInput, renderInputFrom } from "./brief-context.ts";
+export { INPUTS_DIR, INPUTS_NOTE, type MaterializedInputs, materializeInputs, mirrorSpec, readBackDocs, storyItem, worktreeOf } from "./inputs.ts";
+export { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
+export { HANDOFFS_DIR, handoffArtifact, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
 export {
   CheckExit,
   CHECK_START_GRACE_MS,
@@ -30,6 +33,7 @@ export {
 } from "./events/outbox.ts";
 export { batchesDir, batchName, batchSeq, deliveredDir, EVENTS_DIR, outboxDir, receivedDir, runEventsDir, sentDir } from "./events/paths.ts";
 export { EventLogSessionSource, type EventLogSessionSourceOptions } from "./events/session-source.ts";
+export { AGENT_BIN_NAME, agentBinDir, agentBinEnv, cliOfHookCommand, shimScript } from "./agent-bin.ts";
 export { createHarnessLauncher, DEFAULT_HOOK_COMMAND, resolveExecutors } from "./executors.ts";
 export { answerPromptId, type Executor, HarnessLauncher, type HarnessLauncherOptions, nudgePromptId, sessionLogPath, shellQuote } from "./launcher.ts";
 export { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";

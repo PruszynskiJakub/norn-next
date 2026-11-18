@@ -44,6 +44,24 @@ describe("renderBrief", () => {
     expect(renderBrief(input({ answered: [] }))).not.toContain("## Answers already given");
   });
 
+  test("readable inputs replace the bare names: each with its path, short text fenced inline, a note where nothing is held; the story leads", () => {
+    const md = renderBrief(
+      input({
+        story: { key: "gh-12", title: "Sign in with a passkey", url: "https://forge.example/12" },
+        inputs: [
+          { name: "spec", label: "the story's spec", path: ".norn/spec.md" },
+          { name: "last_check", label: "the last check's result", path: ".norn/last_check.md", text: "Check `test` exited 1.\n\n```\nFAIL a.test.ts\n```" },
+          { name: "diff", note: "run `git diff main...HEAD`" },
+        ],
+        inputsNote: "`.norn/` is ignored by git.",
+      }),
+    );
+    expect(md).toContain("## Story\n\n`gh-12`: Sign in with a passkey (https://forge.example/12)\n\n## Your work");
+    expect(md).toContain("- `spec` — the story's spec: `.norn/spec.md`\n- `last_check` — the last check's result: `.norn/last_check.md`\n  ````\n  Check `test` exited 1.\n\n  ```\n  FAIL a.test.ts\n  ```\n  ````\n- `diff` — run `git diff main...HEAD`");
+    expect(md).toContain("`.norn/` is ignored by git.");
+    expect(md).not.toContain("- `handoff`\n");
+  });
+
   test("an attended step sends questions to the person, never through ask", () => {
     const md = renderBrief(input({ attended: true }));
     expect(md).toContain("A person works with you in this session");

@@ -2,7 +2,8 @@
  * The agent's side (what `norn brief`, `norn done`, `norn ask` and `norn stuck` will call): the
  * brief of the unit's live run, and a report recorded as the kernel's `run.reported` receipt through
  * the Journal, plus a `report.made` event in the run's log so the session reads as reported and the
- * stop hook lets the turn end.
+ * stop hook lets the turn end. The documents the agent edited in its worktree (the handoff, the spec)
+ * are read back into the story's documents first, so the next step's inputs carry them.
  *
  * A report is idempotent by its report id (the receipt's id derives from it), so a retried command
  * records once. It is refused, never guessed at, when the run is not the unit's live one or `done`
@@ -12,6 +13,7 @@ import { type BriefInputs, renderBrief, type UnitJournal } from "@norn/kernel";
 import type { HarnessEvent } from "@norn/plugin-api";
 import { STORE_ID_PATTERN } from "@norn/plugin-api";
 import { renderInputFrom } from "./brief-context.ts";
+import { readBackDocs } from "./inputs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
 import { type LiveStep, liveStepOf, reportOnRecord } from "./live-run.ts";
@@ -118,6 +120,8 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   if (req.verb === "ask" && !textOf(req)) return refuse("an ask without a question", "ask one self-contained question", "invalid");
   const text = textOf(req);
   const outcome = req.verb === "done" ? req.outcome : undefined;
+  // before the receipt: once it is applied the next step may launch, and it must read what this run wrote
+  await readBackDocs(env, unit);
   const wrote = await env.journal.record(unit, {
     id: receiptId,
     data: { kind: "run.reported", step: live.step, attempt: live.attempt, run_id: runId, verb: req.verb, ...(outcome !== undefined && { outcome }), ...(text !== undefined && { text }) },

@@ -1,6 +1,6 @@
 /**
- * Agent step rules. A ready step starts in auto mode and waits for a person in manual mode or when
- * attended. A run on the record is judged from its classified session: a report is applied, a dead
+ * Agent step rules. A ready step starts in auto mode and waits for a person in manual mode (until
+ * they start it with `run.requested`) or when attended. A run on the record is judged from its classified session: a report is applied, a dead
  * session (or a launch that never produced one) is retried in a fresh one, a question or permission
  * prompt parks the unit for a person, a usage limit waits for its reset without counting against the
  * deadline, a run past its deadline is stopped once, and a quiet agent is nudged. Every nudge and retry is bounded by
@@ -19,6 +19,14 @@ import { ageMs, applyDecision, applyOrPark, intentFor, noop, parkDecision, takeA
 /** The story's own mode, then the workflow's, then the config's. */
 export function effectiveMode(v: UnitView): Mode {
   return v.state.mode ?? v.graph.mode ?? v.ctx.config.mode;
+}
+
+/**
+ * Manual mode leaves the step's runs to a person, unless they started this visit's run with
+ * `run.requested`: that run is then retried and nudged as an auto run is, since nobody sits beside it.
+ */
+function personDrives(v: UnitView): boolean {
+  return effectiveMode(v) === "manual" && v.state.requested === undefined;
 }
 
 /** The executor a step runs on: its `by:`, else the config's. */
@@ -61,7 +69,8 @@ function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
   const executor = executorOf(v, spec);
   const caps = capsOf(v, executor);
   if (!caps) return parkDecision(v, "agent.no_executor", "stuck", { text: `executor '${executor}' is not configured` });
-  if (effectiveMode(v) === "manual") return parkDecision(v, "agent.ready.manual", "manual", { text: spec.instructions });
+  // a person's `run.requested` starts this visit's agent once; manual mode still holds the next step
+  if (personDrives(v)) return parkDecision(v, "agent.ready.manual", "manual", { text: spec.instructions });
   if (!caps.headless) return parkDecision(v, "agent.ready.no_headless", "manual", { text: `auto mode, but executor '${executor}' cannot run headless` });
   if (!takeAgentSlot(v.ctx)) return noop(v, "agent.queued", `queued: ${v.ctx.config.maxAgents} agent runs in use`);
   const run_id = v.ctx.nextId();
@@ -77,8 +86,10 @@ function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
   };
 }
 
+/** The session's own error travels with the outcome: a run that stopped on one says so in the reason it ends with. */
 function classified(v: UnitView, run: RunInfo, outcome: ClassifiedOutcome, rule: string): Decision {
-  return applyDecision(v, rule, [intentFor(v, { kind: "run.classified", run_id: run.id, outcome, rule })]);
+  const error = v.unit.session?.error;
+  return applyDecision(v, rule, [intentFor(v, { kind: "run.classified", run_id: run.id, outcome, rule, ...(error ? { error } : {}) })]);
 }
 
 function routes(v: UnitView, outcome: ClassifiedOutcome): boolean {
@@ -145,7 +156,10 @@ function overdue(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
 function died(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
   if (routes(v, "died")) return classified(v, run, "died", "agent.died.route");
   // a person drives a manual run: the dead session is theirs to start again
-  if (effectiveMode(v) === "manual" || run.attended) return parkDecision(v, "agent.died.manual", "stuck", { text: `run ${run.id} ended without a report` });
+  if (personDrives(v) || run.attended) {
+    const error = v.unit.session?.error;
+    return parkDecision(v, "agent.died.manual", "stuck", { text: `run ${run.id} ended without a report${error ? `: ${error}` : ""}` });
+  }
   if (v.state.retries_used < spec.retries) return retry(v, spec, run, "agent.died.retry");
   return classified(v, run, "died", "agent.died.exhausted");
 }
@@ -161,7 +175,7 @@ function quiet(v: UnitView, spec: AgentStepSpec, run: RunInfo, base: string): De
   if (routes(v, "silent")) return classified(v, run, "silent", `${base}.route`);
   if (run.last_nudge_at !== undefined && ageMs(v.ctx, run.last_nudge_at) < v.ctx.config.silentAfterMs)
     return noop(v, `${base}.nudged`, `nudged at ${run.last_nudge_at}; waiting for the agent to take it`);
-  if (effectiveMode(v) === "manual") return parkDecision(v, `${base}.manual`, "stuck", { text: `run ${run.id} went quiet without a report` });
+  if (personDrives(v)) return parkDecision(v, `${base}.manual`, "stuck", { text: `run ${run.id} went quiet without a report` });
   if (run.nudges >= spec.nudges) return classified(v, run, "silent", `${base}.exhausted`);
   if (takesNudge(capsOf(v, run.executor))) {
     const reason = base.slice("agent.".length);

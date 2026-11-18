@@ -94,16 +94,11 @@ export async function runDoctor(ctx: CliContext): Promise<DoctorReport> {
     if (plugins.check) checks.push(skipped("slots", "plugins"), skipped("workflows", "plugins"), skipped("hooks", "plugins"));
     else {
       const env = await attempt("slots", () => ctx.runtimeEnv());
-      if (env.check?.code === "step_kind_missing") checks.push(passed("slots", "every slot builds from its config"), { ...env.check, name: "workflows" }, skipped("hooks", "workflows"));
-      else if (env.check) checks.push(env.check, skipped("workflows", "slots"), skipped("hooks", "slots"));
+      if (env.check) checks.push(env.check, skipped("workflows", "slots"), skipped("hooks", "slots"));
       else if (env.value) {
         checks.push(passed("slots", "every slot builds from its config"));
-        const broken = Object.entries(env.value.workflows).flatMap(([name, load]) => (load.ok ? [] : load.errors.map((e) => `${name}${e.path ? ` ${e.path}` : ""}: ${e.message}`)));
-        checks.push(
-          broken.length === 0
-            ? passed("workflows", `${Object.keys(env.value.workflows).sort().join(", ")} load`)
-            : { name: "workflows", ok: false, error: `workflows that do not load: ${broken.join("; ")}`, do_instead: `norn plugin update <the plugin of pack ${env.value.config.pack}>`, code: "workflow_invalid" },
-        );
+        const workflows = await attempt("workflows", () => ctx.workflowEnv());
+        checks.push(workflows.check ?? passed("workflows", `${Object.keys(env.value.workflows).sort().join(", ")} load`));
         checks.push(await hooksCheck(ctx, cwd, env.value.slots.executors));
       }
     }

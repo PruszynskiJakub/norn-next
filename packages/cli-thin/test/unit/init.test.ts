@@ -40,7 +40,7 @@ describe("norn init: detection", () => {
   test("origin on GitHub with gh present, claude on PATH: the github tracker and forge, claude in headless", async () => {
     const { m, r, body } = await init([], { w: { origin: "git@github.com:acme/app.git", tools: ["gh", "claude"], originHead: "origin/trunk" } });
     expect(r.exit).toBe(ExitCode.ok);
-    expect(body.chose).toEqual({ tracker: "github", forge: "github", store: "local", executor: "claude", runner: "headless", base: "trunk" });
+    expect(body.chose).toEqual({ tracker: "github", forge: "github", store: "local", executor: "claude", runner: "headless", mode: "auto", base: "trunk" });
     expect(await written(m, PATHS.local)).toEqual({
       format: 1,
       tracker: { use: "github", intake: { label: "norn" } },
@@ -48,6 +48,7 @@ describe("norn init: detection", () => {
       store: { use: "local" },
       executors: { claude: { harness: "claude", runner: "headless" } },
       base: "trunk",
+      kernel: { mode: "auto" },
     });
   });
 
@@ -59,7 +60,7 @@ describe("norn init: detection", () => {
 
   test("no origin, no claude: local and none, the claude executor still named, the base from the current branch", async () => {
     const { m, body } = await init([], { w: { branch: "dev" } });
-    expect(body.chose).toEqual({ tracker: "local", forge: "none", store: "local", executor: "claude", runner: "headless", base: "dev" });
+    expect(body.chose).toEqual({ tracker: "local", forge: "none", store: "local", executor: "claude", runner: "headless", mode: "auto", base: "dev" });
     expect(body.detected).toMatchObject({ origin: null, claude: false });
     // a local tracker has nobody to assign to: every labelled open item is intake
     expect((await written(m, PATHS.local)).tracker).toEqual({ use: "local", intake: { label: "norn", assignee: null } });
@@ -80,6 +81,19 @@ describe("norn init: detection", () => {
     expect((asked.body.chose as { runner: string }).runner).toBe("herdr");
     const outside = await init(["--yes"], { w: { tools: ["claude", "herdr"] } });
     expect({ runner: (outside.body.chose as { runner: string }).runner, offered: outside.body.offered }).toEqual({ runner: "headless", offered: [] });
+  });
+
+  test("the mode: auto with the headless runner, manual in herdr, a flag wins, printed with why; a mode that is neither refuses", async () => {
+    const headless = await init([], { w: { tools: ["claude"] } });
+    expect((await written(headless.m, PATHS.local)).kernel).toEqual({ mode: "auto" });
+    const md = await runCli(["init"], machine({ script: world({ tools: ["claude"] }) }).io);
+    expect(md.stdout).toContain("- mode: auto (the headless runner has nobody beside the agent");
+    const herdr = await init(["--yes"], { w: { tools: ["claude", "herdr"] }, env: { HERDR_ENV: "1" } });
+    expect(herdr.body.chose).toMatchObject({ runner: "herdr", mode: "manual" });
+    const flagged = await init(["--mode", "manual"], { w: { tools: ["claude"] } });
+    expect((await written(flagged.m, PATHS.local)).kernel).toEqual({ mode: "manual" });
+    const bad = await init(["--mode", "sometimes"], { w: { tools: ["claude"] } });
+    expect({ exit: bad.r.exit, code: bad.body.code }).toEqual({ exit: ExitCode.usage, code: "usage" });
   });
 
   test("pi alone on PATH: the pi executor, written with the pi harness, and doctor checks the pi binary", async () => {

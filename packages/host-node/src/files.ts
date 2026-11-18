@@ -1,4 +1,4 @@
-import { link, mkdir, open, readdir, readFile, rename, unlink } from "node:fs/promises";
+import { chmod, link, mkdir, open, readdir, readFile, rename, unlink } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import type { HostFiles } from "@norn/plugin-api";
 
@@ -47,6 +47,21 @@ async function writeTemp(path: string, data: string): Promise<string> {
   return tmp;
 }
 
+/** rwxr-xr-x */
+const EXECUTABLE = 0o755;
+
+async function replace(p: string, data: string, mode?: number): Promise<void> {
+  const tmp = await writeTemp(p, data);
+  try {
+    if (mode !== undefined) await chmod(tmp, mode);
+    await rename(tmp, p);
+  } catch (e) {
+    await unlink(tmp).catch(() => {});
+    throw e;
+  }
+  await fsyncDir(dirname(p));
+}
+
 /** Files on the local disk; a relative path is taken from `root`. */
 export function nodeFiles(root: string): HostFiles {
   const at = (path: string): string => (isAbsolute(path) ? path : resolve(root, path));
@@ -59,17 +74,9 @@ export function nodeFiles(root: string): HostFiles {
         throw e;
       }
     },
-    write: async (path, data) => {
-      const p = at(path);
-      const tmp = await writeTemp(p, data);
-      try {
-        await rename(tmp, p);
-      } catch (e) {
-        await unlink(tmp).catch(() => {});
-        throw e;
-      }
-      await fsyncDir(dirname(p));
-    },
+    write: (path, data) => replace(at(path), data),
+    // the bit goes on the temp file, so the name never points at a script that cannot run
+    writeExecutable: (path, data) => replace(at(path), data, EXECUTABLE),
     // link, not open("wx") on the target: a reader racing the creator (a lock's owner reading its
     // timestamp) sees no file or the whole file, never an empty one
     create: async (path, data) => {

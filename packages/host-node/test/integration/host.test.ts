@@ -48,6 +48,16 @@ describe("exec", () => {
 });
 
 describe("files", () => {
+  test("writeExecutable replaces the file atomically with its owner's exec bit set", async () => {
+    const { files } = host();
+    const path = join(root, "bin", "tool");
+    await files.writeExecutable?.(path, "#!/bin/sh\necho one\n");
+    await files.writeExecutable?.(path, "#!/bin/sh\necho two\n");
+    expect(statSync(path).mode & 0o777).toBe(0o755);
+    expect(readdirSync(join(root, "bin"))).toEqual(["tool"]);
+    expect((await host().exec([path])).stdout).toBe("two\n");
+  });
+
   test("write creates nested folders, replaces atomically and leaves no temp file", async () => {
     const { files } = host();
     const path = join(root, "a", "b", "c.json");

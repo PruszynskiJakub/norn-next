@@ -70,7 +70,7 @@ function toolCall(payload: unknown, env: Readonly<Record<string, string | undefi
 function settle(payload: unknown): Draft[] {
   const error = str(payload, "stop_reason") === "error" ? (str(payload, "error_message") ?? "pi stopped on a provider error") : undefined;
   const last = error !== undefined ? `pi stopped on an error: ${error}` : str(payload, "last_assistant_message");
-  return [{ type: "turn.ended", ...(last && { last_message: last }) }];
+  return [{ type: "turn.ended", ...(last && { last_message: last }), ...(error !== undefined && { error: `pi stopped on an error: ${error}` }) }];
 }
 
 function drafts(hook: PiHook, payload: unknown, env: Readonly<Record<string, string | undefined>>): Draft[] {

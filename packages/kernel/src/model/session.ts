@@ -33,6 +33,7 @@ export const SessionFactsSchema = Type.Object(
     limit: Type.Optional(Type.Object({ kind: LimitKind, resets_at: Type.Optional(IsoTime) }, closed)),
     report: Type.Optional(Type.Object({ verb: ReportVerb, outcome: Type.Optional(Type.String()) }, closed)),
     last_message: Type.Optional(Type.String()),
+    error: Type.Optional(Type.String()),
     pending_tools: NonNegInt,
     subagents: NonNegInt,
     pane_answers: NonNegInt,

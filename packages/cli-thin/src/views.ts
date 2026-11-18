@@ -53,6 +53,8 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
   const s = u.state;
   if (!s || s.ended === "done") return null;
   if (s.ended) return { for: "person", text: `ended ${s.ended}${s.ended_reason ? `: ${s.ended_reason}` : ""}` };
+  // manual mode's park is lifted only by a person's start, so the view names the verb that does it
+  if (s.parked?.reason === "agent.ready.manual") return { for: "person", text: `${s.parked.reason}: start its agent with norn run start ${u.id}` };
   if (s.parked) return { for: "person", text: s.parked.reason };
   if (u.session?.ask) return { for: "answer", text: u.session.ask.question };
   if (u.session?.permission) return { for: "permission", text: u.session.permission.prompt };

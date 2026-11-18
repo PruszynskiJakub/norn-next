@@ -3,11 +3,12 @@
  * release the lock. The lock is released whatever happens in between, so a failed tick never blocks
  * the next one.
  */
-import { type Decision, decide } from "@norn/kernel";
+import { type Decision, decide, type KernelFacts } from "@norn/kernel";
 import { ulid } from "@norn/schema";
 import { act } from "./act.ts";
 import type { RuntimeEnv, TickContext } from "./env.ts";
 import { gatherFacts } from "./facts.ts";
+import { mirrorSpec } from "./inputs.ts";
 import { acquireTickLock } from "./lock.ts";
 import { TickTrace } from "./trace.ts";
 import type { TickReport } from "./types.ts";
@@ -19,6 +20,20 @@ export function newTickId(now: string): string {
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
+/**
+ * Keep each live story's spec on its item as the tracker has it now, so a changed title or body
+ * reaches the spec when it changes, not only at the next launch. Decide never reads the spec, so this
+ * is host memory beside the tick, and a failure only leaves the spec as it was.
+ */
+async function mirrorSpecs(env: RuntimeEnv, facts: KernelFacts, problems: string[]): Promise<void> {
+  for (const story of facts.stories) {
+    const own = story.units.find((u) => u.id === story.key)?.state;
+    if (!story.item || !own || own.ended !== undefined) continue;
+    const mirrored = await mirrorSpec(env, story.key, story.item).catch((e: unknown) => ({ ok: false as const, failure: { message: message(e) } }));
+    if (!mirrored.ok) problems.push(`${story.key}: spec: ${mirrored.failure.message}`);
+  }
+}
+
 /** Gather, decide and act; anything that stops the tick short is a problem in the report, never a throw past the lock. */
 async function run(env: RuntimeEnv, tickId: string, trace: TickTrace, problems: string[]): Promise<Decision[]> {
   const gathered = await gatherFacts(env, tickId);
@@ -28,6 +43,7 @@ async function run(env: RuntimeEnv, tickId: string, trace: TickTrace, problems: 
   }
   problems.push(...gathered.value.problems);
   trace.facts = gathered.value.facts;
+  await mirrorSpecs(env, gathered.value.facts, problems);
   const t: TickContext = { env, tickId, facts: gathered.value.facts, workflows: gathered.value.workflows };
   // decide is handed a copy: the act handlers read the facts it decided from, and decide must not be able to change them
   const decisions = decide(structuredClone(t.facts), t.workflows, env.config.kernel);

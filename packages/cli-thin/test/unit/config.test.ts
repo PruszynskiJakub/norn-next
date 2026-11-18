@@ -164,6 +164,13 @@ describe("the runtime config derived from the person's", () => {
     expect(runtimeConfigOf(c, "me@box").executors.claude).toEqual({ name: "claude", runner: { name: "headless" }, model: "opus" });
   });
 
+  test("an executor's args reach its choice whole, replacing a lower layer's list rather than appending to it", async () => {
+    const c = await loaded({ user: LOCAL_CONFIG, local: "executors: { claude: { args: [--verbose, --debug] } }\n", repo: "executors: { claude: { args: [--permission-mode, acceptEdits] } }\n" });
+    expect(runtimeConfigOf(c, "me@box").executors.claude).toEqual({ name: "claude", runner: { name: "headless" }, args: ["--permission-mode", "acceptEdits"] });
+    const found = await problems({ user: LOCAL_CONFIG, repo: "executors: { claude: { args: --verbose } }\n" });
+    expect(found.map((p) => `${p.layer} ${p.path}`)).toEqual(["repo /executors/claude/args"]);
+  });
+
   test("an executor key no harness reads is a config error rather than a setting ignored", async () => {
     const found = await problems({ user: LOCAL_CONFIG, repo: "executors: { claude: { effort: high } }\n" });
     expect(found.map((p) => `${p.layer} ${p.path} ${p.message}`)).toEqual(["repo /executors/claude unknown property 'effort'"]);

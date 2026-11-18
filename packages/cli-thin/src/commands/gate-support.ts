@@ -26,7 +26,7 @@ function whereAre(units: readonly UnitJournal[]): string {
 const newestRound = (u: UnitJournal): number => u.receipts.findLast((r) => r.data.kind === "round.started")?.seq ?? 0;
 
 /** The round a unit is in: the seq of the newest `round.started` on its story's own unit, which slices share. */
-async function roundOf(env: RuntimeEnv, u: UnitJournal): Promise<number> {
+export async function roundOf(env: RuntimeEnv, u: UnitJournal): Promise<number> {
   const story = u.unit.split("/")[0] as string;
   if (story === u.unit) return newestRound(u);
   const read = await env.journal.readUnit(story);

@@ -15,6 +15,7 @@ import {
   readEvents,
   readSentPrompt,
   shellQuote,
+  shimScript,
 } from "../../src/index.ts";
 
 const START = "2026-11-17T09:00:00.000Z";
@@ -193,6 +194,74 @@ describe("harness launcher start", () => {
     expect(await broken.start(run())).toMatchObject({ ok: false, failure: { message: "no brief" } });
     s.pane.start = async () => fail("unavailable", "herdr is down");
     expect(await s.launcher.start(run())).toMatchObject({ ok: false, failure: { message: "herdr is down" } });
+  });
+});
+
+describe("the norn a launched agent runs", () => {
+  const CLI = ["/opt/my tools/bun", "/src/cli-thin/main.ts"];
+  const withShim = (s: ReturnType<typeof setup>, over: Partial<HarnessLauncher["opts"]> = {}) =>
+    new HarnessLauncher({ ...s.launcher.opts, hookCommand: [...CLI, "hook"], hostPath: "/usr/local/bin:/usr/bin", ...over });
+
+  test("the launch env's PATH starts with a folder whose executable norn execs the launching CLI, the rest of the env kept", async () => {
+    const s = setup();
+    expect((await withShim(s).start(run())).ok).toBe(true);
+    const launch = s.paneHarness.launches[0] as LaunchRequest;
+    expect(launch.env).toEqual({ PATH: "/m/runtime/bin:/usr/local/bin:/usr/bin", NORN_UNIT: "gh-12/03", NORN_RUN_ID: "01JRUN0000000000000000000A" });
+    expect(s.pane.starts[0]?.env).toMatchObject({ PATH: "/m/runtime/bin:/usr/local/bin:/usr/bin", AGENT_MODE: "x" });
+    expect(s.files.executable("/m/runtime/bin/norn")).toBe(true);
+    expect(await s.files.read("/m/runtime/bin/norn")).toBe(shimScript(CLI));
+    expect(shimScript(CLI)).toContain(`exec '/opt/my tools/bun' /src/cli-thin/main.ts "$@"\n`);
+    expect(s.paneHarness.installs[0]?.hookCommand).toBe("'/opt/my tools/bun' /src/cli-thin/main.ts hook fake");
+  });
+
+  test("the shim is written once: an unchanged one is left, a host PATH that already holds its folder keeps it first and once", async () => {
+    const s = setup();
+    let writes = 0;
+    const counted = s.files.writeExecutable;
+    s.files.writeExecutable = async (path, data) => {
+      writes++;
+      await counted(path, data);
+    };
+    const launcher = withShim(s, { hostPath: "/usr/bin:/m/runtime/bin" });
+    await launcher.start(run());
+    await launcher.start(run({ run_id: "01JRUN0000000000000000000B", executor: "bg" }));
+    expect(writes).toBe(1);
+    expect(s.bgHarness.launches[0]?.env.PATH).toBe("/m/runtime/bin:/usr/bin");
+  });
+
+  test("no shim when it cannot help: a bare norn would exec itself, no host PATH is known, the host cannot make a file executable", async () => {
+    const bare = setup();
+    await withShim(bare, { hookCommand: ["norn", "hook"] }).start(run());
+    const noPath = setup();
+    await new HarnessLauncher({ ...noPath.launcher.opts, hookCommand: [...CLI, "hook"] }).start(run());
+    const noExec = setup();
+    const { writeExecutable: _, ...plain } = noExec.files;
+    await withShim(noExec, { ctx: { ...noExec.ctx, files: plain } }).start(run());
+    for (const s of [bare, noPath, noExec]) {
+      expect(s.paneHarness.launches[0]?.env.PATH).toBeUndefined();
+      expect(await s.files.read("/m/runtime/bin/norn")).toBeNull();
+    }
+  });
+
+  test("a resumed launch takes the shim's PATH and the executor's args too", async () => {
+    const s = setup({ bgHarness: { resume: true } });
+    const launcher = withShim(s, { executors: { pane: { harness: s.paneHarness, runner: s.pane }, bg: { harness: s.bgHarness, runner: s.bg, args: ["--permission-mode", "acceptEdits"] } } });
+    const runId = "01JRUN0000000000000000000B";
+    const started = await launcher.start(run({ executor: "bg", attended: false, run_id: runId }));
+    if (!started.ok) throw new Error("start failed");
+    expect(s.bgHarness.launches[0]?.args).toEqual(["--permission-mode", "acceptEdits"]);
+    await appendEvents(s.ctx, "gh-12/03", runId, [{ type: "session.started", run_id: runId, seq: 0, at: START, harness_session: "sess-1" }]);
+    s.bg.live.clear();
+    expect(await launcher.answer(started.value.handle, "q1", "go left")).toEqual(ok(undefined));
+    const resumed = s.bgHarness.launches[1] as LaunchRequest;
+    expect([resumed.resume, resumed.args, resumed.env.PATH]).toEqual(["sess-1", ["--permission-mode", "acceptEdits"], "/m/runtime/bin:/usr/local/bin:/usr/bin"]);
+    expect(s.bg.starts[1]?.env.PATH).toBe("/m/runtime/bin:/usr/local/bin:/usr/bin");
+  });
+
+  test("an executor with no args leaves them to the harness's defaults", async () => {
+    const s = setup();
+    await s.launcher.start(run());
+    expect(s.paneHarness.launches[0]?.args).toBeUndefined();
   });
 });
 

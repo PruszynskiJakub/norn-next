@@ -57,7 +57,13 @@ const KINDS = [
   kind("run.reported", { run_id: Id, verb: ReportVerb, outcome: Type.Optional(OutcomeName), text: Type.Optional(Type.String()) }),
   kind("run.ended", { run_id: Id, reason: RunEndReason }),
   /** an outcome the kernel read off the session (silent, died, ...), routed like a reported one */
-  kind("run.classified", { run_id: Id, outcome: ClassifiedOutcome, rule: NonEmpty }),
+  kind("run.classified", {
+    run_id: Id,
+    outcome: ClassifiedOutcome,
+    rule: NonEmpty,
+    /** the error the run's last turn stopped on, kept in the reason the unit ends stuck with */
+    error: Type.Optional(Type.String({ minLength: 1 })),
+  }),
   kind("check.finished", { run_id: Id, exit: Type.Integer({ minimum: 0, maximum: 255 }), outcome: OutcomeName }),
   kind("step.finished", { run_id: Type.Optional(Id), step_kind: NonEmpty, outcome: OutcomeName, detail: Type.Optional(Type.Unknown()) }),
   kind("gate.decided", {
@@ -82,6 +88,11 @@ const KINDS = [
   /** the unit waits for a person; `reason` names the rule that parked it, or why, and becomes the state's park */
   kind("unit.parked", { reason: NonEmpty }),
   kind("mode.changed", { mode: Mode, by: NonEmpty }),
+  /**
+   * a person starts the agent of a step manual mode holds, once: it lifts the park for this visit to
+   * the step only, so manual mode still holds every later step
+   */
+  kind("run.requested", { by: NonEmpty }),
   /** applyReceipts refused receipt `seq`; written so the refusal is on the record, never silent */
   kind("receipt.rejected", { seq: PosInt, reason: NonEmpty }),
 ];

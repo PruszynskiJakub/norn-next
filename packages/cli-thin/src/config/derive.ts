@@ -58,7 +58,7 @@ export function runtimeConfigOf(loaded: LoadedConfig, holder: string): RuntimeCo
   const { config } = loaded;
   const executors: Record<string, ExecutorChoice> = {};
   for (const [name, e] of Object.entries(config.executors))
-    executors[name] = { name: e.harness, runner: runnerChoice(e.runner), ...(e.model !== undefined && { model: e.model }) };
+    executors[name] = { name: e.harness, runner: runnerChoice(e.runner), ...(e.model !== undefined && { model: e.model }), ...(e.args !== undefined && { args: [...e.args] }) };
   const lockStale = config.kernel?.lock_stale;
   return {
     tracker: slotChoice(config.tracker, ["intake"]),

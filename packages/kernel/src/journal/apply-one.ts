@@ -64,6 +64,10 @@ export function applyOne(state: RunState, r: KernelReceipt, graph: WorkflowGraph
       return runBound(state, d.run_id) ?? onRun(state, (run) => ({ ...run, stopped_at: r.at }));
     case "run.limited":
       return runBound(state, d.run_id) ?? onRun(state, (run) => ({ ...run, limited_until: d.resets_at }));
+    case "run.requested":
+      if (step.kind !== "agent") return { reject: `${state.step} is a ${step.kind} step; only an agent step is started by a person` };
+      if (state.run !== null) return { reject: `${state.step} attempt ${state.attempt} already has run ${state.run.id}` };
+      return { state: { ...unparked(state), requested: { by: d.by, at: r.at } } };
   }
 }
 
@@ -158,13 +162,15 @@ function classified(state: RunState, d: ReceiptDataOf<"run.classified">, step: C
   if (step.routes[o]) return route(state, graph, o);
   if (step.kind !== "agent") return { reject: `outcome ${o} cannot be classified at a ${step.kind} step that does not route it` };
   const spec = step.agent;
+  // the error first: it says why the agent stopped, which the limit used up does not
+  const why = d.error ? `${o}: ${d.error}; ` : `${o}: `;
   switch (o) {
     case "silent":
     case "stalled":
-      return { state: endStuck(state, `${o}: nudges ${state.run?.nudges ?? 0}/${spec?.nudges ?? 0} used at ${step.name}`) };
+      return { state: endStuck(state, `${why}nudges ${state.run?.nudges ?? 0}/${spec?.nudges ?? 0} used at ${step.name}`) };
     case "died":
     case "timeout":
-      return { state: endStuck(state, `${o}: retries ${state.retries_used}/${spec?.retries ?? 0} used at ${step.name}`) };
+      return { state: endStuck(state, `${why}retries ${state.retries_used}/${spec?.retries ?? 0} used at ${step.name}`) };
     case "ask":
       return { state: { ...state, parked: { reason: `${step.name}: the agent waits for input`, since: at } } };
     case "stuck":

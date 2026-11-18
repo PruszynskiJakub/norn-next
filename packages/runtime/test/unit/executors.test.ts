@@ -58,6 +58,13 @@ describe("executors as a harness in a runner", () => {
     expect([executors.claude?.model, executors.bot?.model]).toEqual(["opus", undefined]);
   });
 
+  test("an executor's args are handed to the launcher with its harness and runner", () => {
+    const { env } = build((c) => ({ ...c, executors: { claude: { name: "fake", runner: { name: "pane" }, args: ["--permission-mode", "plan"] }, bot: { name: "fake", runner: { name: "bg" } } } }));
+    if (!env.ok) throw new Error(env.failure.message);
+    const executors = (env.value.launcher as HarnessLauncher).opts.executors;
+    expect([executors.claude?.args, executors.bot?.args]).toEqual([["--permission-mode", "plan"], undefined]);
+  });
+
   test("an executor's facts carry whether its harness resumes a session, which decide reads before delivering an answer", async () => {
     const h = harness();
     const fake = h.plugins[0]?.provides.harness?.fake as Harness;

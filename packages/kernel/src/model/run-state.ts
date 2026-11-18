@@ -73,6 +73,8 @@ export const RunState = Type.Object(
     /** the story's own mode, set by a person; absent takes the workflow's, then the config's */
     mode: Type.Optional(Mode),
     parked: Type.Optional(ParkInfo),
+    /** a person asked for this visit's agent to start though manual mode holds it; entering a step drops it */
+    requested: Type.Optional(Type.Object({ by: NonEmpty, at: IsoTime }, closed)),
     ended: Type.Optional(Ended),
     /** why it ended stuck or corrupt, shown to a person; names the counter when one ran out */
     ended_reason: Type.Optional(NonEmpty),

@@ -8,6 +8,7 @@ import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import { deriveUlid } from "@norn/schema";
 import { ensureWorktree } from "./branches.ts";
 import type { TickContext } from "./env.ts";
+import { mirrorSpec } from "./inputs.ts";
 
 /**
  * Ids the host derives for receipts no decision carries, offset past any decide can mint from the
@@ -16,7 +17,7 @@ import type { TickContext } from "./env.ts";
 const HOST_ID_OFFSET = 1_000_000;
 
 /**
- * A new story: its worktree, then a `round.started` receipt pinning the workflow decide chose, which
+ * A new story: its worktree, its spec mirrored from the item, then a `round.started` receipt pinning the workflow decide chose, which
  * makes the story a unit of the store. The claim and the first run state follow from decide: the
  * round starts once this machine holds the claim, so a story is never in progress unclaimed.
  */
@@ -37,6 +38,9 @@ export async function intakeStory(t: TickContext, d: DecisionOf<"intake_story">,
   }
   const worktree = await ensureWorktree(env, unit);
   if (!worktree.ok) return worktree;
+  // the spec first: once the round is recorded the story is a unit whose first agent reads it
+  const spec = await mirrorSpec(env, unit, d.item);
+  if (!spec.ok) return spec;
   const wrote = await env.journal.record(unit, { id: deriveUlid(t.tickId, HOST_ID_OFFSET + index), data: { kind: "round.started", workflow: structuredClone(load.workflow.pinned) } });
   if (!wrote.ok) return wrote;
   return ok({ worktree: worktree.value, seq: wrote.value.seq });

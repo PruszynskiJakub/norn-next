@@ -309,6 +309,11 @@ describe("applyReceipts: runs, nudges and classified outcomes", () => {
     expect(res.state).toMatchObject({ ended: "stuck", ended_reason: "silent: nudges 2/2 used at implement", run: null });
   });
 
+  test("a classified outcome carrying the session's error keeps it in the stuck reason, before the limit", () => {
+    const res = apply(fresh(), journal(1, started("a1"), { kind: "run.classified", run_id: "a1", outcome: "silent", rule: "agent.silent.exhausted", error: "pi stopped on an error: Codex error: model not supported" }));
+    expect(res.state).toMatchObject({ ended: "stuck", ended_reason: "silent: pi stopped on an error: Codex error: model not supported; nudges 0/2 used at implement", run: null });
+  });
+
   test("an ask with no ask route parks the unit; an answer lifts the park and keeps the run", () => {
     const parked = apply(fresh(), journal(1, started("a1"), { kind: "run.reported", run_id: "a1", verb: "ask", text: "which base?" })).state;
     expect(parked.parked).toEqual({ reason: "which base?", since: iso(2) });

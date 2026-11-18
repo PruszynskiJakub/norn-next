@@ -1,5 +1,5 @@
 /**
- * `norn init [--tracker <name>] [--forge <name>] [--store <name>] [--executor <harness>] [--runner <name>] [--commit] [--yes]`: set up norn in this repo: detect the tracker, forge and executor, write the config, run doctor.
+ * `norn init [--tracker <name>] [--forge <name>] [--store <name>] [--executor <harness>] [--runner <name>] [--mode auto|manual] [--commit] [--yes]`: set up norn in this repo: detect the tracker, forge and executor, write the config, run doctor.
  * Writes the repo-local config (or the committed one with `--commit`), keeps `.agents/` out of git
  * unless committed, prints what it chose and runs doctor. It never asks: every choice is detected or
  * given as a flag (`init.ts`). The choices are resolved against the bundled and installed plugins
@@ -14,19 +14,20 @@ import { AGENTS_DIR, configPaths, type Layer, layerFileName, REPO_COMMITTED_FILE
 import { CliContext } from "../context.ts";
 import { doctorLines, runDoctor } from "../doctor.ts";
 import { choose, completable, completedText, detect, initLayer, initText, offerLine, withExcluded } from "../init.ts";
-import { refuse, rendered } from "../output.ts";
+import { refuse, rendered, usageError } from "../output.ts";
 import { wirePlugins } from "../wiring.ts";
 
 export const initCommand = defineCommand({
   name: "init",
   summary: "Set up norn in this repo: detect the tracker, forge and executor, write the config, run doctor",
-  usage: "norn init [--tracker <name>] [--forge <name>] [--store <name>] [--executor <harness>] [--runner <name>] [--commit] [--yes]",
+  usage: "norn init [--tracker <name>] [--forge <name>] [--store <name>] [--executor <harness>] [--runner <name>] [--mode auto|manual] [--commit] [--yes]",
   options: {
     tracker: { type: "string" },
     forge: { type: "string" },
     store: { type: "string" },
     executor: { type: "string" },
     runner: { type: "string" },
+    mode: { type: "string" },
     commit: { type: "boolean" },
     yes: { type: "boolean" },
   },
@@ -36,6 +37,7 @@ export const initCommand = defineCommand({
     "--store <name>": "where run state lives (default local)",
     "--executor <harness>": "the default executor's harness (detected: claude when it is on PATH, else pi when it is)",
     "--runner <name>": "where agents run (default headless; herdr when inside herdr and asked)",
+    "--mode auto|manual": "how agent steps start: auto on their own, manual when a person runs norn run start (default auto with the headless runner, else manual)",
     "--commit": `write the committed config (${REPO_COMMITTED_FILE}, team mode) instead of the repo-local one (${REPO_LOCAL_FILE})`,
     "--yes": "take every detected choice without asking",
   },
@@ -50,8 +52,20 @@ export const initCommand = defineCommand({
     if (current !== null && !(existing?.ok && completable(existing.value)))
       throw refuse(`norn is set up here already: ${layerFileName(layer)} exists`, "norn doctor, or norn config set <key> <value>", "already_initialized", { file: paths[layer] });
 
+    const given = opt.str(args, "mode");
+    if (given !== undefined && given !== "auto" && given !== "manual") throw usageError(`--mode ${given}: the mode is auto or manual`, "norn init --mode auto, or norn init --mode manual");
+
+    const mode: "auto" | "manual" | undefined = given;
     const detected = await detect(w.ctx, ctx.env, w.repo.root);
-    const flags = { tracker: opt.str(args, "tracker"), forge: opt.str(args, "forge"), store: opt.str(args, "store"), executor: opt.str(args, "executor"), runner: opt.str(args, "runner"), yes: opt.bool(args, "yes") };
+    const flags = {
+      tracker: opt.str(args, "tracker"),
+      forge: opt.str(args, "forge"),
+      store: opt.str(args, "store"),
+      executor: opt.str(args, "executor"),
+      runner: opt.str(args, "runner"),
+      ...(mode !== undefined && { mode }),
+      yes: opt.bool(args, "yes"),
+    };
     const { choices, offered } = choose(detected, flags);
     const doc = initLayer(choices);
     const text = current !== null && existing?.ok && existing.value ? completedText(current, existing.value, doc) : initText(doc);
@@ -87,6 +101,7 @@ export const initCommand = defineCommand({
       `- forge: ${choices.forge}`,
       `- store: ${choices.store}`,
       `- executor: ${choices.executor} in ${choices.runner}${flags.executor || (choices.executor === "pi" ? detected.pi : detected.claude) ? "" : ` (${choices.executor} is not on PATH)`}`,
+      `- mode: ${choices.mode}${flags.mode ? "" : choices.mode === "auto" ? ` (the ${choices.runner} runner has nobody beside the agent: agent steps start on their own)` : ` (agents run in ${choices.runner} beside a person: start each agent step with norn run start <unit>)`}`,
       `- base: ${choices.base}`,
       `- .git/info/exclude: ${exclude === "added" ? `added ${AGENTS_DIR}` : exclude === "present" ? `${AGENTS_DIR} already there` : "untouched (team mode)"}`,
       ...offered.map((o) => offerLine(o, choices)),
