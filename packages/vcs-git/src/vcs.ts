@@ -37,6 +37,12 @@ export function createGitVcs(ctx: HostContext, config: GitVcsConfig): Vcs {
       if (!r.ok) return r;
       return ok("conflict" in r.value ? { conflict: r.value.conflict } : { head: r.value.head });
     },
+    async remoteHead(branch) {
+      if (branch.startsWith("-")) return fail("invalid", `git: ${branch} is not a branch`, false);
+      const has = await remoteIfAny(ctx, root, remote);
+      if (!has.ok) return has;
+      return has.value === null ? ok(null) : revParse(ctx, root, `refs/remotes/${remote}/${branch}`);
+    },
     async push(branch, opts) {
       const r = await pushBranch(ctx, root, remote, branch, opts?.lease);
       return r.ok ? ok(undefined) : r;

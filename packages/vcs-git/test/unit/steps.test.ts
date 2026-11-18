@@ -198,6 +198,56 @@ describe("push", () => {
     expect(h.lines()).toContain("push --porcelain origin refs/heads/gh-12-login:refs/heads/gh-12-login");
     expect(h.lines().some((l) => l.includes("force"))).toBe(false);
   });
+
+  test("a person's push to the branch is merged in with a merge commit before the push, never rebased or forced", async () => {
+    const state = { head: HEAD };
+    const h = host(
+      storyRouter((line) => {
+        if (line === rev("refs/remotes/origin/gh-12-login")) return { stdout: TRACK };
+        if (line === `merge-base --is-ancestor ${TRACK} HEAD`) return { code: 1 };
+        if (line === `merge-base --is-ancestor HEAD ${TRACK}`) return { code: 1 };
+        if (line.startsWith("merge --no-ff --no-edit")) {
+          state.head = MERGED;
+          return {};
+        }
+        if (line.startsWith("push")) return {};
+        return undefined;
+      }, state),
+    );
+    const r = await push.run(input({}, { step: "push" }), h.ctx);
+    expect(r.ok && r.value).toEqual({ outcome: "done", detail: { branch: "gh-12-login", head: MERGED, took_remote: TRACK, remote: "origin" } });
+    const lines = h.lines();
+    const merge = lines.indexOf(`merge --no-ff --no-edit -m Merge origin/gh-12-login into gh-12-login ${TRACK}`);
+    expect(merge).toBeGreaterThanOrEqual(0);
+    expect(lines.findIndex((l) => l.startsWith("push"))).toBeGreaterThan(merge);
+    expect(lines.some((l) => l.startsWith("rebase") || l.includes("force"))).toBe(false);
+  });
+
+  test("a person's push that conflicts is aborted and refused for a person; nothing is pushed", async () => {
+    let inMerge = false;
+    const h = host(
+      storyRouter((line) => {
+        if (line === rev("refs/remotes/origin/gh-12-login")) return { stdout: TRACK };
+        if (line.startsWith("merge-base --is-ancestor")) return { code: 1 };
+        if (line === rev("MERGE_HEAD")) return inMerge ? { stdout: TRACK } : { code: 1 };
+        if (line.startsWith("merge --no-ff")) {
+          inMerge = true;
+          return { code: 1 };
+        }
+        if (line.startsWith("diff --name-only --diff-filter=U")) return { stdout: "src/a.ts\n" };
+        if (line === "merge --abort") {
+          inMerge = false;
+          return {};
+        }
+        return undefined;
+      }, { head: HEAD }),
+    );
+    const r = await push.run(input({}, { step: "push" }), h.ctx);
+    expect(r.ok ? null : { code: r.failure.code, retryable: r.failure.retryable }).toEqual({ code: "conflict", retryable: false });
+    expect(r.ok ? "" : r.failure.message).toContain("src/a.ts");
+    expect(h.lines()).toContain("merge --abort");
+    expect(h.lines().some((l) => l.startsWith("push"))).toBe(false);
+  });
 });
 
 describe("verify-base", () => {

@@ -69,6 +69,12 @@ export interface Vcs {
    * branch, which moves only when the person pulls.
    */
   remoteRef?(branch: string): Promise<PluginResult<string | null>>;
+  /**
+   * the commit the remote's copy of `branch` was at when last fetched, null when the remote has no
+   * such branch or there is no remote. Optional; without it a host cannot take in what a person
+   * pushed to the branch, and a push after theirs is refused.
+   */
+  remoteHead?(branch: string): Promise<PluginResult<string | null>>;
   push(branch: string, opts?: VcsPushOptions): Promise<PluginResult<void>>;
   fetch(): Promise<PluginResult<void>>;
 }

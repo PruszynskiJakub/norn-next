@@ -1,9 +1,10 @@
 /**
  * `open-pr`: open the story's draft change from its `pr.md`, or update the one already open, and set
  * its body. Written over the Forge and Vcs slots, never a provider, so every forge gets the same step.
- * The branch is pushed first (when the vcs pushes at all), so the change shows the head this step saw.
+ * The branch is pushed first (when the vcs pushes at all), after taking in what a person pushed to it,
+ * so the change shows the head this step saw.
  */
-import { fail, type ForgeEffect, type HostContext, ok, parseStoryKey, type PluginResult, type StepKindDefinition, type StepKindInput, type StepKindOutcome } from "@norn/plugin-api";
+import { fail, type ForgeEffect, type HostContext, ok, parseStoryKey, type PluginResult, type StepKindDefinition, type StepKindInput, type StepKindOutcome, type Vcs } from "@norn/plugin-api";
 import { SPECS_DIR } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
 
@@ -73,6 +74,35 @@ export function composeBody(text: string, story: string, url: string | undefined
   return text ? `${text}\n\n---\n\n${footer}` : footer;
 }
 
+/**
+ * Take in commits a person pushed to the branch since norn last pushed it, so the push after them is
+ * a fast-forward rather than refused: a merge commit, never a rebase or a force, since both sides are
+ * published. A merge that conflicts is aborted and refused for a person, who merges by hand; nothing
+ * of either side is dropped. Answers the branch's head after it.
+ */
+async function takeRemote(vcs: Vcs, branch: string, head: string | null): Promise<PluginResult<string | null>> {
+  if (!vcs.remoteHead || !vcs.capabilities.merge) return ok(head);
+  const remote = await vcs.remoteHead(branch);
+  if (!remote.ok) return remote;
+  if (remote.value === null || remote.value === head) return ok(head);
+  if (head !== null) {
+    const holds = await vcs.isAncestor(remote.value, head);
+    if (!holds.ok) return holds;
+    if (holds.value) return ok(head);
+  }
+  const merged = await vcs.merge(branch, remote.value, { abortOnConflict: true });
+  if (!merged.ok) return merged;
+  if ("conflict" in merged.value) {
+    const files = merged.value.conflict.files.join(", ") || "?";
+    return fail(
+      "conflict",
+      `open-pr: ${branch} diverged from its remote copy (${remote.value.slice(0, 12)}), which a person pushed to; merging it conflicts in ${files}. Nothing was pushed: merge ${remote.value.slice(0, 12)} into ${branch} in its worktree by hand (a merge commit, never a rebase or a force), and the step runs again`,
+      false,
+    );
+  }
+  return ok(merged.value.head);
+}
+
 async function run(input: StepKindInput<OpenPrConfig>, ctx: HostContext): Promise<PluginResult<StepKindOutcome>> {
   const forge = input.slots?.forge;
   if (!forge) return fail("invalid", "open-pr: the repo has no forge configured", false);
@@ -92,6 +122,9 @@ async function run(input: StepKindInput<OpenPrConfig>, ctx: HostContext): Promis
     if (!h.ok) return h;
     head = h.value;
     if (vcs.capabilities.push) {
+      const took = await takeRemote(vcs, branch, head);
+      if (!took.ok) return took;
+      head = took.value;
       const pushed = await vcs.push(branch);
       if (!pushed.ok) return pushed;
     }

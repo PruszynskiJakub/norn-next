@@ -168,6 +168,19 @@ describe("git vcs push and fetch", () => {
     expect(h.calls.map((c) => c[1])).toEqual(["remote", "remote"]);
   });
 
+  test("remoteHead reads the fetched remote-tracking ref; no remote or no remote branch is null", async () => {
+    const h = gitHost([
+      ["remote", { stdout: "upstream\n" }],
+      [`rev-parse --verify --quiet --end-of-options refs/remotes/upstream/gh-12-login^{commit}`, { stdout: `${SHA}\n` }],
+      ["rev-parse", { code: 1 }],
+    ]);
+    const vcs = vcsOf(h.ctx, "upstream");
+    expect(await vcs.remoteHead?.("gh-12-login")).toEqual({ ok: true, value: SHA });
+    expect(await vcs.remoteHead?.("gh-13-other")).toEqual({ ok: true, value: null });
+    expect(await vcsOf(gitHost([["remote", { stdout: "" }]]).ctx).remoteHead?.("gh-12-login")).toEqual({ ok: true, value: null });
+    expect((await vcs.remoteHead?.("--all"))?.ok).toBe(false);
+  });
+
   test("fetch prunes and takes no tags", async () => {
     const h = gitHost([
       ["remote", { stdout: "origin\n" }],
