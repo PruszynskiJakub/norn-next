@@ -29,15 +29,18 @@ describe("the light path", () => {
   const merge = (over: Partial<LightCommit> = {}): LightCommit => ({ sha: "m", parents: ["a", "b"], paths: [], fromBase: true, remerge: [], ...over });
   const commit = (paths: string[]): LightCommit => ({ sha: "c", parents: ["a"], paths });
 
-  test("bookkeeping is the story's spec folder, never its spec.md nor another story's folder", () => {
-    expect(bookkeeping(".agents/specs/gh-12-login/handoffs/gh-12.md", "gh-12")).toBe(true);
-    expect(bookkeeping(".agents/specs/gh-12-login/spec.md", "gh-12")).toBe(false);
-    expect(bookkeeping(".agents/specs/gh-123-other/notes.md", "gh-12")).toBe(false);
+  test("bookkeeping is the story's spec folder `.agents/specs/<story>/`, never its spec.md nor another story's folder", () => {
+    expect(bookkeeping(".agents/specs/gh-12/handoffs/gh-12.md", "gh-12")).toBe(true);
+    expect(bookkeeping(".agents/specs/gh-12/slices/01-form.md", "gh-12")).toBe(true);
+    expect(bookkeeping(".agents/specs/gh-12/spec.md", "gh-12")).toBe(false);
+    expect(bookkeeping(".agents/specs/gh-123/notes.md", "gh-12")).toBe(false);
+    expect(bookkeeping(".agents/specs/gh-12-login/notes.md", "gh-12")).toBe(false);
+    expect(bookkeeping(".agents/specs/gh-12", "gh-12")).toBe(false);
     expect(bookkeeping("src/a.ts", "gh-12")).toBe(false);
   });
 
   test("base merges git made alone are clean, one a resolver finished is resolved, anything else takes the full path", () => {
-    expect(lightOutcome([merge(), commit([".agents/specs/gh-12-login/pr.md"])], "gh-12")).toBe("clean");
+    expect(lightOutcome([merge(), commit([".agents/specs/gh-12/pr.md"])], "gh-12")).toBe("clean");
     expect(lightOutcome([], "gh-12")).toBe("clean");
     expect(lightOutcome([merge(), merge({ remerge: ["a.ts"] })], "gh-12")).toBe("resolved");
     expect(lightOutcome([merge({ remerge: null })], "gh-12")).toBe("resolved");
@@ -197,6 +200,32 @@ describe("integrate", () => {
     expect(r.ok ? "" : r.failure.message).toContain("src/a.ts:4");
     expect(h.lines()).toContain(`${DIFF} -U0 --no-color --no-ext-diff --no-textconv --src-prefix=a/ --dst-prefix=b/ gh-12-login...${HEAD}`);
     expect(h.lines().some((l) => l.startsWith("merge "))).toBe(false);
+  });
+
+  test("a conflict aborts the merge and names the story branch's commit and the paths, so the slice's resolver merges that commit", async () => {
+    let inMerge = false;
+    const h = host((line, cwd) => {
+      if (line === "symbolic-ref --quiet --short HEAD") return { stdout: cwd === SLICE_WT ? "gh-12-03-form\n" : "gh-12-login\n" };
+      if (line === rev("HEAD")) return { stdout: cwd === SLICE_WT ? HEAD : BASE };
+      if (line === `merge-base --is-ancestor ${HEAD} HEAD`) return { code: 1 };
+      if (line === rev("MERGE_HEAD")) return inMerge ? { stdout: HEAD } : { code: 1 };
+      if (line.startsWith("rev-parse")) return { code: 1 };
+      if (line.startsWith("status --porcelain")) return { stdout: "" };
+      if (line.startsWith(DIFF)) return { stdout: "" };
+      if (line.startsWith("merge --no-ff --no-edit")) {
+        inMerge = true;
+        return { code: 1 };
+      }
+      if (line.startsWith("diff --name-only --diff-filter=U")) return { stdout: "src/a.ts\nsrc/b.ts\n" };
+      if (line === "merge --abort") {
+        inMerge = false;
+        return {};
+      }
+      return undefined;
+    });
+    const r = await integrate.run(slice(), h.ctx);
+    expect(r).toEqual({ ok: true, value: { outcome: "conflict", detail: { story_branch: "gh-12-login", slice_head: HEAD, base: { ref: "gh-12-login", sha: BASE }, conflicts: ["src/a.ts", "src/b.ts"] } } });
+    expect(h.lines()).toContain("merge --abort");
   });
 
   test("a story is never integrated into itself", async () => {

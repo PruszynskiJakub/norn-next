@@ -21,16 +21,18 @@ interface AgentStep {
   where: string;
   text: string;
   inputs: string[];
+  skills: string[];
 }
 
 function agentSteps(): AgentStep[] {
   const out: AgentStep[] = [];
   for (const file of DIRS.flatMap(yamlFiles)) {
-    const doc = parse(readFileSync(file, "utf8")) as { steps?: Record<string, { agent?: unknown; inputs?: unknown[] }> };
+    const doc = parse(readFileSync(file, "utf8")) as { steps?: Record<string, { agent?: unknown; inputs?: unknown[]; skills?: unknown[] }> };
     for (const [name, step] of Object.entries(doc.steps ?? {})) {
       if (typeof step?.agent !== "string") continue;
       const inputs = (step.inputs ?? []).filter((i): i is string => typeof i === "string");
-      out.push({ where: `${relative(ROOT, file)}#${name}`, text: step.agent, inputs });
+      const skills = (step.skills ?? []).filter((i): i is string => typeof i === "string");
+      out.push({ where: `${relative(ROOT, file)}#${name}`, text: step.agent, inputs, skills });
     }
   }
   return out;
@@ -42,6 +44,12 @@ describe("agent step texts", () => {
     expect(steps.length).toBeGreaterThan(0);
     const missing = steps.flatMap((s) => [...s.text.matchAll(/the (\w+) input/g)].map((m) => m[1] as string).filter((i) => !s.inputs.includes(i)).map((i) => `${s.where}: ${i}`));
     expect(missing).toEqual([]);
+  });
+
+  test("a step that resolves a merge lists base_side, the only input that names the commit to merge and the conflicting paths", () => {
+    const resolvers = agentSteps().filter((s) => s.skills.includes("norn-merge"));
+    expect(resolvers.map((s) => s.where)).toEqual(expect.arrayContaining([expect.stringMatching(/slice\.yaml#merge$/), expect.stringMatching(/release\.yaml#resolve$/)]));
+    expect(resolvers.filter((s) => !s.inputs.includes("base_side")).map((s) => s.where)).toEqual([]);
   });
 
   test("no step looks for the base commit under Rework, which carries findings and never a base commit", () => {

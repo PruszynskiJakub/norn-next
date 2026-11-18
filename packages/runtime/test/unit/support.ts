@@ -206,6 +206,7 @@ export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: Step
     "await-thing": kind("await-thing", "wait", ["ready"]),
     // named as the vcs plugin's kind, so the inputs that read the base update's receipts find it
     "update-branch": kind("update-branch", "effect", ["done", "conflict", "resolved"]),
+    integrate: kind("integrate", "effect", ["done", "conflict"]),
   };
 }
 
@@ -276,6 +277,19 @@ export const WORKFLOWS: Record<string, string> = {
     "    agent: Merge the base commit the base_side input names.",
     "    inputs: [base_side]",
     "    outcomes: { done: update }",
+    "",
+  ].join("\n"),
+  "integrating.yaml": [
+    "name: integrating",
+    "start: integrate",
+    "steps:",
+    "  integrate:",
+    "    integrate: null",
+    "    outcomes: { done: $done, conflict: merge }",
+    "  merge:",
+    "    agent: Merge the story branch's commit the base_side input names.",
+    "    inputs: [base_side]",
+    "    outcomes: { done: integrate }",
     "",
   ].join("\n"),
   "sliced.yaml": "name: sliced\nstart: split\nsteps:\n  split:\n    slices:\n    outcomes: { done: $done, stuck: $stuck }\n",

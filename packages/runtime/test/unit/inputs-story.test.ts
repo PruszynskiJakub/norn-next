@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { type BriefInputs, type KernelReceipt, type ReceiptData, renderBrief, type UnitJournal } from "@norn/kernel";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { SDLC_PACK } from "@norn/pack-sdlc";
+import { parse } from "yaml";
+import { REPO_ROOT } from "../../../../test/support/repo-root.ts";
 import { materializeInputs, readBackDocs, readStoryDoc, renderInputFrom } from "../../src/index.ts";
 import { has, harness, type Harnessed, record, tickUntil, trackerItem } from "./support.ts";
 
@@ -50,6 +55,15 @@ function withReceipts(journal: UnitJournal, ...data: ReceiptData[]): UnitJournal
 const updateFinished = (outcome: string, detail: unknown): ReceiptData => ({ kind: "step.finished", step: "update", attempt: 1, step_kind: "update-branch", outcome, detail });
 const conflict = updateFinished("conflict", { base: { ref: "main", sha: BASE_SHA }, conflicts: ["src/a.ts", "docs/it's.md"] });
 const resolved = updateFinished("resolved", { base: { ref: "main", sha: BASE_SHA }, head: HEAD, merged: true, anchor: ANCHOR });
+const STORY_SHA = "d".repeat(40);
+const integrateConflict: ReceiptData = {
+  kind: "step.finished",
+  step: "integrate",
+  attempt: 1,
+  step_kind: "integrate",
+  outcome: "conflict",
+  detail: { story_branch: "norn/lt-1", slice_head: HEAD, base: { ref: "norn/lt-1", sha: STORY_SHA }, conflicts: ["src/a.ts", "src/b.ts"] },
+};
 
 /** The slice step wrote two slice files in the story's worktree and reported. */
 async function sliced(h: Harnessed): Promise<void> {
@@ -152,6 +166,72 @@ describe("the base side of a conflict", () => {
     h.env.slots.vcs.mergeBase = async () => ({ ok: true, value: ANCHOR });
     await only(h, withReceipts(await record(h, UNIT), conflict), "base_side");
     expect(await h.files.read(`${WORKTREE}/.agents/inputs/base_side.md`)).toContain(`git diff ${ANCHOR} ${BASE_SHA} -- 'src/a.ts'`);
+  });
+
+  test("a slice whose integrate conflicted is given the story branch's commit to merge and, per path, what the story branch changed there", async () => {
+    const h = await started();
+    await sliced(h);
+    const slice = withReceipts(await sliceStarted(h, "lt-1/01"), integrateConflict);
+    const v = await only(h, slice, "base_side");
+    expect(v.path).toBe(".agents/inputs/base_side.md");
+    const text = (await h.files.read(`${SLICE_WORKTREE}/.agents/inputs/base_side.md`)) ?? "";
+    expect(text).toContain(`Integrating this slice into the story branch \`norn/lt-1\` at \`integrate\` conflicted with it at \`${STORY_SHA}\`: 2 paths.`);
+    expect(text).toContain(`\`git merge ${STORY_SHA}\``);
+    expect(text).toContain(`- \`src/a.ts\`: the commits \`git log --format='%h %an %s' $(git merge-base HEAD ${STORY_SHA})..${STORY_SHA} -- 'src/a.ts'\``);
+    expect(text).toContain("`src/b.ts`");
+  });
+});
+
+/** The steps a pack or repo workflow sends to merge a base or story-branch commit, and the inputs each lists in its file. */
+function resolverInputs(): { where: string; inputs: string[] }[] {
+  const of = (where: string, text: string, step: string) => {
+    const doc = parse(text) as { steps: Record<string, { inputs?: unknown[] }> };
+    return { where: `${where}#${step}`, inputs: (doc.steps[step]?.inputs ?? []).filter((i): i is string => typeof i === "string") };
+  };
+  const repo = (file: string) => readFileSync(join(REPO_ROOT, ".agents", "workflows", file), "utf8");
+  return [
+    of("pack shared/sync.yaml", SDLC_PACK.shared["sync.yaml"] ?? "", "sync-resolve"),
+    of("pack refinement.yaml", SDLC_PACK.workflows["refinement.yaml"] ?? "", "sync-resolve"),
+    of("pack shared/base-update.yaml", SDLC_PACK.shared["base-update.yaml"] ?? "", "resolve"),
+    of("repo shared/sync.yaml", repo("shared/sync.yaml"), "sync-resolve"),
+    of("repo refinement.yaml", repo("refinement.yaml"), "sync-resolve"),
+    of("repo release.yaml", repo("release.yaml"), "resolve"),
+    of("repo shared/base-update.yaml", repo("shared/base-update.yaml"), "resolve"),
+  ];
+}
+
+describe("each step sent to merge the base, as its workflow file lists its inputs", () => {
+  test("is given the base commit and the conflicting paths in base_side after its update conflicted", async () => {
+    const h = await started();
+    const journal = withReceipts(await record(h, UNIT), conflict);
+    for (const { where, inputs } of resolverInputs()) {
+      const made = await materializeInputs(h.env, journal, briefWith(inputs));
+      if (!made.ok) throw new Error(made.failure.message);
+      const view = made.value.inputs.find((i) => i.name === "base_side");
+      expect({ where, path: view?.path }).toEqual({ where, path: ".agents/inputs/base_side.md" });
+      const text = (await h.files.read(`${WORKTREE}/.agents/inputs/base_side.md`)) ?? "";
+      expect({ where, sha: text.includes(`\`git merge ${BASE_SHA}\``), a: text.includes("`src/a.ts`"), b: text.includes("`docs/it's.md`") }).toEqual({ where, sha: true, a: true, b: true });
+      await h.files.remove(`${WORKTREE}/.agents/inputs/base_side.md`);
+    }
+  });
+
+  test("the slice's merge step is given the story branch's commit and the paths after integrate conflicted", async () => {
+    const h = await started();
+    await sliced(h);
+    const slice = withReceipts(await sliceStarted(h, "lt-1/01"), integrateConflict);
+    const steps = [
+      { where: "pack slice.yaml#merge", text: SDLC_PACK.workflows["slice.yaml"] ?? "" },
+      { where: "repo slice.yaml#merge", text: readFileSync(join(REPO_ROOT, ".agents", "workflows", "slice.yaml"), "utf8") },
+    ];
+    for (const { where, text } of steps) {
+      const inputs = ((parse(text) as { steps: Record<string, { inputs?: string[] }> }).steps.merge?.inputs ?? []).filter((i) => typeof i === "string");
+      const made = await materializeInputs(h.env, slice, briefWith(inputs));
+      if (!made.ok) throw new Error(made.failure.message);
+      expect({ where, path: made.value.inputs.find((i) => i.name === "base_side")?.path }).toEqual({ where, path: ".agents/inputs/base_side.md" });
+      const file = (await h.files.read(`${SLICE_WORKTREE}/.agents/inputs/base_side.md`)) ?? "";
+      expect({ where, sha: file.includes(`\`git merge ${STORY_SHA}\``), a: file.includes("`src/a.ts`"), b: file.includes("`src/b.ts`") }).toEqual({ where, sha: true, a: true, b: true });
+      await h.files.remove(`${SLICE_WORKTREE}/.agents/inputs/base_side.md`);
+    }
   });
 });
 

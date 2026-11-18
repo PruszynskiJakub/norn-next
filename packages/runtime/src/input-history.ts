@@ -2,8 +2,9 @@
  * The inputs read off the story's record rather than its documents: `record` (what every unit of the
  * story reported, its criteria reports with their evidence), `resolution` (the merges a resolver
  * finished, to review against git's own merge) and `base_side` (what the base changed in each path a
- * base update conflicted in). The vcs slot answers no log, so where the agent needs commits the text
- * names the exact git command over the commits the receipts recorded, as `diff` does.
+ * base update conflicted in, or, for a slice whose integrate conflicted, what the story branch
+ * changed). The vcs slot answers no log, so where the agent needs commits the text names the exact
+ * git command over the commits the receipts recorded, as `diff` does.
  */
 import type { KernelReceipt, RunState, UnitJournal } from "@norn/kernel";
 import { parseUnitId } from "@norn/plugin-api";
@@ -16,6 +17,7 @@ import type { RuntimeEnv } from "./env.ts";
 export type Resolved = { text: string } | { note: string };
 
 const UPDATE_KIND = "update-branch";
+const INTEGRATE_KIND = "integrate";
 const BaseRef = Type.Object({ ref: Type.String({ minLength: 1 }), sha: Type.String({ minLength: 1 }) });
 const UpdateConflict = Type.Object({ base: BaseRef, conflicts: Type.Array(Type.String({ minLength: 1 })) });
 const UpdateMerged = Type.Object({ base: BaseRef, head: Type.String({ minLength: 1 }), anchor: Type.Optional(Type.String({ minLength: 1 })) });
@@ -32,6 +34,8 @@ export function roundOf(record: UnitJournal): KernelReceipt[] {
 
 type UpdateFinished = KernelReceipt & { data: { kind: "step.finished" } };
 const isUpdate = (r: KernelReceipt): r is UpdateFinished => r.data.kind === "step.finished" && r.data.step_kind === UPDATE_KIND;
+/** A merge a step kind tried for the unit: a base update, or a slice's integrate into its story branch. */
+const isMerge = (r: KernelReceipt): r is UpdateFinished => isUpdate(r) || (r.data.kind === "step.finished" && r.data.step_kind === INTEGRATE_KIND);
 
 function conflictOf(r: UpdateFinished) {
   if (r.data.outcome !== "conflict") return null;
@@ -47,20 +51,23 @@ function conflictLine(r: UpdateFinished): string {
 }
 
 /**
- * The base commit the unit's latest base update could not merge, or null when that update did not
- * end `conflict` (or none ran): the commit a resolver is sent to merge.
+ * The commit the unit's latest merge of its base could not make (a base update's base, or a slice's
+ * integrate's story branch head), or null when that merge did not end `conflict` (or none ran): the
+ * commit a resolver is sent to merge.
  */
 export function baseConflictOf(record: UnitJournal): { ref: string; sha: string } | null {
-  const last = record.receipts.findLast(isUpdate);
+  const last = record.receipts.findLast(isMerge);
   return last ? (conflictOf(last)?.base ?? null) : null;
 }
 
 /**
- * The base side of the conflict that sent the unit here: the latest base update's receipt, when it
- * ended `conflict`. The update aborted its merge, so the resolver merges the named commit itself.
+ * The base side of the conflict that sent the unit here: the latest base update's receipt, or a
+ * slice's latest integrate, when it ended `conflict`. Both abort their merge, so the resolver merges
+ * the named commit itself.
  */
 export async function baseSideOf(env: RuntimeEnv, record: UnitJournal): Promise<Resolved> {
-  const last = record.receipts.findLast(isUpdate);
+  const last = record.receipts.findLast(isMerge);
+  if (last?.data.step_kind === INTEGRATE_KIND) return integrateSideOf(env, record, last);
   if (!last) return { note: "no base update has run for this unit yet, so no base conflict sent it here" };
   if (last.data.outcome !== "conflict") return { note: `no base conflict sent this unit here: the last base update (${code(last.data.step ?? UPDATE_KIND)}, receipt ${last.seq}) ended ${code(last.data.outcome)}` };
   const c = conflictOf(last);
@@ -77,6 +84,28 @@ export async function baseSideOf(env: RuntimeEnv, record: UnitJournal): Promise<
   ];
   const earlier = roundOf(record).filter((r) => isUpdate(r) && r.seq !== last.seq && r.data.outcome === "conflict") as UpdateFinished[];
   if (earlier.length > 0) lines.push("", "Earlier base conflicts this round:", "", ...earlier.map(conflictLine));
+  return { text: lines.join("\n") };
+}
+
+/**
+ * The story branch's side of a slice's integrate that conflicted: integrate aborted its merge in the
+ * story's worktree, so the slice takes the story branch in and the next integrate merges cleanly.
+ */
+async function integrateSideOf(env: RuntimeEnv, record: UnitJournal, last: UpdateFinished): Promise<Resolved> {
+  const step = code(last.data.step ?? INTEGRATE_KIND);
+  if (last.data.outcome !== "conflict") return { note: `no conflict sent this slice here: its last integrate (${step}, receipt ${last.seq}) ended ${code(last.data.outcome)}` };
+  const c = conflictOf(last);
+  if (!c) return { note: `the last integrate (receipt ${last.seq}) ended \`conflict\` without naming the story branch's commit and paths; run it again to have them recorded` };
+  const mb = await env.slots.vcs.mergeBase(branchOf(record.unit), c.base.sha).catch(() => null);
+  const from = mb?.ok && mb.value ? mb.value : `$(git merge-base HEAD ${c.base.sha})`;
+  const lines = [
+    `Integrating this slice into the story branch ${code(c.base.ref)} at ${step} conflicted with it at ${code(c.base.sha)}: ${c.conflicts.length} path${c.conflicts.length === 1 ? "" : "s"}.`,
+    `norn aborted that merge in the story's worktree, so nothing is in progress: merge the story branch's commit into this slice yourself (\`git merge ${c.base.sha}\`) in this worktree, resolve, and commit the merge; the next integrate then merges cleanly.`,
+    "",
+    "The story branch's side of each conflicting path, what it changed since this slice left it:",
+    "",
+    ...c.conflicts.map((p) => `- ${code(p)}: the commits \`git log --format='%h %an %s' ${from}..${c.base.sha} -- ${quoted(p)}\`, the change \`git diff ${from} ${c.base.sha} -- ${quoted(p)}\``),
+  ];
   return { text: lines.join("\n") };
 }
 

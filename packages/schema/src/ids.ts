@@ -203,14 +203,8 @@ export const STORY_UNIT_DIR = "_story";
 /** Repo-relative folder holding every story's spec folder. */
 export const SPECS_DIR = ".agents/specs";
 
-const SPEC_DIR_RE = /^((?:gh|gl)-[1-9][0-9]*)-([a-z0-9]+(?:-[a-z0-9]+)*)$/;
 const SLICE_FILE_RE = /^([0-9]{2,3})-([a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 
-/** Spec folder name (and story branch) `gh-123-fix-login` → `{ story: "gh-123", slug: "fix-login" }`. */
-export function parseSpecDirName(name: string): { story: string; slug: string } | null {
-  const m = SPEC_DIR_RE.exec(name);
-  return m && isStoryKey(m[1]) ? { story: m[1] as string, slug: m[2] as string } : null;
-}
 /** Slice file name `03-add-form.md` → `{ nn: "03", slug: "add-form" }`. */
 export function parseSliceFileName(name: string): { nn: string; slug: string } | null {
   const m = SLICE_FILE_RE.exec(name);
@@ -287,7 +281,7 @@ export function roundRecordPath(n: number, workflow: string): string {
  * as the same unit's record (`_story/rounds/01-story`).
  */
 export const normalRecord = (record: string): string => record.replace(new RegExp(`^${RUNS_DIR}/`), "");
-/** The story a unit's run state belongs to: its key and its root-relative spec folder (`.agents/specs/<id>-<slug>`). */
+/** The story a unit's run state belongs to: its key and its root-relative spec folder (`.agents/specs/<story>`, `SPECS_DIR` joined with the key). */
 export interface RunStory {
   key: string;
   spec_dir: string;

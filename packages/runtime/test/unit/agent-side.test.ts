@@ -13,6 +13,7 @@ import {
   readEvents,
   recordSentPrompt,
   reportRun,
+  writeStoryDoc,
 } from "../../src/index.ts";
 import { has, harness, type Harnessed, record, session, tickUntil, trackerItem } from "./support.ts";
 
@@ -554,6 +555,38 @@ describe("the resolve of a base update", () => {
     expect(again?.step).toBe("resolve");
     h.env.slots.vcs.isAncestor = async () => ok(false);
     expect(await reportRun(h.env, UNIT, again?.run?.id ?? "", { verb: "done", outcome: "done" }, "r2")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
+  test("a slice's merge step's done after integrate conflicted is refused until the slice branch holds the story branch's commit integrate named", async () => {
+    const STORY_SHA = "d".repeat(40);
+    const SLICE = "lt-1/01";
+    const integrating = async () => {
+      const h = harness({ workflow: "sliced", kernel: { sliceWorkflow: "integrating" } });
+      h.stepAnswers.integrate = [{ outcome: "conflict", detail: { story_branch: "norn/lt-1", slice_head: "c".repeat(40), base: { ref: "norn/lt-1", sha: STORY_SHA }, conflicts: ["a.txt"] } }];
+      h.items.push(trackerItem(1));
+      const wrote = await writeStoryDoc(h.env, UNIT, "slices/01-parse.md", ["---", `id: ${SLICE}`, "depends_on: []", "status: planned", "---", "## Goal", ""].join("\n"));
+      if (!wrote.ok) throw new Error(wrote.failure.message);
+      await tickUntil(
+        h,
+        async () => {
+          const r = await record(h, SLICE);
+          return r.state?.step === "merge" && r.state.run !== null && r.unapplied.length === 0;
+        },
+        40,
+      );
+      const state = (await record(h, SLICE)).state;
+      if (state?.step !== "merge" || !state.run) throw new Error(`not at merge: ${state?.step}`);
+      return { h, runId: state.run.id };
+    };
+    const { h, runId } = await integrating();
+    h.env.slots.vcs.isAncestor = async (a, b) => ok(a === STORY_SHA && b === "norn/lt-1");
+    expect(await reportRun(h.env, SLICE, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({
+      ok: false,
+      refusal: { code: "merge_unfinished", error: expect.stringContaining("norn/lt-1-01"), do_instead: expect.stringContaining(`git merge ${STORY_SHA}`) },
+    });
+    const merged = await integrating();
+    merged.h.env.slots.vcs.isAncestor = async (a, b) => ok(a === STORY_SHA && b === "norn/lt-1-01");
+    expect(await reportRun(merged.h.env, SLICE, merged.runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
   });
 
   test("a done is refused when the vcs cannot tell whether the base commit is merged", async () => {
