@@ -171,6 +171,48 @@ describe("the resolution to review", () => {
   });
 });
 
+describe("the last findings", () => {
+  const reject: ReceiptData = { kind: "gate.decided", step: "ready", attempt: 1, outcome: "reject", by: "jo", reason: "Rename the flag." };
+  const approve: ReceiptData = { kind: "gate.decided", step: "ready", attempt: 2, outcome: "approve", by: "jo" };
+  const red: ReceiptData = { kind: "check.finished", step: "test", attempt: 1, run_id: "r-test", exit: 1, outcome: "fail" };
+
+  async function lastFindings(h: Harnessed, journal: UnitJournal, reworkFrom?: number) {
+    const brief = { ...briefWith(["last_findings"]), ...(reworkFrom !== undefined && { rework_from: reworkFrom }) };
+    const made = await materializeInputs(h.env, journal, brief);
+    if (!made.ok) throw new Error(made.failure.message);
+    const text = await h.files.read(`${WORKTREE}/.agents/inputs/last_findings.md`);
+    return { view: made.value.inputs[0], text };
+  }
+
+  test("are the findings of the receipt that sent the unit back", async () => {
+    const h = await started();
+    const journal = withReceipts(await record(h, UNIT), reject);
+    const { view, text } = await lastFindings(h, journal, journal.receipts.at(-1)?.seq);
+    expect(view?.path).toBe(".agents/inputs/last_findings.md");
+    expect(text).toContain("Rename the flag.");
+  });
+
+  test("a red check that sent the unit back after a later approval never brings back the findings that approval settled", async () => {
+    const h = await started();
+    const rejected = withReceipts(await record(h, UNIT), reject);
+    expect((await lastFindings(h, rejected, rejected.receipts.at(-1)?.seq)).text).toContain("Rename the flag.");
+    const journal = withReceipts(rejected, approve, red);
+    const { view, text } = await lastFindings(h, journal, journal.receipts.at(-1)?.seq);
+    expect(view?.note).toContain("the check");
+    expect(text ?? "").not.toContain("Rename the flag.");
+  });
+
+  test("a step nothing sent back reads the findings of the latest send-back, and none when that was a red check", async () => {
+    const h = await started();
+    const answered = await lastFindings(h, withReceipts(await record(h, UNIT), reject));
+    expect(answered.text).toContain("Rename the flag.");
+    const h2 = await started();
+    const settled = await lastFindings(h2, withReceipts(await record(h2, UNIT), reject, approve, red));
+    expect(settled.view?.note).toBeDefined();
+    expect(settled.text ?? "").not.toContain("Rename the flag.");
+  });
+});
+
 describe("the story's record", () => {
   test("names each unit's outcomes, gate rulings and criteria reports with their evidence", async () => {
     const h = await started();
