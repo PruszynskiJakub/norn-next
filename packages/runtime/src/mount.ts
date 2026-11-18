@@ -4,7 +4,7 @@
  * renders, each one norn holds is written by its row and the brief lists the paths, short ones inline.
  * The story's documents go to its spec folder, `.agents/specs/<story>/` (`spec.md`,
  * `handoffs/<unit>.md`, `slices/<nn>-<slug>.md`), the layout a repo keeping specs in `.agents` uses;
- * every other input goes to `.agents/inputs/`. Every row's folder carries the `ignoreAll` mark, so
+ * every other input goes to `.agents/inputs/`. Each input row's folder carries the `ignoreAll` mark, so
  * nothing the agent reads is ever committed, whether or not the repo commits the rest of `.agents/`.
  *
  * An `in` row is rewritten for every run. An `in-out` row is a document the agent edits: what it
@@ -13,13 +13,18 @@
  * worktree included. A copy of what norn last wrote sits in `.agents/inputs/.base/`, and only a file
  * that differs from it is read back, so a worktree that kept a stale, untouched copy never overwrites
  * a newer document.
+ *
+ * Two more rows are written by the launcher before the agent starts, hooks first: the harness's hook
+ * files, whose write and ownership check are `harness.install`'s, and the pack's skills in
+ * `.agents/skills/`, with the harness's own skills folder as their second path (skills.ts).
  */
 import type { BriefInputs, BriefInputView, BriefStory, UnitJournal } from "@norn/kernel";
-import { ok, type PluginResult, parseStoryKey, parseUnitId, type TrackerItem } from "@norn/plugin-api";
+import { fail, type Harness, type HostFiles, ok, type PluginResult, parseStoryKey, parseUnitId, type TrackerItem } from "@norn/plugin-api";
 import type { RuntimeEnv } from "./env.ts";
 import { standing, storyUnits } from "./input-history.ts";
 import { type InputText, inputText } from "./inputs.ts";
-import { ignoreAll } from "./ownership.ts";
+import { harnessHeld, ignoreAll, skillMark } from "./ownership.ts";
+import { installSkills, type PackSkills, SKILLS_DIR } from "./skills.ts";
 import { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 import { handoffArtifact, listStoryDocs, readStoryDoc, writeStoryDoc } from "./story-docs.ts";
 
@@ -115,6 +120,25 @@ interface InputsRow {
   readonly source: (env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, kind: string) => Promise<InputText>;
 }
 
+/** The pack's skills: an `in` row under the skills' mark, its second path the harness's skills folder. */
+interface SkillsRow {
+  readonly name: "skills";
+  readonly mode: "in";
+  readonly mark: typeof skillMark;
+  readonly folder: () => string;
+  /** the harness's own skills folder, linked to the row's folder; none when the harness reads no skills */
+  readonly second: (harness: Harness) => string | undefined;
+  readonly write: typeof installSkills;
+}
+
+/** The harness's hook files: written, and their ownership checked, by the harness itself. */
+interface HooksRow {
+  readonly name: "hooks";
+  readonly mode: "in";
+  readonly mark: typeof harnessHeld;
+  readonly write: (harness: Harness, worktree: string, hookCommand: string) => Promise<unknown>;
+}
+
 const kept = async (env: RuntimeEnv, unit: string, artifact: string): Promise<string | null> => {
   const got = await readStoryDoc(env, unit, artifact);
   return got.ok ? got.value : null;
@@ -165,8 +189,14 @@ const SLICE_FILES: DocRow = {
 
 const INPUTS: InputsRow = { name: "inputs", mode: "in", mark: ignoreAll, folder: () => INPUTS_DIR, source: inputText };
 
-/** Every file norn writes into a worktree for a step's inputs, row by row. */
-const MOUNTS: readonly (DocRow | InputsRow)[] = [INPUTS, SPEC, HANDOFF, SLICE_FILES];
+const SKILLS: SkillsRow = { name: "skills", mode: "in", mark: skillMark, folder: () => SKILLS_DIR, second: (harness) => harness.skillsDir, write: installSkills };
+
+const HOOKS: HooksRow = { name: "hooks", mode: "in", mark: harnessHeld, write: (harness, worktree, hookCommand) => harness.install({ worktree, hookCommand }) };
+
+/** Every file norn writes into a worktree, row by row. */
+const MOUNTS: readonly (DocRow | InputsRow | SkillsRow | HooksRow)[] = [INPUTS, SPEC, HANDOFF, SLICE_FILES, SKILLS, HOOKS];
+/** The rows of a step's inputs, each under a folder norn owns whole. */
+const INPUT_ROWS = MOUNTS.filter((r): r is DocRow | InputsRow => r.mark === ignoreAll);
 const DOC_ROWS = MOUNTS.filter((r): r is DocRow => r.mode === "in-out");
 
 /** The file an `in-out` row's artifact is mounted at, relative to the worktree. */
@@ -231,7 +261,7 @@ export async function materializeInputs(env: RuntimeEnv, record: UnitJournal, br
   const unit = record.unit;
   try {
     const marked = new Set<string>();
-    for (const row of MOUNTS) {
+    for (const row of INPUT_ROWS) {
       const folder = row.folder(unit);
       if (marked.has(folder)) continue;
       marked.add(folder);
@@ -321,4 +351,24 @@ async function materializeSlices(env: RuntimeEnv, worktree: string, unit: string
   }
   if (lines.length === 0) return { name, label, path: folder, note: `no slice files yet: the slice step writes them to \`${folder}\`` };
   return { name, label, path: folder, text: `The slice files, each with where its slice stands:\n\n${lines.join("\n")}` };
+}
+
+/**
+ * Mount the rows a launch writes before the agent starts: the hooks, then the pack's skills. A row
+ * that cannot be written refuses the launch, naming the harness and where.
+ */
+export async function mountLaunch(files: HostFiles, harness: Harness, worktree: string, hookCommand: string, skills: PackSkills | undefined): Promise<PluginResult<void>> {
+  try {
+    await HOOKS.write(harness, worktree, hookCommand);
+  } catch (e) {
+    return fail("unavailable", `${harness.name}: installing hooks in ${worktree} failed: ${message(e)}`);
+  }
+  const second = SKILLS.second(harness);
+  if (second === undefined || skills === undefined) return ok(undefined);
+  try {
+    await SKILLS.write(files, worktree, second, skills);
+  } catch (e) {
+    return fail("unavailable", `${harness.name}: writing the pack's skills to ${worktree}/${second} failed: ${message(e)}`);
+  }
+  return ok(undefined);
 }

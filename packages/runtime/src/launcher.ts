@@ -2,8 +2,8 @@
  * AgentLauncher by composition: each executor is a harness (how the agent is wired and launched)
  * running in a runner (where its process lives).
  *
- * - start: `harness.install` in the worktree with the hook command, the pack's skills written to
- *   the harness's `skillsDir` (skills.ts), the brief rendered and marked
+ * - start: the launch's mount rows (mount.ts): `harness.install` in the worktree with the hook
+ *   command, then the pack's skills reachable from the harness's `skillsDir`, the brief rendered and marked
  *   (prompt id = the run id) and recorded as sent, `harness.launch` (headless when the runner has no
  *   pane), then `runner.start` keyed by the run id, so a replayed start finds the first process. The
  *   launch env carries RUN_ENV (unit and run) and never the per-launch NORN_PROMPT_SOURCE.
@@ -25,7 +25,8 @@ import { receivedDir } from "./events/paths.ts";
 import { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
 import { currentRunnerHandle, recordLaunch, resumesOf, resumeWith } from "./launcher-resume.ts";
 import { shellQuote } from "./shell.ts";
-import { installSkills, type PackSkills } from "./skills.ts";
+import { mountLaunch } from "./mount.ts";
+import type { PackSkills } from "./skills.ts";
 import type { AgentLauncher, AgentRunRequest, ExecutorModes, LauncherModes } from "./types.ts";
 
 export interface Executor {
@@ -115,18 +116,8 @@ export class HarnessLauncher implements AgentLauncher {
     const e = this.opts.executors[run.executor];
     if (!e) return fail("not_found", `no executor ${JSON.stringify(run.executor)} is configured`, false);
     const { ctx } = this.opts;
-    try {
-      await e.harness.install({ worktree: run.worktree, hookCommand: shellQuote([...this.opts.hookCommand, e.harness.name]) });
-    } catch (err) {
-      return fail("unavailable", `${e.harness.name}: installing hooks in ${run.worktree} failed: ${message(err)}`);
-    }
-    if (e.harness.skillsDir !== undefined && this.opts.skills !== undefined) {
-      try {
-        await installSkills(ctx.files, run.worktree, e.harness.skillsDir, this.opts.skills);
-      } catch (err) {
-        return fail("unavailable", `${e.harness.name}: writing the pack's skills to ${run.worktree}/${e.harness.skillsDir} failed: ${message(err)}`);
-      }
-    }
+    const mounted = await mountLaunch(ctx.files, e.harness, run.worktree, shellQuote([...this.opts.hookCommand, e.harness.name]), this.opts.skills);
+    if (!mounted.ok) return mounted;
     const brief = await this.opts.renderBrief(run);
     if (!brief.ok) return brief;
     // the brief's id is the run's own: a replayed start records and sends the same prompt

@@ -10,8 +10,13 @@
  * `.gitignore` naming norn's links. The mark also tells norn's copy from the repo's own: a skill
  * folder of that name without it, or anything at a link's name that is not norn's link, is the
  * repo's and is left untouched, so a repo overrides a pack skill by committing its own. A host without links gets a marked copy in the harness's folder.
+ *
+ * This is the mount table's skills row writer (mount.ts). Which skill wins a name is the overlay
+ * rule's call, the repo's unmarked folders over the pack; the mark stays the guard at every write,
+ * since the folder can change between reading the layer and writing it.
  */
 import { type HostFiles, isPackPath } from "@norn/plugin-api";
+import { byName, overlay } from "./overlay.ts";
 import { skillMark } from "./ownership.ts";
 
 export type PackSkills = Readonly<Record<string, Readonly<Record<string, string>>>>;
@@ -56,6 +61,36 @@ async function linkSkill(files: HostFiles & Linker, dir: string, name: string, t
 }
 
 /**
+ * The repo's layer: each folder under `.agents/skills/` of a pack skill's name that holds something
+ * without the mark. Only the pack's names are read, since only they can contend, and anything else
+ * there (a README, the repo's own skills) is no folder norn may look into. Its value is never read,
+ * only its name, since a winner the repo holds is left where it is.
+ */
+async function repoSkills(files: HostFiles, own: string, packNames: readonly string[]): Promise<Record<string, true>> {
+  let names: string[];
+  try {
+    names = await files.list(own);
+  } catch {
+    return {};
+  }
+  const out: Record<string, true> = {};
+  for (const name of packNames) if (names.includes(name) && !(await skillMark.mayWriteFolder(files, `${own}/${name}`))) out[name] = true;
+  return out;
+}
+
+/** The pack's skills that win their name over the repo's own, by the overlay rule. */
+async function packWinners(files: HostFiles, own: string, skills: PackSkills): Promise<[string, Readonly<Record<string, string>>][]> {
+  const won = overlay<"pack" | "repo", unknown>(
+    [
+      { label: "pack", value: skills },
+      { label: "repo", value: await repoSkills(files, own, Object.keys(skills)) },
+    ],
+    byName((name) => name),
+  );
+  return Object.entries(skills).filter(([name]) => won.originOf(name) === "pack");
+}
+
+/**
  * Write every skill to `<worktree>/.agents/skills/` and make it reachable from `skillsDir`, and
  * answer the paths written. A `skillsDir` that is not a plain relative folder is refused: the links
  * climb out of it by its depth.
@@ -64,13 +99,14 @@ export async function installSkills(files: HostFiles, worktree: string, skillsDi
   if (!isPackPath(skillsDir)) throw new Error(`skills folder ${JSON.stringify(skillsDir)} is not a relative folder inside the worktree`);
   const changed: string[] = [];
   const own = `${worktree}/${SKILLS_DIR}`;
-  for (const [name, content] of Object.entries(skills)) {
+  const winners = await packWinners(files, own, skills);
+  for (const [name, content] of winners) {
     if (await skillMark.mayWriteFolder(files, `${own}/${name}`)) await writeCopy(files, `${own}/${name}`, content, changed);
   }
   if (skillsDir === SKILLS_DIR) return changed;
   const dir = `${worktree}/${skillsDir}`;
   if (!files.symlink || !files.readLink) {
-    for (const [name, content] of Object.entries(skills)) if (await skillMark.mayWriteFolder(files, `${dir}/${name}`)) await writeCopy(files, `${dir}/${name}`, content, changed);
+    for (const [name, content] of winners) if (await skillMark.mayWriteFolder(files, `${dir}/${name}`)) await writeCopy(files, `${dir}/${name}`, content, changed);
     return changed;
   }
   const linker = files as HostFiles & Linker;

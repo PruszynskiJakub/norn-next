@@ -82,3 +82,6 @@ export const unitRuns = {
   /** Whether a check log or exit named `name` (`<run>-…`) belongs to one of `runs`. */
   owns: (name: string, runs: ReadonlySet<string>): boolean => [...runs].some((r) => name.startsWith(`${r}-`)),
 };
+
+/** The harness's hook files: `harness.install` decides what in them is norn's, so the runtime only delegates. */
+export const harnessHeld = { heldBy: "harness.install" } as const;

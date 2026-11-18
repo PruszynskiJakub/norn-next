@@ -24,7 +24,7 @@ bun run golden -- --update  # after an intended change in what decide decides; r
 packages/schema           @norn/schema           JSON Schemas (TypeBox), types, ajv validators, ids
 packages/plugin-api       @norn/plugin-api       the plugin contract: slots, HostContext, PluginResult, events, story keys
 packages/kernel           @norn/kernel           pure: workflow loader, decide, journal rules, session reducer, brief
-packages/runtime          @norn/runtime          the host around the kernel: tick, act, launcher, hooks, inputs, skills, overlay, forge step kinds
+packages/runtime          @norn/runtime          the host around the kernel: tick, act, launcher, hooks, the mount table, overlay rule and ownership mark, forge step kinds
 packages/host-node        @norn/host-node        the one IO boundary: files (atomic writes), exec, detached processes
 packages/vcs-git          @norn/vcs-git          vcs over git: worktrees, merge, push; step kinds update-branch, integrate, push, verify-base
 packages/tracker-local    @norn/tracker-local    tracker: items as markdown files
@@ -69,7 +69,7 @@ Dependencies point one way only: `schema ← plugin-api ← kernel ← runtime �
 - The plugin contract: `packages/plugin-api/src/`. One file per slot (`harness.ts`, `tracker.ts`, `forge.ts`, `store.ts`, `vcs.ts`, `runner.ts`, `step-kind.ts`, `pack.ts`), `plugin.ts` (`defineNornPlugin`, `PluginProvides`), `host.ts` (`HostContext`), `result.ts` (`PluginResult`), `events.ts` (normalized harness events), `version.ts` (the plugin API version).
 - Persisted formats and ids (validate with `assertValid`, never by hand): `packages/schema/src/*.ts`; ids, names and refs in `packages/schema/src/ids.ts`.
 - The kernel's model: `packages/kernel/src/model/` (`facts.ts`, `actions.ts`, `receipts.ts`, `run-state.ts`, `config.ts`). decide itself: `packages/kernel/src/decide/`. The journal's write rules: `packages/kernel/src/journal/journal.ts`. Workflow loading and counters: `packages/kernel/src/workflow/`.
-- The config a person writes and its layers: `packages/cli/src/config/schema.ts` and `packages/cli/src/config/paths.ts`, the layers resolved by the runtime's overlay (`packages/runtime/src/overlay.ts`), as the repo's workflows over the pack are; the norn home and the machine dir: `packages/cli/src/home.ts`. Where a worktree's inputs and skills go: `packages/runtime/src/inputs.ts` and `packages/runtime/src/skills.ts`.
+- The config a person writes and its layers: `packages/cli/src/config/schema.ts` and `packages/cli/src/config/paths.ts`, the layers resolved by the runtime's overlay (`packages/runtime/src/overlay.ts`), as the repo's workflows over the pack are; the norn home and the machine dir: `packages/cli/src/home.ts`. Where a worktree's inputs, skills and hooks go: the mount table, `packages/runtime/src/mount.ts`, under the ownership marks of `packages/runtime/src/ownership.ts`.
 - Change a contract only together with its tests, its conformance suite and every user of it. What each file holds: [Development](docs/development.md#where-the-contracts-live).
 
 ## Gotchas
