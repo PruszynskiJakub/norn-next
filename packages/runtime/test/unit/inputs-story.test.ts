@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { type BriefInputs, type KernelReceipt, type ReceiptData, renderBrief, type UnitJournal } from "@norn/kernel";
-import { materializeInputs, readBackDocs, readStoryDoc } from "../../src/index.ts";
+import { materializeInputs, readBackDocs, readStoryDoc, renderInputFrom } from "../../src/index.ts";
 import { has, harness, type Harnessed, record, tickUntil, trackerItem } from "./support.ts";
 
 const UNIT = "lt-1";
@@ -302,3 +302,55 @@ describe("the brief", () => {
     expect(baseMd).toContain("- `base_side` — the base side of the conflict: the base commit to merge and what it changed in each conflicting path: `.agents/inputs/base_side.md`");
   });
 });
+
+describe("the brief's history, rulings and retry notice", () => {
+  async function rendered(h: Harnessed, journal: UnitJournal, brief: BriefInputs = briefWith([]), runId?: string) {
+    const got = await renderInputFrom(h.env, journal, { ...brief, hash: journal.state?.workflow.hash ?? brief.hash }, runId, WORKTREE);
+    if (!got.ok) throw new Error(got.failure.message);
+    return got.value;
+  }
+  const checked = (attempt: number): ReceiptData => ({ kind: "check.finished", step: "test", attempt, run_id: `r-test-${attempt}`, exit: 1, outcome: "fail" });
+  const ruled = (attempt: number, reason: string): ReceiptData => ({ kind: "gate.decided", step: "ready", attempt, outcome: "reject", by: "jo", reason });
+
+  test("a long history keeps its newest lines and counts the ones it left out", async () => {
+    const h = await started();
+    const journal = withReceipts(await record(h, UNIT), ...Array.from({ length: 25 }, (_, i) => checked(i + 1)));
+    const history = (await rendered(h, journal)).history ?? [];
+    expect(history).toHaveLength(20);
+    expect(history[0]).toMatch(/^… \d+ earlier$/);
+    expect(history.at(-1)).toBe("`test #25` check exited 1 (`fail`)");
+  });
+
+  test("a retry's notice counts the nudges the session it replaces was sent", async () => {
+    const h = await started();
+    const journal = withReceipts(
+      await record(h, UNIT),
+      { kind: "nudge.sent", run_id: "r-old", reason: "quiet" },
+      { kind: "nudge.sent", run_id: "r-old", reason: "quiet" },
+      { kind: "run.started", run_id: "r-new", run_kind: "agent", executor: "claude", attended: false, retry_of: "r-old" },
+    );
+    expect((await rendered(h, journal, briefWith([]), "r-new")).retry).toBe("run `r-old`, nudged 2 times");
+  });
+
+  test("the record says where a person moved the unit and why", async () => {
+    const h = await started();
+    const journal = withReceipts(await record(h, UNIT), { kind: "step.moved", to: "build", by: "jo", reason: "Try the parser again." });
+    await h.env.journal.record(UNIT, { id: "01JD5G0000MOVED00000000000", data: { kind: "step.moved", to: "build", by: "jo", reason: "Try the parser again." } });
+    const v = await only(h, await record(h, UNIT), "record");
+    expect(await h.files.read(`${WORKTREE}/${v.path}`)).toContain("- moved to `build` by jo: Try the parser again.");
+    expect((await rendered(h, journal)).history?.at(-1)).toBe("moved to `build` by jo");
+  });
+
+  test("rulings keep the newest few, and leave out the one already under Rework", async () => {
+    const h = await started();
+    for (let i = 1; i <= 12; i++) await h.env.journal.record(UNIT, { id: `01JD5G0000RULING${String(i).padStart(10, "0")}`, data: ruled(i, `Ruling ${i}.`) });
+    const journal = await record(h, UNIT);
+    const rulings = (await rendered(h, journal, { ...briefWith([]), rework_from: journal.receipts.at(-1)?.seq as number })).rulings ?? [];
+    expect(rulings.some((r) => r.includes("Ruling 12."))).toBe(false);
+    expect(rulings.some((r) => r.includes("Ruling 11."))).toBe(true);
+    expect(rulings.some((r) => r.includes("Ruling 1."))).toBe(false);
+    expect(rulings[0]).toMatch(/^… \d+ earlier/);
+    expect(rulings.length).toBeLessThanOrEqual(11);
+  });
+});
+

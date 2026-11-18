@@ -168,17 +168,25 @@ export function historyOf(record: UnitJournal): string[] {
   return [`… ${lines.length - HISTORY_MAX + 1} earlier`, ...lines.slice(-(HISTORY_MAX - 1))];
 }
 
-/** Every gate ruling with a reason on the story's units, every round: a reason is what settles a question. */
-export async function rulingsOf(env: RuntimeEnv, record: UnitJournal): Promise<string[]> {
-  const out: string[] = [];
+const RULINGS_MAX = 10;
+
+/**
+ * The gate rulings with a reason on the story's units, every round, newest kept when they run long: a
+ * reason is what settles a question. `except` is the receipt the brief already shows under Rework.
+ */
+export async function rulingsOf(env: RuntimeEnv, record: UnitJournal, except?: number): Promise<string[]> {
+  const found: { at: string; line: string }[] = [];
   for (const u of await storyUnits(env, record.unit)) {
     for (const r of u.receipts) {
       const d = r.data;
       if (d.kind !== "gate.decided" || !d.reason?.trim()) continue;
-      out.push(`${code(u.unit)} ${code(`${d.step ?? "?"}${d.attempt !== undefined ? ` #${d.attempt}` : ""}`)} decided \`${d.outcome}\` by ${d.by}${d.delegated ? " (delegated)" : ""}: ${d.reason.trim()}`);
+      if (u.unit === record.unit && r.seq === except) continue;
+      found.push({ at: r.at, line: `${code(u.unit)} ${code(`${d.step ?? "?"}${d.attempt !== undefined ? ` #${d.attempt}` : ""}`)} decided \`${d.outcome}\` by ${d.by}${d.delegated ? " (delegated)" : ""}: ${d.reason.trim()}` });
     }
   }
-  return out;
+  const lines = found.sort((a, b) => a.at.localeCompare(b.at)).map((f) => f.line);
+  if (lines.length <= RULINGS_MAX) return lines;
+  return [`… ${lines.length - RULINGS_MAX} earlier, in the story's record`, ...lines.slice(-RULINGS_MAX)];
 }
 
 function verdictLine(c: CriterionVerdict): string {

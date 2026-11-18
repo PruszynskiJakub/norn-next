@@ -122,7 +122,7 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
   const rework = brief.rework_from === undefined ? undefined : await reworkText(env, record.unit, record.receipts.find((r) => r.seq === brief.rework_from));
   const answered = runId === undefined ? [] : await answeredAsks(env, record, runId);
   const retry = runId === undefined ? undefined : retryOf(record.receipts, runId);
-  const rulings = await rulingsOf(env, record);
+  const rulings = await rulingsOf(env, record, brief.rework_from);
   const history = historyOf(record);
   const made = await materializeInputs(env, record, brief, worktree ?? worktreeOf(env, record.unit));
   const inputs = made.ok ? made.value : null;
