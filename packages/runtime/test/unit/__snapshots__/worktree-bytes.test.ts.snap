@@ -1,0 +1,510 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`the bytes norn writes in a worktree a story unit, after a tick launched it and a brief rendered, then every other input kind: story brief 1`] = `
+"# norn brief — lt-1 · build #1
+
+You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+
+## Story
+
+\`lt-1\`: Parse and export (https://tracker.example/1)
+
+## Your work
+
+Build the thing.
+
+## Inputs
+
+Read these before you change anything:
+
+- \`spec\` — the story's spec: its tracker item, mirrored, and the sections later steps added: \`.agents/specs/lt-1/spec.md\`
+- \`handoff\` — this unit's handoff, which you keep current: \`.agents/specs/lt-1/handoffs/lt-1.md\`
+- \`last_check\` — the last check's result. no check has run for this unit yet
+
+norn's files in this worktree are under \`.agents/\` and ignored by git: the story's spec and this unit's handoff in \`.agents/specs/<story>/\`, the other inputs in \`.agents/inputs/\`. Edit the handoff, and add your sections to the spec below its item block; norn reads both back when you report, and the slice files in its \`slices/\` folder too. The other inputs are rewritten for every run.
+
+## Handoff
+
+\`.agents/specs/lt-1/handoffs/lt-1.md\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary, and refresh it right before you report.
+
+## Rules
+
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes.
+- Never \`git push\`, never switch branches or worktrees, and never change the remote (a pull request, an issue, a comment): only norn does, under a receipt.
+- Never edit norn's run state (its data folder outside the worktree): a hand-edited file fails validation and makes the unit corrupt.
+- Of the norn commands, run only the four this brief names; every other one is the person's.
+- A subagent you start works under these rules though it never sees this brief: tell it the ones its work can break.
+- A usage limit is not a reason to report stuck: it resets on its own, and the session continues after it.
+
+## Finish with exactly one of
+
+- \`norn done done\`
+- \`norn ask "<one self-contained question>"\` — you need a person's decision; the step waits until it is answered.
+- \`norn stuck "<reason>"\` — you cannot go on; say what would unblock it.
+
+Report exactly once, from the worktree root, with the outcome whose meaning is true. A refused report says what to do instead: do exactly that, then report again. After a report succeeds, end your turn.
+
+After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's record each time.
+"
+`;
+
+exports[`the bytes norn writes in a worktree a story unit, after a tick launched it and a brief rendered, then every other input kind: story files after the brief 1`] = `
+{
+  ".agents/inputs/.base/specs/lt-1/handoffs/lt-1.md": 
+"# Handoff: lt-1
+
+This unit's current state, for the next agent and the person. Rewrite it in place.
+
+## State
+
+## Notes
+"
+,
+  ".agents/inputs/.base/specs/lt-1/spec.md": 
+"---
+key: "lt-1"
+title: "Parse and export"
+labels: ["docs", "norn"]
+url: "https://tracker.example/1"
+---
+<!-- norn:item: norn rewrites this block from the tracker item; write your own sections below the end marker -->
+# Parse and export
+
+Parse the input, then export it.
+
+https://tracker.example/1
+<!-- /norn:item -->
+"
+,
+  ".agents/inputs/.gitignore": 
+"*
+"
+,
+  ".agents/specs/lt-1/.gitignore": 
+"*
+"
+,
+  ".agents/specs/lt-1/handoffs/lt-1.md": 
+"# Handoff: lt-1
+
+This unit's current state, for the next agent and the person. Rewrite it in place.
+
+## State
+
+## Notes
+"
+,
+  ".agents/specs/lt-1/spec.md": 
+"---
+key: "lt-1"
+title: "Parse and export"
+labels: ["docs", "norn"]
+url: "https://tracker.example/1"
+---
+<!-- norn:item: norn rewrites this block from the tracker item; write your own sections below the end marker -->
+# Parse and export
+
+Parse the input, then export it.
+
+https://tracker.example/1
+<!-- /norn:item -->
+"
+,
+}
+`;
+
+exports[`the bytes norn writes in a worktree a story unit, after a tick launched it and a brief rendered, then every other input kind: story brief, every input kind 1`] = `
+"# norn brief — lt-1 · build #1
+
+You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+
+## Your work
+
+Work step \`build\` of workflow \`handed\`.
+
+## Inputs
+
+Read these before you change anything:
+
+- \`spec\` — the story's spec: its tracker item, mirrored, and the sections later steps added: \`.agents/specs/lt-1/spec.md\`
+- \`handoff\` — this unit's handoff, which you keep current: \`.agents/specs/lt-1/handoffs/lt-1.md\`
+- \`last_check\` — the last check's result. no check has run for this unit yet
+- \`last_findings\` — the last findings sent back: \`.agents/inputs/last_findings.md\`
+  \`\`\`
+  \`approve\` was decided \`reject\` by jo:
+
+  Name the flag.
+  \`\`\`
+- \`diff\` — the change so far. run \`git diff main...HEAD\` in this worktree
+- \`slice\` — this slice's file: its scope, dependencies and acceptance criteria, each with its verifier. lt-1 is the story, not a slice: it has no slice file of its own (\`slices\` names them all)
+- \`slices\` — every slice file of the story: scope, dependencies, acceptance criteria: \`.agents/specs/lt-1/slices/\`
+  \`\`\`
+  The slice files, each with where its slice stands:
+
+  - \`01-parse.md\`: not started
+  - \`02-export.md\`: not started
+  \`\`\`
+- \`record\` — the story's record: every unit's outcomes, gate rulings and criteria reports with their evidence: \`.agents/inputs/record.md\`
+  \`\`\`
+  The record of \`lt-1\`: what each of its units reported, every check and gate ruling, and the criteria reports with the evidence each verdict cites. The record is the story's receipts, kept with its run data and not in the repo; this file is its summary. norn keeps no evidence files of its own, so evidence is what the reports wrote.
+
+  ## \`lt-1\` (the story): at \`build\` #1
+
+  - nothing reported yet
+  \`\`\`
+- \`resolution\` — the resolution to review: each merge's remerge-diff and the conflicts this round recorded. no base update of this unit has ended \`resolved\` yet, so there is no resolution to review
+- \`base_side\` — the base side of the conflict: the base commit to merge and what it changed in each conflicting path: \`.agents/inputs/base_side.md\`
+  \`\`\`
+  The base update at \`update\` could not merge \`main\` at \`bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\` into the story branch \`norn/lt-1\`: it conflicts in 1 path.
+  norn aborted that merge, so the worktree starts clean: merge the commit yourself (\`git merge bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\`), resolve, and commit the merge.
+
+  The base side of each conflicting path, what the base changed there since the story branch left it:
+
+  - \`src/a.ts\`: the commits \`git log --format='%h %an %s' $(git merge-base HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb -- 'src/a.ts'\`, the change \`git diff $(git merge-base HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb -- 'src/a.ts'\`
+  \`\`\`
+- \`notes\` — the story's notes: \`.agents/inputs/notes.md\`
+  \`\`\`
+  Keep the export streaming.
+  \`\`\`
+- \`mystery\` — norn holds nothing for this input yet
+- \`docs/guide.md\` — the guide: \`docs/guide.md\`
+
+## Rules
+
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes.
+- Never \`git push\`, never switch branches or worktrees, and never change the remote (a pull request, an issue, a comment): only norn does, under a receipt.
+- Never edit norn's run state (its data folder outside the worktree): a hand-edited file fails validation and makes the unit corrupt.
+- Of the norn commands, run only the four this brief names; every other one is the person's.
+- A subagent you start works under these rules though it never sees this brief: tell it the ones its work can break.
+- A usage limit is not a reason to report stuck: it resets on its own, and the session continues after it.
+
+## Finish with exactly one of
+
+- \`norn done done\`
+- \`norn ask "<one self-contained question>"\` — you need a person's decision; the step waits until it is answered.
+- \`norn stuck "<reason>"\` — you cannot go on; say what would unblock it.
+
+Report exactly once, from the worktree root, with the outcome whose meaning is true. A refused report says what to do instead: do exactly that, then report again. After a report succeeds, end your turn.
+
+After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's record each time.
+"
+`;
+
+exports[`the bytes norn writes in a worktree a story unit, after a tick launched it and a brief rendered, then every other input kind: story files, every input kind 1`] = `
+{
+  ".agents/inputs/.base/specs/lt-1/handoffs/lt-1.md": 
+"# Handoff: lt-1
+
+This unit's current state, for the next agent and the person. Rewrite it in place.
+
+## State
+
+## Notes
+"
+,
+  ".agents/inputs/.base/specs/lt-1/slices/01-parse.md": 
+"---
+id: lt-1/01
+title: Parse the input
+depends_on: []
+criteria:
+  - { id: AC1, verifier: test }
+---
+
+## Goal
+Parse it.
+"
+,
+  ".agents/inputs/.base/specs/lt-1/slices/02-export.md": 
+"---
+id: lt-1/02
+title: Export it
+depends_on: [lt-1/01]
+criteria:
+  - { id: AC1, verifier: agent }
+---
+
+## Goal
+Export it.
+"
+,
+  ".agents/inputs/.base/specs/lt-1/spec.md": 
+"---
+key: "lt-1"
+title: "Parse and export"
+labels: ["docs", "norn"]
+url: "https://tracker.example/1"
+---
+<!-- norn:item: norn rewrites this block from the tracker item; write your own sections below the end marker -->
+# Parse and export
+
+Parse the input, then export it.
+
+https://tracker.example/1
+<!-- /norn:item -->
+"
+,
+  ".agents/inputs/.gitignore": 
+"*
+"
+,
+  ".agents/inputs/base_side.md": 
+"The base update at \`update\` could not merge \`main\` at \`bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\` into the story branch \`norn/lt-1\`: it conflicts in 1 path.
+norn aborted that merge, so the worktree starts clean: merge the commit yourself (\`git merge bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\`), resolve, and commit the merge.
+
+The base side of each conflicting path, what the base changed there since the story branch left it:
+
+- \`src/a.ts\`: the commits \`git log --format='%h %an %s' $(git merge-base HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)..bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb -- 'src/a.ts'\`, the change \`git diff $(git merge-base HEAD bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb -- 'src/a.ts'\`
+"
+,
+  ".agents/inputs/last_findings.md": 
+"\`approve\` was decided \`reject\` by jo:
+
+Name the flag.
+"
+,
+  ".agents/inputs/notes.md": 
+"Keep the export streaming.
+"
+,
+  ".agents/inputs/record.md": 
+"The record of \`lt-1\`: what each of its units reported, every check and gate ruling, and the criteria reports with the evidence each verdict cites. The record is the story's receipts, kept with its run data and not in the repo; this file is its summary. norn keeps no evidence files of its own, so evidence is what the reports wrote.
+
+## \`lt-1\` (the story): at \`build\` #1
+
+- nothing reported yet
+"
+,
+  ".agents/specs/lt-1/.gitignore": 
+"*
+"
+,
+  ".agents/specs/lt-1/handoffs/lt-1.md": 
+"# Handoff: lt-1
+
+This unit's current state, for the next agent and the person. Rewrite it in place.
+
+## State
+
+## Notes
+"
+,
+  ".agents/specs/lt-1/slices/01-parse.md": 
+"---
+id: lt-1/01
+title: Parse the input
+depends_on: []
+criteria:
+  - { id: AC1, verifier: test }
+---
+
+## Goal
+Parse it.
+"
+,
+  ".agents/specs/lt-1/slices/02-export.md": 
+"---
+id: lt-1/02
+title: Export it
+depends_on: [lt-1/01]
+criteria:
+  - { id: AC1, verifier: agent }
+---
+
+## Goal
+Export it.
+"
+,
+  ".agents/specs/lt-1/spec.md": 
+"---
+key: "lt-1"
+title: "Parse and export"
+labels: ["docs", "norn"]
+url: "https://tracker.example/1"
+---
+<!-- norn:item: norn rewrites this block from the tracker item; write your own sections below the end marker -->
+# Parse and export
+
+Parse the input, then export it.
+
+https://tracker.example/1
+<!-- /norn:item -->
+"
+,
+}
+`;
+
+exports[`the bytes norn writes in a worktree a slice unit in its own worktree: slice brief 1`] = `
+"# norn brief — lt-1/01 · build #1
+
+You do one step of a larger delivery and report how it ended, once; code decides what happens next.
+
+## Where you run
+
+- You run unattended: no person reads this session. A question goes through \`norn ask\`, which parks the step until a person answers it.
+
+## Your work
+
+Work step \`build\` of workflow \`handed\`.
+
+## Inputs
+
+Read these before you change anything:
+
+- \`spec\` — the story's spec: its tracker item, mirrored, and the sections later steps added: \`.agents/specs/lt-1/spec.md\`
+- \`handoff\` — this unit's handoff, which you keep current: \`.agents/specs/lt-1/handoffs/lt-1-01.md\`
+- \`slice\` — this slice's file: its scope, dependencies and acceptance criteria, each with its verifier: \`.agents/specs/lt-1/slices/01-parse.md\`
+- \`slices\` — every slice file of the story: scope, dependencies, acceptance criteria: \`.agents/specs/lt-1/slices/\`
+  \`\`\`
+  The slice files, each with where its slice stands:
+
+  - \`01-parse.md\`: at \`build\` #1
+  - \`02-export.md\`: not started
+  \`\`\`
+- \`last_check\` — the last check's result. no check has run for this unit yet
+
+## Rules
+
+- Work only in this worktree and only on this step: nothing that belongs to later work, no drive-by changes.
+- Never \`git push\`, never switch branches or worktrees, and never change the remote (a pull request, an issue, a comment): only norn does, under a receipt.
+- Never edit norn's run state (its data folder outside the worktree): a hand-edited file fails validation and makes the unit corrupt.
+- Of the norn commands, run only the four this brief names; every other one is the person's.
+- A subagent you start works under these rules though it never sees this brief: tell it the ones its work can break.
+- A usage limit is not a reason to report stuck: it resets on its own, and the session continues after it.
+
+## Finish with exactly one of
+
+- \`norn done done\`
+- \`norn ask "<one self-contained question>"\` — you need a person's decision; the step waits until it is answered.
+- \`norn stuck "<reason>"\` — you cannot go on; say what would unblock it.
+
+Report exactly once, from the worktree root, with the outcome whose meaning is true. A refused report says what to do instead: do exactly that, then report again. After a report succeeds, end your turn.
+
+After a long session or a lost thread, run \`norn brief\` again: it is rendered from the unit's record each time.
+"
+`;
+
+exports[`the bytes norn writes in a worktree a slice unit in its own worktree: slice files 1`] = `
+{
+  ".agents/inputs/.base/specs/lt-1/handoffs/lt-1-01.md": 
+"# Handoff: lt-1/01
+
+This unit's current state, for the next agent and the person. Rewrite it in place.
+
+## State
+
+## Notes
+"
+,
+  ".agents/inputs/.base/specs/lt-1/slices/01-parse.md": 
+"---
+id: lt-1/01
+title: Parse the input
+depends_on: []
+criteria:
+  - { id: AC1, verifier: test }
+---
+
+## Goal
+Parse it.
+"
+,
+  ".agents/inputs/.base/specs/lt-1/slices/02-export.md": 
+"---
+id: lt-1/02
+title: Export it
+depends_on: [lt-1/01]
+criteria:
+  - { id: AC1, verifier: agent }
+---
+
+## Goal
+Export it.
+"
+,
+  ".agents/inputs/.base/specs/lt-1/spec.md": 
+"---
+key: "lt-1"
+title: "Parse and export"
+labels: ["docs", "norn"]
+url: "https://tracker.example/1"
+---
+<!-- norn:item: norn rewrites this block from the tracker item; write your own sections below the end marker -->
+# Parse and export
+
+Parse the input, then export it.
+
+https://tracker.example/1
+<!-- /norn:item -->
+"
+,
+  ".agents/inputs/.gitignore": 
+"*
+"
+,
+  ".agents/specs/lt-1/.gitignore": 
+"*
+"
+,
+  ".agents/specs/lt-1/handoffs/lt-1-01.md": 
+"# Handoff: lt-1/01
+
+This unit's current state, for the next agent and the person. Rewrite it in place.
+
+## State
+
+## Notes
+"
+,
+  ".agents/specs/lt-1/slices/01-parse.md": 
+"---
+id: lt-1/01
+title: Parse the input
+depends_on: []
+criteria:
+  - { id: AC1, verifier: test }
+---
+
+## Goal
+Parse it.
+"
+,
+  ".agents/specs/lt-1/slices/02-export.md": 
+"---
+id: lt-1/02
+title: Export it
+depends_on: [lt-1/01]
+criteria:
+  - { id: AC1, verifier: agent }
+---
+
+## Goal
+Export it.
+"
+,
+  ".agents/specs/lt-1/spec.md": 
+"---
+key: "lt-1"
+title: "Parse and export"
+labels: ["docs", "norn"]
+url: "https://tracker.example/1"
+---
+<!-- norn:item: norn rewrites this block from the tracker item; write your own sections below the end marker -->
+# Parse and export
+
+Parse the input, then export it.
+
+https://tracker.example/1
+<!-- /norn:item -->
+"
+,
+}
+`;

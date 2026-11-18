@@ -18,6 +18,7 @@ import { ok, type PluginResult, parseStoryKey, parseUnitId, type TrackerItem } f
 import type { CriterionVerdict } from "@norn/schema";
 import { cutFrom } from "./branches.ts";
 import type { RuntimeEnv } from "./env.ts";
+import { ignoreAll } from "./ownership.ts";
 import { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 import { readStepRun } from "./step-runs.ts";
 import { baseSideOf, recordOf, type Resolved, resolutionOf, standing, storyUnits } from "./input-history.ts";
@@ -29,7 +30,6 @@ export const SPECS_DIR = `${AGENTS_DIR}/specs`;
 /** the folder of the inputs rewritten for every run */
 export const INPUTS_DIR = `${AGENTS_DIR}/inputs`;
 const BASE_DIR = `${INPUTS_DIR}/.base`;
-const IGNORE_ALL = "*\n";
 /** Text up to this long is shown in the brief itself as well as written to its file. */
 const INLINE_MAX = 1500;
 
@@ -204,8 +204,8 @@ export interface MaterializedInputs {
 export async function materializeInputs(env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, worktree = worktreeOf(env, record.unit)): Promise<PluginResult<MaterializedInputs>> {
   const unit = record.unit;
   try {
-    await env.ctx.files.write(`${worktree}/${INPUTS_DIR}/.gitignore`, IGNORE_ALL);
-    await env.ctx.files.write(`${worktree}/${specFolder(unit)}/.gitignore`, IGNORE_ALL);
+    await ignoreAll.mark(env.ctx.files, `${worktree}/${INPUTS_DIR}`);
+    await ignoreAll.mark(env.ctx.files, `${worktree}/${specFolder(unit)}`);
     await readBackDocs(env, unit, worktree);
     const item = await storyItem(env, unit);
     const out: MaterializedInputs = { inputs: [] };

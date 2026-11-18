@@ -30,15 +30,22 @@ describe("no rules file", () => {
 
 // ------------------------------------------------------------------------------------------- handoff
 
-/** A unit's handoff, `<spec folder>/handoffs/story.md` (an older norn's `_story.md`) or `handoffs/<nn>-<slug>.md`. */
+/**
+ * A unit's handoff, `<spec folder>/handoffs/story.md` (an older norn's `_story.md`) or `handoffs/<nn>-<slug>.md`,
+ * or the runtime's story document named by the unit, `handoffs/<story>.md` or `handoffs/<story>-<nn>.md`.
+ */
 /** The slice number part of a slice handoff's name, from the schema's own pattern (`^[0-9]{2,3}$` today). */
 const SLICE_NN = SLICE_NN_PATTERN.replace(/^\^|\$$/g, "");
-const UNIT_HANDOFF = new RegExp(`^\\.agents/specs/[^/]+/handoffs/(?:_?story|${SLICE_NN}-[a-z0-9]+(?:-[a-z0-9]+)*)\\.md$`);
+const UNIT_HANDOFF = new RegExp(
+  `^\\.agents/specs/([^/]+)/handoffs/(?:_?story|${SLICE_NN}-[a-z0-9]+(?:-[a-z0-9]+)*|\\1(?:-${SLICE_NN})?)\\.md$`,
+);
 /** An older norn's handoff, `runs/<unit>/handoff.md` in a spec folder: moved to `handoffs/` at the unit's next boundary. */
 const OLD_HANDOFF = /^\.agents\/specs\/[^/]+\/(?:.*\/)?runs\//;
 
 /** A handoff tracked anywhere but a spec folder's `handoffs/` (or an older norn's `runs/`). */
-function strayHandoff(relPath: string): boolean {
+function strayHandoff(path: string): boolean {
+  // norn's base copy of what it last wrote mirrors `.agents/specs/` under `.agents/inputs/.base/`.
+  const relPath = path.replace(/^\.agents\/inputs\/\.base\/specs\//, ".agents/specs/");
   const parts = relPath.split("/");
   if (parts.at(-2) === "handoffs") return !UNIT_HANDOFF.test(relPath);
   return parts.at(-1) === "handoff.md" && !OLD_HANDOFF.test(relPath);
@@ -59,6 +66,12 @@ describe("no stray handoff (B34)", () => {
     expect(strayHandoff(".agents/specs/gh-1-x/handoffs/01--a.md")).toBe(true);
     expect(strayHandoff(".agents/specs/gh-1-x/handoffs/01-a--b.md")).toBe(true);
     expect(strayHandoff(".agents/specs/gh-1-x/handoffs/101-a-b2.md")).toBe(false);
+    expect(strayHandoff(".agents/specs/gh-403/handoffs/gh-403.md")).toBe(false);
+    expect(strayHandoff(".agents/specs/gh-403/handoffs/gh-403-01.md")).toBe(false);
+    expect(strayHandoff(".agents/specs/gh-403/handoffs/gh-404-01.md")).toBe(true);
+    expect(strayHandoff(".agents/specs/gh-403/handoffs/gh-403-1.md")).toBe(true);
+    expect(strayHandoff(".agents/inputs/.base/specs/gh-403/handoffs/gh-403-01.md")).toBe(false);
+    expect(strayHandoff(".agents/inputs/.base/handoff.md")).toBe(true);
     expect(strayHandoff("docs/handoffs/story.md")).toBe(true);
     expect(strayHandoff(".agents/specs/gh-1-x/handoff.md")).toBe(true);
     expect(strayHandoff(".agents/specs/gh-1-x/runs/_story/handoff.md")).toBe(false);

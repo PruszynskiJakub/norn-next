@@ -103,3 +103,86 @@ describe("a finished story's logs", () => {
     expect(last?.problems).toEqual([`lt-1: logs: 1 file could not be removed; first: ${sessionLogPath(h.ctx, run)}: EACCES`]);
   });
 });
+
+describe("a story's finish", () => {
+  /** A story whose check ran, with its unit's session and check logs on disk. */
+  async function checked() {
+    const h = harness();
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("check.finished"));
+    // a merged change, so the finish closes the item too
+    h.changes["norn/lt-1"] = { id: 4, state: "merged", draft: false, head_branch: "norn/lt-1", base_branch: "main", head_sha: "a1", title: "Story 1" };
+    const run = (await record(h, "lt-1")).receipts.flatMap((r) => (r.data.kind === "run.started" ? [r.data.run_id] : []))[0] as string;
+    const logs = [sessionLogPath(h.ctx, run), checkLogPath(h.ctx, "lt-1", run, 1), checkExitPath(h.ctx, "lt-1", run, 1)];
+    for (const p of logs) await h.files.write(p, "x\n");
+    return { h, logs };
+  }
+
+  test("closes the item first, removes the worktrees next and the unit logs last", async () => {
+    const { h, logs } = await checked();
+    const order: string[] = [];
+    const tracker = h.env.slots.tracker;
+    const perform = tracker.perform.bind(tracker);
+    tracker.perform = async (effect, opts) => {
+      order.push(`tracker ${effect.kind}`);
+      return perform(effect, opts);
+    };
+    const worktree = h.env.slots.vcs.worktree;
+    const removeWorktree = worktree.remove.bind(worktree);
+    worktree.remove = async (unit) => {
+      order.push(`vcs remove ${unit}`);
+      return removeWorktree(unit);
+    };
+    const remove = h.files.remove;
+    h.files.remove = async (p) => {
+      if (logs.includes(p)) order.push(`log ${p}`);
+      return remove(p);
+    };
+    const reports = await tickUntil(h, has("story.finish"));
+    expect(reports.at(-1)?.outcomes.find((o) => o.decision.rule === "story.finish")).toMatchObject({ ok: true, detail: { closed: true, removed: ["lt-1"] } });
+    expect(order).toEqual(["tracker close", "vcs remove lt-1", ...logs.map((p) => `log ${p}`)]);
+    expect(h.vcsCalls.filter((c) => c.op === "remove").map((c) => c.args)).toEqual([["lt-1"]]);
+    expect(h.items[0]?.open).toBe(false);
+  });
+
+  test("a worktree the vcs cannot remove fails the finish, removes no log, and the next tick finishes under the claim", async () => {
+    const { h, logs } = await checked();
+    const worktree = h.env.slots.vcs.worktree;
+    const removeWorktree = worktree.remove.bind(worktree);
+    worktree.remove = async () => ({ ok: false, failure: { code: "unavailable", message: "worktree is busy", retryable: true } });
+    const failed = (await tickUntil(h, has("story.finish"))).at(-1);
+    expect(failed?.outcomes.filter((o) => ["story.finish", "claim.release"].includes(o.decision.rule)).map((o) => `${o.decision.rule} ${o.ok}`)).toEqual(["story.finish false", "claim.release false"]);
+    const held = await h.env.slots.store.claims.read("lt-1");
+    expect(held.ok && held.value?.holder).toBe("machine-a");
+    const left = Object.keys(h.files.snapshot());
+    expect(logs.filter((p) => left.includes(p))).toEqual(logs);
+    worktree.remove = removeWorktree;
+    const next = await h.runtime.tick();
+    expect(next.outcomes.filter((o) => ["story.finish", "claim.release"].includes(o.decision.rule)).map((o) => `${o.decision.rule} ${o.ok}`)).toEqual(["story.finish true", "claim.release true"]);
+    const after = Object.keys(h.files.snapshot());
+    expect(logs.filter((p) => after.includes(p))).toEqual([]);
+    const released = await h.env.slots.store.claims.read("lt-1");
+    expect(released.ok && released.value).toBeNull();
+  });
+
+  test("a unit whose record cannot be read keeps its session and check logs, with a problem saying so; the finish succeeds", async () => {
+    const { h, logs } = await checked();
+    // the record turns unreadable once the finish is under way, after decide read it
+    const journal = h.env.journal;
+    const readUnit = journal.readUnit.bind(journal);
+    let unreadable = false;
+    journal.readUnit = async (unit) => (unreadable && unit === "lt-1" ? { ok: false, failure: { code: "invalid", message: "receipt 3 fails validation", retryable: false } } : readUnit(unit));
+    const worktree = h.env.slots.vcs.worktree;
+    const removeWorktree = worktree.remove.bind(worktree);
+    worktree.remove = async (unit) => {
+      unreadable = true;
+      return removeWorktree(unit);
+    };
+    const last = (await tickUntil(h, has("story.finish"))).at(-1);
+    unreadable = false;
+    expect(last?.outcomes.find((o) => o.decision.rule === "story.finish")?.ok).toBe(true);
+    expect(last?.problems).toEqual(["lt-1: logs: its record could not be read, so its session and check logs stay: receipt 3 fails validation"]);
+    const left = Object.keys(h.files.snapshot());
+    expect(logs.filter((p) => left.includes(p))).toEqual(logs);
+  });
+});
