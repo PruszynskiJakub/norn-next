@@ -10,7 +10,7 @@
  */
 import { isAbsolute, resolve } from "node:path";
 import { parseJson } from "@norn/plugin-api";
-import { reportRun } from "@norn/runtime";
+import { FINDINGS_SHAPE, reportRun } from "@norn/runtime";
 import { CriteriaReport, type CriterionVerdict, type Finding } from "@norn/schema";
 import { Type } from "@sinclair/typebox";
 import { defineCommand, opt } from "../command.ts";
@@ -36,7 +36,7 @@ async function readCriteria(ctx: CliContext, file: string): Promise<CriterionVer
   return v.value;
 }
 
-const FINDINGS_SHAPE = 'write the findings as JSON, {"findings": [{"severity": "blocking", "title": "...", ...}]} or an array of them, then report again';
+const FINDINGS_HINT = `write ${FINDINGS_SHAPE}, or the findings array alone, then report again`;
 /** An array of findings or `{findings: [...]}`; each entry is checked and normalized one by one, so a refusal names the entry. */
 const FindingsFile = Type.Union([Type.Array(Type.Unknown()), Type.Object({ findings: Type.Array(Type.Unknown()) })]);
 const SEVERITIES: ReadonlySet<string> = new Set(["blocking", "major", "minor", "nit"]);
@@ -49,14 +49,14 @@ const text = (v: unknown): string | undefined => (typeof v === "string" && v.tri
  */
 export function parseFindings(raw: string, file: string): Finding[] {
   const parsed = parseJson(FindingsFile, raw, `findings file ${file}`);
-  if (!parsed.ok) throw refuse(parsed.failure.message, FINDINGS_SHAPE, "invalid_findings");
+  if (!parsed.ok) throw refuse(parsed.failure.message, FINDINGS_HINT, "invalid_findings");
   const held: unknown[] = Array.isArray(parsed.value) ? parsed.value : parsed.value.findings;
   return held.map((x, i) => {
     const o = (typeof x === "object" && x !== null ? x : {}) as Record<string, unknown>;
     const severity = text(o.severity)?.toLowerCase();
     const title = text(o.title) ?? text(o.summary);
     if (severity === undefined || !SEVERITIES.has(severity) || title === undefined)
-      throw refuse(`finding ${i + 1} in ${file} needs a title and a severity (blocking | major | minor | nit)`, FINDINGS_SHAPE, "invalid_findings");
+      throw refuse(`finding ${i + 1} in ${file} needs a title and a severity (blocking | major | minor | nit)`, FINDINGS_HINT, "invalid_findings");
     const id = text(o.id);
     const where = text(o.file);
     const criterion = text(o.criterion) ?? (typeof o.criterion === "number" ? String(o.criterion) : undefined);
@@ -82,9 +82,9 @@ async function readFindings(ctx: CliContext, file: string): Promise<Finding[]> {
   try {
     raw = await (await ctx.host()).files.read(path);
   } catch (e) {
-    throw refuse(`findings file ${file} cannot be read: ${(e as Error).message}`, FINDINGS_SHAPE, "invalid_findings");
+    throw refuse(`findings file ${file} cannot be read: ${(e as Error).message}`, FINDINGS_HINT, "invalid_findings");
   }
-  if (raw === null) throw refuse(`findings file not found: ${file}`, FINDINGS_SHAPE, "invalid_findings");
+  if (raw === null) throw refuse(`findings file not found: ${file}`, FINDINGS_HINT, "invalid_findings");
   return parseFindings(raw, file);
 }
 

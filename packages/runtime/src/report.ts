@@ -184,7 +184,8 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   return { ok: true, value: { seq: wrote.value.seq, replayed: wrote.value.replayed, ...(criteria !== undefined && { criteria: criteria.summary }) } };
 }
 
-const FINDINGS_SHAPE =
+/** The findings file `norn done --findings` reads, as a refusal names it. */
+export const FINDINGS_SHAPE =
   'a JSON file {"findings": [{"severity": "blocking" | "major" | "minor" | "nit", "title": "...", "detail"?, "file"?, "line"?, "criterion"?, "repro"?}]} with at least one finding';
 
 /**
