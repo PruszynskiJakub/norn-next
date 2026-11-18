@@ -236,7 +236,7 @@ norn config set executors.claude.runner herdr
 norn config set kernel.mode manual
 ```
 
-The herdr runner opens one Herdr workspace per story and one tab per run, with the agent in its pane: you can watch it and type into it. With a person beside the agent, manual mode fits: start each agent step with `norn run start <unit>`. A decision given by typing into the pane is not on norn's record; give it with `norn story answer` too.
+The herdr runner opens one Herdr workspace per story and one tab per run, with the agent in its pane: you can watch it and type into it. In auto mode norn starts each agent step in its pane on its own, and you can look in or type at any time; in manual mode you start each one with `norn run start <unit>`. An attended step always waits for `norn run start`, and then runs in its pane with you. A decision given by typing into the pane is not on norn's record; give it with `norn story answer` too.
 
 ## Share run data with a team
 
