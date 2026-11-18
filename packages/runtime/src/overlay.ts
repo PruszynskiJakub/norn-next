@@ -70,14 +70,24 @@ export function getKey(value: unknown, key: string): unknown {
 
 const child = (path: string, key: string): string => (path ? `${path}.${key}` : key);
 
+/** Inside a mapping a key is set by being there: an explicit `null` replaces the value below it. */
+const setByKey = (): boolean => true;
+
 function mergeTwo(below: unknown, above: unknown, path: string, nornKeys: DeepMerge["nornKeys"]): unknown {
-  if (!isMapping(below) || !isMapping(above)) return structuredClone(above);
+  if (!isMapping(below) || !isMapping(above))
+    return overlayWhole(
+      [
+        { label: "below", value: below },
+        { label: "above", value: above },
+      ],
+      setByKey,
+    ).value;
   let out: Mapping = structuredClone(below);
   if (typeof above.use === "string" && typeof below.use === "string" && above.use !== below.use) {
     const own = nornKeys[path] ?? [];
     out = Object.fromEntries(Object.entries(out).filter(([key]) => own.includes(key)));
   }
-  for (const [key, value] of Object.entries(above)) out[key] = key in out ? mergeTwo(out[key], value, child(path, key), nornKeys) : structuredClone(value);
+  for (const [key, value] of Object.entries(above)) out[key] = mergeTwo(out[key], value, child(path, key), nornKeys);
   return out;
 }
 
@@ -96,8 +106,11 @@ function overlayDeep<L extends string>(layers: readonly OverlayLayer<L, unknown>
   return { value, origins, originOf };
 }
 
-function overlayWhole<L extends string, V>(layers: readonly OverlayLayer<L, V>[]): Overlaid<L, V | undefined> {
-  const top = [...layers].reverse().find((l) => l.value !== null && l.value !== undefined);
+/** A whole layer is set unless it is absent. */
+const setByLayer = (value: unknown): boolean => value !== null && value !== undefined;
+
+function overlayWhole<L extends string, V>(layers: readonly OverlayLayer<L, V>[], isSet: (value: unknown) => boolean = setByLayer): Overlaid<L, V | undefined> {
+  const top = [...layers].reverse().find((l) => isSet(l.value));
   const value = top === undefined ? undefined : (structuredClone(top.value) as V);
   const originOf = (key: string): L | null => (key === "" && top !== undefined ? top.label : null);
   return { value, origins: top === undefined ? {} : { "": top.label }, originOf };

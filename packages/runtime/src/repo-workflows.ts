@@ -63,6 +63,7 @@ export function overlayRepoWorkflows(pack: Pack, repo: RepoWorkflows): Pack {
 export function repoFileOf(repo: RepoWorkflows, name: string, kind: "workflow" | "shared"): string | null {
   const resolved = overlayFiles({}, kind === "workflow" ? repo.workflows : repo.shared);
   if (resolved.originOf(name) !== "repo") return null;
-  const file = Object.keys(resolved.value).find((f) => workflowNameOf(f) === name) as string;
+  const file = Object.keys(resolved.value).find((f) => workflowNameOf(f) === name);
+  if (file === undefined) return null;
   return kind === "workflow" ? `${REPO_WORKFLOWS_DIR}/${file}` : `${REPO_WORKFLOWS_DIR}/shared/${file}`;
 }
