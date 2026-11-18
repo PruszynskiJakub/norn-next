@@ -2,7 +2,8 @@
  * AgentLauncher by composition: each executor is a harness (how the agent is wired and launched)
  * running in a runner (where its process lives).
  *
- * - start: `harness.install` in the worktree with the hook command, the brief rendered and marked
+ * - start: `harness.install` in the worktree with the hook command, the pack's skills written to
+ *   the harness's `skillsDir` (skills.ts), the brief rendered and marked
  *   (prompt id = the run id) and recorded as sent, `harness.launch` (headless when the runner has no
  *   pane), then `runner.start` keyed by the run id, so a replayed start finds the first process. The
  *   launch env carries RUN_ENV (unit and run) and never the per-launch NORN_PROMPT_SOURCE.
@@ -24,6 +25,7 @@ import { receivedDir } from "./events/paths.ts";
 import { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
 import { currentRunnerHandle, recordLaunch, resumesOf, resumeWith } from "./launcher-resume.ts";
 import { shellQuote } from "./shell.ts";
+import { installSkills, type PackSkills } from "./skills.ts";
 import type { AgentLauncher, AgentRunRequest, ExecutorModes, LauncherModes } from "./types.ts";
 
 export interface Executor {
@@ -48,6 +50,8 @@ export interface HarnessLauncherOptions {
    * holds a `norn` running this CLI (agent-bin.ts); absent, the agent's PATH is left alone.
    */
   hostPath?: string;
+  /** the pack's skills, written into the harness's `skillsDir` in the worktree before every launch */
+  skills?: PackSkills;
   /** the brief for a run, as brief-context.ts renders it */
   renderBrief(run: AgentRunRequest): Promise<PluginResult<string>>;
   /** where a run's output goes when no pane shows it; default `<dataDir>/runtime/sessions/<run>.log` */
@@ -109,6 +113,13 @@ export class HarnessLauncher implements AgentLauncher {
       await e.harness.install({ worktree: run.worktree, hookCommand: shellQuote([...this.opts.hookCommand, e.harness.name]) });
     } catch (err) {
       return fail("unavailable", `${e.harness.name}: installing hooks in ${run.worktree} failed: ${message(err)}`);
+    }
+    if (e.harness.skillsDir !== undefined && this.opts.skills !== undefined) {
+      try {
+        await installSkills(ctx.files, run.worktree, e.harness.skillsDir, this.opts.skills);
+      } catch (err) {
+        return fail("unavailable", `${e.harness.name}: writing the pack's skills to ${run.worktree}/${e.harness.skillsDir} failed: ${message(err)}`);
+      }
     }
     const brief = await this.opts.renderBrief(run);
     if (!brief.ok) return brief;

@@ -1,10 +1,10 @@
 /**
- * Story-wide decisions: taking a new item in, the story's claim, its mailbox and publishing a shared
- * store. None of them commits a unit's state; each is safe to carry out again, because the store's
+ * Story-wide decisions: taking a new item in, the story's claim, its mailbox, publishing a shared
+ * store and tidying an ended story. None of them commits a unit's state; each is safe to carry out again, because the store's
  * claims compare versions and its receipts and messages are idempotent by id.
  */
 import { type DecisionOf, validateMailboxLetter } from "@norn/kernel";
-import { fail, ok, type PluginResult } from "@norn/plugin-api";
+import { fail, ok, type PluginResult, parseStoryKey } from "@norn/plugin-api";
 import { deriveUlid } from "@norn/schema";
 import { ensureWorktree } from "./branches.ts";
 import type { TickContext } from "./env.ts";
@@ -92,4 +92,32 @@ export async function flush(t: TickContext, d: DecisionOf<"flush">): Promise<Plu
   const store = t.env.slots.store;
   if (!store.flush) return ok({ pushed: false });
   return store.flush(d.story);
+}
+
+/**
+ * The item is closed first and the worktrees after: a closed item is what a person sees, and a
+ * worktree left behind by a failure is only disk. Both are idempotent (closing a closed item,
+ * removing a missing worktree), so a failure is carried out again whole next tick under that
+ * tick's id; the tick keeps the claim until it succeeds.
+ */
+export async function finishStory(t: TickContext, d: DecisionOf<"finish_story">): Promise<PluginResult<unknown>> {
+  const { env } = t;
+  let closed = false;
+  if (d.close_item) {
+    const tracker = env.slots.tracker;
+    const key = parseStoryKey(d.story, tracker.keyPrefix);
+    if (!key) return fail("invalid", `${d.story} is not a key of tracker ${tracker.name}`, false);
+    const done = await tracker.perform({ kind: "close", id: key.id }, { receipt_id: d.effect_id });
+    if (!done.ok) return done;
+    closed = true;
+  }
+  const removed: string[] = [];
+  if (env.slots.vcs.capabilities.worktrees) {
+    for (const unit of d.worktrees) {
+      const gone = await env.slots.vcs.worktree.remove(unit);
+      if (!gone.ok) return gone;
+      removed.push(unit);
+    }
+  }
+  return ok({ closed, removed });
 }

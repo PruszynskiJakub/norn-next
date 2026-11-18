@@ -45,7 +45,7 @@ export function trackerItem(id: number, over: Partial<TrackerItem> = {}): Tracke
   return { id, key: `lt-${id}`, title: `Story ${id}`, body: "", open: true, assignees: ["me"], labels: ["norn"], updated_at: START, ...over };
 }
 
-/** A tracker over a list the test edits. */
+/** A tracker over a list the test edits; it closes an item and performs nothing else. */
 export function fakeTracker(items: TrackerItem[]): Tracker {
   return {
     name: "fake",
@@ -54,7 +54,13 @@ export function fakeTracker(items: TrackerItem[]): Tracker {
     whoami: async () => ok("me"),
     intake: async (q) => ok(items.filter((i) => i.open && i.labels.includes(q.label))),
     get: async (id) => ok(items.find((i) => i.id === id) ?? null),
-    perform: async () => fail("invalid", "the fake tracker performs nothing"),
+    perform: async (effect) => {
+      if (effect.kind !== "close") return fail("invalid", `the fake tracker performs no ${effect.kind}`);
+      const i = items.findIndex((x) => x.id === effect.id);
+      if (i < 0) return fail("not_found", `no item ${effect.id}`);
+      items[i] = { ...(items[i] as TrackerItem), open: false };
+      return ok({ kind: "close", id: effect.id, replayed: false });
+    },
   };
 }
 

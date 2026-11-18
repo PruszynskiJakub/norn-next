@@ -154,6 +154,12 @@ const ACTIONS = [
   }),
   action("notify", { item: InboxItem }),
   action("import_mailbox", { story: NonEmpty, ids: Type.Array(Id, { minItems: 1 }) }),
+  /**
+   * tidy a story that ended before its claim is given up: remove the worktrees of its units that
+   * ended done, and close its item when the story itself ended done and the item is still open;
+   * `effect_id` is the tracker's idempotence key for the close
+   */
+  action("finish_story", { story: NonEmpty, worktrees: Type.Array(NonEmpty), close_item: Type.Boolean(), effect_id: Id }),
   /** publish a shared store's run data for the story */
   action("flush", { story: NonEmpty }),
   action("noop", { reason: Type.String() }),
@@ -173,4 +179,4 @@ export type Action = Without<Decision, "unit" | "rule">;
  * Actions on a whole story or the tick rather than one unit; their decisions carry `unit: null` and
  * name the story, so keeping a claim alive never takes the story unit's one action of the tick.
  */
-export const STORY_ACTIONS: readonly ActionKind[] = ["intake_story", "claim", "renew_claim", "release_claim", "import_mailbox", "flush"];
+export const STORY_ACTIONS: readonly ActionKind[] = ["intake_story", "claim", "renew_claim", "release_claim", "finish_story", "import_mailbox", "flush"];

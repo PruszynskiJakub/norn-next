@@ -19,6 +19,7 @@ export const RULE_IDS: readonly string[] = [
   "claim.none",
   "claim.pending",
   "claim.release",
+  "story.finish",
   "store.flush",
   "mailbox.import",
   "mailbox.reject",

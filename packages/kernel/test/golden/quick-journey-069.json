@@ -760,6 +760,17 @@
       "reason": "the change merged"
     },
     {
+      "kind": "finish_story",
+      "unit": null,
+      "rule": "story.finish",
+      "story": "gh-7",
+      "worktrees": [
+        "gh-7"
+      ],
+      "close_item": true,
+      "effect_id": "01JD5G00007HNZ5QSNH97K8HSD"
+    },
+    {
       "kind": "release_claim",
       "unit": null,
       "rule": "claim.release",

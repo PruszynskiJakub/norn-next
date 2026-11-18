@@ -7,7 +7,7 @@ import type { Decision } from "@norn/kernel";
 import type { PluginResult } from "@norn/plugin-api";
 import { nudge, retryRun, startRun, stopRun } from "./act-runs.ts";
 import { runCheck, runStep } from "./act-steps.ts";
-import { claim, flush, importMailbox, intakeStory, releaseClaim, renewClaim } from "./act-story.ts";
+import { claim, finishStory, flush, importMailbox, intakeStory, releaseClaim, renewClaim } from "./act-story.ts";
 import { applyReceipts, markCorrupt, markDone, park, startSlices } from "./act-unit.ts";
 import type { TickContext } from "./env.ts";
 import type { ActionOutcome } from "./types.ts";
@@ -46,6 +46,8 @@ function carryOut(t: TickContext, d: Decision, index: number): Promise<PluginRes
       return park(t, d);
     case "import_mailbox":
       return importMailbox(t, d);
+    case "finish_story":
+      return finishStory(t, d);
     case "flush":
       return flush(t, d);
     // an inbox item and a noop have no effect here: the trace is their record, and a front end reads it

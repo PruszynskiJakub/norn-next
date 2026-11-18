@@ -47,8 +47,18 @@ async function run(env: RuntimeEnv, tickId: string, trace: TickTrace, problems: 
   const t: TickContext = { env, tickId, facts: gathered.value.facts, workflows: gathered.value.workflows };
   // decide is handed a copy: the act handlers read the facts it decided from, and decide must not be able to change them
   const decisions = decide(structuredClone(t.facts), t.workflows, env.config.kernel);
-  // in order, one at a time: a story's claim comes before its units' actions, its flush and release after them
-  for (const [i, d] of decisions.entries()) trace.record(await act(t, d, i));
+  // in order, one at a time: a story's claim comes before its units' actions, its flush, finish and release after them
+  const unfinished = new Set<string>();
+  for (const [i, d] of decisions.entries()) {
+    // a story whose finishing failed keeps its claim, so the next tick decides the finish again
+    if (d.kind === "release_claim" && unfinished.has(d.story)) {
+      trace.record({ decision: d, ok: false, error: "skipped: finishing the story failed; the claim is kept for the next tick", retryable: true });
+      continue;
+    }
+    const outcome = await act(t, d, i);
+    if (d.kind === "finish_story" && !outcome.ok) unfinished.add(d.story);
+    trace.record(outcome);
+  }
   return decisions;
 }
 

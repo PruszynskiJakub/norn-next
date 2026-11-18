@@ -46,6 +46,7 @@ back as the unit's `corrupt_marked` fact.
 | `claim.unclaimed` | `noop` | `claim.none` | `noop` for every unit (in progress and unclaimed: a person takes it over) |
 | (none) | | `claim.pending` | `noop` (the claim is taken or reacquired this tick; units wait for it) |
 | (none) | | `claim.release` | `release_claim` (nothing of the story is left open) |
+| (none) | | `story.finish` | `finish_story` before `release_claim`: remove the worktrees of units that ended done; close the item when the story ended done, the item is open and `capabilities.tracker.close` |
 | `story.finished` | `noop` | `story.ended` | `noop` |
 | `story.corrupt` | `mark_corrupt` | `unit.corrupt` | `mark_corrupt` (each unit whose record fails validation, once: its `unit.marked` receipt is read back as `corrupt_marked`; there is no story-wide record to fail) |
 | `story.record_only` | `noop` | dropped: a record without a branch is an old-layout case; the store holds the record | |
@@ -265,8 +266,8 @@ New rule ids: `agent.died.route`, `agent.died.manual`, `agent.died.retry`, `agen
 | `notify` | `notify` (declared for the host's inbox; no rule emits it yet, since every inbox item travels on the `park` that raises it) |
 | `update_story_mirror` | dropped: tracker display, mirrored by the host after a commit |
 | `retitle_pr` | dropped: forge display, set by the `open-pr` step kind |
-| `cleanup_merged_story` | `mark_done`, then `release_claim`; worktree cleanup is the host's |
-| `close_story` | `apply_receipts` (`unit.marked`), then `release_claim`; worktree cleanup is the host's |
+| `cleanup_merged_story` | `mark_done`, then `finish_story` (done worktrees removed, the item closed) and `release_claim` |
+| `close_story` | `apply_receipts` (`unit.marked`), then `release_claim`; a stuck unit keeps its worktree |
 | `round_migrate` | dropped: old on-disk layout |
 | `round_start` | `apply_receipts` (`round.started`) |
 | `noop` | `noop` |
@@ -275,4 +276,4 @@ New rule ids: `agent.died.route`, `agent.died.manual`, `agent.died.retry`, `agen
 | `set_aside_record` | dropped: the store's compare-and-swap settles a lost race |
 | `restore_markers` | dropped: worktree markers belong to the host |
 | `reclaim_leases` | dropped: machine slot leases belong to the host |
-| (none) | `stop_run`, `run_step`, `renew_claim`, `release_claim`, `flush` are new |
+| (none) | `stop_run`, `run_step`, `renew_claim`, `release_claim`, `finish_story`, `flush` are new |

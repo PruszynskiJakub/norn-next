@@ -13,6 +13,7 @@ export { hookCommandFor, mergeNornHooks, NORN_MARKER, removeNornHooks } from "./
 export const claudeHarness: Harness = Object.freeze({
   name: "claude",
   capabilities: Object.freeze({ blockStop: true, denyTool: true, injectContext: true, subagents: true, limits: true, paneInput: true, promptMarks: true, resume: true }),
+  skillsDir: ".claude/skills",
   install,
   uninstall,
   launch,

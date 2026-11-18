@@ -1483,6 +1483,20 @@
       "reason": "ended done at integrate"
     },
     {
+      "kind": "finish_story",
+      "unit": null,
+      "rule": "story.finish",
+      "story": "gh-12",
+      "worktrees": [
+        "gh-12",
+        "gh-12/01",
+        "gh-12/03",
+        "gh-12/02"
+      ],
+      "close_item": true,
+      "effect_id": "01JD5G0000QY97G99B06VVZ6EJ"
+    },
+    {
       "kind": "release_claim",
       "unit": null,
       "rule": "claim.release",

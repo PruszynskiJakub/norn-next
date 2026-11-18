@@ -67,8 +67,26 @@ export function decideStoryTail(story: StoryFacts, ctx: DecideContext): Decision
   const out: Decision[] = [];
   const live = Date.parse(facts.now) < Date.parse(claim.expires_at);
   if (live && facts.capabilities.store.shared) out.push({ kind: "flush", unit: null, rule: "store.flush", story: story.key });
-  if (!isOpen(story)) out.push({ kind: "release_claim", unit: null, rule: "claim.release", story: story.key });
+  if (!isOpen(story)) {
+    const finish = finishRule(story, ctx);
+    if (finish) out.push(finish);
+    out.push({ kind: "release_claim", unit: null, rule: "claim.release", story: story.key });
+  }
   return out;
+}
+
+/**
+ * What an ended story leaves to tidy, decided once, as its claim is given up. Only work that ended
+ * done is tidied: a stuck unit keeps its worktree for the person to look into, and a stuck story's
+ * item stays open as the record that it is unfinished. With no tracker that can close, the item is
+ * left to the person.
+ */
+function finishRule(story: StoryFacts, ctx: DecideContext): Decision | null {
+  const worktrees = story.units.filter((u) => u.state?.ended === "done").map((u) => u.id);
+  const own = story.units.find((u) => u.id === story.key);
+  const closeItem = own?.state?.ended === "done" && story.item?.open === true && ctx.facts.capabilities.tracker?.close === true;
+  if (worktrees.length === 0 && !closeItem) return null;
+  return { kind: "finish_story", unit: null, rule: "story.finish", story: story.key, worktrees, close_item: closeItem, effect_id: ctx.nextId() };
 }
 
 /** One `intake_story` per open item that is not a story yet, when a tracker is configured. */

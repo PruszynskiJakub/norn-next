@@ -437,3 +437,42 @@ describe("shellQuote", () => {
     expect(shellQuote(["/a b/norn", "it's"])).toBe(`'/a b/norn' 'it'\\''s'`);
   });
 });
+
+describe("the pack's skills", () => {
+  const SKILLS = { "norn-implement": { "SKILL.md": "# implement\n", "refs/tdd.md": "red, green\n" }, norn: { "SKILL.md": "# norn\n" } };
+
+  function withSkills(skillsDir: string | undefined) {
+    const s = setup();
+    const harness = { ...fakeHarness(), ...(skillsDir !== undefined && { skillsDir }) };
+    const launcher = new HarnessLauncher({ ...s.launcher.opts, executors: { pane: { harness, runner: s.pane } }, skills: SKILLS });
+    return { ...s, launcher };
+  }
+
+  test("are written into the harness's skills folder in the worktree before the launch, each folder ignored by git", async () => {
+    const s = withSkills(".agent/skills");
+    expect((await s.launcher.start(run())).ok).toBe(true);
+    const dir = "/wt/gh-12-03/.agent/skills";
+    expect(await s.files.read(`${dir}/norn-implement/SKILL.md`)).toBe("# implement\n");
+    expect(await s.files.read(`${dir}/norn-implement/refs/tdd.md`)).toBe("red, green\n");
+    expect(await s.files.read(`${dir}/norn/SKILL.md`)).toBe("# norn\n");
+    expect(await s.files.read(`${dir}/norn/.gitignore`)).toEndWith("\n*\n");
+  });
+
+  test("a skill the repo has of the same name is left as it is, and norn's own copy is brought up to date", async () => {
+    const s = withSkills(".agent/skills");
+    const dir = "/wt/gh-12-03/.agent/skills";
+    await s.files.write(`${dir}/norn/SKILL.md`, "# the repo's own norn skill\n");
+    expect((await s.launcher.start(run())).ok).toBe(true);
+    expect(await s.files.read(`${dir}/norn/SKILL.md`)).toBe("# the repo's own norn skill\n");
+    expect(await s.files.read(`${dir}/norn/.gitignore`)).toBeNull();
+    await s.files.write(`${dir}/norn-implement/SKILL.md`, "# stale\n");
+    expect((await s.launcher.start(run({ run_id: "01JRUN0000000000000000000B" }))).ok).toBe(true);
+    expect(await s.files.read(`${dir}/norn-implement/SKILL.md`)).toBe("# implement\n");
+  });
+
+  test("a harness with no skills folder gets none", async () => {
+    const s = withSkills(undefined);
+    expect((await s.launcher.start(run())).ok).toBe(true);
+    expect((await s.files.list("/wt/gh-12-03")).length).toBe(0);
+  });
+});

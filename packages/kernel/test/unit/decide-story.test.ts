@@ -112,11 +112,12 @@ describe("claims", () => {
     expect(storyDecisions(story())).toEqual([]);
   });
 
-  test("the claim is released once every unit ended, after the units' noops", () => {
+  test("the claim is released once every unit ended, after the units' noops and the story's finish", () => {
     const s = story({ units: [unit("gh-1", state("gh-1", "split", { ended: "done" })), unit("gh-1/01", state("gh-1/01", "build", { ended: "done" }))] });
     expect(storyDecisions(s).map((d) => [d.unit, d.rule])).toEqual([
       ["gh-1", "unit.ended.done"],
       ["gh-1/01", "unit.ended.done"],
+      [null, "story.finish"],
       [null, "claim.release"],
     ]);
   });
@@ -124,6 +125,37 @@ describe("claims", () => {
   test("a letter still in the mailbox keeps the claim", () => {
     const s = story({ units: [unit("gh-1", state("gh-1", "split", { ended: "done" }))], mailbox: [letter("m1", { unit: "gh-1", receipt: { kind: "mode.changed", mode: "auto", by: "ann" } })] });
     expect(rules(storyDecisions(s))).not.toContain("claim.release");
+  });
+});
+
+describe("finishing an ended story", () => {
+  const finishOf = (s: ReturnType<typeof story>, over: Parameters<typeof storyDecisions>[1] = {}) =>
+    storyDecisions(s, over).find((d): d is DecisionOf<"finish_story"> => d.kind === "finish_story") ?? null;
+
+  test("a story that ended done has every done unit's worktree removed and its open item closed, before the release", () => {
+    const s = story({ units: [unit("gh-1", state("gh-1", "split", { ended: "done" })), unit("gh-1/01", state("gh-1/01", "build", { ended: "done" }))] });
+    expect(finishOf(s)).toMatchObject({ kind: "finish_story", unit: null, rule: "story.finish", story: "gh-1", worktrees: ["gh-1", "gh-1/01"], close_item: true });
+    expect(finishOf(s)?.effect_id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+  });
+
+  test("a stuck unit keeps its worktree, and a story that ended stuck keeps its item open", () => {
+    const s = story({ units: [unit("gh-1", state("gh-1", "split", { ended: "stuck" })), unit("gh-1/01", state("gh-1/01", "build", { ended: "done" }))] });
+    expect(finishOf(s)).toMatchObject({ worktrees: ["gh-1/01"], close_item: false });
+    expect(finishOf(story({ units: [unit("gh-1", state("gh-1", "split", { ended: "stuck" }))] }))).toBeNull();
+  });
+
+  test("an item already closed, or a tracker that cannot close, leaves the item alone", () => {
+    const done = [unit("gh-1", state("gh-1", "split", { ended: "done" }))];
+    expect(finishOf(story({ units: done, item: item(1, { open: false }) }))?.close_item).toBe(false);
+    expect(finishOf(story({ units: done }), { capabilities: caps({}, false) })?.close_item).toBe(false);
+    const noClose = caps();
+    if (noClose.tracker) noClose.tracker.close = false;
+    expect(finishOf(story({ units: done }), { capabilities: noClose })?.close_item).toBe(false);
+  });
+
+  test("nothing is finished while the story is open or once its claim is given up", () => {
+    expect(finishOf(story())).toBeNull();
+    expect(finishOf(story({ claim: null, units: [unit("gh-1", state("gh-1", "split", { ended: "done" }))] }))).toBeNull();
   });
 });
 
@@ -452,7 +484,7 @@ describe("flush", () => {
 
   test("a story released this tick is flushed before the release", () => {
     const s = story({ units: [unit("gh-1", state("gh-1", "split", { ended: "done" }))] });
-    expect(rules(storyDecisions(s, { capabilities: caps({ shared: true }) }))).toEqual(["unit.ended.done", "store.flush", "claim.release"]);
+    expect(rules(storyDecisions(s, { capabilities: caps({ shared: true }) }))).toEqual(["unit.ended.done", "store.flush", "story.finish", "claim.release"]);
   });
 });
 

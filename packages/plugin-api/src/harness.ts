@@ -109,6 +109,12 @@ export interface Harness {
   readonly name: string;
   readonly capabilities: HarnessCapabilities;
   /**
+   * The folder, relative to a worktree, the agent loads project skills from (`.claude/skills`), each
+   * skill a folder holding a `SKILL.md` (plugin API 1.7). A host writes the pack's skills there before
+   * a launch, so the skills a brief names are the agent's to use; without it the agent has none.
+   */
+  readonly skillsDir?: string;
+  /**
    * Wire the agent's hooks in one worktree; idempotent, returns the files it changed. Every write is
    * atomic (temp file, fsync, rename): a torn config file would leave the agent with no hooks.
    */

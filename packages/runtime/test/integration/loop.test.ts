@@ -66,6 +66,10 @@ describe("a local tracker item through the quick workflow", () => {
     });
     expect(existsSync(join(m.repo, "feature.txt"))).toBe(true);
     expect(m.agents.starts.map((s) => s.step)).toEqual(["implement", "review", "describe"]);
+    // the done story is tidied before its claim goes: its worktree removed, its item closed
+    expect(existsSync(worktree)).toBe(false);
+    const item = await m.env.slots.tracker.get(1);
+    expect(item.ok && item.value?.open).toBe(false);
     // every tick left its trace
     expect(readdirSync(join(t.dir, "a-machine", TRACE_DIR)).length).toBeGreaterThan(10);
   }, 60_000);
@@ -96,6 +100,10 @@ describe("a check that keeps failing", () => {
       const claim = await m.env.slots.store.claims.read(unit);
       return claim.ok && claim.value === null;
     });
+    // a stuck story keeps its worktree for the person and its item open
+    expect(existsSync(m.agents.starts[0]?.worktree as string)).toBe(true);
+    const item = await m.env.slots.tracker.get(1);
+    expect(item.ok && item.value?.open).toBe(true);
   }, 60_000);
 });
 

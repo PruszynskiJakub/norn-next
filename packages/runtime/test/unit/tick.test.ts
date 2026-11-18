@@ -8,7 +8,7 @@ import { has, harness, MINUTE, type Report, record, rulesOf, session, START, tic
 const lastRules = (reports: Report[]) => reports.map(rulesOf);
 
 describe("a story from intake to done", () => {
-  test("a check step: intake, claim, round, check, apply, done, release", async () => {
+  test("a check step: intake, claim, round, check, apply, done, finish, release", async () => {
     const h = harness();
     h.items.push(trackerItem(1));
     const reports = await tickUntil(h, has("claim.release"));
@@ -19,7 +19,7 @@ describe("a story from intake to done", () => {
       ["lt-1 check.run"],
       ["lt-1 receipts.apply"],
       ["- claim.renew", "lt-1 check.finished"],
-      ["lt-1 unit.ended.done", "- claim.release"],
+      ["lt-1 unit.ended.done", "- story.finish", "- claim.release"],
     ]);
     const unit = await record(h, "lt-1");
     expect(unit.state?.ended).toBe("done");
@@ -29,6 +29,9 @@ describe("a story from intake to done", () => {
     expect(h.exec.calls.map((c) => [c.argv, c.opts.cwd, c.opts.timeoutMs])).toEqual([[["sh", "-c", "bun test"], "/machine/repo/worktrees/lt-1", 300_000]]);
     const claim = await h.env.slots.store.claims.read("lt-1");
     expect(claim.ok && claim.value).toBeNull();
+    // finishing a done story closes its item and removes its worktree
+    expect(h.items[0]?.open).toBe(false);
+    expect(h.vcsCalls.filter((c) => c.op === "remove").map((c) => c.args)).toEqual([["lt-1"]]);
   });
 
   test("an agent step: the launcher starts it with its brief, the report routes it, and the ended run is stopped", async () => {
