@@ -34,7 +34,7 @@ The order below matters where it is numbered; how deep each part goes is yours t
 ```markdown
 | Criterion or story | What it says | Verifier | Proven by |
 | --- | --- | --- | --- |
-| AC1 | an expired invite is rejected | test | `test/unit/invites.test.ts` › "rejects an expired invite" |
+| AC1 | an expired invite is rejected | test | `packages/core/test/unit/invites.test.ts` › "rejects an expired invite" |
 | AC2 | the inviter sees who joined | test | UNTRACED |
 | AC3 | the invite email reads well | person | QA (person) |
 ```
