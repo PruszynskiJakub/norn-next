@@ -70,6 +70,12 @@ export interface BriefRenderInput {
   attended?: boolean;
   /** answers given to earlier sessions of this step, which a fresh session would otherwise never see */
   answered?: readonly AnsweredAsk[];
+  /** for a run that replaces a session which ended without a report: how that session ended, already rendered */
+  retry?: string;
+  /** a person's gate rulings on the story, one rendered line each */
+  rulings?: readonly string[];
+  /** what the unit's steps did this round, oldest first, one rendered line each */
+  history?: readonly string[];
   /** the inputs as the host made them readable; absent: the bare names the step lists */
   inputs?: readonly BriefInputView[];
   /** a line under the inputs on how the host keeps their files (what it reads back, what git ignores) */
@@ -197,6 +203,13 @@ export function renderBrief(input: BriefRenderInput): string {
   if (input.description) out.push(input.description.trim(), "");
   if (b.skills.length > 0) out.push(skillLine(b.skills), "");
   if (!input.instructions && !input.description && b.skills.length === 0) out.push(`Work step \`${b.step}\` of workflow \`${b.workflow}\`.`, "");
+  if (input.retry)
+    out.push(
+      "## Retry",
+      "",
+      `A previous session of this attempt ended without reporting (${input.retry.trim()}). This is a fresh session: nothing it did counts as reported. Look at \`git status\`, \`git log\` and the handoff for partial work, then finish the step.`,
+      "",
+    );
   if (input.rework) out.push("## Rework", "", "This attempt reworks what was sent back. Address the points below first.", "", input.rework.trim(), "");
   if (input.answered && input.answered.length > 0)
     out.push(
@@ -205,6 +218,15 @@ export function renderBrief(input: BriefRenderInput): string {
       "An earlier session of this step asked a person and these are the answers; treat them as decided and do not ask again:",
       "",
       ...answeredLines(input.answered),
+      "",
+    );
+  if (input.rulings && input.rulings.length > 0)
+    out.push(
+      "## Rulings",
+      "",
+      "A person ruled at a gate of this story. A ruling settles the question it answers, even where the spec still says otherwise: follow it and do not raise it again. It judged the code of its time, so it never makes a criterion `pass` on its own.",
+      "",
+      ...input.rulings.map((r) => `- ${r.trim().replaceAll("\n", "\n  ")}`),
       "",
     );
   if (input.inputs && input.inputs.length > 0) {
@@ -219,6 +241,7 @@ export function renderBrief(input: BriefRenderInput): string {
       `\`${input.handoff}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary, and refresh it right before you report.`,
       "",
     );
+  if (input.history && input.history.length > 0) out.push("## History", "", "What this unit's steps did this round, oldest first:", "", ...input.history.map((l) => `- ${l}`), "");
   out.push("## Rules", "", ...RULES.map((r) => `- ${r}`), "");
   out.push("## Finish with exactly one of", "", ...finishLines(input, c), "");
   out.push(

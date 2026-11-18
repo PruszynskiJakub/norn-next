@@ -123,26 +123,62 @@ const oneLine = (text: string, max = 300): string => {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 };
 
-function recordLine(r: KernelReceipt): string | null {
+/** How receipt `r` ended a step, in one line; `said` adds what the report or ruling said. */
+function eventLine(r: KernelReceipt, said: boolean): string | null {
   const d = r.data;
   const at = `${d.step ?? "?"}${d.attempt !== undefined ? ` #${d.attempt}` : ""}`;
+  const text = (t: string | undefined) => (said && t ? `: ${oneLine(t)}` : "");
   switch (d.kind) {
     case "run.reported":
       if (d.verb === "ask") return null;
-      return `- ${code(at)} reported \`${d.verb}${d.outcome ? ` ${d.outcome}` : ""}\`${d.text ? `: ${oneLine(d.text)}` : ""}${d.criteria ? " (criteria report below)" : ""}`;
+      return `${code(at)} reported \`${d.verb}${d.outcome ? ` ${d.outcome}` : ""}\`${text(d.text)}${said && d.criteria ? " (criteria report below)" : ""}`;
     case "check.finished":
-      return `- ${code(at)} check exited ${d.exit} (\`${d.outcome}\`)`;
+      return `${code(at)} check exited ${d.exit} (\`${d.outcome}\`)`;
     case "gate.decided":
-      return `- ${code(at)} decided \`${d.outcome}\` by ${d.by}${d.delegated ? " (delegated)" : ""}${d.reason ? `: ${oneLine(d.reason)}` : ""}`;
+      return `${code(at)} decided \`${d.outcome}\` by ${d.by}${d.delegated ? " (delegated)" : ""}${text(d.reason)}`;
     case "step.finished":
-      return `- ${code(at)} ${d.step_kind} ended \`${d.outcome}\``;
+      return `${code(at)} ${d.step_kind} ended \`${d.outcome}\``;
     case "run.classified":
-      return `- ${code(at)} run judged \`${d.outcome}\``;
+      return `${code(at)} run judged \`${d.outcome}\``;
+    case "step.moved":
+      return `moved to ${code(d.to)} by ${d.by}${text(d.reason)}`;
     case "unit.marked":
-      return `- marked \`${d.ended}\`${d.reason ? `: ${oneLine(d.reason)}` : ""}`;
+      return `marked \`${d.ended}\`${text(d.reason)}`;
     default:
       return null;
   }
+}
+
+function recordLine(r: KernelReceipt): string | null {
+  const line = eventLine(r, true);
+  return line === null ? null : `- ${line}`;
+}
+
+const HISTORY_MAX = 20;
+
+/**
+ * What the unit's steps did this round, oldest first, without what they said: the outcomes that
+ * route the work, so an agent sees where its step sits. The newest lines win when it runs long.
+ */
+export function historyOf(record: UnitJournal): string[] {
+  const lines = roundOf(record)
+    .map((r) => eventLine(r, false))
+    .filter((l): l is string => l !== null);
+  if (lines.length <= HISTORY_MAX) return lines;
+  return [`… ${lines.length - HISTORY_MAX + 1} earlier`, ...lines.slice(-(HISTORY_MAX - 1))];
+}
+
+/** Every gate ruling with a reason on the story's units, every round: a reason is what settles a question. */
+export async function rulingsOf(env: RuntimeEnv, record: UnitJournal): Promise<string[]> {
+  const out: string[] = [];
+  for (const u of await storyUnits(env, record.unit)) {
+    for (const r of u.receipts) {
+      const d = r.data;
+      if (d.kind !== "gate.decided" || !d.reason?.trim()) continue;
+      out.push(`${code(u.unit)} ${code(`${d.step ?? "?"}${d.attempt !== undefined ? ` #${d.attempt}` : ""}`)} decided \`${d.outcome}\` by ${d.by}${d.delegated ? " (delegated)" : ""}: ${d.reason.trim()}`);
+    }
+  }
+  return out;
 }
 
 function verdictLine(c: CriterionVerdict): string {

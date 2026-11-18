@@ -1,8 +1,9 @@
 /**
  * Everything the kernel's renderBrief needs beyond the decision's BriefInputs, gathered from the
  * unit's record and its pinned workflow: the outcomes `done` may report at the step, the handoff
- * path, the rework text (a red check's output tail, review findings) when the run reworks one, and
- * for a retry the questions the sessions it replaces asked and the answers a person gave them.
+ * path, the rework text (a red check's output tail, review findings) when the run reworks one, the
+ * story's gate rulings and the unit's steps this round, and for a retry how the session it replaces
+ * ended, the questions the sessions it replaces asked and the answers a person gave them.
  * Shared by the launcher (the brief a launch sends) and `brief(unit)` (what `norn brief` prints), so
  * both say the same.
  */
@@ -11,6 +12,7 @@ import { wantsCriteria } from "@norn/kernel";
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import type { RuntimeEnv } from "./env.ts";
 import { readEvents } from "./events/log.ts";
+import { historyOf, rulingsOf } from "./input-history.ts";
 import { INPUTS_NOTE, materializeInputs, unsettledCriteria, worktreeOf } from "./inputs.ts";
 import { reportableOutcomes } from "./live-run.ts";
 import { readStepRun } from "./step-runs.ts";
@@ -57,6 +59,18 @@ function replacedRuns(receipts: readonly KernelReceipt[], runId: string): { runs
     r = startOf(r.data.retry_of);
   }
   return { runs, startedAt: own?.seq ?? Number.POSITIVE_INFINITY };
+}
+
+/**
+ * The session run `runId` replaced, when it is a retry: the run and the nudges it was sent. Why decide
+ * retried it (dead, or quiet past its nudges) is on no receipt, so the notice claims no more.
+ */
+function retryOf(receipts: readonly KernelReceipt[], runId: string): string | undefined {
+  const own = receipts.find((r) => r.data.kind === "run.started" && r.data.run_id === runId);
+  if (own?.data.kind !== "run.started" || own.data.retry_of === undefined) return undefined;
+  const old = own.data.retry_of;
+  const nudges = receipts.filter((r) => r.data.kind === "nudge.sent" && r.data.run_id === old).length;
+  return `run \`${old}\`${nudges > 0 ? `, nudged ${nudges} time${nudges === 1 ? "" : "s"}` : ""}`;
 }
 
 /**
@@ -107,6 +121,9 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
   for (const o of outcomes) if (spec.means[o] !== undefined) means[o] = spec.means[o];
   const rework = brief.rework_from === undefined ? undefined : await reworkText(env, record.unit, record.receipts.find((r) => r.seq === brief.rework_from));
   const answered = runId === undefined ? [] : await answeredAsks(env, record, runId);
+  const retry = runId === undefined ? undefined : retryOf(record.receipts, runId);
+  const rulings = await rulingsOf(env, record);
+  const history = historyOf(record);
   const made = await materializeInputs(env, record, brief, worktree ?? worktreeOf(env, record.unit));
   const inputs = made.ok ? made.value : null;
   return ok({
@@ -120,6 +137,9 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
     ...(spec.attended && { attended: true }),
     ...(rework !== undefined && { rework }),
     ...(answered.length > 0 && { answered }),
+    ...(retry !== undefined && { retry }),
+    ...(rulings.length > 0 && { rulings }),
+    ...(history.length > 0 && { history }),
     ...(inputs?.story !== undefined && { story: inputs.story }),
     ...(inputs !== null && inputs.inputs.length > 0 && { inputs: inputs.inputs, inputsNote: INPUTS_NOTE }),
     ...(inputs?.handoff !== undefined && { handoff: inputs.handoff }),

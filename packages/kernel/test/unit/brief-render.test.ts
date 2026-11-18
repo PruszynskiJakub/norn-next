@@ -50,6 +50,25 @@ describe("renderBrief", () => {
     expect(md.indexOf("## Rework")).toBeLessThan(md.indexOf("## Inputs"));
   });
 
+  test("a retry says the session it replaces ended without a report, before the rework", () => {
+    const md = renderBrief(input({ retry: "run `r-1`, nudged 2 times", rework: "Check `test` exited 1." }));
+    expect(md).toContain("## Retry\n\nA previous session of this attempt ended without reporting (run `r-1`, nudged 2 times). This is a fresh session:");
+    expect(md.indexOf("## Retry")).toBeLessThan(md.indexOf("## Rework"));
+    expect(renderBrief(input())).not.toContain("## Retry");
+  });
+
+  test("carries the person's gate rulings and the unit's history this round, each only when there is one", () => {
+    const md = renderBrief(input({ rulings: ["`gh-12` `ready #1` `reject` by jo: Keep the old flag."], history: ["`build #1` reported `done`", "`ready #1` `reject` by jo"] }));
+    expect(md).toContain("## Rulings");
+    expect(md).toContain("- `gh-12` `ready #1` `reject` by jo: Keep the old flag.");
+    expect(md).toContain("## History\n\nWhat this unit's steps did this round, oldest first:\n\n- `build #1` reported `done`\n- `ready #1` `reject` by jo\n");
+    expect(md.indexOf("## Rulings")).toBeLessThan(md.indexOf("## Inputs"));
+    expect(md.indexOf("## History")).toBeLessThan(md.indexOf("## Rules"));
+    const none = renderBrief(input({ rulings: [], history: [] }));
+    expect(none).not.toContain("## Rulings");
+    expect(none).not.toContain("## History");
+  });
+
   test("carries the answers earlier sessions of the step were given, so a fresh session does not ask again", () => {
     const md = renderBrief(input({ answered: [{ question: "Which branch?", answer: "main,\nnot develop" }, { answer: "yes" }] }));
     expect(md).toContain("## Answers already given");
