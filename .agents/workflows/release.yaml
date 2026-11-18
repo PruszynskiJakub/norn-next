@@ -16,7 +16,7 @@ steps:
   prepare:
     agent: >-
       Write the changelog section, the version bumps and the proposed version with its reason as the
-      skill says; a version given in the issue's `## Version` or by the person in Rework wins over
+      skill says; a version given in the issue's `## Version` or in the reject at ready (under Rework) wins over
       your proposal. Also write the PR body to pr.md in the spec folder: the proposed version, its
       reason and the new changelog section; norn puts the issue link under it. In the same diff as
       the bump, copy packages/pack-sdlc/assets/skills/norn* over .agents/skills/norn* as the skill
@@ -33,9 +33,9 @@ steps:
     # a branch that already held its base (clean) or took it in after a resolve (resolved) is prepared again too
     outcomes: { done: prepare, conflict: resolve, clean: prepare, resolved: prepare }
   resolve:
-    agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. CHANGELOG.md and version conflicts: keep the base side; prepare writes the release section again next."
+    agent: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. CHANGELOG.md and version conflicts: keep the base side; prepare writes the release section again next."
     skills: [norn-merge]
-    inputs: [spec, handoff]
+    inputs: [spec, handoff, base_side]
     outcomes:
       done: update
     means:

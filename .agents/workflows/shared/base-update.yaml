@@ -18,7 +18,7 @@ steps:
       resolved: test-resolution
       conflict: resolve
   resolve:
-    agent: "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase."
+    agent: "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase."
     skills: [norn-merge]
     inputs: [spec, handoff, base_side]
     outcomes:
