@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { claudeHarness, claudePlugin, DEFAULT_ARGS, RUN_ID_ENV } from "../../src/index.ts";
+import { relative } from "node:path";
+import { claudeHarness, claudePlugin, DEFAULT_ARGS, RUN_ID_ENV, settingsLocalPath } from "../../src/index.ts";
 
 const REQ = { cwd: "/repo/.worktrees/gh-12", prompt: "Use the norn skill, then run `norn brief`.", run_id: "run-1", env: { PATH: "/usr/bin" } };
 
@@ -33,6 +34,10 @@ describe("claude plugin", () => {
     expect(claudePlugin.api).toBe("^1");
     expect(claudePlugin.provides.harness?.claude).toBe(claudeHarness);
     expect(Object.isFrozen(claudePlugin)).toBe(true);
+  });
+  test("declares the settings file it wires hooks into as local to the worktree, so a host never reads it as work to commit", () => {
+    const worktree = "/repo/.worktrees/gh-12";
+    expect(claudeHarness.localFiles).toEqual([relative(worktree, settingsLocalPath(worktree))]);
   });
   test("declares what Claude Code's hooks can do", () => {
     expect(claudeHarness.name).toBe("claude");

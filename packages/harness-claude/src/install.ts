@@ -14,7 +14,9 @@ import { readJson, readText, removeFile, removeIfEmpty, writeJsonAtomic, writeTe
 import { isObject, type JsonObject } from "./payload.ts";
 import { mergeNornHooks, removeNornHooks } from "./settings.ts";
 
-export const settingsLocalPath = (worktree: string) => join(worktree, ".claude", "settings.local.json");
+/** the settings file norn wires hooks into, relative to a worktree */
+export const LOCAL_SETTINGS = ".claude/settings.local.json";
+export const settingsLocalPath = (worktree: string) => join(worktree, LOCAL_SETTINGS);
 export const gitignorePath = (worktree: string) => join(worktree, ".claude", ".gitignore");
 
 const OWNER_MARK = "# norn: keeps the hooks norn wires into settings.local.json out of git";

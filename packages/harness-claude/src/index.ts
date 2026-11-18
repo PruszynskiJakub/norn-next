@@ -1,5 +1,5 @@
 import { defineNornPlugin, type Harness } from "@norn/plugin-api";
-import { install, uninstall } from "./install.ts";
+import { install, LOCAL_SETTINGS, uninstall } from "./install.ts";
 import { launch } from "./launch.ts";
 import { normalize } from "./normalize.ts";
 import { respond } from "./respond.ts";
@@ -14,6 +14,7 @@ export const claudeHarness: Harness = Object.freeze({
   name: "claude",
   capabilities: Object.freeze({ blockStop: true, denyTool: true, injectContext: true, subagents: true, limits: true, paneInput: true, promptMarks: true, resume: true }),
   skillsDir: ".claude/skills",
+  localFiles: Object.freeze([LOCAL_SETTINGS]),
   install,
   uninstall,
   launch,

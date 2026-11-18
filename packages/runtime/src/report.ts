@@ -18,6 +18,7 @@ import { declaredCriteria } from "./criteria.ts";
 import { INPUTS_DIR, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
+import { skillLinks } from "./skills.ts";
 import { type LiveStep, liveStepOf, reportOnRecord } from "./live-run.ts";
 
 export type ReportRequest =
@@ -147,7 +148,7 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     if (handBack) return handBack;
     const stopped = await unfinishedRefusal(env, unit);
     if (stopped) return stopped;
-    const dirty = await uncommittedRefusal(env, unit);
+    const dirty = await uncommittedRefusal(env, unit, live.run.executor);
     if (dirty) return dirty;
   }
   const text = textOf(req);
@@ -244,18 +245,22 @@ const DIRTY_SHOWN = 10;
 /**
  * Why a `done` cannot be recorded while the unit's checkout holds work not committed, or null when
  * it can: the steps after it (a branch update, a push, a pull request) carry commits only, so what
- * is left in the worktree would be lost or make them fail. norn's own files there (the inputs and
- * the story's spec folder, which it reads back itself) never count, though a repo that commits its
- * specs tracks them. An ask or stuck is never held back: the work is not handed on.
+ * is left in the worktree would be lost or make them fail. norn's own files there never count: the
+ * inputs and the story's spec folder, which it reads back itself (though a repo that commits its
+ * specs tracks them), and what it installed for the run's executor, which a repo's own `.gitignore`
+ * can leave showing and which committing would carry norn's hooks into the branch. An ask or stuck
+ * is never held back: the work is not handed on.
  */
-async function uncommittedRefusal(env: RuntimeEnv, unit: string): Promise<Refusable<never> | null> {
+async function uncommittedRefusal(env: RuntimeEnv, unit: string, executor: string): Promise<Refusable<never> | null> {
   const vcs = env.slots.vcs;
   if (!vcs.uncommitted) return null;
   const worktree = worktreeOf(env, unit);
   const r = await vcs.uncommitted(worktree);
   if (!r.ok) return refuse(`cannot tell whether ${worktree} holds uncommitted work: ${r.failure.message}`, "report again with the same command", r.failure.code);
   const owned = [`${INPUTS_DIR}/`, `${specFolder(unit)}/`];
-  const left = r.value.filter((p) => !owned.some((o) => p.startsWith(o)));
+  const harness = env.slots.executors[executor];
+  const installed = new Set([...(harness?.localFiles ?? []), ...skillLinks(harness?.skillsDir, env.slots.pack.skills)]);
+  const left = r.value.filter((p) => !installed.has(p) && !owned.some((o) => p.startsWith(o)));
   if (left.length === 0) return null;
   const named = left.slice(0, DIRTY_SHOWN).join(", ") + (left.length > DIRTY_SHOWN ? ` and ${left.length - DIRTY_SHOWN} more` : "");
   return refuse(
