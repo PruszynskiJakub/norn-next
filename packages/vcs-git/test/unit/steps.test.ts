@@ -285,6 +285,20 @@ describe("push guard", () => {
     expect(h.lines().some((l) => l.startsWith(DIFF) && l.endsWith("origin/main...HEAD"))).toBe(true);
     expect(h.lines().some((l) => l.startsWith("push"))).toBe(false);
   });
+
+  test("a repo where no base resolves still pushes, with no base to read conflicts against", async () => {
+    const h = host(
+      storyRouter((line) => {
+        if (line === rev("origin/main")) return { code: 1 };
+        if (line.startsWith("push")) return {};
+        return undefined;
+      }, { head: HEAD }),
+    );
+    const r = await push.run(input({}, { step: "push" }), h.ctx);
+    expect(r.ok && r.value.outcome).toBe("done");
+    expect(h.lines().some((l) => l.startsWith(DIFF))).toBe(false);
+    expect(h.lines().some((l) => l.startsWith("push"))).toBe(true);
+  });
 });
 
 describe("verify-base", () => {

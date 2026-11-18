@@ -22,9 +22,12 @@ async function run(input: StepKindInput<{ remote?: string }>, ctx: HostContext):
   const sync = await syncRemote(ctx, p);
   if (!sync.ok) return sync;
   const base = await resolveBase(ctx, p.cwd, { ...input, config: {} }, p.remote);
-  if (!base.ok) return base;
-  const clean = await unresolvedConflicts(ctx, p.cwd, input.step, base.value.ref, "HEAD", "Nothing was pushed");
-  if (!clean.ok) return clean;
+  // with no base to measure from there are no commits of the branch's own to read, and the push goes ahead as it always did
+  if (!base.ok && base.failure.code !== "not_found") return base;
+  if (base.ok) {
+    const clean = await unresolvedConflicts(ctx, p.cwd, input.step, base.value.ref, "HEAD", "Nothing was pushed");
+    if (!clean.ok) return clean;
+  }
   const pushed = await pushBranch(ctx, p.cwd, p.remote, p.branch);
   if (!pushed.ok) return pushed;
   const head = await revParse(ctx, p.cwd, "HEAD");
