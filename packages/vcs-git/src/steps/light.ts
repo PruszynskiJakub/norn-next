@@ -20,13 +20,10 @@ export interface LightCommit {
   remerge?: string[] | null;
 }
 
-/** Bookkeeping: a path in the story's spec folder that is not its `spec.md`. */
+/** Bookkeeping: a path in the story's spec folder (`.agents/specs/<story>/`) that is not its `spec.md`. */
 export function bookkeeping(path: string, story: string): boolean {
-  if (!path.startsWith(`${SPECS_DIR}/`)) return false;
-  const rest = path.slice(SPECS_DIR.length + 1);
-  const cut = rest.indexOf("/");
-  if (cut < 0) return false;
-  return rest.slice(0, cut).startsWith(`${story}-`) && rest.slice(cut + 1) !== "spec.md";
+  const folder = `${SPECS_DIR}/${story}/`;
+  return path.startsWith(folder) && path.slice(folder.length) !== "spec.md";
 }
 
 /** The light outcome the commits allow, or null for the full path. Pure, so every case is tested with scripted commits. */

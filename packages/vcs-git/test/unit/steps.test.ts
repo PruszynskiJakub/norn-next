@@ -29,15 +29,18 @@ describe("the light path", () => {
   const merge = (over: Partial<LightCommit> = {}): LightCommit => ({ sha: "m", parents: ["a", "b"], paths: [], fromBase: true, remerge: [], ...over });
   const commit = (paths: string[]): LightCommit => ({ sha: "c", parents: ["a"], paths });
 
-  test("bookkeeping is the story's spec folder, never its spec.md nor another story's folder", () => {
-    expect(bookkeeping(".agents/specs/gh-12-login/handoffs/gh-12.md", "gh-12")).toBe(true);
-    expect(bookkeeping(".agents/specs/gh-12-login/spec.md", "gh-12")).toBe(false);
-    expect(bookkeeping(".agents/specs/gh-123-other/notes.md", "gh-12")).toBe(false);
+  test("bookkeeping is the story's spec folder `.agents/specs/<story>/`, never its spec.md nor another story's folder", () => {
+    expect(bookkeeping(".agents/specs/gh-12/handoffs/gh-12.md", "gh-12")).toBe(true);
+    expect(bookkeeping(".agents/specs/gh-12/slices/01-form.md", "gh-12")).toBe(true);
+    expect(bookkeeping(".agents/specs/gh-12/spec.md", "gh-12")).toBe(false);
+    expect(bookkeeping(".agents/specs/gh-123/notes.md", "gh-12")).toBe(false);
+    expect(bookkeeping(".agents/specs/gh-12-login/notes.md", "gh-12")).toBe(false);
+    expect(bookkeeping(".agents/specs/gh-12", "gh-12")).toBe(false);
     expect(bookkeeping("src/a.ts", "gh-12")).toBe(false);
   });
 
   test("base merges git made alone are clean, one a resolver finished is resolved, anything else takes the full path", () => {
-    expect(lightOutcome([merge(), commit([".agents/specs/gh-12-login/pr.md"])], "gh-12")).toBe("clean");
+    expect(lightOutcome([merge(), commit([".agents/specs/gh-12/pr.md"])], "gh-12")).toBe("clean");
     expect(lightOutcome([], "gh-12")).toBe("clean");
     expect(lightOutcome([merge(), merge({ remerge: ["a.ts"] })], "gh-12")).toBe("resolved");
     expect(lightOutcome([merge({ remerge: null })], "gh-12")).toBe("resolved");
