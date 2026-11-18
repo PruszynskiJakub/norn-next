@@ -10,6 +10,7 @@ import { checkExitsDir, checkLogsDir } from "./checks-detached.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { RUN_EVENT_FOLDERS, unitEventsDir } from "./events/paths.ts";
 import { sessionLogPath } from "./launcher.ts";
+import { tickId as tickIdMark, unitRuns } from "./ownership.ts";
 import { TRACE_DIR } from "./trace.ts";
 
 export const DEFAULT_TRACE_RETAIN_MS = 7 * 24 * 3_600_000;
@@ -18,8 +19,6 @@ export const DEFAULT_TRACE_RETAIN_MS = 7 * 24 * 3_600_000;
 export const TRACE_PRUNE_PER_TICK = 200;
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
-
-const TRACE_NAME = /^([0-9A-HJKMNP-TV-Z]{26})\.json$/;
 
 /** Collects removal failures, naming the first and counting the rest, so one bad folder never floods the report. */
 class Failures {
@@ -56,7 +55,7 @@ export async function pruneTraces(ctx: HostContext, tickId: string, retainMs: nu
   // a ULID's time part leads it, so the sorted listing is oldest first and the first young trace ends the walk
   for (const name of names) {
     if (removed >= limit) break;
-    const id = TRACE_NAME.exec(name)?.[1];
+    const id = tickIdMark.of(name);
     if (!id) continue;
     if (ulidTime(id) >= cutoff) break;
     const path = `${dir}/${name}`;
@@ -97,7 +96,7 @@ async function runEventFiles(ctx: HostContext, runDir: string): Promise<string[]
 
 /** The files under `dir` whose names start with one of the runs, as check logs and exits are keyed. */
 async function filesOfRuns(ctx: HostContext, dir: string, runs: ReadonlySet<string>): Promise<string[]> {
-  return (await ctx.files.list(dir)).filter((name) => [...runs].some((r) => name.startsWith(`${r}-`))).map((name) => `${dir}/${name}`);
+  return (await ctx.files.list(dir)).filter((name) => unitRuns.owns(name, runs)).map((name) => `${dir}/${name}`);
 }
 
 /**

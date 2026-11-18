@@ -502,6 +502,18 @@ describe("the pack's skills", () => {
     expect(await plain.read(`${WT}/.claude/skills/norn/SKILL.md`)).toBe("# norn\n");
   });
 
+  test("every path, link target and byte under .agents/skills and the harness's folder, with links and without", async () => {
+    const linked = withSkills(".claude/skills");
+    expect((await linked.launcher.start(run())).ok).toBe(true);
+    const inWorktree = (all: Record<string, string>) => Object.fromEntries(Object.entries(all).filter(([p]) => p.startsWith(`${WT}/`)));
+    expect({ files: inWorktree(linked.files.snapshot()), links: linked.files.links() }).toMatchSnapshot("a host with links");
+    const plain = memoryFiles();
+    const noLinks = { ...plain, symlink: undefined, readLink: undefined } as unknown as ReturnType<typeof memoryFiles>;
+    const copied = withSkills(".claude/skills", noLinks);
+    expect((await copied.launcher.start(run())).ok).toBe(true);
+    expect({ files: inWorktree(plain.snapshot()), links: plain.links() }).toMatchSnapshot("a host without links");
+  });
+
   test("a harness with no skills folder gets none", async () => {
     const s = withSkills(undefined);
     expect((await s.launcher.start(run())).ok).toBe(true);

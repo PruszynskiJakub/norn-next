@@ -1,0 +1,93 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`the pack's skills every path, link target and byte under .agents/skills and the harness's folder, with links and without: a host with links 1`] = `
+{
+  "files": {
+    "/wt/gh-12-03/.agents/skills/norn-implement/.gitignore": 
+"# norn: pack skills, rewritten before every launch; edit the pack, not these copies
+*
+"
+,
+    "/wt/gh-12-03/.agents/skills/norn-implement/SKILL.md": 
+"# implement
+"
+,
+    "/wt/gh-12-03/.agents/skills/norn-implement/refs/tdd.md": 
+"red, green
+"
+,
+    "/wt/gh-12-03/.agents/skills/norn/.gitignore": 
+"# norn: pack skills, rewritten before every launch; edit the pack, not these copies
+*
+"
+,
+    "/wt/gh-12-03/.agents/skills/norn/SKILL.md": 
+"# norn
+"
+,
+    "/wt/gh-12-03/.claude/skills/.gitignore": 
+"# norn: pack skills, rewritten before every launch; edit the pack, not these copies
+/.gitignore
+/norn-implement
+/norn
+"
+,
+  },
+  "links": {
+    "/wt/gh-12-03/.claude/skills/norn": "../../.agents/skills/norn",
+    "/wt/gh-12-03/.claude/skills/norn-implement": "../../.agents/skills/norn-implement",
+  },
+}
+`;
+
+exports[`the pack's skills every path, link target and byte under .agents/skills and the harness's folder, with links and without: a host without links 1`] = `
+{
+  "files": {
+    "/wt/gh-12-03/.agents/skills/norn-implement/.gitignore": 
+"# norn: pack skills, rewritten before every launch; edit the pack, not these copies
+*
+"
+,
+    "/wt/gh-12-03/.agents/skills/norn-implement/SKILL.md": 
+"# implement
+"
+,
+    "/wt/gh-12-03/.agents/skills/norn-implement/refs/tdd.md": 
+"red, green
+"
+,
+    "/wt/gh-12-03/.agents/skills/norn/.gitignore": 
+"# norn: pack skills, rewritten before every launch; edit the pack, not these copies
+*
+"
+,
+    "/wt/gh-12-03/.agents/skills/norn/SKILL.md": 
+"# norn
+"
+,
+    "/wt/gh-12-03/.claude/skills/norn-implement/.gitignore": 
+"# norn: pack skills, rewritten before every launch; edit the pack, not these copies
+*
+"
+,
+    "/wt/gh-12-03/.claude/skills/norn-implement/SKILL.md": 
+"# implement
+"
+,
+    "/wt/gh-12-03/.claude/skills/norn-implement/refs/tdd.md": 
+"red, green
+"
+,
+    "/wt/gh-12-03/.claude/skills/norn/.gitignore": 
+"# norn: pack skills, rewritten before every launch; edit the pack, not these copies
+*
+"
+,
+    "/wt/gh-12-03/.claude/skills/norn/SKILL.md": 
+"# norn
+"
+,
+  },
+  "links": {},
+}
+`;
