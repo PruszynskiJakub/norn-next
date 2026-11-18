@@ -23,7 +23,8 @@ import { DEFAULT_START_WAIT_MS, type HerdrConfig } from "./config.ts";
 
 export const RUNNER_NAME = "herdr";
 
-export const HERDR_CAPABILITIES: RunnerCapabilities = Object.freeze({ attended: true, headless: false, paneInput: true });
+// a pane runs its agent whether or not anyone watches it, so auto mode starts agents here as well
+export const HERDR_CAPABILITIES: RunnerCapabilities = Object.freeze({ attended: true, headless: true, paneInput: true });
 
 /** What a start under one key made, so a replay finds it. */
 export const HerdrKeyRecord = Type.Object(

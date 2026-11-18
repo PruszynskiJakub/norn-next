@@ -7,7 +7,7 @@ describe("herdr runner plugin", () => {
   test("provides the herdr runner: attended, with pane input, on any host", () => {
     expect(herdrRunnerPlugin.provides.runners?.herdr).toBe(herdrRunnerFactory);
     const made = createRunner(herdrRunnerFactory, memoryHost(), {});
-    expect(made.ok && made.value.capabilities).toEqual({ attended: true, headless: false, paneInput: true });
+    expect(made.ok && made.value.capabilities).toEqual({ attended: true, headless: true, paneInput: true });
     expect(createRunner(herdrRunnerFactory, memoryHost(), { colour: "red" }).ok).toBe(false);
   });
 
