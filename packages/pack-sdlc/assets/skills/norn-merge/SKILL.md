@@ -14,6 +14,7 @@ Without this, conflicts get resolved by picking a winner and one side's work qui
 | Your inputs have a `base_side` that names a base commit to merge | base | `git merge --no-ff <base commit>` in this worktree. |
 | You resolve a slice whose `integrate` conflicted; it aborted the merge, so nothing is in progress | slice | `git merge <story branch>` (the story's branch, `norn/<story>`) in the slice worktree. |
 | A merge, rebase or cherry-pick already in progress (`git status`) | in progress | Resolve it and continue that operation. |
+| A review of your resolution sent findings under Rework, and `base_side` names no conflict | fix resolution | Fix the resolution they name in the merges already committed. Merge nothing. |
 | None of these, asked to bring a branch up to date | — | Merge its target in, like base mode. |
 
 **Never start a rebase**, whatever your brief or inputs say: only the tooling that runs this work rebases. A published story branch is never rebased; a slice that merged its story branch in is taken in by a merge at `integrate`, so the resolution is not linearised away and the same conflict does not come back.

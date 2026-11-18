@@ -53,4 +53,10 @@ describe("agent step texts", () => {
     expect(skill).toContain("`base_side`");
     expect(skill).not.toMatch(/Rework section|Base update section|\(Rework:/);
   });
+
+  test("the merge skill has a mode for a resolver a resolution review sent back, which merges nothing", () => {
+    const skill = readFileSync(join(ROOT, "packages", "pack-sdlc", "assets", "skills", "norn-merge", "SKILL.md"), "utf8");
+    const row = skill.split("\n").find((l) => l.startsWith("|") && l.includes("findings under Rework"));
+    expect(row).toContain("Merge nothing");
+  });
 });
