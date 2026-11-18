@@ -25,7 +25,7 @@ const rules = (m: { reports: { report: Parameters<typeof rulesOf>[0] }[] }) => m
 describe("an agent step and a check, both detached", () => {
   test("a story goes from intake through a real agent process and a detached check to its gate, no tick waiting on either", async () => {
     const t = await team();
-    const m = await agentMachine(t, { workflow: "e2e", plans: [{ behavior: "work", commit: { "feature.txt": "the feature\n" }, pauseMs: 1500 }] });
+    const m = await agentMachine(t, { workflow: "e2e-slow", plans: [{ behavior: "work", commit: { "feature.txt": "the feature\n" }, pauseMs: 4000 }] });
     await newStory(m, "Add the feature");
 
     await drive(m, async () => (await unitOf(m, UNIT)).state?.parked !== undefined, { stepMs: 2_000 });
@@ -72,7 +72,7 @@ describe("an agent step and a check, both detached", () => {
     const stepRun = await readStepRun(m.ctx, UNIT);
     expect([stepRun?.exit, stepRun?.running, stepRun?.output?.trim()]).toEqual([0, undefined, "ok"]);
     // no tick took as long as the agent's pause or the check's sleep
-    expect(Math.max(...m.reports.map((r) => r.ms))).toBeLessThan(1000);
+    expect(Math.max(...m.reports.map((r) => r.ms))).toBeLessThan(2500);
     expect(rules(m)).toContain(`${UNIT} agent.running`);
   }, 90_000);
 });
@@ -162,7 +162,7 @@ describe("a check that hangs past its timeout", () => {
     expect(settled?.output).toContain("timed out after 60000 ms");
     // the process group is gone: the check does not hold the worktree past its deadline
     expect(await m.ctx.alive?.(proc.pid, proc.started)).toBe(false);
-    expect(Math.max(...m.reports.map((r) => r.ms))).toBeLessThan(1000);
+    expect(Math.max(...m.reports.map((r) => r.ms))).toBeLessThan(2500);
     expect(rules(m).filter((r) => r.includes("!"))).toEqual([]);
   }, 90_000);
 });

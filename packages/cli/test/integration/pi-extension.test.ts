@@ -136,7 +136,8 @@ describe("norn's pi extension in a pi process, answered by norn hook pi", () => 
       const m = await machine();
       const req = await launchPi(m);
       expect(req.argv.slice(0, 4)).toEqual(["pi", "--approve", "-p", "--"]);
-      const outside = join(m.root, "NOTES.md");
+      // not the repo beside the worktree: on Linux the test's temp folder is under /tmp, a root any write may land in
+      const outside = "/norn-outside-every-root/NOTES.md";
       const report = await runPi(m, req, [
         { tool: "write", input: { path: outside, content: "x" } },
         { tool: "write", input: { path: join(m.worktree, "spec.md"), content: "x" } },

@@ -36,11 +36,12 @@ export function nornCommand(setupPath: string): string[] {
 /**
  * The workflows these tests run, each short enough to read whole:
  * - e2e: an agent step and a check that takes a moment, then a gate;
+ * - e2e-slow: the same, with a check slow enough that a tick waiting on it would show;
  * - e2e-hang: the same, with a check that outlives its timeout.
  */
-const WORKFLOWS: Record<string, string> = {
-  "e2e.yaml": [
-    "name: e2e",
+const e2e = (name: string, check: string): string =>
+  [
+    `name: ${name}`,
     "start: build",
     "steps:",
     "  build:",
@@ -49,14 +50,18 @@ const WORKFLOWS: Record<string, string> = {
     "    outcomes: { done: test }",
     "    means: { done: the thing is built }",
     "  test:",
-    "    check: sleep 1 && sh check.sh",
+    `    check: ${check}`,
     "    timeout: 1m",
     "    outcomes: { pass: ready, fail: build }",
     "  ready:",
     "    gate: Approve the thing.",
     "    outcomes: { approve: $done, reject: build }",
     "",
-  ].join("\n"),
+  ].join("\n");
+
+const WORKFLOWS: Record<string, string> = {
+  "e2e.yaml": e2e("e2e", "sleep 1 && sh check.sh"),
+  "e2e-slow.yaml": e2e("e2e-slow", "sleep 3 && sh check.sh"),
   "e2e-hang.yaml": [
     "name: e2e-hang",
     "start: build",
