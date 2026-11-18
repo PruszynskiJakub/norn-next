@@ -90,6 +90,8 @@ export interface RuntimeParts {
   self: readonly string[];
   /** this process's PATH, which launched agents get with a `norn` running `self` in front */
   path?: string;
+  /** the norn home the env chose (`NORN_HOME_DIR`), which launched agents and their hooks take too */
+  home?: string;
 }
 
 function runtimeDeps(p: RuntimeParts): Parameters<typeof createRuntimeEnv>[0] {
@@ -100,6 +102,7 @@ function runtimeDeps(p: RuntimeParts): Parameters<typeof createRuntimeEnv>[0] {
     config,
     hookCommand: [...p.self, "hook"],
     ...(p.path !== undefined ? { hostPath: p.path } : {}),
+    ...(p.home !== undefined ? { agentEnv: { NORN_HOME_DIR: p.home } } : {}),
     sessions: (launcher) =>
       new EventLogSessionSource({ ctx: p.w.ctx, classify: { silentAfterMs: config.kernel.silentAfterMs }, alive: (h) => launcher.alive?.(h) ?? Promise.resolve(null) }),
   };

@@ -71,7 +71,9 @@ function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
   if (!caps) return parkDecision(v, "agent.no_executor", "stuck", { text: `executor '${executor}' is not configured` });
   // a person's `run.requested` starts this visit's agent once; manual mode still holds the next step
   if (personDrives(v)) return parkDecision(v, "agent.ready.manual", "manual", { text: spec.instructions });
-  if (!caps.headless) return parkDecision(v, "agent.ready.no_headless", "manual", { text: `auto mode, but executor '${executor}' cannot run headless` });
+  // a run a person started may open where they watch it (a pane); one nobody started must run headless
+  const personStarted = v.state.requested !== undefined && caps.attended;
+  if (!caps.headless && !personStarted) return parkDecision(v, "agent.ready.no_headless", "manual", { text: `auto mode, but executor '${executor}' cannot run headless` });
   if (!takeAgentSlot(v.ctx)) return noop(v, "agent.queued", `queued: ${v.ctx.config.maxAgents} agent runs in use`);
   const run_id = v.ctx.nextId();
   return {

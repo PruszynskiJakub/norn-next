@@ -45,6 +45,20 @@ export function keyRecordPath(ctx: HostContext, key: string): string {
   return `${ctx.repo.dataDir}/runners/herdr/${key}.json`;
 }
 
+/** The script a start types into its pane, beside its key record. */
+export function launchScriptPath(ctx: HostContext, key: string): string {
+  return `${ctx.repo.dataDir}/runners/herdr/${key}.sh`;
+}
+
+/**
+ * The command as a script the pane runs with one short line: `pane run` goes through the terminal's
+ * line input, which caps a line (1024 bytes on macOS) far below a launch with its env and brief.
+ * `exec`, so the agent itself holds the pane's foreground.
+ */
+export function launchScript(argv: readonly string[]): string {
+  return `#!/bin/sh\n# a norn launch, run in its herdr pane\nexec ${shellJoin(argv)}\n`;
+}
+
 /** A key becomes a file name, so it may not climb out of the runner's folder. */
 const SAFE_KEY = /^[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
 /** How often a start looks whether the agent took the pane's foreground. */
@@ -89,8 +103,10 @@ function lastLines(screen: string, n: number): string {
 }
 
 /**
- * The command with the launch env on it, for a pane this start did not open: its shell may hold an
- * earlier run's env, and a hook reading that run's id would file this run's events under it.
+ * The command with the launch env on it, in every pane. One this start did not open may hold an
+ * earlier run's env, and a hook reading that run's id would file this run's events under it; and in
+ * one it opened, the shell's own startup files run after `--env` and may put PATH back in their own
+ * order, so the `norn` the agent runs would be another build than the one that launched it.
  */
 function withEnv(req: RunnerStartRequest): string[] {
   const env = Object.entries(req.env);
@@ -198,7 +214,15 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
 
   /** Run the command in a recorded pane, then mark the record; a failed run removes both so a retry starts clean. */
   async function finish(path: string, rec: HerdrKeyRecord & { pane: string }, argv: string[]): Promise<PluginResult<{ handle: string }>> {
-    const ran = await runIn(rec.pane, argv);
+    const script = launchScriptPath(ctx, rec.key);
+    try {
+      await ctx.files.write(script, launchScript(argv));
+    } catch (e) {
+      await herdr(["pane", "close", rec.pane]);
+      await forget(path);
+      return fail("unavailable", `herdr runner: cannot write ${script}: ${message(e)}`);
+    }
+    const ran = await runIn(rec.pane, ["sh", script]);
     if (!ran.ok) {
       await herdr(["pane", "close", rec.pane]);
       await forget(path);
@@ -235,7 +259,7 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
     const named = { ...rec, workspace, pane: opened.value.pane };
     const wrote = await writeRecord(path, named);
     if (!wrote.ok) return closeAfter(named.pane, wrote);
-    return finish(path, named, req.argv);
+    return finish(path, named, withEnv(req));
   }
 
   return {

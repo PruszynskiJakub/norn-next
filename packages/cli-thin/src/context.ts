@@ -94,6 +94,6 @@ export class CliContext {
 
   private async parts() {
     const [w, loaded, p] = await Promise.all([this.repo(), this.config(), this.plugins()]);
-    return { w, loaded, plugins: p.plugins, holder: defaultHolder(this.io.env, this.io.hostname ?? hostname()), self: this.io.self, ...(this.io.env.PATH !== undefined ? { path: this.io.env.PATH } : {}) };
+    return { w, loaded, plugins: p.plugins, holder: defaultHolder(this.io.env, this.io.hostname ?? hostname()), self: this.io.self, ...(this.io.env.PATH !== undefined ? { path: this.io.env.PATH } : {}), ...(this.io.env.NORN_HOME_DIR ? { home: this.io.env.NORN_HOME_DIR } : {}) };
   }
 }

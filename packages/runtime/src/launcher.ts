@@ -50,6 +50,11 @@ export interface HarnessLauncherOptions {
    * holds a `norn` running this CLI (agent-bin.ts); absent, the agent's PATH is left alone.
    */
   hostPath?: string;
+  /**
+   * Env every launch adds, resumed ones too (`NORN_HOME_DIR` when the CLI runs on another home): a
+   * pane's shell starts from its own env, and the agent's `norn` and hooks must find this home.
+   */
+  agentEnv?: Readonly<Record<string, string>>;
   /** the pack's skills, written into the harness's `skillsDir` in the worktree before every launch */
   skills?: PackSkills;
   /** the brief for a run, as brief-context.ts renders it */
@@ -87,9 +92,10 @@ const message = (e: unknown): string => (e instanceof Error ? e.message : String
 export class HarnessLauncher implements AgentLauncher {
   constructor(readonly opts: HarnessLauncherOptions) {}
 
-  /** The env every launch adds for the agent beside the run's own: agent-bin.ts's PATH. */
-  private agentEnv(): Promise<PluginResult<Record<string, string>>> {
-    return agentBinEnv(this.opts.ctx, cliOfHookCommand(this.opts.hookCommand), this.opts.hostPath);
+  /** The env every launch adds for the agent beside the run's own: the configured env and agent-bin.ts's PATH. */
+  private async agentEnv(): Promise<PluginResult<Record<string, string>>> {
+    const bin = await agentBinEnv(this.opts.ctx, cliOfHookCommand(this.opts.hookCommand), this.opts.hostPath);
+    return bin.ok ? ok({ ...this.opts.agentEnv, ...bin.value }) : bin;
   }
 
   /** Any executor that can run headless or attended makes the launcher able to. */

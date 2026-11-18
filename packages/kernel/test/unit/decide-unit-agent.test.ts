@@ -51,6 +51,14 @@ describe("a ready agent step", () => {
     expect(decideCase({ state: stateAt("build"), executors: { claude: caps({ headless: false }) } })?.rule).toBe("agent.ready.no_headless");
   });
 
+  test("a run a person started opens on an executor that runs only where a person watches", () => {
+    const requested = { by: "ann", at: NOW };
+    const paneOnly = { claude: caps({ headless: false, attended: true }) };
+    expect(decideCase({ state: stateAt("build", { requested }), config: { mode: "manual" }, executors: paneOnly })?.rule).toBe("agent.start");
+    // with neither headless nor a pane there is nowhere to run it
+    expect(decideCase({ state: stateAt("build", { requested }), config: { mode: "manual" }, executors: { claude: caps({ headless: false, attended: false }) } })?.rule).toBe("agent.ready.no_headless");
+  });
+
   test("a start beyond maxAgents queues", () => {
     const busy = { id: "gh-10", state: stateAt("build", { unit: "gh-10", story: "gh-10", run: run({ id: "run-9" }) }), receipts: [], session: null };
     const d = kindOf(decideCase({ state: stateAt("build"), config: { maxAgents: 1 }, others: [busy] }), "noop");

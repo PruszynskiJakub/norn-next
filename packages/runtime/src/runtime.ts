@@ -34,6 +34,7 @@ function launcherOf(deps: Omit<RuntimeDeps, "tickId">, slots: ResolvedSlots, env
   return createHarnessLauncher(deps.ctx, deps.plugins, deps.config, slots.executors, {
     hookCommand: deps.hookCommand ?? DEFAULT_HOOK_COMMAND,
     ...(deps.hostPath !== undefined ? { hostPath: deps.hostPath } : {}),
+    ...(deps.agentEnv !== undefined ? { agentEnv: deps.agentEnv } : {}),
     skills: slots.pack.skills,
     renderBrief: briefRenderer(envOf),
   });

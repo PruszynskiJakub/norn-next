@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { memoryFiles, memoryHost, type ScriptedAnswer, scriptedExec } from "@norn/conformance";
 import type { RunnerStartRequest } from "@norn/plugin-api";
-import { createHerdrRunner, type HerdrConfig, keyRecordPath, shellJoin } from "../../src/index.ts";
+import { createHerdrRunner, type HerdrConfig, keyRecordPath, launchScript, launchScriptPath, shellJoin } from "../../src/index.ts";
 
 interface Pane {
   pane_id: string;
@@ -128,14 +128,18 @@ function setup(config: HerdrConfig = {}, herdrOpts: Parameters<typeof fakeHerdr>
 
 describe("herdr start", () => {
   test("a story's first run opens its workspace, titles the tab, runs the command with the env and records the key", async () => {
-    const { h, runner, record } = setup();
+    const { h, runner, record, files, ctx } = setup();
     expect(await runner.start(req())).toEqual({ ok: true, value: { handle: "w1:p2" } });
     expect(h.workspaces).toEqual([{ workspace_id: "w1", label: "gh-1" }]);
     expect(h.tabs).toEqual([{ tab_id: "w1:t2", workspace_id: "w1", label: "gh-1 implement" }]);
     const create = h.exec.calls.find((c) => c.argv[1] === "workspace" && c.argv[2] === "create");
     expect(create?.argv).toEqual(["herdr", "workspace", "create", "--label", "gh-1", "--cwd", "/wt/gh-1", "--env", "NORN_RUN_ID=01JRUN1", "--env", "NORN_UNIT=gh-1", "--no-focus"]);
+    // the pane runs a script with one short line; the env goes in it as well, since the pane's shell
+    // startup files run after --env and may reorder PATH
     const run = h.exec.calls.find((c) => c.argv[2] === "run");
-    expect(run?.argv).toEqual(["herdr", "pane", "run", "w1:p2", "claude --settings 'a b.json'"]);
+    expect(run?.argv).toEqual(["herdr", "pane", "run", "w1:p2", `sh ${launchScriptPath(ctx, "01JRUN1")}`]);
+    expect(files.snapshot()[launchScriptPath(ctx, "01JRUN1")]).toBe(launchScript(["env", "NORN_RUN_ID=01JRUN1", "NORN_UNIT=gh-1", "claude", "--settings", "a b.json"]));
+    expect(launchScript(["claude", "a b"])).toEndWith("\nexec claude 'a b'\n");
     expect(record()).toEqual({ key: "01JRUN1", workspace: "w1", pane: "w1:p2", title: "gh-1 implement", ran: true });
   });
 
@@ -171,7 +175,7 @@ describe("herdr start", () => {
     h.panes.push({ pane_id: "w9:p1", tab_id: "w9:t1", workspace_id: "w9", shell: 50, fg: 50 });
     await files.write(keyRecordPath(ctx, "01JRUN1"), JSON.stringify({ key: "01JRUN1", workspace: "w9", pane: "w9:p1", title: "gh-1 implement", ran: false }));
     expect(await runner.start(req())).toEqual({ ok: true, value: { handle: "w9:p1" } });
-    expect(h.exec.calls.find((c) => c.argv[2] === "run")?.argv[4]).toBe("env NORN_RUN_ID=01JRUN1 NORN_UNIT=gh-1 claude --settings 'a b.json'");
+    expect(h.exec.calls.find((c) => c.argv[2] === "run")?.argv[4]).toBe(`sh ${launchScriptPath(ctx, "01JRUN1")}`);
     expect(record().ran).toBe(true);
   });
 
@@ -192,7 +196,7 @@ describe("herdr start", () => {
     await files.write(keyRecordPath(ctx, "01JRUN1"), JSON.stringify({ key: "01JRUN1", title: "gh-1 implement", ran: false }));
     expect(await runner.start(req())).toEqual({ ok: true, value: { handle: "w9:p1" } });
     expect(h.calls()).not.toContain("tab create");
-    expect(h.exec.calls.find((c) => c.argv[2] === "run")?.argv[4]).toBe("env NORN_RUN_ID=01JRUN1 NORN_UNIT=gh-1 claude --settings 'a b.json'");
+    expect(h.exec.calls.find((c) => c.argv[2] === "run")?.argv[4]).toBe(`sh ${launchScriptPath(ctx, "01JRUN1")}`);
     expect(record()).toEqual({ key: "01JRUN1", workspace: "w9", pane: "w9:p1", title: "gh-1 implement", ran: true });
   });
 

@@ -114,6 +114,8 @@ export interface RuntimeDeps {
   hookCommand?: readonly string[];
   /** the host's PATH, which the built launcher hands its agents with its own `norn` first (agent-bin.ts) */
   hostPath?: string;
+  /** env every launched agent gets, and so its hooks: what a call back into this CLI needs to find the same home */
+  agentEnv?: Readonly<Record<string, string>>;
   /** mints each tick's id; a test passes a fixed sequence so its traces and ids repeat */
   tickId?: () => string;
 }

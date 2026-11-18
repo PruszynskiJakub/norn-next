@@ -214,6 +214,13 @@ describe("the norn a launched agent runs", () => {
     expect(s.paneHarness.installs[0]?.hookCommand).toBe("'/opt/my tools/bun' /src/cli-thin/main.ts hook fake");
   });
 
+  test("the configured agent env goes with every launch, so a pane's shell and the agent's hooks find the same norn home", async () => {
+    const s = setup();
+    expect((await withShim(s, { agentEnv: { NORN_HOME_DIR: "/scratch/home" } }).start(run())).ok).toBe(true);
+    expect(s.paneHarness.launches[0]?.env).toMatchObject({ NORN_HOME_DIR: "/scratch/home", PATH: "/m/runtime/bin:/usr/local/bin:/usr/bin" });
+    expect(s.pane.starts[0]?.env).toMatchObject({ NORN_HOME_DIR: "/scratch/home" });
+  });
+
   test("the shim is written once: an unchanged one is left, a host PATH that already holds its folder keeps it first and once", async () => {
     const s = setup();
     let writes = 0;
