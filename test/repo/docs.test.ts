@@ -44,6 +44,15 @@ function strayHandoff(relPath: string): boolean {
   return parts.at(-1) === "handoff.md" && !OLD_HANDOFF.test(relPath);
 }
 
+/** Under a folder that ignores itself whole (a `.gitignore` of `*`): norn's own copies in a unit worktree, never tracked. */
+function selfIgnored(relPath: string): boolean {
+  const parts = relPath.split("/").slice(0, -1);
+  return parts.some((_, i) => {
+    const gi = join(ROOT, ...parts.slice(0, i + 1), ".gitignore");
+    return existsSync(gi) && read(gi).split("\n").some((l) => l.trim() === "*");
+  });
+}
+
 describe("no stray handoff (B34)", () => {
   test("matcher", () => {
     expect(strayHandoff("handoff.md")).toBe(true);
@@ -67,7 +76,8 @@ describe("no stray handoff (B34)", () => {
   });
 
   test("no handoff in the repo outside a spec folder's handoffs/ (or an older norn's runs/)", () => {
-    expect(textFiles(ROOT, [".md"]).map(rel).filter(strayHandoff).map((f) => `${f}: a handoff is tracked outside a spec folder's handoffs/; delete it`)).toEqual([]);
+    const strays = textFiles(ROOT, [".md"]).map(rel).filter(strayHandoff).filter((f) => !selfIgnored(f));
+    expect(strays.map((f) => `${f}: a handoff is tracked outside a spec folder's handoffs/; delete it`)).toEqual([]);
   });
 });
 
