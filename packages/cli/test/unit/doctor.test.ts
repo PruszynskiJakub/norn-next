@@ -190,6 +190,15 @@ describe("norn doctor", () => {
     expect(await check(LOCAL_CONFIG, null)).toMatchObject({ ok: true });
   });
 
+  test("--repo reads the repo's own config files, never the user's", async () => {
+    const seed = { [PATHS.user]: "bogus: 1\n" };
+    const whole = await doctor({ config: LOCAL_CONFIG, seed });
+    expect(whole.check("config")).toMatchObject({ ok: false, code: "config_invalid" });
+    const repoOnly = await doctor({ config: LOCAL_CONFIG, seed, args: ["--repo"] });
+    expect(repoOnly.r.exit).toBe(ExitCode.ok);
+    expect(repoOnly.check("config")).toMatchObject({ ok: true });
+  });
+
   test("the markdown names each failing check with what to do instead", async () => {
     const m = machine({ seed: { [PATHS.local]: LOCAL_CONFIG }, script: tools("git", "norn") });
     const r = await runCli(["doctor"], m.io);

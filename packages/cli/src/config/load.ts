@@ -82,10 +82,12 @@ export function mergeConfig(layers: Record<Layer, ConfigLayer | null>, paths: Co
   return { ok: true, value: { config: r.value, executor: cross.executor, layers, paths } };
 }
 
-export async function loadConfig(files: HostFiles, paths: ConfigPaths): Promise<ConfigLoad> {
+/** `read`: the layers to read; one left out loads as if its file did not exist. */
+export async function loadConfig(files: HostFiles, paths: ConfigPaths, read: readonly Layer[] = LAYERS): Promise<ConfigLoad> {
   const layers = { user: null, local: null, repo: null } as Record<Layer, ConfigLayer | null>;
   const problems: ConfigProblem[] = [];
   for (const layer of LAYERS) {
+    if (!read.includes(layer)) continue;
     const text = await files.read(paths[layer]);
     const parsed = parseLayer(layer, text);
     if (parsed.ok) layers[layer] = parsed.value;

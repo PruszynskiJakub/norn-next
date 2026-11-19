@@ -141,14 +141,16 @@ async function labelsCheck(env: RuntimeEnv): Promise<DoctorCheck> {
 
 export interface DoctorOptions {
   /**
-   * Only what the repo's tree decides: its config, the plugins it names, its slots and workflows. No
-   * hooks and no tools, so a machine with no agent or runner (CI checking a branch) can run it.
+   * Only what the repo's tree decides: its config (the repo's own files, never the user's), the
+   * plugins it names, its slots and workflows. No hooks and no tools, so a machine with no agent or
+   * runner (CI checking a branch) can run it.
    */
   repoOnly?: boolean;
 }
 
 export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Promise<DoctorReport> {
   const checks: DoctorCheck[] = [];
+  if (opts.repoOnly) ctx.repoLayersOnly();
   const w = await ctx.repo();
   const cwd = w.repo.root;
 
