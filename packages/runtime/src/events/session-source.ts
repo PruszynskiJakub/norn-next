@@ -2,8 +2,8 @@
  * SessionSource over the event log: each run's events reduced and classified by the kernel at the
  * tick's time, and a session the runner reports dead without a `session.ended` read as ended (died).
  * A process that ended before its first event reads ended too, with the head of its log as the error:
- * an agent that never got going (a bad flag, a missing login) sends no event at all, and without this
- * its run would wait out the silent window and be retried with no reason given.
+ * an agent that never got going (a bad flag, a missing login) sends no event at all, so its run is
+ * judged at once and the reason it ends with is what it printed.
  * A log with bad files still classifies from its valid batches; the problems go to the tick.
  */
 import { type ClassifyOptions, classifySession, reduceSession, type SessionFacts } from "@norn/kernel";

@@ -41,7 +41,7 @@ export const LeaseFile = Type.Object(
     holder: ProcessIdentity,
     created_at: IsoTime,
     worktree: Type.Optional(NonEmpty),
-    /** Nothing writes or reads it now; kept so a lease file written with it still validates */
+    /** Kept only so a lease file written with it still validates */
     port_base: Type.Optional(PosInt),
   },
   { $id: "https://norn.dev/schema/lease.json", title: "norn machine lease", additionalProperties: false },
