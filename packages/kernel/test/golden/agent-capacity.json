@@ -580,7 +580,7 @@
       "kind": "noop",
       "unit": "gh-111",
       "rule": "agent.queued",
-      "reason": "queued: 1 agent runs in use"
+      "reason": "queued: 1 agent and check runs in use"
     }
   ]
 }
