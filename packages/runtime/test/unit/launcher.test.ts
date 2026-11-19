@@ -436,6 +436,22 @@ describe("harness launcher nudge and answer", () => {
     expect(await s.launcher.alive(h)).toBe(false);
   });
 
+  test("a resumed launch installs the harness's hooks in the worktree again before it starts, as a cleaned worktree lost them", async () => {
+    const s = setup({ bgHarness: { resume: true } });
+    const unit = "gh-12/03";
+    const runId = "01JRUN0000000000000000000A";
+    const started = await s.launcher.start(run({ executor: "bg", attended: false }));
+    if (!started.ok) throw new Error("start failed");
+    await appendEvents(s.ctx, unit, runId, [{ type: "session.started", run_id: runId, seq: 0, at: START, harness_session: "sess-1" }]);
+    await appendEvents(s.ctx, unit, runId, [{ type: "session.ended", run_id: runId, seq: 0, at: START, reason: "exit" }]);
+    s.bg.live.clear();
+    expect(s.bgHarness.installs).toHaveLength(1);
+    expect(await s.launcher.answer(started.value.handle, "q1", "go left")).toEqual(ok(undefined));
+    const first = s.bgHarness.installs[0];
+    expect(s.bgHarness.installs).toEqual([first, first].filter((i) => i !== undefined));
+    expect(s.bgHarness.installs[1]?.worktree).toBe("/wt/gh-12-03");
+  });
+
   test("an answer to an ended session that cannot be resumed is refused, so it is never applied undelivered", async () => {
     const unit = "gh-12/03";
     const runId = "01JRUN0000000000000000000A";
