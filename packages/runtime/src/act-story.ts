@@ -98,8 +98,8 @@ export async function flush(t: TickContext, d: DecisionOf<"flush">): Promise<Plu
 
 /**
  * The item is closed first, the worktrees after, then their branches, and the units' logs last: a
- * closed item is what a person sees, and a worktree or branch left behind by a failure is only disk. Both are idempotent (closing a closed item,
- * removing a missing worktree), so a failure is carried out again whole next tick under that
+ * closed item is what a person sees, and a worktree or branch left behind by a failure is only disk. Every
+ * phase is idempotent (closing a closed item, removing a missing worktree or branch), so a failure is carried out again whole next tick under that
  * tick's id; the tick keeps the claim until it succeeds.
  */
 export async function finishStory(t: TickContext, d: DecisionOf<"finish_story">): Promise<PluginResult<unknown>> {
