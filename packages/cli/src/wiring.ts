@@ -11,7 +11,7 @@ import { runtimeConfigOf } from "./config/derive.ts";
 import { configError, type LoadedConfig, loadConfig } from "./config/load.ts";
 import { oldConfigRefusal } from "./config/migrate.ts";
 import { migrateOldLocalConfig } from "./config/migrate-local.ts";
-import { configPaths, lockPath } from "./config/paths.ts";
+import { configPaths, LAYERS, type Layer, lockPath } from "./config/paths.ts";
 import { homePaths, locateRepo, machineDir, type RepoIdentity } from "./home.ts";
 import { configFailure, refuse } from "./output.ts";
 import { BUNDLED_PLUGINS } from "./plugins/bundled.ts";
@@ -41,14 +41,15 @@ export async function wireRepo(home: string, cwd: string, hosts: HostFactory): P
 }
 
 /** `note` takes a line for the person, such as the notice of the old repo-local config moved. */
-export async function wireConfig(w: WiredRepo, note: (line: string) => void = () => {}): Promise<LoadedConfig> {
+/** `read`: the layers to read, every one by default (see `loadConfig`). */
+export async function wireConfig(w: WiredRepo, note: (line: string) => void = () => {}, read: readonly Layer[] = LAYERS): Promise<LoadedConfig> {
   const paths = configPaths(w.home, w.repo.root);
   // before the files load: the user's file alone may make a valid config, which the old team config would then silently lose to
   const old = await oldConfigRefusal(w.ctx.files, w.repo.root, paths);
   if (old) throw old;
   const moved = await migrateOldLocalConfig(w.ctx.files, w.repo.root, paths, { setUp: true });
   if (moved) note(moved.notice);
-  const loaded = await loadConfig(w.ctx.files, paths);
+  const loaded = await loadConfig(w.ctx.files, paths, read);
   if (!loaded.ok) throw configError(loaded.problems, loaded.layers, paths);
   return loaded.value;
 }

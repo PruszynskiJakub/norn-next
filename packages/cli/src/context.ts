@@ -7,6 +7,7 @@ import { hostname } from "node:os";
 import type { HostContext } from "@norn/plugin-api";
 import type { Runtime, RuntimeEnv } from "@norn/runtime";
 import type { LoadedConfig } from "./config/load.ts";
+import { LAYERS, type Layer } from "./config/paths.ts";
 import { nornHome } from "./home.ts";
 import { packFailure } from "./plugins/pack-check.ts";
 import type { PluginImporter } from "./plugins/installed.ts";
@@ -42,6 +43,7 @@ export class CliContext {
   private configP?: Promise<LoadedConfig>;
   private pluginsP?: Promise<WiredPlugins>;
   private envP?: Promise<RuntimeEnv>;
+  private layers: readonly Layer[] = LAYERS;
   readonly stderr: string[] = [];
 
   /** `acts`: the command acts, so its runtime env is refused below the store's version floor */
@@ -74,8 +76,16 @@ export class CliContext {
   }
   /** the merged, validated config; a config error otherwise */
   config(): Promise<LoadedConfig> {
-    this.configP ??= this.repo().then((w) => wireConfig(w, (line) => this.note(line)));
+    this.configP ??= this.repo().then((w) => wireConfig(w, (line) => this.note(line), this.layers));
     return this.configP;
+  }
+  /**
+   * From here on, read only the repo's own config files, as a checkout with no person's home sees
+   * them (CI): what the user's file sets would hide, or cause, a problem the repo alone has.
+   */
+  repoLayersOnly(): void {
+    this.layers = LAYERS.filter((l) => l !== "user");
+    this.reload();
   }
   /** bundled and installed plugins, every pick resolved */
   plugins(): Promise<WiredPlugins> {

@@ -57,7 +57,7 @@ Check the config, plugins, workflows, harness hooks and tools this repo needs
 norn doctor [--repo]
 ```
 
-- `--repo`: check only the repo's config, plugins, slots and workflows; no hooks or tools (CI)
+- `--repo`: check only the repo's own config files (never the user's), plugins, slots and workflows; no hooks or tools (CI)
 
 ##### `norn config` (noun)
 

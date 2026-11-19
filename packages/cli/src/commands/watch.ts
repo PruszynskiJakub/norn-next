@@ -13,6 +13,7 @@
  * - before each tick the files the runtime is built from are read again, and a change rebuilds it, so a
  *   `config set`, a merged workflow or a plugin add counts from the next tick. A change that does not
  *   build keeps the last runtime that did, and is reported once as a `config` line;
+ * - a git older than `MIN_GIT_VERSION` is refused before the first tick;
  * - a norn below the store's version floor ticks no more: it reports that once as a `paused` line and
  *   waits out each interval until a person stops it to upgrade (`version-guard.ts`).
  */
@@ -20,6 +21,7 @@ import { readWake, type Runtime, type RuntimeEnv, type TickReport, wakeWriterOf 
 import { defineCommand, opt } from "../command.ts";
 import type { CliContext } from "../context.ts";
 import { durationMs } from "../config/derive.ts";
+import { gitVersionRefusal } from "../git-version.ts";
 import { Duration } from "../config/schema.ts";
 import { rendered, toFailure, usageError } from "../output.ts";
 import { failedCount, tickLines } from "../tick-report.ts";
@@ -179,8 +181,11 @@ export const watchCommand = defineCommand({
     const max = maxRaw === undefined ? Number.POSITIVE_INFINITY : Number(maxRaw);
     if (!(Number.isInteger(max) || max === Number.POSITIVE_INFINITY) || max < 1) throw usageError(`bad --max-ticks '${maxRaw}' (a whole number from 1)`, "norn watch --max-ticks 10");
     const ms = durationMs(interval);
-    const built = await Rebuilding.start(ctx);
     const host = await ctx.host();
+    // refused once here: on an older git every tick would fail to see a conflict with the base, and say nothing
+    const oldGit = await gitVersionRefusal(host, (await ctx.repo()).repo.root);
+    if (oldGit) throw oldGit;
+    const built = await Rebuilding.start(ctx);
     const read = () => readWake(host);
     const sleep: Sleep = ctx.io.sleep ? ctx.io.sleep.bind(ctx.io) : pause;
     const log = (line: string) => ctx.io.log?.(line);

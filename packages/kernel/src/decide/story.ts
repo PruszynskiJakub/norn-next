@@ -15,6 +15,20 @@ import { hasPendingUnitWork, held, isOpen, mailboxDecisions, unitIds } from "./s
 import { decideSlices } from "./story-slices.ts";
 import { applyWith, corruptRule, endedRule, liveRun, moveRule, park, roundRule, startRule } from "./story-unit.ts";
 
+/** How a story's unit ends when its item closes: a rerun or a round would only end it again, so status names neither. */
+export const ITEM_CLOSED_REASON = "the item closed";
+
+const CHANGE_CLOSED = /^the change( \S+)? closed without merging$/;
+
+/** The park a closed change holds: a rerun clears it, and the next tick parks again while the change stays closed. */
+export function changeClosedReason(url: string | undefined): string {
+  return `the change${url ? ` ${url}` : ""} closed without merging`;
+}
+
+export function isChangeClosedReason(reason: string): boolean {
+  return CHANGE_CLOSED.test(reason);
+}
+
 /**
  * The story's decisions: story-wide ones (`unit: null`) and at most one per unit. A unit given a
  * decision here is not passed to the unit rules this tick.
@@ -165,12 +179,11 @@ function unitRule(story: StoryFacts, id: string, u: UnitFacts | null, ctx: Decid
       intent: { id: ctx.nextId(), data: { kind: "unit.marked", ended: "done", reason: "the change merged", step: state.step, attempt: state.attempt } },
     };
   }
-  if (itemClosed) return applyWith(u, state, { kind: "unit.marked", ended: "stuck", reason: "the item closed", step: state.step, attempt: state.attempt }, "story.item_closed", ctx);
+  if (itemClosed) return applyWith(u, state, { kind: "unit.marked", ended: "stuck", reason: ITEM_CLOSED_REASON, step: state.step, attempt: state.attempt }, "story.item_closed", ctx);
   // a closed change parks at any step once nothing is waiting on the record: a wait or check run
   // stays on the record between polls, and would otherwise poll a change a person closed forever
   if (isStory && story.change?.state === "closed" && u.receipts.length === 0 && state.parked === undefined && !liveRun(u, state, ctx)) {
-    const where = story.change.url ? ` ${story.change.url}` : "";
-    return park(u.id, u, state, "story.change_closed", "stuck", `the change${where} closed without merging`, ctx);
+    return park(u.id, u, state, "story.change_closed", "stuck", changeClosedReason(story.change.url), ctx);
   }
   // the unit rules apply what is on the record, and settle a run, before anything here reads the step
   if (hasPendingUnitWork(u, state)) return null;

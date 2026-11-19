@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
+import { changeClosedReason, ITEM_CLOSED_REASON } from "@norn/kernel";
 import type { HarnessEvent } from "@norn/plugin-api";
 import { appendEvents, gatherFacts, launchRecordPath, newTickId } from "@norn/runtime";
 import { ExitCode, runCli } from "../../src/index.ts";
@@ -158,5 +159,26 @@ describe("status and story view say what a parked unit waits for, never the rule
     const gate = configured();
     await seedUnit(gate, { step: GATE_STEP, run: null, extra: { parked: { reason: "gate.park", since: "2026-11-17T10:00:00.000Z" } } });
     expect(waitingIn((await runCli(["status", "--json"], gate.io)).stdout)?.text).toContain("Review the slice files");
+  });
+
+  test("a gate not yet parked names approve and reject; a closed change or item names reopening it, since a rerun alone would end or park again; another stuck end or park names rerun", async () => {
+    const reject = `norn story approve ${UNIT}, or norn story reject ${UNIT} --reason "<what to change>"`;
+    const rerun = `norn run rerun ${UNIT}`;
+    const newWork = 'norn story create "<title>" for the new work';
+    const closed = changeClosedReason("https://github.com/acme/app/pull/7");
+    const since = "2026-11-17T10:00:00.000Z";
+    const cases: Array<[string, Partial<Parameters<typeof seedUnit>[1]["extra"] & object>, { for: string; next: string }]> = [
+      [GATE_STEP, {}, { for: "gate", next: reject }],
+      [AGENT_STEP, { ended: "stuck", ended_reason: "counter review_rounds ran out" }, { for: "person", next: rerun }],
+      [AGENT_STEP, { ended: "stuck", ended_reason: ITEM_CLOSED_REASON }, { for: "person", next: `reopen the item, then ${rerun}; or ${newWork}` }],
+      [AGENT_STEP, { parked: { reason: closed, since } }, { for: "person", next: `reopen the change on the forge, then ${rerun}; or ${newWork}` }],
+      [AGENT_STEP, { parked: { reason: "slice file 01.md failed validation", since } }, { for: "person", next: rerun }],
+    ];
+    for (const [step, extra, expected] of cases) {
+      const m = configured();
+      await seedUnit(m, { step, run: null, extra: structuredClone(extra) });
+      const w = waitingIn((await runCli(["status", "--json"], m.io)).stdout);
+      expect({ extra, for: w?.for, next: w?.next }).toEqual({ extra, ...expected });
+    }
   });
 });

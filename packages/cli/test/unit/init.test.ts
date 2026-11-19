@@ -25,6 +25,8 @@ function world(w: World): ExecScript {
     if (line === "git symbolic-ref --short refs/remotes/origin/HEAD") return w.originHead ? { stdout: `${w.originHead}\n` } : { code: 128 };
     if (line === "git branch --show-current") return { stdout: `${w.branch ?? "main"}\n` };
     if (argv[1] === "--version") return tools.has(argv[0] as string) ? { stdout: `${argv[0]} 1.0\n` } : undefined;
+    if (argv[0] === "sh" && argv[1] === "-c" && argv[2]?.startsWith("norn hook ")) return { stdout: "" };
+    if (line === "gh auth status" && tools.has("gh")) return { stdout: "" };
     return undefined;
   };
 }
@@ -260,6 +262,7 @@ describe("norn init: doctor", () => {
       ["labels", true],
       ["hooks", true],
       ["tool git", true],
+      ["remote", true],
       ["tool claude", true],
     ]);
   });
