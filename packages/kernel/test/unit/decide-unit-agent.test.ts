@@ -194,6 +194,17 @@ describe("an agent run, judged from its session", () => {
     expect(decideCase({ state: running(), session: quietFor3 })?.rule).toBe("agent.running");
   });
 
+  test("a run with no session seen yet waits the workflow's stalled window, not the config's", () => {
+    const short = loaded({ ...graph(), stalled_ms: 2 * 60_000 });
+    const pane = { claude: caps({ paneInput: true, dialogKeys: true }) };
+    const started = (minutes: number) => stateAt("build", { run: run({ started_at: minutesAgo(minutes) }) }, short);
+    expect(decideCase({ state: started(1), workflows: [short], session: null, run_alive: true, executors: pane })?.rule).toBe("agent.unobserved");
+    expect(decideCase({ state: started(3), workflows: [short], session: null, run_alive: true, executors: pane })?.rule).toBe("agent.no_events.park");
+    const long = loaded({ ...graph(), stalled_ms: 60 * 60_000 });
+    const startedLong = stateAt("build", { run: run({ started_at: minutesAgo(20) }) }, long);
+    expect(decideCase({ state: startedLong, workflows: [long], session: null, run_alive: true, executors: pane })?.rule).toBe("agent.unobserved");
+  });
+
   test("a nudge is waited on for the workflow's stalled window, not the config's", () => {
     const short = loaded({ ...graph(), stalled_ms: 2 * 60_000 });
     const nudged = { run: run({ nudges: 1, last_nudge_at: minutesAgo(3) }) };
