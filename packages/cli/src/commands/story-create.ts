@@ -1,11 +1,12 @@
 /**
  * `norn story create <title> [--body <text>] [--workflow <name>]`: create a tracker item with the intake label (local tracker).
  * The item is made the way intake takes it in: the intake label, the intake assignee, and the
- * workflow label when one is named, so the next tick starts it as a story.
+ * workflow label when one is named, so the next tick starts it as a story. The labels are defined on
+ * the tracker first, so a repository that never had them takes the item.
  */
-import { DEFAULT_WORKFLOW_LABEL_PREFIX } from "@norn/kernel";
 import { ulid } from "@norn/schema";
 import { defineCommand, opt } from "../command.ts";
+import { ensureLabels, intakeLabel, workflowLabel } from "../labels.ts";
 import { failure, refuse, rendered, usageError } from "../output.ts";
 
 export const storyCreateCommand = defineCommand({
@@ -33,14 +34,15 @@ export const storyCreateCommand = defineCommand({
       const loading = Object.entries(env.workflows).flatMap(([name, w]) => (w.ok ? [name] : []));
       throw refuse(`no workflow ${workflow} loads`, `name one of ${loading.sort().join(", ")}`, "unknown_workflow");
     }
-    const prefix = env.config.kernel.intakeWorkflowLabelPrefix ?? DEFAULT_WORKFLOW_LABEL_PREFIX;
-    const labels = [env.config.intake.label, ...(workflow ? [`${prefix}${workflow}`] : [])];
+    const defined = [intakeLabel(env), ...(workflow ? [workflowLabel(env, workflow)] : [])];
+    const labels = defined.map((l) => l.name);
     let assignee: string | undefined;
     if (env.config.intake.assignee === "me") {
       const me = await tracker.whoami();
       if (!me.ok) throw failure(`cannot tell who you are to the ${tracker.name} tracker: ${me.failure.message}`, "norn doctor", me.failure.code);
       assignee = me.value;
     } else if (env.config.intake.assignee !== null) assignee = env.config.intake.assignee;
+    await ensureLabels(env, defined);
     // a person's create has no record to replay from; a retry makes a second item, as typing it twice would
     const made = await tracker.perform(
       { kind: "create", title, body: opt.str(args, "body") ?? "", labels, ...(assignee !== undefined && { assignee }) },

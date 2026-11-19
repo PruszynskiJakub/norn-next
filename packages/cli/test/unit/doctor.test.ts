@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
 import { configPaths, ExitCode, machineDir, machineId, type PluginImporter, runCli } from "../../src/index.ts";
-import { COMMON, HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
+import { COMMON, fakeGh, GITHUB_CONFIG, HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
 
 const PATHS = configPaths(HOME, ROOT);
 const LOCK = `${machineDir(HOME, machineId(COMMON))}/plugins.lock`;
@@ -35,7 +35,34 @@ describe("norn doctor", () => {
     const { r, body } = await doctor({ config: LOCAL_CONFIG });
     expect(r.exit).toBe(ExitCode.ok);
     expect(body.ok).toBe(true);
-    expect(body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "hooks", "tool git", "tool claude"]);
+    expect(body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "labels", "hooks", "tool git", "tool claude"]);
+  });
+
+  test("labels: doctor defines the labels norn uses on the tracker, the intake label, one per workflow and the triage set, once", async () => {
+    const gh = fakeGh(["norn", "norn:wf:quick"]);
+    const m = machine({ seed: { [PATHS.local]: GITHUB_CONFIG }, script: (argv, o) => gh.script(argv, o) ?? tools("git", "norn", "claude")(argv, o) });
+    const r = await runCli(["doctor", "--json"], m.io);
+    const labels = (Bun.JSONL.parse(r.stdout)[0] as { checks: Check[] }).checks.find((c) => c.name === "labels");
+    expect(labels).toMatchObject({ ok: true });
+    const made = gh.calls.filter((c) => c.startsWith("label create")).map((c) => c.slice("label create ".length));
+    expect(made).toContain("norn:wf:story");
+    expect(made).toContain("norn:kind:bug");
+    expect(made).toContain("norn:priority:extreme");
+    expect(made).not.toContain("norn");
+    expect(made).not.toContain("norn:wf:quick");
+    gh.calls.length = 0;
+    await runCli(["doctor", "--json"], m.io);
+    expect(gh.calls.filter((c) => c.startsWith("label create"))).toEqual([]);
+  });
+
+  test("labels: one the tracker cannot define fails the check, naming what to do", async () => {
+    const gh = fakeGh();
+    gh.refuseLabels = true;
+    const m = machine({ seed: { [PATHS.local]: GITHUB_CONFIG }, script: (argv, o) => gh.script(argv, o) ?? tools("git", "norn", "claude")(argv, o) });
+    const r = await runCli(["doctor", "--json"], m.io);
+    const labels = (Bun.JSONL.parse(r.stdout)[0] as { checks: Check[] }).checks.find((c) => c.name === "labels");
+    expect(labels).toMatchObject({ ok: false, code: "labels_undefined" });
+    expect(labels?.do_instead).toContain("norn doctor");
   });
 
   test("--repo checks only the repo's tree: no hooks and no tools, so a machine with no agent passes", async () => {
@@ -48,7 +75,7 @@ describe("norn doctor", () => {
     const { r, body, check } = await doctor();
     expect(r.exit).toBe(ExitCode.error);
     expect(check("config")).toMatchObject({ ok: false, code: "config_missing", do_instead: "norn init" });
-    expect(body.checks.filter((c) => c.skipped).map((c) => c.name)).toEqual(["plugins", "slots", "workflows", "hooks"]);
+    expect(body.checks.filter((c) => c.skipped).map((c) => c.name)).toEqual(["plugins", "slots", "workflows", "labels", "hooks"]);
     expect(check("tool git").ok).toBe(true);
   });
 
@@ -68,7 +95,7 @@ describe("norn doctor", () => {
     expect(missing.check("tool claude")).toBeUndefined();
     const present = await doctor({ config: pi, have: ["git", "norn", "pi"] });
     expect(present.body.ok).toBe(true);
-    expect(present.body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "hooks", "tool git", "tool pi"]);
+    expect(present.body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "labels", "hooks", "tool git", "tool pi"]);
   });
 
   test("gh is needed with the github tracker or forge, herdr with the herdr runner", async () => {

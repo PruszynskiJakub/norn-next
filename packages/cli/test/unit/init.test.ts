@@ -3,7 +3,7 @@ import type { ExecScript } from "@norn/conformance";
 import { parse } from "yaml";
 import { join } from "node:path";
 import { AGENTS_DIR, configPaths, REPO_LOCAL_FILE, ExitCode, OLD_REPO_CONFIG_FILE, runCli } from "../../src/index.ts";
-import { COMMON, HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
+import { COMMON, fakeGh, HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
 
 const PATHS = configPaths(HOME, ROOT);
 const EXCLUDE = `${COMMON}/info/exclude`;
@@ -245,10 +245,21 @@ describe("norn init: doctor", () => {
       ["plugins", true],
       ["slots", true],
       ["workflows", true],
+      ["labels", true],
       ["hooks", true],
       ["tool git", true],
       ["tool claude", true],
     ]);
+  });
+
+  test("on GitHub, init defines the labels norn puts on issues, so the first story create takes them", async () => {
+    const gh = fakeGh();
+    const m = machine({ script: (argv, o) => gh.script(argv, o) ?? world({ origin: "git@github.com:acme/app.git", tools: ["gh", "claude"] })(argv, o) });
+    const r = await runCli(["init", "--json"], m.io);
+    const checks = (json(r.stdout).doctor as { checks: Array<{ name: string; ok: boolean }> }).checks;
+    expect(checks.find((c) => c.name === "labels")?.ok).toBe(true);
+    expect(gh.labels).toContain("norn");
+    expect(gh.labels).toContain("norn:wf:quick");
   });
 
   test("the markdown says what was chosen and what doctor found", async () => {

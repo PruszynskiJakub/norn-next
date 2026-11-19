@@ -10,7 +10,7 @@ import type { Pack } from "@norn/plugin-api";
 import { collectStepKinds, findProvided, loadPackWorkflows, overlayRepoWorkflows } from "@norn/runtime";
 import { parse } from "yaml";
 import { BUNDLED_PLUGINS, configPaths, ExitCode, REPO_COMMITTED_FILE, runCli } from "../../src/index.ts";
-import { HOME, machine, ROOT } from "./support.ts";
+import { fakeGh, HOME, machine, ROOT } from "./support.ts";
 
 const REPO = join(import.meta.dir, "..", "..", "..", "..");
 const WORKFLOWS = join(".agents", "workflows");
@@ -30,7 +30,9 @@ const tools = (argv: string[]) => (argv[1] === "--version" && ["git", "norn", "c
 describe("this repo on the norn it builds", () => {
   test("its team config loads, and every workflow of its .agents/workflows loads with the bundled plugins", async () => {
     const config = readFileSync(join(REPO, REPO_COMMITTED_FILE), "utf8");
-    const m = machine({ seed: { [PATHS.repo]: config, ...repoFiles() }, script: tools });
+    // its github tracker defines the labels doctor asks for on a repository gh answers for
+    const gh = fakeGh();
+    const m = machine({ seed: { [PATHS.repo]: config, ...repoFiles() }, script: (argv, o) => gh.script(argv, o) ?? tools(argv) });
     const r = await runCli(["doctor", "--json"], m.io);
     const checks = (Bun.JSONL.parse(r.stdout)[0] as { checks: Array<{ name: string; ok: boolean; detail?: string; error?: string }> }).checks;
     const byName = Object.fromEntries(checks.map((c) => [c.name, c]));
