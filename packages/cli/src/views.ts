@@ -19,7 +19,8 @@ export interface UnitView {
   ended_reason?: string;
   parked?: string;
   corrupt?: string;
-  run: { id: string; executor: string; started_at: string; activity: string | null } | null;
+  /** `attended`: started where a person works beside it */
+  run: { id: string; executor: string; started_at: string; attended: boolean; activity: string | null } | null;
   /** what a person is asked for, when anything */
   waiting: {
     for: "gate" | "answer" | "permission" | "person";
@@ -58,6 +59,8 @@ export interface IntakeView {
 }
 
 export interface ProjectView {
+  /** who this machine claims as */
+  holder: string;
   stories: StoryView[];
   /** open items the intake query matches that no tick has taken yet */
   intake: IntakeView[];
@@ -157,7 +160,7 @@ export function unitView(u: UnitFacts, workflows: KernelWorkflows, executors: Ke
     ...(s?.ended_reason ? { ended_reason: s.ended_reason } : {}),
     ...(s?.parked ? { parked: s.parked.reason } : {}),
     ...(u.corrupt ? { corrupt: u.corrupt } : {}),
-    run: s?.run ? { id: s.run.id, executor: s.run.executor, started_at: s.run.started_at, activity: u.session?.activity ?? null } : null,
+    run: s?.run ? { id: s.run.id, executor: s.run.executor, started_at: s.run.started_at, attended: s.run.attended, activity: u.session?.activity ?? null } : null,
     waiting: u.corrupt ? { for: "person", text: `corrupt: ${u.corrupt}` } : waitingOf(u, kind, step?.gate?.prompt, s?.run ? executors[s.run.executor]?.dialogKeys === true : false),
     pending_receipts: u.receipts.length,
     counters: spentCounters(s?.counters ?? {}, graph?.counters ?? {}),
@@ -202,13 +205,17 @@ export function storyView(s: StoryFacts, workflows: KernelWorkflows, executors: 
   };
 }
 
-/** The facts of a tick that never acts: the same reads, so what is shown is what the next tick decides from. */
-export async function loadProjectView(env: RuntimeEnv): Promise<ProjectView> {
+/**
+ * The facts of a tick that never acts: the same reads, so what is shown is what the next tick decides
+ * from. `local`: this machine's record alone, with no item, change or intake (a view polled every few seconds).
+ */
+export async function loadProjectView(env: RuntimeEnv, opts: { local?: boolean } = {}): Promise<ProjectView> {
   // outside the tick lock: a view that wrote what it read would race the tick's own writes
-  const gathered = await gatherFacts(env, newTickId(env.ctx.now()), { readOnly: true });
+  const gathered = await gatherFacts(env, newTickId(env.ctx.now()), { readOnly: true, ...(opts.local === true && { local: true }) });
   if (!gathered.ok) throw refuse(`the store could not be read: ${gathered.failure.message}`, "norn doctor", "facts_unavailable");
   const { facts, workflows, problems } = gathered.value;
   return {
+    holder: facts.holder,
     stories: facts.stories.map((s) => storyView(s, workflows, facts.capabilities.executors, facts.holder)),
     // an item a tick took is a story from then on, whatever the tracker's query still matches
     intake: facts.intake.filter((i) => !facts.stories.some((s) => s.key === i.key)).map((i) => ({ key: i.key, title: i.title, url: i.url ?? null })),

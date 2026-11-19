@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { manualClock, memoryFiles, memoryHost } from "@norn/conformance";
 import { type BriefInputs, reduceSession } from "@norn/kernel";
-import { fail, type Harness, type HarnessEvent, type LaunchRequest, ok, type PluginResult, readPromptMark, type Runner, type RunnerKey, type RunnerStartRequest } from "@norn/plugin-api";
+import { fail, type Harness, type HarnessEvent, type LaunchRequest, ok, type PluginResult, readPromptMark, type Runner, type RunnerKey, type RunnerSplitRequest, type RunnerStartRequest } from "@norn/plugin-api";
 import {
   type AgentRunRequest,
   answerFor,
@@ -57,6 +57,9 @@ interface FakeRunner extends Runner {
   pressed: { handle: string; keys: readonly RunnerKey[] }[];
   stopped: string[];
   closed: { handle: string; key: string }[];
+  focused: string[];
+  splits: RunnerSplitRequest[];
+  labels: Array<[string, string, number]>;
   live: Map<string, string>;
 }
 
@@ -68,6 +71,9 @@ function fakeRunner(caps: Runner["capabilities"]): FakeRunner {
   const pressed: FakeRunner["pressed"] = [];
   const stopped: string[] = [];
   const closed: FakeRunner["closed"] = [];
+  const focused: string[] = [];
+  const splits: RunnerSplitRequest[] = [];
+  const labels: FakeRunner["labels"] = [];
   let made = 0;
   return {
     name: caps.paneInput ? "pane" : "bg",
@@ -77,6 +83,9 @@ function fakeRunner(caps: Runner["capabilities"]): FakeRunner {
     pressed,
     stopped,
     closed,
+    focused,
+    splits,
+    labels,
     live,
     start: async (req) => {
       starts.push(req);
@@ -96,6 +105,18 @@ function fakeRunner(caps: Runner["capabilities"]): FakeRunner {
       keys: async (handle: string, keys: readonly RunnerKey[]): Promise<PluginResult<void>> => {
         pressed.push({ handle, keys });
         return ok(undefined);
+      },
+      focus: async (handle: string): Promise<PluginResult<boolean>> => {
+        focused.push(handle);
+        return ok([...live.values()].includes(handle));
+      },
+      split: async (req: RunnerSplitRequest): Promise<PluginResult<{ handle: string }>> => {
+        splits.push(req);
+        return ok({ handle: `split|${splits.length}` });
+      },
+      label: async (workspace: string, text: string, ttlMs: number): Promise<PluginResult<boolean>> => {
+        labels.push([workspace, text, ttlMs]);
+        return ok(workspace === "gh-12");
       },
     }),
     stop: async (handle) => {
@@ -684,6 +705,47 @@ describe("harness launcher close", () => {
       { handle: "proc|2", key: resumeKey as string },
       { handle: "proc|1", key: runId },
     ]);
+  });
+});
+
+describe("harness launcher in front of a person", () => {
+  test("focus brings a run's pane in front through its runner's own handle; a pane gone is false", async () => {
+    const s = setup();
+    expect([s.launcher.modesOf("pane")?.focus, s.launcher.modesOf("bg")?.focus]).toEqual([true, false]);
+    const started = await s.launcher.start(run());
+    if (!started.ok) throw new Error("start failed");
+    expect(await s.launcher.focus(started.value.handle)).toEqual(ok(true));
+    expect(s.pane.focused).toEqual(["proc|1"]);
+    await s.pane.stop("proc|1");
+    expect(await s.launcher.focus(started.value.handle)).toEqual(ok(false));
+  });
+
+  test("focus is refused for a run whose runner has no pane, and for one launched on another machine", async () => {
+    const s = setup();
+    const bg = await s.launcher.start(run({ executor: "bg", attended: false }));
+    if (!bg.ok) throw new Error("start failed");
+    const r = await s.launcher.focus(bg.value.handle);
+    expect(!r.ok && r.failure.message).toBe("gh-12/03 run 01JRUN0000000000000000000A runs in bg, which has no pane to bring in front");
+    const started = await s.launcher.start(run({ run_id: "01JRUN0000000000000000000B" }));
+    if (!started.ok) throw new Error("start failed");
+    const other = await setup().launcher.focus(started.value.handle);
+    expect(!other.ok && other.failure.message).toBe("gh-12/03 run 01JRUN0000000000000000000B was launched on another machine: its pane is there");
+  });
+
+  test("split and label go to the runners that have them; with none configured split is refused", async () => {
+    const s = setup();
+    expect(await s.launcher.split({ argv: ["norn", "status", "--watch"], cwd: "/repo", title: "norn" })).toEqual(ok({ handle: "split|1" }));
+    expect(s.pane.splits).toEqual([{ argv: ["norn", "status", "--watch"], cwd: "/repo", title: "norn" }]);
+    expect(await s.launcher.label("gh-12", "● approve", 30_000)).toEqual(ok(true));
+    expect(await s.launcher.label("gh-9", "◐ running", 30_000)).toEqual(ok(false));
+    expect(s.pane.labels).toEqual([
+      ["gh-12", "● approve", 30_000],
+      ["gh-9", "◐ running", 30_000],
+    ]);
+    const headless = new HarnessLauncher({ ...s.launcher.opts, executors: { bg: { harness: s.bgHarness, runner: s.bg } } });
+    const r = await headless.split({ argv: ["norn"], cwd: "/repo", title: "norn" });
+    expect(!r.ok && r.failure.message).toBe("no configured runner opens a pane a person sees (bg)");
+    expect(await headless.label("gh-12", "x", 1)).toEqual(ok(false));
   });
 });
 

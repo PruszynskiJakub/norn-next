@@ -85,8 +85,8 @@ describe("the machine contract", () => {
   };
   /** built, with tests of their own (agent-verbs, person-verbs) */
   const AGENT_AND_PERSON_VERBS = new Set(["brief", "done", "ask", "stuck", "story create", "story approve", "story reject", "story answer", "story round", "story take", "story update-branch", "story close", "run start", "run stop", "run rerun"]);
-  /** built, with tests of their own (init, doctor, config-commands, plugin-commands, tick-views, tidy) */
-  const HOST_AND_READ_COMMANDS = new Set(["init", "doctor", "status", "tick", "watch", "tidy", "story list", "story view", "config get", "config set", "config show", "plugin add", "plugin list", "plugin remove", "plugin update"]);
+  /** built, with tests of their own (init, doctor, config-commands, plugin-commands, tick-views, tidy, cockpit) */
+  const HOST_AND_READ_COMMANDS = new Set(["init", "doctor", "status", "tick", "watch", "tidy", "run attach", "story list", "story view", "config get", "config set", "config show", "plugin add", "plugin list", "plugin remove", "plugin update"]);
   const stubs = [...COMMANDS, ...NOUNS.flatMap((n) => n.verbs)]
     .map((c) => c.name)
     .filter((n) => n !== "help" && n !== "hook" && !AGENT_AND_PERSON_VERBS.has(n) && !HOST_AND_READ_COMMANDS.has(n));

@@ -41,6 +41,21 @@ export interface RunnerStartRequest {
  */
 export type RunnerKey = { text: string } | { key: "enter" | "up" | "down" | "esc" };
 
+/** A pane opened beside the one a person works in, for something a person keeps in view (norn's cockpit). */
+export interface RunnerSplitRequest {
+  argv: string[];
+  cwd: string;
+  /** what a person sees the pane as */
+  title: string;
+  /** added to the pane's environment, such as the norn home the asking command ran with */
+  env?: Record<string, string>;
+  /**
+   * The runner's own id of the pane the asking command runs in, when its environment names one; the
+   * new pane opens beside it, else beside the pane the person has in front.
+   */
+  beside?: string;
+}
+
 export interface Runner {
   readonly name: string;
   readonly capabilities: RunnerCapabilities;
@@ -72,6 +87,22 @@ export interface Runner {
    * runner that leaves nothing open once its process ends.
    */
   close?(handle: string, key: string): Promise<PluginResult<boolean>>;
+  /**
+   * Bring the handle's pane in front of a person, with the tab and workspace it sits in (plugin API
+   * 1.18). False when the pane is gone. Absent on a runner with no pane.
+   */
+  focus?(handle: string): Promise<PluginResult<boolean>>;
+  /**
+   * Open a pane below the one a person works in and run `argv` there, leaving the person's focus where
+   * it was (plugin API 1.18). Absent on a runner with no pane a person sees.
+   */
+  split?(req: RunnerSplitRequest): Promise<PluginResult<{ handle: string }>>;
+  /**
+   * Show `text` beside the group of runs started under `workspace`, where a person looks for them, until
+   * `ttlMs` passes unless shown again (plugin API 1.18). False when no such group is open. Presentation
+   * only: nothing reads it back.
+   */
+  label?(workspace: string, text: string, ttlMs: number): Promise<PluginResult<boolean>>;
 }
 
 export interface RunnerFactory<S extends TSchema = TSchema> {

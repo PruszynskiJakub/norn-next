@@ -20,7 +20,9 @@ interface Pane {
  * and a pane's foreground, which `pane run` hands to a new process unless `runSticks` is false.
  */
 function fakeHerdr(opts: { runSticks?: boolean; agentKnown?: boolean } = {}) {
-  const workspaces: Array<{ workspace_id: string; label: string }> = [];
+  const workspaces: Array<{ workspace_id: string; label: string; tokens?: Record<string, string> }> = [];
+  /** what a person has in front: the pane or tab herdr last focused */
+  const focused: { pane?: string; tab?: string } = {};
   const tabs: Array<{ tab_id: string; workspace_id: string; label: string }> = [];
   const panes: Pane[] = [];
   let n = 0;
@@ -101,6 +103,35 @@ function fakeHerdr(opts: { runSticks?: boolean; agentKnown?: boolean } = {}) {
       case "pane send-text":
       case "pane send-keys":
         return pane(rest[0]) ? { stdout: "" } : notFound("pane_not_found");
+      case "agent focus":
+        // herdr finds an agent target only where it recognized an agent
+        if (!pane(rest[0]) || opts.agentKnown === false) return notFound("agent_not_found");
+        focused.pane = rest[0];
+        return json({ type: "ok" });
+      case "tab focus": {
+        const t = tabs.find((x) => x.tab_id === rest[0]);
+        if (!t) return notFound("tab_not_found");
+        focused.tab = t.tab_id;
+        return json({ type: "tab_info", tab: t });
+      }
+      case "pane split": {
+        // without a target herdr splits the pane in front, which a headless server has none of
+        const at = pane(flag(argv, "--pane") ?? focused.pane);
+        if (!at) return notFound("pane_not_found");
+        const shell = 1000 + ++n;
+        const p: Pane = { pane_id: `${at.workspace_id}:p${n}`, tab_id: at.tab_id, workspace_id: at.workspace_id, shell, fg: shell };
+        panes.push(p);
+        return json({ type: "pane_info", pane: { pane_id: p.pane_id, tab_id: p.tab_id, workspace_id: p.workspace_id } });
+      }
+      case "pane rename":
+        return pane(rest[0]) ? json({ type: "pane_info", pane: { pane_id: rest[0], label: rest[1] } }) : notFound("pane_not_found");
+      case "workspace report-metadata": {
+        const ws = workspaces.find((w) => w.workspace_id === rest[0]);
+        if (!ws) return notFound("workspace_not_found");
+        const token = flag(argv, "--token") as string;
+        ws.tokens = { ...ws.tokens, [token.slice(0, token.indexOf("="))]: token.slice(token.indexOf("=") + 1) };
+        return { stdout: "" };
+      }
       default:
         return undefined;
     }
@@ -111,7 +142,7 @@ function fakeHerdr(opts: { runSticks?: boolean; agentKnown?: boolean } = {}) {
     p.fg = p.shell;
   };
   const calls = () => exec.calls.map((c) => c.argv.slice(1).slice(0, 2).join(" "));
-  return { exec, workspaces, tabs, panes, exitAgent, calls };
+  return { exec, workspaces, tabs, panes, focused, exitAgent, calls };
 }
 
 const req = (over: Partial<RunnerStartRequest> = {}): RunnerStartRequest => ({
@@ -473,6 +504,56 @@ describe("herdr close", () => {
     tab.label = "a person's tab";
     expect(await runner.close?.("w1:p2", "01JRUN1")).toEqual({ ok: true, value: false });
     expect(h.panes.map((p) => p.pane_id)).toEqual(["w1:p2"]);
+  });
+});
+
+describe("herdr focus, split and label", () => {
+  test("focus brings a run's agent pane in front; a pane gone is false, and nothing else is focused", async () => {
+    const { h, runner } = setup();
+    await runner.start(req());
+    expect(await runner.focus?.("w1:p2")).toEqual({ ok: true, value: true });
+    expect(h.focused).toEqual({ pane: "w1:p2" });
+    expect(await runner.focus?.("w1:p99")).toEqual({ ok: true, value: false });
+    expect(h.focused).toEqual({ pane: "w1:p2" });
+  });
+
+  test("with no agent herdr recognizes in the pane, focus brings the pane's tab in front", async () => {
+    const { h, runner } = setup({}, { agentKnown: false });
+    await runner.start(req());
+    expect(await runner.focus?.("w1:p2")).toEqual({ ok: true, value: true });
+    expect(h.focused).toEqual({ tab: "w1:t2" });
+  });
+
+  test("split opens a short pane below the asking pane without focus, names it and runs the command in it", async () => {
+    const { h, runner } = setup();
+    await runner.start(req());
+    const before = h.exec.calls.length;
+    expect(await runner.split?.({ argv: ["norn", "status", "--watch"], cwd: "/work/repo", title: "norn", env: { NORN_HOME_DIR: "/n" }, beside: "w1:p2" })).toEqual({ ok: true, value: { handle: "w1:p3" } });
+    expect(h.exec.calls.slice(before).map((c) => c.argv.slice(1))).toEqual([
+      ["pane", "split", "--pane", "w1:p2", "--direction", "down", "--ratio", "0.3", "--cwd", "/work/repo", "--env", "NORN_HOME_DIR=/n", "--no-focus"],
+      ["pane", "rename", "w1:p3", "norn"],
+      ["pane", "run", "w1:p3", "norn status --watch"],
+    ]);
+    expect(h.focused).toEqual({});
+  });
+
+  test("split with no asking pane goes below the pane in front, and fails when herdr has none", async () => {
+    const { h, runner } = setup();
+    await runner.start(req());
+    const r = await runner.split?.({ argv: ["norn"], cwd: "/w", title: "norn" });
+    expect(r?.ok === false && r.failure.code).toBe("not_found");
+    h.focused.pane = "w1:p2";
+    expect(await runner.split?.({ argv: ["norn"], cwd: "/w", title: "norn" })).toEqual({ ok: true, value: { handle: "w1:p3" } });
+    expect(h.exec.calls.findLast((c) => c.argv[2] === "split")?.argv.includes("--pane")).toBe(false);
+  });
+
+  test("label sets the norn token of the story's workspace for a while; a story with no workspace open is false", async () => {
+    const { h, runner } = setup();
+    await runner.start(req());
+    expect(await runner.label?.("gh-1", "● approve", 30_000)).toEqual({ ok: true, value: true });
+    expect(h.workspaces[0]?.tokens).toEqual({ norn: "● approve" });
+    expect(h.exec.calls.findLast((c) => c.argv[2] === "report-metadata")?.argv.slice(1)).toEqual(["workspace", "report-metadata", "w1", "--source", "norn", "--token", "norn=● approve", "--ttl-ms", "30000"]);
+    expect(await runner.label?.("gh-9", "◐ running", 30_000)).toEqual({ ok: true, value: false });
   });
 });
 
