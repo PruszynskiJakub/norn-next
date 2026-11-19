@@ -15,11 +15,14 @@ interface Check {
   code?: string;
 }
 
-/** Only the listed binaries answer `--version`. */
+/** Only the listed binaries answer `--version`; with norn among them, the hook line an agent runs answers as norn's does outside a run. */
 const tools =
   (...have: string[]): ExecScript =>
-  (argv) =>
-    argv[1] === "--version" && have.includes(argv[0] as string) ? { stdout: `${argv[0]} 1.0\n` } : undefined;
+  (argv) => {
+    if (argv[1] === "--version" && have.includes(argv[0] as string)) return { stdout: `${argv[0]} 1.0\n` };
+    if (argv[0] === "sh" && argv[1] === "-c" && have.includes("norn") && argv[2]?.startsWith("norn hook ")) return { stdout: "" };
+    return undefined;
+  };
 
 async function doctor(opts: { config?: string; have?: string[]; seed?: Record<string, string>; importer?: PluginImporter; args?: string[] } = {}) {
   const seed = { ...(opts.config === undefined ? {} : { [PATHS.local]: opts.config }), ...(opts.seed ?? {}) };
@@ -35,7 +38,7 @@ describe("norn doctor", () => {
     const { r, body } = await doctor({ config: LOCAL_CONFIG });
     expect(r.exit).toBe(ExitCode.ok);
     expect(body.ok).toBe(true);
-    expect(body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "labels", "hooks", "tool git", "tool claude"]);
+    expect(body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "labels", "hooks", "tool git", "remote", "tool claude"]);
   });
 
   test("labels: doctor defines the labels norn uses on the tracker, the intake label, one per workflow and the triage set, once", async () => {
@@ -95,7 +98,7 @@ describe("norn doctor", () => {
     expect(missing.check("tool claude")).toBeUndefined();
     const present = await doctor({ config: pi, have: ["git", "norn", "pi"] });
     expect(present.body.ok).toBe(true);
-    expect(present.body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "labels", "hooks", "tool git", "tool pi"]);
+    expect(present.body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "labels", "hooks", "tool git", "remote", "tool pi"]);
   });
 
   test("gh is needed with the github tracker or forge, herdr with the herdr runner", async () => {
@@ -124,7 +127,67 @@ describe("norn doctor", () => {
 
   test("a hook command that cannot run fails the hooks check", async () => {
     const { check } = await doctor({ config: LOCAL_CONFIG, have: ["git", "claude"] });
-    expect(check("hooks")).toMatchObject({ ok: false, code: "hook_command_missing" });
+    expect(check("hooks")).toMatchObject({ ok: false, code: "hook_not_firing" });
+  });
+
+  test("hooks: the line an agent's hook runs is run through a shell, outside any run; one that does not answer fails though norn itself runs", async () => {
+    // norn answers --version, but the hook line fails as a hook run by bun without its script did
+    const m = machine({
+      seed: { [PATHS.local]: LOCAL_CONFIG },
+      script: (argv, o) => (argv[0] === "sh" ? { code: 1, stderr: 'error: Script not found "hook"\n' } : tools("git", "norn", "claude")(argv, o)),
+    });
+    const r = await runCli(["doctor", "--json"], m.io);
+    const hooks = (Bun.JSONL.parse(r.stdout)[0] as { checks: Check[] }).checks.find((c) => c.name === "hooks");
+    expect(hooks).toMatchObject({ ok: false, code: "hook_not_firing" });
+    expect(hooks?.error).toContain('Script not found "hook"');
+    expect(hooks?.do_instead).toContain("norn");
+    const probe = m.exec.calls.find((c) => c.argv[0] === "sh");
+    expect(probe?.argv[2]).toStartWith("norn hook claude ");
+    // a doctor run inside a unit must not file its probe under that unit's run
+    expect(probe?.opts.env).toMatchObject({ NORN_UNIT: "", NORN_RUN_ID: "" });
+    const fires = await doctor({ config: LOCAL_CONFIG });
+    expect(fires.check("hooks")).toMatchObject({ ok: true });
+  });
+
+  test("git older than 2.38 fails the git check, naming the upgrade", async () => {
+    const old = (version: string): ExecScript => (argv, o) => (argv[0] === "git" && argv[1] === "--version" ? { stdout: `git version ${version}\n` } : tools("norn", "claude")(argv, o));
+    const m = machine({ seed: { [PATHS.local]: LOCAL_CONFIG }, script: old("2.37.1") });
+    const r = await runCli(["doctor", "--json"], m.io);
+    const git = (Bun.JSONL.parse(r.stdout)[0] as { checks: Check[] }).checks.find((c) => c.name === "tool git");
+    expect(r.exit).toBe(ExitCode.error);
+    expect(git).toMatchObject({ ok: false, code: "git_too_old" });
+    expect(git?.do_instead).toContain("2.38");
+    const fresh = machine({ seed: { [PATHS.local]: LOCAL_CONFIG }, script: old("2.39.3 (Apple Git-145)") });
+    const ok = (Bun.JSONL.parse((await runCli(["doctor", "--json"], fresh.io)).stdout)[0] as { checks: Check[] }).checks.find((c) => c.name === "tool git");
+    expect(ok).toMatchObject({ ok: true });
+  });
+
+  test("gh: with the github tracker or forge, a gh that is not logged in fails gh auth, naming gh auth login", async () => {
+    const run = async (loggedOut: boolean) => {
+      const gh = fakeGh();
+      gh.loggedOut = loggedOut;
+      const m = machine({ seed: { [PATHS.local]: GITHUB_CONFIG }, script: (argv, o) => gh.script(argv, o) ?? tools("git", "norn", "claude")(argv, o) });
+      const r = await runCli(["doctor", "--json"], m.io);
+      return (Bun.JSONL.parse(r.stdout)[0] as { checks: Check[] }).checks.find((c) => c.name === "gh auth");
+    };
+    expect(await run(true)).toMatchObject({ ok: false, code: "gh_logged_out", do_instead: "gh auth login" });
+    expect(await run(false)).toMatchObject({ ok: true });
+  });
+
+  test("remote: the github forge with no git remote fails the remote check, naming git remote add; forge none needs none", async () => {
+    const forge = LOCAL_CONFIG.replace("forge: { use: none }", "forge: { use: github }");
+    const remote = (url: string | null): ExecScript => (argv, o) => {
+      if (argv[0] === "git" && argv[1] === "remote" && argv[2] === "get-url") return url === null ? { code: 2, stderr: "error: No such remote 'origin'\n" } : { stdout: `${url}\n` };
+      if (argv[0] === "gh" && argv[1] === "auth") return { stdout: "" };
+      return tools("git", "norn", "claude", "gh")(argv, o);
+    };
+    const check = async (config: string, url: string | null) => {
+      const m = machine({ seed: { [PATHS.local]: config }, script: remote(url) });
+      return (Bun.JSONL.parse((await runCli(["doctor", "--json"], m.io)).stdout)[0] as { checks: Check[] }).checks.find((c) => c.name === "remote");
+    };
+    expect(await check(forge, null)).toMatchObject({ ok: false, code: "no_remote", do_instead: "git remote add origin <url>" });
+    expect(await check(forge, "git@github.com:acme/app.git")).toMatchObject({ ok: true });
+    expect(await check(LOCAL_CONFIG, null)).toMatchObject({ ok: true });
   });
 
   test("the markdown names each failing check with what to do instead", async () => {

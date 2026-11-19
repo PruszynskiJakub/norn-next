@@ -91,6 +91,8 @@ export interface FakeGh {
   calls: string[];
   /** gh refuses `label create`, as for a token without write access */
   refuseLabels?: boolean;
+  /** `gh auth status` says no account is logged in */
+  loggedOut?: boolean;
 }
 
 export function fakeGh(labels: string[] = []): FakeGh {
@@ -103,6 +105,7 @@ export function fakeGh(labels: string[] = []): FakeGh {
       if (sub === "--version") return { stdout: "gh 2.0\n" };
       if (sub === "repo" && verb === "view") return { stdout: '{"nameWithOwner":"acme/app"}' };
       if (sub === "api" && verb === "user") return { stdout: "me\n" };
+      if (sub === "auth" && verb === "status") return gh.loggedOut ? { code: 1, stderr: "You are not logged into any GitHub hosts. To log in, run: gh auth login\n" } : { stdout: "" };
       gh.calls.push(`${sub} ${verb}${first && !first.startsWith("-") ? ` ${first}` : ""}`);
       if (sub === "label" && verb === "list") return { stdout: JSON.stringify(gh.labels.map((name) => ({ name }))) };
       if (sub === "label" && verb === "create") {

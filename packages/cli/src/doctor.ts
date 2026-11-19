@@ -1,13 +1,16 @@
 /**
  * The doctor's checks, in the order each needs the last: the config, the plugins it picks (installed
  * and on this norn's plugin API), the slots they build, the workflows (the pack's and the repo's
- * own), the labels norn puts on items, the harness hooks, and the tools on PATH the config needs. A
+ * own), the labels norn puts on items, the harness hooks, and the tools on PATH the config needs
+ * (git followed by its remote, gh by its login). A
  * check that cannot run because an earlier one failed is skipped rather than failed, so the first
  * failure is the one to fix. `init` runs the same checks.
  */
-import { REPO_WORKFLOWS_DIR, repoFileOf, type RuntimeEnv } from "@norn/runtime";
+import { RUN_ENV } from "@norn/plugin-api";
+import { REPO_WORKFLOWS_DIR, repoFileOf, type RuntimeEnv, shellQuote } from "@norn/runtime";
 import type { NornConfig } from "./config/schema.ts";
 import type { CliContext } from "./context.ts";
+import { GIT_UPGRADE, gitTooOld, MIN_GIT_TEXT } from "./git-version.ts";
 import { ensureLabels, nornLabels } from "./labels.ts";
 import { CliFailure, toFailure } from "./output.ts";
 
@@ -66,27 +69,63 @@ function workflowsDetail(env: RuntimeEnv): string {
 
 const TOOL_TIMEOUT_MS = 15_000;
 
+const firstLine = (r: { stderr: string; code: number }): string => (r.stderr.trim() || `exit ${r.code}`).split("\n")[0] as string;
+
 async function toolCheck(ctx: CliContext, cwd: string, t: { tool: string; why: string; install: string }): Promise<DoctorCheck> {
   const host = await ctx.host();
   const r = await host.exec([t.tool, "--version"], { cwd, timeoutMs: TOOL_TIMEOUT_MS });
   const name = `tool ${t.tool}`;
-  if (r.code === 0) return passed(name, (r.stdout.trim().split("\n")[0] ?? "").trim() || "present");
-  return { name, ok: false, error: `${t.tool} is not runnable (${t.why}): ${(r.stderr.trim() || `exit ${r.code}`).split("\n")[0]}`, do_instead: t.install, code: "tool_missing" };
+  const version = (r.stdout.trim().split("\n")[0] ?? "").trim();
+  if (r.code !== 0) return { name, ok: false, error: `${t.tool} is not runnable (${t.why}): ${firstLine(r)}`, do_instead: t.install, code: "tool_missing" };
+  if (t.tool === "git" && gitTooOld(version))
+    return { name, ok: false, error: `${version} is older than ${MIN_GIT_TEXT}, which norn needs to find conflicts with the base (git merge-tree --write-tree)`, do_instead: GIT_UPGRADE, code: "git_too_old" };
+  return passed(name, version || "present");
+}
+
+/** A gh that is installed but logged out fails every tracker and forge call, so the tick that needs it is the first to say so. */
+async function ghAuthCheck(ctx: CliContext, cwd: string): Promise<DoctorCheck> {
+  const r = await (await ctx.host()).exec(["gh", "auth", "status"], { cwd, timeoutMs: TOOL_TIMEOUT_MS });
+  if (r.code === 0) return passed("gh auth", "gh is logged in");
+  return { name: "gh auth", ok: false, error: `gh is not logged in: ${firstLine(r)}`, do_instead: "gh auth login", code: "gh_logged_out" };
 }
 
 /**
- * The hooks an agent's harness installs call back into this binary; a harness that lacks install, or
- * a binary that cannot be run, leaves an agent that never reports.
+ * The git remote a code host's forge opens changes through and a refs store shares run data through.
+ * Without it every push fails; a repo on forge none with a local store keeps its work local and needs none.
  */
-async function hooksCheck(ctx: CliContext, cwd: string, harnesses: Readonly<Record<string, { install?: unknown }>>): Promise<DoctorCheck> {
+async function remoteCheck(ctx: CliContext, cwd: string, config: NornConfig): Promise<DoctorCheck | null> {
+  if (config.vcs.use !== "git") return null;
+  const configured = (config.vcs as { remote?: unknown }).remote;
+  const remote = typeof configured === "string" ? configured : "origin";
+  const r = await (await ctx.host()).exec(["git", "remote", "get-url", remote], { cwd, timeoutMs: TOOL_TIMEOUT_MS });
+  if (r.code === 0) return passed("remote", `${remote} is ${r.stdout.trim()}`);
+  const needs = [config.forge.use !== "none" ? `the ${config.forge.use} forge` : null, config.store.use === "refs" ? "the refs store" : null].filter((x): x is string => x !== null);
+  if (needs.length === 0) return passed("remote", `no remote ${remote}; none needed with forge ${config.forge.use} and store ${config.store.use}`);
+  return { name: "remote", ok: false, error: `this repository has no git remote ${remote}, which ${needs.join(" and ")} pushes to`, do_instead: `git remote add ${remote} <url>`, code: "no_remote" };
+}
+
+/** The hook name the probe passes: any name will do, as norn answers a hook outside a run before it reads the name. */
+const HOOK_PROBE = "doctor-probe";
+
+/**
+ * Runs the hook line each harness writes, the way an agent runs it: through a shell, outside any run.
+ * `norn --version` alone is not enough: run by bun without its script, the binary runs while every
+ * hook line fails, which leaves an agent unguarded whose events never reach norn.
+ */
+async function hooksCheck(ctx: CliContext, cwd: string, harnesses: Readonly<Record<string, { name: string; install?: unknown }>>): Promise<DoctorCheck> {
   const lacking = Object.entries(harnesses).filter(([, h]) => typeof h.install !== "function").map(([name]) => name);
   if (lacking.length > 0) return { name: "hooks", ok: false, error: `the harness of executor ${lacking.join(", ")} cannot install hooks`, do_instead: "norn plugin update <the harness plugin>", code: "hooks_uninstallable" };
-  const self = ctx.io.self;
   const host = await ctx.host();
-  const r = await host.exec([...self, "--version"], { cwd, timeoutMs: TOOL_TIMEOUT_MS });
-  if (r.code !== 0)
-    return { name: "hooks", ok: false, error: `the hook command (${self.join(" ")} hook) cannot be run: ${(r.stderr.trim() || `exit ${r.code}`).split("\n")[0]}`, do_instead: "put norn on PATH, or run norn from where it is installed", code: "hook_command_missing" };
-  return passed("hooks", `${Object.keys(harnesses).join(", ")} install hooks that run ${self.join(" ")} hook`);
+  const lines: string[] = [];
+  for (const name of [...new Set(Object.values(harnesses).map((h) => h.name))]) {
+    const line = `${shellQuote([...ctx.io.self, "hook", name])} ${HOOK_PROBE}`;
+    // emptied, so a doctor run inside a unit never files its probe under that unit's run
+    const r = await host.exec(["sh", "-c", line], { cwd, input: "{}", env: { [RUN_ENV.unit]: "", [RUN_ENV.run]: "" }, timeoutMs: TOOL_TIMEOUT_MS });
+    if (r.code !== 0)
+      return { name: "hooks", ok: false, error: `the ${name} hook line (${line}) does not run: ${firstLine(r)}`, do_instead: "put norn on PATH, or reinstall norn, then norn doctor", code: "hook_not_firing" };
+    lines.push(line);
+  }
+  return passed("hooks", `every hook line runs: ${lines.join("; ")}`);
 }
 
 /**
@@ -133,7 +172,17 @@ export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Prom
     }
   }
 
-  if (!opts.repoOnly) for (const t of toolsNeeded(config.value?.config ?? null)) checks.push(await toolCheck(ctx, cwd, t));
+  if (!opts.repoOnly)
+    for (const t of toolsNeeded(config.value?.config ?? null)) {
+      const tool = await toolCheck(ctx, cwd, t);
+      checks.push(tool);
+      if (!tool.ok) continue;
+      if (t.tool === "git" && config.value) {
+        const remote = await remoteCheck(ctx, cwd, config.value.config);
+        if (remote) checks.push(remote);
+      }
+      if (t.tool === "gh") checks.push(await ghAuthCheck(ctx, cwd));
+    }
   return { ok: checks.every((c) => c.ok), checks };
 }
 

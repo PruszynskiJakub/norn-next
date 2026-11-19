@@ -87,6 +87,16 @@ describe("norn watch", () => {
     expect(json(r.stdout)).toMatchObject({ ticks: 0 });
   });
 
+  test("git older than 2.38 is refused before the first tick, naming the upgrade", async () => {
+    const lines: string[] = [];
+    const old: ExecScript = (argv, o) => (argv[0] === "git" && argv[1] === "--version" ? { stdout: "git version 2.37.0\n" } : gitAgrees(argv, o));
+    const r = await runCli(["watch", "--interval", "1ms", "--max-ticks", "1", "--json"], repo({ script: old, log: (l) => lines.push(l) }).io);
+    expect(r.exit).toBe(ExitCode.refused);
+    expect(json(r.stdout)).toMatchObject({ code: "git_too_old" });
+    expect(json(r.stdout).do_instead).toContain("2.38");
+    expect(lines).toEqual([]);
+  });
+
   test("--max-ticks ends it; a bad interval or count is a usage error", async () => {
     const r = await runCli(["watch", "--interval", "1ms", "--max-ticks", "3", "--json"], repo({ log: () => {} }).io);
     expect(json(r.stdout)).toMatchObject({ ticks: 3, interval: "1ms" });

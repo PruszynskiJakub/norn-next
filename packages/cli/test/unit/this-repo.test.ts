@@ -25,7 +25,13 @@ function repoFiles(): Record<string, string> {
   return out;
 }
 
-const tools = (argv: string[]) => (argv[1] === "--version" && ["git", "norn", "claude", "gh"].includes(argv[0] as string) ? { stdout: "1.0\n" } : undefined);
+/** the tools answer `--version`, the hook line runs, and the checkout has its remote */
+const tools = (argv: string[]) => {
+  if (argv[1] === "--version" && ["git", "norn", "claude", "gh"].includes(argv[0] as string)) return { stdout: "1.0\n" };
+  if (argv[0] === "sh" && argv[1] === "-c" && argv[2]?.startsWith("norn hook ")) return { stdout: "" };
+  if (argv.join(" ") === "git remote get-url origin") return { stdout: "git@github.com:acme/app.git\n" };
+  return undefined;
+};
 
 describe("this repo on the norn it builds", () => {
   test("its team config loads, and every workflow of its .agents/workflows loads with the bundled plugins", async () => {
