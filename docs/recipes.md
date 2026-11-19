@@ -14,13 +14,25 @@ The next tick delivers your answer to the same session, or starts a fresh sessio
 
 ## A permission prompt blocks an agent
 
-**You see:** a question that quotes the agent tool's prompt with its options.
+**You see:** the unit waiting for a permission, with the call it asks about and the agent tool's prompt: `Bash(rm -rf build): Claude needs your permission to use Bash`.
 
 ```sh
-norn story answer gh-18 "1"
+norn story answer gh-18 1     # the first option, which lets it run; `no` refuses it
 ```
 
-Claude Code runs in its `auto` permission mode by default, so this is rare; an executor's `args` replaces that default whole ([Use another agent tool or model](#use-another-agent-tool-or-model)).
+The next tick presses the keys for that option in the agent's pane. Only a runner with a pane can do that (herdr); in a headless run, rerun the step instead. Claude Code runs in its `auto` permission mode by default, so this is rare; an executor's `args` replaces that default whole ([Use another agent tool or model](#use-another-agent-tool-or-model)).
+
+## An agent in a pane sends nothing
+
+**You see:** the unit waiting for a permission: its agent runs in its pane but has sent no event, most likely behind a trust prompt for the new worktree.
+
+Trust the folder in the pane, or answer the prompt from here:
+
+```sh
+norn story answer gh-18 1
+```
+
+The run goes on with its first event. If the pane shows something else, start the step again with `norn run rerun gh-18`.
 
 ## A gate waits for you
 

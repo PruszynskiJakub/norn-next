@@ -188,8 +188,8 @@ describe("classifySession: the rest of the facts", () => {
     });
   });
 
-  test("the permission carries its id and prompt", () => {
-    expect(at(stream(START, BRIEF, shell("t1"), perm), 5).permission).toEqual({ id: "t1", prompt: "Allow?" });
+  test("the permission carries its id, prompt and the call it asks about", () => {
+    expect(at(stream(START, BRIEF, shell("t1"), perm), 5).permission).toEqual({ id: "t1", prompt: "Allow?", call: { id: "t1", tool: "Bash" } });
   });
 
   test("classifying never changes the view", () => {

@@ -16,6 +16,10 @@
  *   is never dropped silently, nor counted when it cannot arrive.
  * - every launch, resumed ones too, puts agent-bin.ts's folder first on the agent's PATH, so the
  *   `norn` the brief tells the agent to run is the build that launched it.
+ * - a dialog answer (a permission or trust prompt in the agent's pane): the harness's keys for the
+ *   answer pressed through the runner, only while the run's events still show that dialog open and
+ *   only once (recorded as sent after the keys went in), as keys pressed after it closed would land
+ *   in the agent's prompt.
  * - stop / alive: the runner, on the run's newest process (its latest resume, else the first).
  * The handle is launcher-handle.ts's: executor, unit, run and the runner's own handle.
  */
@@ -23,6 +27,7 @@ import { DEFAULT_KERNEL_CONFIG, reduceSession } from "@norn/kernel";
 import type { Harness, HostContext, NornPromptSource, PluginResult, Runner } from "@norn/plugin-api";
 import { fail, markPrompt, ok, RUN_ENV } from "@norn/plugin-api";
 import { agentBinEnv, cliOfHookCommand } from "./agent-bin.ts";
+import { dialogInputId } from "./dialog.ts";
 import { readEvents } from "./events/log.ts";
 import { markDelivered, pendingInjections, queueInjection, readSentPrompt, recordSentPrompt } from "./events/outbox.ts";
 import { receivedDir } from "./events/paths.ts";
@@ -30,7 +35,7 @@ import { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./lau
 import { currentRunnerHandle, recordLaunch, resumesOf, resumeWith } from "./launcher-resume.ts";
 import { shellQuote } from "./shell.ts";
 import { installSkills, type PackSkills } from "./skills.ts";
-import type { AgentLauncher, AgentRunRequest, ExecutorModes, LauncherModes } from "./types.ts";
+import type { AgentLauncher, AgentRunRequest, AnswerOptions, ExecutorModes, LauncherModes } from "./types.ts";
 
 export interface Executor {
   harness: Harness;
@@ -117,7 +122,12 @@ export class HarnessLauncher implements AgentLauncher {
     const e = this.opts.executors[executor];
     if (!e) return null;
     const r = e.runner.capabilities;
-    return { headless: r.headless, attended: r.attended, paneInput: r.paneInput && e.harness.capabilities.paneInput };
+    return {
+      headless: r.headless,
+      attended: r.attended,
+      paneInput: r.paneInput && e.harness.capabilities.paneInput,
+      dialogKeys: typeof e.runner.keys === "function" && typeof e.harness.dialogKeys === "function",
+    };
   }
 
   async start(run: AgentRunRequest): Promise<PluginResult<{ handle: string }>> {
@@ -178,7 +188,8 @@ export class HarnessLauncher implements AgentLauncher {
     return this.deliver(handle, "nudge", promptId, text);
   }
 
-  async answer(handle: string, inputId: string, text: string): Promise<PluginResult<void>> {
+  async answer(handle: string, inputId: string, text: string, opts: AnswerOptions = {}): Promise<PluginResult<void>> {
+    if (opts.dialog === true) return this.pressDialog(handle, inputId, text);
     return this.deliver(handle, "answer", answerPromptId(inputId), text, inputId);
   }
 
@@ -253,6 +264,29 @@ export class HarnessLauncher implements AgentLauncher {
     if (!resumed.ok) return resumed;
     // the resumed prompt carries it; a later hook of the resumed session must not deliver it again
     return markDelivered(ctx, h.unit, h.run_id, [id]);
+  }
+
+  private async pressDialog(handle: string, inputId: string, text: string): Promise<PluginResult<void>> {
+    const found = this.resolve(handle);
+    if (!found.ok) return found;
+    const { ctx } = this.opts;
+    const { handle: h, executor } = found.value;
+    const { runner, harness } = executor;
+    if (!runner.keys || !harness.dialogKeys)
+      return fail("invalid", `${h.unit} run ${h.run_id} cannot answer a dialog in its pane: ${runner.keys ? `${harness.name} names no keys for its dialogs` : `${runner.name} cannot press keys in a pane`}`, false);
+    const keys = harness.dialogKeys(text);
+    if (!keys) return fail("invalid", `${harness.name}'s dialog takes no ${JSON.stringify(text)}: answer with an option's number, yes or no`, false);
+    const id = answerPromptId(inputId);
+    if ((await readSentPrompt(ctx, h.unit, h.run_id, id)) !== null) return ok(undefined);
+    const read = await readEvents(ctx, h.unit, h.run_id);
+    const permission = reduceSession(read.events).permission ?? null;
+    const open = permission ? dialogInputId(permission, h.run_id) === inputId : read.events.length === 0 && dialogInputId(null, h.run_id) === inputId;
+    // answered in the pane meanwhile: nothing waits for the keys
+    if (!open) return ok(undefined);
+    const pressed = await runner.keys(await currentRunnerHandle(ctx, h), keys);
+    if (!pressed.ok) return pressed;
+    const recorded = await recordSentPrompt(ctx, h.unit, h.run_id, { id, source: "answer", at: ctx.now(), input_id: inputId });
+    return recorded.ok ? ok(undefined) : recorded;
   }
 
   /** No event from the run's session (or, before its first, since its launch) for the silent window. */

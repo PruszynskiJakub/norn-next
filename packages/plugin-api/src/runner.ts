@@ -35,6 +35,12 @@ export interface RunnerStartRequest {
   logPath: string;
 }
 
+/**
+ * A key a person would press in a pane: text typed as it is, or a named key. A dialog the agent shows
+ * (a permission or trust prompt) takes keys, never a submitted prompt.
+ */
+export type RunnerKey = { text: string } | { key: "enter" | "up" | "down" | "esc" };
+
 export interface Runner {
   readonly name: string;
   readonly capabilities: RunnerCapabilities;
@@ -43,6 +49,11 @@ export interface Runner {
   alive(handle: string): Promise<PluginResult<boolean>>;
   /** type `text` and submit it; refused (`invalid`) when the runner has no pane input */
   send(handle: string, text: string): Promise<PluginResult<void>>;
+  /**
+   * Press `keys` in the handle's pane, in order (plugin API 1.12). Absent on a runner with no pane:
+   * a dialog in a process nobody sees cannot be answered from outside it.
+   */
+  keys?(handle: string, keys: readonly RunnerKey[]): Promise<PluginResult<void>>;
   /** end the process; stopping one already gone is not an error */
   stop(handle: string): Promise<PluginResult<void>>;
 }

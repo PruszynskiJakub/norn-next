@@ -5,6 +5,8 @@ import type { SessionView } from "./view.ts";
 interface Acc {
   view: SessionView;
   tools: Map<string, PendingToolKind>;
+  // what each pending call is, `Bash(rm -rf build)`, for the permission prompt that asks about it
+  calls: Map<string, string>;
   subagents: Map<string, boolean>;
   // an id once finished never reopens: a hook replayed with a fresh seq must not resurrect a call or an ask
   closedTools: Set<string>;
@@ -32,6 +34,7 @@ function resumed(acc: Acc): void {
 function dropTools(acc: Acc): void {
   for (const id of acc.tools.keys()) acc.closedTools.add(id);
   acc.tools.clear();
+  acc.calls.clear();
 }
 
 function dropSubagents(acc: Acc, which: (background: boolean) => boolean): void {
@@ -50,6 +53,11 @@ function closePermission(acc: Acc): void {
 /** The most recently requested call still pending: the one an unnamed permission prompt is about. */
 function latestPendingTool(acc: Acc): string | undefined {
   return [...acc.tools.keys()].at(-1);
+}
+
+function nameCall(acc: Acc, id: string | undefined): void {
+  const tool = id !== undefined ? acc.calls.get(id) : undefined;
+  if (acc.view.permission && id !== undefined && tool !== undefined) acc.view.permission.call = { id, tool };
 }
 
 function closeInput(acc: Acc, id: string): void {
@@ -95,6 +103,7 @@ function apply(acc: Acc, e: HarnessEvent): void {
       resumed(acc);
       closeUnbackedInput(acc, e.id);
       acc.tools.set(e.id, e.kind);
+      acc.calls.set(e.id, e.detail !== undefined ? `${e.tool}(${e.detail})` : e.tool);
       if (v.permission && v.permission.id !== e.id) closePermission(acc);
       return;
     case "tool.permission":
@@ -103,10 +112,12 @@ function apply(acc: Acc, e: HarnessEvent): void {
       v.permission = { id: e.id, prompt: e.prompt };
       if (acc.tools.has(e.id)) delete acc.permissionTool;
       else acc.permissionTool = latestPendingTool(acc);
+      nameCall(acc, acc.tools.has(e.id) ? e.id : acc.permissionTool);
       return;
     case "tool.finished":
       if (!acc.tools.has(e.id)) return;
       acc.tools.delete(e.id);
+      acc.calls.delete(e.id);
       acc.closedTools.add(e.id);
       if (v.permission && (v.permission.id === e.id || acc.permissionTool === e.id)) closePermission(acc);
       closeInput(acc, e.id);
@@ -177,6 +188,7 @@ export function reduceSession(events: readonly HarnessEvent[]): SessionView {
   const acc: Acc = {
     view: emptyView(),
     tools: new Map(),
+    calls: new Map(),
     subagents: new Map(),
     closedTools: new Set(),
     closedSubagents: new Set(),

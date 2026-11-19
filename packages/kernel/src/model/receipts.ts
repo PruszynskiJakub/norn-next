@@ -86,7 +86,11 @@ const KINDS = [
     /** set when the decision came through a run: a unit's own step agent may never decide its gate */
     run_id: Type.Optional(Id),
   }),
-  kind("answer.sent", { input_id: Id, text: Type.String(), by: NonEmpty }),
+  /**
+   * `to: dialog`: the answer chooses an option in a dialog the agent's pane shows (a permission or
+   * trust prompt), so it goes in as keys, never as a prompt typed to the agent
+   */
+  kind("answer.sent", { input_id: Id, text: Type.String(), by: NonEmpty, to: Type.Optional(Type.Literal("dialog")) }),
   kind("nudge.sent", { run_id: Id, reason: NonEmpty }),
   /** a check or effect step run again under its run, after it was cut short or its plugin failed; counted against the retries */
   kind("run.resumed", { run_id: Id, reason: Type.Optional(Type.String()) }),

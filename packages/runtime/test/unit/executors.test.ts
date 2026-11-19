@@ -43,8 +43,8 @@ describe("executors as a harness in a runner", () => {
     if (!env.ok) throw new Error(env.failure.message);
     expect(env.value.launcher).toBeInstanceOf(HarnessLauncher);
     expect(handed()).toBe(env.value.launcher);
-    expect(env.value.launcher.modesOf?.("claude")).toEqual({ headless: false, attended: true, paneInput: false });
-    expect(env.value.launcher.modesOf?.("bot")).toEqual({ headless: true, attended: false, paneInput: false });
+    expect(env.value.launcher.modesOf?.("claude")).toEqual({ headless: false, attended: true, paneInput: false, dialogKeys: false });
+    expect(env.value.launcher.modesOf?.("bot")).toEqual({ headless: true, attended: false, paneInput: false, dialogKeys: false });
     const gathered = await gatherFacts(env.value, "01JD5G00000000000000000000");
     if (!gathered.ok) throw new Error(gathered.failure.message);
     expect(gathered.value.facts.capabilities.executors.claude).toMatchObject({ headless: false, attended: true, paneInput: false });

@@ -19,6 +19,8 @@ export interface OpenInput {
 export interface OpenPermission {
   id: string;
   prompt: string;
+  /** the pending call the prompt asks about, as `Bash(rm -rf build)`; absent when none was pending */
+  call?: { id: string; tool: string };
 }
 
 export interface SessionLimit {

@@ -192,10 +192,10 @@ norn story reject <key> --reason <text> [--gate <step>]
 
 ##### `norn story answer`
 
-Answer the question a story's agent asked
+Answer the question a story's agent asked, or the permission or trust prompt in its pane
 
 ```sh
-norn story answer <key> <text>
+norn story answer <key> <text>   (a prompt in the pane: an option's number, yes or no)
 ```
 
 ##### `norn story round`

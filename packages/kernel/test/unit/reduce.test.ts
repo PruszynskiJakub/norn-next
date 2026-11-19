@@ -208,8 +208,15 @@ describe("reduceSession", () => {
     const tool = { type: "tool.requested", id: "t1", kind: "shell", tool: "Bash" } as const;
     const perm = { type: "tool.permission", id: "t1", prompt: "Allow rm?" } as const;
 
-    test("opens on tool.permission", () => {
-      expect(reduceSession(stream(BRIEF, tool, perm)).permission).toEqual({ id: "t1", prompt: "Allow rm?" });
+    test("opens on tool.permission, naming the call it is about", () => {
+      expect(reduceSession(stream(BRIEF, tool, perm)).permission).toEqual({ id: "t1", prompt: "Allow rm?", call: { id: "t1", tool: "Bash" } });
+    });
+
+    test("a call's detail is part of what it names, and a prompt with no call pending names none", () => {
+      const rm = { type: "tool.requested", id: "t1", kind: "shell", tool: "Bash", detail: "rm -rf build" } as const;
+      const unnamed = { type: "tool.permission", id: "perm-1a2b", prompt: "Allow Bash?" } as const;
+      expect(reduceSession(stream(BRIEF, rm, unnamed)).permission).toEqual({ id: "perm-1a2b", prompt: "Allow Bash?", call: { id: "t1", tool: "Bash(rm -rf build)" } });
+      expect(reduceSession(stream(BRIEF, unnamed)).permission).toEqual({ id: "perm-1a2b", prompt: "Allow Bash?" });
     });
 
     test("closes when its tool finishes", () => {

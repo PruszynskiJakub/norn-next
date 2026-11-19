@@ -4,6 +4,7 @@
  * harness gets the same classification from the kernel.
  */
 import type { HarnessEvent } from "./events.ts";
+import type { RunnerKey } from "./runner.ts";
 
 /** What the agent's native hooks let norn do; the kernel never asks a harness for what it lacks. */
 export interface HarnessCapabilities {
@@ -135,4 +136,10 @@ export interface Harness {
   normalize(input: NormalizeInput): HarnessEvent[];
   /** Pure: render the kernel's answer in the agent's protocol. */
   respond(input: RespondInput): NativeReply;
+  /**
+   * Pure: the keys that choose `answer` in the agent's own choice dialog, a permission or a trust
+   * prompt: an option's number, `yes` or `no` (plugin API 1.12). Null for an answer the dialog takes
+   * no key for. Absent: such a dialog is answered in the agent's pane by a person, never by norn.
+   */
+  dialogKeys?(answer: string): readonly RunnerKey[] | null;
 }

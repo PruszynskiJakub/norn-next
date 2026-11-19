@@ -334,6 +334,21 @@ describe("herdr alive, send and stop", () => {
     ]);
   });
 
+  test("keys go into the pane as a person would press them: text typed, runs of named keys in one call", async () => {
+    const { h, runner } = setup();
+    await runner.start(req());
+    const before = h.exec.calls.length;
+    expect(await runner.keys?.("w1:p2", [{ text: "1" }, { key: "enter" }])).toEqual({ ok: true, value: undefined });
+    expect(await runner.keys?.("w1:p2", [{ key: "down" }, { key: "down" }, { key: "enter" }])).toEqual({ ok: true, value: undefined });
+    expect(h.exec.calls.slice(before).map((c) => c.argv)).toEqual([
+      ["herdr", "pane", "send-text", "w1:p2", "1"],
+      ["herdr", "pane", "send-keys", "w1:p2", "enter"],
+      ["herdr", "pane", "send-keys", "w1:p2", "down", "down", "enter"],
+    ]);
+    const gone = await runner.keys?.("w9:p9", [{ key: "esc" }]);
+    expect(gone?.ok ? null : gone?.failure.code).toBe("not_found");
+  });
+
   test("stop closes the pane; a pane already gone is not an error", async () => {
     const { h, runner } = setup();
     await runner.start(req());

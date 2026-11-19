@@ -303,6 +303,12 @@ describe("an agent run, judged from its session", () => {
     expect(decideCase({ state: quiet, session: null, run_alive: true })).toMatchObject({ kind: "retry_run", rule: "agent.died.retry" });
   });
 
+  test("a permission park names the call it asks about", () => {
+    const permission = { id: "p-1", prompt: "Claude needs your permission to use Bash", call: { id: "t-1", tool: "Bash(rm -rf build)" } };
+    const d = kindOf(decideCase({ state: running(), session: session("permission", { permission }) }), "park");
+    expect(d.inbox).toMatchObject({ kind: "permission", input_id: "p-1", text: "Bash(rm -rf build): Claude needs your permission to use Bash" });
+  });
+
   test("a report with an outcome the step does not declare parks the unit with the refusal and writes nothing, so the next tick does not write it again", () => {
     const bogus = session("reported", { report: { verb: "done", outcome: "bogus" } });
     const d = kindOf(decideCase({ state: running(), session: bogus }), "park");
@@ -368,6 +374,8 @@ describe("an answer to a session that cannot take it", () => {
       { state: at(), session: session("working") },
       { state: at(), session: session("ended"), executors: { claude: caps({ resume: true }) } },
       { state: at({ attended: true }), session: session("ended") },
+      // no event yet, its process alive here: the dialog its pane shows takes the answer as keys
+      { state: at(), session: null, run_alive: true },
     ]) {
       const d = kindOf(decideCase({ ...c, receipts: answered }), "apply_receipts");
       expect([d.rule, d.undelivered]).toEqual(["receipts.apply", undefined]);

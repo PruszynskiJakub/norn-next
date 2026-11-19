@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { manualClock, memoryFiles, memoryHost } from "@norn/conformance";
 import { type BriefInputs, reduceSession } from "@norn/kernel";
-import { fail, type Harness, type HarnessEvent, type LaunchRequest, ok, type PluginResult, readPromptMark, type Runner, type RunnerStartRequest } from "@norn/plugin-api";
+import { fail, type Harness, type HarnessEvent, type LaunchRequest, ok, type PluginResult, readPromptMark, type Runner, type RunnerKey, type RunnerStartRequest } from "@norn/plugin-api";
 import {
   type AgentRunRequest,
   answerFor,
   appendEvents,
   claimReceived,
   decodeLaunchHandle,
+  dialogInputId,
   HarnessLauncher,
   nudgePromptId,
   markDelivered,
@@ -45,12 +46,14 @@ function fakeHarness(over: Partial<Harness["capabilities"]> = {}): FakeHarness {
     },
     normalize: () => [],
     respond: () => ({ stdout: "", exit_code: 0 }),
+    dialogKeys: (answer) => (/^\d$/.test(answer) ? [{ text: answer }, { key: "enter" }] : null),
   };
 }
 
 interface FakeRunner extends Runner {
   starts: RunnerStartRequest[];
   sent: { handle: string; text: string }[];
+  pressed: { handle: string; keys: readonly RunnerKey[] }[];
   stopped: string[];
   live: Map<string, string>;
 }
@@ -60,6 +63,7 @@ function fakeRunner(caps: Runner["capabilities"]): FakeRunner {
   const live = new Map<string, string>();
   const starts: RunnerStartRequest[] = [];
   const sent: FakeRunner["sent"] = [];
+  const pressed: FakeRunner["pressed"] = [];
   const stopped: string[] = [];
   let made = 0;
   return {
@@ -67,6 +71,7 @@ function fakeRunner(caps: Runner["capabilities"]): FakeRunner {
     capabilities: caps,
     starts,
     sent,
+    pressed,
     stopped,
     live,
     start: async (req) => {
@@ -83,6 +88,12 @@ function fakeRunner(caps: Runner["capabilities"]): FakeRunner {
       sent.push({ handle, text });
       return ok(undefined);
     },
+    ...(caps.paneInput && {
+      keys: async (handle: string, keys: readonly RunnerKey[]): Promise<PluginResult<void>> => {
+        pressed.push({ handle, keys });
+        return ok(undefined);
+      },
+    }),
     stop: async (handle) => {
       stopped.push(handle);
       for (const [k, v] of live) if (v === handle) live.delete(k);
@@ -485,6 +496,67 @@ describe("harness launcher nudge and answer", () => {
     const s = setup();
     expect(await s.launcher.nudge("h-01JRUN", "x", "nudge-1")).toMatchObject({ ok: false, failure: { code: "invalid" } });
     expect(await s.launcher.stop("h-01JRUN")).toMatchObject({ ok: false, failure: { code: "invalid" } });
+  });
+});
+
+describe("harness launcher answering a dialog in the agent's pane", () => {
+  const UNIT = "gh-12/03";
+  const RUN_ID = "01JRUN0000000000000000000A";
+  const ev = (seq: number, body: Record<string, unknown>) => ({ run_id: RUN_ID, seq, at: START, ...body }) as HarnessEvent;
+  const permissionOpen = [
+    ev(0, { type: "session.started", harness_session: "s-1" }),
+    ev(1, { type: "tool.requested", id: "t1", kind: "shell", tool: "Bash", detail: "rm -rf build" }),
+    ev(2, { type: "tool.permission", id: "perm-1", prompt: "Claude needs your permission to use Bash" }),
+  ];
+  const openPermission = () => reduceSession(permissionOpen).permission as NonNullable<ReturnType<typeof reduceSession>["permission"]>;
+
+  test("an open permission gets the harness's keys for the answer pressed in its pane, once however often the answer is replayed", async () => {
+    const s = setup();
+    const started = await s.launcher.start(run());
+    if (!started.ok) throw new Error("start failed");
+    await appendEvents(s.ctx, UNIT, RUN_ID, permissionOpen);
+    const id = dialogInputId(openPermission(), RUN_ID);
+    expect(await s.launcher.answer(started.value.handle, id, "1", { dialog: true })).toEqual(ok(undefined));
+    expect(await s.launcher.answer(started.value.handle, id, "1", { dialog: true })).toEqual(ok(undefined));
+    expect(s.pane.pressed).toEqual([{ handle: "proc|1", keys: [{ text: "1" }, { key: "enter" }] }]);
+    // keys, never a prompt typed to the agent
+    expect(s.pane.sent).toEqual([]);
+  });
+
+  test("a permission the pane no longer shows gets no keys: they would land in the agent's prompt", async () => {
+    const s = setup();
+    const started = await s.launcher.start(run());
+    if (!started.ok) throw new Error("start failed");
+    await appendEvents(s.ctx, UNIT, RUN_ID, [...permissionOpen, ev(3, { type: "tool.finished", id: "t1", ok: true })]);
+    expect(await s.launcher.answer(started.value.handle, dialogInputId(openPermission(), RUN_ID), "1", { dialog: true })).toEqual(ok(undefined));
+    expect(s.pane.pressed).toEqual([]);
+  });
+
+  test("a run that has sent no event yet gets the keys for the dialog that holds it, until its first event", async () => {
+    const s = setup();
+    const started = await s.launcher.start(run());
+    if (!started.ok) throw new Error("start failed");
+    const trust = dialogInputId(null, RUN_ID);
+    expect(await s.launcher.answer(started.value.handle, trust, "1", { dialog: true })).toEqual(ok(undefined));
+    expect(s.pane.pressed).toEqual([{ handle: "proc|1", keys: [{ text: "1" }, { key: "enter" }] }]);
+  });
+
+  test("a runner that cannot press keys, a harness that names none, and an answer no option takes are refused", async () => {
+    const s = setup({ bgHarness: {} });
+    const bg = await s.launcher.start(run({ executor: "bg", attended: false }));
+    const pane = await s.launcher.start(run({ run_id: "01JRUN0000000000000000000B" }));
+    if (!bg.ok || !pane.ok) throw new Error("start failed");
+    const noKeys = await s.launcher.answer(bg.value.handle, dialogInputId(null, RUN_ID), "1", { dialog: true });
+    expect(noKeys.ok ? null : noKeys.failure.code).toBe("invalid");
+    const notAnOption = await s.launcher.answer(pane.value.handle, dialogInputId(null, "01JRUN0000000000000000000B"), "maybe", { dialog: true });
+    expect(notAnOption.ok ? null : notAnOption.failure.message).toContain("maybe");
+    expect(s.launcher.modesOf("pane")?.dialogKeys).toBe(true);
+    delete (s.paneHarness as Partial<Harness>).dialogKeys;
+    const unnamed = await s.launcher.answer(pane.value.handle, dialogInputId(null, "01JRUN0000000000000000000B"), "1", { dialog: true });
+    expect(unnamed.ok ? null : unnamed.failure.code).toBe("invalid");
+    expect(s.launcher.modesOf("pane")?.dialogKeys).toBe(false);
+    expect(s.launcher.modesOf("bg")?.dialogKeys).toBe(false);
+    expect(s.pane.pressed).toEqual([]);
   });
 });
 

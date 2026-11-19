@@ -38,6 +38,7 @@ export { batchesDir, batchName, batchSeq, deliveredDir, EVENTS_DIR, outboxDir, R
 export { EventLogSessionSource, type EventLogSessionSourceOptions } from "./events/session-source.ts";
 export { AGENT_BIN_NAME, agentBinDir, agentBinEnv, cliOfHookCommand, shimScript } from "./agent-bin.ts";
 export { createHarnessLauncher, DEFAULT_HOOK_COMMAND, resolveExecutors } from "./executors.ts";
+export { dialogInputId } from "./dialog.ts";
 export { answerPromptId, type Executor, HarnessLauncher, type HarnessLauncherOptions, nudgePromptId, sessionLogPath, shellQuote } from "./launcher.ts";
 export { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
 export { type LiveStep, liveStepOf, reportableOutcomes, reportOnRecord } from "./live-run.ts";

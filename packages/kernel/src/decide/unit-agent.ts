@@ -118,8 +118,10 @@ function judgeRun(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
     const ask = session.ask;
     return parkDecision(v, "agent.asking.park", "ask", { text: ask.question, input_id: ask.id, ...(ask.options ? { options: ask.options } : {}) });
   }
-  if (session?.activity === "permission" && session.permission)
-    return parkDecision(v, "agent.permission.park", "permission", { text: session.permission.prompt, input_id: session.permission.id });
+  if (session?.activity === "permission" && session.permission) {
+    const { prompt, call, id } = session.permission;
+    return parkDecision(v, "agent.permission.park", "permission", { text: call ? `${call.tool}: ${prompt}` : prompt, input_id: id });
+  }
   if (!session) {
     if (ageMs(v.ctx, run.started_at) <= v.ctx.config.silentAfterMs) return noop(v, "agent.unobserved", `run ${run.id} is on the record; no session seen yet`);
     // alive in a pane yet silent: its hooks never loaded, as behind a trust dialog, and a fresh

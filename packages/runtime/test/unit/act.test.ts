@@ -99,6 +99,20 @@ describe("agent runs", () => {
     expect(h.launcher.of("answer")).toEqual([[st?.run?.session, "q1", "left"]]);
   });
 
+  test("an answer to a dialog in the agent's pane goes to the session as a dialog answer, never as a typed prompt", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const st = (await record(h, "lt-1")).state;
+    h.sessions.byUnit.set("lt-1", session("permission", { permission: { id: "perm-1", prompt: "Claude needs your permission to use Bash" } }));
+    await tickUntil(h, has("agent.permission.park"));
+    await h.env.journal.record("lt-1", { id: "01JD5G0000ANSWER000000000Q", data: { kind: "answer.sent", input_id: "perm-1", text: "1", by: "person", to: "dialog", step: st?.step, attempt: st?.attempt } });
+    h.sessions.byUnit.set("lt-1", session("working"));
+    await tickUntil(h, has("receipts.apply"));
+    expect(h.launcher.of("answer")).toEqual([[st?.run?.session, "perm-1", "1", { dialog: true }]]);
+  });
+
   test("an answer that fails to reach the session is not applied, and goes again next tick", async () => {
     const h = harness({ workflow: "agented" });
     h.items.push(trackerItem(1));

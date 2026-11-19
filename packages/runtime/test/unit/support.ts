@@ -28,6 +28,7 @@ import { localStorePlugin } from "@norn/store-local";
 import { Type } from "@sinclair/typebox";
 import {
   type AgentLauncher,
+  type AnswerOptions,
   type AgentRunRequest,
   createRuntimeEnv,
   gatherFacts,
@@ -149,8 +150,8 @@ export class FakeLauncher implements AgentLauncher {
     this.calls.push({ op: "nudge", args: [handle, text, promptId] });
     return ok(undefined);
   }
-  async answer(handle: string, inputId: string, text: string) {
-    this.calls.push({ op: "answer", args: [handle, inputId, text] });
+  async answer(handle: string, inputId: string, text: string, opts?: AnswerOptions) {
+    this.calls.push({ op: "answer", args: [handle, inputId, text, ...(opts ? [opts] : [])] });
     if (this.failAnswers) return fail<void>("unavailable", `session ${handle} is gone`);
     return ok(undefined);
   }
