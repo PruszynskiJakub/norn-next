@@ -32,6 +32,9 @@ The `refs` store shared by several clones is tested with clones on one machine o
 - **The hooks are a reminder, not a sandbox.** In a unit worktree the harness's hook refuses a file-tool write outside the worktree or under norn's run state, and keeps the agent from ending a turn without a report (a few times a run, then the step's nudges take over), each with the rule's reason. It reads only file-tool writes, refuses no shell command, and lets anything but a guarded write through when it fails itself, so it is no security boundary. What it misses is still forbidden by the brief: shell writes under norn's run state, remote writes not on its list (it lists none: a `git push`, a `gh` call, a `curl`), and every norn command but `brief`, `done`, `ask` and `stuck`.
 - **No guards on transitions** (`when:`), no per-slice mode, no `fork`/`join` steps: conditions are outcomes, a person's QA is a gate, and `attended: true` on a step covers the precise cases.
 - **Cost per story** is not tracked.
+- **`kernel.max_agents` bounds one repository, not the machine.** It counts the agent and check runs of the stories this machine holds in that repo; two repos watched on one machine each run up to their own cap.
+- **No port slots per worktree.** norn 0.35 gave each worktree its own port range (`.env.norn`, `PORT_BASE`) and stopped stray listeners; this norn does neither. An app a QA step starts picks free ports itself, and two worktrees running the same app at once can collide.
+- **No story reset.** norn 0.35's reset verb is gone: nothing takes a story back to before intake, deleting its record and its remote branches. Close it (`norn story close`), let a tick end it, remove its worktrees and local branches with `norn tidy`, and create a new story for the work.
 
 ## Not yet proven in real use
 
