@@ -1,8 +1,9 @@
 /**
  * `norn watch [--interval <duration>] [--max-ticks <n>]`: tick on an interval until a signal stops it.
  * The first SIGINT or SIGTERM lets the tick in flight finish and ends the pause at once; a second
- * stops the process, which is the entry's to do. Each tick's report goes to stderr as one JSON line as it
- * happens; stdout gets one summary when the loop ends.
+ * stops the process, which is the entry's to do. Each tick goes to stderr as it happens: under `--json`
+ * its report as one JSON line, otherwise one short line with its time and the actions that moved
+ * something, and nothing for a tick of only waiting. stdout gets one summary when the loop ends.
  *
  * The interval is the longest a watch waits, not the pace of a story:
  * - a tick that moved a story on is followed at once, up to `SETTLE_TICKS` in a row, since its action
@@ -24,7 +25,7 @@ import { durationMs } from "../config/derive.ts";
 import { gitVersionRefusal } from "../git-version.ts";
 import { Duration } from "../config/schema.ts";
 import { rendered, toFailure, usageError } from "../output.ts";
-import { failedCount, tickLines } from "../tick-report.ts";
+import { failedCount, STANDING, tickLines, watchLine } from "../tick-report.ts";
 import { floorRefusal } from "../version-guard.ts";
 import { wireRuntime, wiringSources } from "../wiring.ts";
 
@@ -96,7 +97,7 @@ class Rebuilding {
     return new Rebuilding(ctx, sources, env, wireRuntime(env));
   }
 
-  async refresh(log: (line: string) => void): Promise<void> {
+  async refresh(log: (fields: Record<string, unknown>) => void): Promise<void> {
     let now: string;
     try {
       now = await wiringSources(await this.ctx.repo());
@@ -111,19 +112,19 @@ class Rebuilding {
       this.runtime = wireRuntime(this.env);
       this.sources = now;
       this.refused = null;
-      log(JSON.stringify({ config: "reloaded" }));
+      log({ config: "reloaded" });
     } catch (e) {
       this.refuse(now, e, log);
     }
   }
 
-  private refuse(sources: string, e: unknown, log: (line: string) => void): void {
+  private refuse(sources: string, e: unknown, log: (fields: Record<string, unknown>) => void): void {
     if (sources === this.refused) return;
     this.refused = sources;
     // drop what the failed build cached, so a later use reads the files again instead of the rejection
     this.ctx.reload();
     const { error, do_instead } = toFailure(e).body;
-    log(JSON.stringify({ config: "refused", error, do_instead, kept: "the last config that loaded" }));
+    log({ config: "refused", error, do_instead, kept: "the last config that loaded" });
   }
 }
 
@@ -147,20 +148,15 @@ const progress = (r: TickReport) => ({
   lines: tickLines(r),
 });
 
-type ActionKind = TickReport["decisions"][number]["kind"];
-
-/**
- * Kinds that only keep a story where it is: decide asks for them again on every tick a unit waits (an
- * agent or check running, a unit parked or ended) or a shared store's story is held, so counting them
- * would follow every pause with a burst of ticks that change nothing.
- */
-const STANDING: ReadonlySet<ActionKind> = new Set<ActionKind>(["noop", "notify", "flush", "renew_claim"]);
-
 /**
  * Whether the tick moved a story on, so the next one likely has work ready. A failed action is retried
- * an interval later, never at once: what failed now (an outage) most likely fails again now.
+ * an interval later, never at once: what failed now (an outage) most likely fails again now. A standing
+ * action does not count, or every pause would be followed by a burst of ticks that change nothing.
  */
 const acted = (r: TickReport): boolean => r.outcomes.some((o) => o.ok && !STANDING.has(o.decision.kind));
+
+/** The wall-clock time of day a line is stamped with, as a person reads it beside their terminal's clock. */
+const clock = (iso: string): string => new Date(iso).toTimeString().slice(0, 8);
 
 export const watchCommand = defineCommand({
   name: "watch",
@@ -189,6 +185,9 @@ export const watchCommand = defineCommand({
     const read = () => readWake(host);
     const sleep: Sleep = ctx.io.sleep ? ctx.io.sleep.bind(ctx.io) : pause;
     const log = (line: string) => ctx.io.log?.(line);
+    // a note for a person: the JSON line under --json, else its fields as `key: value` text
+    const note = (fields: Record<string, unknown>) => log(args.json ? JSON.stringify(fields) : Object.entries(fields).map(([k, v]) => `${k}: ${String(v)}`).join("; "));
+    let said = new Set<string>();
     const signal = ctx.io.signal;
     const summary: WatchSummary = { ticks: 0, failed_actions: 0, skipped_locked: 0, interval };
     let settling = 0;
@@ -197,14 +196,14 @@ export const watchCommand = defineCommand({
     let pausedIntervals = 0;
     let floorNote: string | null = null;
     const noteFloor = (line: string) => {
-      if (line !== floorNote) log(JSON.stringify({ floor: line }));
+      if (line !== floorNote) note({ floor: line });
       floorNote = line;
     };
     while (summary.ticks + pausedIntervals < max && !signal?.aborted) {
-      if (summary.ticks > 0 || paused) await built.refresh(log);
+      if (summary.ticks > 0 || paused) await built.refresh(note);
       const refusal = await floorRefusal(built.env.slots.store, ctx.version, noteFloor);
       if (refusal) {
-        if (!paused) log(JSON.stringify({ paused: refusal.body.code, error: refusal.body.error, do_instead: refusal.body.do_instead }));
+        if (!paused) note({ paused: refusal.body.code, error: refusal.body.error, do_instead: refusal.body.do_instead });
         paused = true;
         pausedIntervals++;
         if (summary.ticks + pausedIntervals >= max) break;
@@ -217,7 +216,12 @@ export const watchCommand = defineCommand({
       summary.ticks++;
       if (report.skipped === "locked") summary.skipped_locked++;
       summary.failed_actions += failedCount(report);
-      log(JSON.stringify(progress(report)));
+      if (args.json) log(JSON.stringify(progress(report)));
+      else {
+        const line = watchLine(report, clock(host.now()), said);
+        if (line !== null) log(line);
+        said = new Set(report.problems);
+      }
       if (summary.ticks >= max || signal?.aborted) break;
       if (acted(report) && settling < SETTLE_TICKS) {
         settling++;

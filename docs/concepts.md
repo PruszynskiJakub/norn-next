@@ -68,7 +68,7 @@ Checks and the git and forge steps always run on their own. Gates, attended step
 
 ## One tick
 
-`norn watch` runs the heartbeat until Ctrl-C, which lets the tick in flight finish. `norn tick` runs one by hand. The interval (30 seconds, `--interval` changes it) is the longest watch waits, not the pace of a story:
+`norn watch` runs the heartbeat until Ctrl-C, which lets the tick in flight finish. It prints one line per tick that did something: the time and each action that moved a story or failed (a tick of only waiting prints nothing); `--json` prints every tick's report as a JSON line instead. `norn tick` runs one by hand. The interval (30 seconds, `--interval` changes it) is the longest watch waits, not the pace of a story:
 
 - a tick that moved a story on is followed at once by up to three more, so a step that ends leads to the next one in the same moment. A tick that only waited (an agent or check still running, a unit parked or ended, a shared store's flush) pauses the whole interval;
 - a receipt recorded during the pause by another process on this machine (`norn done`, `norn story answer`) or a check that finishes ends the pause within about a second. A receipt written on another machine arrives with the next tick's sync, and a step kind that waits across ticks (on the forge, say) is looked at again only at the next tick;
