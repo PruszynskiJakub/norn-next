@@ -6,7 +6,8 @@
  *
  * Nothing that holds unique work goes: a story under a live claim (a machine may act on it), a
  * story still in progress, a worktree with uncommitted changes, or a branch whose commits are on no
- * other branch is kept, each with the reason. The caller holds the tick lock, so no tick here makes
+ * other branch is kept, each with the reason, and so is a unit git refuses to remove; only a store or
+ * journal read that fails stops the run. The caller holds the tick lock, so no tick here makes
  * a worktree again while it is removed.
  */
 import { ok, type PluginResult, parseUnitId } from "@norn/plugin-api";
@@ -68,27 +69,39 @@ async function tidyUnit(env: RuntimeEnv, story: string, unit: string, dryRun: bo
   const there = vcs.capabilities.worktrees && (await hasWorktree(env, unit));
   if (there && vcs.uncommitted) {
     const dirty = await vcs.uncommitted(vcs.worktree.path(unit));
-    if (!dirty.ok) return dirty;
+    if (!dirty.ok) {
+      out.kept.push({ story, unit, reason: `worktree: ${dirty.failure.message}` });
+      return ok(undefined);
+    }
     if (dirty.value.length) {
       out.kept.push({ story, unit, reason: `its worktree holds uncommitted changes: ${dirty.value.join(", ")}` });
       return ok(undefined);
     }
   }
   const home = await branchHome(env, unit);
-  if (!home.ok) return home;
+  if (!home.ok) {
+    out.kept.push({ story, unit, reason: `branch: ${home.failure.message}` });
+    return ok(undefined);
+  }
   if (home.value && home.value.home === null) {
     out.kept.push({ story, unit, reason: home.value.reason });
     return ok(undefined);
   }
   if (!there && home.value === null) return ok(undefined);
+  // git refusing one unit (a branch the person has checked out elsewhere, a locked worktree) is
+  // reported as kept and never stops the run: a rerun would stop at the same unit and never reach the rest
   if (there && !dryRun) {
     const gone = await vcs.worktree.remove(unit);
-    if (!gone.ok) return gone;
+    if (!gone.ok) {
+      out.kept.push({ story, unit, reason: `worktree: ${gone.failure.message}` });
+      return ok(undefined);
+    }
   }
   const fate = home.value === null ? null : await dropUnitBranch(env, unit, { dryRun });
-  if (fate && !fate.ok) return fate;
-  const branch = fate?.value?.deleted ? fate.value.branch : null;
-  if (fate?.value && !fate.value.deleted) out.kept.push({ story, unit, reason: fate.value.reason });
+  let branch: string | null = null;
+  if (fate && !fate.ok) out.kept.push({ story, unit, reason: `branch: ${fate.failure.message}` });
+  else if (fate?.value?.deleted === true) branch = fate.value.branch;
+  else if (fate?.value?.deleted === false) out.kept.push({ story, unit, reason: fate.value.reason });
   if (there || branch) out.removed.push({ story, unit, worktree: there, branch });
   return ok(undefined);
 }
