@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
 import { parse } from "yaml";
 import { join } from "node:path";
-import { AGENTS_DIR, configPaths, REPO_LOCAL_FILE, ExitCode, OLD_REPO_CONFIG_FILE, runCli } from "../../src/index.ts";
+import { AGENTS_DIR, configPaths, REPO_LOCAL_FILE, ExitCode, OLD_LOCAL_CONFIG_FILE, OLD_REPO_CONFIG_FILE, runCli } from "../../src/index.ts";
 import { COMMON, fakeGh, HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
 
 const PATHS = configPaths(HOME, ROOT);
@@ -279,6 +279,45 @@ describe("norn init: doctor", () => {
     expect(r.stdout).toContain("- tracker: local (no GitHub origin)");
     expect(r.stdout).toContain("- executor: claude in headless (claude is not on PATH)");
     expect(r.stdout).toContain("- tool claude: FAILED");
+  });
+});
+
+describe("the old norn's repo-local config", () => {
+  const OLD_LOCAL = join(ROOT, OLD_LOCAL_CONFIG_FILE);
+  const OLD_LOCAL_TEXT = ["mode: manual", "agent: claude", "agents:", "  claude: { model: opus, args: [--verbose] }", "  codex: { model: o3 }", ""].join("\n");
+
+  test("a set-up repo moves it into the repo-local file on the next command, once, with a one-line notice, the old text kept", async () => {
+    const m = machine({ script: world({ tools: ["claude"] }), seed: { [PATHS.local]: LOCAL_CONFIG, [OLD_LOCAL]: OLD_LOCAL_TEXT } });
+    const r = await runCli(["config", "get", "kernel.mode", "--json"], m.io);
+    expect(json(r.stdout)).toEqual({ key: "kernel.mode", value: "manual" });
+    expect(r.stderr?.trim().split("\n")).toHaveLength(1);
+    expect(r.stderr).toContain(`moved ${OLD_LOCAL_CONFIG_FILE} (the old norn's) into ${REPO_LOCAL_FILE}: took mode → kernel.mode, agent → executor, agents.claude.model → executors.claude.model, agents.claude.args → executors.claude.args`);
+    expect(r.stderr).toContain("ignored agents.codex: no executor codex is configured");
+    expect(await written(m, PATHS.local)).toMatchObject({ executor: "claude", kernel: { mode: "manual" }, executors: { claude: { harness: "claude", runner: "headless", model: "opus", args: ["--verbose"] } } });
+    expect(await m.files.read(OLD_LOCAL)).toBeNull();
+    expect(await m.files.read(`${OLD_LOCAL}.old`)).toBe(OLD_LOCAL_TEXT);
+    const again = await runCli(["config", "get", "kernel.mode", "--json"], m.io);
+    expect(again.stderr ?? "").toBe("");
+  });
+
+  test("a key the repo-local file sets already keeps its value", async () => {
+    const m = machine({ script: world({ tools: ["claude"] }), seed: { [PATHS.local]: `${LOCAL_CONFIG}kernel: { mode: auto }\n`, [OLD_LOCAL]: "mode: manual\n" } });
+    const r = await runCli(["config", "get", "kernel.mode", "--json"], m.io);
+    expect(json(r.stdout).value).toBe("auto");
+    expect(r.stderr).toContain(`ignored mode: ${REPO_LOCAL_FILE} sets kernel.mode already`);
+  });
+
+  test("before init it stays, and init takes its mode over detection and moves the rest", async () => {
+    const m = machine({ script: world({ tools: ["claude"] }), seed: { [OLD_LOCAL]: OLD_LOCAL_TEXT } });
+    const before = await runCli(["status", "--json"], m.io);
+    expect(json(before.stdout)).toMatchObject({ code: "config_missing", do_instead: "norn init" });
+    expect(await m.files.read(OLD_LOCAL)).toBe(OLD_LOCAL_TEXT);
+    const r = await runCli(["init", "--json"], m.io);
+    const body = json(r.stdout);
+    expect(body.chose).toMatchObject({ runner: "headless", mode: "manual" });
+    expect(body.local_migrated).toMatchObject({ file: OLD_LOCAL, backup: `${OLD_LOCAL}.old` });
+    expect((await written(m, PATHS.local)).executors).toEqual({ claude: { harness: "claude", runner: "headless", model: "opus", args: ["--verbose"] } });
+    expect(await m.files.read(OLD_LOCAL)).toBeNull();
   });
 });
 

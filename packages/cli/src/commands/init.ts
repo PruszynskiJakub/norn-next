@@ -14,8 +14,9 @@ import type { HostFiles } from "@norn/plugin-api";
 import { defineCommand, opt } from "../command.ts";
 import { configError, loadConfig, mergeConfig, parseLayer } from "../config/load.ts";
 import { mapOldConfig, type OldConfig } from "../config/migrate.ts";
+import { mapOldLocalConfig, migrateOldLocalConfig } from "../config/migrate-local.ts";
 import { isOldUserConfig, mapOldUserConfig, OLD_USER_BACKUP_SUFFIX, type OldUserConfig, oldUserConfigText } from "../config/migrate-user.ts";
-import { AGENTS_DIR, configPaths, type Layer, layerFileName, OLD_REPO_CONFIG_FILE, REPO_COMMITTED_FILE, REPO_LOCAL_FILE } from "../config/paths.ts";
+import { AGENTS_DIR, configPaths, type Layer, layerFileName, OLD_LOCAL_CONFIG_FILE, OLD_REPO_CONFIG_FILE, REPO_COMMITTED_FILE, REPO_LOCAL_FILE } from "../config/paths.ts";
 import type { ConfigLayer } from "../config/schema.ts";
 import { setKeyInText } from "../config/write.ts";
 import { CliContext } from "../context.ts";
@@ -122,7 +123,10 @@ export const initCommand = defineCommand({
     // the old norn's team config, when the repo still has it: its keys win over detection, a flag over both
     const oldText = await files.read(join(w.repo.root, OLD_REPO_CONFIG_FILE));
     const old = oldText === null ? null : mapOldConfig(oldText);
-    const mode: "auto" | "manual" | undefined = given ?? old?.mode;
+    // the old repo-local file was the person's own: its mode wins over the old team file's
+    const oldLocalText = await files.read(join(w.repo.root, OLD_LOCAL_CONFIG_FILE));
+    const oldLocalMode = oldLocalText === null ? undefined : (mapOldLocalConfig(oldLocalText, {}).set.find((x) => x.key === "kernel.mode")?.value as "auto" | "manual" | undefined);
+    const mode: "auto" | "manual" | undefined = given ?? oldLocalMode ?? old?.mode;
     const detected = await detect(w.ctx, ctx.env, w.repo.root);
     const flags = {
       tracker: opt.str(args, "tracker") ?? old?.tracker,
@@ -163,6 +167,8 @@ export const initCommand = defineCommand({
     if (next !== null) await files.write(excludePath, next);
     const exclude: "added" | "present" = next === null ? "present" : "added";
 
+    const localMigrated = await migrateOldLocalConfig(files, w.repo.root, paths, { setUp: false, carried: given === undefined && oldLocalMode !== undefined ? ["kernel.mode"] : [] });
+
     // a fresh context: this one may hold the "no config" it saw before the file was written
     const doctor = await runDoctor(new CliContext(ctx.io));
     const migrated = old && { file: OLD_REPO_CONFIG_FILE, mapped: old.mapped, ignored: old.ignored, notes: old.notes };
@@ -180,6 +186,7 @@ export const initCommand = defineCommand({
       ...(commit && { local_file: paths.local }),
       ...(migrated && { migrated }),
       ...(userMigrated && { user_migrated: { file: paths.user, ...userMigrated } }),
+      ...(localMigrated && { local_migrated: { file: localMigrated.file, backup: localMigrated.backup, mapped: localMigrated.mapped, ignored: localMigrated.ignored } }),
       doctor,
     };
     const md = [
@@ -198,6 +205,7 @@ export const initCommand = defineCommand({
       ...offered.map((o) => offerLine(o, choices)),
       ...(old ? oldConfigLines(old) : []),
       ...(userMigrated ? oldUserConfigLines(userMigrated) : []),
+      ...(localMigrated ? [`- ${localMigrated.notice.replace(/^norn: /, "")}`] : []),
       "",
       `## norn doctor: ${doctor.ok ? "all checks pass" : "some checks fail"}`,
       "",

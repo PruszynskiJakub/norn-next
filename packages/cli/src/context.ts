@@ -69,7 +69,7 @@ export class CliContext {
   }
   /** the merged, validated config; a config error otherwise */
   config(): Promise<LoadedConfig> {
-    this.configP ??= this.repo().then(wireConfig);
+    this.configP ??= this.repo().then((w) => wireConfig(w, (line) => this.note(line)));
     return this.configP;
   }
   /** bundled and installed plugins, every pick resolved */
