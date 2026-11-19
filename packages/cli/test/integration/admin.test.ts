@@ -44,7 +44,7 @@ function snapshot(dir: string): Record<string, string> {
   return out;
 }
 
-type Check = { name: string; ok: boolean; detail?: string; error?: string; code?: string };
+type Check = { name: string; ok: boolean; detail?: string; warning?: string; error?: string; code?: string };
 const checkOf = (doctor: NornOut, name: string): Check | undefined => (doctor.body.checks as Check[]).find((c) => c.name === name);
 
 describe("a person's commands on a repo with a story at its gate", () => {
@@ -165,7 +165,7 @@ describe("workflows that cannot run", () => {
   let tickMissing: NornOut;
   let doctorSkill: NornOut;
   let tickSkill: NornOut;
-  let tickSkillAdded: NornOut;
+  let doctorSkillAdded: NornOut;
 
   beforeAll(async () => {
     w = await world("work");
@@ -184,7 +184,7 @@ describe("workflows that cannot run", () => {
     tickSkill = await norn(w, ["tick", "--json"]);
     mkdirSync(join(w.root, ".agents", "skills", "no-such-skill"), { recursive: true });
     writeFileSync(join(w.root, ".agents", "skills", "no-such-skill", "SKILL.md"), "---\nname: no-such-skill\ndescription: the repo's own\n---\n");
-    tickSkillAdded = await norn(w, ["tick", "--json"]);
+    doctorSkillAdded = await norn(w, ["doctor", "--json"]);
   }, SLOW);
 
   test("doctor passes while the shared file is there", () => {
@@ -201,14 +201,16 @@ describe("workflows that cannot run", () => {
     expect(tickMissing.body).toMatchObject({ code: "repo_workflow_invalid" });
   });
 
-  test("a repo workflow naming a skill nobody has is named by doctor and refused by the tick, until the repo adds it", () => {
-    expect(doctorSkill.code).toBe(1);
-    expect(checkOf(doctorSkill, "workflows")).toMatchObject({ ok: false, code: "unknown_skill", error: expect.stringContaining("no-such-skill (step build)") });
-    expect(tickSkill.code).toBe(3);
-    expect(tickSkill.body).toMatchObject({ code: "unknown_skill", details: { files: [".agents/workflows/skilled.yaml"], skills: ["no-such-skill"] } });
-    expect(String(tickSkill.body.do_instead)).toContain(".agents/skills/no-such-skill/SKILL.md");
-    expect(tickSkillAdded.code).toBe(0);
+  test("a repo workflow naming a skill nobody has draws a doctor warning while the tick still runs, until the repo adds it", () => {
+    expect(doctorSkill.code).toBe(0);
+    const check = checkOf(doctorSkill, "workflows");
+    expect(check?.ok).toBe(true);
+    expect(check?.warning).toContain("no-such-skill (step build)");
+    expect(check?.warning).toContain(".agents/skills/no-such-skill/SKILL.md");
+    expect(tickSkill.code).toBe(0);
+    expect(checkOf(doctorSkillAdded, "workflows")?.warning).toBeUndefined();
   });
+
 });
 
 describe("pack skills: doctor repairs a drifted copy, and a launch keeps the repo's own", () => {

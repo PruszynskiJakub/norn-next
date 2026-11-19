@@ -58,22 +58,21 @@ describe("the repo's own workflows in .agents/workflows", () => {
     expect(String(json(asked.stdout).error)).toContain("does not parse");
   });
 
-  test("a repo workflow naming a skill neither the pack nor the repo has: doctor names it, and a tick refuses it", async () => {
-    const skilled = TIDY.replace("    agent: Do the work.", "    agent: Do the work.\n    skills: [norn-tdd, house-style, no-such-skill]");
+  test("a repo workflow naming a skill neither the pack nor the repo has: doctor warns naming it, and the tick still runs, since the harness may load it from outside the repo", async () => {
+    const skilled = TIDY.replace("    agent: Do the work.", "    agent: Do the work.\n    skills: [norn-tdd, house-style, user-level-skill, some-plugin:its-skill]");
     const m = repoWith({ "tidy.yaml": skilled });
     await m.files.write(`${ROOT}/.agents/skills/house-style/SKILL.md`, "---\nname: house-style\n---\n");
-    const tick = await runCli(["tick", "--json"], m.io);
-    expect({ exit: tick.exit, body: json(tick.stdout) }).toMatchObject({
-      exit: ExitCode.refused,
-      body: { code: "unknown_skill", error: ".agents/workflows/tidy.yaml names a skill neither the pack nor .agents/skills/ has: no-such-skill (step work)", details: { skills: ["no-such-skill"] } },
-    });
-    expect(String(json(tick.stdout).do_instead)).toContain(".agents/skills/no-such-skill/SKILL.md");
-    const doctor = await runCli(["doctor", "--json"], m.io);
-    const check = (json(doctor.stdout).checks as Array<{ name: string; ok: boolean; code?: string; error?: string }>).find((c) => c.name === "workflows");
-    expect(check).toMatchObject({ ok: false, code: "unknown_skill" });
-    expect(check?.error).toContain("no-such-skill");
-    await m.files.write(`${ROOT}/.agents/skills/no-such-skill/SKILL.md`, "---\nname: no-such-skill\n---\n");
     expect((await runCli(["tick", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    const doctor = await runCli(["doctor", "--json"], m.io);
+    const check = (json(doctor.stdout).checks as Array<{ name: string; ok: boolean; warning?: string }>).find((c) => c.name === "workflows");
+    expect(check?.ok).toBe(true);
+    expect(check?.warning).toContain(".agents/workflows/tidy.yaml names a skill neither the pack nor the repo has: user-level-skill (step work)");
+    expect(check?.warning).not.toContain("house-style");
+    expect(check?.warning).not.toContain("its-skill");
+    expect((await runCli(["doctor"], m.io)).stdout).toContain("user-level-skill (step work)");
+    await m.files.write(`${ROOT}/.agents/skills/user-level-skill/SKILL.md`, "---\nname: user-level-skill\n---\n");
+    const again = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; warning?: string }>).find((c) => c.name === "workflows");
+    expect(again?.warning).toBeUndefined();
   });
 
   test("a broken repo shared file is named for the pack workflow that loads it", async () => {
