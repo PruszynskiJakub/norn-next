@@ -4,7 +4,7 @@
  * runs it. The test harness plugin (fixtures/test-harness) is installed with `norn plugin add`, and
  * its agent reports through the same binary.
  */
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { nodeExec } from "@norn/host-node";
@@ -42,7 +42,7 @@ export async function sh(cwd: string, ...argv: string[]): Promise<string> {
 }
 
 /** The test harness agent's plans (fixtures/test-harness/agent.ts names what each does). */
-export type AgentPlan = "work" | "ask" | "ask-then-stuck" | "hang" | "protocol" | "findings" | "attended" | "permission" | "trust" | "logged-out" | "report";
+export type AgentPlan = "work" | "ask" | "ask-then-stuck" | "hang" | "protocol" | "findings" | "attended" | "permission" | "trust" | "logged-out" | "report" | "resolve" | "resolve-ask";
 
 /**
  * A fresh clone of an empty bare remote with one commit on main, and a norn home beside it. The
@@ -233,4 +233,69 @@ export const machineOf = (added: NornOut): string => dirname(added.body.lock as 
 /** The machine name `w`'s norn home claims under, as its first command fixed it: holders are `<user>@<this>`. */
 export function machineName(w: World): string {
   return (JSON.parse(readFileSync(join(w.home, "holder.json"), "utf8")) as { machine: string }).machine;
+}
+
+/**
+ * A `post-receive` hook on the bare remote that appends one line per updated ref to
+ * `<dir>/pushes.log`: `<ref> <old> <new>`, then `forced` when the new commit does not contain the old
+ * one, so a test can tell a force-push from a fast-forward after the fact.
+ */
+export function logPushes(w: World): string {
+  const log = join(w.dir, "pushes.log");
+  const hook = join(w.remote, "hooks", "post-receive");
+  writeFileSync(
+    hook,
+    [
+      "#!/bin/sh",
+      "zero=0000000000000000000000000000000000000000",
+      "while read old new ref; do",
+      '  how=""',
+      '  if [ "$old" != "$zero" ] && [ "$new" != "$zero" ] && ! git merge-base --is-ancestor "$old" "$new"; then how=" forced"; fi',
+      `  echo "$ref $old $new$how" >> '${log}'`,
+      "done",
+      "",
+    ].join("\n"),
+  );
+  chmodSync(hook, 0o755);
+  return log;
+}
+
+/** The lines `logPushes` wrote, for one ref when named. */
+export function pushes(w: World, ref?: string): string[] {
+  const log = join(w.dir, "pushes.log");
+  if (!existsSync(log)) return [];
+  return readFileSync(log, "utf8")
+    .split("\n")
+    .filter((l) => l !== "" && (ref === undefined || l.startsWith(`${ref} `)));
+}
+
+/**
+ * A person's commit to a branch of the remote, from a plain clone of their own (made once, at
+ * `<dir>/person`): what a teammate's merge to the base looks like to norn. Returns the new commit.
+ */
+export async function personPush(w: World, branch: string, files: Record<string, string>, message: string): Promise<string> {
+  const clone = join(w.dir, "person");
+  if (!existsSync(clone)) await sh(w.dir, "git", "clone", "-q", w.remote, clone);
+  await sh(clone, "git", "fetch", "-q", "origin");
+  await sh(clone, "git", "checkout", "-q", "-B", branch, `origin/${branch}`);
+  for (const [name, text] of Object.entries(files)) {
+    mkdirSync(dirname(join(clone, name)), { recursive: true });
+    writeFileSync(join(clone, name), text);
+  }
+  await sh(clone, "git", "add", "-A");
+  await sh(clone, "git", "-c", "user.email=p@p", "-c", "user.name=p", "commit", "-q", "-m", message);
+  await sh(clone, "git", "push", "-q", "origin", `HEAD:${branch}`);
+  return sh(clone, "git", "rev-parse", "HEAD");
+}
+
+/** The path of a unit's worktree (`.../worktrees/<unit>`), or null when git knows of none. */
+export async function worktreeOf(w: World, unit = "lt-1"): Promise<string | null> {
+  const list = await sh(w.root, "git", "worktree", "list", "--porcelain");
+  return (
+    list
+      .split("\n")
+      .filter((l) => l.startsWith("worktree "))
+      .map((l) => l.slice("worktree ".length))
+      .find((p) => p.endsWith(`/worktrees/${unit}`)) ?? null
+  );
 }
