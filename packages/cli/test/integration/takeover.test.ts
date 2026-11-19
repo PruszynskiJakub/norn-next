@@ -2,11 +2,12 @@
  * A story moved between two machines on the refs store, and back, through the CLI alone: two clones
  * of one bare remote, each with its own norn home and user. Alice's machine builds the story (its
  * agent commits) and starts the review; her review agent reports while she holds the claim, but
- * before her next tick publishes it. Bob takes the story over: his tick finds alice's run gone,
- * retries the review in a worktree of his own, which must hold alice's committed work. Alice's
- * machine then shows the run data it never published; her take back carries the story on from the
- * remote's record, and her flushes go through again. Bob's review agent, reporting after the claim
- * moved back, is told so and changes nothing.
+ * before her next tick publishes it. Bob takes the story over: his tick finds alice's run gone and
+ * retries the review in a worktree of his own, which must hold alice's committed work, and his
+ * review agent commits a fix his next tick publishes. Alice's next tick, no longer the holder, drops
+ * the run data it never published for the remote's record. Bob's machine stops; alice takes the
+ * story back, and her retried review runs in her old worktree moved forward to bob's fix. Bob's
+ * review agent, reporting after the claim moved back, is told so and changes nothing.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -16,7 +17,7 @@ import { agentNotes, awaitNote, machineOf, type NornOut, norn, otherMachine, pla
 
 const KEY = "lt-1";
 const SLOW = 300_000;
-const TAKEOVER = ["name: takeover", "start: build", "steps:", "  build:", "    agent: Build the thing.", "    outcomes: { done: review }", "  review:", "    agent: Review the thing.", "    outcomes: { done: $done }", ""].join("\n");
+const TAKEOVER = ["name: takeover", "start: build", "steps:", "  build:", "    agent: Build the thing.", "    outcomes: { done: review }", "  review:", "    agent: Review the thing.", "    retries: 3", "    outcomes: { done: $done }", ""].join("\n");
 const ALICE = { USER: "alice" };
 const BOB = { USER: "bob" };
 
@@ -46,10 +47,12 @@ async function setUpRefs(w: World, silentAfter: string): Promise<string> {
   return machineOf(added);
 }
 
-async function tickAs(w: World, env: Record<string, string>, rules: string[]): Promise<void> {
+/** One tick; its problems. */
+async function tickAs(w: World, env: Record<string, string>, rules: string[]): Promise<string[]> {
   const t = await norn(w, ["tick", "--json"], env);
   if (t.code !== 0) throw new Error(`tick exited ${t.code}: ${t.stdout}${t.stderr}`);
   rules.push(...((t.body.outcomes ?? []) as { decision: { rule: string }; ok: boolean }[]).map((o) => `${o.decision.rule}${o.ok ? "" : "!"}`));
+  return (t.body.problems ?? []) as string[];
 }
 
 async function storyOf(w: World, env: Record<string, string>): Promise<StoryStatus | null> {
@@ -98,8 +101,15 @@ describe("a story taken over on the refs store, and taken back", () => {
   let bobTook: NornOut;
   let bobWorktree: string;
   let bobRetried: StoryStatus | null;
-  let aliceUnsynced: StoryStatus | null;
+  let bobReview: string;
+  let bobStartHead: string;
+  let bobFix: string;
+  let publishedAfterBob: string;
+  let aliceDropped: string[];
+  let aliceSynced: StoryStatus | null;
   let aliceTookBack: NornOut;
+  let aliceRetried: StoryStatus | null;
+  let aliceWorktreeHead: string;
   let aliceAfter: StoryStatus | null;
   let aliceView: NornOut;
   let bobLate: NornOut;
@@ -125,13 +135,28 @@ describe("a story taken over on the refs store, and taken back", () => {
 
     bobTook = await norn(b, ["story", "take", KEY, "--force", "--reason", "alice is away", "--json"], BOB);
     bobRetried = await tickUntil(b, BOB, bob, (s) => s?.units[0]?.run !== null && s?.units[0]?.run?.id !== aliceReview);
-    const bobReview = await runNoting(a, "pid", [aliceReview]);
+    bobReview = await runNoting(a, "pid", [aliceReview]);
     bobWorktree = join(machineB, "worktrees", KEY);
 
-    await tickAs(a, ALICE, aliceBack);
-    aliceUnsynced = await storyOf(a, ALICE);
+    bobStartHead = await sh(bobWorktree, "git", "rev-parse", "HEAD");
+    // bob's review agent commits a fix; his next tick publishes it
+    writeFileSync(join(bobWorktree, "fix.txt"), "bob's fix\n");
+    await sh(bobWorktree, "git", "add", "fix.txt");
+    await sh(bobWorktree, "git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "review fix");
+    bobFix = await sh(bobWorktree, "git", "rev-parse", "HEAD");
+    await tickAs(b, BOB, bob);
+    publishedAfterBob = await sh(a.remote, "git", "rev-parse", `refs/norn/heads/norn/${KEY}`);
+
+    aliceDropped = (await tickAs(a, ALICE, aliceBack)).filter((p) => p.startsWith(`${KEY}: run data this clone never published`));
+    aliceSynced = await storyOf(a, ALICE);
+
+    // bob's machine stops: every agent it started ends
+    for (const n of agentNotes(a).filter((x) => x.note === "pid" && x.run !== aliceReview)) await Bun.$`kill -9 ${n.value as number}`.nothrow().quiet();
+    // a run another machine started is only judged gone once it stays silent; alice waits as briefly as bob did
+    await norn(a, ["config", "set", "kernel.silent_after", "2s", "--json"]);
     aliceTookBack = await norn(a, ["story", "take", KEY, "--force", "--reason", "back again", "--json"], ALICE);
-    await tickAs(a, ALICE, aliceBack);
+    aliceRetried = await tickUntil(a, ALICE, aliceBack, (s) => s?.units[0]?.run != null && ![aliceReview, bobReview].includes(s.units[0].run.id));
+    aliceWorktreeHead = await sh(join(machineA, "worktrees", KEY), "git", "rev-parse", "HEAD");
     await tickAs(a, ALICE, aliceBack);
     aliceAfter = await storyOf(a, ALICE);
     aliceView = await norn(a, ["story", "view", KEY, "--json"], ALICE);
@@ -160,19 +185,31 @@ describe("a story taken over on the refs store, and taken back", () => {
     expect(bob).toContain("agent.died.retry");
     expect(bobRetried?.claim?.holder).toBe(`bob@${host}`);
     expect(existsSync(join(bobWorktree, "feature.txt"))).toBe(true);
-    expect(await sh(bobWorktree, "git", "rev-parse", "HEAD")).toBe(built);
+    expect(bobStartHead).toBe(built);
   });
 
-  test("alice's machine, no longer the holder, shows the run data it never published with the command that resolves it", () => {
+  test("bob's committed fix reaches the remote as the published head at his next tick", () => {
+    expect(publishedAfterBob).toBe(bobFix);
+  });
+
+  test("alice's next tick, no longer the holder, drops the run data it never published for the remote's record, keeping it under a ref", async () => {
     expect(aliceBack.slice(0, 1)).toEqual(["claim.held_elsewhere"]);
-    expect(aliceUnsynced?.unsynced).toEqual({ text: expect.stringContaining(`from before bob@${host} took the claim`), next: `norn story take ${KEY} --force` });
+    expect(aliceDropped).toHaveLength(1);
+    const kept = /kept at (\S+)$/.exec(aliceDropped[0] as string)?.[1] as string;
+    expect(kept).toStartWith(`refs/norn/v2/dropped/runs/${KEY}/`);
+    expect(await sh(a.root, "git", "rev-parse", kept)).toBe(kept.split("/").at(-1) as string);
+    // her view of the story is the remote's record: bob's retried review, nothing unsynced
+    expect(aliceSynced?.unsynced).toBeUndefined();
+    expect(aliceSynced?.claim?.holder).toBe(`bob@${host}`);
+    expect(aliceSynced?.units[0]?.run?.id).toBe(bobReview);
   });
 
-  test("alice's take back carries the story on from the remote's record, keeping her own part under a ref, and her flushes go through", async () => {
+  test("alice's take back retries the review in her old worktree moved forward to bob's fix, and her flushes go through", async () => {
     expect(aliceTookBack.code).toBe(0);
-    const dropped = aliceTookBack.body.dropped as { commit: string; kept_at: string };
-    expect(dropped.kept_at).toBe(`refs/norn/v2/dropped/runs/${KEY}/${dropped.commit}`);
-    expect(await sh(a.root, "git", "rev-parse", dropped.kept_at)).toBe(dropped.commit);
+    expect(aliceTookBack.body.dropped).toBeUndefined();
+    expect(aliceBack).toContain("agent.died.retry");
+    expect(aliceRetried?.units[0]?.step).toBe("review");
+    expect(aliceWorktreeHead).toBe(bobFix);
     expect(aliceBack).toContain("store.flush");
     expect(aliceBack.filter((r) => r.endsWith("!"))).toEqual([]);
     expect(aliceAfter?.unsynced).toBeUndefined();

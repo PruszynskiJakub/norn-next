@@ -91,10 +91,11 @@ export async function importMailbox(t: TickContext, d: DecisionOf<"import_mailbo
 }
 
 /**
- * Publish the story: each unit's branch head first, then the run data. In that order, the record on
- * the remote never names a step whose work the remote lacks, so a machine that takes the story over
- * starts from that work. A head that cannot be published is reported and never holds the run data
- * back, which would keep every other machine from seeing where the story stands.
+ * Publish the story: each unit's branch head first, then the run data. In that order, a record on the
+ * remote names no step whose published work is missing, so a machine that takes the story over starts
+ * from that work. A head that cannot be published (one that diverged from another clone's) is
+ * reported as a problem and never holds the run data back, which would keep every other machine from
+ * seeing where the story stands; that unit's newest work then lives only here until it is resolved.
  */
 export async function flush(t: TickContext, d: DecisionOf<"flush">): Promise<PluginResult<unknown>> {
   const { env } = t;
