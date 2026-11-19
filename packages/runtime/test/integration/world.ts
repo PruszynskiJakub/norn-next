@@ -94,12 +94,11 @@ export async function team(): Promise<Team> {
 }
 
 /**
- * The shipped pack as a repo would install it, with the edits its comments invite: the base-update
- * test runs this repo's check, and the CI wait (a `gh` script) is a repo with no CI.
+ * The shipped pack as a repo would install it, with the edit its comments invite: the CI wait (a
+ * `gh` script) is a repo with no CI. The test command is the config's `checks.test`.
  */
 function localPack(): NornPlugin {
   const shared = { ...SDLC_PACK.shared };
-  shared["base-update.yaml"] = (shared["base-update.yaml"] as string).replace("check: bun test", "check: sh check.sh");
   const ship = parse(shared["ship.yaml"] as string) as { steps: { ci: { check: string } } };
   ship.steps.ci.check = 'echo "no CI in this repo"';
   shared["ship.yaml"] = stringify(ship);
@@ -266,6 +265,7 @@ export async function machine(t: Team, opts: MachineOptions): Promise<Machine> {
     base: "main",
     baseRef: "origin/main",
     holder: opts.name,
+    checks: { test: "sh check.sh" },
   };
   const reporterStore = createStore((store === "local" ? localStorePlugin : refsStorePlugin).provides.store?.[store] as StoreFactory, base, {});
   if (!reporterStore.ok) throw new Error(reporterStore.failure.message);
