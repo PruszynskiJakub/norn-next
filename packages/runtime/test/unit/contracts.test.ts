@@ -49,8 +49,8 @@ describe("harness launcher modes", () => {
     expect(launcher.modes).toEqual({ headless: true, attended: true });
   });
   test("each executor's own modes; pane input needs both a pane and a harness that reads typed prompts", () => {
-    expect(launcher.modesOf("pane")).toEqual({ headless: false, attended: true, paneInput: true, dialogKeys: false });
-    expect(launcher.modesOf("bg")).toEqual({ headless: true, attended: false, paneInput: false, dialogKeys: false });
+    expect(launcher.modesOf("pane")).toEqual({ headless: false, attended: true, paneInput: true, dialogKeys: false, focus: false });
+    expect(launcher.modesOf("bg")).toEqual({ headless: true, attended: false, paneInput: false, dialogKeys: false, focus: false });
     expect(launcher.modesOf("nope")).toBeNull();
   });
 });

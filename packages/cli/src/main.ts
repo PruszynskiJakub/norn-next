@@ -21,6 +21,31 @@ for (const sig of ["SIGINT", "SIGTERM"] as const)
 
 const self = selfCommand(process.execPath, process.argv[1]);
 
+/** The alternate screen (frames leave no scrollback), no cursor, SGR mouse reporting for the wheel. */
+const SCREEN_ON = "\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1006h";
+const SCREEN_OFF = "\x1b[?1006l\x1b[?1000l\x1b[?25h\x1b[?1049l";
+
+/** stdin in raw mode for `status --watch`, put back as it was on close; without a terminal its input ends the cockpit. */
+function terminal() {
+  const stdin = process.stdin;
+  const raw = stdin.isTTY === true;
+  const screen = process.stderr.isTTY === true;
+  if (raw) stdin.setRawMode(true);
+  stdin.setEncoding("utf8");
+  if (screen) process.stderr.write(SCREEN_ON);
+  return {
+    keys: stdin as AsyncIterable<string>,
+    columns: Number(process.env.COLUMNS) || process.stderr.columns || 100,
+    rows: Number(process.env.LINES) || process.stderr.rows || 30,
+    color: screen && process.env.NO_COLOR === undefined && process.env.TERM !== "dumb",
+    close: () => {
+      if (raw) stdin.setRawMode(false);
+      if (screen) process.stderr.write(SCREEN_OFF);
+      stdin.pause();
+    },
+  };
+}
+
 const result = await runCli(process.argv.slice(2), {
   env: process.env,
   cwd: process.cwd(),
@@ -28,6 +53,7 @@ const result = await runCli(process.argv.slice(2), {
   stdin: () => Bun.stdin.text(),
   signal: controller.signal,
   log: (line) => process.stderr.write(`${line}\n`),
+  terminal,
   self,
   version: NORN_VERSION,
   hosts: { host: createNodeHost, exec: nodeExec },

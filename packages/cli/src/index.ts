@@ -7,7 +7,7 @@ export { getKey, mergeLayers } from "./config/merge.ts";
 export * from "./config/paths.ts";
 export * from "./config/schema.ts";
 export { parseValue, planSet, setKeyInText, writeLayer } from "./config/write.ts";
-export { CliContext, type CliIo } from "./context.ts";
+export { CliContext, type CliIo, type Terminal } from "./context.ts";
 export * from "./home.ts";
 export * from "./output.ts";
 export { BUNDLED_PLUGINS, bundledNames } from "./plugins/bundled.ts";

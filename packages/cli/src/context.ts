@@ -15,6 +15,18 @@ import type { PluginImporter } from "./plugins/installed.ts";
 import { floorRefusal } from "./version-guard.ts";
 import { type HostFactory, type WiredPlugins, type WiredRepo, wireConfig, wirePlugins, wireRepo, wireRepoWorkflows, wireRuntime, wireRuntimeEnv } from "./wiring.ts";
 
+/** A terminal a person types into: what `status --watch` reads keys from and draws its frames for. */
+export interface Terminal {
+  /** raw key chunks as the terminal sends them; the cockpit ends when they end */
+  keys: AsyncIterable<string>;
+  columns: number;
+  rows: number;
+  /** the frames may carry colour */
+  color: boolean;
+  /** hand the terminal back as it was */
+  close(): void;
+}
+
 /** The process as the entry hands it over; a test passes its own, so the CLI runs in-process with no child. */
 export interface CliIo {
   env: Readonly<Record<string, string | undefined>>;
@@ -29,6 +41,8 @@ export interface CliIo {
   sleep?(ms: number, signal?: AbortSignal): Promise<void>;
   /** a line for a person on stderr; never data */
   log?(line: string): void;
+  /** the person's terminal, taken over by `status --watch` until it quits */
+  terminal?(): Terminal;
   /** how this binary is invoked, so a launched agent's hooks call the same build: `[bun, main.ts]` or `[norn]` */
   self: readonly string[];
   /** this binary's version; the entry passes the package's */
