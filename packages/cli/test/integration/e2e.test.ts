@@ -49,7 +49,7 @@ describe("a story from intake to merged, through the CLI alone", () => {
   });
 
   test("ticks carry it through the agent step and the check to the gate; approve passes it to open-pr, and the merge ends it done", async () => {
-    expect(atGate?.units[0]).toMatchObject({ step: "ready", parked: "gate.park", waiting: { for: "person" } });
+    expect(atGate?.units[0]).toMatchObject({ step: "ready", parked: "gate.park", waiting: { for: "gate", next: `norn story approve ${KEY}, or norn story reject ${KEY} --reason "<what to change>"` } });
     expect(approved).toMatchObject({ code: 0, body: { unit: KEY, step: "ready", outcome: "approve", replayed: false } });
     expect(afterPr?.change).toMatchObject({ id: 1, state: "open" });
     // open-pr pushed the story branch to the bare remote before opening the change
