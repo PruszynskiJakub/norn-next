@@ -1,0 +1,50 @@
+# norn's Herdr plugin: the cockpit (`norn status --watch`) as a popup or as a split, and three actions.
+# Config snippet (tab bar segment, sidebar token, key bindings): README.md beside this file.
+# Install it once:  herdr plugin install PruszynskiJakub/norn-next/plugins/herdr
+# (from a norn checkout: herdr plugin link <checkout>/plugins/herdr)
+id = "norn"
+name = "norn"
+version = "0.5.0"
+min_herdr_version = "0.9.0"
+description = "norn's cockpit: what needs you and every story, with the actions each offers"
+platforms = ["linux", "macos"]
+
+# `norn status --watch` as a popup over the focused pane, on any workspace.
+[[panes]]
+id = "pick"
+title = "norn's cockpit"
+placement = "overlay"
+command = ["sh", "pick.sh"]
+
+# Opens the cockpit below the focused pane without taking focus (`norn status --watch --pane`). Bind it to a key:
+#   [[keys.command]]
+#   key = "prefix+n"
+#   type = "plugin_action"
+#   command = "norn.open"
+[[actions]]
+id = "open"
+title = "Open the cockpit below (norn status --watch --pane)"
+contexts = ["workspace"]
+command = ["sh", "open.sh"]
+
+# Focuses the pane of the agent that has waited on you longest (`norn run attach --next`); a toast when none.
+#   [[keys.command]]
+#   key = "prefix+N"
+#   type = "plugin_action"
+#   command = "norn.next"
+[[actions]]
+id = "next"
+title = "Go to the agent waiting for you"
+contexts = ["workspace"]
+command = ["sh", "next.sh"]
+
+# Opens the cockpit as a popup over the focused pane, on any workspace.
+#   [[keys.command]]
+#   key = "prefix+p"
+#   type = "plugin_action"
+#   command = "norn.pick"
+[[actions]]
+id = "pick"
+title = "Open the cockpit as a popup"
+contexts = ["workspace"]
+command = ["sh", "pick-open.sh"]

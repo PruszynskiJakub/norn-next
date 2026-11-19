@@ -257,6 +257,8 @@ The herdr runner opens one Herdr workspace per story and one tab per run, labell
 
 `norn status --watch` is the cockpit: what needs you (your turn, an answer, a gate, a stuck unit), then one row per story, the selected row's story beside it, and the keys its row offers in the footer. Each key runs the norn command you would type: `s` is `norn run start`, `a` is `norn story answer`, `y` and `x` are `norn story approve` and `reject`, `u` is `norn run rerun`, `t` is `norn story take`, `g` is `norn run attach`, `enter` shows `norn story view`, and `o` and `i` open the PR and the issue; `?` lists them all. `--pane` opens it in a pane below the one you are in, leaving the focus where it was.
 
+norn's Herdr plugin lives in [`plugins/herdr/`](../plugins/herdr/README.md): the cockpit as a popup (`norn.pick`) or a split (`norn.open`), `norn.next` for `norn run attach --next`, and `norn status --segment` for Herdr's tab bar, which also writes each story's `$norn` sidebar token on its workspace. Its README has the config snippet.
+
 ## Share run data with a team
 
 ```sh
