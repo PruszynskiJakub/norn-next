@@ -194,7 +194,8 @@ describe("await-merge", () => {
     const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
     const { vcs } = fakeVcs(refs, parents);
     value(await openPr.run(input({}, { slots: { forge: world.forge, vcs } }), memoryHost()));
-    const poll = () => awaitMerge.run(input<Record<string, never>>({}, { step: "merge", slots: { forge: world.forge, vcs } }), memoryHost());
+    // the merge step's own receipt, as the host writes one per step run
+    const poll = () => awaitMerge.run(input<Record<string, never>>({}, { step: "merge", receipt_id: "01JD0000000000000000000002", slots: { forge: world.forge, vcs } }), memoryHost());
     return { world, poll, vcs };
   }
 
@@ -202,6 +203,23 @@ describe("await-merge", () => {
     // the reference forge reports every change at the zero commit
     const { poll } = await opened({ "gh-12-login": ZERO, "origin/main": BASE }, { [ZERO]: [BASE] });
     expect(value(await poll()).outcome).toBe("waiting");
+  });
+
+  test("a draft change waiting at merge is marked ready, once: a forge merges no draft", async () => {
+    const { world, poll } = await opened({ "gh-12-login": ZERO, "origin/main": BASE }, { [ZERO]: [BASE] });
+    const effects = recorded(world);
+    expect(value(await world.forge.findChanges(["gh-12-login"]))["gh-12-login"]?.draft).toBe(true);
+    expect(value(await poll()).outcome).toBe("waiting");
+    expect(value(await world.forge.findChanges(["gh-12-login"]))["gh-12-login"]?.draft).toBe(false);
+    expect(value(await poll()).outcome).toBe("waiting");
+    expect(effects.map((e) => e.kind)).toEqual(["ready"]);
+  });
+
+  test("a draft change the branch has outgrown is not marked ready: its commits go through open-pr first", async () => {
+    const { world, poll } = await opened({ "gh-12-login": HEAD, "origin/main": BASE }, { [HEAD]: [ZERO], [ZERO]: [BASE] });
+    const effects = recorded(world);
+    expect(value(await poll()).outcome).toBe("unpushed");
+    expect(effects).toEqual([]);
   });
 
   test("merged once the change merged, even though the base moved with it", async () => {

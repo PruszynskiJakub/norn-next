@@ -6,9 +6,10 @@
  * `base_stale` fact and decide routes between polls. Merged is asked first, so a change that merged
  * ends the story whatever else moved.
  */
-import { fail, type HostContext, ok, type PluginResult, type StepKindDefinition, type StepKindInput, type StepKindOutcome } from "@norn/plugin-api";
+import { type ChangeRequest, fail, type HostContext, ok, type PluginResult, type StepKindDefinition, type StepKindInput, type StepKindOutcome } from "@norn/plugin-api";
 import { Type } from "@sinclair/typebox";
 import { specOnly } from "../spec-only.ts";
+import { effectKey } from "./open-pr.ts";
 
 export const AwaitMergeConfig = Type.Object({}, { additionalProperties: false });
 
@@ -39,16 +40,29 @@ async function run(input: StepKindInput<Record<string, never>>, _ctx: HostContex
   if (change === null) return ok({ outcome: "unpushed", detail: { head: head.value, reason: "no change holds the branch" } });
   const holds = change.head_sha === head.value ? ok(true) : await vcs.isAncestor(head.value, change.head_sha);
   if (!holds.ok) return holds;
-  if (holds.value) return ok({ outcome: "waiting", detail: { change } });
+  if (holds.value) return waitReady(input, change, head.value);
   // commits past the change that touch only the story's spec folder go with its next code push
   const ahead = await vcs.isAncestor(change.head_sha, head.value);
   if (!ahead.ok) return ahead;
   if (ahead.value) {
     const notes = await specOnly(vcs, input.story, change.head_sha, head.value);
     if (!notes.ok) return notes;
-    if (notes.value) return ok({ outcome: "waiting", detail: { change } });
+    if (notes.value) return waitReady(input, change, head.value);
   }
   return ok({ outcome: "unpushed", detail: { head: head.value, change } });
+}
+
+/**
+ * Wait on a change that holds the branch, marking a draft ready first: a story reaches this step only
+ * past its ready gate, and a forge refuses to merge a draft, so leaving it would wait on a person's
+ * click nobody asked for.
+ */
+async function waitReady(input: StepKindInput<Record<string, never>>, change: ChangeRequest, head: string): Promise<Answer> {
+  const forge = input.slots?.forge;
+  if (!change.draft || !forge?.capabilities.draft) return ok({ outcome: "waiting", detail: { change } });
+  const readied = await forge.perform({ kind: "ready", id: change.id }, { receipt_id: effectKey(input, head) });
+  if (!readied.ok) return readied;
+  return ok({ outcome: "waiting", detail: { change: readied.value.change, effect: "ready" } });
 }
 
 export const awaitMerge: StepKindDefinition<typeof AwaitMergeConfig> = {
