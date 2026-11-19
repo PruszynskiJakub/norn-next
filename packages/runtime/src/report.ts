@@ -214,7 +214,7 @@ async function claimMovedRefusal(env: RuntimeEnv, unit: string, runId: string): 
   const message = `the report of run ${runId} was dropped: the claim of ${story} moved from ${env.config.holder} to ${holder}`;
   const { next_seq } = await readEvents(env.ctx, unit, runId);
   await appendEvents(env.ctx, unit, runId, [{ type: "hook.error", run_id: runId, seq: next_seq, at: env.ctx.now(), hook: "report", message }]);
-  return refuse(message, `end your turn: ${holder} carries ${story} on now, and this run's report would move nothing`, "claim_moved");
+  return refuse(message, `end your turn now and report nothing: ${holder} carries ${story} on, and this run's report would move nothing`, "claim_moved");
 }
 
 /** `holder` is this machine: its current name, or one it claimed under before. */

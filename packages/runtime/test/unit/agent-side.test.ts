@@ -108,6 +108,15 @@ describe("stop hook", () => {
     expect(h.files.snapshot()).toEqual(before);
   });
 
+  test("a run whose story's claim another holder took may end its turn: it owes this machine no report", async () => {
+    const { h, runId } = await running();
+    const held = await h.env.slots.store.claims.read(UNIT);
+    await h.env.slots.store.claims.takeOver?.(UNIT, "machine-b", 60 * 60_000, held.ok && held.value ? held.value.version : null);
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: false, refusal: { code: "claim_moved", do_instead: expect.stringContaining("end your turn") } });
+    const r = await hook(h, runId, "Stop", {}, { claimMoved: async (unit) => (await claimHeldElsewhere(h.env, unit)) !== null });
+    expect(r.reply).toEqual({ stdout: "", exit_code: 0 });
+  });
+
   test("a stop it refused is a turn that goes on: the session does not read as a turn ended, so it is not nudged as quiet", async () => {
     const { h, runId } = await running();
     expect(JSON.parse((await hook(h, runId, "Stop", {})).reply.stdout).decision).toBe("block");

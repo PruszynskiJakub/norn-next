@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
 import { ExitCode, homePaths, runCli } from "../../src/index.ts";
 import { HOME, type TestMachine } from "./support.ts";
-import { AGENT_STEP, configured, envOf, runEnv, seedUnit, UNIT } from "./units.ts";
+import { AGENT_STEP, configured, envOf, runEnv, seedUnit, UNIT, withEnv } from "./units.ts";
 
 const json = (stdout: string): unknown => Bun.JSONL.parse(stdout)[0];
 const HOLDER_FILE = homePaths(HOME).holder;
@@ -63,5 +63,20 @@ describe("a machine claims under one holder for as long as its norn home lives",
     const r = await runCli(["done", "done", "--json"], m.io);
     expect({ exit: r.exit, out: json(r.stdout) }).toMatchObject({ exit: ExitCode.corrupt, out: { code: "corrupt", error: expect.stringContaining(HOLDER_FILE) } });
     expect(await m.files.read(HOLDER_FILE)).toBe('{"machine": ""}\n');
+  });
+});
+
+describe("an agent whose claim moved can end its turn", () => {
+  test("after done is refused with claim_moved, the Stop hook lets the turn end, on claude and on pi", async () => {
+    const stop = JSON.stringify({ session_id: "abc123", hook_event_name: "Stop", stop_hook_active: false });
+    const m = configured({ env: runEnv(), stdin: stop });
+    await seedUnit(m, { step: AGENT_STEP });
+    await claimAs(m, "me@desk");
+    const refused = await runCli(["done", "done", "--json"], m.io);
+    expect(json(refused.stdout)).toMatchObject({ code: "claim_moved", do_instead: expect.stringContaining("end your turn") });
+    const allowed = await runCli(["hook", "claude", "Stop"], m.io);
+    expect({ exit: allowed.exit, stdout: allowed.stdout }).toEqual({ exit: 0, stdout: "" });
+    const settled = await runCli(["hook", "pi", "agent_before_settle"], withEnv(m, runEnv(), JSON.stringify({ last_assistant_message: "Refused: claim moved." })).io);
+    expect({ exit: settled.exit, stdout: settled.stdout }).toEqual({ exit: 0, stdout: "" });
   });
 });
