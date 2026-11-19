@@ -207,6 +207,21 @@ describe("status and story view say what a parked unit waits for, never the rule
     expect(waitingIn((await runCli(["status", "--json"], gate.io)).stdout)?.text).toContain("Review the slice files");
   });
 
+  test("an agent's ask and a person's stop park a live run under their own text, and both name story answer, never a rerun that would drop the run", async () => {
+    const answer = `norn story answer ${UNIT} "<answer>"`;
+    const since = "2026-11-17T10:00:00.000Z";
+    const cases: Array<[string, { for: string; text: string; next: string }]> = [
+      ["Which colour should the button be?", { for: "answer", text: "Which colour should the button be?", next: answer }],
+      [`run ${RUN} stopped by me@box`, { for: "answer", text: `run ${RUN} stopped by me@box`, next: answer }],
+      ["agent.silent.manual", { for: "person", text: "its run went quiet without a report", next: `norn run rerun ${UNIT}` }],
+    ];
+    for (const [reason, expected] of cases) {
+      const m = configured();
+      await seedUnit(m, { step: AGENT_STEP, extra: { parked: { reason, since } } });
+      expect([reason, waitingIn((await runCli(["status", "--json"], m.io)).stdout)]).toEqual([reason, expected]);
+    }
+  });
+
   test("a gate not yet parked names approve and reject; a closed change or item names reopening it, since a rerun alone would end or park again; another stuck end or park names rerun", async () => {
     const reject = `norn story approve ${UNIT}, or norn story reject ${UNIT} --reason "<what to change>"`;
     const rerun = `norn run rerun ${UNIT}`;

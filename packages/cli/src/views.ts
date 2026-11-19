@@ -115,6 +115,9 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
     default:
       // a rerun alone would see the closed change park the unit again on the next tick
       if (isChangeClosedReason(reason)) return { for: "person", text: reason, next: `reopen the change on the forge, then ${rerun}; or ${newWork}` };
+      // an agent's ask and a person's stop park a live run under their own text; the answer goes into
+      // that session, where a rerun would throw the question and the session away
+      if (!STUCK_PARKS[reason] && kind === "agent" && s.run) return { for: "answer", text: reason, next: `norn story answer ${id} "<answer>"` };
       // a park no rule derives (slice files that failed validation) holds until a person moves the unit on
       return { for: "person", text: STUCK_PARKS[reason] ?? reason, next: rerun };
   }

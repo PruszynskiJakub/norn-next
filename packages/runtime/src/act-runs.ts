@@ -10,6 +10,7 @@ import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import { ensureWorktree } from "./branches.ts";
 import { stopDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
+import { appendEvents } from "./events/log.ts";
 import { nudgePromptId } from "./launcher.ts";
 import { unitInFacts } from "./record.ts";
 import { readStepRun } from "./step-runs.ts";
@@ -42,6 +43,20 @@ function launched(intent: ReceiptIntent, handle: string): ReceiptData {
   return { ...intent.data, session: handle };
 }
 
+/**
+ * A launch that failed leaves a run on the record with no session and no process to probe, which
+ * would otherwise read as a slow start for the whole silent window and then die with no reason.
+ * Its session is ended here naming the failure, so the next tick retries or ends it at once with it.
+ * Best effort: a log that cannot take it leaves the silent window to find the run dead.
+ */
+async function endUnlaunched(t: TickContext, unit: string, runId: string, why: string): Promise<void> {
+  const at = t.env.ctx.now();
+  await appendEvents(t.env.ctx, unit, runId, [
+    { type: "turn.ended", run_id: runId, seq: 0, at, error: `the agent could not be launched: ${why}` },
+    { type: "session.ended", run_id: runId, seq: 1, at, reason: "crash" },
+  ]);
+}
+
 async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"retry_run">): Promise<PluginResult<unknown>> {
   const unit = unitOf(d);
   const worktree = await ensureWorktree(t.env, unit);
@@ -58,7 +73,11 @@ async function launch(t: TickContext, d: DecisionOf<"start_run"> | DecisionOf<"r
   };
   const acted = await t.env.journal.act(unit, {
     intent: d.intent,
-    perform: () => t.env.launcher.start(request),
+    perform: async () => {
+      const started = await t.env.launcher.start(request);
+      if (!started.ok) await endUnlaunched(t, unit, d.run_id, started.failure.message);
+      return started;
+    },
     outcome: (v) => launched(d.intent, v.handle),
     next: () => null,
   });

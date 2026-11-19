@@ -4,7 +4,7 @@
  * runs it. The test harness plugin (fixtures/test-harness) is installed with `norn plugin add`, and
  * its agent reports through the same binary.
  */
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { nodeExec } from "@norn/host-node";
@@ -19,6 +19,10 @@ export interface World {
   remote: string;
   home: string;
   notes: string;
+  /** where the test raises the test plugin's flag files (`stop-fails`, `missing-bin`) */
+  flags: string;
+  /** the agent's per-step plans file (TEST_AGENT_PLANS), written by `plans` */
+  plans: string;
   env: Record<string, string>;
 }
 
@@ -35,19 +39,25 @@ export async function sh(cwd: string, ...argv: string[]): Promise<string> {
   return r.stdout.trim();
 }
 
+/** The test harness agent's plans (fixtures/test-harness/agent.ts names what each does). */
+export type AgentPlan = "work" | "ask" | "ask-then-stuck" | "hang" | "protocol" | "findings" | "attended";
+
 /**
  * A fresh clone of an empty bare remote with one commit on main, and a norn home beside it. The
  * env empties HERDR_ENV, so a person's running herdr is never probed, and names a git identity, so
  * the agent's commits and the person's merge need no global config.
  */
-export async function world(plan: "work" | "ask" = "work"): Promise<World> {
+export async function world(plan: AgentPlan = "work"): Promise<World> {
   // realpath: macOS hands out /var under /private, and git names the canonical path
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "norn-e2e-")));
   const remote = join(dir, "remote.git");
   const root = join(dir, "repo");
   const home = join(dir, "home");
   const notes = join(dir, "notes");
+  const flags = join(dir, "flags");
+  const plans = join(dir, "plans.json");
   mkdirSync(notes);
+  mkdirSync(flags);
   await sh(dir, "git", "init", "-q", "--bare", "-b", "main", remote);
   await sh(dir, "git", "clone", "-q", remote, root);
   await sh(root, "git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "init");
@@ -57,17 +67,30 @@ export async function world(plan: "work" | "ask" = "work"): Promise<World> {
     HERDR_ENV: "",
     TEST_AGENT_NOTES: notes,
     TEST_AGENT_PLAN: plan,
+    TEST_AGENT_PLANS: plans,
+    TEST_FLAGS: flags,
     GIT_AUTHOR_NAME: "t",
     GIT_AUTHOR_EMAIL: "t@t",
     GIT_COMMITTER_NAME: "t",
     GIT_COMMITTER_EMAIL: "t@t",
   };
-  return { dir, root, remote, home, notes, env };
+  return { dir, root, remote, home, notes, flags, plans, env };
+}
+
+/** Raise or lower one of the test plugin's flag files. */
+export function flag(w: World, name: "stop-fails" | "missing-bin", up: boolean): void {
+  if (up) writeFileSync(join(w.flags, name), "");
+  else rmSync(join(w.flags, name), { force: true });
+}
+
+/** The agent's plan per step (`"<step>"`) or per visit (`"<step>#<attempt>"`), over TEST_AGENT_PLAN. */
+export function plans(w: World, byStep: Record<string, AgentPlan>): void {
+  writeFileSync(w.plans, JSON.stringify(byStep));
 }
 
 /** One norn call as a subprocess in the checkout; `--json` output parsed when it is one value. */
-export async function norn(w: World, args: string[], env: Record<string, string> = {}): Promise<NornOut> {
-  const r = await nodeExec(["bun", MAIN, ...args], { cwd: w.root, env: { ...w.env, ...env }, timeoutMs: NORN_TIMEOUT_MS });
+export async function norn(w: World, args: string[], env: Record<string, string> = {}, cwd = w.root): Promise<NornOut> {
+  const r = await nodeExec(["bun", MAIN, ...args], { cwd, env: { ...w.env, ...env }, timeoutMs: NORN_TIMEOUT_MS });
   let body: Record<string, unknown> = {};
   try {
     body = JSON.parse(r.stdout) as Record<string, unknown>;
@@ -77,19 +100,35 @@ export async function norn(w: World, args: string[], env: Record<string, string>
   return { code: r.code, body, stdout: r.stdout, stderr: r.stderr };
 }
 
+export interface SetUpOptions {
+  /** how stories run (default auto) */
+  mode?: "auto" | "manual";
+  /** where the agent's process lives: the bundled headless runner (default), or the test plugin's */
+  runner?: "headless" | "test";
+  /** the workflow a story takes when it names none (default the pack's e2e) */
+  workflow?: string;
+  /** repo workflows by name, written into `.agents/workflows/<name>.yaml` */
+  workflows?: Record<string, string>;
+  /** more `norn config set` pairs, such as a short `kernel.silent_after` */
+  config?: [string, string][];
+}
+
 /**
  * Installed before init names it, as a person adds a harness norn does not bundle: the test plugin
- * (harness `test`, pack `e2e`), then init on the local tracker, no forge, the local store and the
- * test harness in the headless runner, then the pack's workflow in auto mode.
+ * (harness `test`, runner `test`, pack `e2e`), then init on the local tracker, no forge, the local
+ * store and the test harness in the headless runner (or the test runner), then the pack's workflow
+ * in auto mode, unless the options say otherwise.
  */
-export async function setUp(w: World): Promise<{ added: NornOut; init: NornOut }> {
+export async function setUp(w: World, opts: SetUpOptions = {}): Promise<{ added: NornOut; init: NornOut }> {
   const added = await norn(w, ["plugin", "add", TEST_PLUGIN, "--json"]);
-  const init = await norn(w, ["init", "--tracker", "local", "--forge", "none", "--store", "local", "--executor", "test", "--runner", "headless", "--yes", "--json"]);
-  for (const [key, value] of [
-    ["packs", "[e2e]"],
-    ["kernel.workflow", "e2e"],
-    ["kernel.mode", "auto"],
-  ] as const) {
+  const runner = opts.runner ?? "headless";
+  const init = await norn(w, ["init", "--tracker", "local", "--forge", "none", "--store", "local", "--executor", "test", "--runner", runner, "--yes", "--json"]);
+  if (init.code !== 0) throw new Error(`init: ${init.stdout}${init.stderr}`);
+  for (const [name, text] of Object.entries(opts.workflows ?? {})) {
+    mkdirSync(join(w.root, ".agents", "workflows"), { recursive: true });
+    writeFileSync(join(w.root, ".agents", "workflows", `${name}.yaml`), text);
+  }
+  for (const [key, value] of [["packs", "[e2e]"], ["kernel.workflow", opts.workflow ?? "e2e"], ["kernel.mode", opts.mode ?? "auto"], ...(opts.config ?? [])] as const) {
     const set = await norn(w, ["config", "set", key, value, "--json"]);
     if (set.code !== 0) throw new Error(`config set ${key}: ${set.stdout}${set.stderr}`);
   }
@@ -102,7 +141,7 @@ export interface UnitShown {
   ended?: string;
   ended_reason?: string;
   parked?: string;
-  waiting: { for: string; text: string } | null;
+  waiting: { for: string; text: string; next?: string } | null;
 }
 
 export interface StoryShown {
