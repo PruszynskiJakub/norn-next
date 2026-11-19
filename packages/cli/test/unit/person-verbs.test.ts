@@ -58,6 +58,17 @@ describe("story approve and reject", () => {
     expect((await runCli(["story", "reject", UNIT, "--reason", "split slice 2", "--json"], m.io)).exit).toBe(ExitCode.ok);
     expect((await receiptsOf(m)).map((r) => r.data)).toEqual([{ kind: "gate.decided", outcome: "reject", by: "me@box", step: GATE_STEP, attempt: 1, reason: "split slice 2" }]);
   });
+
+  test("a decision shows back the reason it records, and a retried one never shows a reason the record does not hold", async () => {
+    const m = configured();
+    await seedUnit(m, { step: GATE_STEP, run: null });
+    const first = json((await runCli(["story", "reject", UNIT, "--reason", "A", "--json"], m.io)).stdout);
+    const again = json((await runCli(["story", "reject", UNIT, "--reason", "B", "--json"], m.io)).stdout);
+    expect(first).toMatchObject({ reason: "A", replayed: false });
+    expect(again).toMatchObject({ replayed: true });
+    expect(again).not.toHaveProperty("reason");
+    expect((await receiptsOf(m)).map((r) => (r.data as { reason?: string }).reason)).toEqual(["A"]);
+  });
 });
 
 describe("a decision on a story another machine holds", () => {

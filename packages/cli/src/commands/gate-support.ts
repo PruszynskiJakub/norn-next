@@ -70,7 +70,8 @@ export async function decideGate(ctx: CliContext, args: ParsedArgs, outcome: Gat
   const route = await routeDecision(env, key.split("/")[0] as string, retry);
   const data = { kind: "gate.decided" as const, outcome, by: env.config.holder, step: state.step, attempt: state.attempt, ...(reason && { reason }) };
   const sent = await deliverDecision(env, route, u.unit, { id, data }, retry);
-  const value = { unit: u.unit, step: state.step, attempt: state.attempt, outcome, ...(reason && { reason }), receipt_id: id, ...sent };
+  // a replayed decision keeps the reason sent first, so this call's reason would misstate the record
+  const value = { unit: u.unit, step: state.step, attempt: state.attempt, outcome, ...(reason && !sent.replayed && { reason }), receipt_id: id, ...sent };
   const line = deliveredLine(sent, `\`${outcome}\` at gate ${state.step} of ${u.unit}`);
   return rendered(value, sent.via === "local" ? `${line} The next tick routes it.` : line);
 }
