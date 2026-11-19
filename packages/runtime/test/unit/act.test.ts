@@ -111,6 +111,22 @@ describe("agent runs", () => {
     expect(h.launcher.of("answer")).toEqual([[st?.run?.session, "q1", "left"]]);
   });
 
+  test("the unit's worktree is made again before an answer goes to the session, as a resumed agent runs in it", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const st = (await record(h, "lt-1")).state;
+    h.sessions.byUnit.set("lt-1", session("asking", { ask: { id: "q1", question: "Which way?" } }));
+    await tickUntil(h, has("agent.asking.park"));
+    await h.env.journal.record("lt-1", { id: "01JD5G0000ANSWER000000000Q", data: { kind: "answer.sent", input_id: "q1", text: "left", by: "person", step: st?.step, attempt: st?.attempt } });
+    h.sessions.byUnit.set("lt-1", session("working"));
+    h.vcsCalls.length = 0;
+    await tickUntil(h, has("receipts.apply"));
+    expect(h.launcher.of("answer")).toEqual([[st?.run?.session, "q1", "left"]]);
+    expect(h.vcsCalls.filter((c) => c.op === "ensure").map((c) => c.args[0])).toEqual(["lt-1"]);
+  });
+
   test("an answer to a dialog in the agent's pane goes to the session as a dialog answer, never as a typed prompt", async () => {
     const h = harness({ workflow: "agented" });
     h.items.push(trackerItem(1));

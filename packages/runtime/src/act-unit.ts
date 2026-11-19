@@ -24,8 +24,16 @@ const unitOf = (d: { unit: string | null; rule: string }): string => {
 async function deliverAnswers(t: TickContext, unit: string, through: number, before: RunState | null, undelivered: readonly string[]): Promise<PluginResult<unknown>> {
   const handle = before?.run?.session;
   if (!handle) return ok(null);
+  let worktreeReady = false;
   for (const r of unitInFacts(t.facts, unit)?.receipts ?? []) {
     if (r.seq > through || r.data.kind !== "answer.sent" || undelivered.includes(r.id)) continue;
+    // a session that ended is resumed in the worktree, which a person may have removed while the unit
+    // was parked; a dialog's keys go to a live pane, which resumes nothing
+    if (!worktreeReady && r.data.to !== "dialog") {
+      const worktree = await ensureWorktree(t.env, unit);
+      if (!worktree.ok) return worktree;
+      worktreeReady = true;
+    }
     // an answer that did not reach the agent must not be applied, or the unit unparks with nobody told
     // a dialog's answer is keys pressed in the pane; typed as a prompt it would reach the agent as words
     const sent = r.data.to === "dialog" ? await t.env.launcher.answer(handle, r.data.input_id, r.data.text, { dialog: true }) : await t.env.launcher.answer(handle, r.data.input_id, r.data.text);
