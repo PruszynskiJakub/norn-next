@@ -26,6 +26,8 @@ export interface Detected {
   herdr: boolean;
   /** origin's default branch, else the current branch */
   base: string | null;
+  /** bun answers, for a JS repo with no lockfile to say which tool installs it */
+  bun: boolean;
 }
 
 export interface InitFlags {
@@ -65,11 +67,12 @@ export async function detect(host: HostContext, env: Readonly<Record<string, str
   const gh = github && (await answers(host, ["gh", "--version"], root)) !== null;
   const claude = (await answers(host, ["claude", "--version"], root)) !== null;
   const pi = (await answers(host, ["pi", "--version"], root)) !== null;
+  const bun = (await answers(host, ["bun", "--version"], root)) !== null;
   const herdr = Boolean(env.HERDR_ENV) && (await answers(host, ["herdr", "--version"], root)) !== null;
   const originHead = await answers(host, ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], root);
   const current = originHead ? null : await answers(host, ["git", "branch", "--show-current"], root);
   const base = originHead ? originHead.replace(/^origin\//, "") : current || null;
-  return { origin, github, gh, claude, pi, herdr, base };
+  return { origin, github, gh, claude, pi, herdr, base, bun };
 }
 
 /**
@@ -117,25 +120,35 @@ const PackageJson = Type.Object({ scripts: Type.Optional(Type.Record(Type.String
 /** npm's placeholder for a project without tests */
 const NPM_NO_TEST = /no test specified/;
 
+/** a package.json script that runs bun */
+const RUNS_BUN = /(^|[\s;&|(])(bun|bunx)(\s|$)/;
+
 /**
  * The repo's test command from its build files, or null when nothing says. A check runs in a fresh
- * worktree with no installed dependencies, so a JS command installs first.
+ * worktree with no installed dependencies, so a JS command installs first. With no lockfile the
+ * install is told not to write one: it would be left untracked in the unit's worktree and hold back
+ * the next agent's `norn done`. `bun` says whether bun is on PATH.
  */
-export async function detectTestCommand(files: HostFiles, root: string): Promise<DetectedTestCommand | null> {
+export async function detectTestCommand(files: HostFiles, root: string, opts: { bun?: boolean } = {}): Promise<DetectedTestCommand | null> {
   const read = (f: string) => files.read(join(root, f));
   const has = async (f: string) => (await read(f)) !== null;
   const pkgText = await read("package.json");
   if (pkgText !== null) {
     const pkg = parseJson(PackageJson, pkgText, "package.json");
-    const script = pkg.ok ? pkg.value.scripts?.test : undefined;
+    const scripts = pkg.ok ? (pkg.value.scripts ?? {}) : {};
+    const script = scripts.test;
     const hasScript = typeof script === "string" && !NPM_NO_TEST.test(script);
     const from = "package.json";
-    if ((await has("bun.lock")) || (await has("bun.lockb"))) return { command: `bun install --frozen-lockfile && ${hasScript ? "bun run test" : "bun test"}`, from };
+    const bunTest = hasScript ? "bun run test" : "bun test";
+    if ((await has("bun.lock")) || (await has("bun.lockb"))) return { command: `bun install --frozen-lockfile && ${bunTest}`, from };
     if (hasScript) {
       if (await has("pnpm-lock.yaml")) return { command: "pnpm install --frozen-lockfile && pnpm test", from };
       if (await has("yarn.lock")) return { command: "yarn install && yarn test", from };
-      return { command: (await has("package-lock.json")) ? "npm ci && npm test" : "npm install && npm test", from };
+      if (await has("package-lock.json")) return { command: "npm ci && npm test", from };
     }
+    const usesBun = Object.values(scripts).some((v) => typeof v === "string" && RUNS_BUN.test(v));
+    if (opts.bun === true && usesBun) return { command: `bun install --no-save && ${bunTest}`, from };
+    if (hasScript) return { command: "npm install --no-package-lock && npm test", from };
   }
   if (await has("Cargo.toml")) return { command: "cargo test", from: "Cargo.toml" };
   if (await has("go.mod")) return { command: "go test ./...", from: "go.mod" };

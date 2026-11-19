@@ -133,8 +133,8 @@ describe("norn init: detection", () => {
 describe("norn init: the test command", () => {
   const at = (name: string) => join(ROOT, name);
   const pkg = (test?: string) => JSON.stringify({ name: "app", scripts: test === undefined ? {} : { test } });
-  const testOf = async (seed: Record<string, string>) => {
-    const { m, body } = await init([], { seed });
+  const testOf = async (seed: Record<string, string>, tools: string[] = []) => {
+    const { m, body } = await init([], { seed, w: { tools } });
     return { checks: (await written(m, PATHS.local)).checks, test: body.test };
   };
 
@@ -142,9 +142,21 @@ describe("norn init: the test command", () => {
     expect((await testOf({ [at("package.json")]: pkg("jest"), [at("package-lock.json")]: "{}" })).checks).toEqual({ test: "npm ci && npm test" });
     expect((await testOf({ [at("package.json")]: pkg("vitest"), [at("pnpm-lock.yaml")]: "" })).checks).toEqual({ test: "pnpm install --frozen-lockfile && pnpm test" });
     expect((await testOf({ [at("package.json")]: pkg("vitest"), [at("yarn.lock")]: "" })).checks).toEqual({ test: "yarn install && yarn test" });
-    expect((await testOf({ [at("package.json")]: pkg("vitest") })).checks).toEqual({ test: "npm install && npm test" });
+    expect((await testOf({ [at("package.json")]: pkg("vitest") })).checks).toEqual({ test: "npm install --no-package-lock && npm test" });
     expect((await testOf({ [at("package.json")]: pkg("bun test --bail"), [at("bun.lock")]: "" })).checks).toEqual({ test: "bun install --frozen-lockfile && bun run test" });
     expect((await testOf({ [at("package.json")]: pkg(), [at("bun.lock")]: "" })).checks).toEqual({ test: "bun install --frozen-lockfile && bun test" });
+  });
+
+  test("with no lockfile, bun on PATH and package.json's scripts running bun pick bun; no install there writes a lockfile into the worktree", async () => {
+    const bunPkg = JSON.stringify({ name: "app", scripts: { test: "bun test", dev: "bun run src/main.ts" } });
+    expect((await testOf({ [at("package.json")]: bunPkg }, ["bun"])).checks).toEqual({ test: "bun install --no-save && bun run test" });
+    const bunDev = JSON.stringify({ name: "app", scripts: { dev: "bun run src/main.ts" } });
+    expect((await testOf({ [at("package.json")]: bunDev }, ["bun"])).checks).toEqual({ test: "bun install --no-save && bun test" });
+    // bun not on PATH, or scripts that never run it: npm, as before, without leaving a package-lock.json
+    expect((await testOf({ [at("package.json")]: bunPkg })).checks).toEqual({ test: "npm install --no-package-lock && npm test" });
+    expect((await testOf({ [at("package.json")]: pkg("vitest") }, ["bun"])).checks).toEqual({ test: "npm install --no-package-lock && npm test" });
+    // bun.lockb, the older lockfile, is bun's too
+    expect((await testOf({ [at("package.json")]: pkg("vitest"), [at("bun.lockb")]: "" })).checks).toEqual({ test: "bun install --frozen-lockfile && bun run test" });
   });
 
   test("npm's placeholder is no test script; other build files and a Makefile's test target are read too", async () => {
