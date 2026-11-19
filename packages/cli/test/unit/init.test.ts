@@ -316,6 +316,13 @@ describe("the old norn's repo-local config", () => {
     expect(await m.files.read(`${OLD_LOCAL}.old`)).toBe("mode: manual\n");
   });
 
+  test("init --commit beside a repo-local file that names its own mode keeps that mode and says so, never the old one", async () => {
+    const { m, body } = await init(["--commit"], { w: { tools: ["claude"] }, seed: { [PATHS.local]: "format: 1\nkernel: { mode: auto }\n", [OLD_LOCAL]: "mode: manual\n" } });
+    expect(await written(m, PATHS.local)).toEqual({ format: 1, kernel: { mode: "auto" } });
+    expect(body.chose).toMatchObject({ mode: "auto" });
+    expect(body.local_migrated).toMatchObject({ mapped: [], ignored: [`mode: ${REPO_LOCAL_FILE} sets kernel.mode already`] });
+  });
+
   test("before init it stays, and init takes its mode over detection and moves the rest", async () => {
     const m = machine({ script: world({ tools: ["claude"] }), seed: { [OLD_LOCAL]: OLD_LOCAL_TEXT } });
     const before = await runCli(["status", "--json"], m.io);

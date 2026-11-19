@@ -167,7 +167,13 @@ export const initCommand = defineCommand({
     if (next !== null) await files.write(excludePath, next);
     const exclude: "added" | "present" = next === null ? "present" : "added";
 
-    const localMigrated = await migrateOldLocalConfig(files, w.repo.root, paths, { setUp: false, carried: given === undefined && oldLocalMode !== undefined ? ["kernel.mode"] : [] });
+    // beside a committed config a repo-local file that names a mode keeps it, so the mode chosen here is not the one in effect
+    const keptMode = personalMode !== undefined && localText === null ? layers.local?.kernel?.mode : undefined;
+    const chose = keptMode === undefined ? choices : { ...choices, mode: keptMode };
+    const localMigrated = await migrateOldLocalConfig(files, w.repo.root, paths, {
+      setUp: false,
+      carried: given === undefined && oldLocalMode !== undefined && keptMode === undefined ? ["kernel.mode"] : [],
+    });
 
     // a fresh context: this one may hold the "no config" it saw before the file was written
     const doctor = await runDoctor(new CliContext(ctx.io));
@@ -177,7 +183,7 @@ export const initCommand = defineCommand({
       file: paths[layer],
       layer,
       team: commit,
-      chose: choices,
+      chose,
       detected,
       offered,
       test,
@@ -198,7 +204,9 @@ export const initCommand = defineCommand({
       `- forge: ${choices.forge}`,
       `- store: ${choices.store}`,
       `- executor: ${choices.executor} in ${choices.runner}${flags.executor || (choices.executor === "pi" ? detected.pi : detected.claude) ? "" : ` (${choices.executor} is not on PATH)`}`,
-      `- mode: ${choices.mode}${flags.mode ? "" : choices.mode === "auto" ? ` (the ${choices.runner} runner has nobody beside the agent: agent steps start on their own)` : ` (agents run in ${choices.runner} beside a person: start each agent step with norn run start <unit>)`}${commit ? `; in ${REPO_LOCAL_FILE}, as each person picks their own` : ""}`,
+      keptMode !== undefined
+        ? `- mode: ${keptMode} (${REPO_LOCAL_FILE} names it already, and keeps it)`
+        : `- mode: ${choices.mode}${flags.mode ? "" : choices.mode === "auto" ? ` (the ${choices.runner} runner has nobody beside the agent: agent steps start on their own)` : ` (agents run in ${choices.runner} beside a person: start each agent step with norn run start <unit>)`}${commit ? `; in ${REPO_LOCAL_FILE}, as each person picks their own` : ""}`,
       `- base: ${choices.base}`,
       testLine(test),
       `- .git/info/exclude: ${exclude === "added" ? `added ${excluded}` : `${excluded} already there`}`,
