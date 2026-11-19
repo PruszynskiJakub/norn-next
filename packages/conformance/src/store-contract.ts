@@ -15,6 +15,7 @@ import {
   validateStoredMessage,
   validateUnitRecord,
 } from "@norn/plugin-api";
+import { compareVersions } from "@norn/schema";
 import { type ContractOptions, contractTest, expectValid, failureOf, valueOf } from "./contract.ts";
 import { receiptId } from "./tracker-contract.ts";
 
@@ -61,7 +62,9 @@ export type StoreContractTest =
   | "malformed units, stories, ids and durations are refused as invalid"
   | "odd JSON and text round-trip exactly"
   | "a failing store answers writes with failures and nothing lands"
-  | "a shared store syncs and flushes";
+  | "a shared store syncs and flushes"
+  | "floor: none until raised, then it only rises"
+  | "racing raises leave the highest floor";
 
 /** How many writers each race test starts. */
 const RACERS = 8;
@@ -512,6 +515,7 @@ export function storeContract(name: string, makeWorld: () => StoreWorld | Promis
         failureOf(await st.artifacts.remove(UNIT, "spec.md"));
       }
       failureOf(await st.archive(UNIT));
+      if (st.floor) failureOf(await st.floor.raise("2.0.0"));
       world.failing(false);
       expect(await read(UNIT)).toEqual(before);
       expect(await read(SLICE)).toEqual({ state: null, receipts: [] });
@@ -521,6 +525,7 @@ export function storeContract(name: string, makeWorld: () => StoreWorld | Promis
       if (st.mailbox) expect(valueOf(await st.mailbox.receive(UNIT)).map((m) => m.id)).toEqual(["m-1"]);
       if (st.artifacts) expect(valueOf(await st.artifacts.read(UNIT, "spec.md"))).toBe("kept");
       expect(await append(UNIT, 2)).toEqual({ seq: 2, replayed: false });
+      if (st.floor) expect(valueOf(await st.floor.read())).toBeNull();
     });
 
     t("a shared store syncs and flushes", async () => {
@@ -532,6 +537,31 @@ export function storeContract(name: string, makeWorld: () => StoreWorld | Promis
       expect(valueOf(await flush(UNIT)).pushed).toBe(true);
       expect(valueOf(await flush(UNIT)).pushed).toBe(false);
       expect(valueOf(await need("sync", st.sync).call(st)).fetched).toBeGreaterThanOrEqual(0);
+    });
+
+    t("floor: none until raised, then it only rises", async () => {
+      const { st, twin } = await made();
+      if (!st.floor) return;
+      const floor = st.floor;
+      expect(valueOf(await floor.read())).toBeNull();
+      expect(valueOf(await floor.raise("0.36.6"))).toEqual({ floor: "0.36.6" });
+      expect(valueOf(await floor.raise("0.36.10"))).toEqual({ floor: "0.36.10" });
+      expect(valueOf(await floor.raise("0.36.9"))).toEqual({ floor: "0.36.10" });
+      expect(valueOf(await floor.raise("0.36.10"))).toEqual({ floor: "0.36.10" });
+      expect(valueOf(await floor.read())).toBe("0.36.10");
+      expect(valueOf(await need("floor", twin.floor).read())).toBe("0.36.10");
+      for (const bad of ["0.36", "0.37.0-dev.1", "v1.0.0", ""]) expect({ bad, code: failureOf(await floor.raise(bad)).code }).toEqual({ bad, code: "invalid" });
+      expect(valueOf(await floor.read())).toBe("0.36.10");
+    });
+
+    t("racing raises leave the highest floor", async () => {
+      const { st, racer } = await made();
+      if (!st.floor) return;
+      const versions = Array.from({ length: RACERS }, (_, i) => `0.${30 + ((i * 5) % RACERS)}.${i}`);
+      const answers = await Promise.all(versions.map((v, i) => need("floor", racer(i).floor).raise(v)));
+      const highest = [...versions].sort((a, b) => compareVersions(a, b)).at(-1);
+      for (const [i, a] of answers.entries()) expect(compareVersions(valueOf(a).floor, versions[i] as string)).toBeGreaterThanOrEqual(0);
+      expect(valueOf(await st.floor.read())).toBe(highest as string);
     });
   });
 }

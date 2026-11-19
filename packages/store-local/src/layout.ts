@@ -7,6 +7,8 @@
  *   stories/<story>/claim.json, mailbox.json, archived.json
  *   stories/<story>/artifacts/<encoded path>
  *
+ *   floor.json                                        the norn version floor
+ *
  * Lock files sit beside the record they guard (`<record>.lock`).
  */
 import { parseUnitId } from "@norn/plugin-api";
@@ -26,6 +28,7 @@ const SEQ_WIDTH = 8;
 export const isHidden = (name: string): boolean => name.startsWith(".");
 
 export interface Layout {
+  floor: string;
   stories: string;
   story(story: string): string;
   units(story: string): string;
@@ -52,6 +55,7 @@ export function layout(dataDir: string): Layout {
   };
   const receipts = (u: string) => `${unit(u)}/${RECEIPTS_DIR}`;
   return {
+    floor: `${root}/floor.json`,
     stories,
     story,
     units,

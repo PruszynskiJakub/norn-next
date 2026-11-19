@@ -224,6 +224,19 @@ export interface StoreArtifacts {
   remove(story: string, path: string): Promise<PluginResult<null>>;
 }
 
+/**
+ * The lowest norn version that may act on the store's data (plugin API 1.13). Each norn raises it to
+ * its own version as it acts, so a record shape an older norn would read as corrupt never reaches
+ * one: that norn finds the floor above itself and refuses to act. The floor only ever rises, and two
+ * racing raises leave the higher of the two.
+ */
+export interface StoreFloor {
+  /** the floor as `X.Y.Z`, or null while no norn has recorded one */
+  read(): Promise<PluginResult<string | null>>;
+  /** raise the floor to `version` unless it already stands there or higher; answers the floor after. A version not `X.Y.Z` is `invalid`. */
+  raise(version: string): Promise<PluginResult<{ floor: string }>>;
+}
+
 export interface Store {
   readonly name: string;
   readonly capabilities: StoreCapabilities;
@@ -244,6 +257,8 @@ export interface Store {
   claims: StoreClaims;
   mailbox?: StoreMailbox;
   artifacts?: StoreArtifacts;
+  /** the norn version floor; a store without one lets any norn act on its data */
+  floor?: StoreFloor;
   /**
    * Move every unit of the story out of the default `listUnits`; the units still read, and list with
    * `archived: true`. Answers the units it moved, so archiving again moves none. The kernel archives
