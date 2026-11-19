@@ -1,6 +1,6 @@
 /**
  * What the unit rules share: the unit as they read it, receipts built for the current step and
- * attempt, the apply decision that commits them, inbox items, and agent capacity for the tick.
+ * attempt, the apply decision that commits them, and inbox items.
  */
 import type { DecisionOf, InboxItem, InboxKind } from "../model/actions.ts";
 import type { StoryFacts, UnitFacts } from "../model/facts.ts";
@@ -92,35 +92,4 @@ export function noop(v: UnitView, rule: string, reason: string): DecisionOf<"noo
 /** Milliseconds from `since` to the tick's now. */
 export function ageMs(ctx: DecideContext, since: string): number {
   return Date.parse(ctx.facts.now) - Date.parse(since);
-}
-
-/**
- * Slots in use this tick: runs on the record at an agent or a check step, plus the ones this tick
- * started. A check runs detached beside the agents, on the same machine's cores, so it counts as one.
- * Kept per tick beside the context, so decide stays a function of its facts.
- */
-const startedThisTick = new WeakMap<DecideContext, number>();
-
-function agentRunsOnRecord(ctx: DecideContext): number {
-  let n = 0;
-  for (const story of ctx.facts.stories) {
-    // a shared store shows other machines' stories too; their runs take those machines' slots, not this one's
-    if (story.claim && story.claim.holder !== ctx.facts.holder) continue;
-    for (const unit of story.units) {
-      const st = unit.state;
-      if (!st?.run || st.ended) continue;
-      const graph = ctx.workflows.byHash[st.workflow.hash]?.graph;
-      const kind = graph?.steps[st.run.step]?.kind;
-      if (kind === "agent" || kind === "check") n++;
-    }
-  }
-  return n;
-}
-
-/** Take one slot for a new agent or check run; false when `maxAgents` are in use. */
-export function takeAgentSlot(ctx: DecideContext): boolean {
-  const started = startedThisTick.get(ctx) ?? 0;
-  if (agentRunsOnRecord(ctx) + started >= ctx.config.maxAgents) return false;
-  startedThisTick.set(ctx, started + 1);
-  return true;
 }

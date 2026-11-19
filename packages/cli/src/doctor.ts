@@ -9,6 +9,7 @@
  */
 import { RUN_ENV } from "@norn/plugin-api";
 import { installSkills, REPO_WORKFLOWS_DIR, repoFileOf, repoSkills, type RuntimeEnv, SKILLS_DIR, shellQuote } from "@norn/runtime";
+import { problemText } from "./config/load.ts";
 import type { NornConfig } from "./config/schema.ts";
 import type { CliContext } from "./context.ts";
 import { GIT_UPGRADE, gitTooOld, MIN_GIT_TEXT } from "./git-version.ts";
@@ -209,7 +210,8 @@ export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Prom
   const cwd = w.repo.root;
 
   const config = await attempt("config", () => ctx.config());
-  checks.push(config.check ?? passed("config", `executor ${config.value?.executor}; tracker ${config.value?.config.tracker.use}, forge ${config.value?.config.forge.use}, store ${config.value?.config.store.use}`));
+  const retired = (config.value?.retired ?? []).map((r) => `; ${problemText(r)} (${r.do_instead})`).join("");
+  checks.push(config.check ?? passed("config", `executor ${config.value?.executor}; tracker ${config.value?.config.tracker.use}, forge ${config.value?.config.forge.use}, store ${config.value?.config.store.use}${retired}`));
 
   if (config.check) checks.push(skipped("plugins", "config"), skipped("slots", "config"), skipped("workflows", "config"), ...(opts.repoOnly ? [] : [skipped("labels", "config"), skipped("hooks", "config"), skipped("skills", "config")]));
   else {

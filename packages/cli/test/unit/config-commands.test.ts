@@ -31,16 +31,16 @@ describe("norn config set", () => {
 
   test("--commit writes the committed file, --user the user file; the value is read as YAML", async () => {
     const m = machine({ seed: { [PATHS.local]: LOCAL_CONFIG } });
-    await runCli(["config", "set", "kernel.max_agents", "3", "--commit"], m.io);
-    expect(await m.files.read(PATHS.repo)).toBe("format: 1\nkernel:\n  max_agents: 3\n");
+    await runCli(["config", "set", "kernel.max_nudges", "3", "--commit"], m.io);
+    expect(await m.files.read(PATHS.repo)).toBe("format: 1\nkernel:\n  max_nudges: 3\n");
     await runCli(["config", "set", "holder", "me@desk", "--user"], m.io);
     expect(await m.files.read(PATHS.user)).toBe("format: 1\nholder: me@desk\n");
-    expect(json((await runCli(["config", "get", "kernel.max_agents", "--json"], m.io)).stdout).value).toBe(3);
+    expect(json((await runCli(["config", "get", "kernel.max_nudges", "--json"], m.io)).stdout).value).toBe(3);
   });
 
   test("a set that would break a valid config is a config error and writes nothing", async () => {
     const m = machine({ seed: { [PATHS.local]: LOCAL_CONFIG } });
-    const r = await runCli(["config", "set", "kernel.max_agents", "many", "--json"], m.io);
+    const r = await runCli(["config", "set", "kernel.max_nudges", "many", "--json"], m.io);
     expect(r.exit).toBe(ExitCode.config);
     expect(json(r.stdout)).toMatchObject({ code: "config_invalid" });
     expect(await m.files.read(PATHS.local)).toBe(LOCAL_CONFIG);
@@ -59,9 +59,19 @@ describe("norn config set", () => {
 
   test("a set nothing higher overrides, or one in the highest file, carries no override", async () => {
     const m = machine({ seed: { [PATHS.local]: LOCAL_CONFIG, [PATHS.repo]: "format: 1\nkernel: { mode: manual }\n" } });
-    expect(json((await runCli(["config", "set", "kernel.max_agents", "2", "--json"], m.io)).stdout).overridden).toBeUndefined();
+    expect(json((await runCli(["config", "set", "kernel.max_nudges", "2", "--json"], m.io)).stdout).overridden).toBeUndefined();
     expect(json((await runCli(["config", "set", "kernel.mode", "auto", "--commit", "--json"], m.io)).stdout).overridden).toBeUndefined();
     expect(json((await runCli(["config", "set", "kernel.mode", "auto", "--user", "--json"], m.io)).stdout).overridden).toMatchObject({ layer: "repo" });
+  });
+
+  test("a key this norn no longer reads is refused as a set and removed by --unset", async () => {
+    const m = machine({ seed: { [PATHS.local]: `${LOCAL_CONFIG}kernel:\n  max_agents: 4\n` } });
+    const r = await runCli(["config", "set", "kernel.max_agents", "3", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.config);
+    expect(json(r.stdout).error).toContain("kernel.max_agents is no longer read");
+    expect(await m.files.read(PATHS.local)).toContain("max_agents: 4");
+    expect((await runCli(["config", "set", "kernel.max_agents", "--unset", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    expect(await m.files.read(PATHS.local)).not.toContain("max_agents");
   });
 
   test("--unset removes the key", async () => {

@@ -237,26 +237,6 @@ export const MATRIX: Scenario[] = [
     ["check.running", "check.rerun", "step.running", "step.resume", "gate.stale", "unit.unpark", "receipts.reject"],
   ),
   scenario(
-    "agent-capacity",
-    "Agent capacity: with room for one agent run, the first ready story starts and the second waits its turn.",
-    { files: shippedFiles("slice"), config: config({ maxAgents: 1 }) },
-    (w) => {
-      seed(w, "gh-110", { workflow: "slice", step: "implement" });
-      seed(w, "gh-111", { workflow: "slice", step: "implement" });
-    },
-    ["agent.start", "agent.queued"],
-  ),
-  scenario(
-    "check-capacity",
-    "Check capacity: with room for one run, a check takes the slot and the next due check waits its turn.",
-    { files: shippedFiles("slice"), config: config({ maxAgents: 1 }) },
-    (w) => {
-      seed(w, "gh-112", { workflow: "slice", step: "test" });
-      seed(w, "gh-113", { workflow: "slice", step: "test" });
-    },
-    ["check.run", "check.queued"],
-  ),
-  scenario(
     "agent-no-executor",
     "A ready agent step whose executor is configured nowhere: the story waits for a person rather than starting on a guess.",
     { files: shippedFiles("slice"), config: config({ executor: "codex" }) },

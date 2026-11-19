@@ -207,34 +207,17 @@ describe("the unit's record", () => {
   });
 });
 
-describe("checks and max_agents", () => {
-  const busyAgent = { id: "gh-10", state: stateAt("build", { unit: "gh-10", story: "gh-10", run: run({ id: "run-9" }) }), receipts: [], session: null };
-  const busyCheck = { id: "gh-11", state: stateAt("test", { unit: "gh-11", story: "gh-11", run: run({ id: "chk-9", step: "test", executor: "check" }) }), receipts: [], session: null, step_run: { kind: "check", running: true } as const };
-
-  test("a check beyond maxAgents queues instead of starting", () => {
-    const d = kindOf(decideCase({ state: stateAt("test"), config: { maxAgents: 1 }, others: [busyAgent] }), "noop");
-    expect(d.rule).toBe("check.queued");
-    expect(decideCase({ state: stateAt("test"), config: { maxAgents: 2 }, others: [busyAgent] })?.rule).toBe("check.run");
-  });
-
-  test("a check on the record takes a slot an agent run would need", () => {
-    expect(decideCase({ state: stateAt("build"), config: { maxAgents: 1 }, others: [busyCheck] })?.rule).toBe("agent.queued");
-  });
-
-  test("a check cut short runs again under its recorded run though the slots are full: it holds its own", () => {
-    const d = decideCase({ state: stateAt("test", { run: checkRun }), step_run: { kind: "check", running: false }, config: { maxAgents: 1 }, others: [busyAgent] });
-    expect(d?.rule).toBe("check.rerun");
-  });
-
-  test("with N checks due in one tick, no more than maxAgents start", () => {
-    const units = [1, 10, 11, 12, 13].map((n) => ({ id: `gh-${n}`, state: stateAt("test", { unit: `gh-${n}`, story: `gh-${n}` }), receipts: [], session: null }));
-    const [first, ...rest] = units;
-    const f = factsOf({ state: first?.state ?? null, others: rest });
+describe("no cap on runs at once", () => {
+  test("with 5 agents and 5 checks due in one tick, all 10 start", () => {
+    // the fixture keys the other stories gh-10 on, in order: four more agents, then five checks
+    const due = (step: string, n: number) => ({ id: `gh-${n}`, state: stateAt(step, { unit: `gh-${n}`, story: `gh-${n}` }), receipts: [], session: null });
+    const others = [...[10, 11, 12, 13].map((n) => due("build", n)), ...[14, 15, 16, 17, 18].map((n) => due("test", n))];
+    const f = factsOf({ state: stateAt("build"), others });
     for (const s of f.stories) s.claim = { story: s.key, holder: f.holder, acquired_at: minutesAgo(1), expires_at: "2026-11-17T11:00:00.000Z", version: 1 };
     const wf = loaded();
-    const ds = decide(f, { byName: {}, byHash: { [wf.pinned.hash]: wf } }, { ...DEFAULT_KERNEL_CONFIG, mode: "auto", maxAgents: 2 });
-    const byRule = (rule: string) => ds.filter((d) => d.rule === rule).length;
-    expect(byRule("check.run")).toBe(2);
-    expect(byRule("check.queued")).toBe(3);
+    const ds = decide(f, { byName: {}, byHash: { [wf.pinned.hash]: wf } }, { ...DEFAULT_KERNEL_CONFIG, mode: "auto" });
+    expect(ds.filter((d) => d.kind === "start_run").map((d) => d.unit)).toEqual(["gh-1", "gh-10", "gh-11", "gh-12", "gh-13"]);
+    expect(ds.filter((d) => d.kind === "run_check").map((d) => d.unit)).toEqual(["gh-14", "gh-15", "gh-16", "gh-17", "gh-18"]);
+    expect(ds.filter((d) => d.unit !== null && d.kind === "noop")).toEqual([]);
   });
 });

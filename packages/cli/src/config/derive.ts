@@ -50,7 +50,6 @@ export function kernelConfigOf(config: NornConfig, executor: string): KernelConf
     sliceWorkflow: k.slice_workflow ?? d.sliceWorkflow,
     claimTtlMs: k.claim_ttl ? durationMs(k.claim_ttl) : d.claimTtlMs,
     claimRenewBeforeMs: k.claim_renew_before ? durationMs(k.claim_renew_before) : d.claimRenewBeforeMs,
-    maxAgents: k.max_agents ?? d.maxAgents,
   };
 }
 

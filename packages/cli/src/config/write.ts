@@ -7,6 +7,7 @@ import type { HostFiles } from "@norn/plugin-api";
 import { Document, isMap, parse, parseDocument } from "yaml";
 import { type ConfigLoad, type ConfigProblem, type LoadedConfig, mergeConfig, parseLayer } from "./load.ts";
 import type { Layer } from "./paths.ts";
+import { retiredText, retiredWhy, unsetCommand } from "./retired.ts";
 import { CONFIG_FORMAT } from "./schema.ts";
 
 /** A command-line value read as YAML: `true`, `3`, `[a, b]` and `{use: local}` mean what they say; the rest is a string. */
@@ -35,6 +36,9 @@ export type PlannedSet = { ok: true; text: string; next: LoadedConfig } | { ok: 
 
 /** What setting `key` in `layer` would leave: the file's new text and the merged config, or the problems it would cause. */
 export function planSet(loaded: Pick<LoadedConfig, "layers" | "paths">, current: string | null, layer: Layer, key: string, value: unknown): PlannedSet {
+  // a retired key would load and be ignored, so setting one would only look like it worked
+  const why = value === undefined ? undefined : retiredWhy(key);
+  if (why) return { ok: false, problems: [{ layer, path: `/${key.split(".").join("/")}`, message: retiredText(key, why), do_instead: unsetCommand(key, layer) }] };
   let text: string;
   try {
     text = setKeyInText(current, key, value);
@@ -43,7 +47,7 @@ export function planSet(loaded: Pick<LoadedConfig, "layers" | "paths">, current:
   }
   const parsed = parseLayer(layer, text);
   if (!parsed.ok) return parsed;
-  const merged: ConfigLoad = mergeConfig({ ...loaded.layers, [layer]: parsed.value }, loaded.paths);
+  const merged: ConfigLoad = mergeConfig({ ...loaded.layers, [layer]: parsed.value }, loaded.paths, parsed.retired);
   return merged.ok ? { ok: true, text, next: merged.value } : { ok: false, problems: merged.problems };
 }
 

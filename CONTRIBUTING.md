@@ -41,7 +41,7 @@ You need write access to the repo.
 
 1. Install the latest released binary as in the [README](README.md#install). The process always runs a released `norn`, never a build of this repo.
 2. Clone the repo and run `norn doctor`; `norn init` if it asks for a config.
-3. In `~/.norn/config.yaml` (never in the repo): your mode and agent limit, such as `kernel: { mode: auto, max_agents: 2 }`. Without a mode, agent steps wait for `norn run start <unit>`. The committed `.agents/norn.yaml` wins over your files for every key it sets (tracker, forge, store, the `claude` executor, base, the default workflow).
+3. In `~/.norn/config.yaml` (never in the repo): your mode, such as `kernel: { mode: auto }`. Without a mode, agent steps wait for `norn run start <unit>`. The committed `.agents/norn.yaml` wins over your files for every key it sets (tracker, forge, store, the `claude` executor, base, the default workflow).
 4. `norn watch`, and `norn status` in another terminal.
 
 **No write access?** Open an issue with one of the templates. A PR from a fork is read as input to an issue, never merged as is.

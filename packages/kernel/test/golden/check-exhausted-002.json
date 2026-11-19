@@ -549,8 +549,7 @@
     "workflow": "story",
     "sliceWorkflow": "slice",
     "claimTtlMs": 600000,
-    "claimRenewBeforeMs": 400000,
-    "maxAgents": 9
+    "claimRenewBeforeMs": 400000
   },
   "facts": {
     "tick_id": "01JD5G0000RDXMZM6QPZT4D2T8",

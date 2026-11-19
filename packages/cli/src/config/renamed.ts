@@ -34,7 +34,7 @@ const OLD_KEYS: Record<string, Renamed | Replaced | Gone> = {
   default_agent: { to: "executor", owner: "person" },
   agents: { by: "executors.<name>.model and executors.<name>.args", owner: "person" },
   runner: { by: "executors.<name>.runner", owner: "person" },
-  max_agents: { to: "kernel.max_agents", owner: "machine" },
+  max_agents: { gone: "norn starts every due agent and check, with no cap" },
   workflow: { to: "kernel.workflow", owner: "team" },
   default_workflow: { to: "kernel.workflow", owner: "team" },
   slice_workflow: { to: "kernel.slice_workflow", owner: "team" },
@@ -57,8 +57,8 @@ const OLD_KEYS: Record<string, Renamed | Replaced | Gone> = {
   norn_version: { gone: "the store keeps the norn version floor; no config holds it" },
   regenerate: { gone: "this norn regenerates nothing" },
   record: { gone: "the store slot (store.use) keeps run data" },
-  slots: { gone: "kernel.max_agents bounds the agents that run at once" },
-  max_checks: { gone: "checks follow kernel.max_agents" },
+  slots: { gone: "norn starts every due agent and check, with no cap" },
+  max_checks: { gone: "norn starts every due agent and check, with no cap" },
   watch_interval: { gone: "use norn watch --interval" },
 };
 

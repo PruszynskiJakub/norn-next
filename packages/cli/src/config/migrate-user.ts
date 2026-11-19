@@ -1,6 +1,6 @@
 /**
  * Moving a machine off the old norn's user config. The old `<norn home>/config.yaml` kept its keys at
- * the top level (`max_agents: 4`), where this norn's schema refuses them, so every command would fail
+ * the top level (`mode: auto`), where this norn's schema refuses them, so every command would fail
  * on a file the person never touched. It is told apart only when it fails this norn's schema and every
  * key in it is one the old file allowed; then a command refuses with `config_old` and `norn init`
  * rewrites it in this norn's keys, keeping the old text beside it.
@@ -42,6 +42,7 @@ const IGNORED_WHY: Record<string, string> = {
   agent: "the default executor is chosen per repo, by `executor` in the repo's config",
   agents: "an executor's model and args are set under `executors` in the repo's config",
   notify: "this norn sends no notifications",
+  max_agents: "norn starts every due agent and check, with no cap",
 };
 
 /** The old file mapped to this norn's keys; call only on text `isOldUserConfig` accepts. */
@@ -53,10 +54,7 @@ export function mapOldUserConfig(text: string): OldUserConfig {
   const ignored: string[] = [];
   for (const [key, value] of Object.entries(doc)) {
     if (key === "$schema") continue;
-    if (key === "max_agents" && Number.isInteger(value) && (value as number) >= 1) {
-      kernel.max_agents = value;
-      mapped.push("max_agents → kernel.max_agents");
-    } else if (key === "mode" && (value === "auto" || value === "manual")) {
+    if (key === "mode" && (value === "auto" || value === "manual")) {
       kernel.mode = value;
       mapped.push("mode → kernel.mode");
     } else if (key === "trace" && isMapping(value) && check(TraceRetain, value.retain).ok) {

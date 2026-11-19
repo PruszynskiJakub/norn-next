@@ -394,7 +394,6 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `kernel.workflow` | string | `"story"` |
 | `kernel.slice_workflow` | string | `"slice"` |
 | `kernel.intake_workflow_label_prefix` | string | `"norn:wf:"` |
-| `kernel.max_agents` | integer ≥ 1 | `9` |
 | `kernel.max_nudges` | integer ≥ 0 | `2` |
 | `kernel.max_retries` | integer ≥ 0 | `1` |
 | `kernel.silent_after` | duration | `"15m"` |

@@ -134,7 +134,7 @@ back as the unit's `corrupt_marked` fact.
 | (none) | | `check.finished.rejected` | `park` (inbox `stuck`: the check answered an outcome the step does not declare; no receipt is written, so nothing repeats each tick) |
 | `check.running` | `noop` | `check.running` | `noop` |
 | (none) | | `check.finished` | `apply_receipts` (`check.finished` from the check's answered outcome) |
-| `check.queued` | `noop` | `check.queued` | `noop` (`maxAgents` in use: a check run takes a slot as an agent run does) |
+| `check.queued` | `noop` | dropped: every due check starts; no cap bounds the runs at once | |
 | `check.no_worktree` | `noop` | dropped: the host resolves the worktree when it runs the check | |
 | `verify.run` | `run_check` | folded into `base_stale`: the host runs the vcs plugin's `verify-base` step kind on a clean base move under a story waiting at a step that routes `stale`, once per (head, base) pair, and a red merged tree reads as `base_stale` | then `gate.stale` or `step.stale` (the failing output is not handed to the next step as `last_check`) |
 | `verify.awaits_sync` | `noop` | dropped: as `verify.run` | |
@@ -168,7 +168,7 @@ back as the unit's `corrupt_marked` fact.
 | `agent.ready.manual.no_runner` | `noop` | `agent.ready.no_headless` | `park` (inbox `manual`: auto mode, the executor lacks `headless`) |
 | (none) | | `agent.no_executor` | `park` (inbox `stuck`: the step's executor is not configured) |
 | (attended) | `noop` | `agent.ready.attended` | `park` (inbox `attended`) |
-| `agent.queued` | `noop` | `agent.queued` | `noop` (`maxAgents` in use) |
+| `agent.queued` | `noop` | dropped: every due agent starts; no cap bounds the runs at once | |
 | `agent.start.wait_active` | `noop` | dropped: the act protocol records a run before launching it, so no second run starts beside one on the record | |
 | `agent.no_worktree` | `noop` | dropped: the host resolves the worktree for `start_run` | |
 | `agent.running` | `noop` | `agent.running` | `noop` |
@@ -191,7 +191,7 @@ back as the unit's `corrupt_marked` fact.
 | (none) | | `agent.retry.no_headless` | `park` (inbox `stuck`: a fresh session is needed and the executor cannot run headless) |
 | `answer.resume.wait_active` | `noop` | dropped: as `agent.start.wait_active` | |
 | `answer.resume.queued` | `noop` | dropped: an answer is delivered to the live session, never by starting one | |
-| `agent.nudge.queued` | `noop` | dropped: a nudge takes no agent slot | |
+| `agent.nudge.queued` | `noop` | dropped: a nudge waits on nothing | |
 
 ### Classified agent rules (old `<base>.<suffix>`)
 
