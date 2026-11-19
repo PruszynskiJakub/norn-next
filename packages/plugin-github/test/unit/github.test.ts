@@ -68,6 +68,13 @@ describe("how gh is run", () => {
     expect(listing?.argv.join(" ")).not.toContain("search(");
   });
 
+  test("intake asks gh who `me` is once per tracker, not on every tick", async () => {
+    const { tracker, exec, gh } = rig();
+    gh.seed([{ id: 1, title: "mine", body: "", open: true, assignees: [LOGIN], labels: ["norn"] }]);
+    for (let i = 0; i < 3; i++) expect(valueOf(await tracker.intake({ label: "norn", assignee: "me" })).map((x) => x.id)).toEqual([1]);
+    expect(exec.calls.filter((c) => c.argv[1] === "api" && c.argv[2] === "user")).toHaveLength(1);
+  });
+
   test("intake reads every page of the listing", async () => {
     const { tracker, gh } = rig();
     gh.seed(Array.from({ length: 130 }, (_, i) => ({ id: i + 1, title: `s${i + 1}`, body: "", open: true, assignees: [], labels: ["norn"] })));

@@ -54,6 +54,15 @@ export function createGithubTracker(ctx: HostContext, config: GithubConfig): Tra
     const login = out.value.trim();
     return login ? ok(login) : fail("auth", "gh api user named no login");
   }
+  // gh's login does not change under a running tracker, and intake resolves `me` on every tick;
+  // whoami itself still asks, so a probe of gh's auth reads it live
+  let me: string | undefined;
+  async function myLogin(): Promise<PluginResult<string>> {
+    if (me !== undefined) return ok(me);
+    const login = await whoami();
+    if (login.ok) me = login.value;
+    return login;
+  }
   const done = (kind: TrackerEffect["kind"], id?: number, url?: string, replayed = false): Outcome =>
     ok({ kind, replayed, ...(id === undefined ? {} : { id, key: formatStoryKey(GITHUB_KEY_PREFIX, id) }), ...(url === undefined ? {} : { url }) });
 
@@ -131,9 +140,9 @@ export function createGithubTracker(ctx: HostContext, config: GithubConfig): Tra
     async intake(q) {
       let assignee: string | null = q.assignee;
       if (assignee === "me") {
-        const me = await whoami();
-        if (!me.ok) return me;
-        assignee = me.value;
+        const login = await myLogin();
+        if (!login.ok) return login;
+        assignee = login.value;
       }
       const repo = await gh.repo();
       if (!repo.ok) return repo;
