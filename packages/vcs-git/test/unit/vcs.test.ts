@@ -427,6 +427,9 @@ describe("git vcs worktrees", () => {
     const there = gitHost([
       ["worktree prune", {}],
       ["worktree list", listing(`worktree /private${DATA}/worktrees/gh-12\nHEAD ${SHA}\nbranch refs/heads/gh-12-login\n\n`)],
+      // no other clone carried the unit on, so the worktree there stays as it is
+      ["rev-parse --verify --quiet --end-of-options refs/norn/remote-heads/", { code: 1 }],
+      ["rev-parse --verify --quiet --end-of-options refs/remotes/", { code: 1 }],
     ]);
     expect(await vcsOf(there.ctx).worktree.ensure("gh-12", "gh-12-login", "origin/main")).toEqual({ ok: true, value: { path: `${DATA}/worktrees/gh-12` } });
     expect(there.calls.some((c) => c[2] === "add")).toBe(false);

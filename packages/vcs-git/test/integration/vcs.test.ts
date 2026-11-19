@@ -171,12 +171,13 @@ describe("git vcs over real git", () => {
     const more = await commit(theirs, "review fix", { "feature.txt": "g\n" });
     expect(value(await (b.publishHead as NonNullable<typeof b.publishHead>)("norn/gh-12"))).toEqual({ pushed: true });
 
-    // the first machine, behind now, pushes nothing over it; once its worktree is gone it takes the newer head in
+    // the first machine, behind now, pushes nothing over it; its worktree, still there, is moved forward to the newer head
     value(await w.vcs.fetch());
     expect(value(await publish("norn/gh-12"))).toEqual({ pushed: false });
-    value(await w.vcs.worktree.remove("gh-12"));
     const again = value(await w.vcs.worktree.ensure("gh-12", "norn/gh-12", "origin/main")).path;
+    expect(again).toBe(path);
     expect(await git(again, "rev-parse", "HEAD")).toBe(more);
+    expect(await git(again, "status", "--porcelain")).toBe("");
 
     // a branch that diverged from the published head is never pushed over it
     await commit(theirs, "b again", { "b.txt": "b\n" });
@@ -186,6 +187,11 @@ describe("git vcs over real git", () => {
     const diverged = await publish("norn/gh-12");
     expect(diverged.ok ? null : diverged.failure.code).toBe("conflict");
     expect(await git(w.remote, "rev-parse", "refs/norn/heads/norn/gh-12")).toBe(await git(theirs, "rev-parse", "HEAD"));
+    // nor is a worktree that diverged from it run on as if it held the other clone's work
+    const local = await git(again, "rev-parse", "HEAD");
+    const split = await w.vcs.worktree.ensure("gh-12", "norn/gh-12", "origin/main");
+    expect(split.ok ? null : split.failure).toMatchObject({ code: "conflict", message: expect.stringContaining("diverged") });
+    expect(await git(again, "rev-parse", "HEAD")).toBe(local);
   });
 
   test("fetch brings the remote's branches into the checkout", async () => {

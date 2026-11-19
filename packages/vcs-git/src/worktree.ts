@@ -16,9 +16,9 @@ export function worktreePath(ctx: HostContext, unit: string): string {
  * Make the unit's worktree on `branch`, or find the one already there. A branch this clone lacks is
  * cut from the newest of the remote's copy and the branch's published head when `remote` has either
  * (the unit was carried on by another machine, whose work a branch cut from `base` would drop, and
- * whose push would then be refused), else from `base`. An existing branch is checked out as it is,
- * only moved forward to them first when it is strictly behind, so a re-run after a crash never loses
- * a commit.
+ * whose push would then be refused), else from `base`. An existing branch, with or without its
+ * worktree, is only moved forward to them when it is strictly behind, so a re-run after a crash never
+ * loses a commit.
  */
 export async function ensureWorktree(ctx: HostContext, unit: string, branch: string, base: string, remote?: string): Promise<PluginResult<{ path: string }>> {
   if (branch.startsWith("-") || base.startsWith("-")) return fail("invalid", `git: ${branch} or ${base} is not a ref`, false);
@@ -31,8 +31,8 @@ export async function ensureWorktree(ctx: HostContext, unit: string, branch: str
   if (!list.ok) return list;
   const there = list.value.find((w) => samePath(w.path, path));
   if (there) {
-    if (there.branch === branch) return ok({ path });
-    return fail("conflict", `the worktree of ${unit} at ${path} is on ${there.branch ?? "a detached head"}, not ${branch}`, false);
+    if (there.branch !== branch) return fail("conflict", `the worktree of ${unit} at ${path} is on ${there.branch ?? "a detached head"}, not ${branch}`, false);
+    return catchUp(ctx, root, path, branch, remote);
   }
   const elsewhere = list.value.find((w) => w.branch === branch);
   if (elsewhere) return fail("conflict", `${branch} is checked out at ${elsewhere.path}: one branch has one worktree`, false);
@@ -52,6 +52,31 @@ export async function ensureWorktree(ctx: HostContext, unit: string, branch: str
   const args = exists.value === null ? ["worktree", "add", "--quiet", "-b", branch, path, start] : ["worktree", "add", "--quiet", path, branch];
   const added = await git(ctx, root, args);
   return added.code === 0 ? ok({ path }) : gitFailure(added, "worktree add", "invalid");
+}
+
+/**
+ * Move an existing worktree forward to what another clone carried the unit on to. A worktree left
+ * from before a takeover would otherwise run the next step on the old head, and that step's work
+ * would never take in the other holder's commits. One that diverged from it is refused: neither side's
+ * commits may silently win, so a person merges them.
+ */
+async function catchUp(ctx: HostContext, root: string, path: string, branch: string, remote: string | undefined): Promise<PluginResult<{ path: string }>> {
+  if (remote === undefined || remote.startsWith("-")) return ok({ path });
+  const carried = await carriedOn(ctx, root, remote, branch);
+  if (!carried.ok) return carried;
+  if (carried.value === null) return ok({ path });
+  const head = await revParse(ctx, root, `refs/heads/${branch}`);
+  if (!head.ok) return head;
+  if (head.value === null || carried.value.sha === head.value) return ok({ path });
+  const ahead = await isAncestor(ctx, root, carried.value.sha, head.value);
+  if (!ahead.ok) return ahead;
+  if (ahead.value) return ok({ path });
+  const behind = await isAncestor(ctx, root, head.value, carried.value.sha);
+  if (!behind.ok) return behind;
+  if (!behind.value)
+    return fail("conflict", `${branch} in ${path} and ${carried.value.ref} diverged: another clone carried the unit on while this one committed; merge ${carried.value.ref} into it in ${path}`, false);
+  const moved = await git(ctx, path, ["merge", "--ff-only", "--quiet", carried.value.sha]);
+  return moved.code === 0 ? ok({ path }) : gitFailure(moved, `fast-forward ${branch} to ${carried.value.ref}`, "conflict");
 }
 
 /**
