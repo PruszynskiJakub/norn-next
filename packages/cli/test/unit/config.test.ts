@@ -229,6 +229,15 @@ describe("the runtime config derived from the person's", () => {
     expect(planSet(c, LOCAL_CONFIG, "local", "trace.retain", "forever").ok).toBe(false);
   });
 
+  test("checks: each named command reaches the runtime, the committed file's over the local one's; a name or an empty command it refuses", async () => {
+    const r = runtimeConfigOf(await loaded({ local: `${LOCAL_CONFIG}checks: { test: npm test, lint: make lint }\n`, repo: "checks: { test: pnpm test }\n" }), "me@box");
+    expect(r.checks).toEqual({ test: "pnpm test", lint: "make lint" });
+    expect("checks" in runtimeConfigOf(await loaded({ local: LOCAL_CONFIG }), "me@box")).toBe(false);
+    const c = await loaded({ local: LOCAL_CONFIG });
+    expect(planSet(c, LOCAL_CONFIG, "local", "checks.test", "").ok).toBe(false);
+    expect(planSet(c, LOCAL_CONFIG, "local", "checks.Test", "x").ok).toBe(false);
+  });
+
   test("durations", () => {
     expect([durationMs("250ms"), durationMs("30s"), durationMs("15m"), durationMs("2h"), durationMs("7d")]).toEqual([250, 30_000, 900_000, 7_200_000, 604_800_000]);
     expect(() => durationMs("15 m")).toThrow();

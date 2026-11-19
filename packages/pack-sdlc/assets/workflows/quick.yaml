@@ -6,8 +6,8 @@
 # ready, then wait at merge until the person merges the PR.
 # A story waiting at ready or merge goes back through update when the base moved under it in a way
 # that conflicts (base.stale: conflict).
-# Steps shared with other workflows come from `shared/` (`use:`): change the test command in
-# `shared/base-update.yaml`, the CI wait in `shared/ship.yaml`.
+# Steps shared with other workflows come from `shared/` (`use:`): the test command is the config's
+# `checks.test`; change the CI wait in `shared/ship.yaml`.
 name: quick
 description: Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.
 start: sync

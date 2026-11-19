@@ -398,6 +398,7 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `kernel.counters.stale` | integer ≥ 1 | `10` |
 | `kernel.counters.agent_back` | integer ≥ 1 | `3` |
 | `trace.retain` | duration or `"keep"` | `"7d"` |
+| `checks.<name>` | string | derived: `checks.test` is "bun test", which the shipped workflows' test steps run; init detects the repo's own |
 
 Beside `use`, `tracker`, `forge`, `store`, `vcs`, `executors.<name>.runner` take the keys of the plugin they name; that plugin checks them.
 

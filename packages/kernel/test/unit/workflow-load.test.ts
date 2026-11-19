@@ -155,7 +155,7 @@ describe("the shipped workflows", () => {
     expect(w.graph.steps["sync-base"]).toBeUndefined();
     expect(w.graph.steps.sync?.routes.done).toEqual({ to: "slice" });
     expect(w.graph.steps.merge).toMatchObject({ kind: "await-merge", runner: { type: "plugin", mode: "wait" }, outcomes: ["merged", "stale", "unpushed"] });
-    expect(w.graph.steps["test-merge"]?.check).toEqual({ command: "bun test", timeout_ms: 15 * 60_000, exits: {} });
+    expect(w.graph.steps["test-merge"]?.check).toEqual({ command: "{checks.test}", timeout_ms: 15 * 60_000, exits: {} });
     expect(w.graph.steps.ci?.outcomes).toEqual(["pass", "fail", "stale"]);
     expect(w.graph.steps["approve-slices"]?.outcomes).toEqual(["approve", "reject"]);
     expect(w.graph.steps["human-qa"]?.outcomes).toEqual(["approve", "reject", "stale"]);

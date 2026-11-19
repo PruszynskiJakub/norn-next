@@ -49,6 +49,8 @@ export interface RuntimeConfig {
   lockStaleMs?: number;
   /** how old a tick trace may grow before a tick removes it; null keeps every trace; absent: DEFAULT_TRACE_RETAIN_MS */
   traceRetainMs?: number | null;
+  /** the commands a check step names as `{checks.<name>}`, over DEFAULT_CHECKS */
+  checks?: Record<string, string>;
 }
 
 /** What the launcher needs to start one agent run; the brief is the kernel's inputs, rendered by the launcher. */

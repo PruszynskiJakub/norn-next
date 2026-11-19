@@ -221,6 +221,8 @@ export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: Step
 /** The workflows the tests run: a check, an agent step, a plugin effect and wait, a gate, a slices step. */
 export const WORKFLOWS: Record<string, string> = {
   "checked.yaml": "name: checked\nstart: test\nsteps:\n  test:\n    check: bun test\n    timeout: 5m\n    exits: { 3: flaky }\n    outcomes: { pass: $done, fail: $stuck, flaky: $stuck }\n",
+  "configured.yaml": 'name: configured\nstart: test\nsteps:\n  test:\n    check: "{checks.test} --bail"\n    timeout: 5m\n    outcomes: { pass: $done, fail: $stuck }\n',
+  "unconfigured.yaml": 'name: unconfigured\nstart: test\nsteps:\n  test:\n    check: "{checks.lint}"\n    timeout: 5m\n    outcomes: { pass: $done, fail: $stuck }\n',
   "agented.yaml": [
     "name: agented",
     "start: build",
@@ -309,7 +311,7 @@ export const WORKFLOWS: Record<string, string> = {
     "    gate: Ready?",
     "    outcomes: { approve: $done, reject: $stuck, stale: test }",
     "  test:",
-    "    check: bun test",
+    '    check: "{checks.test}"',
     "    timeout: 5m",
     "    outcomes: { pass: ready, fail: $stuck }",
     "base: { stale: conflict, verify: test }",
@@ -378,6 +380,8 @@ export interface HarnessOptions {
   exec?: ExecScript;
   /** give the host detached processes, so checks run outside the tick */
   processes?: FakeProcesses;
+  /** the config's `checks`, the commands a check step names as `{checks.<name>}` */
+  checks?: Record<string, string>;
 }
 
 export function harness(opts: HarnessOptions = {}): Harnessed {
@@ -420,6 +424,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     intake: { label: "norn", assignee: "me" },
     base: "main",
     holder: "machine-a",
+    ...(opts.checks ? { checks: opts.checks } : {}),
   };
   const tickIds: string[] = [];
   const built = createRuntimeEnv({ ctx, plugins, config, launcher, sessions });
