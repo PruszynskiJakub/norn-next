@@ -44,8 +44,6 @@ interface Outcome {
   error?: string;
 }
 
-const lostRace = (o: Outcome): boolean => o.error?.includes("the record moved since facts were read") === true;
-
 /** Every tick's outcomes, kept; `after` runs after each tick, so a test can look at the repo between ticks. */
 class Ticks {
   readonly outcomes: Outcome[] = [];
@@ -58,7 +56,7 @@ class Ticks {
     const t = await norn(this.w, ["tick", "--json"]);
     const outcomes = (t.body.outcomes ?? []) as Outcome[];
     this.outcomes.push(...outcomes);
-    if (t.code !== 0 && !outcomes.every((o) => o.ok || lostRace(o))) throw new Error(`tick exited ${t.code}: ${t.stdout}${t.stderr}`);
+    if (t.code !== 0 && !outcomes.every((o) => o.ok)) throw new Error(`tick exited ${t.code}: ${t.stdout}${t.stderr}`);
     await this.after();
     return t;
   }

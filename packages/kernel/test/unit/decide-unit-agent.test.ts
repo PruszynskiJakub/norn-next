@@ -96,15 +96,29 @@ describe("a ready agent step", () => {
 describe("an agent run, judged from its session", () => {
   const running = (over = {}) => stateAt("build", { run: run(over) });
 
-  test("a report is written as run.reported and applied, routing the outcome", () => {
-    const d = kindOf(decideCase({ state: running(), session: session("reported", { report: { verb: "done", outcome: "done" } }) }), "apply_receipts");
-    expect(d.rule).toBe("agent.reported");
-    expect(d.receipts.map((r) => r.data)).toEqual([{ kind: "run.reported", run_id: "run-1", verb: "done", outcome: "done", step: "build", attempt: 1 }]);
-    expect(d.state).toMatchObject({ step: "test", attempt: 1, run: null, applied_through: 1 });
+  test("a report the session shows before its receipt is on the record waits for the receipt and writes none of its own", () => {
+    const d = kindOf(decideCase({ state: running(), session: session("reported", { report: { verb: "ask" } }) }), "noop");
+    expect(d.rule).toBe("agent.reporting");
+    expect(decideCase({ state: running(), session: session("reported", { report: { verb: "done", outcome: "done" } }) })?.rule).toBe("agent.reporting");
   });
 
   test("a report outranks the session ending after it", () => {
-    expect(decideCase({ state: running(), session: session("ended", { report: { verb: "done", outcome: "done" } }) })?.rule).toBe("agent.reported");
+    expect(decideCase({ state: running(), session: session("ended", { report: { verb: "done", outcome: "done" } }) })?.rule).toBe("agent.reporting");
+  });
+
+  test("the report's own receipt, once on the record, is applied with its text, writing no second one", () => {
+    const asked = [receipt(1, { kind: "run.reported", run_id: "run-1", verb: "ask", text: "Which database?", step: "build", attempt: 1 })];
+    const d = kindOf(decideCase({ state: running(), receipts: asked, session: session("reported", { report: { verb: "ask" } }) }), "apply_receipts");
+    expect(d.rule).toBe("receipts.apply");
+    expect(d.receipts).toEqual([]);
+    expect(d.state.parked).toMatchObject({ text: "Which database?" });
+  });
+
+  test("a report whose receipt never comes parks the unit for a person once the quiet window passes, still writing none", () => {
+    const lost = session("reported", { report: { verb: "done", outcome: "done" }, last_event_at: minutesAgo(30) });
+    const d = kindOf(decideCase({ state: running({ started_at: minutesAgo(40) }), session: lost }), "park");
+    expect(d).toMatchObject({ rule: "agent.reporting.lost", inbox: { kind: "stuck" } });
+    expect(d.inbox?.text).toContain("run-1");
   });
 
   test("receipts on the record are applied before anything the session shows", () => {
@@ -129,9 +143,9 @@ describe("an agent run, judged from its session", () => {
     const reported = [receipt(1, { kind: "run.reported", run_id: "run-old", verb: "done", outcome: "done" })];
     const d = kindOf(decideCase({ state: running(), receipts: reported, session: session("working", { silent: true }) }), "apply_receipts");
     expect(d.receipts.map((r) => r.data.kind)).toEqual(["receipt.rejected"]);
-    const fresh = kindOf(decideCase({ state: running(), session: session("reported", { report: { verb: "done", outcome: "done" } }) }), "apply_receipts");
-    expect(fresh.receipts.map((r) => r.data.kind)).toEqual(["run.reported"]);
-    expect(fresh.state.applied_through).toBe(1);
+    const nudged = kindOf(decideCase({ state: running({ nudges: 2 }), receipts: reported, session: session("working", { silent: true }) }), "apply_receipts");
+    expect(nudged.receipts.map((r) => r.data.kind)).toEqual(["receipt.rejected"]);
+    expect(nudged.state.applied_through).toBe(2);
   });
 
   test("a silent agent is nudged while nudges last, then the unit ends stuck", () => {
@@ -358,16 +372,18 @@ describe("an agent run, judged from its session", () => {
     expect(d.inbox).toMatchObject({ kind: "permission", input_id: "p-1", text: "Bash(rm -rf build): Claude needs your permission to use Bash" });
   });
 
-  test("a report with an outcome the step does not declare parks the unit with the refusal and writes nothing, so the next tick does not write it again", () => {
+  test("a report the kernel refused parks the unit with the refusal and writes nothing, so the next tick does not write it again", () => {
     const bogus = session("reported", { report: { verb: "done", outcome: "bogus" } });
-    const d = kindOf(decideCase({ state: running(), session: bogus }), "park");
-    expect(d).toMatchObject({ rule: "agent.reported.rejected", inbox: { kind: "stuck", text: "not applied: outcome bogus is not declared at build" } });
+    const refused = "outcome bogus is not declared at build";
+    const d = kindOf(decideCase({ state: running(), session: bogus, report_rejected: refused }), "park");
+    expect(d).toMatchObject({ rule: "agent.reported.rejected", inbox: { kind: "stuck", text: `not applied: ${refused}` } });
     const parked = stateAt("build", { run: run(), parked: { reason: "agent.reported.rejected", since: minutesAgo(1) } });
-    expect(decideCase({ state: parked, session: bogus })).toMatchObject({ kind: "noop", rule: "unit.parked" });
-    // a fresh report from the agent is applied, lifting the park
-    const good = kindOf(decideCase({ state: parked, session: session("reported", { report: { verb: "done", outcome: "done" } }) }), "apply_receipts");
-    expect(good).toMatchObject({ rule: "agent.reported", state: { step: "test" } });
-    expect(good.state.parked).toBeUndefined();
+    expect(decideCase({ state: parked, session: bogus, report_rejected: refused })).toMatchObject({ kind: "noop", rule: "unit.parked" });
+    // the agent's next report comes as its own receipt, which is applied, lifting the park
+    const good = [receipt(1, { kind: "run.reported", run_id: "run-1", verb: "done", outcome: "done", step: "build", attempt: 1 })];
+    const applied = kindOf(decideCase({ state: parked, receipts: good, session: session("reported", { report: { verb: "done", outcome: "done" } }) }), "apply_receipts");
+    expect(applied).toMatchObject({ rule: "receipts.apply", state: { step: "test" } });
+    expect(applied.state.parked).toBeUndefined();
   });
 
   test("a working agent is left alone", () => {

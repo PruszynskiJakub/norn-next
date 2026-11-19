@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { memoryHost } from "@norn/conformance";
 import { fail, ok, parseJson } from "@norn/plugin-api";
 import { Type } from "@sinclair/typebox";
-import { acquireTickLock, createRuntime, readStoryDoc, tickLockPath, tracePath, writeStoryDoc } from "../../src/index.ts";
+import { acquireTickLock, createRuntime, readStoryDoc, reportRun, tickLockPath, tracePath, writeStoryDoc } from "../../src/index.ts";
 import { type Harnessed, has, harness, MINUTE, type Report, record, rulesOf, session, START, tickUntil, trackerItem } from "./support.ts";
 
 const lastRules = (reports: Report[]) => reports.map(rulesOf);
@@ -45,8 +45,10 @@ describe("a story from intake to done", () => {
     await tickUntil(h, has("receipts.apply"));
     const handle = (await record(h, "lt-1")).state?.run?.session;
     expect(handle).toStartWith("h-");
+    const runId = (await record(h, "lt-1")).state?.run?.id as string;
+    expect(await reportRun(h.env, "lt-1", runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true });
     h.sessions.byUnit.set("lt-1", session("reported", { report: { verb: "done", outcome: "done" } }));
-    await tickUntil(h, has("agent.reported"));
+    await tickUntil(h, async () => (await record(h, "lt-1")).state?.ended !== undefined);
     expect((await record(h, "lt-1")).state?.ended).toBe("done");
     expect(h.launcher.of("stop")).toEqual([[handle]]);
     // the story's finish closes what the ended run left open (its pane) and removes its worktree

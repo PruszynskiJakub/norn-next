@@ -193,8 +193,10 @@ export class FakeLauncher implements AgentLauncher {
 /** Sessions by unit, answered for whatever run is current: a test sets what the agent is doing. */
 export class FakeSessions implements SessionSource {
   readonly byUnit = new Map<string, SessionFacts>();
-  facts(unit: string): SessionFacts | null {
-    return this.byUnit.get(unit) ?? null;
+  facts(unit: string): SessionFacts | null | Promise<SessionFacts | null> {
+    // a copy, as a real source folds fresh facts on every read: the tick edits what it is handed
+    const s = this.byUnit.get(unit);
+    return s ? structuredClone(s) : null;
   }
 }
 

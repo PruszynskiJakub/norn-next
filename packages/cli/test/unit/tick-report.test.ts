@@ -3,7 +3,7 @@ import type { TickReport } from "@norn/runtime";
 import { failedCount, outcomeLine, tickMarkdown } from "../../src/tick-report.ts";
 
 type Outcome = TickReport["outcomes"][number];
-const decision = { kind: "apply_receipts", unit: "gh-1", rule: "agent.reported" } as unknown as Outcome["decision"];
+const decision = { kind: "apply_receipts", unit: "gh-1", rule: "receipts.apply" } as unknown as Outcome["decision"];
 const report = (outcomes: Outcome[]): TickReport => ({ tick_id: "01JAAAAAAAAAAAAAAAAAAAAAAA", decisions: [], outcomes, problems: [] }) as unknown as TickReport;
 const lost: Outcome = { decision, ok: false, retryable: true, error: "conflict: gh-1: receipt X landed at seq 11, decide numbered it 10; the record moved since facts were read" };
 

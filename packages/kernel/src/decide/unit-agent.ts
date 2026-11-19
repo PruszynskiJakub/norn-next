@@ -16,7 +16,7 @@ import type { ClassifiedOutcome } from "../model/receipts.ts";
 import type { RunInfo } from "../model/run-state.ts";
 import type { SessionFacts } from "../session/view.ts";
 import type { AgentStepSpec } from "../workflow/graph.ts";
-import { ageMs, applyDecision, applyOrPark, intentFor, noop, parkDecision, type UnitView } from "./unit-support.ts";
+import { ageMs, applyDecision, intentFor, noop, parkDecision, type UnitView } from "./unit-support.ts";
 
 /** The story's own mode, then the workflow's, then the config's. */
 export function effectiveMode(v: UnitView): Mode {
@@ -106,11 +106,7 @@ function routes(v: UnitView, outcome: ClassifiedOutcome): boolean {
 function judgeRun(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
   const session = v.unit.session;
   // a report outranks the session ending: an agent reports, then its process exits
-  if (session?.report) {
-    const { verb, outcome } = session.report;
-    const body = { kind: "run.reported" as const, run_id: run.id, verb, ...(outcome === undefined ? {} : { outcome }) };
-    return applyOrPark(v, "agent.reported", "agent.reported.rejected", [intentFor(v, body)]);
-  }
+  if (session?.report) return reportWithoutReceipt(v, run, session);
   if (session?.activity === "ended") return died(v, spec, run);
   // a person works beside an attended run: only its report or its end is decided
   if (run.attended) return noop(v, "agent.running", `attended run ${run.id} in progress`);
@@ -148,6 +144,26 @@ function judgeRun(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
   if (silentNow(v, session)) return quiet(v, spec, run, "agent.silent");
   if (session.activity === "turn_ended") return quiet(v, spec, run, "agent.turn_ended");
   return noop(v, "agent.running", `run ${run.id} ${session.activity}`);
+}
+
+/**
+ * A report the session shows whose receipt the facts do not hold, as the host strips a report whose
+ * receipt stands. The receipt is the report: it carries the agent's text, criteria and findings,
+ * and the reporting API writes it before the event, so a tick that read the record just before the
+ * report landed sees the event alone and the next tick finds the receipt. Writing one here would
+ * record the report a second time without its text. A refused receipt parks the unit with the
+ * refusal; a report whose receipt never comes (a reporting path that broke that order) is handed to
+ * a person once the agent has been quiet for the window, never guessed at. That park is derived, so
+ * a later event from the agent lifts it until the next quiet window passes.
+ */
+function reportWithoutReceipt(v: UnitView, run: RunInfo, session: SessionFacts): Decision {
+  const rejected = v.unit.report_rejected;
+  if (rejected !== undefined) return parkDecision(v, "agent.reported.rejected", "stuck", { text: `not applied: ${rejected}` });
+  const { verb } = session.report as NonNullable<SessionFacts["report"]>;
+  if (ageMs(v.ctx, session.last_event_at ?? run.started_at) <= quietWindowMs(v)) return noop(v, "agent.reporting", `run ${run.id} reported ${verb}; waiting for its receipt`);
+  return parkDecision(v, "agent.reporting.lost", "stuck", {
+    text: `run ${run.id}'s session shows a ${verb} report that is not on the record; start the step again with norn run rerun ${v.unit.id}`,
+  });
 }
 
 /** only an executor that can press keys in its pane takes the answer from story answer */

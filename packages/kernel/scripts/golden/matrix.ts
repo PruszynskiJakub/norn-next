@@ -409,6 +409,23 @@ export const MATRIX: Scenario[] = [
     2,
   ),
   scenario(
+    "agent-report-receipt",
+    "A report is applied from its own receipt, never from the session alone: a session that shows a report before its receipt is on the record waits for it, writing nothing; the receipt on the record is applied with the agent's text; a report whose receipt never comes is handed to a person once the agent has been quiet past the window.",
+    SLICE(),
+    (w) => {
+      seed(w, "gh-190", { workflow: "slice", step: "implement", run: {} });
+      w.unit("gh-190").session = session("reported", { report: { verb: "ask" }, last_event_at: earlier(w, 1) });
+      seed(w, "gh-191", { workflow: "slice", step: "implement", run: {} });
+      w.report("gh-191", "ask", undefined, "Which database should the cache use?");
+      seed(w, "gh-192", { workflow: "slice", step: "implement", run: { minutesAgo: 60 } });
+      w.unit("gh-192").session = session("reported", { report: { verb: "done", outcome: "done" }, last_event_at: earlier(w, 45) });
+      w.manual.add("gh-190");
+      w.manual.add("gh-191");
+      w.manual.add("gh-192");
+    },
+    ["agent.reporting", "receipts.apply", "agent.reporting.lost"],
+  ),
+  scenario(
     "steps-cut-short",
     "Runs that keep ending without an answer decide accepts: a check and an effect step cut short with their retries spent end the unit stuck, naming the limit; a check, a plugin step and an agent answering an outcome the step does not declare park the unit for a person, and the next tick writes nothing again.",
     { files: shippedFiles("quick") },
@@ -422,7 +439,7 @@ export const MATRIX: Scenario[] = [
       w.unit("gh-183").step_run = { kind: "open-pr", running: false, outcome: "opened" };
       seed(w, "gh-184", { workflow: "quick", step: "implement", run: {} });
       w.manual.add("gh-184");
-      w.unit("gh-184").session = session("reported", { report: { verb: "done", outcome: "bogus" } });
+      w.report("gh-184", "done", "bogus");
     },
     ["check.rerun.exhausted", "step.resume.exhausted", "check.finished.rejected", "step.finished.rejected", "agent.reported.rejected", "unit.parked"],
     2,

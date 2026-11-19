@@ -83,13 +83,14 @@
             }
           },
           "sync-resolve": {
-            "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+            "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
             "skills": [
               "norn-merge"
             ],
             "inputs": [
               "spec",
-              "handoff"
+              "handoff",
+              "base_side"
             ],
             "outcomes": {
               "done": "sync"
@@ -129,7 +130,7 @@
             }
           },
           "resolve": {
-            "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+            "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
             "skills": [
               "norn-merge"
             ],
@@ -146,7 +147,7 @@
             }
           },
           "test": {
-            "check": "bun test",
+            "check": "{checks.test}",
             "timeout": "15m",
             "outcomes": {
               "pass": "review",
@@ -157,7 +158,7 @@
             }
           },
           "test-merge": {
-            "check": "bun test",
+            "check": "{checks.test}",
             "timeout": "15m",
             "outcomes": {
               "pass": "open-pr",
@@ -168,7 +169,7 @@
             }
           },
           "test-resolution": {
-            "check": "bun test",
+            "check": "{checks.test}",
             "timeout": "15m",
             "outcomes": {
               "pass": "resolution-review",
@@ -201,7 +202,7 @@
             "means": {
               "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
               "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-              "changes_requested": "blocking findings on the resolution in the receipt"
+              "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
             }
           },
           "review": {
@@ -226,7 +227,7 @@
             },
             "means": {
               "approve": "the change does what the story asks and nothing else, no blocking findings",
-              "changes_requested": "blocking findings in the receipt"
+              "changes_requested": "blocking findings, handed back with --findings <file>"
             }
           },
           "describe": {
@@ -253,7 +254,7 @@
             }
           },
           "ci": {
-            "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+            "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
             "timeout": "30m",
             "exits": {
               "3": "stale"
@@ -291,11 +292,11 @@
           "merge": {
             "await-merge": null,
             "outcomes": {
+              "merged": "$done",
               "stale": {
                 "to": "update",
                 "counter": "ship.stale"
               },
-              "merged": "$done",
               "unpushed": {
                 "to": "open-pr",
                 "counter": "merge.unpushed"
@@ -371,6 +372,7 @@
     "workflow": "story",
     "intakeWorkflowLabelPrefix": "norn:wf:",
     "sliceWorkflow": "slice",
+    "base": "main",
     "claimTtlMs": 600000,
     "claimRenewBeforeMs": 400000
   },
@@ -442,7 +444,7 @@
               "story": "gh-180",
               "workflow": {
                 "name": "quick",
-                "hash": "2bba59ca6b5b133722d54f98b1a1456906abd6fe54ee447a9c43c47a116cee50",
+                "hash": "f857907e3cab36e4bb9b37e1f9343e220a77c91f3735f2dd7b1b2e4d893a7edd",
                 "doc": {
                   "name": "quick",
                   "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -461,13 +463,14 @@
                       }
                     },
                     "sync-resolve": {
-                      "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
                       "skills": [
                         "norn-merge"
                       ],
                       "inputs": [
                         "spec",
-                        "handoff"
+                        "handoff",
+                        "base_side"
                       ],
                       "outcomes": {
                         "done": "sync"
@@ -507,7 +510,7 @@
                       }
                     },
                     "resolve": {
-                      "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
                       "skills": [
                         "norn-merge"
                       ],
@@ -524,7 +527,7 @@
                       }
                     },
                     "test": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "review",
@@ -535,7 +538,7 @@
                       }
                     },
                     "test-merge": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "open-pr",
@@ -546,7 +549,7 @@
                       }
                     },
                     "test-resolution": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "resolution-review",
@@ -579,7 +582,7 @@
                       "means": {
                         "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
                         "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-                        "changes_requested": "blocking findings on the resolution in the receipt"
+                        "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
                       }
                     },
                     "review": {
@@ -604,7 +607,7 @@
                       },
                       "means": {
                         "approve": "the change does what the story asks and nothing else, no blocking findings",
-                        "changes_requested": "blocking findings in the receipt"
+                        "changes_requested": "blocking findings, handed back with --findings <file>"
                       }
                     },
                     "describe": {
@@ -631,7 +634,7 @@
                       }
                     },
                     "ci": {
-                      "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+                      "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
                       "timeout": "30m",
                       "exits": {
                         "3": "stale"
@@ -669,11 +672,11 @@
                     "merge": {
                       "await-merge": null,
                       "outcomes": {
+                        "merged": "$done",
                         "stale": {
                           "to": "update",
                           "counter": "ship.stale"
                         },
-                        "merged": "$done",
                         "unpushed": {
                           "to": "open-pr",
                           "counter": "merge.unpushed"
@@ -798,7 +801,7 @@
               "story": "gh-181",
               "workflow": {
                 "name": "quick",
-                "hash": "2bba59ca6b5b133722d54f98b1a1456906abd6fe54ee447a9c43c47a116cee50",
+                "hash": "f857907e3cab36e4bb9b37e1f9343e220a77c91f3735f2dd7b1b2e4d893a7edd",
                 "doc": {
                   "name": "quick",
                   "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -817,13 +820,14 @@
                       }
                     },
                     "sync-resolve": {
-                      "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
                       "skills": [
                         "norn-merge"
                       ],
                       "inputs": [
                         "spec",
-                        "handoff"
+                        "handoff",
+                        "base_side"
                       ],
                       "outcomes": {
                         "done": "sync"
@@ -863,7 +867,7 @@
                       }
                     },
                     "resolve": {
-                      "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
                       "skills": [
                         "norn-merge"
                       ],
@@ -880,7 +884,7 @@
                       }
                     },
                     "test": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "review",
@@ -891,7 +895,7 @@
                       }
                     },
                     "test-merge": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "open-pr",
@@ -902,7 +906,7 @@
                       }
                     },
                     "test-resolution": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "resolution-review",
@@ -935,7 +939,7 @@
                       "means": {
                         "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
                         "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-                        "changes_requested": "blocking findings on the resolution in the receipt"
+                        "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
                       }
                     },
                     "review": {
@@ -960,7 +964,7 @@
                       },
                       "means": {
                         "approve": "the change does what the story asks and nothing else, no blocking findings",
-                        "changes_requested": "blocking findings in the receipt"
+                        "changes_requested": "blocking findings, handed back with --findings <file>"
                       }
                     },
                     "describe": {
@@ -987,7 +991,7 @@
                       }
                     },
                     "ci": {
-                      "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+                      "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
                       "timeout": "30m",
                       "exits": {
                         "3": "stale"
@@ -1025,11 +1029,11 @@
                     "merge": {
                       "await-merge": null,
                       "outcomes": {
+                        "merged": "$done",
                         "stale": {
                           "to": "update",
                           "counter": "ship.stale"
                         },
-                        "merged": "$done",
                         "unpushed": {
                           "to": "open-pr",
                           "counter": "merge.unpushed"
@@ -1159,7 +1163,7 @@
               "story": "gh-182",
               "workflow": {
                 "name": "quick",
-                "hash": "2bba59ca6b5b133722d54f98b1a1456906abd6fe54ee447a9c43c47a116cee50",
+                "hash": "f857907e3cab36e4bb9b37e1f9343e220a77c91f3735f2dd7b1b2e4d893a7edd",
                 "doc": {
                   "name": "quick",
                   "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -1178,13 +1182,14 @@
                       }
                     },
                     "sync-resolve": {
-                      "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
                       "skills": [
                         "norn-merge"
                       ],
                       "inputs": [
                         "spec",
-                        "handoff"
+                        "handoff",
+                        "base_side"
                       ],
                       "outcomes": {
                         "done": "sync"
@@ -1224,7 +1229,7 @@
                       }
                     },
                     "resolve": {
-                      "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
                       "skills": [
                         "norn-merge"
                       ],
@@ -1241,7 +1246,7 @@
                       }
                     },
                     "test": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "review",
@@ -1252,7 +1257,7 @@
                       }
                     },
                     "test-merge": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "open-pr",
@@ -1263,7 +1268,7 @@
                       }
                     },
                     "test-resolution": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "resolution-review",
@@ -1296,7 +1301,7 @@
                       "means": {
                         "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
                         "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-                        "changes_requested": "blocking findings on the resolution in the receipt"
+                        "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
                       }
                     },
                     "review": {
@@ -1321,7 +1326,7 @@
                       },
                       "means": {
                         "approve": "the change does what the story asks and nothing else, no blocking findings",
-                        "changes_requested": "blocking findings in the receipt"
+                        "changes_requested": "blocking findings, handed back with --findings <file>"
                       }
                     },
                     "describe": {
@@ -1348,7 +1353,7 @@
                       }
                     },
                     "ci": {
-                      "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+                      "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
                       "timeout": "30m",
                       "exits": {
                         "3": "stale"
@@ -1386,11 +1391,11 @@
                     "merge": {
                       "await-merge": null,
                       "outcomes": {
+                        "merged": "$done",
                         "stale": {
                           "to": "update",
                           "counter": "ship.stale"
                         },
-                        "merged": "$done",
                         "unpushed": {
                           "to": "open-pr",
                           "counter": "merge.unpushed"
@@ -1519,7 +1524,7 @@
               "story": "gh-183",
               "workflow": {
                 "name": "quick",
-                "hash": "2bba59ca6b5b133722d54f98b1a1456906abd6fe54ee447a9c43c47a116cee50",
+                "hash": "f857907e3cab36e4bb9b37e1f9343e220a77c91f3735f2dd7b1b2e4d893a7edd",
                 "doc": {
                   "name": "quick",
                   "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -1538,13 +1543,14 @@
                       }
                     },
                     "sync-resolve": {
-                      "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
                       "skills": [
                         "norn-merge"
                       ],
                       "inputs": [
                         "spec",
-                        "handoff"
+                        "handoff",
+                        "base_side"
                       ],
                       "outcomes": {
                         "done": "sync"
@@ -1584,7 +1590,7 @@
                       }
                     },
                     "resolve": {
-                      "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
                       "skills": [
                         "norn-merge"
                       ],
@@ -1601,7 +1607,7 @@
                       }
                     },
                     "test": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "review",
@@ -1612,7 +1618,7 @@
                       }
                     },
                     "test-merge": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "open-pr",
@@ -1623,7 +1629,7 @@
                       }
                     },
                     "test-resolution": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "resolution-review",
@@ -1656,7 +1662,7 @@
                       "means": {
                         "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
                         "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-                        "changes_requested": "blocking findings on the resolution in the receipt"
+                        "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
                       }
                     },
                     "review": {
@@ -1681,7 +1687,7 @@
                       },
                       "means": {
                         "approve": "the change does what the story asks and nothing else, no blocking findings",
-                        "changes_requested": "blocking findings in the receipt"
+                        "changes_requested": "blocking findings, handed back with --findings <file>"
                       }
                     },
                     "describe": {
@@ -1708,7 +1714,7 @@
                       }
                     },
                     "ci": {
-                      "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+                      "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
                       "timeout": "30m",
                       "exits": {
                         "3": "stale"
@@ -1746,11 +1752,11 @@
                     "merge": {
                       "await-merge": null,
                       "outcomes": {
+                        "merged": "$done",
                         "stale": {
                           "to": "update",
                           "counter": "ship.stale"
                         },
-                        "merged": "$done",
                         "unpushed": {
                           "to": "open-pr",
                           "counter": "merge.unpushed"
@@ -1879,7 +1885,7 @@
               "story": "gh-184",
               "workflow": {
                 "name": "quick",
-                "hash": "2bba59ca6b5b133722d54f98b1a1456906abd6fe54ee447a9c43c47a116cee50",
+                "hash": "f857907e3cab36e4bb9b37e1f9343e220a77c91f3735f2dd7b1b2e4d893a7edd",
                 "doc": {
                   "name": "quick",
                   "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -1898,13 +1904,14 @@
                       }
                     },
                     "sync-resolve": {
-                      "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
                       "skills": [
                         "norn-merge"
                       ],
                       "inputs": [
                         "spec",
-                        "handoff"
+                        "handoff",
+                        "base_side"
                       ],
                       "outcomes": {
                         "done": "sync"
@@ -1944,7 +1951,7 @@
                       }
                     },
                     "resolve": {
-                      "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
                       "skills": [
                         "norn-merge"
                       ],
@@ -1961,7 +1968,7 @@
                       }
                     },
                     "test": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "review",
@@ -1972,7 +1979,7 @@
                       }
                     },
                     "test-merge": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "open-pr",
@@ -1983,7 +1990,7 @@
                       }
                     },
                     "test-resolution": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "resolution-review",
@@ -2016,7 +2023,7 @@
                       "means": {
                         "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
                         "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-                        "changes_requested": "blocking findings on the resolution in the receipt"
+                        "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
                       }
                     },
                     "review": {
@@ -2041,7 +2048,7 @@
                       },
                       "means": {
                         "approve": "the change does what the story asks and nothing else, no blocking findings",
-                        "changes_requested": "blocking findings in the receipt"
+                        "changes_requested": "blocking findings, handed back with --findings <file>"
                       }
                     },
                     "describe": {
@@ -2068,7 +2075,7 @@
                       }
                     },
                     "ci": {
-                      "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+                      "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
                       "timeout": "30m",
                       "exits": {
                         "3": "stale"
@@ -2106,11 +2113,11 @@
                     "merge": {
                       "await-merge": null,
                       "outcomes": {
+                        "merged": "$done",
                         "stale": {
                           "to": "update",
                           "counter": "ship.stale"
                         },
-                        "merged": "$done",
                         "unpushed": {
                           "to": "open-pr",
                           "counter": "merge.unpushed"
@@ -2197,18 +2204,28 @@
               }
             },
             "version": 2,
-            "receipts": [],
+            "receipts": [
+              {
+                "seq": 2,
+                "id": "01JD5G00007X6WZ5RMAVTMTBG5",
+                "at": "2026-11-17T09:00:00.000Z",
+                "data": {
+                  "kind": "run.reported",
+                  "run_id": "run-gh-184-1",
+                  "verb": "done",
+                  "outcome": "bogus",
+                  "step": "implement",
+                  "attempt": 1
+                }
+              }
+            ],
             "session": {
               "activity": "reported",
               "silent": false,
               "pending_tools": 0,
               "subagents": 0,
               "pane_answers": 0,
-              "errors": [],
-              "report": {
-                "verb": "done",
-                "outcome": "bogus"
-              }
+              "errors": []
             }
           }
         ],
@@ -2240,7 +2257,7 @@
         "story": "gh-180",
         "workflow": {
           "name": "quick",
-          "hash": "2bba59ca6b5b133722d54f98b1a1456906abd6fe54ee447a9c43c47a116cee50",
+          "hash": "f857907e3cab36e4bb9b37e1f9343e220a77c91f3735f2dd7b1b2e4d893a7edd",
           "doc": {
             "name": "quick",
             "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -2259,13 +2276,14 @@
                 }
               },
               "sync-resolve": {
-                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
                 "skills": [
                   "norn-merge"
                 ],
                 "inputs": [
                   "spec",
-                  "handoff"
+                  "handoff",
+                  "base_side"
                 ],
                 "outcomes": {
                   "done": "sync"
@@ -2305,7 +2323,7 @@
                 }
               },
               "resolve": {
-                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
                 "skills": [
                   "norn-merge"
                 ],
@@ -2322,7 +2340,7 @@
                 }
               },
               "test": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "review",
@@ -2333,7 +2351,7 @@
                 }
               },
               "test-merge": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "open-pr",
@@ -2344,7 +2362,7 @@
                 }
               },
               "test-resolution": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "resolution-review",
@@ -2377,7 +2395,7 @@
                 "means": {
                   "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
                   "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-                  "changes_requested": "blocking findings on the resolution in the receipt"
+                  "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
                 }
               },
               "review": {
@@ -2402,7 +2420,7 @@
                 },
                 "means": {
                   "approve": "the change does what the story asks and nothing else, no blocking findings",
-                  "changes_requested": "blocking findings in the receipt"
+                  "changes_requested": "blocking findings, handed back with --findings <file>"
                 }
               },
               "describe": {
@@ -2429,7 +2447,7 @@
                 }
               },
               "ci": {
-                "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+                "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
                 "timeout": "30m",
                 "exits": {
                   "3": "stale"
@@ -2467,11 +2485,11 @@
               "merge": {
                 "await-merge": null,
                 "outcomes": {
+                  "merged": "$done",
                   "stale": {
                     "to": "update",
                     "counter": "ship.stale"
                   },
-                  "merged": "$done",
                   "unpushed": {
                     "to": "open-pr",
                     "counter": "merge.unpushed"
@@ -2576,7 +2594,7 @@
         "story": "gh-181",
         "workflow": {
           "name": "quick",
-          "hash": "2bba59ca6b5b133722d54f98b1a1456906abd6fe54ee447a9c43c47a116cee50",
+          "hash": "f857907e3cab36e4bb9b37e1f9343e220a77c91f3735f2dd7b1b2e4d893a7edd",
           "doc": {
             "name": "quick",
             "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -2595,13 +2613,14 @@
                 }
               },
               "sync-resolve": {
-                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
                 "skills": [
                   "norn-merge"
                 ],
                 "inputs": [
                   "spec",
-                  "handoff"
+                  "handoff",
+                  "base_side"
                 ],
                 "outcomes": {
                   "done": "sync"
@@ -2641,7 +2660,7 @@
                 }
               },
               "resolve": {
-                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
                 "skills": [
                   "norn-merge"
                 ],
@@ -2658,7 +2677,7 @@
                 }
               },
               "test": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "review",
@@ -2669,7 +2688,7 @@
                 }
               },
               "test-merge": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "open-pr",
@@ -2680,7 +2699,7 @@
                 }
               },
               "test-resolution": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "resolution-review",
@@ -2713,7 +2732,7 @@
                 "means": {
                   "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
                   "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-                  "changes_requested": "blocking findings on the resolution in the receipt"
+                  "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
                 }
               },
               "review": {
@@ -2738,7 +2757,7 @@
                 },
                 "means": {
                   "approve": "the change does what the story asks and nothing else, no blocking findings",
-                  "changes_requested": "blocking findings in the receipt"
+                  "changes_requested": "blocking findings, handed back with --findings <file>"
                 }
               },
               "describe": {
@@ -2765,7 +2784,7 @@
                 }
               },
               "ci": {
-                "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+                "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
                 "timeout": "30m",
                 "exits": {
                   "3": "stale"
@@ -2803,11 +2822,11 @@
               "merge": {
                 "await-merge": null,
                 "outcomes": {
+                  "merged": "$done",
                   "stale": {
                     "to": "update",
                     "counter": "ship.stale"
                   },
-                  "merged": "$done",
                   "unpushed": {
                     "to": "open-pr",
                     "counter": "merge.unpushed"
@@ -2917,7 +2936,7 @@
         "story": "gh-182",
         "workflow": {
           "name": "quick",
-          "hash": "2bba59ca6b5b133722d54f98b1a1456906abd6fe54ee447a9c43c47a116cee50",
+          "hash": "f857907e3cab36e4bb9b37e1f9343e220a77c91f3735f2dd7b1b2e4d893a7edd",
           "doc": {
             "name": "quick",
             "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -2936,13 +2955,14 @@
                 }
               },
               "sync-resolve": {
-                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
                 "skills": [
                   "norn-merge"
                 ],
                 "inputs": [
                   "spec",
-                  "handoff"
+                  "handoff",
+                  "base_side"
                 ],
                 "outcomes": {
                   "done": "sync"
@@ -2982,7 +3002,7 @@
                 }
               },
               "resolve": {
-                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
                 "skills": [
                   "norn-merge"
                 ],
@@ -2999,7 +3019,7 @@
                 }
               },
               "test": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "review",
@@ -3010,7 +3030,7 @@
                 }
               },
               "test-merge": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "open-pr",
@@ -3021,7 +3041,7 @@
                 }
               },
               "test-resolution": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "resolution-review",
@@ -3054,7 +3074,7 @@
                 "means": {
                   "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
                   "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-                  "changes_requested": "blocking findings on the resolution in the receipt"
+                  "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
                 }
               },
               "review": {
@@ -3079,7 +3099,7 @@
                 },
                 "means": {
                   "approve": "the change does what the story asks and nothing else, no blocking findings",
-                  "changes_requested": "blocking findings in the receipt"
+                  "changes_requested": "blocking findings, handed back with --findings <file>"
                 }
               },
               "describe": {
@@ -3106,7 +3126,7 @@
                 }
               },
               "ci": {
-                "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+                "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
                 "timeout": "30m",
                 "exits": {
                   "3": "stale"
@@ -3144,11 +3164,11 @@
               "merge": {
                 "await-merge": null,
                 "outcomes": {
+                  "merged": "$done",
                   "stale": {
                     "to": "update",
                     "counter": "ship.stale"
                   },
-                  "merged": "$done",
                   "unpushed": {
                     "to": "open-pr",
                     "counter": "merge.unpushed"
@@ -3267,7 +3287,7 @@
         "story": "gh-183",
         "workflow": {
           "name": "quick",
-          "hash": "2bba59ca6b5b133722d54f98b1a1456906abd6fe54ee447a9c43c47a116cee50",
+          "hash": "f857907e3cab36e4bb9b37e1f9343e220a77c91f3735f2dd7b1b2e4d893a7edd",
           "doc": {
             "name": "quick",
             "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -3286,13 +3306,14 @@
                 }
               },
               "sync-resolve": {
-                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
                 "skills": [
                   "norn-merge"
                 ],
                 "inputs": [
                   "spec",
-                  "handoff"
+                  "handoff",
+                  "base_side"
                 ],
                 "outcomes": {
                   "done": "sync"
@@ -3332,7 +3353,7 @@
                 }
               },
               "resolve": {
-                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
                 "skills": [
                   "norn-merge"
                 ],
@@ -3349,7 +3370,7 @@
                 }
               },
               "test": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "review",
@@ -3360,7 +3381,7 @@
                 }
               },
               "test-merge": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "open-pr",
@@ -3371,7 +3392,7 @@
                 }
               },
               "test-resolution": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "resolution-review",
@@ -3404,7 +3425,7 @@
                 "means": {
                   "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
                   "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-                  "changes_requested": "blocking findings on the resolution in the receipt"
+                  "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
                 }
               },
               "review": {
@@ -3429,7 +3450,7 @@
                 },
                 "means": {
                   "approve": "the change does what the story asks and nothing else, no blocking findings",
-                  "changes_requested": "blocking findings in the receipt"
+                  "changes_requested": "blocking findings, handed back with --findings <file>"
                 }
               },
               "describe": {
@@ -3456,7 +3477,7 @@
                 }
               },
               "ci": {
-                "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+                "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
                 "timeout": "30m",
                 "exits": {
                   "3": "stale"
@@ -3494,11 +3515,11 @@
               "merge": {
                 "await-merge": null,
                 "outcomes": {
+                  "merged": "$done",
                   "stale": {
                     "to": "update",
                     "counter": "ship.stale"
                   },
-                  "merged": "$done",
                   "unpushed": {
                     "to": "open-pr",
                     "counter": "merge.unpushed"
@@ -3591,33 +3612,26 @@
       "expect_version": 2
     },
     {
-      "kind": "park",
+      "kind": "apply_receipts",
       "unit": "gh-184",
-      "rule": "agent.reported.rejected",
-      "reason": "agent.reported.rejected",
-      "inbox": {
-        "kind": "stuck",
-        "unit": "gh-184",
-        "step": "implement",
-        "since": "2026-11-17T09:00:00.000Z",
-        "text": "not applied: outcome bogus is not declared at implement"
-      },
-      "intent": {
-        "id": "01JD5G00002AZQWCETWCAAAGJ0",
-        "data": {
-          "kind": "unit.parked",
-          "reason": "agent.reported.rejected",
-          "step": "implement",
-          "attempt": 1
+      "rule": "receipts.reject",
+      "receipts": [
+        {
+          "id": "01JD5G0000ZJJQWQYF9123TAM0",
+          "data": {
+            "kind": "receipt.rejected",
+            "seq": 2,
+            "reason": "outcome bogus is not declared at implement"
+          }
         }
-      },
+      ],
       "state": {
         "format": 1,
         "unit": "gh-184",
         "story": "gh-184",
         "workflow": {
           "name": "quick",
-          "hash": "2bba59ca6b5b133722d54f98b1a1456906abd6fe54ee447a9c43c47a116cee50",
+          "hash": "f857907e3cab36e4bb9b37e1f9343e220a77c91f3735f2dd7b1b2e4d893a7edd",
           "doc": {
             "name": "quick",
             "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -3636,13 +3650,14 @@
                 }
               },
               "sync-resolve": {
-                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
                 "skills": [
                   "norn-merge"
                 ],
                 "inputs": [
                   "spec",
-                  "handoff"
+                  "handoff",
+                  "base_side"
                 ],
                 "outcomes": {
                   "done": "sync"
@@ -3682,7 +3697,7 @@
                 }
               },
               "resolve": {
-                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
                 "skills": [
                   "norn-merge"
                 ],
@@ -3699,7 +3714,7 @@
                 }
               },
               "test": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "review",
@@ -3710,7 +3725,7 @@
                 }
               },
               "test-merge": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "open-pr",
@@ -3721,7 +3736,7 @@
                 }
               },
               "test-resolution": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "resolution-review",
@@ -3754,7 +3769,7 @@
                 "means": {
                   "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
                   "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-                  "changes_requested": "blocking findings on the resolution in the receipt"
+                  "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
                 }
               },
               "review": {
@@ -3779,7 +3794,7 @@
                 },
                 "means": {
                   "approve": "the change does what the story asks and nothing else, no blocking findings",
-                  "changes_requested": "blocking findings in the receipt"
+                  "changes_requested": "blocking findings, handed back with --findings <file>"
                 }
               },
               "describe": {
@@ -3806,7 +3821,7 @@
                 }
               },
               "ci": {
-                "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
+                "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
                 "timeout": "30m",
                 "exits": {
                   "3": "stale"
@@ -3844,11 +3859,11 @@
               "merge": {
                 "await-merge": null,
                 "outcomes": {
+                  "merged": "$done",
                   "stale": {
                     "to": "update",
                     "counter": "ship.stale"
                   },
-                  "merged": "$done",
                   "unpushed": {
                     "to": "open-pr",
                     "counter": "merge.unpushed"
@@ -3929,16 +3944,18 @@
           "attended": false,
           "nudges": 0
         },
-        "applied_through": 2,
+        "applied_through": 3,
         "visits": {
           "implement": 1
-        },
-        "parked": {
-          "reason": "agent.reported.rejected",
-          "since": "2026-11-17T09:00:00.000Z"
         }
       },
-      "expect_version": 2
+      "expect_version": 2,
+      "rejected": [
+        {
+          "seq": 2,
+          "reason": "outcome bogus is not declared at implement"
+        }
+      ]
     }
   ]
 }

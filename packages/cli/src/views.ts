@@ -77,6 +77,7 @@ const STUCK_PARKS: Readonly<Record<string, string>> = {
   "agent.limited.unknown": "its run hit a usage limit with no reset time given",
   "agent.retry.no_headless": "its run needs a fresh session, and its executor cannot run headless",
   "agent.reported.rejected": "what its agent reported is not an outcome of its step",
+  "agent.reporting.lost": "its agent's session shows a report that is not on the record",
   "check.finished.rejected": "its check's outcome is not one the step declares",
   "step.finished.rejected": "its step's outcome is not one the step declares",
 };

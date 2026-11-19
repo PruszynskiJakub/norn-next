@@ -188,8 +188,9 @@ back as the unit's `corrupt_marked` fact.
 | (none) | | `agent.limited.wait` | `noop` until `limit.resets_at`; never a nudge, and never stopped by the deadline, which counts from the reset |
 | (none) | | `agent.limited.record` | `apply_receipts` (`run.limited`: the reset kept on the run as `limited_until`, once per reset) |
 | (none) | | `agent.limited.unknown` | `park` (inbox `limited`: a limit with no reset time, shown to a person rather than waited on unseen) |
-| (none) | | `agent.reported` | `apply_receipts` (the `run.reported` receipt) |
-| (none) | | `agent.reported.rejected` | `park` (inbox `stuck`: the report would be refused, e.g. an outcome the step does not declare; nothing is written, and a new report is applied as it comes) |
+| (none) | | `agent.reporting` | `noop`: the session shows a report whose `run.reported` receipt the facts do not hold yet; the reporting API writes it before the event, so the next tick applies it (`receipts.apply`) with the agent's text |
+| (none) | | `agent.reporting.lost` | `park` (inbox `stuck`: a report on the session with no receipt past the quiet window; nothing is written) |
+| (none) | | `agent.reported.rejected` | `park` (inbox `stuck`: the report's receipt was refused, e.g. an outcome the step does not declare; nothing is written, and a new report is applied as it comes) |
 | (none) | | `agent.retry.no_headless` | `park` (inbox `stuck`: a fresh session is needed and the executor cannot run headless) |
 | `answer.resume.wait_active` | `noop` | dropped: as `agent.start.wait_active` | |
 | `answer.resume.queued` | `noop` | dropped: an answer is delivered to the live session, never by starting one | |

@@ -163,7 +163,7 @@ function agentTroubles(): GoldenCase[] {
   w.tick();
   for (let i = 0; i < 16; i++) w.tick();
   w.unit("gh-41").session = session("working", { silent: true });
-  w.unit("gh-40").session = session("reported", { report: { verb: "done", outcome: "done" } });
+  w.report("gh-40", "done", "done");
   w.tick();
   w.tick();
   w.tick();

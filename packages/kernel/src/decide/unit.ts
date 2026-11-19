@@ -33,6 +33,7 @@ export const DERIVED_PARKS: ReadonlySet<string> = new Set([
   "agent.retry.no_headless",
   "agent.limited.unknown",
   "agent.reported.rejected",
+  "agent.reporting.lost",
   "check.finished.rejected",
   "step.finished.rejected",
   "gate.park",

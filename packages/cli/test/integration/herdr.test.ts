@@ -72,8 +72,7 @@ class Ticks {
     const t = await norn(this.w, ["tick", "--json"]);
     const outcomes = (t.body.outcomes ?? []) as Outcome[];
     this.rules.push(...outcomes.map((o) => `${o.decision.rule}${o.ok ? "" : "!"}`));
-    // a commit that lost the race to the agent's own receipt is decided again by the next tick
-    this.errors.push(...outcomes.flatMap((o) => (o.ok || o.error === undefined || o.error.includes("the record moved since facts were read") ? [] : [o.error])));
+    this.errors.push(...outcomes.flatMap((o) => (o.ok || o.error === undefined ? [] : [o.error])));
     const seen = this.look(this.w);
     if (seen) this.after.push(seen);
     return t;

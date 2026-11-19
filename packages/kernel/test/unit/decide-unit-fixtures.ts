@@ -130,6 +130,8 @@ export interface Case {
   run_alive?: boolean;
   /** the dialog the run's pane shows, as its runner read it */
   run_dialog?: string;
+  /** why the kernel refused the run's report the session shows */
+  report_rejected?: string;
   unitId?: string;
   story?: Partial<StoryFacts>;
   executors?: Record<string, ExecutorCapabilities>;
@@ -146,6 +148,7 @@ export function factsOf(c: Case): KernelFacts {
   if (c.corrupt_marked) unit.corrupt_marked = true;
   if (c.run_alive !== undefined) unit.run_alive = c.run_alive;
   if (c.run_dialog !== undefined) unit.run_dialog = c.run_dialog;
+  if (c.report_rejected !== undefined) unit.report_rejected = c.report_rejected;
   const story: StoryFacts = { key: "gh-1", item: null, change: null, claim: null, units: [unit], mailbox: [], ...c.story };
   const others: StoryFacts[] = (c.others ?? []).map((u, i) => ({ key: `gh-${i + 10}`, item: null, change: null, claim: null, units: [u], mailbox: [] }));
   return {
