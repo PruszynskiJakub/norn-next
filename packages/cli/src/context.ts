@@ -11,6 +11,7 @@ import { LAYERS, type Layer } from "./config/paths.ts";
 import { nornHome } from "./home.ts";
 import { machineHolder } from "./holder.ts";
 import { packFailure } from "./plugins/pack-check.ts";
+import { skillFailure } from "./plugins/skill-check.ts";
 import type { PluginImporter } from "./plugins/installed.ts";
 import { floorRefusal } from "./version-guard.ts";
 import { type HostFactory, type WiredPlugins, type WiredRepo, wireConfig, wirePlugins, wireRepo, wireRepoWorkflows, wireRuntime, wireRuntimeEnv } from "./wiring.ts";
@@ -127,11 +128,13 @@ export class CliContext {
       });
     return this.envP;
   }
-  /** the runtime env, refused when the workflows (the pack's and the repo's) cannot run: what a tick needs */
+  /** the runtime env, refused when the workflows (the pack's and the repo's) cannot run, or a repo workflow names a skill nobody has: what a tick needs */
   async workflowEnv(): Promise<RuntimeEnv> {
     const [env, p] = await Promise.all([this.runtimeEnv(), this.plugins()]);
     const failure = packFailure(env.workflows, { pack: env.config.pack, plugins: p.plugins, installedAs: p.installedAs, repo: env.repoWorkflows });
     if (failure) throw failure;
+    const skills = await skillFailure(env);
+    if (skills) throw skills;
     return env;
   }
   /** the tick host */
