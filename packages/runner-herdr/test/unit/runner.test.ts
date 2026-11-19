@@ -451,6 +451,31 @@ describe("herdr alive, send and stop", () => {
   });
 });
 
+describe("herdr close", () => {
+  test("closes the pane a start opened under its key, which takes its tab and, with the last one, the story's workspace", async () => {
+    const { h, runner, ctx, files } = setupWithKill();
+    await runner.start(req());
+    await runner.start(req({ key: "01JRUN2", title: "gh-1 review" }));
+    expect(await runner.close?.("w1:p2", "01JRUN1")).toEqual({ ok: true, value: true });
+    expect(h.tabs.map((t) => t.label)).toEqual(["gh-1 review"]);
+    expect(await runner.close?.("w1:p3", "01JRUN2")).toEqual({ ok: true, value: true });
+    expect(h.workspaces).toEqual([]);
+    // the key's record and script go with it; closing again closes nothing
+    expect(Object.keys(files.snapshot()).filter((f) => f.startsWith(`${ctx.repo.dataDir}/runners/herdr/`))).toEqual([]);
+    expect(await runner.close?.("w1:p2", "01JRUN1")).toEqual({ ok: true, value: false });
+  });
+
+  test("never closes a pane its key did not open: another key's pane, or a pane under the same id in a tab not titled for the run", async () => {
+    const { h, runner } = setupWithKill();
+    await runner.start(req());
+    expect(await runner.close?.("w1:p2", "01JOTHER")).toEqual({ ok: true, value: false });
+    const tab = h.tabs[0] as { label: string };
+    tab.label = "a person's tab";
+    expect(await runner.close?.("w1:p2", "01JRUN1")).toEqual({ ok: true, value: false });
+    expect(h.panes.map((p) => p.pane_id)).toEqual(["w1:p2"]);
+  });
+});
+
 describe("herdr missing or failing", () => {
   test("a herdr binary that cannot run is an unavailable failure, never a throw", async () => {
     const ctx = memoryHost({ exec: scriptedExec(() => ({ code: 127, stderr: "herdr: command not found" })) });

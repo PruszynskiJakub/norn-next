@@ -395,6 +395,33 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
       return flush();
     },
 
+    async close(handle, key) {
+      if (!SAFE_KEY.test(key)) return ok(false);
+      const path = keyRecordPath(ctx, key);
+      const known = await readRecord(path);
+      if (!known.ok) return known;
+      const rec = known.value;
+      if (!rec || rec.pane !== handle || !rec.workspace) return ok(false);
+      // the pane id must still be this start's pane: in its workspace, in a tab titled for the run
+      const panes = await herdrJson(herdr, ["pane", "list", "--workspace", rec.workspace], PaneList);
+      if (!panes.ok && !isGone(panes)) return panes;
+      const tabId = panes.ok ? panes.value.result.panes.find((p) => p.pane_id === handle)?.tab_id : undefined;
+      let ours = false;
+      if (tabId !== undefined) {
+        const tabs = await herdrJson(herdr, ["tab", "list", "--workspace", rec.workspace], TabList);
+        if (!tabs.ok && !isGone(tabs)) return tabs;
+        ours = tabs.ok && tabs.value.result.tabs.some((t) => t.tab_id === tabId && t.label === rec.title);
+      }
+      if (ours) {
+        const closed = await closePane(handle);
+        if (!closed.ok) return closed;
+      }
+      // a pane gone or taken over is no longer this key's: nothing is left for its record to find
+      await forget(path);
+      await forget(launchScriptPath(ctx, key));
+      return ok(ours);
+    },
+
     async stop(handle) {
       // without a way to signal the agent, closing its pane is the only way to end it
       if (!ctx.kill) return closePane(handle);

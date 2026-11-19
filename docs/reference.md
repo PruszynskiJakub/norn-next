@@ -358,7 +358,7 @@ norn help [<command>]
 
 ##### `norn tidy`
 
-Remove the worktrees and local branches of ended stories that no live claim holds
+Remove the worktrees and local branches of ended stories that no live claim holds, and close their runs' panes
 
 ```sh
 norn tidy [--dry-run]

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { fail } from "@norn/plugin-api";
 import { tidy, writeStoryDoc } from "../../src/index.ts";
-import { has, harness, record, tickUntil, trackerItem } from "./support.ts";
+import { has, harness, record, session, tickUntil, trackerItem } from "./support.ts";
 
 /** Three stories that each end stuck at their first step, their claims given up, each with a worktree on disk. */
 async function stuckStories() {
@@ -36,6 +36,26 @@ describe("tidy", () => {
     ]);
     const ops = h.vcsCalls.map((c) => `${c.op} ${c.args[0]}`);
     expect(ops.filter((o) => o.startsWith("remove ") || o.startsWith("deleteBranch "))).toEqual(["remove lt-1", "deleteBranch norn/lt-1"]);
+  });
+
+  test("closes what the runs of an ended story left open on this machine, even with its worktree gone, and lists it; a dry run closes nothing", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const handle = (await record(h, "lt-1")).state?.run?.session as string;
+    h.sessions.byUnit.set("lt-1", session("reported", { report: { verb: "stuck" } }));
+    await tickUntil(h, has("claim.release"));
+    expect((await record(h, "lt-1")).state?.ended).toBe("stuck");
+    const dry = await tidy(h.env, { dryRun: true });
+    expect(dry.ok && dry.value.closed).toEqual([]);
+    expect(h.launcher.of("close")).toEqual([]);
+    const got = await tidy(h.env);
+    expect(got.ok && got.value.closed).toEqual([{ story: "lt-1", unit: "lt-1", runs: 1 }]);
+    expect(h.launcher.of("close")).toEqual([[handle]]);
+    // nothing left open: a second tidy closes nothing and lists nothing
+    const again = await tidy(h.env);
+    expect(again.ok && again.value.closed).toEqual([]);
   });
 
   test("a dry run lists what it would remove and changes nothing", async () => {
@@ -104,6 +124,7 @@ describe("tidy", () => {
         { story: "lt-1", unit: "lt-1", worktree: true, branch: "norn/lt-1" },
       ],
       kept: [],
+      closed: [],
     });
   });
 });

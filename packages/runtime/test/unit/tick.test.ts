@@ -49,6 +49,12 @@ describe("a story from intake to done", () => {
     await tickUntil(h, has("agent.reported"));
     expect((await record(h, "lt-1")).state?.ended).toBe("done");
     expect(h.launcher.of("stop")).toEqual([[handle]]);
+    // the story's finish closes what the ended run left open (its pane), before its worktree goes
+    await tickUntil(h, has("story.finish"));
+    expect(h.launcher.of("close")).toEqual([[handle]]);
+    const order = h.launcher.calls.findIndex((c) => c.op === "close");
+    expect(order).toBeGreaterThan(-1);
+    expect(h.vcsCalls.some((c) => c.op === "remove")).toBe(true);
   });
 
   test("plugin steps get the slots and their config; a wait step is polled until it answers", async () => {

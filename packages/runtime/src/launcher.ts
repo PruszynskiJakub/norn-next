@@ -34,7 +34,7 @@ import { readEvents } from "./events/log.ts";
 import { markDelivered, pendingInjections, queueInjection, readSentPrompt, recordSentPrompt } from "./events/outbox.ts";
 import { receivedDir } from "./events/paths.ts";
 import { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
-import { currentRunnerHandle, launchedHere, readLaunch, recordLaunch, resumesOf, resumeWith } from "./launcher-resume.ts";
+import { currentRunnerHandle, keyOf, launchedHere, readLaunch, recordLaunch, resumesOf, resumeWith } from "./launcher-resume.ts";
 import { shellQuote } from "./shell.ts";
 import { installSkills, type PackSkills } from "./skills.ts";
 import type { AgentLauncher, AgentRunRequest, AnswerOptions, ExecutorModes, LauncherModes } from "./types.ts";
@@ -231,6 +231,25 @@ export class HarnessLauncher implements AgentLauncher {
       if (!stopped.ok) return stopped;
     }
     return ok(undefined);
+  }
+
+  async close(handle: string): Promise<PluginResult<boolean>> {
+    const found = this.resolve(handle);
+    if (!found.ok) return found;
+    const { handle: h, executor } = found.value;
+    const runner = executor.runner;
+    if (!runner.close) return ok(false);
+    const { ctx } = this.opts;
+    // a pane id names a pane only on the machine that opened it
+    if (!(await launchedHere(ctx, h.unit, h.run_id))) return ok(false);
+    const launches = [...(await resumesOf(ctx, h.unit, h.run_id)).map((r) => ({ runner: r.handle, key: keyOf(h.run_id, r.id) })), { runner: h.runner, key: h.run_id }];
+    let closed = false;
+    for (const l of launches) {
+      const done = await runner.close(l.runner, l.key);
+      if (!done.ok) return done;
+      closed ||= done.value;
+    }
+    return ok(closed);
   }
 
   /**
