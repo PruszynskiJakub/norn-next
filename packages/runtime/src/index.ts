@@ -42,7 +42,7 @@ export { dialogInputId } from "./dialog.ts";
 export { answerPromptId, type Executor, HarnessLauncher, type HarnessLauncherOptions, nudgePromptId, sessionLogPath, shellQuote } from "./launcher.ts";
 export { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
 export { type LiveStep, liveStepOf, reportableOutcomes, reportOnRecord } from "./live-run.ts";
-export { type BriefShown, briefOf, type CriteriaSummary, FINDINGS_SHAPE, type Refusable, type ReportRecorded, type ReportRefusal, type ReportRequest, reportReceiptId, reportRun } from "./report.ts";
+export { type BriefShown, briefOf, claimHeldElsewhere, type CriteriaSummary, FINDINGS_SHAPE, isOwnHolder, type Refusable, type ReportRecorded, type ReportRefusal, type ReportRequest, reportReceiptId, reportRun } from "./report.ts";
 export { nudgeText } from "./act-runs.ts";
 export { checkOutcome } from "./act-steps.ts";
 export { checkCommandOf, DEFAULT_CHECKS } from "./check-command.ts";

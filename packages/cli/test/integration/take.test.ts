@@ -5,10 +5,9 @@
  * and so one local store, as two people on one box, or two machines over a shared claim, would.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
-import { hostname } from "node:os";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { type NornOut, norn, setUp, type UnitShown, unitOf, type World, world } from "./world.ts";
+import { machineName, type NornOut, norn, setUp, type UnitShown, unitOf, type World, world } from "./world.ts";
 
 const KEY = "lt-1";
 const SLOW = 180_000;
@@ -35,7 +34,7 @@ async function tickUntil(w: World, env: Record<string, string>, rules: string[],
 
 describe("a story taken over by another holder, through the CLI alone", () => {
   let w: World;
-  const host = hostname();
+  let host = "";
   const alice: string[] = [];
   const bobBefore: string[] = [];
   const bob: string[] = [];
@@ -63,6 +62,7 @@ describe("a story taken over by another holder, through the CLI alone", () => {
     await tickAs(w, ALICE, aliceAfter);
     ended = await unitOf(w, KEY);
     view = await norn(w, ["story", "view", KEY, "--json"], BOB);
+    host = machineName(w);
   }, SLOW);
 
   test("while alice holds the story, bob's tick leaves it alone and his take is refused naming her", () => {

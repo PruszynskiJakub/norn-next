@@ -5,6 +5,7 @@ import {
   batchesDir,
   batchName,
   briefOf,
+  claimHeldElsewhere,
   EventLogSessionSource,
   ingestHook,
   type IngestDeps,
@@ -21,8 +22,8 @@ const UNIT = "lt-1";
 const WORKTREE = "/machine/repo/worktrees/lt-1";
 
 /** A story at its agent step with the run started and on the record. */
-async function running(): Promise<{ h: Harnessed; runId: string }> {
-  const h = harness({ workflow: "agented" });
+async function running(formerHolders?: string[]): Promise<{ h: Harnessed; runId: string }> {
+  const h = harness({ workflow: "agented", ...(formerHolders && { formerHolders }) });
   h.items.push(trackerItem(1));
   await tickUntil(h, has("agent.start"));
   await tickUntil(h, has("receipts.apply"));
@@ -105,6 +106,15 @@ describe("stop hook", () => {
     const r = await ingestHook(deps(h), { harness: "claude", hook: "Stop", payload: { hook_event_name: "Stop" }, env: {} });
     expect(r.reply.stdout).toBe("");
     expect(h.files.snapshot()).toEqual(before);
+  });
+
+  test("a run whose story's claim another holder took may end its turn: it owes this machine no report", async () => {
+    const { h, runId } = await running();
+    const held = await h.env.slots.store.claims.read(UNIT);
+    await h.env.slots.store.claims.takeOver?.(UNIT, "machine-b", 60 * 60_000, held.ok && held.value ? held.value.version : null);
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: false, refusal: { code: "claim_moved", do_instead: expect.stringContaining("end your turn") } });
+    const r = await hook(h, runId, "Stop", {}, { claimMoved: async (unit) => (await claimHeldElsewhere(h.env, unit)) !== null });
+    expect(r.reply).toEqual({ stdout: "", exit_code: 0 });
   });
 
   test("a stop it refused is a turn that goes on: the session does not read as a turn ended, so it is not nudged as quiet", async () => {
@@ -306,6 +316,29 @@ describe("reporting", () => {
     const logged = (await readEvents(h.ctx, UNIT, runId)).events.filter((e) => e.type === "hook.error");
     expect(logged).toHaveLength(3);
     expect(logged[0]).toMatchObject({ hook: "report", message: expect.stringContaining(`the report of run ${runId} was dropped`) });
+  });
+
+  test("a claim held under a name this machine used before is its own: the report goes through, and the next tick carries the claim to its current name", async () => {
+    const { h, runId } = await running(["machine-a.home"]);
+    const held = await h.env.slots.store.claims.read(UNIT);
+    await h.env.slots.store.claims.takeOver?.(UNIT, "machine-a.home", 60 * 60_000, held.ok && held.value ? held.value.version : null);
+    expect(await claimHeldElsewhere(h.env, UNIT)).toBeNull();
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true });
+    await h.runtime.tick();
+    const after = await h.env.slots.store.claims.read(UNIT);
+    expect(after.ok && after.value?.holder).toBe("machine-a");
+    expect((await record(h, UNIT)).state?.ended).toBe("done");
+  });
+
+  test("another machine's claim is never this machine's, whatever names it used before", async () => {
+    const { h, runId } = await running(["machine-a.home"]);
+    const held = await h.env.slots.store.claims.read(UNIT);
+    await h.env.slots.store.claims.takeOver?.(UNIT, "machine-b", 60 * 60_000, held.ok && held.value ? held.value.version : null);
+    expect(await claimHeldElsewhere(h.env, UNIT)).toBe("machine-b");
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: false, refusal: { code: "claim_moved" } });
+    await h.runtime.tick();
+    const after = await h.env.slots.store.claims.read(UNIT);
+    expect(after.ok && after.value?.holder).toBe("machine-b");
   });
 
   test("an outcome the step does not route is refused, naming the ones it does", async () => {

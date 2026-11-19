@@ -389,7 +389,7 @@ Every file takes every key: the user file, the repo-local file and the committed
 | `plugins.<name>` | string | none |
 | `base` | string | `"main"` |
 | `base_ref` | string | derived: the remote's fetched copy of `base` (`origin/main`), else `base` |
-| `holder` | string | derived: user@host |
+| `holder` | string | derived: user@ the machine's LocalHostName, else its hostname, fixed in `~/.norn/holder.json` on first use |
 | `kernel.mode` | `"manual"` or `"auto"` | `"manual"` |
 | `kernel.workflow` | string | `"story"` |
 | `kernel.slice_workflow` | string | `"slice"` |

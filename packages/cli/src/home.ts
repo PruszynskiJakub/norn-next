@@ -50,6 +50,8 @@ export const homePaths = (home: string) => ({
   /** a bun project the installed plugins live in */
   plugins: join(home, "plugins"),
   repos: join(home, "repos"),
+  /** who this machine claims as, fixed on first use (see holder.ts) */
+  holder: join(home, "holder.json"),
 });
 
 export const machineDir = (home: string, id: string): string => join(homePaths(home).repos, id);

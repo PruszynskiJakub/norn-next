@@ -420,6 +420,8 @@ export interface HarnessOptions {
   processes?: FakeProcesses;
   /** the config's `checks`, the commands a check step names as `{checks.<name>}` */
   checks?: Record<string, string>;
+  /** names this machine claimed under before its current holder */
+  formerHolders?: string[];
 }
 
 export function harness(opts: HarnessOptions = {}): Harnessed {
@@ -463,6 +465,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     intake: { label: "norn", assignee: "me" },
     base: "main",
     holder: "machine-a",
+    ...(opts.formerHolders ? { formerHolders: opts.formerHolders } : {}),
     ...(opts.checks ? { checks: opts.checks } : {}),
   };
   const tickIds: string[] = [];

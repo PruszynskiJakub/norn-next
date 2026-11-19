@@ -18,8 +18,8 @@ describe("norn home", () => {
     expect(nornHome({ NORN_HOME_DIR: "" }, "/home/me")).toBe("/home/me/.norn");
   });
 
-  test("the user config, the plugins project and each checkout's machine dir live under it", () => {
-    expect(homePaths("/h")).toEqual({ userConfig: "/h/config.yaml", plugins: "/h/plugins", repos: "/h/repos" });
+  test("the user config, the plugins project, the holder file and each checkout's machine dir live under it", () => {
+    expect(homePaths("/h")).toEqual({ userConfig: "/h/config.yaml", plugins: "/h/plugins", repos: "/h/repos", holder: "/h/holder.json" });
     expect(machineDir("/h", "repo-1234abcd")).toBe("/h/repos/repo-1234abcd");
   });
 });
