@@ -107,6 +107,7 @@ export function fakeVcs(ctx: HostContext, heads: Record<string, string>, calls: 
     merge: (branch, from) => call("merge", [branch, from], { head: `${branch}+${from}` }),
     unfinished: (path) => Promise.resolve(ok(stopped[path] ?? null)),
     uncommitted: (path) => Promise.resolve(ok(dirty[path] ?? [])),
+    deleteBranch: (branch) => call("deleteBranch", [branch], undefined),
     push: (branch) => call("push", [branch], undefined),
     fetch: () => call("fetch", [], undefined),
   };

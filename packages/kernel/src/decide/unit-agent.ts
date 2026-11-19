@@ -76,7 +76,7 @@ function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
   // a run a person started may open where they watch it (a pane); one nobody started must run headless
   const personStarted = v.state.requested !== undefined && caps.attended;
   if (!caps.headless && !personStarted) return parkDecision(v, "agent.ready.no_headless", "manual", { text: `auto mode, but executor '${executor}' cannot run headless` });
-  if (!takeAgentSlot(v.ctx)) return noop(v, "agent.queued", `queued: ${v.ctx.config.maxAgents} agent runs in use`);
+  if (!takeAgentSlot(v.ctx)) return noop(v, "agent.queued", `queued: ${v.ctx.config.maxAgents} agent and check runs in use`);
   const run_id = v.ctx.nextId();
   // attended only where the person can sit beside it (a pane); started headless, it is retried and nudged as an auto run
   const attended = spec.attended === true && personStarted;

@@ -46,6 +46,8 @@ export { type BriefShown, briefOf, type CriteriaSummary, FINDINGS_SHAPE, type Re
 export { nudgeText } from "./act-runs.ts";
 export { checkOutcome } from "./act-steps.ts";
 export { checkCommandOf, DEFAULT_CHECKS } from "./check-command.ts";
+export { type BranchFate, branchHome, dropUnitBranch } from "./branch-cleanup.ts";
+export { type TidyKept, type TidyRemoved, type TidyReport, tidy } from "./tidy.ts";
 export { baseRefOf, branchOf, cutFrom, ensureWorktree } from "./branches.ts";
 export type { RuntimeEnv, TickContext } from "./env.ts";
 export { type GatherOptions, type GatheredFacts, gatherFacts } from "./facts.ts";

@@ -134,7 +134,7 @@ back as the unit's `corrupt_marked` fact.
 | (none) | | `check.finished.rejected` | `park` (inbox `stuck`: the check answered an outcome the step does not declare; no receipt is written, so nothing repeats each tick) |
 | `check.running` | `noop` | `check.running` | `noop` |
 | (none) | | `check.finished` | `apply_receipts` (`check.finished` from the check's answered outcome) |
-| `check.queued` | `noop` | dropped: decide bounds agent runs only (`maxAgents`); the host queues the check processes it runs | |
+| `check.queued` | `noop` | `check.queued` | `noop` (`maxAgents` in use: a check run takes a slot as an agent run does) |
 | `check.no_worktree` | `noop` | dropped: the host resolves the worktree when it runs the check | |
 | `verify.run` | `run_check` | folded into `base_stale`: the host runs the vcs plugin's `verify-base` step kind on a clean base move under a story waiting at a step that routes `stale`, once per (head, base) pair, and a red merged tree reads as `base_stale` | then `gate.stale` or `step.stale` (the failing output is not handed to the next step as `last_check`) |
 | `verify.awaits_sync` | `noop` | dropped: as `verify.run` | |

@@ -109,6 +109,12 @@ export interface Vcs {
    * leaves a conflict in the work.
    */
   conflictMarkers?(base: string, head: string): Promise<PluginResult<VcsConflictMarker[]>>;
+  /**
+   * delete the local `branch` whatever it holds; deleting a missing one is not an error. The host
+   * asks only once the branch's commits are somewhere else, and never for a branch a worktree has
+   * checked out. Optional (plugin API 1.14); without it a finished unit's branch stays.
+   */
+  deleteBranch?(branch: string): Promise<PluginResult<void>>;
   push(branch: string, opts?: VcsPushOptions): Promise<PluginResult<void>>;
   fetch(): Promise<PluginResult<void>>;
 }

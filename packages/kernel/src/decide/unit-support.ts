@@ -95,7 +95,8 @@ export function ageMs(ctx: DecideContext, since: string): number {
 }
 
 /**
- * Agent runs in use this tick: runs on the record at an agent step, plus the ones this tick started.
+ * Slots in use this tick: runs on the record at an agent or a check step, plus the ones this tick
+ * started. A check runs detached beside the agents, on the same machine's cores, so it counts as one.
  * Kept per tick beside the context, so decide stays a function of its facts.
  */
 const startedThisTick = new WeakMap<DecideContext, number>();
@@ -109,13 +110,14 @@ function agentRunsOnRecord(ctx: DecideContext): number {
       const st = unit.state;
       if (!st?.run || st.ended) continue;
       const graph = ctx.workflows.byHash[st.workflow.hash]?.graph;
-      if (graph?.steps[st.run.step]?.kind === "agent") n++;
+      const kind = graph?.steps[st.run.step]?.kind;
+      if (kind === "agent" || kind === "check") n++;
     }
   }
   return n;
 }
 
-/** Take one agent slot for a new run; false when `maxAgents` are in use. */
+/** Take one slot for a new agent or check run; false when `maxAgents` are in use. */
 export function takeAgentSlot(ctx: DecideContext): boolean {
   const started = startedThisTick.get(ctx) ?? 0;
   if (agentRunsOnRecord(ctx) + started >= ctx.config.maxAgents) return false;

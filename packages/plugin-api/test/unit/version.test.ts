@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { apiSatisfies, PLUGIN_API_VERSION } from "../../src/index.ts";
 
 describe("apiSatisfies", () => {
-  test("the running API is 1.13.0 and satisfies ^1 through ^1.13", () => {
-    expect(PLUGIN_API_VERSION).toBe("1.13.0");
+  test("the running API is 1.14.0 and satisfies ^1 through ^1.14", () => {
+    expect(PLUGIN_API_VERSION).toBe("1.14.0");
     expect(apiSatisfies("^1.1")).toBe(true);
     expect(apiSatisfies("^1.2")).toBe(true);
     expect(apiSatisfies("^1.3")).toBe(true);
@@ -17,7 +17,8 @@ describe("apiSatisfies", () => {
     expect(apiSatisfies("^1.11")).toBe(true);
     expect(apiSatisfies("^1.12")).toBe(true);
     expect(apiSatisfies("^1.13")).toBe(true);
-    expect(apiSatisfies("^1.14")).toBe(false);
+    expect(apiSatisfies("^1.14")).toBe(true);
+    expect(apiSatisfies("^1.15")).toBe(false);
     expect(apiSatisfies("^1")).toBe(true);
     expect(apiSatisfies("^1.0")).toBe(true);
     expect(apiSatisfies("^1.0.0")).toBe(true);

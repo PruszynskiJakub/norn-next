@@ -68,6 +68,7 @@ describe("story update-branch over real git", () => {
   let view: NornOut;
   let rulesAfterClean: string[] = [];
   let worktreeAtEnd: string | null = "";
+  let localAfterFinish = "";
 
   beforeAll(async () => {
     w = await world("work");
@@ -87,7 +88,9 @@ describe("story update-branch over real git", () => {
     await norn(w, ["story", "approve", KEY, "--json"]);
     await tickUntil(w, rules, (u) => u?.ended === "done");
     await tickUntil(w, rules, () => rules.includes("claim.release"));
-    storyHead = await sh(w.root, "git", "rev-parse", BRANCH);
+    // the finish deleted the local branch, whose commits the remote holds; the update cuts it again from there
+    localAfterFinish = await sh(w.root, "git", "branch", "--list", BRANCH);
+    storyHead = await sh(w.root, "git", "rev-parse", `refs/remotes/origin/${BRANCH}`);
     remoteBefore = await sh(w.remote, "git", "rev-parse", BRANCH);
 
     await pushToMain(w, { "shared.txt": "base\n" }, "base edits the same file");
@@ -113,6 +116,7 @@ describe("story update-branch over real git", () => {
     expect(rules).toEqual(expect.arrayContaining(["claim.take", "step.run", "story.finish", "claim.release"]));
     expect(rules.filter((r) => r.endsWith("!"))).toEqual([]);
     expect(remoteBefore).toBe(storyHead);
+    expect(localAfterFinish).toBe("");
   });
 
   test("a conflicting base is aborted and refused with its paths; the branch, the remote and the claim are as they were", () => {
