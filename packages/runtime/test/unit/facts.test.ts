@@ -84,6 +84,33 @@ describe("agent run facts", () => {
   });
 });
 
+describe("a local gathering", () => {
+  test("reads the stories from this machine's record alone: no fetch, no tracker or forge call, no intake", async () => {
+    const h = harness({ workflow: "stepped" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    h.items.push(trackerItem(2));
+    const remote: string[] = [];
+    const { tracker, forge, vcs } = h.env.slots;
+    const spied = {
+      ...h.env,
+      slots: {
+        ...h.env.slots,
+        tracker: { ...tracker, get: (id: number) => (remote.push("tracker.get"), tracker.get(id)), intake: (q: Parameters<typeof tracker.intake>[0]) => (remote.push("tracker.intake"), tracker.intake(q)) },
+        forge: { ...forge, findChanges: (b: string[]) => (remote.push("forge.findChanges"), forge.findChanges(b)) },
+        vcs: { ...vcs, capabilities: { ...vcs.capabilities, push: true }, fetch: () => (remote.push("vcs.fetch"), vcs.fetch()) },
+      },
+    };
+    const local = await gatherFacts(spied, h.tickIds[0] as string, { readOnly: true, local: true });
+    if (!local.ok) throw new Error(local.failure.message);
+    expect(remote).toEqual([]);
+    expect(local.value.facts.stories.map((s) => [s.key, s.item, s.change])).toEqual([["lt-1", null, null]]);
+    expect(local.value.facts.intake).toEqual([]);
+    await gatherFacts(spied, h.tickIds[0] as string, { readOnly: true });
+    expect(remote).toEqual(["forge.findChanges", "vcs.fetch", "tracker.get", "tracker.intake"]);
+  });
+});
+
 describe("vcs facts", () => {
   test("unpushed: the story branch moved past its open change's head", async () => {
     const h = harness({ workflow: "stepped" });

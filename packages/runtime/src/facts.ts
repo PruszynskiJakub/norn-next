@@ -44,6 +44,12 @@ export interface GatheredFacts {
  */
 export interface GatherOptions {
   readOnly?: boolean;
+  /**
+   * Read only this machine's record: no fetch, no tracker or forge call, no intake, no vcs facts. For
+   * a view polled every few seconds (herdr's tab bar), where a call to the code host per story would
+   * cost more than the line is worth; items, changes and intake come back empty, never as a guess.
+   */
+  local?: boolean;
 }
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -192,13 +198,15 @@ export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherO
     env,
     reads.flatMap((r) => r.pinned),
   );
-  const changes = await changesOf(
-    env,
-    reads.map((r) => r.key),
-    problems,
-  );
+  const changes = opts.local
+    ? {}
+    : await changesOf(
+        env,
+        reads.map((r) => r.key),
+        problems,
+      );
   // a base or change that moved on the remote is only seen once fetched
-  if (reads.length > 0 && env.slots.vcs.capabilities.push) {
+  if (!opts.local && reads.length > 0 && env.slots.vcs.capabilities.push) {
     const fetched = await env.slots.vcs.fetch();
     if (!fetched.ok) problems.push(`vcs fetch: ${fetched.failure.message}`);
   }
@@ -207,8 +215,8 @@ export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherO
     const own = r.units.find((u) => u.id === r.key)?.state ?? null;
     const change = changes[branchOf(r.key)] ?? null;
     const graph = own ? workflows.byHash[own.workflow.hash]?.graph : undefined;
-    const story: StoryFacts = { key: r.key, item: await itemOf(env, r.key, problems), change, claim: r.claim, units: r.units, mailbox: r.mailbox };
-    Object.assign(story, await vcsFacts(env, r.key, own, graph, change, problems));
+    const story: StoryFacts = { key: r.key, item: opts.local ? null : await itemOf(env, r.key, problems), change, claim: r.claim, units: r.units, mailbox: r.mailbox };
+    if (!opts.local) Object.assign(story, await vcsFacts(env, r.key, own, graph, change, problems));
     if (store.capabilities.shared && store.diverged) {
       const split = await store.diverged(r.key);
       if (!split.ok) problems.push(`${r.key}: store: ${split.failure.message}`);
@@ -227,7 +235,7 @@ export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherO
     }
     stories.push(story);
   }
-  const intake = await env.slots.tracker.intake(env.config.intake);
+  const intake = opts.local ? ok([]) : await env.slots.tracker.intake(env.config.intake);
   if (!intake.ok) problems.push(`tracker intake: ${intake.failure.message}`);
   const facts: KernelFacts = {
     tick_id: tickId,
