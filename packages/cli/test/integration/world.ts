@@ -111,6 +111,9 @@ export interface SetUpOptions {
   workflows?: Record<string, string>;
   /** more `norn config set` pairs, such as a short `kernel.silent_after` */
   config?: [string, string][];
+  /** the tracker and forge plugins (default local and none); github needs `fakeGh` first */
+  tracker?: "local" | "github";
+  forge?: "none" | "github";
 }
 
 /**
@@ -122,7 +125,7 @@ export interface SetUpOptions {
 export async function setUp(w: World, opts: SetUpOptions = {}): Promise<{ added: NornOut; init: NornOut }> {
   const added = await norn(w, ["plugin", "add", TEST_PLUGIN, "--json"]);
   const runner = opts.runner ?? "headless";
-  const init = await norn(w, ["init", "--tracker", "local", "--forge", "none", "--store", "local", "--executor", "test", "--runner", runner, "--yes", "--json"]);
+  const init = await norn(w, ["init", "--tracker", opts.tracker ?? "local", "--forge", opts.forge ?? "none", "--store", "local", "--executor", "test", "--runner", runner, "--yes", "--json"]);
   if (init.code !== 0) throw new Error(`init: ${init.stdout}${init.stderr}`);
   for (const [name, text] of Object.entries(opts.workflows ?? {})) {
     mkdirSync(join(w.root, ".agents", "workflows"), { recursive: true });
