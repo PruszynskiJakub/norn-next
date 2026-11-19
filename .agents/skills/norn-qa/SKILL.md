@@ -10,7 +10,7 @@ Without this, an agent passes what the tests or the code suggest instead of what
 ## Check
 
 1. **List the criteria.** When the slice or story frontmatter lists `criteria`, those ids are the list: one verdict for each, and for no other id. Otherwise take the Acceptance items (for a bug fix: the reported behaviour, which must no longer happen). Note each one's verifier and which ones are seen in a web page. A `person` verifier says why; that reason is what only a person checks.
-2. **Prepare the environment** the way a user would: build, start the app or service, seed data, on the ports and environment configured for this worktree. Do not rerun the test suite: a separate check already ran it, and tests are not QA.
+2. **Prepare the environment** the way a user would: build, start the app or service, seed data. Other worktrees may run their own app at the same time and norn gives none its own ports: pick ports nothing listens on, and stop what you started once the report is written. Do not rerun the test suite: a separate check already ran it, and tests are not QA.
 3. **Check every criterion that is not `person` as a user would**, `test` and `agent` verifiers alike, through the real interface (UI, CLI, HTTP API, library entry point): do the action, observe the effect, compare with the criterion, try the edges the spec lists. Record what you ran, what you saw, and the evidence (commands or clicks, output, request and response, logs) in files named after the criterion.
    - **One subagent per criterion** when several are independent, so the evidence of one does not crowd the context you judge the next in. Collect each criterion's evidence in its own subagent, against the environment you prepared (never one it sets up itself): give it the criterion, its verifier, the edges the spec lists, how to reach the running app, and the evidence directory; it writes that criterion's evidence files and comes back with what it saw and the verdict it would give. Run them in parallel only for criteria that leave shared state alone (seeded data, a logged-in session, a config); one that changes it runs on its own, after the others. You write the criteria report, judging each verdict from the evidence files, not from the subagent's summary. With one criterion, or criteria that build on each other, there is nothing to split. When you cannot start subagents, check each criterion yourself, one after another.
    - **Subagents that run commands** (every one here does) get these rules with their reasons, since they see only what you give them:
@@ -33,17 +33,17 @@ Exactly one per criterion:
 
 A person's earlier ruling or approval never turns a criterion into `pass`: it judged older code. Cite it in a `person` verdict's `how` so the person confirms it on the current head.
 
-A criterion that passed as written but that a person may read differently stays `pass`, with a **note** for a person, tied to that criterion, carrying the question. A note never replaces a verdict.
+A criterion that passed as written but that a person may read differently stays `pass`, with a **note** for a person (the entry's `note` field), tied to that criterion, carrying the question. A note never replaces a verdict.
 
 ## Files
 
-Write everything to one directory **outside the repository** (e.g. under `$TMPDIR`) unless told where: whatever is left in the worktree is committed when you report.
+Write everything to one directory **outside the repository** (e.g. under `$TMPDIR`) unless told where: `norn done` is refused while the worktree holds uncommitted work, and QA files do not belong in the branch.
 
-- `criteria.json`, the criteria report, one entry per criterion. Required: `evidence` for `pass`, `repro` for `fail`, `how` for `person`, `reason` and `how` for `unverified`; `evidence` may go on any.
+- `criteria.json`, the criteria report, one entry per criterion. Required: `evidence` for `pass`, `repro` for `fail`, `how` for `person`, `reason` and `how` for `unverified`; `evidence` and `note` (for a person) may go on any.
 
   ```json
   [
-    { "id": "AC1", "verdict": "pass", "evidence": "AC1.md" },
+    { "id": "AC1", "verdict": "pass", "evidence": "AC1.md", "note": "the empty state reads 'Nothing here'; the spec does not say what it should read" },
     { "id": "AC2", "verdict": "fail", "repro": "Add 'buy milk p1' on /today. Expected a red flag; actual none.", "evidence": "AC2.png" },
     { "id": "AC3", "verdict": "unverified", "reason": "no browser in this session", "how": "open /today, add 'buy milk p1', expect a red flag" },
     { "id": "AC4", "verdict": "person", "how": "compare the dialog with Figma frame 12; screenshot in AC4.png" }
@@ -72,7 +72,7 @@ Write everything to one directory **outside the repository** (e.g. under `$TMPDI
 
 ## Report
 
-The worst verdict decides what you may report: fail > unverified > person > pass; a report that contradicts it is refused. Report with the criteria file: `norn done <outcome> --criteria <dir>/criteria.json` (or the report command your instructions name). A step that requires criteria refuses a report without it, and one that does not cover exactly the frontmatter `criteria` ids. Put what the next step must know in `--note`: on a `fail`, each failing criterion's repro and the path of `findings.json`, since rework reads the note; name the evidence directory there too.
+The worst verdict decides what you may report: fail > unverified > person > pass; a report that contradicts it is refused. Report with the criteria file: `norn done <outcome> --criteria <dir>/criteria.json` (or the report command your instructions name). A step that requires criteria refuses a report without it, and one that does not cover exactly the frontmatter `criteria` ids. On a `fail`, hand `findings.json` back with the report (`--findings <dir>/findings.json`): rework reads it. Put anything else the next step must know in `--note`, and name the evidence directory there. A verdict's `note` reaches the person at the story's gate, never the next step.
 
 ## Rules
 

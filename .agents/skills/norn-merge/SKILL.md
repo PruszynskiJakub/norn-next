@@ -11,16 +11,17 @@ Without this, conflicts get resolved by picking a winner and one side's work qui
 
 | You find | Mode | Do |
 |---|---|---|
-| Your Rework section has **Base update (merge skill, base mode)** with a base commit | base | `git merge --no-ff <base commit>` in this worktree. |
-| A slice whose `integrate` reported a conflict (Rework: "rebase onto `<story branch>` conflicts in …"); nothing is in progress | slice | `git merge <story branch>` in the slice worktree. |
+| Your inputs have a `base_side` that names a base commit to merge | base | `git merge --no-ff <base commit>` in this worktree. |
+| You resolve a slice whose `integrate` conflicted; it aborted the merge, so nothing is in progress, and `base_side` names the story branch's commit | slice | `git merge --no-ff <that commit>` in the slice worktree. |
 | A merge, rebase or cherry-pick already in progress (`git status`) | in progress | Resolve it and continue that operation. |
+| A review of your resolution sent findings under Rework, and `base_side` names no conflict | fix resolution | Fix the resolution they name in the merges already committed. Merge nothing. |
 | None of these, asked to bring a branch up to date | — | Merge its target in, like base mode. |
 
-**Never start a rebase**, whatever the Rework wording says: only the tooling that runs this work rebases. A published story branch is never rebased; a slice that merged its story branch in is taken in by a merge at `integrate`, so the resolution is not linearised away and the same conflict does not come back.
+**Never start a rebase**, whatever your brief or inputs say: only the tooling that runs this work rebases. A published story branch is never rebased; a slice that merged its story branch in is taken in by a merge at `integrate`, so the resolution is not linearised away and the same conflict does not come back.
 
 ## Resolve each conflict by intent
 
-**Read the base side first.** In base mode, when the Base update section lists a **Base side**, start there, before you touch a file: for each conflicting path it names the base commits that touched it, the story that landed each, and that story's spec and PR body on the base. Read them (`git show <base commit>:<path>`) so you know what the other story meant before you rebuild it from `git log`. A commit listed without a story has no spec behind it: its message and diff are all you have.
+**Read the base side first.** In base or slice mode, start with the `base_side` input before you touch a file: for each conflicting path it gives the commands that list the base commits that touched it and show what the base changed there. Run them, and read the messages and any spec or PR they name, so you know what the other side meant before you rebuild it.
 
 For each hunk, read the primary sources on both sides: the commits that touched those lines (`git log -p --merge -- <file>`; for the base side, `git log <merge base>..<base commit> -- <file>`), their messages, the spec and criteria each side serves, and the tests each side added.
 
