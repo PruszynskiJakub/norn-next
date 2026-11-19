@@ -118,7 +118,7 @@ describe("an agent that asks a person", () => {
     await newStory(m, "Add the button");
     await drive(m, async () => (await unitOf(m, UNIT)).state?.parked !== undefined);
     const parked = (await unitOf(m, UNIT)).state;
-    expect([parked?.step, parked?.parked?.reason]).toEqual(["build", "Which colour should the button be?"]);
+    expect([parked?.step, parked?.parked?.reason, parked?.parked?.text]).toEqual(["build", "agent.asked", "Which colour should the button be?"]);
     const runId = m.launched[0] as string;
     // the agent ended its turn on the ask and exited, as a headless agent does
     await waitUntil(async () => (await m.env.launcher.alive?.((parked?.run?.session as string) ?? "")) === false);

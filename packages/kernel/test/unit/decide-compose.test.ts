@@ -77,7 +77,8 @@ describe("one action per unit per tick", () => {
     expect(by("gh-1/02")).toBe("slice.not_started");
     expect(by("gh-3")).toBe("story.change_merged");
     expect(by("gh-4")).toBe("claim.pending");
-    expect(by("gh-5")).toBe("unit.ended.done");
+    // finished: its ended units are left alone
+    expect(by("gh-5")).toBeUndefined();
     expect(by("gh-6/01")).toBe("unit.corrupt");
     expect(by("gh-6")).not.toBeUndefined();
     expect(ds.some((d) => d.rule === "mailbox.import")).toBe(true);

@@ -328,7 +328,7 @@ norn ask <question> [--report-id <id>]
 
 ##### `norn stuck`
 
-Report the step stuck, with the reason
+Report the step stuck, with the reason (a reason ending in ? is asked as a question)
 
 ```sh
 norn stuck <reason> [--report-id <id>]
@@ -358,7 +358,7 @@ norn help [<command>]
 
 ##### `norn tidy`
 
-Remove the worktrees and local branches of ended stories that no live claim holds
+Remove the worktrees and local branches of ended stories that no live claim holds, and close their runs' panes
 
 ```sh
 norn tidy [--dry-run]

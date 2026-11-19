@@ -43,8 +43,17 @@ export const RunInfo = Type.Object(
 );
 export type RunInfo = Static<typeof RunInfo>;
 
-/** Why a unit waits for a person, and since when; a parked unit takes no action until a receipt moves it. */
-export const ParkInfo = Type.Object({ reason: NonEmpty, since: IsoTime }, { ...closed, title: "ParkInfo" });
+/**
+ * The park of an agent waiting on a person's answer, whether it asked (`norn ask`) or its session
+ * showed a question: answered with `norn story answer`, never a rerun.
+ */
+export const ASKED_PARK = "agent.asked";
+
+/**
+ * Why a unit waits for a person, and since when; a parked unit takes no action until a receipt moves
+ * it. `reason` is a code or a short reason; `text` is what the agent asked, shown and never decided on.
+ */
+export const ParkInfo = Type.Object({ reason: NonEmpty, since: IsoTime, text: Type.Optional(NonEmpty) }, { ...closed, title: "ParkInfo" });
 export type ParkInfo = Static<typeof ParkInfo>;
 
 export const Ended = Type.Union([Type.Literal("done"), Type.Literal("stuck"), Type.Literal("corrupt")]);

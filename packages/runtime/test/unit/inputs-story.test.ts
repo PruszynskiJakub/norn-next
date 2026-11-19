@@ -6,6 +6,7 @@ import { SDLC_PACK } from "@norn/pack-sdlc";
 import { parse } from "yaml";
 import { REPO_ROOT } from "../../../../test/support/repo-root.ts";
 import { materializeInputs, readBackDocs, readStoryDoc, renderInputFrom } from "../../src/index.ts";
+import { standing } from "../../src/input-history.ts";
 import { has, harness, type Harnessed, record, tickUntil, trackerItem } from "./support.ts";
 
 const UNIT = "lt-1";
@@ -360,6 +361,19 @@ describe("the story's record", () => {
     expect(text).toContain("- `AC1` pass; evidence: help.test.ts passes");
     expect(text).toContain("- `AC2` person; how to check: open the help page");
     expect(text).toContain("## `lt-1/01`: at `build` #1\n\n- nothing reported yet");
+  });
+});
+
+describe("where a unit stands", () => {
+  test("a unit waiting on its agent's question names the question", async () => {
+    const h = await started();
+    const before = await record(h, UNIT);
+    const state = before.state;
+    if (!state) throw new Error("the unit has no state");
+    const asked: UnitJournal = { ...before, state: { ...state, status: "parked", parked: { reason: "agent.asked", since: "2026-11-17T09:00:00.000Z", text: "Which  db\nshould it use?" } } as typeof state };
+    expect(standing(asked)).toBe('waits at `build` #1: agent.asked: "Which db should it use?"');
+    const bare: UnitJournal = { ...before, state: { ...state, status: "parked", parked: { reason: "gate", since: "2026-11-17T09:00:00.000Z" } } as typeof state };
+    expect(standing(bare)).toBe("waits at `build` #1: gate");
   });
 });
 

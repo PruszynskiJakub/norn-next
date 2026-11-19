@@ -70,7 +70,7 @@ describe("norn tidy", () => {
     await stuckStory(m);
     const r = await runCli(["tidy", "--json"], m.io);
     expect(r.exit).toBe(ExitCode.ok);
-    expect(json(r.stdout)).toEqual({ dry_run: false, removed: [{ story: UNIT, unit: UNIT, worktree: true, branch: BRANCH }], kept: [] });
+    expect(json(r.stdout)).toEqual({ dry_run: false, removed: [{ story: UNIT, unit: UNIT, worktree: true, branch: BRANCH }], kept: [], closed: [] });
     expect(calls).toEqual([`remove ${UNIT}`, `deleteBranch ${BRANCH}`]);
     expect((await runCli(["tidy"], m.io)).stdout).toBe("Nothing to tidy.\n");
   });

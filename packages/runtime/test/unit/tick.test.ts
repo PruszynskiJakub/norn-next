@@ -19,8 +19,10 @@ describe("a story from intake to done", () => {
       ["lt-1 check.run"],
       ["lt-1 receipts.apply"],
       ["- claim.renew", "lt-1 check.finished"],
-      ["lt-1 unit.ended.done", "- story.finish", "- claim.release"],
+      ["- story.finish", "- claim.release"],
     ]);
+    // finished: the ticks after decide nothing, rather than a noop per ended unit on every one
+    expect(rulesOf(await h.runtime.tick())).toEqual([]);
     const unit = await record(h, "lt-1");
     expect(unit.state?.ended).toBe("done");
     expect(unit.receipts.map((r) => r.data.kind)).toEqual(["round.started", "run.started", "check.finished"]);
@@ -47,6 +49,10 @@ describe("a story from intake to done", () => {
     await tickUntil(h, has("agent.reported"));
     expect((await record(h, "lt-1")).state?.ended).toBe("done");
     expect(h.launcher.of("stop")).toEqual([[handle]]);
+    // the story's finish closes what the ended run left open (its pane) and removes its worktree
+    await tickUntil(h, has("story.finish"));
+    expect(h.launcher.of("close")).toEqual([[handle]]);
+    expect(h.vcsCalls.filter((c) => c.op === "remove").map((c) => c.args)).toEqual([["lt-1"]]);
   });
 
   test("plugin steps get the slots and their config; a wait step is polled until it answers", async () => {

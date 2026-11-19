@@ -102,6 +102,12 @@ export interface AgentLauncher {
   nudge(handle: string, text: string, promptId: string): Promise<PluginResult<void>>;
   answer(handle: string, inputId: string, text: string, opts?: AnswerOptions): Promise<PluginResult<void>>;
   stop(handle: string): Promise<PluginResult<void>>;
+  /**
+   * Close what the handle's run left open on this machine once it ended (a herdr pane and, with its
+   * last one, the story's workspace); true when something closed. A run launched on another machine,
+   * or a runner that leaves nothing open, closes nothing.
+   */
+  close?(handle: string): Promise<PluginResult<boolean>>;
   /** whether the handle's process still runs; null when it cannot tell, which is never read as dead */
   alive?(handle: string): Promise<boolean | null>;
   /** the dialog the handle's pane shows, as its runner reads it; null when none shows or it cannot tell */

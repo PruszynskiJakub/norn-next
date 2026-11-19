@@ -85,7 +85,7 @@ export async function currentRunnerHandle(ctx: HostContext, h: LaunchHandle): Pr
 }
 
 // a runner key becomes a file name in some runners, so it keeps to a filename-safe charset
-const keyOf = (runId: string, promptId: string): string => `${runId}.${promptId.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+export const keyOf = (runId: string, promptId: string): string => `${runId}.${promptId.replace(/[^A-Za-z0-9_-]/g, "_")}`;
 
 export interface ResumeInput {
   ctx: HostContext;

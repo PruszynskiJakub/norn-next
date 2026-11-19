@@ -134,7 +134,7 @@ const HARNESS: Harness = {
 };
 
 export interface LauncherCall {
-  op: "start" | "nudge" | "answer" | "stop";
+  op: "start" | "nudge" | "answer" | "stop" | "close";
   args: unknown[];
 }
 
@@ -170,6 +170,12 @@ export class FakeLauncher implements AgentLauncher {
   async stop(handle: string) {
     this.calls.push({ op: "stop", args: [handle] });
     return ok(undefined);
+  }
+  /** closes what each handle left open once: a second close of it finds nothing */
+  async close(handle: string) {
+    const again = this.calls.some((c) => c.op === "close" && c.args[0] === handle);
+    this.calls.push({ op: "close", args: [handle] });
+    return ok(!again);
   }
   async alive(handle: string) {
     this.probed.push(handle);

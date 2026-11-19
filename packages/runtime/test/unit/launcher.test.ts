@@ -56,6 +56,7 @@ interface FakeRunner extends Runner {
   sent: { handle: string; text: string }[];
   pressed: { handle: string; keys: readonly RunnerKey[] }[];
   stopped: string[];
+  closed: { handle: string; key: string }[];
   live: Map<string, string>;
 }
 
@@ -66,6 +67,7 @@ function fakeRunner(caps: Runner["capabilities"]): FakeRunner {
   const sent: FakeRunner["sent"] = [];
   const pressed: FakeRunner["pressed"] = [];
   const stopped: string[] = [];
+  const closed: FakeRunner["closed"] = [];
   let made = 0;
   return {
     name: caps.paneInput ? "pane" : "bg",
@@ -74,6 +76,7 @@ function fakeRunner(caps: Runner["capabilities"]): FakeRunner {
     sent,
     pressed,
     stopped,
+    closed,
     live,
     start: async (req) => {
       starts.push(req);
@@ -99,6 +102,10 @@ function fakeRunner(caps: Runner["capabilities"]): FakeRunner {
       stopped.push(handle);
       for (const [k, v] of live) if (v === handle) live.delete(k);
       return ok(undefined);
+    },
+    close: async (handle, key) => {
+      closed.push({ handle, key });
+      return ok(true);
     },
   };
 }
@@ -650,6 +657,33 @@ describe("harness launcher stop and liveness", () => {
     expect(s.pane.stopped).toEqual(["proc|1"]);
     expect(await s.launcher.alive(started.value.handle)).toBe(false);
     expect(await s.launcher.alive("not-ours")).toBeNull();
+  });
+});
+
+describe("harness launcher close", () => {
+  test("closes the first launch under the run id and every resume under its own key, and nothing of a run launched elsewhere", async () => {
+    const s = setup({ bgHarness: { resume: true } });
+    const unit = "gh-12/03";
+    const runId = "01JRUN0000000000000000000A";
+    const started = await s.launcher.start(run({ executor: "bg", attended: false }));
+    if (!started.ok) throw new Error("start failed");
+    const h = started.value.handle;
+    await appendEvents(s.ctx, unit, runId, [{ type: "session.started", run_id: runId, seq: 0, at: START, harness_session: "sess-1" }]);
+    s.clock.advance(SILENT_MS + 1000);
+    const id = nudgePromptId("01JINTENT7");
+    expect(await s.launcher.nudge(h, "carry on", id)).toEqual(ok(undefined));
+    const resumeKey = s.bg.starts[1]?.key;
+    expect(resumeKey).toStartWith(`${runId}.`);
+
+    const elsewhere = setup({ bgHarness: { resume: true } });
+    expect(await elsewhere.launcher.close(h)).toEqual(ok(false));
+    expect(elsewhere.bg.closed).toEqual([]);
+
+    expect(await s.launcher.close(h)).toEqual(ok(true));
+    expect(s.bg.closed).toEqual([
+      { handle: "proc|2", key: resumeKey as string },
+      { handle: "proc|1", key: runId },
+    ]);
   });
 });
 

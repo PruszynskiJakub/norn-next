@@ -3,7 +3,8 @@
  * per run labelled with its title, the agent started in the tab's pane with the launch env. A person
  * can watch and type, `send` types text and submits it, `keys` presses keys in the pane, as a
  * dialog there takes them, and `dialog` reads one while herdr reports the agent blocked on it. The
- * handle is herdr's pane id.
+ * handle is herdr's pane id. `stop` ends the agent and leaves its tab: herdr closes a workspace with
+ * its last pane, so closing each run's pane would give every run of a story a workspace of its own.
  *
  * `start` is idempotent by key. The key's record (`<dataDir>/runners/herdr/<key>.json`) is made with
  * `ctx.files.create` before any pane is opened, holding no pane yet; it names the pane once one is
@@ -66,6 +67,8 @@ export function launchScript(argv: readonly string[]): string {
 const SAFE_KEY = /^[A-Za-z0-9_-][A-Za-z0-9._-]*$/;
 /** How often a start looks whether the agent took the pane's foreground. */
 const START_POLL_MS = 250;
+/** How long a stop waits for the agent to leave on TERM before it kills it. */
+const STOP_WAIT_MS = 3_000;
 /** How much of the pane a failed start quotes. */
 const SCREEN_LINES = 30;
 
@@ -206,6 +209,11 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
       if (!renamed.ok) return closeAfter(pane, renamed);
     }
     return ok({ workspace: ws, pane });
+  }
+
+  async function closePane(pane: string): Promise<PluginResult<void>> {
+    const closed = await herdr(["pane", "close", pane]);
+    return closed.ok || isGone(closed) ? ok(undefined) : closed;
   }
 
   async function closeAfter<T>(pane: string, failure: PluginResult<T>): Promise<PluginResult<T>> {
@@ -387,9 +395,49 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
       return flush();
     },
 
+    async close(handle, key) {
+      if (!SAFE_KEY.test(key)) return ok(false);
+      const path = keyRecordPath(ctx, key);
+      const known = await readRecord(path);
+      if (!known.ok) return known;
+      const rec = known.value;
+      if (!rec || rec.pane !== handle || !rec.workspace) return ok(false);
+      // the pane id must still be this start's pane: in its workspace, in a tab titled for the run
+      const panes = await herdrJson(herdr, ["pane", "list", "--workspace", rec.workspace], PaneList);
+      if (!panes.ok && !isGone(panes)) return panes;
+      const tabId = panes.ok ? panes.value.result.panes.find((p) => p.pane_id === handle)?.tab_id : undefined;
+      let ours = false;
+      if (tabId !== undefined) {
+        const tabs = await herdrJson(herdr, ["tab", "list", "--workspace", rec.workspace], TabList);
+        if (!tabs.ok && !isGone(tabs)) return tabs;
+        ours = tabs.ok && tabs.value.result.tabs.some((t) => t.tab_id === tabId && t.label === rec.title);
+      }
+      if (ours) {
+        const closed = await closePane(handle);
+        if (!closed.ok) return closed;
+      }
+      // a pane gone or taken over is no longer this key's: nothing is left for its record to find
+      await forget(path);
+      await forget(launchScriptPath(ctx, key));
+      return ok(ours);
+    },
+
     async stop(handle) {
-      const closed = await herdr(["pane", "close", handle]);
-      return closed.ok || isGone(closed) ? ok(undefined) : closed;
+      // without a way to signal the agent, closing its pane is the only way to end it
+      if (!ctx.kill) return closePane(handle);
+      const info = await processInfo(handle);
+      if (!info.ok) return info;
+      if (!busy(info.value)) return ok(undefined);
+      const agent = info.value?.foreground_process_group_id as number;
+      await ctx.kill(agent, "TERM");
+      for (let waited = 0; waited < STOP_WAIT_MS; waited += START_POLL_MS) {
+        const now = await processInfo(handle);
+        if (!now.ok) return now;
+        if (!busy(now.value) || now.value?.foreground_process_group_id !== agent) return ok(undefined);
+        await sleep(START_POLL_MS);
+      }
+      await ctx.kill(agent, "KILL");
+      return ok(undefined);
     },
   };
 }

@@ -19,6 +19,26 @@ export function outcomeLine(o: Outcome): string {
   return o.ok ? base : `${base}  FAILED: ${o.error}${o.retryable ? " (retried next tick)" : ""}`;
 }
 
+/**
+ * Kinds that only keep a story where it is: decide asks for them again on every tick a unit waits (an
+ * agent or check running, a unit parked) or a shared store's story is held.
+ */
+export const STANDING: ReadonlySet<string> = new Set(["noop", "notify", "flush", "renew_claim"]);
+
+/**
+ * A tick in one line for a person watching: its time and each action that moved something or failed,
+ * then problems not said on the tick before (`said`); null for a tick of only waiting.
+ */
+export function watchLine(r: TickReport, time: string, said: ReadonlySet<string>): string | null {
+  const acts = r.outcomes.filter((o) => !o.ok || !STANDING.has(o.decision.kind)).map((o) => {
+    const base = `${who(o.decision)} ${o.decision.rule} → ${o.decision.kind}`;
+    return o.ok ? base : `${base} FAILED: ${o.error}`;
+  });
+  const fresh = r.problems.filter((p) => !said.has(p)).map((p) => `problem: ${p}`);
+  const parts = [...(r.skipped ? [`skipped: ${r.skipped}`] : []), ...acts, ...fresh];
+  return parts.length === 0 ? null : `${time}  ${parts.join("; ")}`;
+}
+
 export const failedCount = (r: TickReport): number => r.outcomes.filter((o) => !o.ok).length;
 
 export function tickLines(r: TickReport): string[] {

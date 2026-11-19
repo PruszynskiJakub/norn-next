@@ -1,8 +1,8 @@
 /**
  * Agents in the herdr runner through the CLI alone, every norn call a subprocess of the binary from
  * source and herdr the fake on PATH (fixtures/fake-herdr), whose panes run the agent for real: one
- * workspace per story, one tab per run in the unit's worktree, the tab of a run nobody sits beside
- * closed once its report is applied, a permission prompt and a pane dialog answered from
+ * workspace per story, one tab per run in the unit's worktree, each kept once its run ended, a
+ * permission prompt and a pane dialog answered from
  * `norn story answer` as keys pressed once, doctor with a herdr that answers nothing, and init inside
  * herdr. The last block runs the same story against a real herdr, only under NORN_TEST_HERDR=1 and in
  * a named herdr session of its own; it covers workspaces and tabs only, as the permission and trust
@@ -124,6 +124,7 @@ describe("one herdr workspace per story, one tab per run", () => {
   let started: NornOut;
   let ended: UnitSeen | null;
   let calls: string[][] = [];
+  let atEnd: HerdrState;
 
   beforeAll(async () => {
     w = await world("work");
@@ -139,6 +140,7 @@ describe("one herdr workspace per story, one tab per run", () => {
     started = await norn(w, ["run", "start", KEY, "--json"]);
     ended = await ticks.until((u) => u?.ended !== undefined);
     calls = herdrCalls(w);
+    atEnd = herdrState(w);
   }, SLOW);
 
   test("an attended step parks with no pane opened until a person starts it", () => {
@@ -158,25 +160,22 @@ describe("one herdr workspace per story, one tab per run", () => {
     expect(herdrCallsOf(calls, "workspace create")[0]).toEqual(expect.arrayContaining(["--label", KEY]));
     const tabCreates = herdrCallsOf(calls, "tab create");
     expect(tabCreates).toHaveLength(1);
-    const ws = herdrState(w).workspaces;
+    const ws = atEnd.workspaces;
     expect(ws.map((x) => x.label)).toEqual([KEY]);
     expect(tabCreates[0]).toEqual(expect.arrayContaining(["--workspace", ws[0]?.workspace_id, "--label", `${KEY} build`]));
     for (const s of ticks.after) expect(s.workspaces.filter((x) => x.label === KEY).length).toBeLessThanOrEqual(1);
   });
 
-  test("tabs go design, then design and build, then back to design: the attended tab stays, the done build tab is closed", () => {
-    expect(tabTimeline(ticks.after)).toEqual([[`${KEY} design`], [`${KEY} design`, `${KEY} build`], [`${KEY} design`]]);
-    const designPane = herdrState(w).panes[0]?.pane_id;
-    const closed = herdrCallsOf(calls, "pane close").map((c) => c[2]);
-    expect(closed).toHaveLength(1);
-    expect(closed).not.toContain(designPane);
+  test("tabs go design, then design and build, and both stay once the build run ended: herdr closes a workspace with its last pane", () => {
+    expect(tabTimeline(ticks.after)).toEqual([[`${KEY} design`], [`${KEY} design`, `${KEY} build`]]);
+    expect(herdrCallsOf(calls, "pane close")).toEqual([]);
   });
 
   test("every pane opens in the story's worktree under the machine dir", () => {
     const real = realpathSync(worktree);
     const cwds = [...herdrCallsOf(calls, "workspace create"), ...herdrCallsOf(calls, "tab create")].map((c) => c[c.indexOf("--cwd") + 1]);
     expect(cwds).toEqual([real, real]);
-    expect(herdrState(w).panes.map((p) => p.cwd)).toEqual([real]);
+    expect(atEnd.panes.map((p) => p.cwd)).toEqual([real, real]);
   });
 
   test("the line typed into a pane stays under a terminal line though PATH is 2 KB", () => {
@@ -482,14 +481,15 @@ describe.skipIf(!REAL)("against a real herdr (NORN_TEST_HERDR=1)", () => {
     if (startedServer) await nodeExec(["herdr", "session", "stop", SESSION], { timeoutMs: 15_000 });
   });
 
-  test("the story ends done with one workspace labelled with its key, and only the attended design tab left", () => {
+  test("the story ends done with one workspace labelled with its key, holding the design and build tabs", () => {
     expect(ended?.ended).toBe("done");
     const mine = final.workspaces.filter((x) => x.label === KEY);
     expect(mine).toHaveLength(1);
     const tabs = final.tabs.filter((t) => t.workspace_id === mine[0]?.workspace_id).map((t) => t.label);
-    expect(tabs).toEqual([`${KEY} design`]);
+    expect(tabs).toEqual([`${KEY} design`, `${KEY} build`]);
     const panes = final.panes.filter((p) => p.workspace_id === mine[0]?.workspace_id);
-    expect(panes.map((p) => p.cwd)).toEqual([realpathSync(join(machine, "worktrees", KEY))]);
+    const real = realpathSync(join(machine, "worktrees", KEY));
+    expect(panes.map((p) => p.cwd)).toEqual([real, real]);
     expect(noteOf(w, "done")).toMatchObject({ code: 0 });
   });
 });

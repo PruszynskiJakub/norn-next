@@ -24,7 +24,6 @@ export const RULE_IDS: readonly string[] = [
   "store.diverged",
   "mailbox.import",
   "mailbox.reject",
-  "story.ended",
   "story.change_merged",
   "story.change_merged.stop",
   "story.item_closed",

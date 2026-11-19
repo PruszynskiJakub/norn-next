@@ -30,6 +30,8 @@
  * - trust: waits for keys in its pane before it fires any hook, as an agent behind a trust dialog
  *   does whose hooks have not loaded, then works as `work` does. The wait is read from
  *   TEST_AGENT_PLAN alone, since a plans file is read only after the first hooks.
+ * - logged-out: its start hook, then a line on stdout and an exit 1 before any prompt, as `claude -p`
+ *   does without a login (TEST_AGENT_PLAN only: it exits before the brief that names the step).
  */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -215,6 +217,10 @@ if (process.env.TEST_AGENT_ONLY === "stop.after-report") {
 
 if (process.env.TEST_AGENT_PLAN === "trust" && !resumed) note("trusted", await paneInput(0));
 note(resumed ? "resume.start" : "start", await hook("start"));
+if (process.env.TEST_AGENT_PLAN === "logged-out") {
+  process.stdout.write("Not logged in · Please run /login\n");
+  process.exit(1);
+}
 note(resumed ? "resume.prompt" : "prompt", await hook("prompt", { prompt }));
 note("norn", (await sh("command -v norn")).stdout.trim());
 const brief = await sh(`${norn} brief`);

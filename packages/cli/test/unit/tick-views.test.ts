@@ -104,6 +104,31 @@ describe("norn watch", () => {
     expect(json(r.stdout)).toMatchObject({ code: "git_missing" });
   });
 
+  test("without --json each tick that acted is one short line with its time and actions; a tick of only waiting prints nothing", async () => {
+    const lines: string[] = [];
+    const m = repo({ log: (l) => lines.push(l) });
+    await addItem(m, "First");
+    m.io.sleep = async () => {};
+    const r = await runCli(["watch", "--interval", "30s", "--max-ticks", "8"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(r.stdout).toStartWith("Stopped after 8 ticks");
+    expect(lines.length).toBeGreaterThan(0);
+    for (const l of lines) {
+      expect(l).not.toStartWith("{");
+      expect(l).toMatch(/^\d\d:\d\d:\d\d {2}\S/);
+      expect(l).not.toContain("→ noop");
+    }
+    expect(lines[0]).toContain("lt-1 intake.story → intake_story");
+    // the same problem on every tick is said once
+    expect(lines.filter((l) => l.includes("problem:")).length).toBeLessThanOrEqual(1);
+    // nothing to do: nothing printed
+    const quiet: string[] = [];
+    const idle = repo({ log: (l) => quiet.push(l) });
+    idle.io.sleep = async () => {};
+    await runCli(["watch", "--interval", "30s", "--max-ticks", "3"], idle.io);
+    expect(quiet).toEqual([]);
+  });
+
   test("--max-ticks ends it; a bad interval or count is a usage error", async () => {
     const r = await runCli(["watch", "--interval", "1ms", "--max-ticks", "3", "--json"], repo({ log: () => {} }).io);
     expect(json(r.stdout)).toMatchObject({ ticks: 3, interval: "1ms" });

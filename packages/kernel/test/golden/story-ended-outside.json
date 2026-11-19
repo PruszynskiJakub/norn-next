@@ -876,12 +876,6 @@
       "expect_version": 1
     },
     {
-      "kind": "noop",
-      "unit": "gh-82",
-      "rule": "story.ended",
-      "reason": "the story ended; nothing to start"
-    },
-    {
       "kind": "release_claim",
       "unit": null,
       "rule": "claim.release",
