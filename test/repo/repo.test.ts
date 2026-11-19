@@ -613,7 +613,7 @@ const SPAWN_ALLOW: Counts = {
  */
 const NORN_PATH = /\.agents\/norn\b|["'`]\.agents["'`]\s*,\s*["'`]norn["'`]/;
 const NORN_PATH_ALLOW: Record<string, [number, string]> = {
-  "packages/cli/src/config/paths.ts": [4, "the cli's path module: its config files, plugin lock and the old norn's config init moves off, as messages name them"],
+  "packages/cli/src/config/paths.ts": [5, "the cli's path module: its config files, plugin lock and the old norn's team and repo-local configs it moves off, as messages name them"],
   "packages/cli/test/unit/config.test.ts": [3, "the cli's config files where a person sees them: the paths and the config error's message"],
   "packages/cli/test/unit/plugins.test.ts": [1, "the cli's committed plugin lock, where a person sees it in team mode"],
 };

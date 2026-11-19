@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { configPaths, ExitCode, runCli } from "../../src/index.ts";
+import { configPaths, ExitCode, REPO_COMMITTED_FILE, REPO_LOCAL_FILE, runCli } from "../../src/index.ts";
 import { HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
 
 const PATHS = configPaths(HOME, ROOT);
@@ -44,6 +44,24 @@ describe("norn config set", () => {
     expect(r.exit).toBe(ExitCode.config);
     expect(json(r.stdout)).toMatchObject({ code: "config_invalid" });
     expect(await m.files.read(PATHS.local)).toBe(LOCAL_CONFIG);
+  });
+
+  test("a set a higher file overrides is written, and the answer says which file wins and the value that stays", async () => {
+    const m = machine({ seed: { [PATHS.local]: LOCAL_CONFIG, [PATHS.repo]: "format: 1\nkernel: { mode: manual }\n" } });
+    const r = await runCli(["config", "set", "kernel.mode", "auto", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(json(r.stdout)).toMatchObject({ layer: "local", overridden: { layer: "repo", file: PATHS.repo, keys: ["kernel.mode"], value: "manual" } });
+    expect(await m.files.read(PATHS.local)).toContain("mode: auto");
+    const md = await runCli(["config", "set", "kernel.mode", "auto"], m.io);
+    expect(md.stdout).toContain(`but ${REPO_COMMITTED_FILE} sets kernel.mode too and wins over ${REPO_LOCAL_FILE}: the merged value stays "manual"`);
+    expect(md.stdout).toContain("norn config set kernel.mode auto --commit");
+  });
+
+  test("a set nothing higher overrides, or one in the highest file, carries no override", async () => {
+    const m = machine({ seed: { [PATHS.local]: LOCAL_CONFIG, [PATHS.repo]: "format: 1\nkernel: { mode: manual }\n" } });
+    expect(json((await runCli(["config", "set", "kernel.max_agents", "2", "--json"], m.io)).stdout).overridden).toBeUndefined();
+    expect(json((await runCli(["config", "set", "kernel.mode", "auto", "--commit", "--json"], m.io)).stdout).overridden).toBeUndefined();
+    expect(json((await runCli(["config", "set", "kernel.mode", "auto", "--user", "--json"], m.io)).stdout).overridden).toMatchObject({ layer: "repo" });
   });
 
   test("--unset removes the key", async () => {

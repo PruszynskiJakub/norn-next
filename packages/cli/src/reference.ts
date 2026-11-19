@@ -6,7 +6,7 @@
  * it between the markers; a unit test fails when the file is stale.
  */
 import { DEFAULT_KERNEL_CONFIG } from "@norn/kernel";
-import { DEFAULT_LOCK_STALE_MS, DEFAULT_TRACE_RETAIN_MS } from "@norn/runtime";
+import { DEFAULT_CHECKS, DEFAULT_LOCK_STALE_MS, DEFAULT_TRACE_RETAIN_MS } from "@norn/runtime";
 import { ExitCode } from "@norn/schema";
 import { parse } from "yaml";
 import type { Command, Noun } from "./command.ts";
@@ -80,7 +80,7 @@ function typeName(s: Schema): string {
 }
 
 /** Keys that open a map: a record's keys are names a person picks, shown as a placeholder. */
-const RECORD_KEY: Record<string, string> = { executors: "<name>", plugins: "<name>" };
+const RECORD_KEY: Record<string, string> = { executors: "<name>", plugins: "<name>", checks: "<name>" };
 
 /**
  * Every key a config file can hold, walked from the file's schema: a map's own keys nest
@@ -142,6 +142,7 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   "kernel.claim_renew_before": durationText(d.claimRenewBeforeMs),
   "kernel.lock_stale": durationText(DEFAULT_LOCK_STALE_MS),
   "trace.retain": durationText(DEFAULT_TRACE_RETAIN_MS),
+  "checks.<name>": { derived: `\`checks.test\` is ${JSON.stringify(DEFAULT_CHECKS.test)}, which the shipped workflows' test steps run; init detects the repo's own` },
   "kernel.counters.check_fail": d.counterDefaults.checkFail,
   "kernel.counters.gate_reject": d.counterDefaults.gateReject,
   "kernel.counters.conflict": d.counterDefaults.conflict,

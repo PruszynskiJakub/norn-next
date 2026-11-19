@@ -10,6 +10,7 @@
 import type { DecisionOf, ReceiptIntent } from "@norn/kernel";
 import { fail, ok, type PluginResult, stepKindAnswerProblem, type StepKindOutcome } from "@norn/plugin-api";
 import { baseRefOf, branchOf, ensureWorktree } from "./branches.ts";
+import { checkCommandOf } from "./check-command.ts";
 import { canDetach, checkOutcome, OUTPUT_TAIL, startDetachedCheck } from "./checks-detached.ts";
 import type { TickContext } from "./env.ts";
 import { unitInFacts } from "./record.ts";
@@ -66,8 +67,10 @@ export async function runCheck(t: TickContext, d: DecisionOf<"run_check">): Prom
   if (!worktree.ok) return worktree;
   return underIntent(t, unit, d.intent, async () => {
     const record = base(t, unit, d, "check", d.intent);
+    const command = checkCommandOf(d.command, t.env.config.checks);
+    if (!command.ok) return { ...record, error: command.error };
     try {
-      const out = await t.env.ctx.exec(["sh", "-c", d.command], { cwd: worktree.value, timeoutMs: d.timeout_ms });
+      const out = await t.env.ctx.exec(["sh", "-c", command.command], { cwd: worktree.value, timeoutMs: d.timeout_ms });
       const output = `${out.stdout}${out.stderr ? `\n${out.stderr}` : ""}${out.timedOut ? `\n(timed out after ${d.timeout_ms} ms)` : ""}`;
       return { ...record, outcome: checkOutcome(exits, out.code, out.timedOut), exit: out.code, output: output.slice(-OUTPUT_TAIL) };
     } catch (e) {

@@ -81,3 +81,42 @@ export const LOCAL_CONFIG = [
   "  claude: { harness: claude, runner: headless }",
   "",
 ].join("\n");
+
+/** A GitHub repository as gh answers for it: labels defined, issues made, every gh call in order. */
+export interface FakeGh {
+  script: ExecScript;
+  /** the labels the repository defines */
+  labels: string[];
+  /** each gh call as `<sub> <verb> <first arg>`, such as `label create norn` */
+  calls: string[];
+  /** gh refuses `label create`, as for a token without write access */
+  refuseLabels?: boolean;
+}
+
+export function fakeGh(labels: string[] = []): FakeGh {
+  const gh: FakeGh = {
+    labels,
+    calls: [],
+    script: (argv) => {
+      if (argv[0] !== "gh") return undefined;
+      const [, sub, verb, first] = argv;
+      if (sub === "--version") return { stdout: "gh 2.0\n" };
+      if (sub === "repo" && verb === "view") return { stdout: '{"nameWithOwner":"acme/app"}' };
+      if (sub === "api" && verb === "user") return { stdout: "me\n" };
+      gh.calls.push(`${sub} ${verb}${first && !first.startsWith("-") ? ` ${first}` : ""}`);
+      if (sub === "label" && verb === "list") return { stdout: JSON.stringify(gh.labels.map((name) => ({ name }))) };
+      if (sub === "label" && verb === "create") {
+        if (gh.refuseLabels) return { code: 1, stderr: "HTTP 403: Resource not accessible by integration" };
+        gh.labels.push(first as string);
+        return { stdout: "" };
+      }
+      if (sub === "issue" && verb === "list") return { stdout: "[]" };
+      if (sub === "issue" && verb === "create") return { stdout: "https://github.com/acme/app/issues/7\n" };
+      return undefined;
+    },
+  };
+  return gh;
+}
+
+/** LOCAL_CONFIG on the github tracker. */
+export const GITHUB_CONFIG = LOCAL_CONFIG.replace("use: local\n  intake", "use: github\n  intake");

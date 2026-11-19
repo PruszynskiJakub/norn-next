@@ -34,6 +34,14 @@ describe("detached checks", () => {
     expect(rulesOf(await h.runtime.tick())).toContain("lt-1 check.running");
   });
 
+  test("a detached check runs the config's command where the step names {checks.<name>}", async () => {
+    const procs = new FakeProcesses();
+    const h = harness({ processes: procs, workflow: "configured", checks: { test: "make test" } });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("check.run"));
+    expect(procs.spawned[0]?.argv[4]).toBe("make test --bail");
+  });
+
   test("a replayed run_check starts nothing new", async () => {
     const procs = new FakeProcesses();
     const h = harness({ processes: procs });

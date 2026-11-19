@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
 import { parse } from "yaml";
 import { join } from "node:path";
-import { AGENTS_DIR, configPaths, REPO_LOCAL_FILE, ExitCode, OLD_REPO_CONFIG_FILE, runCli } from "../../src/index.ts";
-import { COMMON, HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
+import { AGENTS_DIR, configPaths, REPO_COMMITTED_FILE, REPO_LOCAL_FILE, ExitCode, OLD_LOCAL_CONFIG_FILE, OLD_REPO_CONFIG_FILE, runCli } from "../../src/index.ts";
+import { COMMON, fakeGh, HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
 
 const PATHS = configPaths(HOME, ROOT);
 const EXCLUDE = `${COMMON}/info/exclude`;
@@ -127,6 +127,43 @@ describe("norn init: detection", () => {
   });
 });
 
+describe("norn init: the test command", () => {
+  const at = (name: string) => join(ROOT, name);
+  const pkg = (test?: string) => JSON.stringify({ name: "app", scripts: test === undefined ? {} : { test } });
+  const testOf = async (seed: Record<string, string>) => {
+    const { m, body } = await init([], { seed });
+    return { checks: (await written(m, PATHS.local)).checks, test: body.test };
+  };
+
+  test("detected from the lockfile beside package.json's test script, installing first, as a check runs in a fresh worktree", async () => {
+    expect((await testOf({ [at("package.json")]: pkg("jest"), [at("package-lock.json")]: "{}" })).checks).toEqual({ test: "npm ci && npm test" });
+    expect((await testOf({ [at("package.json")]: pkg("vitest"), [at("pnpm-lock.yaml")]: "" })).checks).toEqual({ test: "pnpm install --frozen-lockfile && pnpm test" });
+    expect((await testOf({ [at("package.json")]: pkg("vitest"), [at("yarn.lock")]: "" })).checks).toEqual({ test: "yarn install && yarn test" });
+    expect((await testOf({ [at("package.json")]: pkg("vitest") })).checks).toEqual({ test: "npm install && npm test" });
+    expect((await testOf({ [at("package.json")]: pkg("bun test --bail"), [at("bun.lock")]: "" })).checks).toEqual({ test: "bun install --frozen-lockfile && bun run test" });
+    expect((await testOf({ [at("package.json")]: pkg(), [at("bun.lock")]: "" })).checks).toEqual({ test: "bun install --frozen-lockfile && bun test" });
+  });
+
+  test("npm's placeholder is no test script; other build files and a Makefile's test target are read too", async () => {
+    expect((await testOf({ [at("package.json")]: pkg('echo "Error: no test specified" && exit 1'), [at("package-lock.json")]: "{}" })).checks).toBeUndefined();
+    expect((await testOf({ [at("Cargo.toml")]: "" })).checks).toEqual({ test: "cargo test" });
+    expect((await testOf({ [at("go.mod")]: "" })).checks).toEqual({ test: "go test ./..." });
+    expect((await testOf({ [at("pyproject.toml")]: "" })).checks).toEqual({ test: "pytest" });
+    expect((await testOf({ [at("Makefile")]: "build:\n\tcc x.c\ntest: build\n\t./x\n" })).checks).toEqual({ test: "make test" });
+    expect((await testOf({ [at("Makefile")]: "build:\n\tcc x.c\n" })).checks).toBeUndefined();
+    expect((await testOf({ [at("Makefile")]: "test := unit\nbuild:\n\tcc x.c\n" })).checks).toBeUndefined();
+  });
+
+  test("the answer and the markdown name where it came from, or that the checks run the default", async () => {
+    expect((await testOf({ [at("package.json")]: pkg("jest"), [at("package-lock.json")]: "{}" })).test).toEqual({ command: "npm ci && npm test", from: "package.json" });
+    expect((await testOf({})).test).toBeNull();
+    const found = await runCli(["init"], machine({ script: world({}), seed: { [at("go.mod")]: "" } }).io);
+    expect(found.stdout).toContain("- test: go test ./... (from go.mod), as checks.test");
+    const none = await runCli(["init"], machine({ script: world({}) }).io);
+    expect(none.stdout).toContain('- test: none detected, so the checks run bun test; norn config set checks.test "<command>" names yours');
+  });
+});
+
 describe("norn init: flags", () => {
   test("every flag wins over detection", async () => {
     const { m, body } = await init(["--tracker", "local", "--forge", "none", "--store", "refs", "--executor", "claude", "--runner", "headless", "--yes"], {
@@ -190,12 +227,23 @@ describe("norn init: what stays out of git", () => {
     expect(lines).not.toContain(AGENTS_DIR);
   });
 
-  test("--commit writes the committed config (team mode) and leaves the exclude alone", async () => {
+  test("--commit writes the committed config (team mode) and keeps only the repo-local file out of git", async () => {
     const { m, body } = await init(["--commit"]);
-    expect({ file: body.file, team: body.team, exclude: body.exclude }).toEqual({ file: PATHS.repo, team: true, exclude: "committed" });
+    expect({ file: body.file, team: body.team, exclude: body.exclude, excluded: body.excluded }).toEqual({ file: PATHS.repo, team: true, exclude: "added", excluded: REPO_LOCAL_FILE });
     expect((await written(m, PATHS.repo)).tracker).toMatchObject({ use: "local" });
-    expect(await m.files.read(PATHS.local)).toBeNull();
-    expect(await m.files.read(EXCLUDE)).toBeNull();
+    const lines = ((await m.files.read(EXCLUDE)) as string).split("\n");
+    expect(lines).toContain(REPO_LOCAL_FILE);
+    expect(lines).not.toContain(AGENTS_DIR);
+  });
+
+  test("--commit keeps the mode out of the committed file, which wins over every person's: it goes in the repo-local file", async () => {
+    const { m, body } = await init(["--commit", "--mode", "manual"]);
+    expect((await written(m, PATHS.repo)).kernel).toBeUndefined();
+    expect(await written(m, PATHS.local)).toEqual({ format: 1, kernel: { mode: "manual" } });
+    expect(body.local_file).toBe(PATHS.local);
+    // a repo-local file there already keeps what it holds, its own mode included
+    const kept = await init(["--commit"], { seed: { [PATHS.local]: "format: 1\nkernel: { mode: auto }\nholder: me@desk\n" } });
+    expect(await written(kept.m, PATHS.local)).toEqual({ format: 1, kernel: { mode: "auto" }, holder: "me@desk" });
   });
 });
 
@@ -209,10 +257,21 @@ describe("norn init: doctor", () => {
       ["plugins", true],
       ["slots", true],
       ["workflows", true],
+      ["labels", true],
       ["hooks", true],
       ["tool git", true],
       ["tool claude", true],
     ]);
+  });
+
+  test("on GitHub, init defines the labels norn puts on issues, so the first story create takes them", async () => {
+    const gh = fakeGh();
+    const m = machine({ script: (argv, o) => gh.script(argv, o) ?? world({ origin: "git@github.com:acme/app.git", tools: ["gh", "claude"] })(argv, o) });
+    const r = await runCli(["init", "--json"], m.io);
+    const checks = (json(r.stdout).doctor as { checks: Array<{ name: string; ok: boolean }> }).checks;
+    expect(checks.find((c) => c.name === "labels")?.ok).toBe(true);
+    expect(gh.labels).toContain("norn");
+    expect(gh.labels).toContain("norn:wf:quick");
   });
 
   test("the markdown says what was chosen and what doctor found", async () => {
@@ -221,6 +280,61 @@ describe("norn init: doctor", () => {
     expect(r.stdout).toContain("- tracker: local (no GitHub origin)");
     expect(r.stdout).toContain("- executor: claude in headless (claude is not on PATH)");
     expect(r.stdout).toContain("- tool claude: FAILED");
+  });
+});
+
+describe("the old norn's repo-local config", () => {
+  const OLD_LOCAL = join(ROOT, OLD_LOCAL_CONFIG_FILE);
+  const OLD_LOCAL_TEXT = ["mode: manual", "agent: claude", "agents:", "  claude: { model: opus, args: [--verbose] }", "  codex: { model: o3 }", ""].join("\n");
+
+  test("a set-up repo moves it into the repo-local file on the next command, once, with a one-line notice, the old text kept", async () => {
+    const m = machine({ script: world({ tools: ["claude"] }), seed: { [PATHS.local]: LOCAL_CONFIG, [OLD_LOCAL]: OLD_LOCAL_TEXT } });
+    const r = await runCli(["config", "get", "kernel.mode", "--json"], m.io);
+    expect(json(r.stdout)).toEqual({ key: "kernel.mode", value: "manual" });
+    expect(r.stderr?.trim().split("\n")).toHaveLength(1);
+    expect(r.stderr).toContain(`moved ${OLD_LOCAL_CONFIG_FILE} (the old norn's) into ${REPO_LOCAL_FILE}: took mode → kernel.mode, agent → executor, agents.claude.model → executors.claude.model, agents.claude.args → executors.claude.args`);
+    expect(r.stderr).toContain("ignored agents.codex: no executor codex is configured");
+    expect(await written(m, PATHS.local)).toMatchObject({ executor: "claude", kernel: { mode: "manual" }, executors: { claude: { harness: "claude", runner: "headless", model: "opus", args: ["--verbose"] } } });
+    expect(await m.files.read(OLD_LOCAL)).toBeNull();
+    expect(await m.files.read(`${OLD_LOCAL}.old`)).toBe(OLD_LOCAL_TEXT);
+    const again = await runCli(["config", "get", "kernel.mode", "--json"], m.io);
+    expect(again.stderr ?? "").toBe("");
+  });
+
+  test("a key the repo-local file sets already keeps its value", async () => {
+    const m = machine({ script: world({ tools: ["claude"] }), seed: { [PATHS.local]: `${LOCAL_CONFIG}kernel: { mode: auto }\n`, [OLD_LOCAL]: "mode: manual\n" } });
+    const r = await runCli(["config", "get", "kernel.mode", "--json"], m.io);
+    expect(json(r.stdout).value).toBe("auto");
+    expect(r.stderr).toContain(`ignored mode: ${REPO_LOCAL_FILE} sets kernel.mode already`);
+  });
+
+  test("a key the committed file sets is left out, named as the committed file's, since that file wins", async () => {
+    const m = machine({ script: world({ tools: ["claude"] }), seed: { [PATHS.repo]: `${LOCAL_CONFIG}kernel: { mode: auto }\n`, [OLD_LOCAL]: "mode: manual\n" } });
+    const r = await runCli(["config", "get", "kernel.mode", "--json"], m.io);
+    expect(json(r.stdout).value).toBe("auto");
+    expect(r.stderr).toContain(`took nothing; ignored mode: ${REPO_COMMITTED_FILE} sets kernel.mode (auto), and it wins`);
+    expect(await m.files.read(PATHS.local)).toBeNull();
+    expect(await m.files.read(`${OLD_LOCAL}.old`)).toBe("mode: manual\n");
+  });
+
+  test("init --commit beside a repo-local file that names its own mode keeps that mode and says so, never the old one", async () => {
+    const { m, body } = await init(["--commit"], { w: { tools: ["claude"] }, seed: { [PATHS.local]: "format: 1\nkernel: { mode: auto }\n", [OLD_LOCAL]: "mode: manual\n" } });
+    expect(await written(m, PATHS.local)).toEqual({ format: 1, kernel: { mode: "auto" } });
+    expect(body.chose).toMatchObject({ mode: "auto" });
+    expect(body.local_migrated).toMatchObject({ mapped: [], ignored: [`mode: ${REPO_LOCAL_FILE} sets kernel.mode already`] });
+  });
+
+  test("before init it stays, and init takes its mode over detection and moves the rest", async () => {
+    const m = machine({ script: world({ tools: ["claude"] }), seed: { [OLD_LOCAL]: OLD_LOCAL_TEXT } });
+    const before = await runCli(["status", "--json"], m.io);
+    expect(json(before.stdout)).toMatchObject({ code: "config_missing", do_instead: "norn init" });
+    expect(await m.files.read(OLD_LOCAL)).toBe(OLD_LOCAL_TEXT);
+    const r = await runCli(["init", "--json"], m.io);
+    const body = json(r.stdout);
+    expect(body.chose).toMatchObject({ runner: "headless", mode: "manual" });
+    expect(body.local_migrated).toMatchObject({ file: OLD_LOCAL, backup: `${OLD_LOCAL}.old` });
+    expect((await written(m, PATHS.local)).executors).toEqual({ claude: { harness: "claude", runner: "headless", model: "opus", args: ["--verbose"] } });
+    expect(await m.files.read(OLD_LOCAL)).toBeNull();
   });
 });
 
@@ -239,8 +353,9 @@ describe("norn init: a repo still on the old norn's config", () => {
       store: { use: "local" },
       executors: { claude: { harness: "claude", runner: "headless" } },
       base: "trunk",
-      kernel: { mode: "manual", workflow: "triage" },
+      kernel: { workflow: "triage" },
     });
+    expect((await written(m, PATHS.local)).kernel).toEqual({ mode: "manual" });
     expect(body.migrated).toEqual({ file: OLD_REPO_CONFIG_FILE, mapped: ["provider", "base_branch", "workflow", "mode"], ignored: ["norn_version", "regenerate"], notes: [] });
     // the old file is left for the person to delete
     expect(await m.files.read(OLD)).toBe(OLD_TEXT);
@@ -249,7 +364,8 @@ describe("norn init: a repo still on the old norn's config", () => {
   test("a key the old file left out takes the old default where this norn's differs: triage and manual, each named in the notes", async () => {
     const { m, body } = await init(["--commit"], { w: { tools: ["claude"], branch: "main" }, seed: { [OLD]: "provider: gh\n" } });
     expect(body.chose).toMatchObject({ mode: "manual" });
-    expect(((await written(m, PATHS.repo)) as { kernel?: unknown }).kernel).toEqual({ mode: "manual", workflow: "triage" });
+    expect(((await written(m, PATHS.repo)) as { kernel?: unknown }).kernel).toEqual({ workflow: "triage" });
+    expect(((await written(m, PATHS.local)) as { kernel?: unknown }).kernel).toEqual({ mode: "manual" });
     const migrated = body.migrated as { mapped: string[]; notes: string[] };
     expect(migrated.mapped).toEqual(["provider"]);
     expect(migrated.notes).toEqual([expect.stringContaining("workflow: "), expect.stringContaining("mode: ")]);

@@ -1,7 +1,7 @@
 # Shared steps — shipped in the sdlc pack; a repo copy under .agents/workflows/shared/ replaces it. A workflow brings them in with `use: base-update`.
 # Brings the story branch up to date with its base after the work, tests the merged tree, and takes
 # the light path when only the base moved.
-# Change the `test` step's `check:` to your repo's test command; the light path's test steps copy it (`like: test`).
+# The `test` step runs the config's `checks.test` (default bun test); the light path's test steps copy it (`like: test`).
 # Exits: `tested` (the full path's test passed), `broken` (a test failed: implement's work, which then
 # takes the full path), `ship` (the light path is done: open the PR), `redescribe` (pr.md's merge
 # danger changed).
@@ -29,7 +29,7 @@ steps:
     means:
       done: "base merged into the story branch, conflicts resolved and committed"
   test:
-    check: bun test
+    check: "{checks.test}"
     timeout: 15m
     outcomes: { pass: { exit: tested }, fail: { exit: broken } }
   # the light path's tests run the same command

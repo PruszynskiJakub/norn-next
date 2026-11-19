@@ -147,7 +147,7 @@ describe("doctor on a machine without the plugin the config names", () => {
     expect(doctor.code).toBe(1);
     const checks = doctor.body.checks as { name: string; ok: boolean; code?: string; do_instead?: string; skipped?: boolean }[];
     expect(checks.find((c) => c.name === "plugins")).toMatchObject({ ok: false, code: "plugin_missing", do_instead: `norn plugin add ${TEST_PLUGIN}` });
-    expect(checks.filter((c) => c.skipped).map((c) => c.name)).toEqual(["slots", "workflows", "hooks"]);
+    expect(checks.filter((c) => c.skipped).map((c) => c.name)).toEqual(["slots", "workflows", "labels", "hooks"]);
     // a command that needs the plugin refuses the same way, as a CliError
     const tick = await norn(w, ["tick", "--json"], { NORN_HOME_DIR: `${w.dir}/other-home` });
     expect(tick).toMatchObject({ code: 3, body: { code: "plugin_missing", do_instead: `norn plugin add ${TEST_PLUGIN}` } });

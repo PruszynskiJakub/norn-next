@@ -238,6 +238,27 @@ describe("checks and plugin steps", () => {
     expect(await readStepRun(h.ctx, "lt-1")).toMatchObject({ outcome: "fail", output: expect.stringContaining("timed out") });
   });
 
+  test("a check naming {checks.<name>} runs the config's command there; the default test command is bun test", async () => {
+    for (const [checks, ran] of [[{ test: "npm ci && npm test" }, "npm ci && npm test --bail"], [undefined, "bun test --bail"]] as const) {
+      const h = harness({ workflow: "configured", ...(checks ? { checks } : {}) });
+      h.items.push(trackerItem(1));
+      await tickUntil(h, has("round.start"));
+      const { t, d, index } = await decisionOf(h, "check.run");
+      expect(await act(t, d, index)).toMatchObject({ ok: true, detail: { outcome: "pass" } });
+      expect(h.exec.calls.map((c) => c.argv)).toEqual([["sh", "-c", ran]]);
+    }
+  });
+
+  test("a check naming a {checks.<name>} no config sets runs nothing and fails, naming the key to set", async () => {
+    const h = harness({ workflow: "unconfigured" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    const { t, d, index } = await decisionOf(h, "check.run");
+    await act(t, d, index);
+    expect(h.exec.calls).toHaveLength(0);
+    expect((await readStepRun(h.ctx, "lt-1"))?.error).toContain("norn config set checks.lint <command>");
+  });
+
   test("a step kind's detail reaches its step.finished receipt, where a resolver's brief reads the conflict from", async () => {
     const h = harness({ workflow: "stepped" });
     h.items.push(trackerItem(1));

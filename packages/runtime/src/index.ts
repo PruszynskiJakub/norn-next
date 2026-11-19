@@ -45,6 +45,7 @@ export { type LiveStep, liveStepOf, reportableOutcomes, reportOnRecord } from ".
 export { type BriefShown, briefOf, type CriteriaSummary, FINDINGS_SHAPE, type Refusable, type ReportRecorded, type ReportRefusal, type ReportRequest, reportReceiptId, reportRun } from "./report.ts";
 export { nudgeText } from "./act-runs.ts";
 export { checkOutcome } from "./act-steps.ts";
+export { checkCommandOf, DEFAULT_CHECKS } from "./check-command.ts";
 export { baseRefOf, branchOf, cutFrom, ensureWorktree } from "./branches.ts";
 export type { RuntimeEnv, TickContext } from "./env.ts";
 export { type GatherOptions, type GatheredFacts, gatherFacts } from "./facts.ts";

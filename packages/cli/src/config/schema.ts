@@ -67,6 +67,9 @@ export const KernelKnobs = Type.Object(
   closed,
 );
 
+/** A check's command by the name a workflow's check step spells as `{checks.<name>}`. */
+export const Checks = Type.Record(Name, NonEmpty, closed);
+
 export const CONFIG_FORMAT = 1;
 
 /** The merged config every command runs on. */
@@ -91,6 +94,8 @@ export const NornConfig = Type.Object(
     holder: Type.Optional(NonEmpty),
     kernel: Type.Optional(KernelKnobs),
     trace: Type.Optional(TraceKnobs),
+    /** the commands a workflow's check step names as `{checks.<name>}`; the shipped test steps name `test` */
+    checks: Type.Optional(Checks),
   },
   { ...closed, title: "NornConfig" },
 );
@@ -127,6 +132,7 @@ export const ConfigLayer = Type.Object(
     holder: Type.Optional(NonEmpty),
     kernel: Type.Optional(KernelKnobs),
     trace: Type.Optional(TraceKnobs),
+    checks: Type.Optional(Checks),
   },
   { ...closed, title: "NornConfigLayer" },
 );

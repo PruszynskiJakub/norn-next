@@ -10,6 +10,7 @@ import { configFailure } from "../output.ts";
 import { isMapping, mergeLayers } from "./merge.ts";
 import { isOldUserConfig } from "./migrate-user.ts";
 import { type ConfigPaths, LAYERS, type Layer, layerFileName } from "./paths.ts";
+import { renamedProblems } from "./renamed.ts";
 import { CONFIG_DEFAULTS, ConfigLayer, NornConfig } from "./schema.ts";
 
 export interface ConfigProblem {
@@ -20,6 +21,8 @@ export interface ConfigProblem {
   message: string;
   /** the file is the old norn's, which `norn init` rewrites */
   old?: true;
+  /** the command that fixes this problem, when it is known (an old key's new name) */
+  do_instead?: string;
 }
 
 /** A config every command may run on: the merged file, the default executor named, and each layer as written. */
@@ -47,8 +50,12 @@ export function parseLayer(layer: Layer, text: string | null): { ok: true; value
   if (doc === null || doc === undefined) return { ok: true, value: {} };
   if (!isMapping(doc)) return { ok: false, problems: [{ layer, path: "", message: "must be a mapping of keys" }] };
   const r = check(ConfigLayer, doc);
-  if (!r.ok) return { ok: false, problems: r.errors.map((e) => ({ layer, path: e.path, message: e.message })) };
-  return { ok: true, value: r.value };
+  if (r.ok) return { ok: true, value: r.value };
+  // an old key's own problem says what replaced it; the schema's "unknown property" for it says less
+  const renamed = renamedProblems(layer, doc);
+  const named = new Set(renamed.map((p) => p.path.slice(1)));
+  const rest = r.errors.filter((e) => !(e.path === "" && named.has(/^unknown property '(.*)'$/.exec(e.message)?.[1] ?? "")));
+  return { ok: false, problems: [...renamed, ...rest.map((e) => ({ layer, path: e.path, message: e.message }))] };
 }
 
 /** The merged config's own rules, beyond its shape. */
@@ -111,7 +118,7 @@ export function configError(problems: readonly ConfigProblem[], layers?: Partial
     );
   }
   const nothing = layers !== undefined && problems.every((p) => p.layer === "merged") && LAYERS.every((l) => layers[l] === null || layers[l] === undefined);
-  const doInstead = nothing ? "norn init" : first && first.layer !== "merged" ? `fix ${layerFileName(first.layer)}` : "norn config show";
+  const doInstead = nothing ? "norn init" : first?.do_instead ? first.do_instead : first && first.layer !== "merged" ? `fix ${layerFileName(first.layer)}` : "norn config show";
   const details = problems.map((p) => ({ ...p, ...(paths && p.layer !== "merged" ? { file: paths[p.layer] } : {}) }));
   return configFailure(problems.map(problemText).join("; ") || "the config is invalid", doInstead, nothing ? "config_missing" : "config_invalid", details);
 }

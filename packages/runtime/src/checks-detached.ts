@@ -22,6 +22,7 @@ import { fail, type HostContext, hostProcesses, ok, parseJson, type PluginResult
 import { IsoTime } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
 import { ensureWorktree } from "./branches.ts";
+import { checkCommandOf } from "./check-command.ts";
 import type { TickContext } from "./env.ts";
 import { unitInFacts } from "./record.ts";
 import { readStepRun, type StepRunRecord, writeStepRun } from "./step-runs.ts";
@@ -159,14 +160,17 @@ export async function startDetachedCheck(t: TickContext, d: DecisionOf<"run_chec
   };
   const spawnInto = async (base: StepRunRecord): Promise<PluginResult<StepRunRecord>> => {
     const exitPath = checkExitPath(ctx, unit, d.run_id, d.attempt);
+    const { running: _r, handle: _h, log: _l, timeout_ms: _t, ...rest } = base;
+    const command = checkCommandOf(d.command, t.env.config.checks);
     let record: StepRunRecord;
-    try {
-      const p = await procs.value.spawn(checkWrapperArgv(d.command, exitPath, wakePath(ctx)), { cwd: worktree.value, logPath: base.log as string });
-      record = { ...base, handle: encodeCheckHandle(p.pid, p.started) };
-    } catch (e) {
-      const { running: _r, handle: _h, log: _l, timeout_ms: _t, ...rest } = base;
-      record = { ...rest, error: `the check could not start: ${message(e)}` };
-    }
+    if (!command.ok) record = { ...rest, error: command.error };
+    else
+      try {
+        const p = await procs.value.spawn(checkWrapperArgv(command.command, exitPath, wakePath(ctx)), { cwd: worktree.value, logPath: base.log as string });
+        record = { ...base, handle: encodeCheckHandle(p.pid, p.started) };
+      } catch (e) {
+        record = { ...rest, error: `the check could not start: ${message(e)}` };
+      }
     await writeStepRun(ctx, record);
     return ok(record);
   };

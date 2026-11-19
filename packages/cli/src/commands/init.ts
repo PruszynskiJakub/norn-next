@@ -1,7 +1,8 @@
 /**
  * `norn init [--tracker <name>] [--forge <name>] [--store <name>] [--executor <harness>] [--runner <name>] [--mode auto|manual] [--commit] [--yes]`: set up norn in this repo: detect the tracker, forge and executor, write the config, run doctor.
- * Writes the repo-local config (or the committed one with `--commit`), keeps `.agents/` out of git
- * unless committed, prints what it chose and runs doctor. It never asks: every choice is detected or
+ * Writes the repo-local config (or the committed one with `--commit`, the mode then going in the
+ * repo-local file), keeps `.agents/` out of git (only the repo-local file with `--commit`), prints
+ * what it chose and runs doctor. It never asks: every choice is detected or
  * given as a flag (`init.ts`). The choices are resolved against the bundled and installed plugins
  * before anything is written, so a name no plugin provides is refused with nothing changed; a config
  * file already there is never overwritten, though one holding only what `norn plugin add` wrote is
@@ -13,12 +14,14 @@ import type { HostFiles } from "@norn/plugin-api";
 import { defineCommand, opt } from "../command.ts";
 import { configError, loadConfig, mergeConfig, parseLayer } from "../config/load.ts";
 import { mapOldConfig, type OldConfig } from "../config/migrate.ts";
+import { mapOldLocalConfig, migrateOldLocalConfig } from "../config/migrate-local.ts";
 import { isOldUserConfig, mapOldUserConfig, OLD_USER_BACKUP_SUFFIX, type OldUserConfig, oldUserConfigText } from "../config/migrate-user.ts";
-import { AGENTS_DIR, configPaths, type Layer, layerFileName, OLD_REPO_CONFIG_FILE, REPO_COMMITTED_FILE, REPO_LOCAL_FILE } from "../config/paths.ts";
+import { AGENTS_DIR, configPaths, type Layer, layerFileName, OLD_LOCAL_CONFIG_FILE, OLD_REPO_CONFIG_FILE, REPO_COMMITTED_FILE, REPO_LOCAL_FILE } from "../config/paths.ts";
 import type { ConfigLayer } from "../config/schema.ts";
+import { setKeyInText } from "../config/write.ts";
 import { CliContext } from "../context.ts";
 import { doctorLines, runDoctor } from "../doctor.ts";
-import { choose, completable, completedText, detect, initLayer, initText, offerLine, withExcluded } from "../init.ts";
+import { choose, completable, completedText, detect, detectTestCommand, initLayer, initText, offerLine, personalText, splitPersonal, testLine, withExcluded } from "../init.ts";
 import { refuse, rendered, usageError } from "../output.ts";
 import { wirePlugins } from "../wiring.ts";
 
@@ -61,6 +64,14 @@ function oldUserConfigLines(m: OldUserConfig & { backup: string }): string[] {
     `  - took ${list(m.mapped)}`,
     ...m.ignored.map((i) => `  - ignored ${i}`),
   ];
+}
+
+/** The repo-local file's next text with the person's mode; null when it names a mode already. */
+async function personalLocalText(files: HostFiles, path: string, existing: ConfigLayer | null, mode: "auto" | "manual"): Promise<string | null> {
+  const current = await files.read(path);
+  if (current === null) return personalText(mode);
+  if (existing?.kernel?.mode !== undefined) return null;
+  return setKeyInText(current, "kernel.mode", mode);
 }
 
 export const initCommand = defineCommand({
@@ -112,7 +123,10 @@ export const initCommand = defineCommand({
     // the old norn's team config, when the repo still has it: its keys win over detection, a flag over both
     const oldText = await files.read(join(w.repo.root, OLD_REPO_CONFIG_FILE));
     const old = oldText === null ? null : mapOldConfig(oldText);
-    const mode: "auto" | "manual" | undefined = given ?? old?.mode;
+    // the old repo-local file was the person's own: its mode wins over the old team file's
+    const oldLocalText = await files.read(join(w.repo.root, OLD_LOCAL_CONFIG_FILE));
+    const oldLocalMode = oldLocalText === null ? undefined : (mapOldLocalConfig(oldLocalText, {}).set.find((x) => x.key === "kernel.mode")?.value as "auto" | "manual" | undefined);
+    const mode: "auto" | "manual" | undefined = given ?? oldLocalMode ?? old?.mode;
     const detected = await detect(w.ctx, ctx.env, w.repo.root);
     const flags = {
       tracker: opt.str(args, "tracker") ?? old?.tracker,
@@ -124,7 +138,10 @@ export const initCommand = defineCommand({
       yes: opt.bool(args, "yes"),
     };
     const { choices, offered } = choose(old?.base ? { ...detected, base: old.base } : detected, flags);
-    const doc = withOldKernelKeys(initLayer(choices), old);
+    const test = await detectTestCommand(files, w.repo.root);
+    const whole = withOldKernelKeys(initLayer(choices, test), old);
+    const { team, mode: personalMode } = commit ? splitPersonal(whole) : { team: whole, mode: undefined };
+    const doc = commit ? team : whole;
     const text = current !== null && existing?.ok && existing.value ? completedText(current, existing.value, doc) : initText(doc);
 
     // checked as the next command will load it, with the other files, before a byte is written
@@ -133,20 +150,30 @@ export const initCommand = defineCommand({
     if (!before.ok && before.problems.some((p) => p.layer !== "merged")) throw configError(before.problems, layers, paths);
     const own = parseLayer(layer, text);
     if (!own.ok) throw configError(own.problems, { ...layers, [layer]: {} }, paths);
-    const merged = mergeConfig({ ...layers, [layer]: own.value }, paths);
+    // beside a committed config the mode goes in the person's own file, unless that file names one already
+    const localText = personalMode === undefined ? null : await personalLocalText(files, paths.local, layers.local, personalMode);
+    const local = localText === null ? null : parseLayer("local", localText);
+    if (local && !local.ok) throw configError(local.problems, layers, paths);
+    const merged = mergeConfig({ ...layers, [layer]: own.value, ...(local?.ok && { local: local.value }) }, paths);
     if (!merged.ok) throw configError(merged.problems, { ...layers, [layer]: {} }, paths);
     await wirePlugins(w, merged.value, ctx.io.importer);
 
     // a team that commits .agents/ keeps its specs and workflows there: hiding the folder would hide them from git
-    const excluded = (await files.read(paths.repo)) === null ? AGENTS_DIR : REPO_LOCAL_FILE;
+    const excluded = !commit && (await files.read(paths.repo)) === null ? AGENTS_DIR : REPO_LOCAL_FILE;
     await files.write(paths[layer], text);
-    let exclude: "added" | "present" | "committed" = "committed";
-    if (!commit) {
-      const path = join(w.repo.common, "info", "exclude");
-      const next = withExcluded(await files.read(path), excluded);
-      if (next !== null) await files.write(path, next);
-      exclude = next === null ? "present" : "added";
-    }
+    if (localText !== null) await files.write(paths.local, localText);
+    const excludePath = join(w.repo.common, "info", "exclude");
+    const next = withExcluded(await files.read(excludePath), excluded);
+    if (next !== null) await files.write(excludePath, next);
+    const exclude: "added" | "present" = next === null ? "present" : "added";
+
+    // beside a committed config a repo-local file that names a mode keeps it, so the mode chosen here is not the one in effect
+    const keptMode = personalMode !== undefined && localText === null ? layers.local?.kernel?.mode : undefined;
+    const chose = keptMode === undefined ? choices : { ...choices, mode: keptMode };
+    const localMigrated = await migrateOldLocalConfig(files, w.repo.root, paths, {
+      setUp: false,
+      carried: given === undefined && oldLocalMode !== undefined && keptMode === undefined ? ["kernel.mode"] : [],
+    });
 
     // a fresh context: this one may hold the "no config" it saw before the file was written
     const doctor = await runDoctor(new CliContext(ctx.io));
@@ -156,13 +183,16 @@ export const initCommand = defineCommand({
       file: paths[layer],
       layer,
       team: commit,
-      chose: choices,
+      chose,
       detected,
       offered,
+      test,
       exclude,
-      ...(!commit && { excluded }),
+      excluded,
+      ...(commit && { local_file: paths.local }),
       ...(migrated && { migrated }),
       ...(userMigrated && { user_migrated: { file: paths.user, ...userMigrated } }),
+      ...(localMigrated && { local_migrated: { file: localMigrated.file, backup: localMigrated.backup, mapped: localMigrated.mapped, ignored: localMigrated.ignored } }),
       doctor,
     };
     const md = [
@@ -174,12 +204,16 @@ export const initCommand = defineCommand({
       `- forge: ${choices.forge}`,
       `- store: ${choices.store}`,
       `- executor: ${choices.executor} in ${choices.runner}${flags.executor || (choices.executor === "pi" ? detected.pi : detected.claude) ? "" : ` (${choices.executor} is not on PATH)`}`,
-      `- mode: ${choices.mode}${flags.mode ? "" : choices.mode === "auto" ? ` (the ${choices.runner} runner has nobody beside the agent: agent steps start on their own)` : ` (agents run in ${choices.runner} beside a person: start each agent step with norn run start <unit>)`}`,
+      keptMode !== undefined
+        ? `- mode: ${keptMode} (${REPO_LOCAL_FILE} names it already, and keeps it)`
+        : `- mode: ${choices.mode}${flags.mode ? "" : choices.mode === "auto" ? ` (the ${choices.runner} runner has nobody beside the agent: agent steps start on their own)` : ` (agents run in ${choices.runner} beside a person: start each agent step with norn run start <unit>)`}${commit ? `; in ${REPO_LOCAL_FILE}, as each person picks their own` : ""}`,
       `- base: ${choices.base}`,
-      `- .git/info/exclude: ${exclude === "added" ? `added ${excluded}` : exclude === "present" ? `${excluded} already there` : "untouched (team mode)"}`,
+      testLine(test),
+      `- .git/info/exclude: ${exclude === "added" ? `added ${excluded}` : `${excluded} already there`}`,
       ...offered.map((o) => offerLine(o, choices)),
       ...(old ? oldConfigLines(old) : []),
       ...(userMigrated ? oldUserConfigLines(userMigrated) : []),
+      ...(localMigrated ? [`- ${localMigrated.notice.replace(/^norn: /, "")}`] : []),
       "",
       `## norn doctor: ${doctor.ok ? "all checks pass" : "some checks fail"}`,
       "",

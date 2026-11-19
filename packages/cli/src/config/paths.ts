@@ -19,6 +19,11 @@ export const REPO_LOCK_FILE = ".agents/norn.plugins.lock";
  * norn is, every command that needs a config sends the person to `norn init`, which reads it.
  */
 export const OLD_REPO_CONFIG_FILE = ".agents/norn.config.yaml";
+/**
+ * The old norn's repo-local config: the person's mode and agent. Moved into REPO_LOCAL_FILE by the
+ * first command that loads a config of this norn, or by `norn init`, and kept beside it as `.old`.
+ */
+export const OLD_LOCAL_CONFIG_FILE = ".agents/norn.config.local.yaml";
 /** The folder init keeps out of git (`.git/info/exclude`) unless the config is committed. */
 export const AGENTS_DIR = ".agents/";
 

@@ -1,13 +1,20 @@
 /**
  * `norn config set <key> [<value>] [--commit] [--user] [--unset]`: set one config key in the repo-local file (the committed one with --commit).
  * The value is read as YAML (`true`, `3`, `[a, b]`); the file is checked with the others before it is
- * written (`config/set.ts` has the rule).
+ * written (`config/set.ts` has the rule). A key a higher file also sets is still written, and the
+ * answer says which file wins and the value the merged config keeps (`overridden`).
  */
 import { defineCommand, opt } from "../command.ts";
 import { configPaths, type Layer, layerFileName, REPO_COMMITTED_FILE } from "../config/paths.ts";
-import { setConfigKey } from "../config/set.ts";
+import { type Override, setConfigKey } from "../config/set.ts";
 import { parseValue } from "../config/write.ts";
 import { rendered, usageError } from "../output.ts";
+
+/** The warning for a value a higher file overrides, naming the set that would apply. */
+function overrideText(o: Override, layer: Layer, key: string, raw: string): string {
+  const flag = o.layer === "repo" ? " --commit" : "";
+  return `**Overridden:** written, but ${layerFileName(o.layer)} sets ${o.keys.join(", ")} too and wins over ${layerFileName(layer)}: the merged value stays ${JSON.stringify(o.value)}. To change it for everyone: norn config set ${key} ${raw}${flag}; to make it yours, remove ${key} from ${layerFileName(o.layer)}.`;
+}
 
 const KEY = /^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$/;
 
@@ -41,6 +48,6 @@ export const configSetCommand = defineCommand({
     const out = { key, ...(unset ? { unset: true } : { value }), layer, ...set };
     const what = unset ? `Removed ${key}` : `Set ${key} = ${JSON.stringify(value)}`;
     const rest = set.problems.length ? `\n\nThe config is not complete yet:\n${set.problems.map((p) => `- ${p.path || "/"}: ${p.message}`).join("\n")}` : "";
-    return rendered(out, `${what} in ${layerFileName(layer)}.${rest}`);
+    return rendered(out, `${what} in ${layerFileName(layer)}.${set.overridden ? `\n\n${overrideText(set.overridden, layer, key, raw as string)}` : ""}${rest}`);
   },
 });

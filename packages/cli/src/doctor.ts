@@ -1,12 +1,14 @@
 /**
  * The doctor's checks, in the order each needs the last: the config, the plugins it picks (installed
  * and on this norn's plugin API), the slots they build, the workflows (the pack's and the repo's
- * own), the harness hooks, and the tools on PATH the config needs. A check that cannot run because an earlier one failed is skipped
- * rather than failed, so the first failure is the one to fix. `init` runs the same checks.
+ * own), the labels norn puts on items, the harness hooks, and the tools on PATH the config needs. A
+ * check that cannot run because an earlier one failed is skipped rather than failed, so the first
+ * failure is the one to fix. `init` runs the same checks.
  */
 import { REPO_WORKFLOWS_DIR, repoFileOf, type RuntimeEnv } from "@norn/runtime";
 import type { NornConfig } from "./config/schema.ts";
 import type { CliContext } from "./context.ts";
+import { ensureLabels, nornLabels } from "./labels.ts";
 import { CliFailure, toFailure } from "./output.ts";
 
 export interface DoctorCheck {
@@ -87,6 +89,17 @@ async function hooksCheck(ctx: CliContext, cwd: string, harnesses: Readonly<Reco
   return passed("hooks", `${Object.keys(harnesses).join(", ")} install hooks that run ${self.join(" ")} hook`);
 }
 
+/**
+ * The labels norn puts on items, defined where missing: the one check that changes something, since
+ * a label is missing only on a repository norn has never set up, and init runs this check.
+ */
+async function labelsCheck(env: RuntimeEnv): Promise<DoctorCheck> {
+  const labels = nornLabels(env);
+  const r = await attempt("labels", () => ensureLabels(env, labels));
+  if (r.check) return r.check;
+  return passed("labels", env.slots.tracker.capabilities.labels ? `${labels.length} labels defined on the ${env.slots.tracker.name} tracker` : `the ${env.slots.tracker.name} tracker keeps no labels`);
+}
+
 export interface DoctorOptions {
   /**
    * Only what the repo's tree decides: its config, the plugins it names, its slots and workflows. No
@@ -103,19 +116,19 @@ export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Prom
   const config = await attempt("config", () => ctx.config());
   checks.push(config.check ?? passed("config", `executor ${config.value?.executor}; tracker ${config.value?.config.tracker.use}, forge ${config.value?.config.forge.use}, store ${config.value?.config.store.use}`));
 
-  if (config.check) checks.push(skipped("plugins", "config"), skipped("slots", "config"), skipped("workflows", "config"), ...(opts.repoOnly ? [] : [skipped("hooks", "config")]));
+  if (config.check) checks.push(skipped("plugins", "config"), skipped("slots", "config"), skipped("workflows", "config"), ...(opts.repoOnly ? [] : [skipped("labels", "config"), skipped("hooks", "config")]));
   else {
     const plugins = await attempt("plugins", () => ctx.plugins());
     checks.push(plugins.check ?? passed("plugins", `${plugins.value?.plugins.length} plugins (${plugins.value?.lock.plugins.length} installed), every one on this plugin API`));
-    if (plugins.check) checks.push(skipped("slots", "plugins"), skipped("workflows", "plugins"), ...(opts.repoOnly ? [] : [skipped("hooks", "plugins")]));
+    if (plugins.check) checks.push(skipped("slots", "plugins"), skipped("workflows", "plugins"), ...(opts.repoOnly ? [] : [skipped("labels", "plugins"), skipped("hooks", "plugins")]));
     else {
       const env = await attempt("slots", () => ctx.runtimeEnv());
-      if (env.check) checks.push(env.check, skipped("workflows", "slots"), ...(opts.repoOnly ? [] : [skipped("hooks", "slots")]));
+      if (env.check) checks.push(env.check, skipped("workflows", "slots"), ...(opts.repoOnly ? [] : [skipped("labels", "slots"), skipped("hooks", "slots")]));
       else if (env.value) {
         checks.push(passed("slots", "every slot builds from its config"));
         const workflows = await attempt("workflows", () => ctx.workflowEnv());
         checks.push(workflows.check ?? passed("workflows", workflowsDetail(env.value)));
-        if (!opts.repoOnly) checks.push(await hooksCheck(ctx, cwd, env.value.slots.executors));
+        if (!opts.repoOnly) checks.push(await labelsCheck(env.value), await hooksCheck(ctx, cwd, env.value.slots.executors));
       }
     }
   }

@@ -13,6 +13,8 @@ import {
   loadConfig,
   mergeLayers,
   planSet,
+  REPO_COMMITTED_FILE,
+  REPO_LOCAL_FILE,
   runtimeConfigOf,
   setKeyInText,
 } from "../../src/index.ts";
@@ -158,6 +160,39 @@ describe("an invalid config is a config error, never a guess", () => {
   });
 });
 
+describe("an old key name: the refusal names the key that replaced it and the file it belongs in", () => {
+  const refusal = async (files: Partial<Record<"user" | "local" | "repo", string>>) => {
+    const r = await load(files);
+    if (r.ok) throw new Error("loaded");
+    return configError(r.problems, r.layers, PATHS).body;
+  };
+
+  test("a person's key, wherever it is written, goes in the repo-local file under its new name", async () => {
+    const b = await refusal({ local: `${LOCAL_CONFIG}mode: manual\n` });
+    expect(b.error).toBe(`${REPO_LOCAL_FILE} /mode: \`mode\` is the old norn's spelling: this norn reads kernel.mode, your own key`);
+    expect(b.do_instead).toBe(`norn config set kernel.mode manual, then remove mode from ${REPO_LOCAL_FILE}`);
+    expect((await refusal({ repo: "default_agent: pi\n", local: LOCAL_CONFIG })).do_instead).toBe(`norn config set executor pi, then remove default_agent from ${REPO_COMMITTED_FILE}`);
+  });
+
+  test("a machine key goes in the user file, a team key stays in the file it is in", async () => {
+    expect((await refusal({ local: `${LOCAL_CONFIG}max_agents: 4\n` })).do_instead).toBe(`norn config set kernel.max_agents 4 --user, then remove max_agents from ${REPO_LOCAL_FILE}`);
+    expect((await refusal({ local: LOCAL_CONFIG, repo: "base_branch: trunk\n" })).do_instead).toBe(`norn config set base trunk --commit, then remove base_branch from ${REPO_COMMITTED_FILE}`);
+  });
+
+  test("a key with no one-to-one successor says what replaced it; a key that is gone says to remove it", async () => {
+    const provider = await refusal({ local: LOCAL_CONFIG, repo: "provider: gh\n" });
+    expect(provider.error).toContain("this norn reads tracker.use and forge.use (github)");
+    expect(provider.do_instead).toBe(`norn config set tracker.use github --commit and norn config set forge.use github --commit, then remove provider from ${REPO_COMMITTED_FILE}`);
+    const gone = await refusal({ local: `${LOCAL_CONFIG}notify: { desktop: true }\n` });
+    expect(gone.error).toContain("`notify` is gone: this norn sends no notifications");
+    expect(gone.do_instead).toBe(`remove notify from ${REPO_LOCAL_FILE}`);
+  });
+
+  test("an unknown key that never was norn's keeps the plain refusal", async () => {
+    expect((await refusal({ local: `${LOCAL_CONFIG}trackr: 1\n` })).do_instead).toBe(`fix ${REPO_LOCAL_FILE}`);
+  });
+});
+
 describe("the runtime config derived from the person's", () => {
   test("an executor's model reaches its choice, so its agents launch on it", async () => {
     const c = await loaded({ user: LOCAL_CONFIG, repo: "executors: { claude: { model: opus } }\n" });
@@ -227,6 +262,15 @@ describe("the runtime config derived from the person's", () => {
     const c = await loaded({ local: LOCAL_CONFIG });
     expect(planSet(c, LOCAL_CONFIG, "local", "trace.retain", "0").ok).toBe(false);
     expect(planSet(c, LOCAL_CONFIG, "local", "trace.retain", "forever").ok).toBe(false);
+  });
+
+  test("checks: each named command reaches the runtime, the committed file's over the local one's; a name or an empty command it refuses", async () => {
+    const r = runtimeConfigOf(await loaded({ local: `${LOCAL_CONFIG}checks: { test: npm test, lint: make lint }\n`, repo: "checks: { test: pnpm test }\n" }), "me@box");
+    expect(r.checks).toEqual({ test: "pnpm test", lint: "make lint" });
+    expect("checks" in runtimeConfigOf(await loaded({ local: LOCAL_CONFIG }), "me@box")).toBe(false);
+    const c = await loaded({ local: LOCAL_CONFIG });
+    expect(planSet(c, LOCAL_CONFIG, "local", "checks.test", "").ok).toBe(false);
+    expect(planSet(c, LOCAL_CONFIG, "local", "checks.Test", "x").ok).toBe(false);
   });
 
   test("durations", () => {

@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { reportOnRecord } from "@norn/runtime";
 import { decisionRoute } from "../../src/commands/decision-route.ts";
-import { CliFailure, ExitCode, runCli } from "../../src/index.ts";
+import { CliFailure, configPaths, ExitCode, runCli } from "../../src/index.ts";
+import { fakeGh, GITHUB_CONFIG, HOME, machine, ROOT } from "./support.ts";
 import { AGENT_STEP, configured, envOf, GATE_STEP, RUN, receiptsOf, runEnv, seedUnit, UNIT, withEnv } from "./units.ts";
 
 const json = (stdout: string): unknown => Bun.JSONL.parse(stdout)[0];
@@ -237,6 +238,26 @@ describe("story create and close on the local tracker", () => {
     const item = await env.slots.tracker.get(1);
     expect(item.ok && item.value?.open).toBe(false);
     expect(refusal(await runCli(["story", "close", "lt-7", "--json"], m.io))).toEqual({ exit: ExitCode.refused, code: "unknown_story" });
+  });
+});
+
+describe("story create on GitHub", () => {
+  test("defines the labels the item takes before the issue is made, so a fresh repository takes them; one there already is left as it is", async () => {
+    const gh = fakeGh(["norn"]);
+    const m = machine({ seed: { [configPaths(HOME, ROOT).local]: GITHUB_CONFIG }, script: gh.script });
+    const r = await runCli(["story", "create", "A", "title", "--workflow", "quick", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(gh.calls.filter((c) => !c.startsWith("issue list"))).toEqual(["label list", "label create norn:wf:quick", "issue create"]);
+  });
+
+  test("a label the tracker cannot define refuses before any issue is made", async () => {
+    const gh = fakeGh();
+    gh.refuseLabels = true;
+    const m = machine({ seed: { [configPaths(HOME, ROOT).local]: GITHUB_CONFIG }, script: gh.script });
+    const r = await runCli(["story", "create", "A", "title", "--json"], m.io);
+    expect(r.exit).not.toBe(ExitCode.ok);
+    expect((json(r.stdout) as { error: string }).error).toContain("cannot define the labels norn");
+    expect(gh.calls).not.toContain("issue create");
   });
 });
 

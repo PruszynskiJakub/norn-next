@@ -7,6 +7,7 @@
 import type { ChangeRequest } from "@norn/plugin-api";
 import type { RunState, StoryFacts, WorkflowGraph } from "@norn/kernel";
 import { baseRefOf, branchOf } from "./branches.ts";
+import { checkCommandOf } from "./check-command.ts";
 import type { RuntimeEnv } from "./env.ts";
 
 export type VcsFacts = Pick<StoryFacts, "base_stale" | "unpushed">;
@@ -60,12 +61,17 @@ async function verifyBroken(env: RuntimeEnv, story: string, graph: WorkflowGraph
     problems.push(`${story}: base.verify ${verify} needs step kind ${VERIFY_BASE_KIND} and a check step; the base move is not verified`);
     return undefined;
   }
+  const command = checkCommandOf(check.command, env.config.checks);
+  if (!command.ok) {
+    problems.push(`${story}: base.verify ${verify}: ${command.error}; the base move is not verified`);
+    return undefined;
+  }
   const { vcs, forge, tracker } = env.slots;
   const input = {
     unit: story,
     story,
     step: verify,
-    config: { command: check.command, timeout_ms: check.timeout_ms },
+    config: { command: command.command, timeout_ms: check.timeout_ms },
     worktree: vcs.worktree.path(story),
     slots: { vcs, forge, tracker },
     branch: branchOf(story),

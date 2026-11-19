@@ -75,5 +75,6 @@ export function runtimeConfigOf(loaded: LoadedConfig, holder: string): RuntimeCo
     holder: config.holder ?? holder,
     ...(lockStale ? { lockStaleMs: durationMs(lockStale) } : {}),
     ...(retain ? { traceRetainMs: retain === "keep" ? null : durationMs(retain) } : {}),
+    ...(config.checks ? { checks: { ...config.checks } } : {}),
   };
 }

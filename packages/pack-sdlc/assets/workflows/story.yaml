@@ -10,8 +10,8 @@
 # matching its worst verdict; `unverified` (could not check here) goes to a person at human-qa.
 # A story waiting at human-qa, ready or merge goes back through update when the base moved
 # under it in a way that conflicts (base.stale; `behind` re-updates on any base commit).
-# Steps shared with other workflows come from `shared/` (`use:`): change the test command in
-# `shared/base-update.yaml`, the CI wait in `shared/ship.yaml`.
+# Steps shared with other workflows come from `shared/` (`use:`): the test command is the config's
+# `checks.test`; change the CI wait in `shared/ship.yaml`.
 name: story
 description: Slice a planned story against the current base, run the slices, verify the story, open the draft PR, wait for CI.
 start: sync
