@@ -25,6 +25,8 @@ export interface World {
   plans: string;
   /** what the `report` plan reports per visit (TEST_AGENT_REPORTS), written by `reports` */
   reports: string;
+  /** the slice files the `slicer` plan writes (TEST_AGENT_SLICES), written by `slicesPlanned` */
+  slices: string;
   env: Record<string, string>;
 }
 
@@ -42,7 +44,7 @@ export async function sh(cwd: string, ...argv: string[]): Promise<string> {
 }
 
 /** The test harness agent's plans (fixtures/test-harness/agent.ts names what each does). */
-export type AgentPlan = "work" | "ask" | "ask-then-stuck" | "hang" | "protocol" | "findings" | "attended" | "permission" | "trust" | "logged-out" | "report" | "resolve" | "resolve-ask";
+export type AgentPlan = "work" | "ask" | "ask-then-stuck" | "hang" | "protocol" | "findings" | "attended" | "permission" | "trust" | "logged-out" | "report" | "resolve" | "resolve-ask" | "slicer" | "slice-work" | "slice-ask";
 
 /**
  * A fresh clone of an empty bare remote with one commit on main, and a norn home beside it. The
@@ -59,6 +61,7 @@ export async function world(plan: AgentPlan = "work"): Promise<World> {
   const flags = join(dir, "flags");
   const plans = join(dir, "plans.json");
   const reports = join(dir, "reports.json");
+  const slices = join(dir, "slices.json");
   mkdirSync(notes);
   mkdirSync(flags);
   await sh(dir, "git", "init", "-q", "--bare", "-b", "main", remote);
@@ -72,13 +75,14 @@ export async function world(plan: AgentPlan = "work"): Promise<World> {
     TEST_AGENT_PLAN: plan,
     TEST_AGENT_PLANS: plans,
     TEST_AGENT_REPORTS: reports,
+    TEST_AGENT_SLICES: slices,
     TEST_FLAGS: flags,
     GIT_AUTHOR_NAME: "t",
     GIT_AUTHOR_EMAIL: "t@t",
     GIT_COMMITTER_NAME: "t",
     GIT_COMMITTER_EMAIL: "t@t",
   };
-  return { dir, root, remote, home, notes, flags, plans, reports, env };
+  return { dir, root, remote, home, notes, flags, plans, reports, slices, env };
 }
 
 /** Raise or lower one of the test plugin's flag files. */
@@ -87,7 +91,7 @@ export function flag(w: World, name: "stop-fails" | "missing-bin", up: boolean):
   else rmSync(join(w.flags, name), { force: true });
 }
 
-/** The agent's plan per step (`"<step>"`) or per visit (`"<step>#<attempt>"`), over TEST_AGENT_PLAN. */
+/** The agent's plan per step (`"<step>"`) or per visit (`"<step>#<attempt>"`), either one maybe under a unit (`"<unit>:<step>"`), over TEST_AGENT_PLAN. */
 export function plans(w: World, byStep: Record<string, AgentPlan>): void {
   writeFileSync(w.plans, JSON.stringify(byStep));
 }
@@ -95,6 +99,11 @@ export function plans(w: World, byStep: Record<string, AgentPlan>): void {
 /** What the `report` plan runs per step (`"<step>"`) or visit (`"<step>#<attempt>"`): a criteria report and the norn verbs to try with it. */
 export function reports(w: World, byVisit: Record<string, { criteria?: Record<string, string>[]; tries: string[][] }>): void {
   writeFileSync(w.reports, JSON.stringify(byVisit));
+}
+
+/** The slice files the `slicer` plan writes, in place of its default two independent ones. */
+export function slicesPlanned(w: World, files: { file: string; depends_on?: string[] }[]): void {
+  writeFileSync(w.slices, JSON.stringify(files));
 }
 
 /** One norn call as a subprocess in the checkout; `--json` output parsed when it is one value. */
