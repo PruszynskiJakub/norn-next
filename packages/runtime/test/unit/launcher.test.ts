@@ -577,6 +577,50 @@ describe("harness launcher answering a dialog in the agent's pane", () => {
     expect(s.pane.pressed).toEqual([{ handle: "proc|1", keys: [{ text: "1" }, { key: "enter" }] }]);
   });
 
+  // Claude Code 2.1's trust prompt: unnumbered, its cursor on the refusal, so a typed 1 is ignored and Enter exits
+  const TRUST = ["❯ No, exit", "  Yes, I trust this folder"].join("\n");
+  /** yes is placed only on a menu read off the pane, the way claude's harness places it */
+  const placesYes = (answer: string, dialog?: string): readonly RunnerKey[] | null =>
+    answer === "yes" ? (dialog === undefined ? [{ text: "1" }, { key: "enter" }] : dialog.includes("Yes, I trust") ? [{ key: "down" }, { key: "enter" }] : null) : null;
+
+  test("yes on a pane herdr does not see blocked is placed on the menu the pane shows: it never presses Enter on the refusal the cursor starts on", async () => {
+    const s = setup();
+    s.paneHarness.dialogKeys = placesYes;
+    // the runner sees no blocked agent, so it reads the pane only when asked to whatever it sees
+    s.pane.dialog = async (_h, opts) => ok(opts?.anyStatus === true ? TRUST : null);
+    const started = await s.launcher.start(run());
+    if (!started.ok) throw new Error("start failed");
+    expect(await s.launcher.answer(started.value.handle, dialogInputId(null, RUN_ID), "yes", { dialog: true })).toEqual(ok(undefined));
+    expect(s.pane.pressed).toEqual([{ handle: "proc|1", keys: [{ key: "down" }, { key: "enter" }] }]);
+  });
+
+  test("the dialog probe reads the pane of a run launched here, never one another machine launched: its pane id may name another agent's pane here", async () => {
+    const s = setup();
+    const asked: string[] = [];
+    s.pane.dialog = async (h) => {
+      asked.push(h);
+      return ok(TRUST);
+    };
+    const started = await s.launcher.start(run());
+    if (!started.ok) throw new Error("start failed");
+    expect(await s.launcher.dialog(started.value.handle)).toBe(TRUST);
+    expect(await s.launcher.dialog(started.value.handle.replace(RUN_ID, "01JRUN0000000000000000000F"))).toBeNull();
+    expect(asked).toEqual(["proc|1"]);
+  });
+
+  test("yes is refused, with nothing pressed, when the pane shows no option that says yes or cannot be read at all", async () => {
+    for (const read of [async () => ok("❯ No, exit\n  Trust this folder"), async () => ok(null), async () => fail("unavailable", "herdr is down"), undefined]) {
+      const s = setup();
+      s.paneHarness.dialogKeys = placesYes;
+      if (read) s.pane.dialog = read;
+      const started = await s.launcher.start(run());
+      if (!started.ok) throw new Error("start failed");
+      const answered = await s.launcher.answer(started.value.handle, dialogInputId(null, RUN_ID), "yes", { dialog: true });
+      expect(answered.ok ? null : answered.failure.code).toBe("invalid");
+      expect(s.pane.pressed).toEqual([]);
+    }
+  });
+
   test("a runner that cannot press keys, a harness that names none, and an answer no option takes are refused", async () => {
     const s = setup({ bgHarness: {} });
     const bg = await s.launcher.start(run({ executor: "bg", attended: false }));

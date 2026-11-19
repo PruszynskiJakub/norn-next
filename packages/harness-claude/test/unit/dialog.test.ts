@@ -41,6 +41,13 @@ describe("claude's dialog keys", () => {
     expect(keys("no", TRUST)).toEqual([{ key: "esc" }]);
   });
 
+  test("yes on a dialog read off the pane with no option that says yes, or with no menu at all, names no keys rather than guessing an option", () => {
+    const reworded = TRUST.replace("Yes, I trust this folder", "Trust this folder");
+    expect(keys("yes", reworded)).toBeNull();
+    expect(keys("2", reworded)).toEqual([{ key: "down" }, { key: "enter" }]);
+    expect(keys("yes", "Claude is thinking…")).toBeNull();
+  });
+
   test("a numbered menu read off the pane still takes the number, and yes the option that says yes", () => {
     const numbered = ["Do you want to proceed?", "❯ 1. Yes", "  2. Yes, and don't ask again", "  3. No, and tell Claude what to do differently"].join("\n");
     expect(keys("yes", numbered)).toEqual([{ text: "1" }, { key: "enter" }]);

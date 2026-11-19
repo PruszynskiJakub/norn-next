@@ -41,11 +41,12 @@ export function dialogKeys(answer: string, dialog?: string): readonly RunnerKey[
   if (a === "no" || a === "n") return [{ key: "esc" }];
   const yes = a === "yes" || a === "y";
   if (!yes && !/^[1-9]$/.test(a)) return null;
-  const menu = dialog ? menuOf(dialog) : null;
-  if (!menu) return pick(yes ? "1" : a);
+  const menu = dialog !== undefined ? menuOf(dialog) : null;
+  // yes on a pane that was read is placed on what it shows, never guessed: a guess may confirm "No, exit"
+  if (!menu) return yes && dialog !== undefined ? null : pick(yes ? "1" : a);
   const label = (o: string) => o.replace(NUMBERED, "").toLowerCase();
   // the option that says yes, not the first: a menu may list its refusal first
-  const index = yes ? Math.max(0, menu.options.findIndex((o) => label(o).startsWith("yes"))) : Number(a) - 1;
-  if (index >= menu.options.length) return null;
+  const index = yes ? menu.options.findIndex((o) => label(o).startsWith("yes")) : Number(a) - 1;
+  if (index < 0 || index >= menu.options.length) return null;
   return menu.numbered ? pick(String(index + 1)) : moveTo(menu, index);
 }

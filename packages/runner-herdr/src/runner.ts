@@ -351,16 +351,18 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
       return entered.ok ? ok(undefined) : entered;
     },
 
-    async dialog(handle) {
+    async dialog(handle, opts) {
       // herdr reads the agent off its screen, so it sees a prompt that holds the agent before any hook
       const info = await herdrJson(herdr, ["pane", "get", handle], PaneInfo);
       if (isGone(info)) return ok(null);
       if (!info.ok) return info;
-      if (info.value.result.pane.agent_status !== "blocked") return ok(null);
+      const blocked = info.value.result.pane.agent_status === "blocked";
+      if (!blocked && opts?.anyStatus !== true) return ok(null);
       const screen = await herdr(["pane", "read", handle, "--source", "visible", "--lines", String(SCREEN_LINES)]);
       if (isGone(screen)) return ok(null);
       if (!screen.ok) return screen;
-      return ok(dialogText(screen.value) || "a prompt herdr reports blocking the agent");
+      const text = dialogText(screen.value);
+      return ok(text || (blocked ? "a prompt herdr reports blocking the agent" : null));
     },
 
     async keys(handle, keys) {

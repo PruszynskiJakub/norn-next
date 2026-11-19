@@ -57,10 +57,12 @@ export interface Runner {
   /**
    * The dialog the handle's pane shows while the agent waits on it (a trust or permission prompt), as
    * the lines a person reads there, a blank line between its blocks; null when none shows or the pane
-   * is gone (plugin API 1.15). Absent
+   * is gone (plugin API 1.15). A runner that reads the pane only while it sees the agent held by a
+   * dialog reads it whatever it sees with `anyStatus`: keys chosen for an answer must follow what
+   * the pane shows, even when the runner's own reading of the agent missed the dialog. Absent
    * on a runner with no pane: nobody could read or answer a dialog in a process nobody sees.
    */
-  dialog?(handle: string): Promise<PluginResult<string | null>>;
+  dialog?(handle: string, opts?: { anyStatus?: boolean }): Promise<PluginResult<string | null>>;
   /** end the process; stopping one already gone is not an error */
   stop(handle: string): Promise<PluginResult<void>>;
 }

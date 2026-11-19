@@ -32,7 +32,7 @@ Trust the folder in the pane, or answer the prompt from here:
 norn story answer gh-18 yes   # the option that trusts the folder, wherever the menu lists it
 ```
 
-The run goes on with its first event. If the pane shows something else, start the step again with `norn run rerun gh-18`.
+norn reads the pane to find that option; where it cannot read the pane, or the menu has no option that says yes, `yes` is refused and you answer with the option's number as the pane shows it. The run goes on with its first event. If the pane shows something else, start the step again with `norn run rerun gh-18`.
 
 ## A gate waits for you
 

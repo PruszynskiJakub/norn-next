@@ -385,6 +385,18 @@ describe("herdr alive, send and stop", () => {
     expect(await runner.dialog?.("w9:p9")).toEqual({ ok: true, value: null });
   });
 
+  test("dialog asked to read whatever herdr says of the agent reads the pane even when herdr does not see it blocked", async () => {
+    const { h, runner } = setup();
+    await runner.start(req());
+    const p = h.panes.find((x) => x.pane_id === "w1:p2") as Pane;
+    p.status = "idle";
+    p.screen = ["│ ❯ No, exit           │", "│   Yes, I trust this folder │", ""].join("\n");
+    expect(await runner.dialog?.("w1:p2", { anyStatus: true })).toEqual({ ok: true, value: ["  ❯ No, exit", "    Yes, I trust this folder"].join("\n") });
+    p.screen = "\n\n";
+    expect(await runner.dialog?.("w1:p2", { anyStatus: true })).toEqual({ ok: true, value: null });
+    expect(await runner.dialog?.("w9:p9", { anyStatus: true })).toEqual({ ok: true, value: null });
+  });
+
   test("stop closes the pane; a pane already gone is not an error", async () => {
     const { h, runner } = setup();
     await runner.start(req());
