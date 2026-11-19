@@ -138,7 +138,12 @@ function runtimeDeps(p: RuntimeParts): Parameters<typeof createRuntimeEnv>[0] {
     ...(p.home !== undefined ? { agentEnv: { NORN_HOME_DIR: p.home } } : {}),
     ...(p.repoWorkflows !== undefined ? { repoWorkflows: p.repoWorkflows } : {}),
     sessions: (launcher) =>
-      new EventLogSessionSource({ ctx: p.w.ctx, classify: { silentAfterMs: config.kernel.silentAfterMs }, alive: (h) => launcher.alive?.(h) ?? Promise.resolve(null) }),
+      new EventLogSessionSource({
+        ctx: p.w.ctx,
+        classify: { silentAfterMs: config.kernel.silentAfterMs },
+        alive: (h) => launcher.alive?.(h) ?? Promise.resolve(null),
+        output: (h) => launcher.output?.(h) ?? Promise.resolve(null),
+      }),
   };
 }
 

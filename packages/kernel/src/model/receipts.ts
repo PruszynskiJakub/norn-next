@@ -80,7 +80,10 @@ const KINDS = [
   kind("gate.decided", {
     outcome: GateOutcome,
     by: NonEmpty,
-    /** decided by someone acting for a person (a supervising agent), not the person themselves */
+    /**
+     * Decided by someone acting for a person (a supervising agent). No command sets it now; kept so
+     * a receipt written with it still validates, and its history still says so.
+     */
     delegated: Type.Optional(Type.Boolean()),
     reason: Type.Optional(Type.String()),
     /** set when the decision came through a run: a unit's own step agent may never decide its gate */

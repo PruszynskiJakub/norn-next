@@ -71,7 +71,7 @@ const parkFields = {
     command: Type.Optional(NonEmpty),
     /**
      * An implicit ask (classified from facts, not `norn ask`) and the fact that raised it:
-     * the pane (`waiting_input`) or a hook. A later fact showing the agent moved on resolves it, and
+     * the pane or a hook. A later fact showing the agent moved on resolves it, and
      * agent reports are accepted while parked on it.
      */
     implicit: Type.Optional(Type.Union([Type.Literal("pane"), Type.Literal("hook")])),

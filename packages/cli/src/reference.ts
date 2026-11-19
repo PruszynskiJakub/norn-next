@@ -193,7 +193,6 @@ export const EXIT_MEANING: Record<keyof typeof ExitCode, string> = {
   corrupt: "a file norn keeps failed validation",
   busy: "another process holds the lock or the claim",
   config: "a config file a person wrote needs fixing",
-  timeout: "a wait ran out of time before its condition held",
 };
 
 export interface ReferenceInput {

@@ -33,7 +33,7 @@ import { readEvents } from "./events/log.ts";
 import { markDelivered, pendingInjections, queueInjection, readSentPrompt, recordSentPrompt } from "./events/outbox.ts";
 import { receivedDir } from "./events/paths.ts";
 import { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
-import { currentRunnerHandle, launchedHere, recordLaunch, resumesOf, resumeWith } from "./launcher-resume.ts";
+import { currentRunnerHandle, launchedHere, readLaunch, recordLaunch, resumesOf, resumeWith } from "./launcher-resume.ts";
 import { shellQuote } from "./shell.ts";
 import { installSkills, type PackSkills } from "./skills.ts";
 import type { AgentLauncher, AgentRunRequest, AnswerOptions, ExecutorModes, LauncherModes } from "./types.ts";
@@ -111,6 +111,21 @@ export function nudgePromptId(intentId: string): string {
 }
 
 const message = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+const HEAD_LINES = 5;
+const HEAD_CHARS = 600;
+
+/** The first non-empty lines of a log, joined with ` | ` and cut to fit a reason; null when there are none. */
+export function logHead(text: string): string | null {
+  const head = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l !== "")
+    .slice(0, HEAD_LINES)
+    .join(" | ");
+  if (!head) return null;
+  return head.length > HEAD_CHARS ? `${head.slice(0, HEAD_CHARS - 1)}…` : head;
+}
 
 export class HarnessLauncher implements AgentLauncher {
   constructor(readonly opts: HarnessLauncherOptions) {}
@@ -227,6 +242,25 @@ export class HarnessLauncher implements AgentLauncher {
       if (!(await launchedHere(this.opts.ctx, found.value.handle.unit, found.value.handle.run_id))) return null;
       const alive = await found.value.executor.runner.alive(await currentRunnerHandle(this.opts.ctx, found.value.handle));
       return alive.ok ? alive.value : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * The head of the run's log: its first non-empty lines, joined and cut, so a process that ended
+   * before it said anything through a hook can still say why. Null for a run launched elsewhere (its
+   * log is on that machine), with no log, or a handle not this launcher's.
+   */
+  async output(handle: string): Promise<string | null> {
+    const found = this.resolve(handle);
+    if (!found.ok) return null;
+    const { ctx } = this.opts;
+    try {
+      const launch = await readLaunch(ctx, found.value.handle.unit, found.value.handle.run_id);
+      if (!launch.ok) return null;
+      const text = await ctx.files.read(launch.value.logPath);
+      return text === null ? null : logHead(text);
     } catch {
       return null;
     }

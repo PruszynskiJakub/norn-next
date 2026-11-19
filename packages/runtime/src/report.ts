@@ -9,7 +9,7 @@
  * records once. It is refused, never guessed at, when the run is not the unit's live one or `done`
  * names an outcome the step does not route.
  */
-import { type BriefInputs, checkCriteriaReport, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
+import { type BriefInputs, checkCriteriaReport, HANDOFF_MAX_BYTES, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
 import type { HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
 import { STORE_ID_PATTERN } from "@norn/plugin-api";
 import type { CriterionVerdict, Finding, Note, Verdict } from "@norn/schema";
@@ -18,6 +18,7 @@ import { renderInputFrom } from "./brief-context.ts";
 import { declaredCriteria } from "./criteria.ts";
 import { baseConflictOf } from "./input-history.ts";
 import { INPUTS_DIR, readBackDocs, specFolder, worktreeOf } from "./inputs.ts";
+import { handoffArtifact } from "./story-docs.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { appendEvents, readEvents } from "./events/log.ts";
 import { skillLinks } from "./skills.ts";
@@ -148,6 +149,8 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   if (req.verb === "done") {
     const handBack = handBackRefusal(live, req);
     if (handBack) return handBack;
+    const long = await handoffSizeRefusal(env, unit);
+    if (long) return long;
     const stopped = await unfinishedRefusal(env, unit);
     if (stopped) return stopped;
     const dirty = await uncommittedRefusal(env, unit, live.run.executor);
@@ -218,6 +221,31 @@ function handBackRefusal(live: LiveStep, req: Extract<ReportRequest, { verb: "do
 /** The notes for a person a criteria report's verdicts carry, each naming its criterion. */
 function notesOf(report: readonly CriterionVerdict[] | undefined): Note[] {
   return (report ?? []).flatMap((c) => (c.note !== undefined ? [{ text: c.note, criterion: c.id }] : []));
+}
+
+/**
+ * Why a `done` cannot be recorded while the unit's handoff has grown past `HANDOFF_MAX_BYTES`, or
+ * null when it can: the handoff is the unit's current state, and one that long has turned into a log
+ * (repros, tables, a diary of attempts) that every later brief would carry. An ask or stuck is never
+ * held back, as it hands nothing on.
+ */
+async function handoffSizeRefusal(env: RuntimeEnv, unit: string): Promise<Refusable<never> | null> {
+  const file = `${specFolder(unit)}/${handoffArtifact(unit)}`;
+  let text: string | null;
+  try {
+    text = await env.ctx.files.read(`${worktreeOf(env, unit)}/${file}`);
+  } catch {
+    // unreadable here is unreadable for read-back too: nothing long reaches the next brief
+    return null;
+  }
+  const bytes = text === null ? 0 : new TextEncoder().encode(text.trim()).length;
+  if (bytes <= HANDOFF_MAX_BYTES) return null;
+  const kb = (n: number) => `${Math.ceil(n / 1024)} KB`;
+  return refuse(
+    `the handoff ${file} is ${kb(bytes)}; it may hold at most ${kb(HANDOFF_MAX_BYTES)}`,
+    `rewrite it as the unit's current state (State, Notes): drop what the brief's history already says and the attempts that led nowhere, move long repros and logs into the findings of \`norn done --findings\` when the outcome hands findings back, or into a file of their own under ${specFolder(unit)}/, and name it there, then report again`,
+    "handoff_too_large",
+  );
 }
 
 const CONCLUDE: Record<VcsUnfinished["operation"], string> = { merge: "git commit", rebase: "git rebase --continue", "cherry-pick": "git cherry-pick --continue" };

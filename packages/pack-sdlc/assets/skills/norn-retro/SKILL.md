@@ -33,7 +33,7 @@ The views summarize; the receipts behind them are the evidence. Read those next.
 **The documents.**
 
 - **The spec**, `spec.md`: the tracker item mirrored at the top, then what refinement and planning wrote below it (User Stories, Plan; a review step may have added its verdict). Each slice file `slices/<nn>-<slug>.md` has its acceptance and frontmatter `criteria` with `id` and `verifier`.
-- **The handoffs**, `handoffs/<key>.md` for the story's unit and `handoffs/<key>-<nn>.md` for each slice: the unit's state when it ended (State, Notes with what was tried and failed, Proof, Not proven yet). When an agent kept its findings or a review verdict there rather than in its report, this is the only place they are.
+- **The handoffs**, `handoffs/<key>.md` for the story's unit and `handoffs/<key>-<nn>.md` for each slice: the unit's state when it ended (State, with the review's traceability table, and Notes with what was tried and failed). When an agent kept its findings or a review verdict there rather than in its report, this is the only place they are.
 
 **Each unit's record.** Every file is JSON. `state.json` is `{version, data}`; a receipt is `{seq, id, at, data}`, and its kind is `data.kind`. Find a receipt by its kind, never by its file name: the name is the seq and an id, which only sometimes reads as a word.
 
@@ -43,7 +43,7 @@ The views summarize; the receipts behind them are the evidence. Read those next.
   - `run.started`: `run_id`, `run_kind` (`agent`, `check` or `step`), `executor` (the agent's executor, `check`, or the step kind's name), `attended`; `retry_of` names the run a fresh session replaced; `session` once the session is known. An agent run is recorded twice, the second time with its `session`: count runs by `run_id`, not by receipt.
   - `run.reported`: the agent's report, `verb` `done`, `ask` or `stuck`, with `outcome` (for `done`) and `text`: the note of a `done`, the question of an `ask`, the reason of a `stuck`. `findings`, when present, are the findings a `done` handed back (`--findings`), each with `severity` and `title`; a step whose outcome hands findings back (`hand_back` in the step's definition) gives them there or in its note. `criteria`, when present, is the criteria report: one entry per criterion with `id` and `verdict` (`pass` with `evidence`, `fail` with `repro`, `person` with `how`, `unverified` with `reason` and `how`), and a verdict's `note` for a person. `notes` lists those notes for a person.
   - `answer.sent`: a person's answer to an `ask` or a permission prompt (`input_id`, `text`, `by`).
-  - `gate.decided`: a ruling at a gate, `outcome` `approve` or `reject`, `by`, `reason` (the person's words); `delegated: true` when a supervisor agent decided on the person's behalf: count those apart from the person's own. It follows a `unit.parked` with `reason` `gate.park`.
+  - `gate.decided`: a ruling at a gate, `outcome` `approve` or `reject`, `by`, `reason` (the person's words); a `reason` that starts `fsd:` (or `delegated: true` on older records) is a supervisor agent's ruling on the person's behalf (`norn-fsd-round`): count those apart from the person's own. It follows a `unit.parked` with `reason` `gate.park`.
   - `unit.parked`: the unit waited for a person; `reason` names the rule (`gate.park`, `agent.permission.park`, …).
   - `check.finished`: `exit` and `outcome` of a check; `step.finished`: `step_kind`, `outcome` and any `detail` of a plugin step such as `update-branch` or `open-pr`.
   - `run.classified`: how a run ended, judged from the session rather than reported: `outcome` `silent`, `died`, `timeout`, `stalled`, `ask` or `stuck`, with the `rule` that judged it and the `error` the last turn stopped on. `run.ended`: a run that ended without a report (`reason` `exit`, `killed`, `crash`, `stopped`, `timeout`).
@@ -76,7 +76,7 @@ Rank the findings by what they cost: a person pulled in to unblock or redo work,
 
 A person's ruling at a gate sometimes says how they want every story done, not only this one. Gather those so the next story starts with them.
 
-1. **List the gate rulings.** Every `gate.decided` in the record whose `reason` is not empty, each with the gate (its `step`), the round and unit, and the person's words, quoted. When it has `delegated: true`, mark it delegated: a supervisor agent wrote it, not the person. Give your reading of each (lasting, or about this story only) and ask the person which read as a lasting preference. A delegated ruling is the supervisor's reading, so treat it as lasting only when the person says so. With no ruling that has a reason, say so in one line and propose nothing.
+1. **List the gate rulings.** Every `gate.decided` in the record whose `reason` is not empty, each with the gate (its `step`), the round and unit, and the person's words, quoted. When its `reason` starts `fsd:` (or it carries `delegated: true`, on older records), mark it supervised: a supervisor agent wrote it, not the person. Give your reading of each (lasting, or about this story only) and ask the person which read as a lasting preference. A supervised ruling is the supervisor's reading, so treat it as lasting only when the person says so. With no ruling that has a reason, say so in one line and propose nothing.
 2. **Pick the file by what the ruling is about.** A ruling on how code is judged (what fails review, what not to report, what to ignore) belongs in `REVIEW.md` at the repo root, which review reads. A ruling on how agents work (how to build, test, name things, ask, hand back) belongs in the repo's agent instructions file: `AGENTS.md`, else `CLAUDE.md`.
 3. **Read the target file first.** When it already states the preference, cite that line as evidence and never propose a duplicate; when it states it differently, propose the change to that line. When the file is missing, propose creating it with that line, and say the file is new.
 4. **Propose one line per lasting ruling**, naming the **File**, the **Section** it goes under (an existing heading, or a new one), the **Wording** (the line ready to paste) and the **Ruling** it comes from (its unit, seq and gate, and the words quoted).
@@ -134,7 +134,7 @@ Read: the <local | refs> record of <key> (<n> rounds, <n> slices). Trace: <prese
 Gate rulings (which read as a lasting preference? my reading after each):
 
 - `gh-123 #12 gate.decided reject`, gate `<step>`, round 1: "…" (lasting)
-- `gh-123/02 #21 gate.decided approve`, gate `<step>`, delegated: "…" (this story only)
+- `gh-123/02 #21 gate.decided approve`, gate `<step>`, supervised: "fsd: …" (this story only)
 
 ### 1. <The preference, in one line>
 

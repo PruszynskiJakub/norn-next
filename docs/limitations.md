@@ -54,7 +54,7 @@ The `refs` store shared by several clones is tested with clones on one machine o
 - **Workflows are pinned per unit.** Editing a workflow does not affect units already in flight. This is intended, but surprising.
 - **Nothing stops a person typing into an agent's pane.** With the herdr runner, an answer typed there bypasses norn's record: give decisions with `norn story answer` too.
 - **The local environment must stay healthy.**
-  - It needs git ≥ 2.38, disk for one worktree per running unit, and the tools `norn doctor` names for the config: `gh` signed in for GitHub, the agent tool, `herdr` for the herdr runner. Check commands must do their own setup in a fresh worktree, such as `bun install --frozen-lockfile`.
+  - It needs git ≥ 2.38 (`norn doctor` checks it and `norn watch` refuses an older one), disk for one worktree per running unit, and the tools `norn doctor` names for the config: `gh` signed in for GitHub, the agent tool, `herdr` for the herdr runner. Check commands must do their own setup in a fresh worktree, such as `bun install --frozen-lockfile`.
   - Rate limits or a GitHub outage stop observation of the tracker and forge.
   - A sleeping laptop pauses every watch, and claims expire. They are taken again cleanly after wake, but nothing moves in the meantime.
   - Clean-up removes files only: the folders a finished story's logs lived in stay, empty. A unit that did not end done keeps its logs, as it keeps its worktree, and a session log a custom launcher wrote elsewhere stays too.

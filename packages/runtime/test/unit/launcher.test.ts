@@ -609,6 +609,38 @@ describe("harness launcher stop and liveness", () => {
   });
 });
 
+describe("harness launcher output", () => {
+  test("is the head of the log the run's process wrote: its first non-empty lines, joined", async () => {
+    const s = setup();
+    const started = await s.launcher.start(run({ executor: "bg" }));
+    if (!started.ok) throw new Error("start failed");
+    await s.files.write("/m/runtime/sessions/01JRUN0000000000000000000A.log", "\n  Error: invalid API key  \n\nrun claude login\n3\n4\n5\n6\n");
+    expect(await s.launcher.output(started.value.handle)).toBe("Error: invalid API key | run claude login | 3 | 4 | 5");
+  });
+
+  test("a long head is cut, so a reason stays readable", async () => {
+    const s = setup();
+    const started = await s.launcher.start(run({ executor: "bg" }));
+    if (!started.ok) throw new Error("start failed");
+    await s.files.write("/m/runtime/sessions/01JRUN0000000000000000000A.log", `${"x".repeat(2000)}\n`);
+    const head = await s.launcher.output(started.value.handle);
+    expect(head?.length).toBe(600);
+    expect(head?.endsWith("…")).toBe(true);
+  });
+
+  test("is null with no log, an empty one, a run launched elsewhere, or a handle not this launcher's", async () => {
+    const s = setup();
+    const started = await s.launcher.start(run({ executor: "bg" }));
+    if (!started.ok) throw new Error("start failed");
+    expect(await s.launcher.output(started.value.handle)).toBeNull();
+    await s.files.write("/m/runtime/sessions/01JRUN0000000000000000000A.log", "\n \n");
+    expect(await s.launcher.output(started.value.handle)).toBeNull();
+    expect(await s.launcher.output("not-ours")).toBeNull();
+    const elsewhere = await setup().launcher.output(started.value.handle);
+    expect(elsewhere).toBeNull();
+  });
+});
+
 describe("shellQuote", () => {
   test("keeps plain words and quotes the rest as one word each", () => {
     expect(shellQuote(["norn", "hook", "claude"])).toBe("norn hook claude");

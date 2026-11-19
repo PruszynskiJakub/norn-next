@@ -154,6 +154,32 @@ describe("EventLogSessionSource", () => {
     expect((await readEvents(ctx, "gh-12", RUN)).events.map((e) => e.type)).toEqual(["turn.started"]);
   });
 
+  test("a process that ended before its first event reads ended, with the head of its log as the error", async () => {
+    const { ctx } = host();
+    const asked: string[] = [];
+    const output = async (h: string) => {
+      asked.push(h);
+      return "Error: invalid API key | run claude login";
+    };
+    const facts = await new EventLogSessionSource({ ctx, classify, alive: async () => false, output }).facts("gh-12", RUN, "h-1");
+    expect(facts).toMatchObject({ activity: "ended", silent: false, error: "the agent exited before its first event: Error: invalid API key | run claude login" });
+    expect(asked).toEqual(["h-1"]);
+    expect((await readEvents(ctx, "gh-12", RUN)).events).toEqual([]);
+  });
+
+  test("a process that ended before its first event and left no log still reads ended, saying so", async () => {
+    const { ctx } = host();
+    const facts = await new EventLogSessionSource({ ctx, classify, alive: async () => false, output: async () => null }).facts("gh-12", RUN, "h-1");
+    expect(facts).toMatchObject({ activity: "ended", error: "the agent exited before its first event and left no output" });
+  });
+
+  test("before its first event, a process alive or one the probe cannot tell about has no session yet", async () => {
+    const { ctx } = host();
+    expect(await new EventLogSessionSource({ ctx, classify, alive: async () => true }).facts("gh-12", RUN, "h")).toBeNull();
+    expect(await new EventLogSessionSource({ ctx, classify, alive: async () => null }).facts("gh-12", RUN, "h")).toBeNull();
+    expect(await new EventLogSessionSource({ ctx, classify, alive: async () => false }).facts("gh-12", RUN)).toBeNull();
+  });
+
   test("a probe that cannot answer, or throws, never reads as dead", async () => {
     const { ctx } = await seeded([{ type: "turn.started", source: "brief" }]);
     expect(await new EventLogSessionSource({ ctx, classify, alive: async () => null }).facts("gh-12", RUN, "h")).toMatchObject({ activity: "working" });

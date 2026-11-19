@@ -34,6 +34,7 @@ export const SessionFactsSchema = Type.Object(
     report: Type.Optional(Type.Object({ verb: ReportVerb, outcome: Type.Optional(Type.String()) }, closed)),
     last_message: Type.Optional(Type.String()),
     error: Type.Optional(Type.String()),
+    last_event_at: Type.Optional(IsoTime),
     pending_tools: NonNegInt,
     subagents: NonNegInt,
     pane_answers: NonNegInt,

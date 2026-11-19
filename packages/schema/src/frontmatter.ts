@@ -56,7 +56,7 @@ export const StoryFrontmatter = Type.Object(
     intake_at: IsoTime,
     /** sha256 of the remote issue body at intake/last refine; drives the "issue body changed" inbox item. */
     body_hash: Type.Optional(Type.String({ pattern: "^[0-9a-f]{64}$" })),
-    /** Remote body hash recorded when refine finished, if it differs from body_hash later. */
+    /** Kept only so a story file written with it still validates. */
     refined_body_hash: Type.Optional(Type.String({ pattern: "^[0-9a-f]{64}$" })),
     /** The done record: how the story PR landed, written with `status: done` on the base branch. */
     merge: Type.Optional(StoryMerge),

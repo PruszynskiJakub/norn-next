@@ -434,6 +434,5 @@ The `sdlc` pack's workflows:
 | 4 | `corrupt` | a file norn keeps failed validation |
 | 5 | `busy` | another process holds the lock or the claim |
 | 6 | `config` | a config file a person wrote needs fixing |
-| 7 | `timeout` | a wait ran out of time before its condition held |
 
 <!-- norn:reference:end -->
