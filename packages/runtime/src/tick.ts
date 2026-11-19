@@ -53,6 +53,11 @@ async function run(env: RuntimeEnv, tickId: string, trace: TickTrace, problems: 
   for (const [i, d] of decisions.entries()) {
     // a story whose finishing or last flush failed keeps its claim, so the next tick decides them again:
     // released over an unpublished record, no tick here flushes it again, and another clone reads the remote's stale one as free
+    // the finish waits for the flush too: a worktree removed or an item closed before the record reached the remote tidies away work no other clone can see
+    if (d.kind === "finish_story" && unfinished.has(d.story)) {
+      trace.record({ decision: d, ok: false, error: `skipped: ${unfinished.get(d.story)} failed; the story is finished once its run data reaches the remote`, retryable: true });
+      continue;
+    }
     if (d.kind === "release_claim" && unfinished.has(d.story)) {
       trace.record({ decision: d, ok: false, error: `skipped: ${unfinished.get(d.story)} failed; the claim is kept for the next tick`, retryable: true });
       continue;
