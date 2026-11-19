@@ -4,9 +4,10 @@
  */
 import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
-import { type CliIo, ExitCode, runCli } from "../../src/index.ts";
-import { HOME, ROOT, type TestMachine } from "./support.ts";
-import { AGENT_STEP, configured, envOf, GATE_STEP, receiptsOf, runEnv, seedUnit, UNIT, withEnv } from "./units.ts";
+import { launchRecordPath } from "@norn/runtime";
+import { type CliIo, configPaths, ExitCode, runCli } from "../../src/index.ts";
+import { fakeGh, GITHUB_CONFIG, HOME, LOCAL_CONFIG, machine, ROOT, type TestMachine } from "./support.ts";
+import { AGENT_STEP, configured, envOf, GATE_STEP, RUN, receiptsOf, runEnv, seedUnit, UNIT, withEnv } from "./units.ts";
 
 const json = (stdout: string): Record<string, unknown> => Bun.JSONL.parse(stdout)[0] as Record<string, unknown>;
 /** herdr answering for a pane split below the asking one */
@@ -15,8 +16,19 @@ const herdr: ExecScript = (argv) => {
   const verb = `${argv[1]} ${argv[2]}`;
   if (verb === "pane split") return { stdout: JSON.stringify({ result: { pane: { pane_id: "w1:p9" } } }) };
   if (verb === "pane rename" || verb === "pane run") return { stdout: "" };
+  // the pane `seedUnit`'s handle names for its run, and the story's workspace
+  if (verb === "pane get") return { stdout: JSON.stringify({ result: { pane: { pane_id: argv[3], tab_id: "w1:t2", agent_status: "working" } } }) };
+  if (verb === "agent focus") return { stdout: '{"result":{"type":"ok"}}' };
+  if (verb === "workspace list") return { stdout: JSON.stringify({ result: { workspaces: [{ workspace_id: "w1", label: UNIT }] } }) };
+  if (verb === "workspace report-metadata") return { stdout: "" };
   return undefined;
 };
+
+/** the launch record this machine writes when it starts a run: only such a run's pane is focused */
+async function launchedHere(m: TestMachine): Promise<void> {
+  const env = await envOf(m);
+  await env.ctx.files.write(launchRecordPath(env.ctx, UNIT, RUN), JSON.stringify({ executor: "claude", cwd: "/wt", title: UNIT, workspace: UNIT, logPath: "/m/log" }));
+}
 
 const inPanes = (env: Record<string, string> = {}): TestMachine => configured({ runner: "herdr", script: herdr, env });
 
@@ -84,6 +96,20 @@ describe("norn status --watch", () => {
     await runCli(["status", "--watch"], io);
     expect(frames[1]).toContain("Your answer (answer lt-1):");
     expect((await receiptsOf(m)).at(-1)?.data).toMatchObject({ kind: "answer.sent", text: "use v2" });
+  });
+
+  test("t takes a story another machine holds: the reason typed is the confirmation, and the take goes through with --force", async () => {
+    const m = configured();
+    await seedUnit(m, { step: AGENT_STEP });
+    await (await envOf(m)).slots.store.claims.acquire(UNIT, "alice@laptop", 60_000);
+    const { io, frames } = terminal(m, ["t", "alice is away\r", "q"]);
+    const r = await runCli(["status", "--watch"], io);
+    expect(frames[1]).toContain(`Take ${UNIT} from alice@laptop? Why (take ${UNIT}):`);
+    expect(frames.at(-1)).toContain(`ok: norn story take ${UNIT}`);
+    expect(json(r.stdout)).toMatchObject({ last: { action: "take", unit: UNIT, ok: true } });
+    const claim = await (await envOf(m)).slots.store.claims.read(UNIT);
+    expect(claim.ok && claim.value?.holder).toBe("me@box");
+    expect((await receiptsOf(m)).at(-1)?.data).toMatchObject({ kind: "claim.taken", reason: "alice is away" });
   });
 
   test("a stdin that ends draws one frame and ends the cockpit", async () => {

@@ -83,7 +83,10 @@ function storyActions(s: StoryView, holder: string, o: CockpitOptions, unit: Uni
   const live = unit?.run ? unit : s.units.find((u) => u.run && u.ended === undefined);
   if (live?.run && o.places(live.run.executor)) out.push(action("agent", { kind: "attach", unit: live.id }));
   // a claim nobody holds is this machine's at its next tick: only another holder's is worth a take
-  if (!finished(s) && s.claim !== null && s.claim.holder !== holder && s.unsynced === undefined) out.push(action("take", { kind: "verb", argv: ["story", "take", s.key] }));
+  // story take moves another holder's claim only with --force, since that holder may still act on the
+  // story: the reason the person types is their confirmation, and is kept on the record
+  if (!finished(s) && s.claim !== null && s.claim.holder !== holder && s.unsynced === undefined)
+    out.push(action("take", { kind: "verb", argv: ["story", "take", s.key, "--force", "--reason", "{input}"] }, { prompt: `Take ${s.key} from ${s.claim.holder}? Why`, required: true }));
   if (s.change?.url) out.push(action("pr", { kind: "link", url: s.change.url }));
   if (s.url) out.push(action("issue", { kind: "link", url: s.url }));
   return out;
