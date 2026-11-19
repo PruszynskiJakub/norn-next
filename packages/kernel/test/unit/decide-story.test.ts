@@ -188,6 +188,23 @@ describe("finishing an ended story", () => {
     expect(finishOf(story({ units: after, change: change({ state: "open" }) }))).toMatchObject({ worktrees: ["gh-1"], close_item: false });
   });
 
+  test("a story finished with its change open takes its claim again once the change merges, to close the item, then gives it up", () => {
+    const done = [unit("gh-1", state("gh-1", "split", { ended: "done" }))];
+    const merged = change({ state: "merged" });
+    expect(rules(storyDecisions(story({ claim: null, units: done, change: merged })))).toEqual(["claim.take", "claim.pending"]);
+    expect(finishOf(story({ units: done, change: merged }))).toMatchObject({ close_item: true });
+    expect(rules(storyDecisions(story({ units: done, change: merged })))).toEqual(["story.finish", "claim.release"]);
+  });
+
+  test("a merged change leaves a released story alone when its item is closed, it ended stuck, the tracker cannot close, or it merged elsewhere", () => {
+    const done = [unit("gh-1", state("gh-1", "split", { ended: "done" }))];
+    const merged = change({ state: "merged" });
+    expect(storyDecisions(story({ claim: null, units: done, change: merged, item: item(1, { open: false }) }))).toEqual([]);
+    expect(storyDecisions(story({ claim: null, units: [unit("gh-1", state("gh-1", "split", { ended: "stuck" }))], change: merged }))).toEqual([]);
+    expect(storyDecisions(story({ claim: null, units: done, change: merged }), { capabilities: caps({}, false) })).toEqual([]);
+    expect(storyDecisions(story({ claim: null, units: done, change: change({ state: "merged", base_branch: "release" }) }), {}, workflows(), { ...CONFIG, base: "main" })).toEqual([]);
+  });
+
   test("nothing is finished while the story is open or once its claim is given up", () => {
     expect(finishOf(story())).toBeNull();
     expect(finishOf(story({ claim: null, units: [unit("gh-1", state("gh-1", "split", { ended: "done" }))] }))).toBeNull();
