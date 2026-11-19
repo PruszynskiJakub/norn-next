@@ -411,8 +411,9 @@ describe("hooks: the guard keeps writes out of run state, and the stop cap holds
     wt = (await worktreeOf(w)) as string;
 
     // guard denials first: they must leave the run's stop refusals unspent
+    // outside every temp folder: the world itself lives in one, which the guard lets an agent write to
     denials = [];
-    for (let i = 0; i < 5; i++) denials.push(await fire(w, wt, runId, "tool", { id: `t-out-${i}`, kind: "write", tool: "Write", detail: join(w.dir, `elsewhere-${i}.txt`) }));
+    for (let i = 0; i < 5; i++) denials.push(await fire(w, wt, runId, "tool", { id: `t-out-${i}`, kind: "write", tool: "Write", detail: `/opt/norn-e2e/elsewhere-${i}.txt` }));
     stops = await Promise.all(Array.from({ length: 2 * MAX_STOP_BLOCKS }, () => fire(w, wt, runId, "stop")));
 
     mkdirSync(join(wt, "sub"), { recursive: true });
