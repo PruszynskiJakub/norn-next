@@ -134,6 +134,9 @@ export class FakeLauncher implements AgentLauncher {
   readonly calls: LauncherCall[] = [];
   readonly failStart = new Map<string, "fail" | "throw">();
   failAnswers = false;
+  /** what `alive` answers for every handle; null: it cannot tell */
+  aliveAnswer: boolean | null = null;
+  readonly probed: string[] = [];
 
   async start(run: AgentRunRequest) {
     this.calls.push({ op: "start", args: [run] });
@@ -154,6 +157,10 @@ export class FakeLauncher implements AgentLauncher {
   async stop(handle: string) {
     this.calls.push({ op: "stop", args: [handle] });
     return ok(undefined);
+  }
+  async alive(handle: string) {
+    this.probed.push(handle);
+    return this.aliveAnswer;
   }
   of(op: LauncherCall["op"]): unknown[][] {
     return this.calls.filter((c) => c.op === op).map((c) => c.args);

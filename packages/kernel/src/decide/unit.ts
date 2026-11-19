@@ -25,6 +25,7 @@ export const DERIVED_PARKS: ReadonlySet<string> = new Set([
   "agent.no_executor",
   "agent.asking.park",
   "agent.permission.park",
+  "agent.no_events.park",
   "agent.died.manual",
   "agent.silent.manual",
   "agent.turn_ended.manual",

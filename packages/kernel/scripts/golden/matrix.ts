@@ -283,6 +283,18 @@ export const MATRIX: Scenario[] = [
     3,
   ),
   scenario(
+    "agent-silent-pane",
+    "An agent alive in its pane that has sent no event past the silent window (its hooks never loaded, as behind a trust dialog) parks for a person rather than being retried into the same dialog in a fresh pane; one whose process is gone is dead and retried as before.",
+    { files: shippedFiles("slice"), capabilities: capabilities({ executors: { claude: executor({ paneInput: true }) } }) },
+    (w) => {
+      seed(w, "gh-123", { workflow: "slice", step: "implement", run: { minutesAgo: 20 } });
+      w.unit("gh-123").run_alive = true;
+      seed(w, "gh-124", { workflow: "slice", step: "implement", run: { minutesAgo: 20 } });
+      w.unit("gh-124").run_alive = false;
+    },
+    ["agent.no_events.park", "agent.died.retry"],
+  ),
+  scenario(
     "agent-answer-undelivered",
     "An answer to a headless session that ended after asking, on an executor that cannot resume a session: the answer is applied without delivery (so the unit unparks rather than refusing delivery every tick), and the next tick retries the run in a fresh session. An executor that resumes sessions gets the answer delivered as usual (the model host resumes nothing, so its ended session is retried on the next tick too).",
     { files: shippedFiles("slice"), capabilities: capabilities({ executors: { claude: executor(), resumer: executor({ resume: true }) } }) },

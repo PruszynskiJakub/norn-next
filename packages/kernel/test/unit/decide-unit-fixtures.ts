@@ -126,6 +126,8 @@ export interface Case {
   step_run?: UnitFacts["step_run"];
   corrupt?: string;
   corrupt_marked?: boolean;
+  /** whether the run's process still runs, as probed while its session has sent no event */
+  run_alive?: boolean;
   unitId?: string;
   story?: Partial<StoryFacts>;
   executors?: Record<string, ExecutorCapabilities>;
@@ -140,6 +142,7 @@ export function factsOf(c: Case): KernelFacts {
   if (c.step_run) unit.step_run = c.step_run;
   if (c.corrupt) unit.corrupt = c.corrupt;
   if (c.corrupt_marked) unit.corrupt_marked = true;
+  if (c.run_alive !== undefined) unit.run_alive = c.run_alive;
   const story: StoryFacts = { key: "gh-1", item: null, change: null, claim: null, units: [unit], mailbox: [], ...c.story };
   const others: StoryFacts[] = (c.others ?? []).map((u, i) => ({ key: `gh-${i + 10}`, item: null, change: null, claim: null, units: [u], mailbox: [] }));
   return {

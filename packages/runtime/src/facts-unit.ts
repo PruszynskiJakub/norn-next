@@ -53,6 +53,15 @@ async function settledStepRun(env: RuntimeEnv, unit: string, run: { id: string; 
   }
 }
 
+/** Whether the run's process still runs; null when the launcher cannot tell, which is never read as dead. */
+async function probeAlive(env: RuntimeEnv, handle: string): Promise<boolean | null> {
+  try {
+    return (await env.launcher.alive?.(handle)) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function readUnitFacts(env: RuntimeEnv, unit: string, problems: string[], opts: GatherOptions = {}): Promise<PluginResult<UnitRead>> {
   const read = await env.journal.readUnit(unit);
   if (!read.ok) return fail(read.failure.code, `${unit}: ${read.failure.message}`, read.failure.retryable);
@@ -71,6 +80,10 @@ export async function readUnitFacts(env: RuntimeEnv, unit: string, problems: str
       facts.session = session;
     } catch (e) {
       problems.push(`${unit}: the session source failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    if (facts.session === null && run.session !== undefined) {
+      const alive = await probeAlive(env, run.session);
+      if (alive !== null) facts.run_alive = alive;
     }
     const sr = stepRunFact(await settledStepRun(env, unit, run, problems, opts), run);
     if (sr) facts.step_run = sr;

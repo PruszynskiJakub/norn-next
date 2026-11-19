@@ -283,6 +283,26 @@ describe("an agent run, judged from its session", () => {
     expect(decideCase({ state: stateAt("build", { run: run({ started_at: minutesAgo(120) }) }), session: null })?.rule).toBe("agent.died.retry");
   });
 
+  test("an agent alive in its pane that has sent no event past the silent window parks for a person, never retried; its first event lifts the park", () => {
+    const pane = { claude: caps({ paneInput: true }) };
+    const quiet = (over = {}) => stateAt("build", { run: run({ started_at: minutesAgo(16) }), ...over });
+    const d = kindOf(decideCase({ state: quiet(), session: null, run_alive: true, executors: pane }), "park");
+    expect(d).toMatchObject({ rule: "agent.no_events.park", inbox: { kind: "permission" } });
+    expect(d.inbox?.text).toContain("Trust the folder there");
+    expect(d.inbox?.text).toContain("norn story answer gh-1 1");
+    // parked, each later tick holds it: no retry loop while the dialog waits
+    const parked = quiet({ parked: { reason: "agent.no_events.park", since: minutesAgo(1) } });
+    expect(decideCase({ state: parked, session: null, run_alive: true, executors: pane })).toMatchObject({ kind: "noop", rule: "unit.parked" });
+    expect(decideCase({ state: parked, session: session("working"), executors: pane })).toMatchObject({ kind: "apply_receipts", rule: "unit.unpark" });
+    // its process gone, the run is dead as before
+    expect(decideCase({ state: quiet(), session: null, run_alive: false, executors: pane })).toMatchObject({ kind: "retry_run", rule: "agent.died.retry" });
+  });
+
+  test("a live process with no pane that has sent no event is still judged dead: nobody could answer a dialog in it", () => {
+    const quiet = stateAt("build", { run: run({ started_at: minutesAgo(16) }) });
+    expect(decideCase({ state: quiet, session: null, run_alive: true })).toMatchObject({ kind: "retry_run", rule: "agent.died.retry" });
+  });
+
   test("a report with an outcome the step does not declare parks the unit with the refusal and writes nothing, so the next tick does not write it again", () => {
     const bogus = session("reported", { report: { verb: "done", outcome: "bogus" } });
     const d = kindOf(decideCase({ state: running(), session: bogus }), "park");
