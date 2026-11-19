@@ -10,6 +10,7 @@ import { type HostContext, type HostFiles, parseJson } from "@norn/plugin-api";
 import { DEFAULT_CHECKS } from "@norn/runtime";
 import { Type } from "@sinclair/typebox";
 import { stringify } from "yaml";
+import { REPO_COMMITTED_FILE } from "./config/paths.ts";
 import type { ConfigLayer } from "./config/schema.ts";
 import { setKeyInText } from "./config/write.ts";
 
@@ -168,6 +169,22 @@ export function initLayer(c: Choices, test: DetectedTestCommand | null = null): 
     kernel: { mode: c.mode },
     ...(test && { checks: { test: test.command } }),
   };
+}
+
+/**
+ * The committed file's share of init's layer, and the person's: the mode is how this person works,
+ * and the committed file wins over every person's file, so a mode committed there would hold the
+ * whole team to it.
+ */
+export function splitPersonal(layer: ConfigLayer): { team: ConfigLayer; mode: "auto" | "manual" | undefined } {
+  const { mode, ...kernel } = layer.kernel ?? {};
+  const { kernel: _k, ...rest } = layer;
+  return { team: { ...rest, ...(Object.keys(kernel).length > 0 && { kernel }) }, mode };
+}
+
+/** A new repo-local file holding only the person's mode, written beside a committed config. */
+export function personalText(mode: "auto" | "manual"): string {
+  return `# your own norn config for this repo (kept out of git); the committed ${REPO_COMMITTED_FILE} wins over it\n${stringify({ format: 1, kernel: { mode } })}`;
 }
 
 export function initText(layer: ConfigLayer): string {

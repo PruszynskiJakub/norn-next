@@ -226,12 +226,23 @@ describe("norn init: what stays out of git", () => {
     expect(lines).not.toContain(AGENTS_DIR);
   });
 
-  test("--commit writes the committed config (team mode) and leaves the exclude alone", async () => {
+  test("--commit writes the committed config (team mode) and keeps only the repo-local file out of git", async () => {
     const { m, body } = await init(["--commit"]);
-    expect({ file: body.file, team: body.team, exclude: body.exclude }).toEqual({ file: PATHS.repo, team: true, exclude: "committed" });
+    expect({ file: body.file, team: body.team, exclude: body.exclude, excluded: body.excluded }).toEqual({ file: PATHS.repo, team: true, exclude: "added", excluded: REPO_LOCAL_FILE });
     expect((await written(m, PATHS.repo)).tracker).toMatchObject({ use: "local" });
-    expect(await m.files.read(PATHS.local)).toBeNull();
-    expect(await m.files.read(EXCLUDE)).toBeNull();
+    const lines = ((await m.files.read(EXCLUDE)) as string).split("\n");
+    expect(lines).toContain(REPO_LOCAL_FILE);
+    expect(lines).not.toContain(AGENTS_DIR);
+  });
+
+  test("--commit keeps the mode out of the committed file, which wins over every person's: it goes in the repo-local file", async () => {
+    const { m, body } = await init(["--commit", "--mode", "manual"]);
+    expect((await written(m, PATHS.repo)).kernel).toBeUndefined();
+    expect(await written(m, PATHS.local)).toEqual({ format: 1, kernel: { mode: "manual" } });
+    expect(body.local_file).toBe(PATHS.local);
+    // a repo-local file there already keeps what it holds, its own mode included
+    const kept = await init(["--commit"], { seed: { [PATHS.local]: "format: 1\nkernel: { mode: auto }\nholder: me@desk\n" } });
+    expect(await written(kept.m, PATHS.local)).toEqual({ format: 1, kernel: { mode: "auto" }, holder: "me@desk" });
   });
 });
 
@@ -286,8 +297,9 @@ describe("norn init: a repo still on the old norn's config", () => {
       store: { use: "local" },
       executors: { claude: { harness: "claude", runner: "headless" } },
       base: "trunk",
-      kernel: { mode: "manual", workflow: "triage" },
+      kernel: { workflow: "triage" },
     });
+    expect((await written(m, PATHS.local)).kernel).toEqual({ mode: "manual" });
     expect(body.migrated).toEqual({ file: OLD_REPO_CONFIG_FILE, mapped: ["provider", "base_branch", "workflow", "mode"], ignored: ["norn_version", "regenerate"], notes: [] });
     // the old file is left for the person to delete
     expect(await m.files.read(OLD)).toBe(OLD_TEXT);
@@ -296,7 +308,8 @@ describe("norn init: a repo still on the old norn's config", () => {
   test("a key the old file left out takes the old default where this norn's differs: triage and manual, each named in the notes", async () => {
     const { m, body } = await init(["--commit"], { w: { tools: ["claude"], branch: "main" }, seed: { [OLD]: "provider: gh\n" } });
     expect(body.chose).toMatchObject({ mode: "manual" });
-    expect(((await written(m, PATHS.repo)) as { kernel?: unknown }).kernel).toEqual({ mode: "manual", workflow: "triage" });
+    expect(((await written(m, PATHS.repo)) as { kernel?: unknown }).kernel).toEqual({ workflow: "triage" });
+    expect(((await written(m, PATHS.local)) as { kernel?: unknown }).kernel).toEqual({ mode: "manual" });
     const migrated = body.migrated as { mapped: string[]; notes: string[] };
     expect(migrated.mapped).toEqual(["provider"]);
     expect(migrated.notes).toEqual([expect.stringContaining("workflow: "), expect.stringContaining("mode: ")]);
