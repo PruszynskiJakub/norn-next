@@ -260,6 +260,8 @@ describe("a corrupt record is named and never acted on, the views write nothing,
   test("an old runs folder on the base is never read, shown or moved", async () => {
     expect(await sh(w.root, "git", "rev-parse", "HEAD:runs")).toBe(legacyBefore);
     expect(await sh(w.root, "git", "rev-parse", `origin/norn/${KEY}:runs`)).toBe(legacyBefore);
+    // the view could only show that text by reading the old folder; that lt-1 ran on under its own key
+    // without it is the proof the rest of this block gives
     expect(JSON.stringify(views[0]?.body)).not.toContain("an older norn");
   });
 });
@@ -414,8 +416,9 @@ describe("hooks: the guard keeps writes out of run state, and the stop cap holds
     stops = await Promise.all(Array.from({ length: 2 * MAX_STOP_BLOCKS }, () => fire(w, wt, runId, "stop")));
 
     mkdirSync(join(wt, "sub"), { recursive: true });
-    const intoStore = relative(join(wt, "sub"), join(machine, "runs-v2", "stories", KEY, "claim.json"));
-    climbed = await fire(w, wt, runId, "tool", { id: "t-rel", kind: "write", tool: "Write", detail: intoStore }, join(wt, "sub"));
+    // a relative write path is read against the worktree, as the guard resolves it
+    const intoStore = relative(wt, join(machine, "runs-v2", "stories", KEY, "claim.json"));
+    climbed = await fire(w, wt, runId, "tool", { id: "t-rel", kind: "write", tool: "Write", detail: intoStore });
     symlinkSync(join(machine, "runs-v2"), join(wt, "state-link"));
     viaLink = [
       await fire(w, wt, runId, "tool", { id: "t-link-rel", kind: "write", tool: "Write", detail: `state-link/stories/${KEY}/claim.json` }),
@@ -447,8 +450,8 @@ describe("hooks: the guard keeps writes out of run state, and the stop cap holds
     expect(stops.map((s) => s.code)).toEqual(Array(2 * MAX_STOP_BLOCKS).fill(0));
   });
 
-  test("a relative path from a subfolder that reaches run state is denied", () => {
-    expect(climbed.answer?.kind).toBe("deny");
+  test("a relative path that climbs out of the worktree into run state is denied as run state, and a write in a subfolder is allowed", () => {
+    expect(climbed.answer).toMatchObject({ kind: "deny", reason: expect.stringContaining("run state") });
     expect(ownWrite.answer).toBeNull();
   });
 

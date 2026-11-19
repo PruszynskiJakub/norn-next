@@ -446,10 +446,19 @@ describe("harness launcher nudge and answer", () => {
     await appendEvents(s.ctx, unit, runId, [{ type: "session.ended", run_id: runId, seq: 0, at: START, reason: "exit" }]);
     s.bg.live.clear();
     expect(s.bgHarness.installs).toHaveLength(1);
+    const launchesAtInstall: number[] = [];
+    const install = s.bgHarness.install;
+    s.bgHarness.install = async (target) => {
+      launchesAtInstall.push(s.bgHarness.launches.length);
+      return install(target);
+    };
     expect(await s.launcher.answer(started.value.handle, "q1", "go left")).toEqual(ok(undefined));
     const first = s.bgHarness.installs[0];
     expect(s.bgHarness.installs).toEqual([first, first].filter((i) => i !== undefined));
     expect(s.bgHarness.installs[1]?.worktree).toBe("/wt/gh-12-03");
+    // installed while only the first launch existed: the resume came after
+    expect(launchesAtInstall).toEqual([1]);
+    expect(s.bgHarness.launches).toHaveLength(2);
   });
 
   test("an answer to an ended session that cannot be resumed is refused, so it is never applied undelivered", async () => {
