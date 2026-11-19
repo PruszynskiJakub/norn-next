@@ -40,6 +40,8 @@ import type { AgentLauncher, AgentRunRequest, AnswerOptions, ExecutorModes, Laun
 
 /** `no` refuses, as the dialog contract names it for every harness. */
 const isRefusal = (answer: string): boolean => /^(no|n)$/i.test(answer.trim());
+/** `yes` picks the option that says yes, which only the dialog as shown can place. */
+const isYes = (answer: string): boolean => /^(yes|y)$/i.test(answer.trim());
 
 function refusalText(permission: { prompt: string; call?: { tool: string } }): string {
   const what = permission.call ? permission.call.tool : permission.prompt;
@@ -248,6 +250,25 @@ export class HarnessLauncher implements AgentLauncher {
   }
 
   /**
+   * The dialog the run's pane shows, for decide to park on at once rather than after the silent
+   * window; null when its runner reads no pane, or for a run launched on another machine, whose pane
+   * id may name an unrelated pane here.
+   */
+  async dialog(handle: string): Promise<string | null> {
+    const found = this.resolve(handle);
+    if (!found.ok) return null;
+    const runner = found.value.executor.runner;
+    if (!runner.dialog) return null;
+    try {
+      if (!(await launchedHere(this.opts.ctx, found.value.handle.unit, found.value.handle.run_id))) return null;
+      const read = await runner.dialog(await currentRunnerHandle(this.opts.ctx, found.value.handle));
+      return read.ok ? read.value : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * The head of the run's log: its first non-empty lines, joined and cut, so a process that ended
    * before it said anything through a hook can still say why. Null for a run launched elsewhere (its
    * log is on that machine), with no log, or a handle not this launcher's.
@@ -331,7 +352,17 @@ export class HarnessLauncher implements AgentLauncher {
     // answered in the pane meanwhile: nothing waits for the keys
     if (!open) return ok(undefined);
     const pane = await currentRunnerHandle(ctx, h);
-    const pressed = await runner.keys(pane, keys);
+    // a menu with no numbers is moved through from where its cursor stands, which only the pane shows;
+    // it is read whatever the runner makes of the agent, as a missed dialog still takes these keys
+    const shown = runner.dialog ? await runner.dialog(pane, { anyStatus: true }) : null;
+    const screen = shown?.ok ? shown.value : null;
+    // yes names a different option per menu, and pressed blind on a menu whose cursor starts on its
+    // refusal it would confirm the refusal
+    if (screen === null && isYes(text))
+      return fail("invalid", `${h.unit} run ${h.run_id}'s pane could not be read to find the option that says yes: answer with the option's number as the pane shows it`, false);
+    const chosen = screen !== null ? harness.dialogKeys(text, screen) : keys;
+    if (!chosen) return fail("invalid", `${harness.name}'s dialog as its pane shows it takes no ${JSON.stringify(text)}: answer with an option's number as the pane shows it, or no`, false);
+    const pressed = await runner.keys(pane, chosen);
     if (!pressed.ok) return pressed;
     // a refused call ends the agent's turn with no hook that closes the permission, so the run would
     // park on it again while the agent waits at an empty prompt; the prompt starts a turn, which closes it

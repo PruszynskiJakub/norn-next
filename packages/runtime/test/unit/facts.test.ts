@@ -62,6 +62,26 @@ describe("agent run facts", () => {
     expect(seen.ok && seen.value.facts.stories[0]?.units[0]).not.toHaveProperty("run_alive");
     expect(h.launcher.probed).toHaveLength(probes);
   });
+  test("a live run that has sent no event is read for a dialog in its pane; a dead one, or one with events, is not", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const unitOf = async () => {
+      const g = await gatherFacts(h.env, h.tickIds[0] as string, { readOnly: true });
+      return g.ok ? g.value.facts.stories[0]?.units[0] : undefined;
+    };
+    h.launcher.dialogAnswer = " Do you trust the files in this folder?\n\n ❯ No, exit\n   Yes, I trust this folder\n";
+    h.launcher.aliveAnswer = true;
+    expect((await unitOf())?.run_dialog).toBe("Do you trust the files in this folder? | ❯ No, exit | Yes, I trust this folder");
+    h.launcher.aliveAnswer = false;
+    const read = h.launcher.dialogsRead.length;
+    expect(await unitOf()).not.toHaveProperty("run_dialog");
+    expect(h.launcher.dialogsRead).toHaveLength(read);
+    h.launcher.aliveAnswer = true;
+    h.launcher.dialogAnswer = null;
+    expect(await unitOf()).not.toHaveProperty("run_dialog");
+  });
 });
 
 describe("vcs facts", () => {

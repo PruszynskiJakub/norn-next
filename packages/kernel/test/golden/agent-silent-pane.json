@@ -572,7 +572,7 @@
         "unit": "gh-123",
         "step": "implement",
         "since": "2026-11-17T09:00:00.000Z",
-        "text": "run run-gh-123-1's agent runs in its pane but has sent no event since it started, so its hooks never loaded; the pane most likely shows a trust dialog. Trust the folder there, or answer it from here with norn story answer gh-123 1; the run goes on with its first event. If the pane shows something else, start the step again with norn run rerun gh-123."
+        "text": "run run-gh-123-1's agent runs in its pane but has sent no event since it started, so its hooks never loaded; the pane most likely shows a trust dialog. Trust the folder there, or answer it from here with norn story answer gh-123 yes; the run goes on with its first event. If the pane shows something else, start the step again with norn run rerun gh-123."
       },
       "intent": {
         "id": "01JD5G0000C73G79TPA9EMCVD5",

@@ -107,6 +107,19 @@ export async function unfinished(ctx: HostContext, root: string, path: string): 
 }
 
 /**
+ * The files in the checkout at `path` git neither tracks nor ignores, sorted; empty when `path` is no
+ * checkout of this repo. Read with `-z` so a path git would quote comes back as it is named.
+ */
+export async function untracked(ctx: HostContext, root: string, path: string): Promise<PluginResult<string[]>> {
+  const list = await worktreeList(ctx, root);
+  if (!list.ok) return list;
+  if (!list.value.some((w) => samePath(w.path, path))) return ok([]);
+  const r = await git(ctx, path, ["ls-files", "--others", "--exclude-standard", "-z"]);
+  if (r.code !== 0) return gitFailure(r, "ls-files");
+  return ok(r.stdout.split("\0").filter((p) => p !== "").sort());
+}
+
+/**
  * The paths in the checkout at `path` with a change not committed, sorted; empty when it is clean or
  * `path` is no checkout of this repo. Untracked files count unless a `.gitignore` or the exclude file
  * keeps them out, which is how norn's own files in a worktree stay out of the answer. Read with `-z`

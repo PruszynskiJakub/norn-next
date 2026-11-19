@@ -24,15 +24,15 @@ The next tick presses the keys for that option in the agent's pane; after a `no`
 
 ## An agent in a pane sends nothing
 
-**You see:** the unit waiting for a permission: its agent runs in its pane but has sent no event, most likely behind a trust prompt for the new worktree.
+**You see:** the unit waiting for a permission: its agent waits on a dialog in its pane, with the dialog's text (a trust prompt for the new worktree, as herdr reads it off the pane on the next tick), or, where the pane cannot be read, it has sent no event for the silent window and most likely sits behind such a prompt.
 
 Trust the folder in the pane, or answer the prompt from here:
 
 ```sh
-norn story answer gh-18 1
+norn story answer gh-18 yes   # the option that trusts the folder, wherever the menu lists it
 ```
 
-The run goes on with its first event. If the pane shows something else, start the step again with `norn run rerun gh-18`.
+norn reads the pane to find that option; where it cannot read the pane, or the menu has no option that says yes, `yes` is refused and you answer with the option's number as the pane shows it. The run goes on with its first event. If the pane shows something else, start the step again with `norn run rerun gh-18`.
 
 ## A gate waits for you
 

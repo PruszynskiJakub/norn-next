@@ -138,7 +138,7 @@ export const initCommand = defineCommand({
       yes: opt.bool(args, "yes"),
     };
     const { choices, offered } = choose(old?.base ? { ...detected, base: old.base } : detected, flags);
-    const test = await detectTestCommand(files, w.repo.root);
+    const test = await detectTestCommand(files, w.repo.root, { bun: detected.bun });
     const whole = withOldKernelKeys(initLayer(choices, test), old);
     const { team, mode: personalMode } = commit ? splitPersonal(whole) : { team: whole, mode: undefined };
     const doc = commit ? team : whole;

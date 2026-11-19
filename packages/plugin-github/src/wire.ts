@@ -26,6 +26,50 @@ export const GhIssue = Type.Object({
 export type GhIssue = Static<typeof GhIssue>;
 export const GhIssues = Type.Array(GhIssue);
 
+/** An issue of the intake query: `gh --json`'s fields, with assignees and labels as connections. */
+const GhIssueNode = Type.Object({
+  number: PosInt,
+  url: Type.String(),
+  title: Type.String(),
+  body: Nullable(Type.String()),
+  state: Type.String(),
+  assignees: Type.Object({ nodes: Type.Array(Type.Object({ login: NonEmpty })) }),
+  labels: Type.Object({ nodes: Type.Array(Type.Object({ name: NonEmpty })) }),
+  updatedAt: IsoTime,
+});
+type GhIssueNode = Static<typeof GhIssueNode>;
+
+/** One page of a repository's issue connection, as `gh api graphql` answers the intake query. */
+export const GhIssuePage = Type.Object({
+  data: Type.Object({
+    repository: Type.Union([
+      Type.Object({ issues: Type.Object({ pageInfo: Type.Object({ hasNextPage: Type.Boolean(), endCursor: Nullable(Type.String()) }), nodes: Type.Array(GhIssueNode) }) }),
+      Type.Null(),
+    ]),
+  }),
+});
+
+/** An issue node of the intake query in the shape `gh --json` gives, so both map through `toItem`. */
+export function fromNode(n: GhIssueNode): GhIssue {
+  return { ...n, assignees: n.assignees.nodes, labels: n.labels.nodes };
+}
+
+/**
+ * The repository's open issues with one label, newest first, a page at a time. The issue connection
+ * is read, never search: search's index lags a fresh issue, so a story created a moment ago would be
+ * missing from the next tick's intake while a later listing shows it.
+ */
+export const INTAKE_QUERY = [
+  "query($owner: String!, $name: String!, $label: String!, $assignee: String, $after: String) {",
+  "  repository(owner: $owner, name: $name) {",
+  "    issues(first: 100, after: $after, states: OPEN, labels: [$label], filterBy: {assignee: $assignee}, orderBy: {field: CREATED_AT, direction: DESC}) {",
+  "      pageInfo { hasNextPage endCursor }",
+  "      nodes { number url title body state updatedAt assignees(first: 100) { nodes { login } } labels(first: 100) { nodes { name } } }",
+  "    }",
+  "  }",
+  "}",
+].join("\n");
+
 export const GhIssueLabels = Type.Object({ labels: Type.Array(Type.Object({ name: NonEmpty })) });
 export const GhIssueComments = Type.Object({ comments: Type.Array(Type.Object({ body: Nullable(Type.String()), url: Type.Optional(Type.String()) })) });
 

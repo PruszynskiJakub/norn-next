@@ -85,9 +85,16 @@ export interface VcsCall {
 
 /**
  * A vcs with worktrees under the data dir, heads from a map, and every call recorded but `unfinished`
- * and `uncommitted`, which answer from `stopped` and `dirty` by checkout path.
+ * `uncommitted` and `untracked`, which answer from `stopped`, `dirty` and `untracked` by checkout path.
  */
-export function fakeVcs(ctx: HostContext, heads: Record<string, string>, calls: VcsCall[], stopped: Record<string, VcsUnfinished> = {}, dirty: Record<string, string[]> = {}): Vcs {
+export function fakeVcs(
+  ctx: HostContext,
+  heads: Record<string, string>,
+  calls: VcsCall[],
+  stopped: Record<string, VcsUnfinished> = {},
+  dirty: Record<string, string[]> = {},
+  untracked: Record<string, string[]> = {},
+): Vcs {
   const path = (unit: string) => `${ctx.repo.dataDir}/worktrees/${unit.replace("/", "-")}`;
   const call = <T>(op: string, args: unknown[], value: T): Promise<PluginResult<T>> => {
     calls.push({ op, args });
@@ -107,6 +114,7 @@ export function fakeVcs(ctx: HostContext, heads: Record<string, string>, calls: 
     merge: (branch, from) => call("merge", [branch, from], { head: `${branch}+${from}` }),
     unfinished: (path) => Promise.resolve(ok(stopped[path] ?? null)),
     uncommitted: (path) => Promise.resolve(ok(dirty[path] ?? [])),
+    untracked: (path) => Promise.resolve(ok(untracked[path] ?? [])),
     deleteBranch: (branch) => call("deleteBranch", [branch], undefined),
     push: (branch) => call("push", [branch], undefined),
     fetch: () => call("fetch", [], undefined),
@@ -139,6 +147,9 @@ export class FakeLauncher implements AgentLauncher {
   /** what `alive` answers for every handle; null: it cannot tell */
   aliveAnswer: boolean | null = null;
   readonly probed: string[] = [];
+  /** what `dialog` answers for every handle */
+  dialogAnswer: string | null = null;
+  readonly dialogsRead: string[] = [];
 
   async start(run: AgentRunRequest) {
     this.calls.push({ op: "start", args: [run] });
@@ -163,6 +174,10 @@ export class FakeLauncher implements AgentLauncher {
   async alive(handle: string) {
     this.probed.push(handle);
     return this.aliveAnswer;
+  }
+  async dialog(handle: string) {
+    this.dialogsRead.push(handle);
+    return this.dialogAnswer;
   }
   of(op: LauncherCall["op"]): unknown[][] {
     return this.calls.filter((c) => c.op === op).map((c) => c.args);
@@ -347,6 +362,8 @@ export interface Harnessed {
   stopped: Record<string, VcsUnfinished>;
   /** paths holding uncommitted changes, by checkout path, as the fake vcs reports them */
   dirty: Record<string, string[]>;
+  /** untracked files, by checkout path, as the fake vcs reports them */
+  untracked: Record<string, string[]>;
   stepCalls: StepCall[];
   stepAnswers: Record<string, StepAnswer[]>;
   launcher: FakeLauncher;
@@ -411,6 +428,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
   const vcsCalls: VcsCall[] = [];
   const stopped: Record<string, VcsUnfinished> = {};
   const dirty: Record<string, string[]> = {};
+  const untracked: Record<string, string[]> = {};
   const stepCalls: StepCall[] = [];
   const stepAnswers: Record<string, StepAnswer[]> = {};
   const launcher = new FakeLauncher();
@@ -421,7 +439,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     provides: {
       tracker: { fake: { configSchema: Type.Object({}), create: () => fakeTracker(items) } },
       forge: { fake: { configSchema: Type.Object({}), create: () => fakeForge(changes) } },
-      vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped, dirty) } },
+      vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped, dirty, untracked) } },
       harness: { fake: HARNESS },
       stepKinds: fakeStepKinds(stepAnswers, stepCalls),
       packs: { test: { workflows: WORKFLOWS, shared: {}, skills: {} } },
@@ -451,7 +469,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     return id;
   };
   const runtime: Runtime = { tick: () => tick(env, nextId()) };
-  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stopped, dirty, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
+  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stopped, dirty, untracked, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
 }
 
 export type Report = Awaited<ReturnType<Runtime["tick"]>>;

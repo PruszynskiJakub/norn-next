@@ -1,8 +1,9 @@
 /**
  * The herdr runner: one herdr workspace per story (labelled with the request's `workspace`), one tab
  * per run labelled with its title, the agent started in the tab's pane with the launch env. A person
- * can watch and type, `send` types text and submits it, and `keys` presses keys in the pane, as a
- * dialog there takes them. The handle is herdr's pane id.
+ * can watch and type, `send` types text and submits it, `keys` presses keys in the pane, as a
+ * dialog there takes them, and `dialog` reads one while herdr reports the agent blocked on it. The
+ * handle is herdr's pane id.
  *
  * `start` is idempotent by key. The key's record (`<dataDir>/runners/herdr/<key>.json`) is made with
  * `ctx.files.create` before any pane is opened, holding no pane yet; it names the pane once one is
@@ -84,6 +85,7 @@ const Created = Type.Object({ result: Type.Object({ root_pane: RootPane, tab: Ty
 const MaybeId = Type.Optional(Type.Union([Type.Integer(), Type.Null()]));
 const ProcessInfoAnswer = Type.Object({ result: Type.Object({ process_info: Type.Object({ foreground_process_group_id: MaybeId, shell_pid: MaybeId }) }) });
 type ProcessInfo = Static<typeof ProcessInfoAnswer>["result"]["process_info"];
+const PaneInfo = Type.Object({ result: Type.Object({ pane: Type.Object({ agent_status: Type.Optional(Type.String()) }) }) });
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const isGone = (r: PluginResult<unknown>) => !r.ok && r.failure.code === "not_found";
@@ -102,6 +104,30 @@ function lastLines(screen: string, n: number): string {
     .filter((l) => l.trim() !== "")
     .slice(-n)
     .join(" | ");
+}
+
+/** How many lines of a dialog it hands back: enough for its question and options, never the whole screen. */
+const DIALOG_LINES = 16;
+const DIALOG_CHARS = 1200;
+/** The frame a dialog is drawn in, which says nothing a person answers. */
+const FRAME = /[\u2500-\u257f]/g;
+
+/**
+ * A dialog's lines off the pane's screen, its frame dropped. One blank line is kept between blocks,
+ * as it is what sets a dialog's options apart from its question and its footer.
+ */
+export function dialogText(screen: string): string {
+  const lines: string[] = [];
+  for (const raw of screen.split("\n")) {
+    const line = raw.replace(FRAME, " ").trimEnd();
+    if (line.trim() !== "") lines.push(line);
+    else if (lines.length > 0 && lines.at(-1) !== "") lines.push("");
+  }
+  const kept = lines.slice(-DIALOG_LINES);
+  while (kept[0] === "") kept.shift();
+  while (kept.at(-1) === "") kept.pop();
+  const text = kept.join("\n");
+  return text.length > DIALOG_CHARS ? text.slice(-DIALOG_CHARS) : text;
 }
 
 /**
@@ -323,6 +349,20 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
       if (!typed.ok) return typed;
       const entered = await herdr(["pane", "send-keys", handle, "enter"]);
       return entered.ok ? ok(undefined) : entered;
+    },
+
+    async dialog(handle, opts) {
+      // herdr reads the agent off its screen, so it sees a prompt that holds the agent before any hook
+      const info = await herdrJson(herdr, ["pane", "get", handle], PaneInfo);
+      if (isGone(info)) return ok(null);
+      if (!info.ok) return info;
+      const blocked = info.value.result.pane.agent_status === "blocked";
+      if (!blocked && opts?.anyStatus !== true) return ok(null);
+      const screen = await herdr(["pane", "read", handle, "--source", "visible", "--lines", String(SCREEN_LINES)]);
+      if (isGone(screen)) return ok(null);
+      if (!screen.ok) return screen;
+      const text = dialogText(screen.value);
+      return ok(text || (blocked ? "a prompt herdr reports blocking the agent" : null));
     },
 
     async keys(handle, keys) {

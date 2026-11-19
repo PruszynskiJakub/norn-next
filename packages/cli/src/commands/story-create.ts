@@ -1,5 +1,5 @@
 /**
- * `norn story create <title> [--body <text>] [--workflow <name>]`: create a tracker item with the intake label (local tracker).
+ * `norn story create <title> [--body <text>] [--workflow <name>]`: create an item on the configured tracker.
  * The item is made the way intake takes it in: the intake label, the intake assignee, and the
  * workflow label when one is named, so the next tick starts it as a story. The labels are defined on
  * the tracker first, so a repository that never had them takes the item.
@@ -12,7 +12,7 @@ import { failure, refuse, rendered, usageError } from "../output.ts";
 export const storyCreateCommand = defineCommand({
   name: "story create",
   acts: true,
-  summary: "Create a tracker item with the intake label (local tracker)",
+  summary: "Create an item on the configured tracker (a GitHub issue, a local markdown file) with the intake label, so the next tick takes it in",
   usage: "norn story create <title> [--body <text>] [--workflow <name>]",
   options: {
     body: { type: "string" },

@@ -159,7 +159,7 @@ norn story view <key>
 
 ##### `norn story create`
 
-Create a tracker item with the intake label (local tracker)
+Create an item on the configured tracker (a GitHub issue, a local markdown file) with the intake label, so the next tick takes it in
 
 ```sh
 norn story create <title> [--body <text>] [--workflow <name>]

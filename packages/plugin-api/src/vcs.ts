@@ -102,6 +102,12 @@ export interface Vcs {
    */
   uncommitted?(path: string): Promise<PluginResult<string[]>>;
   /**
+   * the files in the checkout at `path` that are untracked and not ignored, sorted; empty when there
+   * are none or `path` is no checkout. Optional (plugin API 1.15); without it what a check leaves in
+   * a unit's worktree stays there for the next step to deal with.
+   */
+  untracked?(path: string): Promise<PluginResult<string[]>>;
+  /**
    * the conflicts the commits on `head` since it left `base` (from their merge base) added and left
    * unresolved: an opening, a separating and a closing marker line, in that order, all added by those
    * commits, sorted by path and line. A file that only quotes a marker or two is never one. Empty when

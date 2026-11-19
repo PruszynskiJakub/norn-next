@@ -8,6 +8,7 @@ import {
   formatStoryKey,
   type HostContext,
   ok,
+  parseJson,
   type PluginResult,
   type Tracker,
   type TrackerEffect,
@@ -19,15 +20,12 @@ import type { GithubConfig } from "./config.ts";
 import { isMissingIssue } from "./failure.ts";
 import { createGh, type Gh } from "./gh.ts";
 import { hasMarker, isReceiptId, withMarker } from "./marker.ts";
-import { GhIssue, GhIssueComments, GhIssueLabels, GhIssues, GhLabels, ISSUE_FIELDS, toItem } from "./wire.ts";
+import { fromNode, GhIssue, GhIssueComments, GhIssueLabels, GhIssuePage, GhIssues, GhLabels, INTAKE_QUERY, ISSUE_FIELDS, toItem } from "./wire.ts";
 
 export const GITHUB_KEY_PREFIX = "gh";
 
-/**
- * `gh issue list` stops at its limit without saying so; intake asks for this many, far above any
- * backlog norn is pointed at.
- */
-const INTAKE_LIMIT = "500";
+/** Intake reads this many issues at most, far above any backlog norn is pointed at. */
+const INTAKE_LIMIT = 500;
 
 /**
  * How far back a replayed `create` looks among the issues this login opened. A replay follows its
@@ -50,6 +48,21 @@ const lastUrl = (stdout: string): string | undefined =>
 
 export function createGithubTracker(ctx: HostContext, config: GithubConfig): Tracker {
   const gh: Gh = createGh(ctx, config);
+  async function whoami(): Promise<PluginResult<string>> {
+    const out = await gh.run(["api", "user", "--jq", ".login"]);
+    if (!out.ok) return out;
+    const login = out.value.trim();
+    return login ? ok(login) : fail("auth", "gh api user named no login");
+  }
+  // gh's login does not change under a running tracker, and intake resolves `me` on every tick;
+  // whoami itself still asks, so a probe of gh's auth reads it live
+  let me: string | undefined;
+  async function myLogin(): Promise<PluginResult<string>> {
+    if (me !== undefined) return ok(me);
+    const login = await whoami();
+    if (login.ok) me = login.value;
+    return login;
+  }
   const done = (kind: TrackerEffect["kind"], id?: number, url?: string, replayed = false): Outcome =>
     ok({ kind, replayed, ...(id === undefined ? {} : { id, key: formatStoryKey(GITHUB_KEY_PREFIX, id) }), ...(url === undefined ? {} : { url }) });
 
@@ -122,19 +135,34 @@ export function createGithubTracker(ctx: HostContext, config: GithubConfig): Tra
     keyPrefix: GITHUB_KEY_PREFIX,
     capabilities: { assign: true, labels: true, comment: true, create: true, close: true },
 
-    async whoami() {
-      const out = await gh.run(["api", "user", "--jq", ".login"]);
-      if (!out.ok) return out;
-      const login = out.value.trim();
-      return login ? ok(login) : fail("auth", "gh api user named no login");
-    },
+    whoami,
 
     async intake(q) {
-      const who = q.assignee === "me" ? ["--assignee", "@me"] : q.assignee === null ? [] : ["--assignee", q.assignee];
-      const rows = await gh.json(GhIssues, ["issue", "list", "--label", q.label, ...who, "--state", "open", "--limit", INTAKE_LIMIT, "--json", ISSUE_FIELDS]);
-      if (!rows.ok) return rows;
-      // open only is the contract, whatever the CLI's filter let through
-      return ok(rows.value.map((i) => toItem(i, GITHUB_KEY_PREFIX)).filter((i) => i.open));
+      let assignee: string | null = q.assignee;
+      if (assignee === "me") {
+        const login = await myLogin();
+        if (!login.ok) return login;
+        assignee = login.value;
+      }
+      const repo = await gh.repo();
+      if (!repo.ok) return repo;
+      const [owner, name] = repo.value.split("/") as [string, string];
+      const items: TrackerItem[] = [];
+      let after: string | null = null;
+      do {
+        // -f, not -F: -F would turn an all-digit owner or label into a number and break the query's String type
+        const vars = [`owner=${owner}`, `name=${name}`, `label=${q.label}`, ...(assignee === null ? [] : [`assignee=${assignee}`]), ...(after === null ? [] : [`after=${after}`])];
+        const out = await gh.run(["api", "graphql", ...vars.flatMap((v) => ["-f", v]), "-f", `query=${INTAKE_QUERY}`]);
+        if (!out.ok) return out;
+        const page = parseJson(GhIssuePage, out.value, "gh api graphql");
+        if (!page.ok) return page;
+        const issues = page.value.data.repository?.issues;
+        if (!issues) return fail("not_found", `github tracker: no repository ${repo.value}`);
+        items.push(...issues.nodes.map((n) => toItem(fromNode(n), GITHUB_KEY_PREFIX)));
+        after = issues.pageInfo.hasNextPage ? (issues.pageInfo.endCursor ?? null) : null;
+      } while (after !== null && items.length < INTAKE_LIMIT);
+      // open only is the contract, whatever the query's filter let through
+      return ok(items.filter((i) => i.open));
     },
 
     async get(id): Promise<PluginResult<TrackerItem | null>> {

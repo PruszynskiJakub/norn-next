@@ -315,13 +315,28 @@ describe("an agent run, judged from its session", () => {
     const d = kindOf(decideCase({ state: quiet(), session: null, run_alive: true, executors: pane }), "park");
     expect(d).toMatchObject({ rule: "agent.no_events.park", inbox: { kind: "permission" } });
     expect(d.inbox?.text).toContain("Trust the folder there");
-    expect(d.inbox?.text).toContain("norn story answer gh-1 1");
+    expect(d.inbox?.text).toContain("norn story answer gh-1 yes");
     // parked, each later tick holds it: no retry loop while the dialog waits
     const parked = quiet({ parked: { reason: "agent.no_events.park", since: minutesAgo(1) } });
     expect(decideCase({ state: parked, session: null, run_alive: true, executors: pane })).toMatchObject({ kind: "noop", rule: "unit.parked" });
     expect(decideCase({ state: parked, session: session("working"), executors: pane })).toMatchObject({ kind: "apply_receipts", rule: "unit.unpark" });
     // its process gone, the run is dead as before
     expect(decideCase({ state: quiet(), session: null, run_alive: false, executors: pane })).toMatchObject({ kind: "retry_run", rule: "agent.died.retry" });
+  });
+
+  test("a dialog its runner reads in the pane parks the unit at once with the dialog's text, without waiting for the silent window", () => {
+    const pane = { claude: caps({ paneInput: true, dialogKeys: true }) };
+    const fresh = stateAt("build", { run: run({ started_at: minutesAgo(1) }) });
+    const dialog = "Do you trust the files in this folder? 1. Yes, proceed 2. No, exit";
+    const d = kindOf(decideCase({ state: fresh, session: null, run_alive: true, run_dialog: dialog, executors: pane }), "park");
+    expect(d).toMatchObject({ rule: "agent.no_events.park", inbox: { kind: "permission" } });
+    expect(d.inbox?.text).toContain(dialog);
+    expect(d.inbox?.text).toContain("norn story answer gh-1 <option>");
+    // the dialog gone and no event yet, the run is watched again within its window
+    const parked = stateAt("build", { run: run({ started_at: minutesAgo(1) }), parked: { reason: "agent.no_events.park", since: minutesAgo(1) } });
+    expect(decideCase({ state: parked, session: null, run_alive: true, executors: pane })).toMatchObject({ kind: "apply_receipts", rule: "unit.unpark" });
+    // a dialog read in a process with no pane input could not be answered there: the silent rules hold
+    expect(decideCase({ state: fresh, session: null, run_alive: true, run_dialog: dialog })?.rule).toBe("agent.unobserved");
   });
 
   test("a silent run in a pane whose executor cannot press a dialog's keys is sent to the pane, never to story answer", () => {

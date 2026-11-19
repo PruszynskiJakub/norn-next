@@ -124,10 +124,13 @@ function judgeRun(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
     return parkDecision(v, "agent.permission.park", "permission", { text: call ? `${call.tool}: ${prompt}` : prompt, input_id: id });
   }
   if (!session) {
+    const inPane = v.unit.run_alive === true && capsOf(v, run.executor)?.paneInput === true;
+    // a dialog read off the pane is the answer the silent window would only guess at, so it parks now
+    if (inPane && v.unit.run_dialog !== undefined) return parkDecision(v, "agent.no_events.park", "permission", { text: dialogText(v, run, v.unit.run_dialog) });
     if (ageMs(v.ctx, run.started_at) <= quietWindowMs(v)) return noop(v, "agent.unobserved", `run ${run.id} is on the record; no session seen yet`);
     // alive in a pane yet silent: its hooks never loaded, as behind a trust dialog, and a fresh
     // session in a fresh pane would stop at the same dialog, so a person answers it instead
-    if (v.unit.run_alive === true && capsOf(v, run.executor)?.paneInput === true) return parkDecision(v, "agent.no_events.park", "permission", { text: noEventsText(v, run) });
+    if (inPane) return parkDecision(v, "agent.no_events.park", "permission", { text: noEventsText(v, run) });
     // the launch was recorded and never produced a session (a crash between the two, a launch that failed): dead
     return died(v, spec, run);
   }
@@ -147,9 +150,17 @@ function judgeRun(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
   return noop(v, "agent.running", `run ${run.id} ${session.activity}`);
 }
 
+/** only an executor that can press keys in its pane takes the answer from story answer */
+function answerFromHere(v: UnitView, run: RunInfo): string {
+  return capsOf(v, run.executor)?.dialogKeys === true ? `, or answer it from here with norn story answer ${v.unit.id} <option>` : "";
+}
+
+function dialogText(v: UnitView, run: RunInfo, dialog: string): string {
+  return [`run ${run.id}'s agent waits on a dialog in its pane: ${dialog}`, `Answer it there${answerFromHere(v, run)}; the run goes on with its first event.`].join(" ");
+}
+
 function noEventsText(v: UnitView, run: RunInfo): string {
-  // only an executor that can press keys in its pane takes the answer from story answer
-  const fromHere = capsOf(v, run.executor)?.dialogKeys === true ? `, or answer it from here with norn story answer ${v.unit.id} 1` : "";
+  const fromHere = answerFromHere(v, run).replace("<option>", "yes");
   return [
     `run ${run.id}'s agent runs in its pane but has sent no event since it started, so its hooks never loaded;`,
     "the pane most likely shows a trust dialog.",

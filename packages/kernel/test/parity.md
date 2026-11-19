@@ -179,7 +179,7 @@ back as the unit's `corrupt_marked` fact.
 | `run.launch_unknown.wait` | `noop` | `agent.unobserved` | `noop` while a recorded launch has shown no session for less than `silentAfterMs`; after it, `agent.died.retry` / `agent.died.exhausted` |
 | `agent.launch_prompt.resend` | `nudge` | dropped: typing into a pane is harness-specific; a session that never starts ends `died` | |
 | `agent.ask.implicit` | `park` | `agent.permission.park` | `park` (inbox `permission`, from `session.permission`, its text naming the call it asks about) |
-| `agent.ask.implicit` (trust prompt) | `park` | `agent.no_events.park` | `park` (inbox `permission`) once a run whose process still runs in a pane has sent no event for `silentAfterMs`: its hooks never loaded, as behind a trust dialog; lifted by its first event |
+| `agent.ask.implicit` (trust prompt) | `park` | `agent.no_events.park` | `park` (inbox `permission`) once a run whose process still runs in a pane has sent no event for `silentAfterMs`, or at once when its runner reads a dialog in the pane (`run_dialog`): its hooks never loaded, as behind a trust dialog; lifted by its first event |
 | `agent.ask.implicit.resolved` | `apply_receipts` | dropped: the session reducer clears the permission on the next event; nothing to record | |
 | (explicit ask) | (verb receipt) | `agent.asking.park` | `park` (inbox `ask`, from `session.ask`) |
 | (none) | | `agent.ask.route` | `apply_receipts` (`run.classified` ask: the step routes `ask`) |
