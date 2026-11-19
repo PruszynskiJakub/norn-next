@@ -4,6 +4,7 @@ import { ok, PLUGIN_API_VERSION, type StoreFactory } from "@norn/plugin-api";
 import { localStoreFactory } from "@norn/store-local";
 import { CliContext, configPaths, ExitCode, machineDir, machineId, type PluginImporter, runCli } from "../../src/index.ts";
 import { COMMON, HOME, LOCAL_CONFIG, machine, ROOT, type TestMachine } from "./support.ts";
+import { configured, GATE_STEP, seedUnit, UNIT } from "./units.ts";
 
 const PATHS = configPaths(HOME, ROOT);
 const MACHINE = machineDir(HOME, machineId(COMMON));
@@ -385,5 +386,23 @@ describe("norn status, story list and story view", () => {
   test("a story no store holds is refused, naming story list", async () => {
     const r = await runCli(["story", "view", "lt-9", "--json"], repo().io);
     expect(json(r.stdout)).toMatchObject({ code: "story_not_found", do_instead: "norn story list" });
+  });
+});
+
+describe("counters in status", () => {
+  test("a unit shows each counter it has spent against its max, and stuck on a spent one names the rerun that resets it", async () => {
+    const m = configured();
+    await seedUnit(m, { step: GATE_STEP, run: null, extra: { ended: "stuck", ended_reason: "qa_loop ran out", counters: { qa_loop: 2, stale_loop: 0 }, exhausted: "qa_loop" } });
+    const shown = json((await runCli(["status", "--json"], m.io)).stdout) as { stories: { units: Record<string, unknown>[] }[] };
+    expect(shown.stories[0]?.units[0]).toMatchObject({ counters: { qa_loop: { value: 2, max: 2 } }, waiting: { next: `norn run rerun ${UNIT} --reset qa_loop` } });
+    expect((shown.stories[0]?.units[0] as { counters: object }).counters).toEqual({ qa_loop: { value: 2, max: 2 } });
+    expect((await runCli(["status"], m.io)).stdout).toContain(`${UNIT}: ${GATE_STEP} (gate) [qa_loop 2/2]`);
+  });
+
+  test("a unit stuck for another reason names the plain rerun, its counters kept", async () => {
+    const m = configured();
+    await seedUnit(m, { step: GATE_STEP, run: null, extra: { ended: "stuck", ended_reason: "the agent reported stuck", counters: { stale_loop: 1 } } });
+    const shown = json((await runCli(["status", "--json"], m.io)).stdout) as { stories: { units: Record<string, unknown>[] }[] };
+    expect(shown.stories[0]?.units[0]).toMatchObject({ counters: { stale_loop: { value: 1, max: 10 } }, waiting: { next: `norn run rerun ${UNIT}` } });
   });
 });

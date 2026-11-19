@@ -8,7 +8,7 @@ import { handleKey, initialState, type Key, parseKeys, type TuiState } from "../
 import { withRemote } from "../../src/cockpit/watch.ts";
 import type { ProjectView, StoryView, UnitView } from "../../src/views.ts";
 
-const unit = (id: string, over: Partial<UnitView> = {}): UnitView => ({ id, step: "build", kind: "agent", attempt: 1, workflow: "story", run: null, waiting: null, pending_receipts: 0, ...over });
+const unit = (id: string, over: Partial<UnitView> = {}): UnitView => ({ id, step: "build", kind: "agent", attempt: 1, workflow: "story", run: null, waiting: null, pending_receipts: 0, counters: {}, ...over });
 const story = (key: string, over: Partial<StoryView> = {}): StoryView => ({ key, title: `story ${key}`, url: null, open: true, claim: null, change: null, units: [unit(key)], ...over });
 const view = (stories: StoryView[], intake: ProjectView["intake"] = []): ProjectView => ({ holder: "bob@desk", stories, intake, problems: [] });
 const RUN = { id: "01JAAAAAAAAAAAAAAAAAAAAAAA", executor: "claude", started_at: "2026-11-17T10:00:00.000Z", attended: false, activity: null };
