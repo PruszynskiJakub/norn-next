@@ -78,7 +78,7 @@ norn story answer gh-18/02 "Stop rewriting the parser; only fix the off-by-one i
 
 ## An agent died, hung or went quiet
 
-norn handles this itself: an agent that dies is retried in a fresh session, one that goes quiet is nudged, one that runs past its deadline is stopped. Each is bounded (`kernel.max_retries`, `kernel.max_nudges`, `kernel.silent_after`, `kernel.deadline` in the config, or `retries`, `nudges` and `deadline` on the step; a workflow's `defaults.stalled` replaces `kernel.silent_after` for its own steps). You only see it when the bound is reached and the unit is stuck. An agent that exits before its first event (a bad flag, a missing login) is read as died at once, and the reason it ends with is the head of its log.
+norn handles this itself: an agent that dies is retried in a fresh session, one that goes quiet is nudged, one that runs past its deadline is stopped. Each is bounded (`kernel.max_retries`, `kernel.max_nudges`, `kernel.silent_after`, `kernel.deadline` in the config, or `retries`, `nudges` and `deadline` on the step; a workflow's `defaults.stalled` replaces `kernel.silent_after` for its own steps). You only see it when the bound is reached and the unit is stuck. An agent that exits before its first event or before it acted (a bad flag, a missing login) is read as died, and the reason it ends with, on its retry too, is the head of its log.
 
 ## A unit is stuck
 

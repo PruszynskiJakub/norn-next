@@ -167,6 +167,22 @@ describe("EventLogSessionSource", () => {
     expect((await readEvents(ctx, "gh-12", RUN)).events).toEqual([]);
   });
 
+  test("a session that ended before the agent acted, its end its own or the runner's word, carries the head of its log as the error", async () => {
+    const output = async () => "Not logged in · Please run /login";
+    for (const end of [[], [{ type: "session.ended", reason: "exit" }]] as Parameters<typeof seeded>[0][]) {
+      const { ctx } = await seeded([{ type: "session.started", harness_session: "s" }, ...end]);
+      const facts = await new EventLogSessionSource({ ctx, classify, alive: async () => false, output }).facts("gh-12", RUN, "h-1");
+      expect(facts).toMatchObject({ activity: "ended", error: "the agent exited before it acted: Not logged in · Please run /login" });
+    }
+  });
+
+  test("a session that acted before it ended is not judged by its log's head", async () => {
+    const { ctx } = await seeded([{ type: "session.started", harness_session: "s" }, { type: "tool.requested", id: "t", kind: "shell", tool: "Bash" }, { type: "session.ended", reason: "exit" }]);
+    const facts = await new EventLogSessionSource({ ctx, classify, alive: async () => false, output: async () => "a long log" }).facts("gh-12", RUN, "h-1");
+    expect(facts?.activity).toBe("ended");
+    expect(facts?.error).toBeUndefined();
+  });
+
   test("a process that ended before its first event and left no log still reads ended, saying so", async () => {
     const { ctx } = host();
     const facts = await new EventLogSessionSource({ ctx, classify, alive: async () => false, output: async () => null }).facts("gh-12", RUN, "h-1");

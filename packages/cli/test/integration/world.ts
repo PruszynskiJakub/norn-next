@@ -40,7 +40,7 @@ export async function sh(cwd: string, ...argv: string[]): Promise<string> {
 }
 
 /** The test harness agent's plans (fixtures/test-harness/agent.ts names what each does). */
-export type AgentPlan = "work" | "ask" | "ask-then-stuck" | "hang" | "protocol" | "findings" | "attended";
+export type AgentPlan = "work" | "ask" | "ask-then-stuck" | "hang" | "protocol" | "findings" | "attended" | "logged-out";
 
 /**
  * A fresh clone of an empty bare remote with one commit on main, and a norn home beside it. The
