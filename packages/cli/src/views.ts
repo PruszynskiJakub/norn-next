@@ -41,9 +41,10 @@ export interface StoryView {
   change: { id: number; state: string; url: string | null } | null;
   /**
    * This clone's run data of the story and the remote's diverged: no flush can publish it, and while
-   * this machine holds the claim its ticks hold the story. Absent when they agree.
+   * this machine holds the claim its ticks hold the story. Absent when they agree. `waiting`: only a
+   * person resolves it; another holder's story is resolved by this machine's next tick.
    */
-  unsynced?: { text: string; next: string };
+  unsynced?: { text: string; next: string; waiting: boolean };
   units: UnitView[];
 }
 
@@ -156,10 +157,15 @@ export function unitView(u: UnitFacts, workflows: KernelWorkflows, executors: Ke
 /** What a diverged store means for the story on this machine, and the command that carries it on from the remote's record. */
 function unsyncedOf(s: StoryFacts, holder: string | undefined): StoryView["unsynced"] {
   if (s.unsynced !== true) return undefined;
-  const next = `norn story take ${s.key} --force`;
-  if (s.claim !== null && s.claim.holder === holder) return { text: unsyncedReason(s.key), next };
-  const since = s.claim ? `, from before ${s.claim.holder} took the claim` : "";
-  return { text: `this clone holds run data of ${s.key} the remote never had${since}; it is dropped for the remote's record (kept under a ref) when this machine takes the story`, next };
+  if (s.claim !== null && s.claim.holder === holder) return { text: unsyncedReason(s.key), next: `norn story take ${s.key} --force`, waiting: true };
+  // only the holder's writes are published, so another holder's story is carried on from the remote's record by a plain tick
+  if (s.claim !== null)
+    return {
+      text: `this clone holds run data of ${s.key} the remote never had, from before ${s.claim.holder} took the claim; the next tick here drops it for the remote's record, keeping it under a ref`,
+      next: "norn tick",
+      waiting: false,
+    };
+  return { text: `this clone holds run data of ${s.key} the remote never had; it is dropped for the remote's record (kept under a ref) when this machine takes the story`, next: `norn story take ${s.key}`, waiting: true };
 }
 
 /** `holder`: who this machine claims as, so a diverged store is said for the holder or for another machine */

@@ -16,7 +16,7 @@ function needsLine(s: StoryView, u: UnitView, notes: readonly OpenNote[]): strin
 function markdown(v: ProjectView, notes: readonly OpenNote[]): string {
   const out = ["# norn status", ""];
   const waiting = v.stories.flatMap((s) => s.units.filter((u) => u.waiting).map((u) => ({ s, u })));
-  const unsynced = v.stories.filter((s) => s.unsynced);
+  const unsynced = v.stories.filter((s) => s.unsynced?.waiting);
   if (waiting.length || unsynced.length)
     out.push("## Needs you", "", ...unsynced.map((s) => `- ${s.key}: run data unsynced: ${s.unsynced?.text} → ${s.unsynced?.next}`), ...waiting.map(({ s, u }) => needsLine(s, u, notes)), "");
   out.push("## Stories", "");

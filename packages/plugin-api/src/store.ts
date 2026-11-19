@@ -282,8 +282,9 @@ export interface Store {
   /**
    * shared stores: when the story's run data diverged, replace this clone's with the remote's as last
    * synced, keeping what it drops where a person can still read it (`kept_at`); `dropped` is null when
-   * nothing diverged and nothing changed. Optional (plugin API 1.16); the host calls it only for a
-   * story whose claim this clone holds, once a person said to carry the story on from the remote's record.
+   * nothing diverged and nothing changed. Optional (plugin API 1.16); the host calls it at a tick's
+   * sync for a story another machine holds, whose writes alone are published, and for one this clone
+   * holds only once a person said to carry the story on from the remote's record.
    */
   adoptRemote?(story: string): Promise<PluginResult<{ dropped: string | null; kept_at?: string }>>;
 }

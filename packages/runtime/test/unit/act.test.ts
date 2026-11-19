@@ -449,6 +449,46 @@ describe("the mailbox and the store", () => {
     expect(gathered.value.facts.stories[0]).toMatchObject({ key: "lt-1", unsynced: true });
   });
 
+  test("a diverged story another machine holds is carried on from the remote's record at the next sync; one this machine holds is left for a person", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    const split = new Set(["lt-1"]);
+    const adopted: string[] = [];
+    const store = {
+      ...h.env.slots.store,
+      capabilities: { ...h.env.slots.store.capabilities, shared: true },
+      sync: async () => ok({ fetched: 0 }),
+      diverged: async (story: string) => ok(split.has(story)),
+      adoptRemote: async (story: string) => {
+        adopted.push(story);
+        split.delete(story);
+        return ok({ dropped: "c0ffee", kept_at: `refs/norn/v2/dropped/runs/${story}/c0ffee` });
+      },
+    };
+    const env = { ...h.env, slots: { ...h.env.slots, store } };
+    const held = await gatherFacts(env, deriveUlid("01JD5G00000000000000000000", 951));
+    if (!held.ok) throw new Error(held.failure.message);
+    expect(adopted).toEqual([]);
+    expect(held.value.facts.stories[0]).toMatchObject({ key: "lt-1", unsynced: true });
+
+    const claim = held.value.facts.stories[0]?.claim;
+    const took = await h.env.slots.store.claims.takeOver?.("lt-1", "bob@elsewhere", MINUTE * 60, claim?.version ?? null);
+    if (!took?.ok) throw new Error("the claim did not move");
+    const elsewhere = await gatherFacts(env, deriveUlid("01JD5G00000000000000000000", 952));
+    if (!elsewhere.ok) throw new Error(elsewhere.failure.message);
+    expect(adopted).toEqual(["lt-1"]);
+    expect(elsewhere.value.facts.stories[0]?.unsynced).toBeUndefined();
+    expect(elsewhere.value.problems).toContain("lt-1: run data this clone never published was dropped for the remote's record, as bob@elsewhere holds the claim; it is kept at refs/norn/v2/dropped/runs/lt-1/c0ffee");
+
+    // a read-only gathering (status) never drops anything
+    split.add("lt-1");
+    const read = await gatherFacts(env, deriveUlid("01JD5G00000000000000000000", 953), { readOnly: true });
+    if (!read.ok) throw new Error(read.failure.message);
+    expect(adopted).toEqual(["lt-1"]);
+    expect(read.value.facts.stories[0]?.unsynced).toBe(true);
+  });
+
   test("a store without flush publishes nothing, and says so", async () => {
     const h = harness();
     const { t } = await decided(h);

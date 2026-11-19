@@ -20,7 +20,7 @@ import {
   type UnitFacts,
   validateKernelFacts,
 } from "@norn/kernel";
-import { type ChangeRequest, fail, ok, parseStoryKey, parseUnitId, type PluginResult, type TrackerItem } from "@norn/plugin-api";
+import { type ChangeRequest, fail, isStoryUnit, ok, parseStoryKey, parseUnitId, type PluginResult, type TrackerItem } from "@norn/plugin-api";
 import { branchOf } from "./branches.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { readUnitFacts } from "./facts-unit.ts";
@@ -151,6 +151,30 @@ async function readStories(env: RuntimeEnv, ids: readonly string[], problems: st
   return reads.sort((a, b) => a.since.localeCompare(b.since) || a.key.localeCompare(b.key));
 }
 
+/**
+ * Replace this clone's diverged run data of every story another machine holds with the remote's.
+ * Only the holder writes a story's run data, so what this clone wrote and never published (a report
+ * landed just before the claim moved) can never be published, and keeping it would show the person a
+ * record the holder is not acting on. The dropped part stays under a ref the problem names. A story
+ * this machine holds is never touched here: which record to keep is a person's call.
+ */
+async function adoptWhereHeldElsewhere(env: RuntimeEnv, problems: string[]): Promise<void> {
+  const store = env.slots.store;
+  if (!store.diverged || !store.adoptRemote) return;
+  const listed = await store.listUnits();
+  if (!listed.ok) return;
+  for (const story of new Set(listed.value.filter(isStoryUnit))) {
+    const split = await store.diverged(story);
+    if (!split.ok || !split.value) continue;
+    const claim = await store.claims.read(story);
+    if (!claim.ok || claim.value === null || claim.value.holder === env.config.holder) continue;
+    const adopted = await store.adoptRemote(story);
+    if (!adopted.ok) problems.push(`${story}: cannot carry it on from the remote's record: ${adopted.failure.message}`);
+    else if (adopted.value.dropped !== null)
+      problems.push(`${story}: run data this clone never published was dropped for the remote's record, as ${claim.value.holder} holds the claim${adopted.value.kept_at ? `; it is kept at ${adopted.value.kept_at}` : ""}`);
+  }
+}
+
 export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherOptions = {}): Promise<PluginResult<GatheredFacts>> {
   const problems: string[] = [];
   // a shared store shows other machines' run data only once synced; without it a story another machine
@@ -159,6 +183,7 @@ export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherO
   if (!opts.readOnly && store.capabilities.shared && store.sync) {
     const synced = await store.sync();
     if (!synced.ok) problems.push(`store sync: ${synced.failure.message}`);
+    else await adoptWhereHeldElsewhere(env, problems);
   }
   const listed = await store.listUnits();
   if (!listed.ok) return fail(listed.failure.code, `store: ${listed.failure.message}`, listed.failure.retryable);

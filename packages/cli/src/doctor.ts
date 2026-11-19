@@ -218,7 +218,7 @@ async function storeCheck(env: RuntimeEnv): Promise<DoctorCheck | null> {
   });
   if (r.check || !r.value) return r.check;
   const { held, elsewhere } = r.value;
-  const others = elsewhere.length ? `; ${elsewhere.join(", ")} keep run data here the remote never had, dropped when this machine takes them (norn story take <key> --force)` : "";
+  const others = elsewhere.length ? `; ${elsewhere.join(", ")} keep run data here the remote never had, dropped for the remote's record at the next tick (norn tick)` : "";
   if (held.length === 0) return passed("store", `this clone's run data agrees with the remote's for every story it holds${others}`);
   return {
     name: "store",
