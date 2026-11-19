@@ -3,7 +3,7 @@ import { type Decision, type DecisionOf, renderBrief } from "@norn/kernel";
 import { deriveUlid } from "@norn/schema";
 import { layout } from "@norn/store-local";
 import { act, type AgentRunRequest, appendEvents, briefRenderInput, nudgePromptId, readStepRun } from "../../src/index.ts";
-import { decided, decisionOf, has, harness, MINUTE, record, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
+import { decided, decisionOf, type Harnessed, has, harness, MINUTE, record, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
 
 const kinds = async (h: ReturnType<typeof harness>, unit: string) => (await record(h, unit)).receipts.map((r) => r.data.kind);
 
@@ -223,6 +223,28 @@ describe("checks and plugin steps", () => {
     expect(await act(t, d, index)).toMatchObject({ ok: true, detail: { performed: false, outcome: "pass" } });
     expect(h.exec.calls).toHaveLength(1);
     expect(await kinds(h, "lt-1")).toEqual(["round.started", "run.started"]);
+  });
+
+  test("a check run inside the tick has what it left untracked in the worktree removed, never what was there before it", async () => {
+    const wt = "/machine/repo/worktrees/lt-1";
+    let h: Harnessed;
+    h = harness({
+      exec: (argv) => {
+        if (argv[0] !== "sh") return undefined;
+        h.untracked[wt] = ["notes.md", "coverage/out.json"];
+        void h.files.write(`${wt}/coverage/out.json`, "{}");
+        return { code: 0, stdout: "ok" };
+      },
+    });
+    h.untracked[wt] = ["notes.md"];
+    await h.files.write(`${wt}/notes.md`, "mine\n");
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    const { t, d, index } = await decisionOf(h, "check.run");
+    expect(await act(t, d, index)).toMatchObject({ ok: true, detail: { outcome: "pass" } });
+    expect(await h.files.read(`${wt}/coverage/out.json`)).toBeNull();
+    expect(await h.files.read(`${wt}/notes.md`)).toBe("mine\n");
+    expect((await readStepRun(h.ctx, "lt-1"))?.output).toContain("norn removed what the check left untracked in the worktree: coverage/out.json");
   });
 
   test("a check's outcome comes from its exit: `exits` names one, a timeout fails", async () => {

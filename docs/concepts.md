@@ -46,7 +46,7 @@ A **step** is one node of a workflow. Its head key says what happens there:
 | Step | What happens |
 |---|---|
 | `agent:` | an agent does the step, told what it is for by the head's text and, when the step lists `skills:`, with those skills; `by:` picks the executor; it reports an outcome |
-| `check:` | norn runs a command, such as your tests; the exit code is the outcome (`pass` on 0, else `fail`, unless `exits` names another outcome for that code) |
+| `check:` | norn runs a command, such as your tests, in the unit's worktree; the exit code is the outcome (`pass` on 0, else `fail`, unless `exits` names another outcome for that code). Files it leaves there that git neither tracks nor ignores (a lockfile an install wrote, a report) are removed once it ends, and its output names them |
 | `gate:` | a person decides: `approve` or `reject` |
 | `slices:` | the story waits while its slices run, each with the slice workflow |
 | `update-branch:`, `integrate:`, `push:`, `verify-base:` | git work by the vcs plugin: merge the base into the story (never a rebase), integrate a slice into the story branch, push, check the merged tree after the base moved |

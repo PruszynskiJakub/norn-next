@@ -181,6 +181,21 @@ describe("git vcs unfinished", () => {
   });
 });
 
+describe("git vcs untracked", () => {
+  const wtList = `worktree ${ROOT}\nHEAD ${SHA}\nbranch refs/heads/main\n\nworktree ${DATA}/worktrees/gh-12\nHEAD ${SHA}\nbranch refs/heads/gh-12-login\n\n`;
+  const WT = `${DATA}/worktrees/gh-12`;
+
+  test("names the files git neither tracks nor ignores, sorted, read in that checkout; nothing for a path that is no checkout", async () => {
+    const h = gitHost([
+      ["worktree list", { stdout: wtList }],
+      ["ls-files --others --exclude-standard -z", { stdout: ["package-lock.json", "a file.txt", "coverage/out.json", ""].join("\0") }],
+    ]);
+    expect(await vcsOf(h.ctx).untracked?.(WT)).toEqual({ ok: true, value: ["a file.txt", "coverage/out.json", "package-lock.json"] });
+    expect(h.cwds.slice(1).every((c) => c === WT)).toBe(true);
+    expect(await vcsOf(h.ctx).untracked?.(`${DATA}/worktrees/gone`)).toEqual({ ok: true, value: [] });
+  });
+});
+
 describe("git vcs uncommitted", () => {
   const wtList = `worktree ${ROOT}\nHEAD ${SHA}\nbranch refs/heads/main\n\nworktree ${DATA}/worktrees/gh-12\nHEAD ${SHA}\nbranch refs/heads/gh-12-login\n\n`;
   const WT = `${DATA}/worktrees/gh-12`;

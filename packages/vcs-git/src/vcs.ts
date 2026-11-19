@@ -4,7 +4,7 @@ import { GitVcsConfig } from "./config.ts";
 import { conflictMarkers } from "./markers.ts";
 import { mergeInto } from "./merge.ts";
 import { fetchRemote, pushBranch } from "./push.ts";
-import { deleteBranch, isAncestor, mergeBase, remoteIfAny, revParse, trialConflicts, uncommitted, unfinished, worktreeList } from "./refs.ts";
+import { deleteBranch, isAncestor, mergeBase, remoteIfAny, revParse, trialConflicts, uncommitted, unfinished, untracked, worktreeList } from "./refs.ts";
 import { gitWorktrees } from "./worktree.ts";
 
 export const DEFAULT_REMOTE = "origin";
@@ -30,6 +30,7 @@ export function createGitVcs(ctx: HostContext, config: GitVcsConfig): Vcs {
     },
     unfinished: (path) => unfinished(ctx, root, path),
     uncommitted: (path) => uncommitted(ctx, root, path),
+    untracked: (path) => untracked(ctx, root, path),
     conflictMarkers: (base, head) => conflictMarkers(ctx, root, base, head),
     deleteBranch: (branch) => deleteBranch(ctx, root, branch),
     async merge(branch, from, opts) {

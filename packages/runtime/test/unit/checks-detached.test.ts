@@ -54,6 +54,24 @@ describe("detached checks", () => {
     expect(await kinds(h, "lt-1")).toEqual(["round.started", "run.started"]);
   });
 
+  test("what a finished check left untracked in the worktree is removed, so the next agent's done is not held back by it; what was there before stays", async () => {
+    const procs = new FakeProcesses();
+    const h = harness({ processes: procs });
+    const wt = "/machine/repo/worktrees/lt-1";
+    h.untracked[wt] = ["notes.md"];
+    await h.files.write(`${wt}/notes.md`, "the agent's own\n");
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("check.run"));
+    await tickUntil(h, has("receipts.apply"));
+    h.untracked[wt] = ["notes.md", "package-lock.json"];
+    await h.files.write(`${wt}/package-lock.json`, "{}\n");
+    await exits(h, 0, "all passed\n");
+    await tickUntil(h, has("check.finished"));
+    expect(await h.files.read(`${wt}/package-lock.json`)).toBeNull();
+    expect(await h.files.read(`${wt}/notes.md`)).toBe("the agent's own\n");
+    expect((await readStepRun(h.ctx, "lt-1"))?.output).toContain("norn removed what the check left untracked in the worktree: package-lock.json");
+  });
+
   test("a finished check's exit routes its outcome, and its output tail is kept for the rework brief", async () => {
     const { h } = await atCheck();
     await exits(h, 3, "1 test flaked\n");

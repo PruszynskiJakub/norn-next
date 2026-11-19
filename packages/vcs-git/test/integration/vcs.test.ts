@@ -76,6 +76,17 @@ describe("git vcs over real git", () => {
     expect(value(await w.vcs.uncommitted!(join(w.dir, "machine", "worktrees", "gone")))).toEqual([]);
   });
 
+  test("untracked names a new file git does not ignore, never a changed tracked one or what a .gitignore keeps out", async () => {
+    const w = await world();
+    const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));
+    writeFileSync(join(path, ".gitignore"), "node_modules/\n");
+    mkdirSync(join(path, "node_modules"));
+    writeFileSync(join(path, "node_modules", "x.js"), "\n");
+    writeFileSync(join(path, "shared.txt"), "edited\n");
+    writeFileSync(join(path, "package-lock.json"), "{}\n");
+    expect(value(await w.vcs.untracked!(path))).toEqual([".gitignore", "package-lock.json"]);
+  });
+
   test("conflictMarkers names a conflict committed unresolved in a base merge, never a doc quoting part of one nor a marker the base holds", async () => {
     const w = await world();
     const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));

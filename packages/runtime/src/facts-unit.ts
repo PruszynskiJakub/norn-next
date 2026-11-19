@@ -7,7 +7,9 @@ import { type UnitFacts, type UnitJournal, validateReceiptData } from "@norn/ker
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import type { RuntimeEnv } from "./env.ts";
 import type { GatherOptions } from "./facts.ts";
-import { readDetachedCheck, stopDetachedCheck } from "./checks-detached.ts";
+import { removeLeftovers } from "./check-leftovers.ts";
+import { OUTPUT_TAIL, readDetachedCheck, stopDetachedCheck } from "./checks-detached.ts";
+import { worktreeOf } from "./inputs.ts";
 import { sessionReportOnRecord } from "./live-run.ts";
 import { readStepRun, type StepRunRecord, stepRunFact, writeStepRun } from "./step-runs.ts";
 
@@ -32,10 +34,11 @@ async function corruptMarked(env: RuntimeEnv, unit: string): Promise<boolean> {
 
 /**
  * The unit's step run, a detached check of its current run read against its exit file, process and
- * deadline. Gathering facts writes two things here, both host memory and never run state: the
- * settled record (so a finished check's outcome outlives its files), and the stop of a check past
- * its deadline (a lingering check would hold the worktree while decide moves on). A read-only
- * gathering returns the settled record without either write.
+ * deadline. Gathering facts writes three things here, none of them run state: the settled record
+ * (so a finished check's outcome outlives its files), the stop of a check past its deadline (a
+ * lingering check would hold the worktree while decide moves on), and the removal of what a finished
+ * check left untracked in the worktree (check-leftovers.ts). A read-only gathering returns the
+ * settled record without any of them.
  */
 async function settledStepRun(env: RuntimeEnv, unit: string, run: { id: string; step: string; attempt: number }, problems: string[], opts: GatherOptions): Promise<StepRunRecord | null> {
   const record = await readStepRun(env.ctx, unit);
@@ -45,12 +48,23 @@ async function settledStepRun(env: RuntimeEnv, unit: string, run: { id: string; 
     if (read.stop && !opts.readOnly) await stopDetachedCheck(env.ctx, read.stop);
     if (!read.settled) return record;
     if (opts.readOnly) return read.settled;
-    await writeStepRun(env.ctx, read.settled);
-    return read.settled;
+    // only a check that ran to an end has leftovers; a start cut short is run again with its own snapshot
+    const ended = read.settled.running !== true && (read.settled.outcome !== undefined || read.settled.error !== undefined);
+    const settled = ended ? await withoutLeftovers(env, read.settled) : read.settled;
+    await writeStepRun(env.ctx, settled);
+    return settled;
   } catch (e) {
     problems.push(`${unit}: the detached check could not be read: ${e instanceof Error ? e.message : String(e)}`);
     return record;
   }
+}
+
+/** A settled detached check, once what it left untracked in the unit's worktree is removed, its output saying so. */
+async function withoutLeftovers(env: RuntimeEnv, record: StepRunRecord): Promise<StepRunRecord> {
+  const { untracked_before: before, ...rest } = record;
+  if (before === undefined) return record;
+  const removed = await removeLeftovers(env, worktreeOf(env, record.unit), before);
+  return removed === "" ? rest : { ...rest, output: `${rest.output ?? ""}`.slice(-(OUTPUT_TAIL - removed.length)) + removed };
 }
 
 /** The dialog the run's pane shows, on one line for a park's text; null when none, or the launcher cannot read one. */

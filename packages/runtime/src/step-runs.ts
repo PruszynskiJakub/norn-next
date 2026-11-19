@@ -43,6 +43,8 @@ export const StepRunRecord = Type.Object(
     /** the deadline facts enforce on a detached run: started `at` plus this */
     timeout_ms: Type.Optional(PosInt),
     finished_at: Type.Optional(IsoTime),
+    /** a detached check's worktree's untracked files before it started, so what it leaves is removed once it settles */
+    untracked_before: Type.Optional(Type.Array(Type.String())),
   },
   { additionalProperties: false, title: "StepRunRecord" },
 );

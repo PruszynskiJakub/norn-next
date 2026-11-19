@@ -23,6 +23,7 @@ import { IsoTime } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
 import { ensureWorktree } from "./branches.ts";
 import { checkCommandOf } from "./check-command.ts";
+import { untrackedFiles } from "./check-leftovers.ts";
 import type { TickContext } from "./env.ts";
 import { unitInFacts } from "./record.ts";
 import { readStepRun, type StepRunRecord, writeStepRun } from "./step-runs.ts";
@@ -137,6 +138,7 @@ export async function startDetachedCheck(t: TickContext, d: DecisionOf<"run_chec
       return spawnInto(prior);
     }
     const log = checkLogPath(ctx, unit, d.run_id, d.attempt);
+    const before = await untrackedFiles(t.env, worktree.value);
     // a rerun goes under the same run and attempt: what the cut-short run left must not read as this one's
     await ctx.files.remove(exitPath);
     await ctx.files.remove(pidPath);
@@ -153,6 +155,7 @@ export async function startDetachedCheck(t: TickContext, d: DecisionOf<"run_chec
       running: true,
       log,
       timeout_ms: d.timeout_ms,
+      ...(before !== null && { untracked_before: before }),
     };
     // recorded before the spawn, so a crash between the two leaves a record a replay finds
     await writeStepRun(ctx, base);
@@ -160,7 +163,7 @@ export async function startDetachedCheck(t: TickContext, d: DecisionOf<"run_chec
   };
   const spawnInto = async (base: StepRunRecord): Promise<PluginResult<StepRunRecord>> => {
     const exitPath = checkExitPath(ctx, unit, d.run_id, d.attempt);
-    const { running: _r, handle: _h, log: _l, timeout_ms: _t, ...rest } = base;
+    const { running: _r, handle: _h, log: _l, timeout_ms: _t, untracked_before: _u, ...rest } = base;
     const command = checkCommandOf(d.command, t.env.config.checks);
     let record: StepRunRecord;
     if (!command.ok) record = { ...rest, error: command.error };
