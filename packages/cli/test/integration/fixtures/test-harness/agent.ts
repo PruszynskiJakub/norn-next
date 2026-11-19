@@ -135,10 +135,8 @@ function handoffNamed(briefText: string): string | undefined {
   return named ? join(cwd, named[1] as string) : undefined;
 }
 
+/** Under the hold: a tick applying the done would end the run before the second report. */
 async function protocol(briefText: string): Promise<void> {
-  // ticks wait while this file exists: a tick applying the done would end the run before the second report
-  const hold = join(notesDir, "hold");
-  await Bun.write(hold, runId);
   note("done.nope.md", await sh(`${norn} done nope`));
   note("done.nope.json", await nornJson(["done", "nope"]));
   const bare = "env -u NORN_RUN_ID -u NORN_UNIT ";
@@ -174,11 +172,14 @@ note(resumed ? "resume.start" : "start", await hook("start"));
 note(resumed ? "resume.prompt" : "prompt", await hook("prompt", { prompt }));
 note("norn", (await sh("command -v norn")).stdout.trim());
 const brief = await sh(`${norn} brief`);
-note("brief", { code: brief.code, text: brief.stdout });
-note("brief.json", await nornJson(["brief"]));
 // the brief's title names the visit: `# norn brief — <unit> · <step> #<attempt>`
 const visit = brief.stdout.match(/· (\S+) #(\d+)/);
 const plan = planFor(visit?.[1], visit ? Number(visit[2]) : undefined);
+// ticks wait while this file exists, so it goes up as soon as the plan is known
+const hold = join(notesDir, "hold");
+if (plan === "protocol") await Bun.write(hold, runId);
+note("brief", { code: brief.code, text: brief.stdout });
+note("brief.json", await nornJson(["brief"]));
 note("plan", plan);
 const named = handoffNamed(brief.stdout);
 if (named !== undefined) note("handoff.read", existsSync(named) ? readFileSync(named, "utf8") : null);

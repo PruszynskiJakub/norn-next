@@ -287,7 +287,12 @@ describe("what an agent meets: refusals, one report, findings, the handoff, ask 
   });
 
   test("a rerun on an ask is a new visit with attempt + 1", () => {
-    expect(atAsk).toMatchObject({ attempt: 2, parked: "Which colour should the button be?" });
+    // the person is sent to answer the question, never to a rerun that would throw it away
+    expect(atAsk).toMatchObject({
+      attempt: 2,
+      parked: "Which colour should the button be?",
+      waiting: { for: "answer", text: "Which colour should the button be?", next: `norn story answer ${KEY} "<answer>"` },
+    });
     expect(rerunAtAsk).toMatchObject({ code: 0, body: { from: "review", step: "review", attempt: 2, replayed: false } });
     expect(afterAskRerun).toMatchObject({ attempt: 3, parked: "Which colour should the button be?" });
     expect(afterAskRerun?.run?.id).not.toBe(atAsk?.run?.id);
@@ -345,6 +350,38 @@ describe("a silent agent: nudged in its own session, then given up on", () => {
   });
 
   test("no agent process outlives the unit", async () => {
+    for (const pid of notesOf(w, "pid") as number[]) expect(await alive(pid)).toBe(false);
+  });
+});
+
+describe("a silent agent once its story is put in manual mode: a person decides, never a nudge", () => {
+  let w: World;
+  let ticks: Ticks;
+  let parked: UnitSeen | null;
+  let stopped: NornOut;
+
+  beforeAll(async () => {
+    w = await world("hang");
+    await setUp(w, { runner: "test", workflow: "solo", workflows: { solo: SOLO }, config: [["kernel.silent_after", "2s"]] });
+    ticks = new Ticks(w);
+    await norn(w, ["story", "create", "Go quiet with a person", "--json"]);
+    await ticks.until((u) => u?.run !== null);
+    await awaitNote(w, "pid");
+    // a run nobody started by hand is the person's to judge once the mode is manual
+    const set = await norn(w, ["config", "set", "kernel.mode", "manual", "--json"]);
+    if (set.code !== 0) throw new Error(`config set: ${set.stdout}${set.stderr}`);
+    parked = await ticks.until((u) => u?.parked !== undefined || u?.ended !== undefined);
+    stopped = await norn(w, ["run", "stop", KEY, "--json"]);
+  }, SLOW);
+
+  test("the quiet run parks at agent.silent.manual, saying it went quiet and naming norn run rerun", () => {
+    expect(parked).toMatchObject({ parked: "agent.silent.manual", waiting: { for: "person", text: "its run went quiet without a report", next: `norn run rerun ${KEY}` } });
+    expect(ticks.rules.filter((r) => r.startsWith("agent.silent.nudge"))).toEqual([]);
+    expect(ticks.failed).toEqual([]);
+  });
+
+  test("the person's stop ends the quiet process", async () => {
+    expect(stopped).toMatchObject({ code: 0, body: { stopped: true } });
     for (const pid of notesOf(w, "pid") as number[]) expect(await alive(pid)).toBe(false);
   });
 });
@@ -415,7 +452,7 @@ describe("a run stopped by a person, answered, rerun while it runs, then finishe
     expect(pidAliveAfterStop).toBe(false);
     expect(leftInWorktree).toContain("?? wip.txt");
     expect(rulesAfterStop.filter((r) => /agent\.(start|silent|died|turn_ended)/.test(r))).toEqual([]);
-    expect(parked).toMatchObject({ parked: expect.stringContaining("stopped by") });
+    expect(parked).toMatchObject({ parked: expect.stringContaining("stopped by"), waiting: { for: "answer", next: `norn story answer ${KEY} "<answer>"` } });
   });
 
   test("story answer resumes the stopped session", () => {
@@ -441,30 +478,40 @@ describe("an agent binary that is not there", () => {
   let w: World;
   let ticks: Ticks;
   let afterLaunch: UnitSeen;
+  let seen: UnitSeen[] = [];
   let ended: UnitSeen | null;
-  let orphans: string;
+  let tookMs: number;
 
   beforeAll(async () => {
     w = await world("work");
-    await setUp(w, { workflow: "solo", workflows: { solo: SOLO }, config: [["kernel.silent_after", "2s"]] });
+    // the config's silent window, far past the test's patience: the failed launch must not wait it out
+    await setUp(w, { workflow: "solo", workflows: { solo: SOLO }, config: [["kernel.silent_after", "30m"]] });
     flag(w, "missing-bin", true);
     ticks = new Ticks(w);
     await norn(w, ["story", "create", "Cannot start", "--json"]);
     await ticks.until(() => ticks.failed.length > 0);
     afterLaunch = await viewUnit(w);
-    ended = await ticks.until((u) => u?.ended !== undefined);
-    orphans = await Bun.$`ps -Ao command`.quiet().text();
+    const from = performance.now();
+    ended = await ticks.until((u) => {
+      if (u) seen.push(u);
+      return u?.ended !== undefined;
+    });
+    tookMs = performance.now() - from;
   }, SLOW);
 
   test("the launch is a failed action naming the path, the tick exits 1, and no agent ever runs", () => {
     expect(ticks.failed[0]).toMatchObject({ code: 1, outcome: { decision: { rule: "agent.start", unit: KEY }, ok: false, error: expect.stringContaining(MISSING_BIN) } });
-    expect(afterLaunch.run?.activity ?? null).toBeNull();
+    expect(afterLaunch.run).toBeNull();
     expect(agentNotes(w)).toEqual([]);
-    expect(orphans).not.toContain(MISSING_BIN);
   });
 
-  test("past the silent window the run is taken as died, retried once, and the unit ends stuck", () => {
+  test("the failed launch never shows as running: its session reads ended at once, the retry fails the same way, and the unit ends stuck naming the path", () => {
+    for (const u of seen) expect([u.run?.id, u.run?.activity ?? "ended"]).toEqual([u.run?.id, "ended"]);
     expect(ticks.rules).toContain("agent.died.retry!");
-    expect(ended).toMatchObject({ ended: "stuck", ended_reason: expect.stringContaining("died") });
+    expect(ended?.ended).toBe("stuck");
+    expect(ended?.ended_reason).toStartWith("died: the agent could not be launched");
+    expect(ended?.ended_reason).toContain(MISSING_BIN);
+    expect(ended?.ended_reason).toContain("retries 1/1 used");
+    expect(tookMs).toBeLessThan(60_000);
   });
 });
