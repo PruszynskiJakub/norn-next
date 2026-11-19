@@ -152,7 +152,7 @@ export function standing(record: UnitJournal): string {
   const s: RunState | null = record.state;
   if (!s) return "not started";
   if (s.ended) return `ended ${code(s.ended)} at ${code(s.step)}${s.ended_reason ? ` (${s.ended_reason})` : ""}`;
-  if (s.parked) return `waits at ${code(s.step)} #${s.attempt}: ${s.parked.reason}`;
+  if (s.parked) return `waits at ${code(s.step)} #${s.attempt}: ${s.parked.reason}${s.parked.text ? `: "${oneLine(s.parked.text)}"` : ""}`;
   return `at ${code(s.step)} #${s.attempt}`;
 }
 
