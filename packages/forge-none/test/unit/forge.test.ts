@@ -105,6 +105,17 @@ describe("forge none: effects", () => {
     expect(repo.files.snapshot()).toEqual({});
   });
 
+  test("a base branch the clone holds only as the remote's copy is opened against, and merges into it are seen", async () => {
+    const { repo, forge, find } = setup();
+    const develop = repo.branch("refs/remotes/origin/develop");
+    repo.branch("lt-1-login", "refs/remotes/origin/develop");
+    const { change } = valueOf(await forge.perform({ ...openLogin, base: "develop" }, { receipt_id: "r1" }));
+    expect(await repo.record(change.id)).toMatchObject({ base_branch: "develop", base_sha_at_open: develop });
+    expect(change.state).toBe("open");
+    const mergeSha = repo.merge("lt-1-login", "refs/remotes/origin/develop", "c".repeat(40));
+    expect(await find("lt-1-login")).toMatchObject({ state: "merged", merge_sha: mergeSha });
+  });
+
   test("update edits the title and body, and replays by receipt without a second edit", async () => {
     const { repo, forge } = setup();
     repo.branch("lt-1-login");
