@@ -356,6 +356,16 @@ Show every command, or one command's usage
 norn help [<command>]
 ```
 
+##### `norn tidy`
+
+Remove the worktrees and local branches of ended stories that no live claim holds
+
+```sh
+norn tidy [--dry-run]
+```
+
+- `--dry-run`: list what would be removed and change nothing
+
 ### Config keys
 
 Every file takes every key: the user file, the repo-local file and the committed file, the nearer winning.

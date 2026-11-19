@@ -34,6 +34,7 @@ import { storyUpdateBranchCommand } from "./story-update-branch.ts";
 import { storyViewCommand } from "./story-view.ts";
 import { stuckCommand } from "./stuck.ts";
 import { tickCommand } from "./tick.ts";
+import { tidyCommand } from "./tidy.ts";
 import { watchCommand } from "./watch.ts";
 
 export const COMMANDS: readonly Command[] = [
@@ -43,6 +44,7 @@ export const COMMANDS: readonly Command[] = [
   statusCommand,
   tickCommand,
   watchCommand,
+  tidyCommand,
   briefCommand,
   doneCommand,
   askCommand,
