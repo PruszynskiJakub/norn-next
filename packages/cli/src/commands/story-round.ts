@@ -6,12 +6,12 @@
  * record says the round was ended rather than overwritten. The receipt ids carry the round they
  * follow, so a retried start records once.
  */
-import { loadProblem, type RunState, type UnitJournal, type WorkflowGraph } from "@norn/kernel";
+import type { RunState, UnitJournal, WorkflowGraph } from "@norn/kernel";
 import { parseUnitId, RUN_ENV } from "@norn/plugin-api";
 import type { RuntimeEnv } from "@norn/runtime";
 import { defineCommand, opt } from "../command.ts";
 import { corruptError, failure, refuse, rendered, usageError } from "../output.ts";
-import { receiptId, refuseFinished, syncStore } from "./person-support.ts";
+import { receiptId, refuseFinished, syncStore, workflowRefusal } from "./person-support.ts";
 
 const USAGE = "norn story round <key> --workflow <name> [--at <step>] [--force] [--reason <text>]";
 
@@ -105,12 +105,10 @@ export const storyRoundCommand = defineCommand({
     const env = await ctx.runtimeEnv();
     await syncStore(env, key, `norn story round ${key} --workflow ${name}`);
 
+    const refused = workflowRefusal(env, name);
+    if (refused) throw refused;
     const load = env.workflows[name];
-    if (!load) {
-      const loading = Object.keys(env.workflows).sort();
-      throw refuse(`no workflow ${name}`, `name one of ${loading.join(", ")}`, "unknown_workflow");
-    }
-    if (!load.ok) throw refuse(loadProblem(name, load) ?? `workflow ${name} is invalid`, `fix the workflow ${name}, then norn doctor`, "invalid_workflow");
+    if (!load?.ok) throw refuse(`workflow ${name} is invalid`, `fix the workflow ${name}, then norn doctor`, "invalid_workflow");
     const graph = load.workflow.graph;
     if (at !== undefined && !graph.steps[at]) {
       throw refuse(`workflow ${name} has no step ${at}`, `name one of ${Object.keys(graph.steps).join(", ")}`, "unknown_step");

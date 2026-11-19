@@ -54,7 +54,8 @@ describe("the repo's own workflows in .agents/workflows", () => {
     expect((await runCli(["config", "show", "--json"], m.io)).exit).toBe(ExitCode.ok);
     expect((await runCli(["story", "create", "Tidy up", "--workflow", "tidy", "--json"], m.io)).exit).toBe(ExitCode.ok);
     const asked = await runCli(["story", "create", "Fix it", "--workflow", "broken", "--json"], m.io);
-    expect({ exit: asked.exit, code: json(asked.stdout).code }).toEqual({ exit: ExitCode.refused, code: "unknown_workflow" });
+    expect({ exit: asked.exit, body: json(asked.stdout) }).toMatchObject({ exit: ExitCode.refused, body: { code: "invalid_workflow", do_instead: "fix .agents/workflows/broken.yaml, then norn doctor" } });
+    expect(String(json(asked.stdout).error)).toContain("does not parse");
   });
 
   test("a broken repo shared file is named for the pack workflow that loads it", async () => {

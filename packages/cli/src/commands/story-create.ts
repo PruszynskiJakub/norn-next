@@ -8,6 +8,7 @@ import { ulid } from "@norn/schema";
 import { defineCommand, opt } from "../command.ts";
 import { ensureLabels, intakeLabel, workflowLabel } from "../labels.ts";
 import { failure, refuse, rendered, usageError } from "../output.ts";
+import { workflowRefusal } from "./person-support.ts";
 
 export const storyCreateCommand = defineCommand({
   name: "story create",
@@ -31,10 +32,8 @@ export const storyCreateCommand = defineCommand({
     const tracker = env.slots.tracker;
     if (!tracker.capabilities.create) throw refuse(`the ${tracker.name} tracker cannot create an item`, "create the item where the tracker keeps it, with the intake label", "unsupported");
     const workflow = opt.str(args, "workflow");
-    if (workflow !== undefined && env.workflows[workflow]?.ok !== true) {
-      const loading = Object.entries(env.workflows).flatMap(([name, w]) => (w.ok ? [name] : []));
-      throw refuse(`no workflow ${workflow} loads`, `name one of ${loading.sort().join(", ")}`, "unknown_workflow");
-    }
+    const refused = workflow === undefined ? null : workflowRefusal(env, workflow);
+    if (refused) throw refused;
     const defined = [intakeLabel(env), ...(workflow ? [workflowLabel(env, workflow)] : [])];
     const labels = defined.map((l) => l.name);
     let assignee: string | undefined;

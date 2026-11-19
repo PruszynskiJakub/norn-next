@@ -3,10 +3,25 @@
  * journal, and the receipt ids they write. A person verb only records a receipt the kernel models;
  * the next tick applies it, so routing stays in the kernel.
  */
-import type { UnitJournal } from "@norn/kernel";
+import { loadProblem, type UnitJournal } from "@norn/kernel";
 import { parseStoryKey, STORE_ID_PATTERN } from "@norn/plugin-api";
-import { branchOf, type RuntimeEnv } from "@norn/runtime";
-import { corruptError, failure, refuse } from "../output.ts";
+import { branchOf, REPO_WORKFLOWS_DIR, repoFileOf, type RuntimeEnv } from "@norn/runtime";
+import { type CliFailure, corruptError, failure, refuse } from "../output.ts";
+
+/**
+ * Why a person may not name this workflow, or null when it loads. One no file holds is named with
+ * the ones that load and the repo file that would add it; one whose file fails to load, with why.
+ */
+export function workflowRefusal(env: RuntimeEnv, name: string): CliFailure | null {
+  const load = env.workflows[name];
+  if (load?.ok) return null;
+  if (!load) {
+    const loading = Object.entries(env.workflows).flatMap(([n, w]) => (w.ok ? [n] : [])).sort();
+    return refuse(`no workflow ${name}`, `name one of ${loading.join(", ")}, or write ${REPO_WORKFLOWS_DIR}/${name}.yaml`, "unknown_workflow");
+  }
+  const file = repoFileOf(env.repoWorkflows, name, "workflow");
+  return refuse(loadProblem(name, load) ?? `workflow ${name} is invalid`, `fix ${file ?? `the workflow ${name}`}, then norn doctor`, "invalid_workflow");
+}
 
 /** `gh-12` names the story and its slices; `gh-12/03` names that one unit. */
 export async function unitsOf(env: RuntimeEnv, key: string): Promise<UnitJournal[]> {
