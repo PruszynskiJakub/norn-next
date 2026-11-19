@@ -123,6 +123,8 @@ export interface SetUpOptions {
   /** the tracker and forge plugins (default local and none); github needs `fakeGh` first */
   tracker?: "local" | "github";
   forge?: "none" | "github";
+  /** where run data lives (default local); refs shares it through the remote, as clones of one team do */
+  store?: "local" | "refs";
 }
 
 /**
@@ -134,7 +136,7 @@ export interface SetUpOptions {
 export async function setUp(w: World, opts: SetUpOptions = {}): Promise<{ added: NornOut; init: NornOut }> {
   const added = await norn(w, ["plugin", "add", TEST_PLUGIN, "--json"]);
   const runner = opts.runner ?? "headless";
-  const init = await norn(w, ["init", "--tracker", opts.tracker ?? "local", "--forge", opts.forge ?? "none", "--store", "local", "--executor", "test", "--runner", runner, "--yes", "--json"]);
+  const init = await norn(w, ["init", "--tracker", opts.tracker ?? "local", "--forge", opts.forge ?? "none", "--store", opts.store ?? "local", "--executor", "test", "--runner", runner, "--yes", "--json"]);
   if (init.code !== 0) throw new Error(`init: ${init.stdout}${init.stderr}`);
   for (const [name, text] of Object.entries(opts.workflows ?? {})) {
     mkdirSync(join(w.root, ".agents", "workflows"), { recursive: true });
@@ -298,4 +300,21 @@ export async function worktreeOf(w: World, unit = "lt-1"): Promise<string | null
       .map((l) => l.slice("worktree ".length))
       .find((p) => p.endsWith(`/worktrees/${unit}`)) ?? null
   );
+}
+
+/**
+ * A `pre-receive` hook on the bare remote that refuses every push touching a ref under `prefix`, as
+ * a protected namespace or a full disk would; the returned function lifts it.
+ */
+export function rejectPushes(w: World, prefix: string): () => void {
+  const hook = join(w.remote, "hooks", "pre-receive");
+  writeFileSync(hook, ["#!/bin/sh", "while read old new ref; do", `  case "$ref" in '${prefix}'*) echo "refused: $ref" >&2; exit 1;; esac`, "done", ""].join("\n"));
+  chmodSync(hook, 0o755);
+  return () => rmSync(hook, { force: true });
+}
+
+/** The refs under `prefix` a repository holds, `<sha> <ref>` per line, sorted by name. */
+export async function refsUnder(repo: string, prefix = "refs/norn"): Promise<string[]> {
+  const out = await sh(repo, "git", "for-each-ref", "--format=%(objectname) %(refname)", prefix);
+  return out === "" ? [] : out.split("\n");
 }
