@@ -89,7 +89,10 @@ function fakeHerdr(opts: { runSticks?: boolean; agentKnown?: boolean } = {}) {
       case "pane close": {
         const i = panes.findIndex((p) => p.pane_id === rest[0]);
         if (i < 0) return notFound("pane_not_found");
-        panes.splice(i, 1);
+        const [closed] = panes.splice(i, 1) as [Pane];
+        // as herdr does: a tab goes with its last pane, and a workspace with its last tab
+        if (!panes.some((p) => p.tab_id === closed.tab_id)) tabs.splice(tabs.findIndex((t) => t.tab_id === closed.tab_id), 1);
+        if (!panes.some((p) => p.workspace_id === closed.workspace_id)) workspaces.splice(workspaces.findIndex((w) => w.workspace_id === closed.workspace_id), 1);
         return { stdout: "" };
       }
       case "agent prompt":
@@ -134,6 +137,22 @@ function setup(config: HerdrConfig = {}, herdrOpts: Parameters<typeof fakeHerdr>
     return text === undefined ? undefined : JSON.parse(text);
   };
   return { h, files, ctx, runner, record };
+}
+
+/** The setup on a host that signals processes: a TERM ends a pane's agent unless it is stubborn, a KILL always does. */
+function setupWithKill() {
+  const h = fakeHerdr();
+  const files = memoryFiles();
+  const killed: Array<[number, string]> = [];
+  const stubborn = new Set<number>();
+  const kill = async (pid: number, signal: "TERM" | "KILL" = "TERM") => {
+    killed.push([pid, signal]);
+    if (signal === "TERM" && stubborn.has(pid)) return;
+    for (const p of h.panes) if (p.fg === pid) p.fg = p.shell;
+  };
+  const ctx = { ...memoryHost({ exec: h.exec, files }), kill };
+  const runner = createHerdrRunner(ctx, {}, { sleep: noSleep });
+  return { h, files, ctx, runner, killed, stubborn };
 }
 
 describe("herdr start", () => {
@@ -397,7 +416,33 @@ describe("herdr alive, send and stop", () => {
     expect(await runner.dialog?.("w9:p9", { anyStatus: true })).toEqual({ ok: true, value: null });
   });
 
-  test("stop closes the pane; a pane already gone is not an error", async () => {
+  test("stop ends the agent and leaves its tab, so the story's workspace stays for its next run; a pane already gone is not an error", async () => {
+    const { h, runner, killed } = setupWithKill();
+    await runner.start(req());
+    const agent = h.panes[0]?.fg as number;
+    expect(await runner.stop("w1:p2")).toEqual({ ok: true, value: undefined });
+    expect(killed).toEqual([[agent, "TERM"]]);
+    expect(h.panes.map((p) => p.pane_id)).toEqual(["w1:p2"]);
+    expect(await runner.alive("w1:p2")).toEqual({ ok: true, value: false });
+    // the next run of the story is a tab in the same workspace, labelled for its unit and step
+    expect(await runner.start(req({ key: "01JRUN2", title: "gh-1 review" }))).toEqual({ ok: true, value: { handle: "w1:p3" } });
+    expect(h.workspaces.map((w) => w.workspace_id)).toEqual(["w1"]);
+    expect(h.tabs.map((t) => t.label)).toEqual(["gh-1 implement", "gh-1 review"]);
+    // stopping again, an agent already gone, or a pane already gone, signals nothing
+    expect(await runner.stop("w1:p2")).toEqual({ ok: true, value: undefined });
+    expect(await runner.stop("w9:p9")).toEqual({ ok: true, value: undefined });
+    expect(killed).toHaveLength(1);
+  });
+
+  test("an agent that outlives the stop's TERM is killed", async () => {
+    const { h, runner, killed, stubborn } = setupWithKill();
+    await runner.start(req());
+    stubborn.add(h.panes[0]?.fg as number);
+    expect(await runner.stop("w1:p2")).toEqual({ ok: true, value: undefined });
+    expect(killed.map(([, sig]) => sig)).toEqual(["TERM", "KILL"]);
+  });
+
+  test("on a host that cannot signal a process, stop closes the pane", async () => {
     const { h, runner } = setup();
     await runner.start(req());
     expect(await runner.stop("w1:p2")).toEqual({ ok: true, value: undefined });
