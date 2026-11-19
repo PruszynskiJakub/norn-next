@@ -10,14 +10,17 @@
  *   that needs one fail on demand.
  *
  * A flag file `$TEST_FLAGS/missing-bin` makes the harness launch a binary that does not exist.
+ * `TEST_PANE_INPUT=1` in the env norn runs in makes the harness take input typed into its pane, as
+ * Claude Code does in herdr; its dialogs are Claude Code's, so it answers them with the same keys.
  *
  * Hook protocol: the agent pipes a JSON payload to `<hook command> <hook>`, the answer comes back as
  * JSON on stdout (empty: allow). Hooks: `start`, `prompt` {prompt}, `tool` {id, kind, tool, detail?},
- * `tool-done` {id}, `stop`, `end`.
+ * `permission` {id, prompt}, `tool-done` {id}, `stop`, `end`.
  */
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { defineNornPlugin, fail, type Harness, type HarnessEvent, hostProcesses, type NormalizeInput, readPromptMark, type RunnerFactory } from "@norn/plugin-api";
+import { claudeHarness } from "@norn/harness-claude";
 import { createHeadlessRunner, HeadlessConfig } from "@norn/runner-headless";
 
 const AGENT = new URL("./agent.ts", import.meta.url).pathname;
@@ -89,6 +92,12 @@ function normalize(input: NormalizeInput): HarnessEvent[] {
       const detail = str(p, "detail");
       return [{ type: "tool.requested", ...base, id, kind: kind as "write", tool: str(p, "tool") ?? kind, ...(detail !== undefined && { detail }) }];
     }
+    case "permission": {
+      const id = str(p, "id");
+      const prompt = str(p, "prompt");
+      if (id === undefined || prompt === undefined) return bad("permission: no id or prompt");
+      return [{ type: "tool.permission", ...base, id, prompt }];
+    }
     case "tool-done": {
       const id = str(p, "id");
       if (id === undefined) return bad("tool-done: no id");
@@ -103,9 +112,16 @@ function normalize(input: NormalizeInput): HarnessEvent[] {
   }
 }
 
+/**
+ * What the agent reads from the env norn runs it in: a herdr pane starts from a bare login env, so
+ * the launch carries them rather than leaving them to the process norn runs in.
+ */
+const FORWARDED = /^(TEST_AGENT_|TEST_FLAGS$|GIT_(AUTHOR|COMMITTER)_)/;
+const forwarded = (): Record<string, string> => Object.fromEntries(Object.entries(process.env).filter((e): e is [string, string] => FORWARDED.test(e[0]) && e[1] !== undefined));
+
 const harness: Harness = {
   name: "test",
-  capabilities: { blockStop: true, denyTool: true, injectContext: true, subagents: false, limits: false, paneInput: false, promptMarks: true, resume: true },
+  capabilities: { blockStop: true, denyTool: true, injectContext: true, subagents: false, limits: false, paneInput: process.env.TEST_PANE_INPUT === "1", promptMarks: true, resume: true },
   install: async ({ worktree, hookCommand }) => {
     await Bun.write(`${worktree}/${HOOK_DIR}/.gitignore`, "*\n");
     await Bun.write(`${worktree}/${HOOK_FILE}`, `${hookCommand}\n`);
@@ -114,9 +130,10 @@ const harness: Harness = {
   uninstall: async () => ({ changed: [] }),
   launch: (req) => ({
     argv: flagged("missing-bin") ? [MISSING_BIN, req.prompt] : ["bun", AGENT, req.prompt],
-    env: { ...req.env, ...(req.resume !== undefined && { TEST_AGENT_RESUME: req.resume }) },
+    env: { ...forwarded(), ...req.env, ...(req.resume !== undefined && { TEST_AGENT_RESUME: req.resume }) },
   }),
   normalize,
+  dialogKeys: claudeHarness.dialogKeys,
   respond: ({ answer }) => (answer.kind === "allow" ? { stdout: "", exit_code: 0 } : { stdout: `${JSON.stringify(answer)}\n`, exit_code: 0 }),
 };
 
