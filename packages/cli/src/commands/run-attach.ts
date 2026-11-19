@@ -2,7 +2,8 @@
  * `norn run attach <unit> | --next`: bring the pane of a unit's live run in front (its herdr tab and
  * workspace). `--next` picks the agent that has waited on the person longest: a question or a prompt
  * in its pane, or an attended run. Nothing to attach to (no live run, a runner with no pane, a run
- * launched on another machine, a pane gone) is refused `nothing_to_attach`, with what to do instead.
+ * launched on another machine, a pane gone, a unit not on the record) is refused `nothing_to_attach`,
+ * with what to do instead.
  * Presentation only: nothing is recorded.
  */
 import { attachUnit, NOTHING_TO_ATTACH, nextToAttach } from "../cockpit/attach.ts";
@@ -27,8 +28,9 @@ export const runAttachCommand = defineCommand({
     const view = await loadProjectView(env, { local: true });
     const unit = named ?? nextToAttach(view)?.id;
     if (unit === undefined) throw refuse("No agent waits for you", "norn status", NOTHING_TO_ATTACH);
-    const waiting = view.stories.flatMap((s) => s.units).find((u) => u.id === unit)?.waiting;
-    const done = await attachUnit(env, unit, waiting?.next);
+    const known = view.stories.flatMap((s) => s.units).find((u) => u.id === unit);
+    if (!known) throw refuse(`${unit} is not a unit on this machine's record`, "norn status", NOTHING_TO_ATTACH);
+    const done = await attachUnit(env, unit, known.waiting?.next);
     return rendered(done, `Focused the pane of ${done.unit} run ${done.run}.`);
   },
 });

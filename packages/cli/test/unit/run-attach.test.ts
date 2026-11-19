@@ -66,6 +66,17 @@ describe("norn run attach", () => {
     expect(json((await runCli(["run", "attach", UNIT, "--json"], elsewhere.io)).stdout)).toMatchObject({ code: "nothing_to_attach", error: expect.stringContaining("launched on another machine") });
   });
 
+  test("refused nothing_to_attach when the run's pane is gone, and for a unit not on the record", async () => {
+    const goneScript: ExecScript = (argv) => (argv[0] === "herdr" && argv[2] === "get" ? { code: 1, stderr: '{"error":{"code":"pane_not_found"}}' } : herdr(argv, { cwd: "/" }));
+    const m = configured({ runner: "herdr", script: goneScript });
+    await seedUnit(m, { step: AGENT_STEP });
+    await launchedHere(m);
+    const gone = await runCli(["run", "attach", UNIT, "--json"], m.io);
+    expect({ exit: gone.exit, ...json(gone.stdout) }).toMatchObject({ exit: ExitCode.refused, code: "nothing_to_attach", error: `${UNIT} run ${RUN}: its pane is gone`, do_instead: `norn story view ${UNIT}` });
+    const unknown = await runCli(["run", "attach", "lt-9", "--json"], m.io);
+    expect(json(unknown.stdout)).toMatchObject({ code: "nothing_to_attach", error: "lt-9 is not a unit on this machine's record", do_instead: "norn status" });
+  });
+
   test("a unit and --next together, or neither, is a usage error", async () => {
     for (const argv of [["run", "attach"], ["run", "attach", UNIT, "--next"]]) expect((await runCli([...argv, "--json"], configured().io)).exit).toBe(ExitCode.usage);
   });
