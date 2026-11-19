@@ -321,7 +321,7 @@ async function report(step: string | undefined, attempt: number | undefined): Pr
 /** The story's spec folder in this worktree, where norn puts the story's documents and reads them back. */
 const specFolder = () => join(cwd, ".agents", "specs", unit.split("/")[0] as string);
 
-/** Slice files in the spec folder: frontmatter only, which is all decide reads of them. */
+/** Slice files in the spec folder: the frontmatter decide reads and a one-line goal. */
 async function slicer(): Promise<void> {
   const file = process.env.TEST_AGENT_SLICES;
   const listed = (file && existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : [{ file: "01-form.md" }, { file: "02-list.md" }]) as { file: string; depends_on?: string[] }[];

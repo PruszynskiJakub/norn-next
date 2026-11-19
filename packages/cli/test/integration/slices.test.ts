@@ -175,7 +175,8 @@ describe("two slices from the plan's slice files to the story's branch", () => {
     viewMd = (await norn(w, ["story", "view", KEY])).stdout;
     treesAtDone = await worktrees(w);
     // the tick after the story's last unit ended done finishes it, then gives up the claim
-    await tickStory(w, rules, () => rules.some((r) => r.endsWith(" claim.release")));
+    const fromFinish = rules.length;
+    await tickStory(w, rules, () => rules.slice(fromFinish).some((r) => r.endsWith(" claim.release")));
     treesAtEnd = await worktrees(w);
     branchesAtEnd = await nornBranches(w);
     // the story's local branch went at the finish; open-pr pushed it first
@@ -263,6 +264,7 @@ describe("two slices from the plan's slice files to the story's branch", () => {
     expect(storyLog).toContain(`agent: form.txt for ${S1}`);
     expect(storyLog).toContain(`agent: list.txt for ${S2}`);
     expect(storyLog).toContain(`norn/${KEY}-01`);
+    expect(storyLog).toContain(`norn/${KEY}-02`);
     expect(branchesAtEnd).toEqual([]);
     expect(Object.keys(treesAtEnd).filter((p) => p.endsWith(`/worktrees/${KEY}-01`) || p.endsWith(`/worktrees/${KEY}-02`))).toEqual([]);
     expect(rules.some((r) => r.endsWith(" story.finish"))).toBe(true);
@@ -277,6 +279,7 @@ describe("two slices that edit the same file", () => {
   let finished: StoryShown | undefined;
   let form = "";
   let parents: string[] = [];
+  let sliceTipParents: string[] = [];
 
   beforeAll(async () => {
     w = await world("slice-work");
@@ -295,11 +298,11 @@ describe("two slices that edit the same file", () => {
     merged = (agentNotes(w).find((n) => n.note === "conflicts")?.value ?? []) as string[];
     form = await sh(w.root, "git", "show", `norn/${KEY}:form.txt`);
     parents = (await sh(w.root, "git", "rev-list", "--parents", "-n", "1", `norn/${KEY}`)).split(" ").slice(1);
+    sliceTipParents = (await sh(w.root, "git", "rev-list", "--parents", "-n", "1", parents[1] as string)).split(" ").slice(1);
   }, SLOW);
 
   test("the second integrate conflicts and goes to the slice's merge step, which merges the story branch", () => {
     expect(unitIn(atMerge, S2)).toMatchObject({ step: "merge" });
-    expect(rules).toEqual(expect.arrayContaining([`${S2} step.finished`, `${S2} agent.start`]));
     expect(merged).toEqual(["form.txt"]);
   });
 
@@ -310,6 +313,9 @@ describe("two slices that edit the same file", () => {
     expect(unitIn(finished, KEY)).toMatchObject({ step: "open-pr", ended: "done" });
     expect(form).toContain(`written by ${S1}`);
     expect(form).toContain(`written by ${S2}`);
+    // the slice's tip is the merge step's merge of the story's branch as lt-1/01 left it
     expect(parents).toHaveLength(2);
+    expect(sliceTipParents).toHaveLength(2);
+    expect(sliceTipParents).toContain(parents[0] as string);
   });
 });
