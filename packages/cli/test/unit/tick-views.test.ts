@@ -97,6 +97,13 @@ describe("norn watch", () => {
     expect(lines).toEqual([]);
   });
 
+  test("a git that cannot run is refused before the first tick as missing, not as too old", async () => {
+    const missing: ExecScript = (argv, o) => (argv[0] === "git" && argv[1] === "--version" ? { code: 127, stderr: "sh: git: command not found\n" } : gitAgrees(argv, o));
+    const r = await runCli(["watch", "--interval", "1ms", "--max-ticks", "1", "--json"], repo({ script: missing }).io);
+    expect(r.exit).toBe(ExitCode.refused);
+    expect(json(r.stdout)).toMatchObject({ code: "git_missing" });
+  });
+
   test("--max-ticks ends it; a bad interval or count is a usage error", async () => {
     const r = await runCli(["watch", "--interval", "1ms", "--max-ticks", "3", "--json"], repo({ log: () => {} }).io);
     expect(json(r.stdout)).toMatchObject({ ticks: 3, interval: "1ms" });

@@ -30,7 +30,7 @@ export const GIT_UPGRADE = `upgrade git to ${MIN_GIT_TEXT} or later (https://git
 /** The refusal of a command that must not run on this git, or null when git is new enough. */
 export async function gitVersionRefusal(host: HostContext, cwd: string): Promise<CliFailure | null> {
   const r = await host.exec(["git", "--version"], { cwd, timeoutMs: 15_000 });
-  if (r.code !== 0) return refuse(`git cannot be run: ${(r.stderr.trim() || `exit ${r.code}`).split("\n")[0]}`, `install git ${MIN_GIT_TEXT} or later, then norn doctor`, "git_too_old");
+  if (r.code !== 0) return refuse(`git cannot be run: ${(r.stderr.trim() || `exit ${r.code}`).split("\n")[0]}`, `install git ${MIN_GIT_TEXT} or later, then norn doctor`, "git_missing");
   const found = r.stdout.trim();
   if (!gitTooOld(found)) return null;
   return refuse(`git ${MIN_GIT_TEXT} or later is required to find conflicts with the base (found: ${found})`, `${GIT_UPGRADE}, then norn doctor`, "git_too_old");
