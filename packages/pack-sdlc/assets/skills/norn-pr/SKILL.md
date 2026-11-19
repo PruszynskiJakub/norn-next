@@ -15,7 +15,7 @@ Write for the branch as it is now. Each time the PR is opened or updated its bod
 - The whole diff against the base.
 - The proof, from the strongest source the round has:
   - **QA ran** (the `record` input holds criteria reports): the latest criteria report of the change as a whole, not an earlier one a later fix superseded, and what each verdict's `evidence`, `repro` or `how` says.
-  - **No QA** (none given): the tests in the diff, the handoff's Proof (the review's traceability table) and Notes (the implementer's note on which test went red first), and the test check that passed. Say once, at the top of Evidence, that no QA ran and the entries are tests.
+  - **No QA** (none given): the tests in the diff, the review's traceability table in the handoff's State, its Notes (the implementer's note on which test went red first), and the test check that passed. Say once, at the top of Evidence, that no QA ran and the entries are tests.
 
 Never claim what nobody observed.
 
