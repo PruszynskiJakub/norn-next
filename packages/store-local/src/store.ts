@@ -7,6 +7,7 @@ import { fail, type HostContext, isStoreId, isStoryUnit, normalizeArtifactPath, 
 import { artifacts } from "./artifacts.ts";
 import { claims } from "./claims.ts";
 import { LOCAL_STORE_CAPABILITIES, type LocalStoreConfig } from "./config.ts";
+import { floor } from "./floor.ts";
 import { encodeArtifactName, layout } from "./layout.ts";
 import { DEFAULT_LOCK_TUNING, errText, type LockTuning } from "./lock.ts";
 import { mailbox } from "./mailbox.ts";
@@ -52,6 +53,7 @@ export function createLocalStore(ctx: HostContext, _config: LocalStoreConfig = {
   const c = claims(ctx, at, tuning);
   const m = mailbox(ctx, at, tuning);
   const a = artifacts(ctx, at, tuning);
+  const f = floor(ctx, at.floor, tuning);
 
   /** An artifact path checked, normalized and encoded, or the refusal. */
   const artifactName = (story: string, path: unknown): PluginResult<string> => {
@@ -94,6 +96,10 @@ export function createLocalStore(ctx: HostContext, _config: LocalStoreConfig = {
         typeof text !== "string" ? Promise.resolve(invalid("artifact text must be a string")) : withName(story, path, (name) => a.write(story, name, text)),
       list: (story) => checked([badStory(story)], `list artifacts of ${story}`, () => a.list(story)),
       remove: (story, path) => withName(story, path, (name) => a.remove(story, name)),
+    },
+    floor: {
+      read: () => guard("read the norn version floor", () => f.read()),
+      raise: (version) => guard("raise the norn version floor", () => f.raise(version)),
     },
   };
 

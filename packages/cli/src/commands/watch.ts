@@ -12,7 +12,9 @@
  *   check that finishes rewrites the wake stamp, which ends the pause within about a second;
  * - before each tick the files the runtime is built from are read again, and a change rebuilds it, so a
  *   `config set`, a merged workflow or a plugin add counts from the next tick. A change that does not
- *   build keeps the last runtime that did, and is reported once as a `config` line.
+ *   build keeps the last runtime that did, and is reported once as a `config` line;
+ * - a norn below the store's version floor ticks no more: it reports that once as a `paused` line and
+ *   waits out each interval until a person stops it to upgrade (`version-guard.ts`).
  */
 import { readWake, type Runtime, type RuntimeEnv, type TickReport, wakeWriterOf } from "@norn/runtime";
 import { defineCommand, opt } from "../command.ts";
@@ -21,6 +23,7 @@ import { durationMs } from "../config/derive.ts";
 import { Duration } from "../config/schema.ts";
 import { rendered, toFailure, usageError } from "../output.ts";
 import { failedCount, tickLines } from "../tick-report.ts";
+import { floorRefusal } from "../version-guard.ts";
 import { wireRuntime, wiringSources } from "../wiring.ts";
 
 const DEFAULT_INTERVAL = "30s";
@@ -167,7 +170,7 @@ export const watchCommand = defineCommand({
   },
   optionHelp: {
     "--interval <duration>": `the longest pause between ticks, as 30s or 2m (default ${DEFAULT_INTERVAL})`,
-    "--max-ticks <n>": "stop after this many ticks",
+    "--max-ticks <n>": "stop after this many ticks; an interval paused below the store's version floor counts as one",
   },
   async run(ctx, args) {
     const interval = opt.str(args, "interval") ?? DEFAULT_INTERVAL;
@@ -184,8 +187,26 @@ export const watchCommand = defineCommand({
     const signal = ctx.io.signal;
     const summary: WatchSummary = { ticks: 0, failed_actions: 0, skipped_locked: 0, interval };
     let settling = 0;
-    while (summary.ticks < max && !signal?.aborted) {
-      if (summary.ticks > 0) await built.refresh(log);
+    let paused = false;
+    // a paused interval counts toward --max-ticks, or a scripted watch below the floor never ends
+    let pausedIntervals = 0;
+    let floorNote: string | null = null;
+    const noteFloor = (line: string) => {
+      if (line !== floorNote) log(JSON.stringify({ floor: line }));
+      floorNote = line;
+    };
+    while (summary.ticks + pausedIntervals < max && !signal?.aborted) {
+      if (summary.ticks > 0 || paused) await built.refresh(log);
+      const refusal = await floorRefusal(built.env.slots.store, ctx.version, noteFloor);
+      if (refusal) {
+        if (!paused) log(JSON.stringify({ paused: refusal.body.code, error: refusal.body.error, do_instead: refusal.body.do_instead }));
+        paused = true;
+        pausedIntervals++;
+        if (summary.ticks + pausedIntervals >= max) break;
+        await sleep(ms, signal);
+        continue;
+      }
+      paused = false;
       const before = await read();
       const report = await built.runtime.tick();
       summary.ticks++;

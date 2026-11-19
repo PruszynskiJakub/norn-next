@@ -259,6 +259,7 @@ async function claimFor(env: RuntimeEnv, key: string): Promise<boolean> {
 
 export const storyUpdateBranchCommand = defineCommand({
   name: "story update-branch",
+  acts: true,
   summary: "Merge the base into a finished story's branch and push it, for its open change",
   usage: USAGE,
   options: { reason: { type: "string" } },

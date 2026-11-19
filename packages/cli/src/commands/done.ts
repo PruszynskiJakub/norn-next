@@ -92,6 +92,7 @@ async function readFindings(ctx: CliContext, file: string): Promise<Finding[]> {
 
 export const doneCommand = defineCommand({
   name: "done",
+  acts: true,
   summary: "Report the step done with an outcome",
   usage: "norn done <outcome> [--criteria <file>] [--findings <file>] [--note <text>] [--report-id <id>]",
   options: {

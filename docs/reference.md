@@ -283,7 +283,7 @@ norn watch [--interval <duration>] [--max-ticks <n>]
 ```
 
 - `--interval <duration>`: the longest pause between ticks, as 30s or 2m (default 30s)
-- `--max-ticks <n>`: stop after this many ticks
+- `--max-ticks <n>`: stop after this many ticks; an interval paused below the store's version floor counts as one
 
 ##### `norn tick`
 

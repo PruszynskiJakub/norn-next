@@ -10,6 +10,7 @@ import type { LoadedConfig } from "./config/load.ts";
 import { nornHome } from "./home.ts";
 import { packFailure } from "./plugins/pack-check.ts";
 import type { PluginImporter } from "./plugins/installed.ts";
+import { floorRefusal } from "./version-guard.ts";
 import { defaultHolder, type HostFactory, type WiredPlugins, type WiredRepo, wireConfig, wirePlugins, wireRepo, wireRepoWorkflows, wireRuntime, wireRuntimeEnv } from "./wiring.ts";
 
 /** The process as the entry hands it over; a test passes its own, so the CLI runs in-process with no child. */
@@ -43,7 +44,11 @@ export class CliContext {
   private envP?: Promise<RuntimeEnv>;
   readonly stderr: string[] = [];
 
-  constructor(readonly io: CliIo) {}
+  /** `acts`: the command acts, so its runtime env is refused below the store's version floor */
+  constructor(
+    readonly io: CliIo,
+    private readonly opts: { acts?: boolean } = {},
+  ) {}
 
   get env() {
     return this.io.env;
@@ -88,7 +93,13 @@ export class CliContext {
   }
   /** the runtime env the agent verbs and views read */
   runtimeEnv(): Promise<RuntimeEnv> {
-    this.envP ??= this.parts().then(wireRuntimeEnv);
+    this.envP ??= this.parts()
+      .then(wireRuntimeEnv)
+      .then(async (env) => {
+        const refusal = this.opts.acts ? await floorRefusal(env.slots.store, this.version, (line) => this.note(line)) : null;
+        if (refusal) throw refusal;
+        return env;
+      });
     return this.envP;
   }
   /** the runtime env, refused when the workflows (the pack's and the repo's) cannot run: what a tick needs */

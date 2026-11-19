@@ -8,6 +8,7 @@ import { agentRunOf, fromRefusal, reportIdOf, shortHash } from "./agent-support.
 
 export const askCommand = defineCommand({
   name: "ask",
+  acts: true,
   summary: "Ask the person a question and wait for the answer",
   usage: "norn ask <question> [--report-id <id>]",
   options: {

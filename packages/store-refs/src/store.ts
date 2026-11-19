@@ -3,6 +3,7 @@ import { refsArtifacts } from "./artifacts.ts";
 import { refsClaims } from "./claims.ts";
 import { DEFAULT_REMOTE, REFS_STORE_CAPABILITIES, type RefsStoreConfig } from "./config.ts";
 import type { RefsContext } from "./context.ts";
+import { refsFloor } from "./floor.ts";
 import { gitRunner } from "./git.ts";
 import { refsMailbox } from "./mailbox.ts";
 import { flush, sync } from "./share.ts";
@@ -28,6 +29,7 @@ export function createRefsStore(ctx: HostContext, config: RefsStoreConfig = {}):
     claims: refsClaims(rc),
     mailbox: refsMailbox(rc),
     artifacts: refsArtifacts(rc),
+    floor: refsFloor(rc),
     archive: (story) => archive(rc, story),
     sync: () => sync(rc),
     flush: (story) => flush(rc, story),

@@ -11,6 +11,8 @@ export const RUNS_PREFIX = "refs/norn/v2/runs/";
 export const TRACKING_RUNS_PREFIX = "refs/norn/v2/tracking/runs/";
 const CLAIMS_PREFIX = "refs/norn/v2/claims/";
 const MAILBOX_PREFIX = "refs/norn/v2/mailbox/";
+/** one ref for the whole store: the norn version floor */
+export const FLOOR_REF = "refs/norn/v2/floor";
 
 export const runRef = (story: string): string => `${RUNS_PREFIX}${story}`;
 export const trackingRunRef = (story: string): string => `${TRACKING_RUNS_PREFIX}${story}`;
@@ -22,6 +24,8 @@ export const ARCHIVED_FILE = "archived.json";
 export const ARTIFACTS_DIR = "artifacts";
 /** in a claim tree */
 export const CLAIM_FILE = "claim.json";
+/** in the floor's tree */
+export const FLOOR_FILE = "floor.json";
 /** in a mailbox tree: pending messages, and a marker per acknowledged id so a resend stays a replay */
 export const MESSAGES_DIR = "messages";
 export const ACKED_DIR = "acked";

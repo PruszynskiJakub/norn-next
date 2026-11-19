@@ -4,7 +4,7 @@
  * guess.
  */
 import { ClaimRecord, fail, type HostContext, ok, type PluginResult, parseJson, StoreId, StoredMessage } from "@norn/plugin-api";
-import { IsoTime, NonNegInt } from "@norn/schema";
+import { IsoTime, NonNegInt, VERSION_PATTERN } from "@norn/schema";
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
 
 /**
@@ -23,6 +23,10 @@ export const MailboxFile = Type.Object(
   { additionalProperties: false, title: "LocalMailboxFile" },
 );
 export type MailboxFile = Static<typeof MailboxFile>;
+
+/** The lowest norn version that may act on this store's data. */
+export const FloorFile = Type.Object({ version: Type.String({ pattern: VERSION_PATTERN }) }, { additionalProperties: false, title: "LocalFloorFile" });
+export type FloorFile = Static<typeof FloorFile>;
 
 export const ArchivedMarker = Type.Object({ archived_at: IsoTime }, { additionalProperties: false, title: "LocalArchivedMarker" });
 

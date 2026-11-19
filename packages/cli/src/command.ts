@@ -38,6 +38,12 @@ export interface Command {
    * harness never takes a norn error for its own protocol.
    */
   answersRaw?: boolean;
+  /**
+   * The command changes run data, an item or a change, so it runs only on a norn at or above the
+   * store's version floor and raises the floor to itself (`version-guard.ts`). Checked when the command
+   * first builds its runtime env, so its own argument and env refusals still come first.
+   */
+  acts?: boolean;
   run(ctx: CliContext, args: ParsedArgs): Promise<unknown>;
 }
 

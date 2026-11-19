@@ -17,6 +17,7 @@ const stopIntentId = (runId: string): string => (isUlid(runId) ? deriveUlid(runI
 
 export const runStopCommand = defineCommand({
   name: "run stop",
+  acts: true,
   summary: "Stop a unit's live run",
   usage: "norn run stop <unit>",
   positionals: { min: 1, max: 1 },

@@ -8,6 +8,7 @@ import { agentRunOf, fromRefusal, reportIdOf } from "./agent-support.ts";
 
 export const stuckCommand = defineCommand({
   name: "stuck",
+  acts: true,
   summary: "Report the step stuck, with the reason",
   usage: "norn stuck <reason> [--report-id <id>]",
   options: {

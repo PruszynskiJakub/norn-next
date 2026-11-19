@@ -7,6 +7,7 @@ import { decideGate } from "./gate-support.ts";
 
 export const storyRejectCommand = defineCommand({
   name: "story reject",
+  acts: true,
   summary: "Reject the gate a story waits at, with the reason the next attempt gets",
   usage: "norn story reject <key> --reason <text> [--gate <step>]",
   options: {
