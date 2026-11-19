@@ -49,15 +49,22 @@ async function run(env: RuntimeEnv, tickId: string, trace: TickTrace, problems: 
   // decide is handed a copy: the act handlers read the facts it decided from, and decide must not be able to change them
   const decisions = decide(structuredClone(t.facts), t.workflows, env.config.kernel);
   // in order, one at a time: a story's claim comes before its units' actions, its flush, finish and release after them
-  const unfinished = new Set<string>();
+  const unfinished = new Map<string, string>();
   for (const [i, d] of decisions.entries()) {
-    // a story whose finishing failed keeps its claim, so the next tick decides the finish again
+    // a story whose finishing or last flush failed keeps its claim, so the next tick decides them again:
+    // released over an unpublished record, no tick here flushes it again, and another clone reads the remote's stale one as free
+    // the finish waits for the flush too: a worktree removed or an item closed before the record reached the remote tidies away work no other clone can see
+    if (d.kind === "finish_story" && unfinished.has(d.story)) {
+      trace.record({ decision: d, ok: false, error: `skipped: ${unfinished.get(d.story)} failed; the story is finished once its run data reaches the remote`, retryable: true });
+      continue;
+    }
     if (d.kind === "release_claim" && unfinished.has(d.story)) {
-      trace.record({ decision: d, ok: false, error: "skipped: finishing the story failed; the claim is kept for the next tick", retryable: true });
+      trace.record({ decision: d, ok: false, error: `skipped: ${unfinished.get(d.story)} failed; the claim is kept for the next tick`, retryable: true });
       continue;
     }
     const outcome = await act(t, d, i);
-    if (d.kind === "finish_story" && !outcome.ok) unfinished.add(d.story);
+    if (d.kind === "finish_story" && !outcome.ok) unfinished.set(d.story, "finishing the story");
+    if (d.kind === "flush" && !outcome.ok) unfinished.set(d.story, "publishing the story's run data");
     trace.record(outcome);
   }
   return decisions;

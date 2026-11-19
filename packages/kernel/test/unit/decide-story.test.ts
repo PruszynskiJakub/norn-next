@@ -648,6 +648,16 @@ describe("flush", () => {
     const s = story({ units: [unit("gh-1", state("gh-1", "split", { ended: "done" }))] });
     expect(rules(storyDecisions(s, { capabilities: caps({ shared: true }) }))).toEqual(["store.flush", "story.finish", "claim.release"]);
   });
+
+  test("a finished story whose own claim expired on a shared store takes the claim back instead of releasing it unflushed", () => {
+    const s = story({ claim: claim({ expires_at: minutesAgo(1) }), units: [unit("gh-1", state("gh-1", "split", { ended: "done" }))] });
+    expect(storyDecisions(s, { capabilities: caps({ shared: true }) })).toEqual([{ kind: "claim", unit: null, rule: "claim.reacquire", story: "gh-1", expect_version: 7 }]);
+  });
+
+  test("a finished story whose own claim expired on a store that is not shared is released", () => {
+    const s = story({ claim: claim({ expires_at: minutesAgo(1) }), units: [unit("gh-1", state("gh-1", "split", { ended: "done" }))] });
+    expect(rules(storyDecisions(s))).toEqual(["story.finish", "claim.release"]);
+  });
 });
 
 test("the holder in the facts is who the claim is compared with", () => {

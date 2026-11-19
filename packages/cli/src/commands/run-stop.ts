@@ -1,5 +1,5 @@
 /**
- * `norn run stop <unit>`: stop a unit's live run.
+ * `norn run stop <unit>`: stop a unit's live run, on the machine that holds its story's claim.
  * The unit is parked first, so the stopped session is not read as died and retried; an answer
  * (`norn story answer <unit> <text>`) lifts the park and sends the text into the session.
  */
@@ -33,6 +33,12 @@ export const runStopCommand = defineCommand({
     if (state.ended !== undefined || !run) throw refuse(`${unit} has no run in progress`, `norn story view ${unit.split("/")[0]}`, "no_run");
     if (!run.session)
       throw refuse(`run ${run.id} of ${unit} at ${state.step} has no agent session to stop`, `a ${run.executor} run ends on its own; norn story close ${unit.split("/")[0]} ends the story`, "not_agent");
+    const story = unit.split("/")[0] as string;
+    // the run is the holder's: its session lives on the holder's machine, and a park written here sits on a record only the holder publishes
+    const claim = await env.slots.store.claims.read(story);
+    if (!claim.ok) throw failure(`cannot read the claim of ${story}: ${claim.failure.message}`, "try again", claim.failure.code);
+    if (claim.value && claim.value.holder !== env.config.holder)
+      throw refuse(`${story} is held by ${claim.value.holder} until ${claim.value.expires_at}`, `stop it on the machine of ${claim.value.holder}, or norn story take ${story} --force first`, "claim_held");
     const step = { step: state.step, attempt: state.attempt };
     const reason = `run ${run.id} stopped by ${env.config.holder}`;
     // the park is on the record before the stop: a stop alone reads as a died session, which decide retries

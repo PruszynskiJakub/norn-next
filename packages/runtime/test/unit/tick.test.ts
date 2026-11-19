@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { memoryHost } from "@norn/conformance";
-import { parseJson } from "@norn/plugin-api";
+import { fail, ok, parseJson } from "@norn/plugin-api";
 import { Type } from "@sinclair/typebox";
 import { acquireTickLock, createRuntime, readStoryDoc, tickLockPath, tracePath, writeStoryDoc } from "../../src/index.ts";
 import { type Harnessed, has, harness, MINUTE, type Report, record, rulesOf, session, START, tickUntil, trackerItem } from "./support.ts";
@@ -243,6 +243,42 @@ describe("one unit's failure", () => {
     expect(r.problems.some((p) => p.startsWith("lt-1 left out: claim:"))).toBe(true);
     expect(r.decisions.every((d) => d.unit !== "lt-1")).toBe(true);
     expect(rulesOf(r)).toContain("lt-2 check.run");
+  });
+
+  test("on a shared store a finished story keeps its claim and worktree while its last flush fails, past the claim's expiry, and finishes and releases once a flush succeeds", async () => {
+    const h = harness();
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("check.finished"));
+    let refuse = true;
+    const local = h.env.slots.store;
+    Object.assign(h.env.slots, {
+      store: { ...local, capabilities: { ...local.capabilities, shared: true }, flush: async () => (refuse ? fail<{ pushed: boolean }>("unavailable", "the remote refused the push") : ok({ pushed: true })) },
+    });
+    const held = async () => {
+      const c = await local.claims.read("lt-1");
+      return c.ok ? c.value?.holder : "unreadable";
+    };
+
+    const refused = await h.runtime.tick();
+    expect(rulesOf(refused)).toEqual([
+      "- store.flush !unavailable: the remote refused the push",
+      "- story.finish !skipped: publishing the story's run data failed; the story is finished once its run data reaches the remote",
+      "- claim.release !skipped: publishing the story's run data failed; the claim is kept for the next tick",
+    ]);
+    expect(await held()).toBe("machine-a");
+    expect(h.vcsCalls.filter((c) => c.op === "remove")).toEqual([]);
+
+    // past the claim's expiry no flush is decided, so the claim is taken back rather than released over the unpublished record
+    h.clock.advance(h.config.kernel.claimTtlMs + MINUTE);
+    expect(rulesOf(await h.runtime.tick())).toEqual(["- claim.reacquire"]);
+    expect(await held()).toBe("machine-a");
+    expect(rulesOf(await h.runtime.tick())).toEqual(["- store.flush !unavailable: the remote refused the push", "- story.finish !skipped: publishing the story's run data failed; the story is finished once its run data reaches the remote", "- claim.release !skipped: publishing the story's run data failed; the claim is kept for the next tick"]);
+    expect(await held()).toBe("machine-a");
+
+    refuse = false;
+    expect(rulesOf(await h.runtime.tick())).toEqual(["- store.flush", "- story.finish", "- claim.release"]);
+    expect(await held()).toBeUndefined();
+    expect(h.vcsCalls.filter((c) => c.op === "remove").map((c) => c.args)).toEqual([["lt-1"]]);
   });
 });
 

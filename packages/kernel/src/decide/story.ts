@@ -104,6 +104,9 @@ export function decideStoryTail(story: StoryFacts, ctx: DecideContext): Decision
   const live = Date.parse(facts.now) < Date.parse(claim.expires_at);
   if (live && facts.capabilities.store.shared && story.unsynced !== true) out.push({ kind: "flush", unit: null, rule: "store.flush", story: story.key });
   if (!isOpen(story, ctx.config.base)) {
+    // with no live claim nothing is flushed, and the remote may still hold an older record of the story:
+    // released over it, another clone reads that record as free, so the claim is taken back and a later tick flushes and releases it
+    if (!live && facts.capabilities.store.shared && story.unsynced !== true) return [{ kind: "claim", unit: null, rule: "claim.reacquire", story: story.key, expect_version: claim.version }];
     const finish = finishRule(story, ctx);
     if (finish) out.push(finish);
     out.push({ kind: "release_claim", unit: null, rule: "claim.release", story: story.key });
