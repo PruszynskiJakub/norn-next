@@ -8,7 +8,7 @@ import type { HostContext, NornPlugin } from "@norn/plugin-api";
 import { PLUGIN_API_VERSION } from "@norn/plugin-api";
 import { createRuntimeEnv, EventLogSessionSource, newTickId, readRepoWorkflows, type RepoWorkflows, type Runtime, type RuntimeConfig, type RuntimeEnv, tick } from "@norn/runtime";
 import { runtimeConfigOf } from "./config/derive.ts";
-import { configError, type LoadedConfig, loadConfig } from "./config/load.ts";
+import { configError, type LoadedConfig, loadConfig, problemText } from "./config/load.ts";
 import { oldConfigRefusal } from "./config/migrate.ts";
 import { migrateOldLocalConfig } from "./config/migrate-local.ts";
 import { configPaths, LAYERS, type Layer, lockPath } from "./config/paths.ts";
@@ -51,6 +51,7 @@ export async function wireConfig(w: WiredRepo, note: (line: string) => void = ()
   if (moved) note(moved.notice);
   const loaded = await loadConfig(w.ctx.files, paths, read);
   if (!loaded.ok) throw configError(loaded.problems, loaded.layers, paths);
+  for (const r of loaded.value.retired) note(`norn: ${problemText(r)}; ${r.do_instead}`);
   return loaded.value;
 }
 

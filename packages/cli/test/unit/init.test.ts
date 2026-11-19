@@ -518,23 +518,23 @@ describe("norn init: a machine still on the old norn's user config", () => {
   test("init rewrites it in this norn's keys, keeps the old text beside it and names what it left behind", async () => {
     const { m, r, body } = await init([], { w: { tools: ["claude"] }, seed: { [PATHS.user]: OLD_USER } });
     expect(r.exit).toBe(ExitCode.ok);
-    expect(await written(m, PATHS.user)).toEqual({ kernel: { max_agents: 4, mode: "auto" }, trace: { retain: "14d" } });
+    expect(await written(m, PATHS.user)).toEqual({ kernel: { mode: "auto" }, trace: { retain: "14d" } });
     expect(await m.files.read(`${PATHS.user}.old`)).toBe(OLD_USER);
     expect(body.user_migrated).toMatchObject({
       backup: `${PATHS.user}.old`,
-      mapped: ["max_agents → kernel.max_agents", "mode → kernel.mode", "trace.retain → trace.retain"],
-      ignored: [expect.stringContaining("notify: ")],
+      mapped: ["mode → kernel.mode", "trace.retain → trace.retain"],
+      ignored: [expect.stringContaining("max_agents: norn starts every due agent and check"), expect.stringContaining("notify: ")],
     });
     // and the next command loads it
     expect((await runCli(["status", "--json"], m.io)).exit).toBe(ExitCode.ok);
   });
 
   test("in a repo set up already, init still rewrites it and leaves the repo's config as it is", async () => {
-    const { m, r, body } = await init([], { w: { tools: ["claude"] }, seed: { [PATHS.user]: "max_agents: 2\n", [PATHS.local]: LOCAL_CONFIG } });
+    const { m, r, body } = await init([], { w: { tools: ["claude"] }, seed: { [PATHS.user]: "mode: auto\nmax_agents: 2\n", [PATHS.local]: LOCAL_CONFIG } });
     expect(r.exit).toBe(ExitCode.ok);
-    expect(await written(m, PATHS.user)).toEqual({ kernel: { max_agents: 2 } });
+    expect(await written(m, PATHS.user)).toEqual({ kernel: { mode: "auto" } });
     expect(await m.files.read(PATHS.local)).toBe(LOCAL_CONFIG);
-    expect(body.user_migrated).toMatchObject({ mapped: ["max_agents → kernel.max_agents"] });
+    expect(body.user_migrated).toMatchObject({ mapped: ["mode → kernel.mode"] });
   });
 
   test("an old backup is never overwritten", async () => {

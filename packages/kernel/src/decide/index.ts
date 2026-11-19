@@ -16,7 +16,7 @@ import { decideUnit } from "./unit.ts";
 export function decide(facts: KernelFacts, workflows: KernelWorkflows, config: KernelConfig): Decision[] {
   const ctx = decideContext(facts, workflows, config);
   const out = new Decisions();
-  // facts come in queue order (the host sorts stories oldest first), which is the order capacity goes by
+  // facts come in queue order (the host sorts stories oldest first), so decisions come out in an order the facts fix
   for (const story of facts.stories) {
     for (const d of decideStory(story, ctx)) out.add(d);
     for (const unit of story.units) {

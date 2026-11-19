@@ -390,8 +390,7 @@
     "intakeWorkflowLabelPrefix": "norn:wf:",
     "sliceWorkflow": "slice",
     "claimTtlMs": 600000,
-    "claimRenewBeforeMs": 400000,
-    "maxAgents": 9
+    "claimRenewBeforeMs": 400000
   },
   "facts": {
     "tick_id": "01JD5G00000MR9XA8KKK8P87K1",

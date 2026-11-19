@@ -41,6 +41,22 @@ describe("norn doctor", () => {
     expect(body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "labels", "hooks", "skills", "tool git", "remote", "tool claude"]);
   });
 
+  test("a config that still sets kernel.max_agents passes, and the config check names the key to delete", async () => {
+    const { r, body, check } = await doctor({ config: `${LOCAL_CONFIG}kernel:\n  max_agents: 2\n` });
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(body.ok).toBe(true);
+    const detail = (check("config") as Check & { detail?: string }).detail;
+    expect(detail).toContain("kernel.max_agents is no longer read");
+    expect(detail).toContain("norn config set kernel.max_agents --unset");
+  });
+
+  test("any command run on a config that still sets kernel.max_agents runs, with a line on stderr naming the key", async () => {
+    const m = machine({ seed: { [PATHS.local]: `${LOCAL_CONFIG}kernel:\n  max_agents: 2\n` }, script: tools("git", "norn", "claude") });
+    const r = await runCli(["config", "get", "base", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(r.stderr).toContain("kernel.max_agents is no longer read");
+  });
+
   test("labels: doctor defines the labels norn uses on the tracker, the intake label, one per workflow and the triage set, once", async () => {
     const gh = fakeGh(["norn", "norn:wf:quick"]);
     const m = machine({ seed: { [PATHS.local]: GITHUB_CONFIG }, script: (argv, o) => gh.script(argv, o) ?? tools("git", "norn", "claude")(argv, o) });

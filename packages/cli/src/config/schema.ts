@@ -54,7 +54,6 @@ export const KernelKnobs = Type.Object(
     workflow: Type.Optional(Name),
     slice_workflow: Type.Optional(Name),
     intake_workflow_label_prefix: Type.Optional(NonEmpty),
-    max_agents: Type.Optional(PosInt),
     max_nudges: Type.Optional(Count),
     max_retries: Type.Optional(Count),
     silent_after: Type.Optional(Duration),

@@ -76,13 +76,6 @@ describe("a ready agent step", () => {
     expect(decideCase({ state: stateAt("build", { requested }), config: { mode: "manual" }, executors: { claude: caps({ headless: false, attended: false }) } })?.rule).toBe("agent.ready.no_headless");
   });
 
-  test("a start beyond maxAgents queues", () => {
-    const busy = { id: "gh-10", state: stateAt("build", { unit: "gh-10", story: "gh-10", run: run({ id: "run-9" }) }), receipts: [], session: null };
-    const d = kindOf(decideCase({ state: stateAt("build"), config: { maxAgents: 1 }, others: [busy] }), "noop");
-    expect(d.rule).toBe("agent.queued");
-    expect(decideCase({ state: stateAt("build"), config: { maxAgents: 2 }, others: [busy] })?.kind).toBe("start_run");
-  });
-
   test("a park the facts still call for is not sent again; one they no longer call for is lifted", () => {
     const parked = { reason: "agent.ready.manual", since: minutesAgo(30) };
     expect(decideCase({ state: stateAt("build", { parked }), config: { mode: "manual" } })?.rule).toBe("unit.parked");

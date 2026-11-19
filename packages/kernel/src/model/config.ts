@@ -46,8 +46,6 @@ export const KernelConfig = Type.Object(
     /** how long a claim holds, and how long before it expires the holder renews it */
     claimTtlMs: PosInt,
     claimRenewBeforeMs: PosInt,
-    /** agent runs at once on this machine; a ready step beyond it waits */
-    maxAgents: PosInt,
   },
   { ...closed, title: "KernelConfig" },
 );
@@ -72,5 +70,4 @@ export const DEFAULT_KERNEL_CONFIG: KernelConfig = {
   sliceWorkflow: "slice",
   claimTtlMs: 10 * 60_000,
   claimRenewBeforeMs: 400_000,
-  maxAgents: 9,
 };

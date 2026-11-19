@@ -11,6 +11,7 @@ import { isMapping, mergeLayers } from "./merge.ts";
 import { isOldUserConfig } from "./migrate-user.ts";
 import { type ConfigPaths, LAYERS, type Layer, layerFileName } from "./paths.ts";
 import { renamedProblems } from "./renamed.ts";
+import { withoutRetired } from "./retired.ts";
 import { CONFIG_DEFAULTS, ConfigLayer, NornConfig } from "./schema.ts";
 
 export interface ConfigProblem {
@@ -33,13 +34,17 @@ export interface LoadedConfig {
   /** each file's own document, null when the file does not exist */
   layers: Record<Layer, ConfigLayer | null>;
   paths: ConfigPaths;
+  /** keys the files set that this norn no longer reads, each with the command that deletes it */
+  retired: ConfigProblem[];
 }
 
 /** A failed load keeps the layers that did parse, so the refusal can tell "nothing configured" from "wrong". */
 export type ConfigLoad = { ok: true; value: LoadedConfig } | { ok: false; problems: ConfigProblem[]; layers: Record<Layer, ConfigLayer | null> };
 
-export function parseLayer(layer: Layer, text: string | null): { ok: true; value: ConfigLayer | null } | { ok: false; problems: ConfigProblem[] } {
-  if (text === null) return { ok: true, value: null };
+export type ParsedLayer = { ok: true; value: ConfigLayer | null; retired: ConfigProblem[] } | { ok: false; problems: ConfigProblem[] };
+
+export function parseLayer(layer: Layer, text: string | null): ParsedLayer {
+  if (text === null) return { ok: true, value: null, retired: [] };
   let doc: unknown;
   try {
     doc = parse(text);
@@ -47,12 +52,13 @@ export function parseLayer(layer: Layer, text: string | null): { ok: true; value
     return { ok: false, problems: [{ layer, path: "", message: `not YAML: ${e instanceof Error ? e.message : String(e)}` }] };
   }
   // an empty file sets nothing, which is not wrong
-  if (doc === null || doc === undefined) return { ok: true, value: {} };
+  if (doc === null || doc === undefined) return { ok: true, value: {}, retired: [] };
   if (!isMapping(doc)) return { ok: false, problems: [{ layer, path: "", message: "must be a mapping of keys" }] };
-  const r = check(ConfigLayer, doc);
-  if (r.ok) return { ok: true, value: r.value };
+  const { doc: kept, retired } = withoutRetired(layer, doc);
+  const r = check(ConfigLayer, kept);
+  if (r.ok) return { ok: true, value: r.value, retired };
   // an old key's own problem says what replaced it; the schema's "unknown property" for it says less
-  const renamed = renamedProblems(layer, doc);
+  const renamed = renamedProblems(layer, kept);
   const named = new Set(renamed.map((p) => p.path.slice(1)));
   const rest = r.errors.filter((e) => !(e.path === "" && named.has(/^unknown property '(.*)'$/.exec(e.message)?.[1] ?? "")));
   return { ok: false, problems: [...renamed, ...rest.map((e) => ({ layer, path: e.path, message: e.message }))] };
@@ -73,30 +79,33 @@ function crossProblems(config: NornConfig): { executor: string; problems: Config
 }
 
 /** Merge parsed layers over the defaults and check the whole. */
-export function mergeConfig(layers: Record<Layer, ConfigLayer | null>, paths: ConfigPaths): ConfigLoad {
+export function mergeConfig(layers: Record<Layer, ConfigLayer | null>, paths: ConfigPaths, retired: ConfigProblem[] = []): ConfigLoad {
   const merged = mergeLayers([CONFIG_DEFAULTS, ...LAYERS.map((l) => layers[l])]);
   const r = check(NornConfig, merged);
   if (!r.ok) return { ok: false, problems: r.errors.map((e) => ({ layer: "merged", path: e.path, message: e.message })), layers };
   const cross = crossProblems(r.value);
   if (cross.problems.length > 0) return { ok: false, problems: cross.problems, layers };
-  return { ok: true, value: { config: r.value, executor: cross.executor, layers, paths } };
+  return { ok: true, value: { config: r.value, executor: cross.executor, layers, paths, retired } };
 }
 
 /** `read`: the layers to read; one left out loads as if its file did not exist. */
 export async function loadConfig(files: HostFiles, paths: ConfigPaths, read: readonly Layer[] = LAYERS): Promise<ConfigLoad> {
   const layers = { user: null, local: null, repo: null } as Record<Layer, ConfigLayer | null>;
   const problems: ConfigProblem[] = [];
+  const retired: ConfigProblem[] = [];
   for (const layer of LAYERS) {
     if (!read.includes(layer)) continue;
     const text = await files.read(paths[layer]);
     const parsed = parseLayer(layer, text);
-    if (parsed.ok) layers[layer] = parsed.value;
-    else if (layer === "user" && isOldUserConfig(text))
-      problems.push({ layer, path: "", message: "is the old norn's user config, whose keys this norn spells otherwise (max_agents is kernel.max_agents)", old: true });
+    if (parsed.ok) {
+      layers[layer] = parsed.value;
+      retired.push(...parsed.retired);
+    } else if (layer === "user" && isOldUserConfig(text))
+      problems.push({ layer, path: "", message: "is the old norn's user config, whose keys this norn spells otherwise (mode is kernel.mode)", old: true });
     else problems.push(...parsed.problems);
   }
   if (problems.length > 0) return { ok: false, problems, layers };
-  return mergeConfig(layers, paths);
+  return mergeConfig(layers, paths, retired);
 }
 
 export function problemText(p: ConfigProblem): string {

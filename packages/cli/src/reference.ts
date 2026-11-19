@@ -133,7 +133,6 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   "kernel.workflow": d.workflow,
   "kernel.slice_workflow": d.sliceWorkflow,
   "kernel.intake_workflow_label_prefix": d.intakeWorkflowLabelPrefix,
-  "kernel.max_agents": d.maxAgents,
   "kernel.max_nudges": d.maxNudges,
   "kernel.max_retries": d.maxRetries,
   "kernel.silent_after": durationText(d.silentAfterMs),

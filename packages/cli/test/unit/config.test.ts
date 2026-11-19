@@ -49,12 +49,12 @@ describe("config paths", () => {
 describe("merge order: defaults, then user, then repo-local, then repo-committed", () => {
   test("a higher layer's scalar wins; mappings merge key by key", async () => {
     const c = await loaded({
-      user: "base: develop\nkernel: { mode: auto, max_agents: 3 }\n",
-      local: `${LOCAL_CONFIG}kernel: { max_agents: 5 }\n`,
+      user: "base: develop\nkernel: { mode: auto, max_nudges: 3 }\n",
+      local: `${LOCAL_CONFIG}kernel: { max_nudges: 5 }\n`,
       repo: "base: trunk\n",
     });
     expect(c.config.base).toBe("trunk");
-    expect(c.config.kernel).toEqual({ mode: "auto", max_agents: 5 });
+    expect(c.config.kernel).toEqual({ mode: "auto", max_nudges: 5 });
   });
 
   test("the defaults fill what no file sets: vcs git, the sdlc pack, base main", async () => {
@@ -175,7 +175,7 @@ describe("an old key name: the refusal names the key that replaced it and the fi
   });
 
   test("a machine key goes in the user file, a team key stays in the file it is in", async () => {
-    expect((await refusal({ local: `${LOCAL_CONFIG}max_agents: 4\n` })).do_instead).toBe(`norn config set kernel.max_agents 4 --user, then remove max_agents from ${REPO_LOCAL_FILE}`);
+    expect((await refusal({ local: `${LOCAL_CONFIG}mode: auto\n` })).do_instead).toBe(`norn config set kernel.mode auto, then remove mode from ${REPO_LOCAL_FILE}`);
     expect((await refusal({ local: LOCAL_CONFIG, repo: "base_branch: trunk\n" })).do_instead).toBe(`norn config set base trunk --commit, then remove base_branch from ${REPO_COMMITTED_FILE}`);
   });
 
@@ -279,6 +279,29 @@ describe("the runtime config derived from the person's", () => {
   });
 });
 
+describe("a key this norn no longer reads", () => {
+  test("kernel.max_agents loads, is left out of the config, and is named with the command that deletes it", async () => {
+    const c = await loaded({ user: "kernel: { mode: auto, max_agents: 4 }\n", local: LOCAL_CONFIG });
+    expect(c.config.kernel).toEqual({ mode: "auto" });
+    expect(c.retired).toEqual([
+      {
+        layer: "user",
+        path: "/kernel/max_agents",
+        message: "kernel.max_agents is no longer read: norn starts every due agent and check, with no cap",
+        do_instead: "norn config set kernel.max_agents --unset --user",
+      },
+    ]);
+  });
+
+  test("a top-level max_agents, the old norn's spelling, is gone and says to remove it", async () => {
+    const r = await load({ local: `${LOCAL_CONFIG}max_agents: 4\n` });
+    if (r.ok) throw new Error("loaded");
+    const b = configError(r.problems, r.layers, PATHS).body;
+    expect(b.error).toBe(`${REPO_LOCAL_FILE} /max_agents: \`max_agents\` is gone: norn starts every due agent and check, with no cap`);
+    expect(b.do_instead).toBe(`remove max_agents from ${REPO_LOCAL_FILE}`);
+  });
+});
+
 describe("writing a config file", () => {
   test("a set keeps the file's comments and order; a new file starts with format", () => {
     const text = "# mine\nformat: 1\nbase: main # trunk soon\n";
@@ -289,13 +312,13 @@ describe("writing a config file", () => {
 
   test("a set that would break the config is refused before anything is written", async () => {
     const c = await loaded({ local: LOCAL_CONFIG });
-    const bad = planSet(c, LOCAL_CONFIG, "local", "kernel.max_agents", 0);
+    const bad = planSet(c, LOCAL_CONFIG, "local", "kernel.max_nudges", -1);
     expect(bad.ok).toBe(false);
-    if (!bad.ok) expect(bad.problems[0]).toMatchObject({ layer: "local", path: "/kernel/max_agents" });
-    const good = planSet(c, LOCAL_CONFIG, "local", "kernel.max_agents", 2);
+    if (!bad.ok) expect(bad.problems[0]).toMatchObject({ layer: "local", path: "/kernel/max_nudges" });
+    const good = planSet(c, LOCAL_CONFIG, "local", "kernel.max_nudges", 2);
     if (!good.ok) throw new Error(JSON.stringify(good.problems));
-    expect(good.next.config.kernel).toEqual({ max_agents: 2 });
-    expect(good.text).toContain("kernel:\n  max_agents: 2\n");
+    expect(good.next.config.kernel).toEqual({ max_nudges: 2 });
+    expect(good.text).toContain("kernel:\n  max_nudges: 2\n");
   });
 
   test("a set in the committed file merges over the repo-local one", async () => {

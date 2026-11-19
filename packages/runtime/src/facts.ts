@@ -78,7 +78,7 @@ interface StoryRead {
   units: UnitFacts[];
   claim: StoryFacts["claim"];
   mailbox: StoryFacts["mailbox"];
-  /** when its first receipt was taken: stories go to decide oldest first, which is the order capacity goes by */
+  /** when its first receipt was taken: stories go to decide oldest first, so a tick acts on them in a stable order */
   since: string;
   pinned: PinnedWorkflow[];
 }

@@ -108,14 +108,3 @@ test("a second action for a unit is a defect decide refuses loudly", () => {
   out.add({ kind: "flush", unit: null, rule: "store.flush", story: "gh-1" });
   expect(() => out.add({ kind: "noop", unit: "gh-1", rule: "b", reason: "" })).toThrow("second action for gh-1 (b)");
 });
-
-test("agent capacity counts this machine's runs only: a run of a story another machine holds takes no slot here", () => {
-  const busy = state("gh-2", "plan", { unit: "gh-2", story: "gh-2", run: { id: "run-b", step: "plan", attempt: 1, started_at: minutesAgo(5), executor: "claude", attended: false, nudges: 0 } });
-  const elsewhere = story({ key: "gh-2", item: item(2), claim: claim({ story: "gh-2", holder: "machine-b" }), units: [unit("gh-2", busy)] });
-  const config = { ...CONFIG, mode: "auto" as const, maxAgents: 1 };
-  const ours = decideAll(facts([story(), elsewhere]), workflows(), config).find((d) => d.unit === "gh-1");
-  expect(ours?.rule).toBe("agent.start");
-  const mine = story({ key: "gh-2", item: item(2), claim: claim({ story: "gh-2" }), units: [unit("gh-2", busy)] });
-  const queued = decideAll(facts([story(), mine]), workflows(), config).find((d) => d.unit === "gh-1");
-  expect(queued?.rule).toBe("agent.queued");
-});

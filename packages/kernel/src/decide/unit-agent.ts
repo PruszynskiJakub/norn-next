@@ -16,7 +16,7 @@ import type { ClassifiedOutcome } from "../model/receipts.ts";
 import type { RunInfo } from "../model/run-state.ts";
 import type { SessionFacts } from "../session/view.ts";
 import type { AgentStepSpec } from "../workflow/graph.ts";
-import { ageMs, applyDecision, applyOrPark, intentFor, noop, parkDecision, takeAgentSlot, type UnitView } from "./unit-support.ts";
+import { ageMs, applyDecision, applyOrPark, intentFor, noop, parkDecision, type UnitView } from "./unit-support.ts";
 
 /** The story's own mode, then the workflow's, then the config's. */
 export function effectiveMode(v: UnitView): Mode {
@@ -78,7 +78,6 @@ function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
   // a run a person started may open where they watch it (a pane); one nobody started must run headless
   const personStarted = v.state.requested !== undefined && caps.attended;
   if (!caps.headless && !personStarted) return parkDecision(v, "agent.ready.no_headless", "manual", { text: `auto mode, but executor '${executor}' cannot run headless` });
-  if (!takeAgentSlot(v.ctx)) return noop(v, "agent.queued", `queued: ${v.ctx.config.maxAgents} agent and check runs in use`);
   const run_id = v.ctx.nextId();
   // attended only where the person can sit beside it (a pane); started headless, it is retried and nudged as an auto run
   const attended = spec.attended === true && personStarted;
@@ -224,7 +223,7 @@ function quiet(v: UnitView, spec: AgentStepSpec, run: RunInfo, base: string): De
   return classified(v, run, "silent", `${base}.exhausted`);
 }
 
-/** A fresh session for the step in place of `run`; it takes over the run's agent slot. */
+/** A fresh session for the step in place of `run`. */
 function retry(v: UnitView, spec: AgentStepSpec, run: RunInfo, rule: string): Decision {
   if (!capsOf(v, run.executor)?.headless) return parkDecision(v, "agent.retry.no_headless", "stuck", { text: `run ${run.id} needs a fresh session; executor '${run.executor}' cannot run headless` });
   const run_id = v.ctx.nextId();

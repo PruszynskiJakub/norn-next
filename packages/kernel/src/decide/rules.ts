@@ -57,7 +57,6 @@ export const RULE_IDS: readonly string[] = [
   "check.run",
   "check.rerun",
   "check.rerun.exhausted",
-  "check.queued",
   "check.running",
   "check.finished",
   "check.finished.rejected",
@@ -75,7 +74,6 @@ export const RULE_IDS: readonly string[] = [
   "step.finished.rejected",
   // agent steps
   "agent.start",
-  "agent.queued",
   "agent.no_executor",
   "agent.ready.attended",
   "agent.ready.manual",
