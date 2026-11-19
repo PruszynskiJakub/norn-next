@@ -328,7 +328,7 @@ norn ask <question> [--report-id <id>]
 
 ##### `norn stuck`
 
-Report the step stuck, with the reason
+Report the step stuck, with the reason (a reason ending in ? is asked as a question)
 
 ```sh
 norn stuck <reason> [--report-id <id>]

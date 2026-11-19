@@ -4,7 +4,7 @@ What to do when something happens, and how to set norn up the way you work. Each
 
 ## An agent asked a question
 
-**You see:** the unit under "Needs you", waiting on the agent's question; `norn story view <story>` shows it in full.
+**You see:** the unit under "Needs you", waiting for `answer` on the agent's question (`parked: agent.asked` in `--json`, the question in `waiting.text`); `norn story view <story>` shows it in full. An agent that reports `norn stuck` with a question (its reason ends in `?`) is asking it, and waits here too.
 
 ```sh
 norn story answer gh-18 "Keep the old endpoint and mark it deprecated in the docs"

@@ -4,7 +4,7 @@
  * and never a guess at what the writer meant.
  */
 import type { KernelReceipt, ReceiptData, ReceiptDataOf } from "../model/receipts.ts";
-import type { RunState } from "../model/run-state.ts";
+import { ASKED_PARK, type RunState } from "../model/run-state.ts";
 import { type CompiledStep, OVERRIDABLE_OUTCOMES, type WorkflowGraph } from "../workflow/graph.ts";
 import { endStuck, enterStep, takeRoute, type Taken } from "./route.ts";
 
@@ -148,7 +148,7 @@ function reported(state: RunState, d: ReceiptDataOf<"run.reported">, step: Compi
   }
   if (d.verb === "ask") {
     if (step.routes.ask) return route(state, graph, "ask");
-    return { state: { ...state, parked: { reason: text ?? `${step.name}: the agent asks a question`, since: at } } };
+    return { state: { ...state, parked: { reason: ASKED_PARK, since: at, ...(text !== undefined && { text }) } } };
   }
   if (step.routes.stuck) return route(state, graph, "stuck", text);
   return { state: endStuck(state, text ?? `${step.name}: the agent reported stuck`) };
@@ -174,7 +174,7 @@ function classified(state: RunState, d: ReceiptDataOf<"run.classified">, step: C
     case "timeout":
       return { state: endStuck(state, `${why}retries ${state.retries_used}/${spec?.retries ?? 0} used at ${step.name}`) };
     case "ask":
-      return { state: { ...state, parked: { reason: `${step.name}: the agent waits for input`, since: at } } };
+      return { state: { ...state, parked: { reason: ASKED_PARK, since: at } } };
     case "stuck":
       return { state: endStuck(state, `${step.name}: the agent is stuck`) };
   }

@@ -3,7 +3,7 @@
  * gathered and never acted on, shaped for a person. What waits for a person (a gate, a question, a
  * parked or stuck unit) is named per unit, so `status` reads as a list of what needs doing.
  */
-import { ITEM_CLOSED_REASON, isChangeClosedReason, type KernelCapabilities, type KernelWorkflows, type StoryFacts, type UnitFacts, unsyncedReason } from "@norn/kernel";
+import { ASKED_PARK, ITEM_CLOSED_REASON, isChangeClosedReason, type KernelCapabilities, type KernelWorkflows, type StoryFacts, type UnitFacts, unsyncedReason } from "@norn/kernel";
 import { gatherFacts, newTickId, type RuntimeEnv } from "@norn/runtime";
 import { refuse } from "./output.ts";
 
@@ -102,6 +102,9 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
       return { for: "person", text: "auto mode, but its executor cannot run headless: a person starts it in a pane", next: `norn run start ${id}` };
     case "agent.asking.park":
       return { for: "answer", text: u.session?.ask?.question ?? "its agent asks a question", next: `norn story answer ${id} "<answer>"` };
+    // the answer goes into the run's session, or with a fresh one's brief when the session is gone; a rerun would drop the question
+    case ASKED_PARK:
+      return { for: "answer", text: s.parked?.text ?? u.session?.ask?.question ?? "its agent asks a question", next: `norn story answer ${id} "<answer>"` };
     case "agent.permission.park":
       return {
         for: "permission",

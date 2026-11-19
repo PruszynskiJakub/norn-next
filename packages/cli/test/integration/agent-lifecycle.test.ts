@@ -290,11 +290,11 @@ describe("what an agent meets: refusals, one report, findings, the handoff, ask 
     // the person is sent to answer the question, never to a rerun that would throw it away
     expect(atAsk).toMatchObject({
       attempt: 2,
-      parked: "Which colour should the button be?",
+      parked: "agent.asked",
       waiting: { for: "answer", text: "Which colour should the button be?", next: `norn story answer ${KEY} "<answer>"` },
     });
     expect(rerunAtAsk).toMatchObject({ code: 0, body: { from: "review", step: "review", attempt: 2, replayed: false } });
-    expect(afterAskRerun).toMatchObject({ attempt: 3, parked: "Which colour should the button be?" });
+    expect(afterAskRerun).toMatchObject({ attempt: 3, parked: "agent.asked", waiting: { text: "Which colour should the button be?" } });
     expect(afterAskRerun?.run?.id).not.toBe(atAsk?.run?.id);
   });
 
