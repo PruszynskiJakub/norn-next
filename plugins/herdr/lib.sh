@@ -11,9 +11,9 @@ elif [ -x /usr/local/bin/norn ]; then NORN=/usr/local/bin/norn
 else NORN="$HOME/.norn/bin/norn"
 fi
 
-# json_get <key>: a string field of the flat JSON on stdin (no jq needed); escaped quotes are kept.
+# json_get <key>: a string field of the flat JSON on stdin (no jq needed), its \" and \\ read back.
 json_get() {
-  sed -nE "s/.*\"$1\":\"(([^\"\\\\]|\\\\.)*)\".*/\\1/p"
+  sed -nE "s/.*\"$1\":\"(([^\"\\\\]|\\\\.)*)\".*/\\1/p" | sed -e 's/\\"/"/g' -e 's/\\\\/\\/g'
 }
 
 # ctx_get <key>: a string field of the plugin context JSON.

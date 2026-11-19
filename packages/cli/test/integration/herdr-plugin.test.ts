@@ -73,9 +73,9 @@ describe("norn's herdr plugin", () => {
     expect(r.herdr()).toEqual([]);
   });
 
-  test("next branches on the refusal's code, never its text, and keeps escaped quotes in the toast", () => {
+  test("next branches on the refusal's code, never its text, and shows a quote in the refusal as a quote", () => {
     const attach = run("next.sh", { exit: 3, answer: { error: 'no live run for "gh-1/01"', do_instead: "norn run start gh-1/01", code: "nothing_to_attach" } });
-    expect(attach.herdr()).toEqual(['notification|show|norn|--body|no live run for \\"gh-1/01\\"; run: norn run start gh-1/01|--sound|none']);
+    expect(attach.herdr()).toEqual(['notification|show|norn|--body|no live run for "gh-1/01"; run: norn run start gh-1/01|--sound|none']);
     const other = run("next.sh", { exit: 6, answer: { error: "no norn config in this checkout", do_instead: "norn init", code: "config_missing" } });
     expect(other.herdr()).toEqual([`notification|show|norn|--body|norn run attach --next failed in ${other.dir}: no norn config in this checkout|--sound|none`]);
   });
