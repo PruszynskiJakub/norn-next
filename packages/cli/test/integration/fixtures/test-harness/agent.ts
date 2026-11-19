@@ -24,6 +24,12 @@
  *   wait out, so no tick ends the run between the two reports.
  * - findings: `norn done changes_requested --findings <file>`.
  * - attended: a stop before reporting, then `norn done done`.
+ * - permission: leaves a merge in progress, then asks permission for a shell call and waits for keys
+ *   typed into its herdr pane (FAKE_HERDR_INPUT, fixtures/fake-herdr); once they come the call runs,
+ *   a second call asks and waits the same way, then it commits the merge and reports done.
+ * - trust: waits for keys in its pane before it fires any hook, as an agent behind a trust dialog
+ *   does whose hooks have not loaded, then works as `work` does. The wait is read from
+ *   TEST_AGENT_PLAN alone, since a plans file is read only after the first hooks.
  */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -163,11 +169,51 @@ async function protocol(briefText: string): Promise<void> {
   await hook("end");
 }
 
+/**
+ * What was typed into the agent's pane, once it holds more than `after` characters ending in enter
+ * (keys go in as separate calls, and a dialog acts on enter); null if nothing came.
+ */
+async function paneInput(after: number): Promise<string | null> {
+  const file = process.env.FAKE_HERDR_INPUT;
+  if (!file) throw new Error("this plan runs only in the fake herdr's pane");
+  for (const until = Date.now() + 120_000; Date.now() < until; await Bun.sleep(100)) {
+    const text = existsSync(file) ? readFileSync(file, "utf8") : "";
+    if (text.length > after && text.endsWith("<enter>")) return text;
+  }
+  return null;
+}
+
+/** Two permission prompts, each waited out in the pane, over a merge left in progress. */
+async function permission(): Promise<void> {
+  await git("checkout", "-q", "-b", "side");
+  await Bun.write(join(cwd, "side.txt"), "from the side branch\n");
+  await git("add", "side.txt");
+  await git("-c", "user.email=agent@test", "-c", "user.name=agent", "commit", "-q", "-m", "side");
+  await git("checkout", "-q", "-");
+  const head = (await sh("git rev-parse HEAD")).stdout.trim();
+  await git("merge", "-q", "--no-ff", "--no-commit", "side");
+  note("merging", { head, merge_head: (await sh("git rev-parse MERGE_HEAD")).stdout.trim() });
+  let seen = 0;
+  for (const [id, command] of [["t-rm", "rm -rf build"], ["t-rm2", "rm -rf dist"]] as const) {
+    await hook("tool", { id, kind: "shell", tool: "Bash", detail: command });
+    await hook("permission", { id, prompt: `Allow ${command}?` });
+    const keys = await paneInput(seen);
+    note(`keys.${id}`, keys);
+    if (keys === null) process.exit(1);
+    seen = keys.length;
+    await hook("tool-done", { id });
+  }
+  await git("-c", "user.email=agent@test", "-c", "user.name=agent", "commit", "-q", "--no-edit");
+  note("done", await nornJson(["done", "done"]));
+  await hook("end");
+}
+
 if (process.env.TEST_AGENT_ONLY === "stop.after-report") {
   note("stop.after-report", await hook("stop"));
   process.exit(0);
 }
 
+if (process.env.TEST_AGENT_PLAN === "trust" && !resumed) note("trusted", await paneInput(0));
 note(resumed ? "resume.start" : "start", await hook("start"));
 note(resumed ? "resume.prompt" : "prompt", await hook("prompt", { prompt }));
 note("norn", (await sh("command -v norn")).stdout.trim());
@@ -203,7 +249,8 @@ else if (plan === "findings") {
   await Bun.write(file, JSON.stringify([{ severity: "blocking", title: "The button is the wrong colour", detail: "It should be blue." }]));
   note("done", await nornJson(["done", "changes_requested", "--findings", file]));
   await hook("end");
-} else if (plan === "attended") {
+} else if (plan === "permission") await permission();
+else if (plan === "attended") {
   note("stop.before-report", await hook("stop"));
   note("done", await nornJson(["done", "done"]));
   await hook("end");
