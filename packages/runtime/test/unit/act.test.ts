@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { type Decision, type DecisionOf, renderBrief } from "@norn/kernel";
 import { deriveUlid } from "@norn/schema";
 import { layout } from "@norn/store-local";
-import { act, type AgentRunRequest, appendEvents, briefRenderInput, nudgePromptId, readStepRun } from "../../src/index.ts";
+import { act, type AgentRunRequest, appendEvents, briefRenderInput, EventLogSessionSource, nudgePromptId, readStepRun } from "../../src/index.ts";
 import { decided, decisionOf, type Harnessed, has, harness, MINUTE, record, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
 
 const kinds = async (h: ReturnType<typeof harness>, unit: string) => (await record(h, unit)).receipts.map((r) => r.data.kind);
@@ -29,6 +29,17 @@ describe("agent runs", () => {
     expect(again).toMatchObject({ ok: true, detail: { performed: false } });
     expect(h.launcher.of("start")).toHaveLength(2);
     expect(await kinds(h, "lt-1")).toHaveLength(3);
+  });
+
+  test("a launch that fails reads as an ended session naming why, so the next tick judges the run at once instead of waiting out the silent window", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    const { t, d, index } = await decisionOf(h, "agent.start");
+    h.launcher.failStart.set("lt-1", "fail");
+    expect((await act(t, d, index)).ok).toBe(false);
+    const facts = await new EventLogSessionSource({ ctx: h.ctx, classify: { silentAfterMs: 60_000 } }).facts("lt-1", (d as DecisionOf<"start_run">).run_id);
+    expect(facts).toMatchObject({ activity: "ended", error: "the agent could not be launched: launch of lt-1 failed" });
   });
 
   test("a quiet agent is nudged through its session handle", async () => {
