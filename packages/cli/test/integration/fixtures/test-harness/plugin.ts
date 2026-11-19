@@ -3,7 +3,8 @@
  * installed-plugin path (link, lock, dynamic import, API check) carries the run. It provides:
  *
  * - harness `test`, whose agent is a bun script (agent.ts) acting as a coding agent does: it runs
- *   the hook command install was given for each hook and reports with the real `norn` subprocesses;
+ *   the hook command install was given for each hook and reports with the real `norn` subprocesses,
+ *   and reads skills from `.agents/skills`;
  * - pack `e2e`, one workflow that walks an agent step, a check, a gate, open-pr and the merge;
  * - runner `test`: the headless runner, but one a person may sit beside (attended), whose `stop`
  *   fails while the flag file `$TEST_FLAGS/stop-fails` exists, so a test can make a stop or a nudge
@@ -128,6 +129,8 @@ const harness: Harness = {
     return { changed: [`${HOOK_DIR}/.gitignore`, HOOK_FILE] };
   },
   uninstall: async () => ({ changed: [] }),
+  // the pack's own folder, so a launch writes the pack's skills where a repo keeps its own, as a harness reading `.agents/skills` does
+  skillsDir: ".agents/skills",
   launch: (req) => ({
     argv: flagged("missing-bin") ? [MISSING_BIN, req.prompt] : ["bun", AGENT, req.prompt],
     env: { ...forwarded(), ...req.env, ...(req.resume !== undefined && { TEST_AGENT_RESUME: req.resume }) },
