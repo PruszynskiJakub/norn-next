@@ -428,7 +428,7 @@ describe("unit records", () => {
     const { t, d, index } = await decisionOf(h, "receipts.reject");
     await h.env.journal.record("lt-1", { id: "01JD5G0000LATEWRITER000000", data: { kind: "mode.changed", mode: "manual", by: "person" } });
     const before = (await record(h, "lt-1")).version;
-    expect(await act(t, d, index)).toMatchObject({ ok: false, error: expect.stringContaining("the record moved since facts were read") });
+    expect(await act(t, d, index)).toMatchObject({ ok: false, retryable: true, error: expect.stringContaining("the record moved since facts were read") });
     expect((await record(h, "lt-1")).version).toBe(before);
   });
 
