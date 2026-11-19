@@ -380,13 +380,13 @@ describe("git vcs push and fetch", () => {
     expect((await vcs.remoteHead?.("--all"))?.ok).toBe(false);
   });
 
-  test("fetch prunes and takes no tags", async () => {
+  test("fetch prunes, takes no tags, and brings the published heads beside the branches", async () => {
     const h = gitHost([
       ["remote", { stdout: "origin\n" }],
       ["fetch", { code: 0 }],
     ]);
     expect((await vcsOf(h.ctx).fetch()).ok).toBe(true);
-    expect(h.calls[1]).toEqual(["git", "fetch", "--quiet", "--no-tags", "--prune", "origin"]);
+    expect(h.calls[1]).toEqual(["git", "fetch", "--quiet", "--no-tags", "--prune", "origin", "+refs/heads/*:refs/remotes/origin/*", "+refs/norn/heads/*:refs/norn/remote-heads/origin/*"]);
   });
 });
 
@@ -409,11 +409,25 @@ describe("git vcs worktrees", () => {
       ["worktree prune", {}],
       ["worktree list", listing()],
       ["rev-parse --verify --quiet --end-of-options refs/heads/", { code: 1 }],
+      ["rev-parse --verify --quiet --end-of-options refs/norn/remote-heads/", { code: 1 }],
       ["rev-parse --verify --quiet --end-of-options refs/remotes/upstream/gh-12-login", { stdout: SHA }],
       ["worktree add", {}],
     ]);
     expect((await vcsOf(h.ctx, "upstream").worktree.ensure("gh-12", "gh-12-login", "origin/main")).ok).toBe(true);
     expect(h.calls.at(-1)).toEqual(["git", "worktree", "add", "--quiet", "-b", "gh-12-login", `${DATA}/worktrees/gh-12`, "refs/remotes/upstream/gh-12-login"]);
+  });
+
+  test("ensure cuts a branch this clone lacks from its published head, the work another holder finished", async () => {
+    const h = gitHost([
+      ["worktree prune", {}],
+      ["worktree list", listing()],
+      ["rev-parse --verify --quiet --end-of-options refs/heads/", { code: 1 }],
+      ["rev-parse --verify --quiet --end-of-options refs/norn/remote-heads/upstream/gh-12-login", { stdout: SHA }],
+      ["rev-parse --verify --quiet --end-of-options refs/remotes/upstream/gh-12-login", { code: 1 }],
+      ["worktree add", {}],
+    ]);
+    expect((await vcsOf(h.ctx, "upstream").worktree.ensure("gh-12", "gh-12-login", "origin/main")).ok).toBe(true);
+    expect(h.calls.at(-1)).toEqual(["git", "worktree", "add", "--quiet", "-b", "gh-12-login", `${DATA}/worktrees/gh-12`, "refs/norn/remote-heads/upstream/gh-12-login"]);
   });
 
   test("ensure checks out an existing branch as it is, and finds a worktree already there", async () => {
@@ -429,6 +443,9 @@ describe("git vcs worktrees", () => {
     const there = gitHost([
       ["worktree prune", {}],
       ["worktree list", listing(`worktree /private${DATA}/worktrees/gh-12\nHEAD ${SHA}\nbranch refs/heads/gh-12-login\n\n`)],
+      // no other clone carried the unit on, so the worktree there stays as it is
+      ["rev-parse --verify --quiet --end-of-options refs/norn/remote-heads/", { code: 1 }],
+      ["rev-parse --verify --quiet --end-of-options refs/remotes/", { code: 1 }],
     ]);
     expect(await vcsOf(there.ctx).worktree.ensure("gh-12", "gh-12-login", "origin/main")).toEqual({ ok: true, value: { path: `${DATA}/worktrees/gh-12` } });
     expect(there.calls.some((c) => c[2] === "add")).toBe(false);

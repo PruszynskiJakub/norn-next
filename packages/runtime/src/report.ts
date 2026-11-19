@@ -11,7 +11,7 @@
  */
 import { type BriefInputs, checkCriteriaReport, HANDOFF_MAX_BYTES, renderBrief, type UnitJournal, verdictCounts, worstVerdict } from "@norn/kernel";
 import type { HarnessEvent, VcsUnfinished } from "@norn/plugin-api";
-import { STORE_ID_PATTERN } from "@norn/plugin-api";
+import { parseUnitId, STORE_ID_PATTERN } from "@norn/plugin-api";
 import type { CriterionVerdict, Finding, Note, Verdict } from "@norn/schema";
 import { branchOf, baseRefOf, cutFrom } from "./branches.ts";
 import { renderInputFrom } from "./brief-context.ts";
@@ -141,6 +141,8 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
   if (live.run.id !== runId)
     return refuse(`run ${runId} is not the live run of ${unit}; the live run is ${live.run.id}`, "end your turn: this session's run was replaced, and its report would move nothing", "stale_run");
   if (reportOnRecord(record, runId)) return refuse(`run ${runId} has reported already`, "end your turn: a run reports exactly once", "reported");
+  const moved = await claimMovedRefusal(env, unit, runId);
+  if (moved) return moved;
   if (req.verb === "done" && !live.outcomes.includes(req.outcome)) {
     const allowed = live.outcomes.map((o) => `\`${o}\``).join(", ");
     return refuse(`outcome ${JSON.stringify(req.outcome)} is not one step ${live.step} routes`, `report one of ${allowed || "the step's outcomes"}`, "outcome");
@@ -194,6 +196,25 @@ export async function reportRun(env: RuntimeEnv, unit: string, runId: string, re
     await appendEvents(env.ctx, unit, runId, [{ ...eventOf(runId, req), seq: next_seq, at: env.ctx.now() }]);
   }
   return { ok: true, value: { seq: wrote.value.seq, replayed: wrote.value.replayed, ...(criteria !== undefined && { criteria: criteria.summary }) } };
+}
+
+/**
+ * Why a report cannot be recorded on this machine once another holder took the story's claim, or
+ * null when it can: the run started under a claim this machine no longer holds, and the new holder
+ * carries the story on from the shared record, so a receipt written here would move this machine's
+ * copy ahead of that record, where no flush could publish it. Every verb is dropped, and why is kept
+ * in the run's log. A claim nobody holds leaves the report to the next holder's record.
+ */
+async function claimMovedRefusal(env: RuntimeEnv, unit: string, runId: string): Promise<Refusable<never> | null> {
+  const story = parseUnitId(unit)?.story ?? unit;
+  const read = await env.slots.store.claims.read(story);
+  if (!read.ok) return refuse(`cannot read the claim of ${story}: ${read.failure.message}`, "report again with the same command", read.failure.code);
+  const holder = read.value?.holder;
+  if (holder === undefined || holder === env.config.holder) return null;
+  const message = `the report of run ${runId} was dropped: the claim of ${story} moved from ${env.config.holder} to ${holder}`;
+  const { next_seq } = await readEvents(env.ctx, unit, runId);
+  await appendEvents(env.ctx, unit, runId, [{ type: "hook.error", run_id: runId, seq: next_seq, at: env.ctx.now(), hook: "report", message }]);
+  return refuse(message, `end your turn: ${holder} carries ${story} on now, and this run's report would move nothing`, "claim_moved");
 }
 
 /** The findings file `norn done --findings` reads, as a refusal names it. */

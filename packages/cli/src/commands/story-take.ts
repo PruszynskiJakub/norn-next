@@ -9,6 +9,12 @@
  * this machine's: in a shared store only the holder writes a story's run data, so a receipt written
  * first would sit on a copy the remote's holder never merges with, and would claim a takeover a lost
  * race never made.
+ *
+ * In a shared store, the story is carried on from the remote's record: run data this clone wrote and
+ * never published (a late report, a receipt written before the claim moved away) diverged from what
+ * the holders since published, and is dropped for it, kept under a ref the output names. A story this
+ * machine already holds whose run data diverged is carried on from the remote's record only with
+ * `--force`, as no takeover says the remote's record is the one to keep.
  */
 import type { ClaimRecord } from "@norn/plugin-api";
 import { parseUnitId, type PluginResult, RUN_ENV } from "@norn/plugin-api";
@@ -32,6 +38,32 @@ function take(env: RuntimeEnv, key: string, held: ClaimRecord | null, live: bool
       "takeover_unsupported",
     );
   return claims.acquire(key, env.config.holder, ttl, version);
+}
+
+/** Whether this clone's run data of the story and the remote's diverged; a store that cannot tell has nothing to carry on from. */
+async function divergedHere(env: RuntimeEnv, key: string): Promise<boolean> {
+  const store = env.slots.store;
+  if (!store.capabilities.shared || !store.diverged) return false;
+  const split = await store.diverged(key);
+  if (!split.ok) throw failure(`cannot tell whether the run data of ${key} diverged: ${split.failure.message}`, `norn story take ${key} again`, split.failure.code);
+  return split.value;
+}
+
+interface Dropped {
+  commit: string;
+  kept_at: string | null;
+}
+
+async function adoptRemote(env: RuntimeEnv, key: string): Promise<Dropped | null> {
+  const adopt = env.slots.store.adoptRemote;
+  if (!adopt) return null;
+  const r = await adopt(key);
+  if (!r.ok) throw failure(`cannot carry ${key} on from the remote's record: ${r.failure.message}`, `norn story take ${key} --force again`, r.failure.code);
+  return r.value.dropped === null ? null : { commit: r.value.dropped, kept_at: r.value.kept_at ?? null };
+}
+
+function droppedText(key: string, d: Dropped): string {
+  return `This clone's run data of ${key} that the remote never had was dropped for the remote's record${d.kept_at ? `; it is kept at ${d.kept_at}` : ""}.`;
 }
 
 export const storyTakeCommand = defineCommand({
@@ -65,8 +97,17 @@ export const storyTakeCommand = defineCommand({
     if (!read.ok) throw failure(`cannot read the claim of ${key}: ${read.failure.message}`, "try again", read.failure.code);
     const held = read.value;
     if (held?.holder === holder) {
-      const value = { story: key, holder, taken: false, expires_at: held.expires_at, version: held.version };
-      return rendered(value, `${key} is already held by this machine (${holder}) until ${held.expires_at}; nothing to take.`);
+      const split = await divergedHere(env, key);
+      if (split && !force)
+        throw refuse(
+          `${key} is held by this machine, and its run data here and on the remote diverged, so no flush can publish it`,
+          `norn story take ${key} --force carries it on from the remote's record, keeping this clone's part under a ref`,
+          "store_diverged",
+        );
+      const dropped = split ? await adoptRemote(env, key) : null;
+      const value = { story: key, holder, taken: false, expires_at: held.expires_at, version: held.version, ...(dropped && { dropped }) };
+      const text = `${key} is already held by this machine (${holder}) until ${held.expires_at}; nothing to take.`;
+      return rendered(value, dropped ? `${text} ${droppedText(key, dropped)}` : text);
     }
     if (!held) {
       const listed = await env.slots.store.listUnits({ story: key });
@@ -91,6 +132,7 @@ export const storyTakeCommand = defineCommand({
     const claim = took.value;
     // what the old holder flushed before it saw the claim move is fetched before this machine writes beside it
     await syncStore(env, key, `norn story take ${key}`);
+    const dropped = (await divergedHere(env, key)) ? await adoptRemote(env, key) : null;
     const id = receiptId("claim-taken", `v${claim.version}`);
     const data = {
       kind: "claim.taken" as const,
@@ -103,8 +145,20 @@ export const storyTakeCommand = defineCommand({
     const wrote = await env.journal.record(key, { id, data });
     // the claim is this machine's either way; only the record of how it came here is missing
     if (!wrote.ok) throw failure(`took the claim of ${key} but could not record it: ${wrote.failure.message}`, `norn story view ${key}`, wrote.failure.code);
-    const value = { story: key, holder, taken: true, from: held?.holder ?? null, expired: held ? !live : null, expires_at: claim.expires_at, version: claim.version, receipt_id: id, ...wrote.value };
+    const value = {
+      story: key,
+      holder,
+      taken: true,
+      from: held?.holder ?? null,
+      expired: held ? !live : null,
+      expires_at: claim.expires_at,
+      version: claim.version,
+      receipt_id: id,
+      ...wrote.value,
+      ...(dropped && { dropped }),
+    };
     const from = held ? ` from ${held.holder}${live ? "" : " (expired)"}` : "";
-    return rendered(value, `Took the claim of ${key}${from} for ${holder}, until ${claim.expires_at}. The next tick here carries it on.`);
+    const said = `Took the claim of ${key}${from} for ${holder}, until ${claim.expires_at}. The next tick here carries it on.`;
+    return rendered(value, dropped ? `${said} ${droppedText(key, dropped)}` : said);
   },
 });

@@ -2,7 +2,8 @@
  * `norn doctor`: check the config, plugins, workflows, harness hooks and tools this repo needs.
  * Checks: config valid, every slot resolves, API ranges, workflows load, the labels norn puts on items
  * defined on the tracker (created where missing), each harness's hook line runs, the pack's skills in
- * the main checkout (written or brought up to date, a person's own folder left alone), tools present (git
+ * the main checkout (written or brought up to date, a person's own folder left alone), a shared store's
+ * run data agreeing with the remote's for every story this machine holds, tools present (git
  * new enough; gh with github, and logged in; herdr with the herdr runner; claude with the claude
  * harness; pi with the pi harness), and the git remote a forge or a refs store pushes to.
  * `--repo` checks only what the repo's tree decides (the repo's own config files, plugins, slots,

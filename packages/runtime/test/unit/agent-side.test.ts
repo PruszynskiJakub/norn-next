@@ -292,6 +292,22 @@ describe("reporting", () => {
     expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
   });
 
+  test("a report from a run whose story's claim another holder took is dropped on this machine, every verb, with why in the run's log", async () => {
+    const { h, runId } = await running();
+    const takeOver = h.env.slots.store.claims.takeOver;
+    if (!takeOver) throw new Error("store-local offers takeovers");
+    const held = await h.env.slots.store.claims.read(UNIT);
+    await takeOver(UNIT, "machine-b", 60 * 60_000, held.ok && held.value ? held.value.version : null);
+    for (const req of [{ verb: "done", outcome: "done" }, { verb: "ask", question: "Why?" }, { verb: "stuck", reason: "lost" }] as const) {
+      const r = await reportRun(h.env, UNIT, runId, req, `r-${req.verb}`);
+      expect(r).toMatchObject({ ok: false, refusal: { code: "claim_moved", error: expect.stringContaining("moved from machine-a to machine-b"), do_instead: expect.stringContaining("machine-b carries lt-1 on") } });
+    }
+    expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
+    const logged = (await readEvents(h.ctx, UNIT, runId)).events.filter((e) => e.type === "hook.error");
+    expect(logged).toHaveLength(3);
+    expect(logged[0]).toMatchObject({ hook: "report", message: expect.stringContaining(`the report of run ${runId} was dropped`) });
+  });
+
   test("an outcome the step does not route is refused, naming the ones it does", async () => {
     const { h, runId } = await running();
     const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "shipped" }, "r1");

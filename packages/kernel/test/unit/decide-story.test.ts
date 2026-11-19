@@ -123,6 +123,15 @@ describe("claims", () => {
     ]);
   });
 
+  test("a held story whose run data diverged from the remote's is held with the command that carries it on, renewed but never flushed", () => {
+    const shared = { capabilities: caps({ shared: true, claims: "distributed" }) };
+    const s = story({ units: [unit("gh-1", state("gh-1", "plan")), unit("gh-1/01", state("gh-1/01", "build"))], mailbox: [letter("m1", { unit: "gh-1", receipt: { kind: "mode.changed", mode: "auto", by: "ann" } })] });
+    expect(rules(storyDecisions(s, shared))).toEqual(["mailbox.import", "store.flush"]);
+    const diverged = storyDecisions({ ...s, unsynced: true, claim: claim({ expires_at: minutesAhead(5) }) }, shared);
+    expect(rules(diverged)).toEqual(["claim.renew", "store.diverged", "store.diverged"]);
+    expect(diverged[1]).toEqual({ kind: "noop", unit: "gh-1", rule: "store.diverged", reason: expect.stringContaining("norn story take gh-1 --force") });
+  });
+
   test("a letter still in the mailbox keeps the claim", () => {
     const s = story({ units: [unit("gh-1", state("gh-1", "split", { ended: "done" }))], mailbox: [letter("m1", { unit: "gh-1", receipt: { kind: "mode.changed", mode: "auto", by: "ann" } })] });
     expect(rules(storyDecisions(s))).not.toContain("claim.release");

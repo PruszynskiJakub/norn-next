@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { type Decision, type DecisionOf, renderBrief } from "@norn/kernel";
 import { deriveUlid } from "@norn/schema";
 import { layout } from "@norn/store-local";
-import { act, type AgentRunRequest, appendEvents, briefRenderInput, EventLogSessionSource, nudgePromptId, readStepRun } from "../../src/index.ts";
+import { fail, ok } from "@norn/plugin-api";
+import { act, type AgentRunRequest, appendEvents, briefRenderInput, EventLogSessionSource, gatherFacts, nudgePromptId, readStepRun } from "../../src/index.ts";
 import { decided, decisionOf, type Harnessed, has, harness, MINUTE, record, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
 
 const kinds = async (h: ReturnType<typeof harness>, unit: string) => (await record(h, unit)).receipts.map((r) => r.data.kind);
@@ -416,6 +417,76 @@ describe("the mailbox and the store", () => {
     expect((await record(h, "lt-1")).receipts.find((x) => x.id === "01JD5G0000LETTER0000000001")?.data.kind).toBe("gate.decided");
     await tickUntil(h, has("claim.release"));
     expect((await record(h, "lt-1")).state?.ended).toBe("done");
+  });
+
+  test("a flush publishes every unit's branch head before the run data; a head refused is reported and never holds the run data back", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    const { t } = await decided(h);
+    const order: string[] = [];
+    const vcs = { ...t.env.slots.vcs, publishHead: async (branch: string) => (order.push(`publish ${branch}`), branch === "norn/lt-1" ? ok({ pushed: true }) : fail<{ pushed: boolean }>("conflict", "diverged")) };
+    const store = { ...t.env.slots.store, flush: async (story: string) => (order.push(`flush ${story}`), ok({ pushed: true })) };
+    const facts = structuredClone(t.facts);
+    const own = facts.stories[0]?.units[0];
+    if (!own) throw new Error("no unit");
+    facts.stories[0]?.units.push({ ...structuredClone(own), id: "lt-1/01" });
+    const problems: string[] = [];
+    const shared = { ...t, facts, problems, env: { ...t.env, slots: { ...t.env.slots, vcs, store } } };
+    const r = await act(shared, { kind: "flush", unit: null, rule: "store.flush", story: "lt-1" }, 0);
+    expect(r).toMatchObject({ ok: true, detail: { pushed: true, heads: ["norn/lt-1"] } });
+    expect(order).toEqual(["publish norn/lt-1", "publish norn/lt-1-01", "flush lt-1"]);
+    expect(problems).toEqual(["lt-1/01: publishing norn/lt-1-01: diverged"]);
+  });
+
+  test("a story whose run data diverged from the remote's reads as unsynced, so decide holds it", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    const store = { ...h.env.slots.store, capabilities: { ...h.env.slots.store.capabilities, shared: true }, diverged: async (story: string) => ok(story === "lt-1") };
+    const gathered = await gatherFacts({ ...h.env, slots: { ...h.env.slots, store } }, deriveUlid("01JD5G00000000000000000000", 950), { readOnly: true });
+    if (!gathered.ok) throw new Error(gathered.failure.message);
+    expect(gathered.value.facts.stories[0]).toMatchObject({ key: "lt-1", unsynced: true });
+  });
+
+  test("a diverged story another machine holds is carried on from the remote's record at the next sync; one this machine holds is left for a person", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    const split = new Set(["lt-1"]);
+    const adopted: string[] = [];
+    const store = {
+      ...h.env.slots.store,
+      capabilities: { ...h.env.slots.store.capabilities, shared: true },
+      sync: async () => ok({ fetched: 0 }),
+      diverged: async (story: string) => ok(split.has(story)),
+      adoptRemote: async (story: string) => {
+        adopted.push(story);
+        split.delete(story);
+        return ok({ dropped: "c0ffee", kept_at: `refs/norn/v2/dropped/runs/${story}/c0ffee` });
+      },
+    };
+    const env = { ...h.env, slots: { ...h.env.slots, store } };
+    const held = await gatherFacts(env, deriveUlid("01JD5G00000000000000000000", 951));
+    if (!held.ok) throw new Error(held.failure.message);
+    expect(adopted).toEqual([]);
+    expect(held.value.facts.stories[0]).toMatchObject({ key: "lt-1", unsynced: true });
+
+    const claim = held.value.facts.stories[0]?.claim;
+    const took = await h.env.slots.store.claims.takeOver?.("lt-1", "bob@elsewhere", MINUTE * 60, claim?.version ?? null);
+    if (!took?.ok) throw new Error("the claim did not move");
+    const elsewhere = await gatherFacts(env, deriveUlid("01JD5G00000000000000000000", 952));
+    if (!elsewhere.ok) throw new Error(elsewhere.failure.message);
+    expect(adopted).toEqual(["lt-1"]);
+    expect(elsewhere.value.facts.stories[0]?.unsynced).toBeUndefined();
+    expect(elsewhere.value.problems).toContain("lt-1: run data this clone never published was dropped for the remote's record, as bob@elsewhere holds the claim; it is kept at refs/norn/v2/dropped/runs/lt-1/c0ffee");
+
+    // a read-only gathering (status) never drops anything
+    split.add("lt-1");
+    const read = await gatherFacts(env, deriveUlid("01JD5G00000000000000000000", 953), { readOnly: true });
+    if (!read.ok) throw new Error(read.failure.message);
+    expect(adopted).toEqual(["lt-1"]);
+    expect(read.value.facts.stories[0]?.unsynced).toBe(true);
   });
 
   test("a store without flush publishes nothing, and says so", async () => {

@@ -53,6 +53,7 @@ export interface SimStory {
   mailbox: StoredMessage[];
   base_stale?: boolean;
   unpushed?: boolean;
+  unsynced?: boolean;
   plan?: SlicePlan;
 }
 
@@ -176,6 +177,7 @@ export class World {
         const out: KernelFacts["stories"][number] = { key: s.key, item: structuredClone(s.item), change: structuredClone(s.change), claim: structuredClone(s.claim), units: units(s), mailbox: structuredClone(s.mailbox) };
         if (s.base_stale !== undefined) out.base_stale = s.base_stale;
         if (s.unpushed !== undefined) out.unpushed = s.unpushed;
+        if (s.unsynced !== undefined) out.unsynced = s.unsynced;
         if (s.plan) out.plan = structuredClone(s.plan);
         return out;
       }),

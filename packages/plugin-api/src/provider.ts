@@ -111,6 +111,7 @@ export function storeProblems(value: unknown): string[] {
     if (v[m] !== undefined && typeof v[m] !== "function") out.push(`${m} must be a function`);
     else if (caps.shared === true && typeof v[m] !== "function") out.push(`a shared store lacks ${m}`);
   }
+  for (const m of ["diverged", "adoptRemote"] as const) if (v[m] !== undefined && typeof v[m] !== "function") out.push(`${m} must be a function`);
   return out;
 }
 

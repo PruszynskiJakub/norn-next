@@ -3,7 +3,7 @@
  * gathered and never acted on, shaped for a person. What waits for a person (a gate, a question, a
  * parked or stuck unit) is named per unit, so `status` reads as a list of what needs doing.
  */
-import { ITEM_CLOSED_REASON, isChangeClosedReason, type KernelCapabilities, type KernelWorkflows, type StoryFacts, type UnitFacts } from "@norn/kernel";
+import { ITEM_CLOSED_REASON, isChangeClosedReason, type KernelCapabilities, type KernelWorkflows, type StoryFacts, type UnitFacts, unsyncedReason } from "@norn/kernel";
 import { gatherFacts, newTickId, type RuntimeEnv } from "@norn/runtime";
 import { refuse } from "./output.ts";
 
@@ -40,6 +40,12 @@ export interface StoryView {
   claim: { holder: string; expires_at: string } | null;
   /** `merge_sha` once the change merged and the forge names the commit it landed as */
   change: { id: number; state: string; url: string | null; merge_sha?: string } | null;
+  /**
+   * This clone's run data of the story and the remote's diverged: no flush can publish it, and while
+   * this machine holds the claim its ticks hold the story. Absent when they agree. `waiting`: only a
+   * person resolves it; another holder's story is resolved by this machine's next tick.
+   */
+  unsynced?: { text: string; next: string; waiting: boolean };
   units: UnitView[];
 }
 
@@ -149,7 +155,23 @@ export function unitView(u: UnitFacts, workflows: KernelWorkflows, executors: Ke
   };
 }
 
-export function storyView(s: StoryFacts, workflows: KernelWorkflows, executors: KernelCapabilities["executors"] = {}): StoryView {
+/** What a diverged store means for the story on this machine, and the command that carries it on from the remote's record. */
+function unsyncedOf(s: StoryFacts, holder: string | undefined): StoryView["unsynced"] {
+  if (s.unsynced !== true) return undefined;
+  if (s.claim !== null && s.claim.holder === holder) return { text: unsyncedReason(s.key), next: `norn story take ${s.key} --force`, waiting: true };
+  // only the holder's writes are published, so another holder's story is carried on from the remote's record by a plain tick
+  if (s.claim !== null)
+    return {
+      text: `this clone holds run data of ${s.key} the remote never had, from before ${s.claim.holder} took the claim; the next tick here drops it for the remote's record, keeping it under a ref`,
+      next: "norn tick",
+      waiting: false,
+    };
+  return { text: `this clone holds run data of ${s.key} the remote never had; it is dropped for the remote's record (kept under a ref) when this machine takes the story`, next: `norn story take ${s.key}`, waiting: true };
+}
+
+/** `holder`: who this machine claims as, so a diverged store is said for the holder or for another machine */
+export function storyView(s: StoryFacts, workflows: KernelWorkflows, executors: KernelCapabilities["executors"] = {}, holder?: string): StoryView {
+  const unsynced = unsyncedOf(s, holder);
   return {
     key: s.key,
     title: s.item?.title ?? null,
@@ -157,6 +179,7 @@ export function storyView(s: StoryFacts, workflows: KernelWorkflows, executors: 
     open: s.item ? s.item.open : null,
     claim: s.claim ? { holder: s.claim.holder, expires_at: s.claim.expires_at } : null,
     change: s.change ? { id: s.change.id, state: s.change.state, url: s.change.url ?? null, ...(s.change.merge_sha !== undefined && { merge_sha: s.change.merge_sha }) } : null,
+    ...(unsynced && { unsynced }),
     units: s.units.map((u) => unitView(u, workflows, executors)),
   };
 }
@@ -168,7 +191,7 @@ export async function loadProjectView(env: RuntimeEnv): Promise<ProjectView> {
   if (!gathered.ok) throw refuse(`the store could not be read: ${gathered.failure.message}`, "norn doctor", "facts_unavailable");
   const { facts, workflows, problems } = gathered.value;
   return {
-    stories: facts.stories.map((s) => storyView(s, workflows, facts.capabilities.executors)),
+    stories: facts.stories.map((s) => storyView(s, workflows, facts.capabilities.executors, facts.holder)),
     // an item a tick took is a story from then on, whatever the tracker's query still matches
     intake: facts.intake.filter((i) => !facts.stories.some((s) => s.key === i.key)).map((i) => ({ key: i.key, title: i.title, url: i.url ?? null })),
     problems,
@@ -188,5 +211,6 @@ export function unitLine(u: UnitView): string {
 export function storyHead(s: StoryView): string {
   const change = s.change ? `, change #${s.change.id} ${s.change.state}` : "";
   const claim = s.claim ? `, claimed by ${s.claim.holder}` : "";
-  return `${s.key}${s.title ? ` ${s.title}` : ""}${claim}${change}`;
+  const unsynced = s.unsynced ? ` — run data unsynced: ${s.unsynced.text} → ${s.unsynced.next}` : "";
+  return `${s.key}${s.title ? ` ${s.title}` : ""}${claim}${change}${unsynced}`;
 }

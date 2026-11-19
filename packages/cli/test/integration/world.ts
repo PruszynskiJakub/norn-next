@@ -206,5 +206,17 @@ export async function awaitNote(w: World, what: string, ms = 10_000): Promise<un
   return noteOf(w, what);
 }
 
+/**
+ * A second clone of `a`'s remote with a norn home and an agent plans file of its own: another
+ * machine on the same team. Its notes and flags stay `a`'s, so a test reads every agent in one place.
+ */
+export async function otherMachine(a: World, name = "b"): Promise<World> {
+  const root = join(a.dir, `repo-${name}`);
+  const home = join(a.dir, `home-${name}`);
+  const plansFile = join(a.dir, `plans-${name}.json`);
+  await sh(a.dir, "git", "clone", "-q", a.remote, root);
+  return { ...a, root, home, plans: plansFile, env: { ...a.env, NORN_HOME_DIR: home, TEST_AGENT_PLANS: plansFile } };
+}
+
 /** The machine dir of the checkout: where `plugin add` pinned the lock. */
 export const machineOf = (added: NornOut): string => dirname(added.body.lock as string);
