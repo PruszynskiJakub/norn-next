@@ -53,6 +53,21 @@ async function settledStepRun(env: RuntimeEnv, unit: string, run: { id: string; 
   }
 }
 
+/** The dialog the run's pane shows, on one line for a park's text; null when none, or the launcher cannot read one. */
+async function probeDialog(env: RuntimeEnv, handle: string): Promise<string | null> {
+  try {
+    const text = (await env.launcher.dialog?.(handle)) ?? "";
+    const line = text
+      .split("\n")
+      .map((l) => l.replace(/\s+/g, " ").trim())
+      .filter((l) => l !== "")
+      .join(" | ");
+    return line === "" ? null : line;
+  } catch {
+    return null;
+  }
+}
+
 /** Whether the run's process still runs; null when the launcher cannot tell, which is never read as dead. */
 async function probeAlive(env: RuntimeEnv, handle: string): Promise<boolean | null> {
   try {
@@ -84,6 +99,10 @@ export async function readUnitFacts(env: RuntimeEnv, unit: string, problems: str
     if (facts.session === null && run.session !== undefined) {
       const alive = await probeAlive(env, run.session);
       if (alive !== null) facts.run_alive = alive;
+      if (alive === true) {
+        const dialog = await probeDialog(env, run.session);
+        if (dialog !== null) facts.run_dialog = dialog;
+      }
     }
     const sr = stepRunFact(await settledStepRun(env, unit, run, problems, opts), run);
     if (sr) facts.step_run = sr;

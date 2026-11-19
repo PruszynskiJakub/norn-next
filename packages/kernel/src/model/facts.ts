@@ -56,6 +56,12 @@ export const UnitFacts = Type.Object(
      * Absent: not probed, or the runner could not tell.
      */
     run_alive: Type.Optional(Type.Boolean()),
+    /**
+     * The dialog the run's pane shows, as its runner read it, probed only while the process runs and
+     * its session has sent no event: a prompt there (a trust dialog) holds the agent before any hook,
+     * so the pane is the only place it can be seen. Absent: none, not probed, or the runner cannot read one.
+     */
+    run_dialog: Type.Optional(NonEmpty),
     step_run: Type.Optional(StepRunFacts),
   },
   { ...closed, title: "UnitFacts" },

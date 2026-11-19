@@ -248,6 +248,25 @@ export class HarnessLauncher implements AgentLauncher {
   }
 
   /**
+   * The dialog the run's pane shows, for decide to park on at once rather than after the silent
+   * window; null when its runner reads no pane, or for a run launched on another machine, whose pane
+   * id may name an unrelated pane here.
+   */
+  async dialog(handle: string): Promise<string | null> {
+    const found = this.resolve(handle);
+    if (!found.ok) return null;
+    const runner = found.value.executor.runner;
+    if (!runner.dialog) return null;
+    try {
+      if (!(await launchedHere(this.opts.ctx, found.value.handle.unit, found.value.handle.run_id))) return null;
+      const read = await runner.dialog(await currentRunnerHandle(this.opts.ctx, found.value.handle));
+      return read.ok ? read.value : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * The head of the run's log: its first non-empty lines, joined and cut, so a process that ended
    * before it said anything through a hook can still say why. Null for a run launched elsewhere (its
    * log is on that machine), with no log, or a handle not this launcher's.

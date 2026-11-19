@@ -139,6 +139,9 @@ export class FakeLauncher implements AgentLauncher {
   /** what `alive` answers for every handle; null: it cannot tell */
   aliveAnswer: boolean | null = null;
   readonly probed: string[] = [];
+  /** what `dialog` answers for every handle */
+  dialogAnswer: string | null = null;
+  readonly dialogsRead: string[] = [];
 
   async start(run: AgentRunRequest) {
     this.calls.push({ op: "start", args: [run] });
@@ -163,6 +166,10 @@ export class FakeLauncher implements AgentLauncher {
   async alive(handle: string) {
     this.probed.push(handle);
     return this.aliveAnswer;
+  }
+  async dialog(handle: string) {
+    this.dialogsRead.push(handle);
+    return this.dialogAnswer;
   }
   of(op: LauncherCall["op"]): unknown[][] {
     return this.calls.filter((c) => c.op === op).map((c) => c.args);

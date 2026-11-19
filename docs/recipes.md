@@ -24,7 +24,7 @@ The next tick presses the keys for that option in the agent's pane; after a `no`
 
 ## An agent in a pane sends nothing
 
-**You see:** the unit waiting for a permission: its agent runs in its pane but has sent no event, most likely behind a trust prompt for the new worktree.
+**You see:** the unit waiting for a permission: its agent waits on a dialog in its pane, with the dialog's text (a trust prompt for the new worktree, as herdr reads it off the pane on the next tick), or, where the pane cannot be read, it has sent no event for the silent window and most likely sits behind such a prompt.
 
 Trust the folder in the pane, or answer the prompt from here:
 

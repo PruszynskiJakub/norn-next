@@ -108,6 +108,31 @@ describe("a run whose agent has sent no event, parked for the dialog in its pane
   });
 });
 
+describe("a dialog herdr reports blocking the agent before its first event", () => {
+  const TRUST = ["╭────────────────────────────────────╮", "│ Do you trust the files in this folder? │", "│ ❯ 1. Yes, proceed                  │", "│   2. No, exit                      │", "╰────────────────────────────────────╯"].join("\n");
+  /** herdr with the run's pane blocked on the trust dialog */
+  const blocked: ExecScript = (argv, o) => {
+    if (argv[0] === "herdr" && argv[1] === "pane" && argv[2] === "get") return { stdout: JSON.stringify({ result: { pane: { pane_id: PANE, agent_status: "blocked" } } }) };
+    if (argv[0] === "herdr" && argv[1] === "pane" && argv[2] === "read") return { stdout: `${TRUST}\n` };
+    return herdr(argv, o);
+  };
+
+  test("the next tick parks the unit with the dialog's text, status shows it, and story answer presses its keys", async () => {
+    const m = configured({ runner: "herdr", script: blocked });
+    await seedUnit(m, { step: AGENT_STEP });
+    await launchedHere(m);
+    await (await envOf(m)).slots.store.claims.acquire(UNIT, "me@box", 60_000);
+    await runCli(["tick", "--json"], m.io);
+    const w = waitingIn((await runCli(["status", "--json"], m.io)).stdout);
+    expect(w?.for).toBe("permission");
+    expect(w?.text).toContain("Do you trust the files in this folder? | ❯ 1. Yes, proceed | 2. No, exit");
+    expect(w?.next).toContain(`norn story answer ${UNIT} 1`);
+    const r = await runCli(["story", "answer", UNIT, "1", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect((await receiptsOf(m)).at(-1)?.data).toMatchObject({ kind: "answer.sent", input_id: `dialog-${RUN}`, text: "1", to: "dialog" });
+  });
+});
+
 type Waiting = { for: string; text: string; next?: string } | null;
 const waitingIn = (stdout: string): Waiting => ((json(stdout).stories as Array<{ units: Array<{ waiting: Waiting }> }>)[0]?.units[0]?.waiting ?? null) as Waiting;
 

@@ -9,6 +9,10 @@ interface Pane {
   workspace_id: string;
   shell: number;
   fg: number;
+  /** herdr's reading of the agent in the pane */
+  status?: "idle" | "working" | "blocked" | "done" | "unknown";
+  /** what the pane shows, when a test sets it */
+  screen?: string;
 }
 
 /**
@@ -74,8 +78,14 @@ function fakeHerdr(opts: { runSticks?: boolean; agentKnown?: boolean } = {}) {
         if (opts.runSticks !== false) p.fg = p.shell + 500;
         return { stdout: "" };
       }
-      case "pane read":
-        return pane(rest[0]) ? { stdout: "$ claude\nzsh: command not found: claude\n$ \n" } : notFound("pane_not_found");
+      case "pane read": {
+        const p = pane(rest[0]);
+        return p ? { stdout: p.screen ?? "$ claude\nzsh: command not found: claude\n$ \n" } : notFound("pane_not_found");
+      }
+      case "pane get": {
+        const p = pane(rest[0]);
+        return p ? json({ type: "pane_info", pane: { pane_id: p.pane_id, tab_id: p.tab_id, workspace_id: p.workspace_id, agent_status: p.status ?? "unknown" } }) : notFound("pane_not_found");
+      }
       case "pane close": {
         const i = panes.findIndex((p) => p.pane_id === rest[0]);
         if (i < 0) return notFound("pane_not_found");
@@ -347,6 +357,32 @@ describe("herdr alive, send and stop", () => {
     ]);
     const gone = await runner.keys?.("w9:p9", [{ key: "esc" }]);
     expect(gone?.ok ? null : gone?.failure.code).toBe("not_found");
+  });
+
+  test("dialog reads the pane only while herdr says the agent is blocked, and hands back what the pane shows of it", async () => {
+    const { h, runner } = setup();
+    await runner.start(req());
+    const p = h.panes.find((x) => x.pane_id === "w1:p2") as Pane;
+    p.status = "working";
+    expect(await runner.dialog?.("w1:p2")).toEqual({ ok: true, value: null });
+    expect(h.calls().at(-1)).toBe("pane get");
+    p.status = "blocked";
+    p.screen = [
+      "╭──────────────────────────────────────────╮",
+      "│ Do you trust the files in this folder?   │",
+      "│                                          │",
+      "│ /wt/gh-1                                 │",
+      "│ ❯ 1. Yes, proceed                        │",
+      "│   2. No, exit                            │",
+      "╰──────────────────────────────────────────╯",
+      "   Enter to confirm · Esc to exit",
+      "",
+    ].join("\n");
+    expect(await runner.dialog?.("w1:p2")).toEqual({
+      ok: true,
+      value: ["  Do you trust the files in this folder?", "", "  /wt/gh-1", "  ❯ 1. Yes, proceed", "    2. No, exit", "", "   Enter to confirm · Esc to exit"].join("\n"),
+    });
+    expect(await runner.dialog?.("w9:p9")).toEqual({ ok: true, value: null });
   });
 
   test("stop closes the pane; a pane already gone is not an error", async () => {
