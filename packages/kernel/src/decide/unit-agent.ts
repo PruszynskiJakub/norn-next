@@ -223,7 +223,7 @@ function quiet(v: UnitView, spec: AgentStepSpec, run: RunInfo, base: string): De
   return classified(v, run, "silent", `${base}.exhausted`);
 }
 
-/** A fresh session for the step in place of `run`; it takes over the run's agent slot. */
+/** A fresh session for the step in place of `run`. */
 function retry(v: UnitView, spec: AgentStepSpec, run: RunInfo, rule: string): Decision {
   if (!capsOf(v, run.executor)?.headless) return parkDecision(v, "agent.retry.no_headless", "stuck", { text: `run ${run.id} needs a fresh session; executor '${run.executor}' cannot run headless` });
   const run_id = v.ctx.nextId();
