@@ -68,7 +68,13 @@ Checks and the git and forge steps always run on their own. Gates, attended step
 
 ## One tick
 
-`norn watch` runs the heartbeat: a tick every 30 seconds (`--interval` changes it), until Ctrl-C, which lets the tick in flight finish. `norn tick` runs one by hand. Each tick:
+`norn watch` runs the heartbeat until Ctrl-C, which lets the tick in flight finish. `norn tick` runs one by hand. The interval (30 seconds, `--interval` changes it) is the longest watch waits, not the pace of a story:
+
+- a tick that moved a story on is followed at once by up to three more, so a step that ends leads to the next one in the same moment. A tick that only waited (an agent or check still running, a unit parked or ended, a shared store's flush) pauses the whole interval;
+- a receipt recorded during the pause by another process on this machine (`norn done`, `norn story answer`) or a check that finishes ends the pause within about a second. A receipt written on another machine arrives with the next tick's sync, and a step kind that waits across ticks (on the forge, say) is looked at again only at the next tick;
+- before each tick watch reads the config, the plugin lock and the repo's workflows again, so a `config set`, a merged workflow or a `plugin add` counts from the next tick, with no restart. A new version of a plugin the watch already loaded takes a restart, since the process keeps the code it imported. A change that does not load leaves watch on the last config that did, and says so once on stderr.
+
+Each tick:
 
 1. **gathers** the facts: each unit's state and receipts from the store, the claims, the agents' hook events, git, the tracker's items and the forge's changes;
 2. **decides**, with one pure function, the next action for each unit: take in a story, start an agent, nudge a silent one, run a check, take a reported outcome to the next step, push, open the change, finish the story;

@@ -80,6 +80,20 @@ export function wireRepoWorkflows(w: WiredRepo): Promise<RepoWorkflows> {
   return readRepoWorkflows(w.ctx.files, w.repo.root);
 }
 
+/**
+ * The text of every file a runtime is built from: the config layers, the plugin lock in either place
+ * it can be, and the repo's workflow files. Two equal answers mean a rebuild would build the same
+ * runtime, so a long-running command rebuilds only when this changes. An installed plugin's code
+ * changes only with its lock entry, so the lock stands for it; a rebuild imports a new plugin, but one
+ * already imported keeps its loaded module (the import cache is per process), so an upgrade takes a restart.
+ */
+export async function wiringSources(w: WiredRepo): Promise<string> {
+  const paths = configPaths(w.home, w.repo.root);
+  const files = [paths.user, paths.local, paths.repo, lockPath(w.repo.root, w.machine, true), lockPath(w.repo.root, w.machine, false)];
+  const [texts, workflows] = await Promise.all([Promise.all(files.map((f) => w.ctx.files.read(f))), wireRepoWorkflows(w)]);
+  return JSON.stringify({ texts, workflows });
+}
+
 /** Who claims from this machine when the config names nobody. */
 export function defaultHolder(env: Readonly<Record<string, string | undefined>>, hostname: string): string {
   let user = env.USER ?? env.LOGNAME ?? "";

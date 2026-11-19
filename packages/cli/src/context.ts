@@ -22,6 +22,8 @@ export interface CliIo {
   stdin(): Promise<string>;
   /** aborted on the first SIGINT or SIGTERM: `watch` ends its tick and stops */
   signal?: AbortSignal;
+  /** waits `ms`, or less when the signal aborts; a test passes its own, so a watch's pauses take no wall time */
+  sleep?(ms: number, signal?: AbortSignal): Promise<void>;
   /** a line for a person on stderr; never data */
   log?(line: string): void;
   /** how this binary is invoked, so a launched agent's hooks call the same build: `[bun, main.ts]` or `[norn]` */
@@ -74,6 +76,15 @@ export class CliContext {
   plugins(): Promise<WiredPlugins> {
     this.pluginsP ??= Promise.all([this.repo(), this.config()]).then(([w, c]) => wirePlugins(w, c, this.io.importer));
     return this.pluginsP;
+  }
+  /**
+   * Forget the config, the plugins and the env built from them, so the next use reads them again
+   * from disk; the checkout and its host stay.
+   */
+  reload(): void {
+    this.configP = undefined;
+    this.pluginsP = undefined;
+    this.envP = undefined;
   }
   /** the runtime env the agent verbs and views read */
   runtimeEnv(): Promise<RuntimeEnv> {
