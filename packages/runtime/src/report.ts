@@ -210,11 +210,26 @@ async function claimMovedRefusal(env: RuntimeEnv, unit: string, runId: string): 
   const read = await env.slots.store.claims.read(story);
   if (!read.ok) return refuse(`cannot read the claim of ${story}: ${read.failure.message}`, "report again with the same command", read.failure.code);
   const holder = read.value?.holder;
-  if (holder === undefined || holder === env.config.holder) return null;
+  if (holder === undefined || isOwnHolder(env, holder)) return null;
   const message = `the report of run ${runId} was dropped: the claim of ${story} moved from ${env.config.holder} to ${holder}`;
   const { next_seq } = await readEvents(env.ctx, unit, runId);
   await appendEvents(env.ctx, unit, runId, [{ type: "hook.error", run_id: runId, seq: next_seq, at: env.ctx.now(), hook: "report", message }]);
-  return refuse(message, `end your turn: ${holder} carries ${story} on now, and this run's report would move nothing`, "claim_moved");
+  return refuse(message, `end your turn now and report nothing: ${holder} carries ${story} on, and this run's report would move nothing`, "claim_moved");
+}
+
+/** `holder` is this machine: its current name, or one it claimed under before. */
+export function isOwnHolder(env: RuntimeEnv, holder: string): boolean {
+  return holder === env.config.holder || (env.config.formerHolders ?? []).includes(holder);
+}
+
+/**
+ * Who holds the claim of `unit`'s story when that is another machine, else null (this machine, or
+ * nobody). A read that fails answers null: the caller then acts as if nothing moved.
+ */
+export async function claimHeldElsewhere(env: RuntimeEnv, unit: string): Promise<string | null> {
+  const read = await env.slots.store.claims.read(parseUnitId(unit)?.story ?? unit);
+  const holder = read.ok ? read.value?.holder : undefined;
+  return holder === undefined || isOwnHolder(env, holder) ? null : holder;
 }
 
 /** The findings file `norn done --findings` reads, as a refusal names it. */

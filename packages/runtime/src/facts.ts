@@ -175,16 +175,44 @@ async function adoptWhereHeldElsewhere(env: RuntimeEnv, problems: string[]): Pro
   }
 }
 
+/**
+ * Move every claim held under a name this machine claimed under before (an earlier hostname) to its
+ * current holder, compared by version so a claim a person moved meanwhile stays where it went.
+ * Before any claim is read for decide, which knows one holder, and before run data is dropped as
+ * held elsewhere, which this machine's own would otherwise be.
+ */
+async function carryFormerClaims(env: RuntimeEnv, problems: string[]): Promise<void> {
+  const former = env.config.formerHolders ?? [];
+  const claims = env.slots.store.claims;
+  if (former.length === 0) return;
+  const listed = await env.slots.store.listUnits();
+  if (!listed.ok) return;
+  for (const story of new Set(listed.value.filter(isStoryUnit))) {
+    const claim = await claims.read(story);
+    if (!claim.ok || claim.value === null || !former.includes(claim.value.holder)) continue;
+    const was = claim.value.holder;
+    if (!env.slots.store.capabilities.takeover || !claims.takeOver) {
+      problems.push(`${story}: claimed as ${was}, an earlier name of this machine, and store ${env.slots.store.name} cannot move it to ${env.config.holder}`);
+      continue;
+    }
+    const moved = await claims.takeOver(story, env.config.holder, env.config.kernel.claimTtlMs, claim.value.version);
+    if (!moved.ok) problems.push(`${story}: cannot move the claim of ${was}, an earlier name of this machine, to ${env.config.holder}: ${moved.failure.message}`);
+  }
+}
+
 export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherOptions = {}): Promise<PluginResult<GatheredFacts>> {
   const problems: string[] = [];
   // a shared store shows other machines' run data only once synced; without it a story another machine
   // carried on (or finished) would be decided from this machine's stale copy
   const store = env.slots.store;
+  let synced = false;
   if (!opts.readOnly && store.capabilities.shared && store.sync) {
-    const synced = await store.sync();
-    if (!synced.ok) problems.push(`store sync: ${synced.failure.message}`);
-    else await adoptWhereHeldElsewhere(env, problems);
+    const sync = await store.sync();
+    if (!sync.ok) problems.push(`store sync: ${sync.failure.message}`);
+    else synced = true;
   }
+  if (!opts.readOnly) await carryFormerClaims(env, problems);
+  if (synced) await adoptWhereHeldElsewhere(env, problems);
   const listed = await store.listUnits();
   if (!listed.ok) return fail(listed.failure.code, `store: ${listed.failure.message}`, listed.failure.retryable);
   const reads = await readStories(env, listed.value, problems, opts);

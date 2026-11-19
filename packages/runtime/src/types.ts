@@ -45,6 +45,11 @@ export interface RuntimeConfig {
   baseRef?: string;
   /** who this machine claims as */
   holder: string;
+  /**
+   * names this machine claimed under before `holder` (an earlier hostname): a claim under one is
+   * this machine's own, and a tick moves it to `holder`
+   */
+  formerHolders?: readonly string[];
   /** how long a tick lock may sit before another tick takes it over as left by a crash */
   lockStaleMs?: number;
   /** how old a tick trace may grow before a tick removes it; null keeps every trace; absent: DEFAULT_TRACE_RETAIN_MS */

@@ -9,10 +9,11 @@ import type { Runtime, RuntimeEnv } from "@norn/runtime";
 import type { LoadedConfig } from "./config/load.ts";
 import { LAYERS, type Layer } from "./config/paths.ts";
 import { nornHome } from "./home.ts";
+import { machineHolder } from "./holder.ts";
 import { packFailure } from "./plugins/pack-check.ts";
 import type { PluginImporter } from "./plugins/installed.ts";
 import { floorRefusal } from "./version-guard.ts";
-import { defaultHolder, type HostFactory, type WiredPlugins, type WiredRepo, wireConfig, wirePlugins, wireRepo, wireRepoWorkflows, wireRuntime, wireRuntimeEnv } from "./wiring.ts";
+import { type HostFactory, type WiredPlugins, type WiredRepo, wireConfig, wirePlugins, wireRepo, wireRepoWorkflows, wireRuntime, wireRuntimeEnv } from "./wiring.ts";
 
 /** The process as the entry hands it over; a test passes its own, so the CLI runs in-process with no child. */
 export interface CliIo {
@@ -34,7 +35,7 @@ export interface CliIo {
   version: string;
   hosts: HostFactory;
   importer: PluginImporter;
-  /** this machine's name, for the default claim holder */
+  /** what the network calls this machine now (os.hostname); the claim holder is fixed from it only once */
   hostname?: string;
 }
 
@@ -126,7 +127,7 @@ export class CliContext {
 
   private async parts() {
     const [w, loaded, p] = await Promise.all([this.repo(), this.config(), this.plugins()]);
-    const repoWorkflows = await wireRepoWorkflows(w);
-    return { w, loaded, plugins: p.plugins, repoWorkflows, holder: defaultHolder(this.io.env, this.io.hostname ?? hostname()), self: this.io.self, ...(this.io.env.PATH !== undefined ? { path: this.io.env.PATH } : {}), ...(this.io.env.NORN_HOME_DIR ? { home: this.io.env.NORN_HOME_DIR } : {}) };
+    const [repoWorkflows, machine] = await Promise.all([wireRepoWorkflows(w), machineHolder(w.ctx, w.home, this.io.env, this.io.hostname ?? hostname())]);
+    return { w, loaded, plugins: p.plugins, repoWorkflows, holder: machine.holder, formerHolders: machine.former, self: this.io.self, ...(this.io.env.PATH !== undefined ? { path: this.io.env.PATH } : {}), ...(this.io.env.NORN_HOME_DIR ? { home: this.io.env.NORN_HOME_DIR } : {}) };
   }
 }

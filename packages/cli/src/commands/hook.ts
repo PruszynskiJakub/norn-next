@@ -3,7 +3,7 @@
  * Prints the harness's native reply and exits with its code; never a CliError, as a hook must always answer.
  */
 import { type Harness, parseJson, RUN_ENV } from "@norn/plugin-api";
-import { failedHookReply, type IngestInput, ingestHook } from "@norn/runtime";
+import { claimHeldElsewhere, failedHookReply, type IngestInput, ingestHook } from "@norn/runtime";
 import { Type } from "@sinclair/typebox";
 import { defineCommand } from "../command.ts";
 import type { CliContext } from "../context.ts";
@@ -92,6 +92,7 @@ export const hookCommand = defineCommand({
           journal: env.journal,
           worktreeOf: (unit) => env.slots.vcs.worktree.path(unit),
           writableRoots: writableRoots(ctx.env),
+          claimMoved: async (unit) => (await claimHeldElsewhere(env, unit)) !== null,
         },
         input,
       );

@@ -126,7 +126,7 @@ export const KEY_DEFAULTS: Record<string, unknown | { derived: string }> = {
   packs: CONFIG_DEFAULTS.packs,
   base: CONFIG_DEFAULTS.base,
   base_ref: { derived: "the remote's fetched copy of `base` (`origin/main`), else `base`" },
-  holder: { derived: "user@host" },
+  holder: { derived: "user@ the machine's LocalHostName, else its hostname, fixed in `~/.norn/holder.json` on first use" },
   executor: { derived: "the only executor" },
   "tracker.intake.assignee": "me",
   "kernel.mode": d.mode,

@@ -118,6 +118,8 @@ export interface RuntimeParts {
   loaded: LoadedConfig;
   plugins: readonly NornPlugin[];
   holder: string;
+  /** names this machine claimed under before `holder` */
+  formerHolders?: readonly string[];
   /** how a launched agent's hooks call back into this binary, before `hook <harness>` */
   self: readonly string[];
   /** this process's PATH, which launched agents get with a `norn` running `self` in front */
@@ -129,7 +131,7 @@ export interface RuntimeParts {
 }
 
 function runtimeDeps(p: RuntimeParts): Parameters<typeof createRuntimeEnv>[0] {
-  const config: RuntimeConfig = runtimeConfigOf(p.loaded, p.holder);
+  const config: RuntimeConfig = runtimeConfigOf(p.loaded, p.holder, p.formerHolders);
   return {
     ctx: p.w.ctx,
     plugins: p.plugins,

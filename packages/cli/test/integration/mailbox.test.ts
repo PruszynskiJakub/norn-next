@@ -6,9 +6,8 @@
  */
 import { beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
 import { join } from "node:path";
-import { type NornOut, norn, otherMachine, TEST_PLUGIN, type UnitShown, unitOf, type World, world } from "./world.ts";
+import { machineName, type NornOut, norn, otherMachine, TEST_PLUGIN, type UnitShown, unitOf, type World, world } from "./world.ts";
 
 const KEY = "lt-1";
 const SLOW = 240_000;
@@ -43,7 +42,7 @@ async function tickUntil(w: World, env: Record<string, string>, rules: string[],
 describe("a gate decided on another machine reaches the holder through the mailbox", () => {
   let a: World;
   let b: World;
-  const host = hostname();
+  let host = "";
   const alice: string[] = [];
   const bob: string[] = [];
   let bobAtGate: UnitShown | null = null;
@@ -69,6 +68,7 @@ describe("a gate decided on another machine reaches the holder through the mailb
     await tickAs(b, BOB, bob);
     bobAfter = await unitOf(b, KEY);
     bobView = await norn(b, ["story", "view", KEY, "--json"], BOB);
+    host = machineName(a);
   }, SLOW);
 
   test("bob's machine sees alice's story parked at the gate and leaves it to her", () => {

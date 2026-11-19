@@ -31,6 +31,11 @@ export interface IngestDeps {
   writableRoots?: readonly string[];
   /** how the report commands are spelled in a stop block's reason */
   commands?: BriefCommands;
+  /**
+   * whether another machine now holds the claim of `unit`'s story: its report is refused here
+   * (`claim_moved`), so a stop must not wait for one
+   */
+  claimMoved?(unit: string): Promise<boolean>;
 }
 
 export interface IngestInput {
@@ -169,7 +174,15 @@ export async function ingestHook(deps: IngestDeps, input: IngestInput): Promise<
       problems.push(`outbox: ${errorText(e)}`);
     }
     // an attended run is the person's to end, and a replaced run owes nothing
-    const needsReport = isLive && live.agent && !live.attended;
+    let needsReport = isLive && live.agent && !live.attended;
+    // asked only when a stop would block: a moved claim refuses every report, so a block would never end
+    if (owesReportBlock(fresh, { needsReport, reported, capabilities: harness.capabilities }) && deps.claimMoved) {
+      try {
+        if (await deps.claimMoved(unit)) needsReport = false;
+      } catch (e) {
+        problems.push(`claim: ${errorText(e)}`);
+      }
+    }
     let stopBlocksSpent = false;
     if (owesReportBlock(fresh, { needsReport, reported, capabilities: harness.capabilities })) {
       try {
