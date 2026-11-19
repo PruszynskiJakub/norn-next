@@ -161,6 +161,11 @@ describe("storeProblems and createStore", () => {
     expect(storeProblems(inertStore({ claims }))).toEqual(["offers claims.takeOver its capabilities deny"]);
   });
 
+  test("diverged and adoptRemote, when offered, are functions", () => {
+    expect(storeProblems(inertStore({ diverged: "yes" as never, adoptRemote: 1 as never }))).toEqual(["diverged must be a function", "adoptRemote must be a function"]);
+    expect(storeProblems(inertStore({ diverged: async () => ok(false), adoptRemote: async () => ok({ dropped: null }) }))).toEqual([]);
+  });
+
   test("a shared store must sync and flush", () => {
     const caps = { shared: true, claims: "distributed" as const, mailbox: false, artifacts: false };
     expect(storeProblems(inertStore({ capabilities: caps }))).toEqual(["a shared store lacks sync", "a shared store lacks flush"]);

@@ -118,6 +118,11 @@ export const StoryFacts = Type.Object(
      * push them without decide reading git.
      */
     unpushed: Type.Optional(Type.Boolean()),
+    /**
+     * This clone's run data of the story and the remote's each hold writes the other lacks, so a
+     * flush can publish neither. Reported by a shared store; absent or false otherwise.
+     */
+    unsynced: Type.Optional(Type.Boolean()),
     /** present once the story has slice files */
     plan: Type.Optional(SlicePlan),
   },

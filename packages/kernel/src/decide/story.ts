@@ -20,6 +20,11 @@ export const ITEM_CLOSED_REASON = "the item closed";
 
 const CHANGE_CLOSED = /^the change( \S+)? closed without merging$/;
 
+/** Why a held story whose run data diverged from the remote's waits, and the command that carries it on. */
+export function unsyncedReason(story: string): string {
+  return `this clone's run data of ${story} and the remote's diverged, so no flush can publish it; norn story take ${story} --force carries the story on from the remote's record, keeping this clone's part under a ref`;
+}
+
 /** The park a closed change holds: a rerun clears it, and the next tick parks again while the change stays closed. */
 export function changeClosedReason(url: string | undefined): string {
   return `the change${url ? ` ${url}` : ""} closed without merging`;
@@ -60,6 +65,8 @@ export function decideStory(story: StoryFacts, ctx: DecideContext): Decision[] {
   }
   // renewing is a story action: it leaves every unit its one action of the tick
   if (now >= Date.parse(claim.expires_at) - config.claimRenewBeforeMs) out.push({ kind: "renew_claim", unit: null, rule: "claim.renew", story: story.key });
+  // every write on a diverged record deepens the split no flush can publish; the claim is kept, so the story waits here for a person
+  if (story.unsynced === true) return [...out, ...held(story, "store.diverged", unsyncedReason(story.key))];
 
   out.push(...mailboxDecisions(story, ctx));
   for (const id of unitIds(story)) {
@@ -79,7 +86,7 @@ export function decideStoryTail(story: StoryFacts, ctx: DecideContext): Decision
   if (!claim || claim.holder !== facts.holder) return [];
   const out: Decision[] = [];
   const live = Date.parse(facts.now) < Date.parse(claim.expires_at);
-  if (live && facts.capabilities.store.shared) out.push({ kind: "flush", unit: null, rule: "store.flush", story: story.key });
+  if (live && facts.capabilities.store.shared && story.unsynced !== true) out.push({ kind: "flush", unit: null, rule: "store.flush", story: story.key });
   if (!isOpen(story)) {
     const finish = finishRule(story, ctx);
     if (finish) out.push(finish);

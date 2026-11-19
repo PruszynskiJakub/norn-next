@@ -3,7 +3,7 @@ import { type Decision, type DecisionOf, renderBrief } from "@norn/kernel";
 import { deriveUlid } from "@norn/schema";
 import { layout } from "@norn/store-local";
 import { fail, ok } from "@norn/plugin-api";
-import { act, type AgentRunRequest, appendEvents, briefRenderInput, EventLogSessionSource, nudgePromptId, readStepRun } from "../../src/index.ts";
+import { act, type AgentRunRequest, appendEvents, briefRenderInput, EventLogSessionSource, gatherFacts, nudgePromptId, readStepRun } from "../../src/index.ts";
 import { decided, decisionOf, type Harnessed, has, harness, MINUTE, record, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
 
 const kinds = async (h: ReturnType<typeof harness>, unit: string) => (await record(h, unit)).receipts.map((r) => r.data.kind);
@@ -437,6 +437,16 @@ describe("the mailbox and the store", () => {
     expect(r).toMatchObject({ ok: true, detail: { pushed: true, heads: ["norn/lt-1"] } });
     expect(order).toEqual(["publish norn/lt-1", "publish norn/lt-1-01", "flush lt-1"]);
     expect(problems).toEqual(["lt-1/01: publishing norn/lt-1-01: diverged"]);
+  });
+
+  test("a story whose run data diverged from the remote's reads as unsynced, so decide holds it", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    const store = { ...h.env.slots.store, capabilities: { ...h.env.slots.store.capabilities, shared: true }, diverged: async (story: string) => ok(story === "lt-1") };
+    const gathered = await gatherFacts({ ...h.env, slots: { ...h.env.slots, store } }, deriveUlid("01JD5G00000000000000000000", 950), { readOnly: true });
+    if (!gathered.ok) throw new Error(gathered.failure.message);
+    expect(gathered.value.facts.stories[0]).toMatchObject({ key: "lt-1", unsynced: true });
   });
 
   test("a store without flush publishes nothing, and says so", async () => {

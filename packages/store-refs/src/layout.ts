@@ -9,6 +9,8 @@ import { filesIn, type Snapshot } from "./tree.ts";
 export const RUNS_PREFIX = "refs/norn/v2/runs/";
 /** what this clone last saw of the remote's run refs: the lease flush pushes against */
 export const TRACKING_RUNS_PREFIX = "refs/norn/v2/tracking/runs/";
+/** this clone's run data a person dropped for the remote's, kept where git still reaches it: never pushed */
+export const DROPPED_RUNS_PREFIX = "refs/norn/v2/dropped/runs/";
 const CLAIMS_PREFIX = "refs/norn/v2/claims/";
 const MAILBOX_PREFIX = "refs/norn/v2/mailbox/";
 /** one ref for the whole store: the norn version floor */
@@ -16,6 +18,7 @@ export const FLOOR_REF = "refs/norn/v2/floor";
 
 export const runRef = (story: string): string => `${RUNS_PREFIX}${story}`;
 export const trackingRunRef = (story: string): string => `${TRACKING_RUNS_PREFIX}${story}`;
+export const droppedRunRef = (story: string, commit: string): string => `${DROPPED_RUNS_PREFIX}${story}/${commit}`;
 export const claimRef = (story: string): string => `${CLAIMS_PREFIX}${story}`;
 export const mailboxRef = (story: string): string => `${MAILBOX_PREFIX}${story}`;
 

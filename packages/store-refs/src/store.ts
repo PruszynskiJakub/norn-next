@@ -6,7 +6,7 @@ import type { RefsContext } from "./context.ts";
 import { refsFloor } from "./floor.ts";
 import { gitRunner } from "./git.ts";
 import { refsMailbox } from "./mailbox.ts";
-import { flush, sync } from "./share.ts";
+import { adoptRemote, diverged, flush, sync } from "./share.ts";
 import { appendReceipt, archive, commitState, listUnits, readUnit } from "./units.ts";
 
 export function createRefsStore(ctx: HostContext, config: RefsStoreConfig = {}): Store {
@@ -33,5 +33,7 @@ export function createRefsStore(ctx: HostContext, config: RefsStoreConfig = {}):
     archive: (story) => archive(rc, story),
     sync: () => sync(rc),
     flush: (story) => flush(rc, story),
+    diverged: (story) => diverged(rc, story),
+    adoptRemote: (story) => adoptRemote(rc, story),
   };
 }

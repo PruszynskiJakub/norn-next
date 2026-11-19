@@ -184,6 +184,11 @@ export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherO
     const graph = own ? workflows.byHash[own.workflow.hash]?.graph : undefined;
     const story: StoryFacts = { key: r.key, item: await itemOf(env, r.key, problems), change, claim: r.claim, units: r.units, mailbox: r.mailbox };
     Object.assign(story, await vcsFacts(env, r.key, own, graph, change, problems));
+    if (store.capabilities.shared && store.diverged) {
+      const split = await store.diverged(r.key);
+      if (!split.ok) problems.push(`${r.key}: store: ${split.failure.message}`);
+      else if (split.value) story.unsynced = true;
+    }
     if (own && own.ended === undefined && graph?.steps[own.step]?.kind === "slices") {
       // a person edits the slice files in the story's worktree at the gate before the slices step
       if (!opts.readOnly) await readBackDocs(env, r.key);

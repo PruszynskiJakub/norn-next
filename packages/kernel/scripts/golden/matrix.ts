@@ -87,6 +87,17 @@ export const MATRIX: Scenario[] = [
     3,
   ),
   scenario(
+    "store-diverged",
+    "A held story whose run data in this clone and on the remote each hold writes the other lacks: it is held with the command that carries it on, and never flushed, so no tick writes on top of the split; a story beside it flushes as before.",
+    { files: shippedFiles("quick"), capabilities: capabilities({ store: { shared: true, claims: "distributed" } }) },
+    (w) => {
+      seed(w, "gh-53", { workflow: "quick", step: "implement" });
+      w.story("gh-53").unsynced = true;
+      seed(w, "gh-54", { workflow: "quick", step: "ready" });
+    },
+    ["store.diverged", "store.flush"],
+  ),
+  scenario(
     "corrupt",
     "Records decide never guesses at: a unit whose record failed validation, one already marked corrupt, and one pinning a workflow version no longer loaded, which is marked corrupt and then held.",
     SLICE(),
