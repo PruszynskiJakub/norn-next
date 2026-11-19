@@ -161,6 +161,24 @@ describe("guard hook", () => {
     expect(out.hookSpecificOutput.permissionDecisionReason).toContain("run state");
   });
 
+  test("a write through a symlink in the worktree that points into run state is denied as run state", async () => {
+    const { h, runId } = await running();
+    await h.files.symlink("/machine/repo/store", `${WORKTREE}/state-link`);
+    for (const p of ["state-link/units/lt-1/state.json", `${WORKTREE}/state-link/units/lt-1/state.json`]) {
+      const out = JSON.parse((await hook(h, runId, "PreToolUse", preWrite(p))).reply.stdout);
+      expect({ p, decision: out.hookSpecificOutput.permissionDecision, reason: out.hookSpecificOutput.permissionDecisionReason }).toMatchObject({ p, decision: "deny", reason: expect.stringContaining("run state") });
+    }
+  });
+
+  test("a relative symlink target is followed, and a link that stays in the worktree is allowed", async () => {
+    const { h, runId } = await running();
+    await h.files.symlink("src", `${WORKTREE}/lib`);
+    await h.files.symlink("../../store/units", `${WORKTREE}/up`);
+    expect((await hook(h, runId, "PreToolUse", preWrite("lib/x.ts"))).reply.stdout).toBe("");
+    const out = JSON.parse((await hook(h, runId, "PreToolUse", preWrite("up/lt-1/state.json"))).reply.stdout);
+    expect(out.hookSpecificOutput.permissionDecisionReason).toContain("run state");
+  });
+
   test("a write inside the worktree, relative or absolute, or under a writable root, is allowed", async () => {
     const { h, runId } = await running();
     for (const p of ["src/x.ts", `${WORKTREE}/README.md`, "/tmp/criteria.json"]) expect({ p, out: (await hook(h, runId, "PreToolUse", preWrite(p))).reply.stdout }).toEqual({ p, out: "" });
