@@ -24,6 +24,16 @@ export async function isAncestor(ctx: HostContext, cwd: string, a: string, b: st
   return gitFailure(out, "merge-base");
 }
 
+/** Delete the local branch whatever it holds; a branch already gone is not an error. */
+export async function deleteBranch(ctx: HostContext, cwd: string, branch: string): Promise<PluginResult<void>> {
+  if (optionLike(branch)) return fail("invalid", `git: ${branch} is not a branch`, false);
+  const there = await revParse(ctx, cwd, `refs/heads/${branch}`);
+  if (!there.ok) return there;
+  if (there.value === null) return ok(undefined);
+  const out = await git(ctx, cwd, ["branch", "-D", "--end-of-options", branch]);
+  return out.code === 0 ? ok(undefined) : gitFailure(out, "branch -D");
+}
+
 /**
  * The paths merging `from` into `into` would conflict on, empty when it merges clean. `merge-tree
  * --write-tree` merges in the object store only, so no branch moves and no worktree is touched.

@@ -55,4 +55,5 @@ The `refs` store shared by several clones is tested with clones on one machine o
   - Rate limits or a GitHub outage stop observation of the tracker and forge.
   - A sleeping laptop pauses every watch, and claims expire. They are taken again cleanly after wake, but nothing moves in the meantime.
   - Clean-up removes files only: the folders a finished story's logs lived in stay, empty. A unit that did not end done keeps its logs, as it keeps its worktree, and a session log a custom launcher wrote elsewhere stays too.
+  - A finished story deletes a done unit's local branch only once every commit on it is somewhere else: its story's branch, the base, or the remote's copy of it. A story squash-merged whose remote branch was deleted and pruned keeps its local branch.
 - **Observability covers only what goes through norn.** The trace records every tick's facts and decisions, and is kept for `trace.retain` (a week by default). Anything a person or agent does outside norn, such as pane keystrokes or hand merges, shows up only as facts observed later, without the reason.

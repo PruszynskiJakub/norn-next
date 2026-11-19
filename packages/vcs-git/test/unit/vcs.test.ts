@@ -434,3 +434,31 @@ describe("git vcs worktrees", () => {
     expect(missing.calls.some((c) => c[2] === "remove")).toBe(false);
   });
 });
+
+describe("git vcs deleteBranch", () => {
+  test("deletes the local branch whatever it holds, at the repo root, and is fine with a missing one", async () => {
+    const h = gitHost([
+      ["rev-parse --verify --quiet --end-of-options refs/heads/norn/gh-12^{commit}", { stdout: `${SHA}\n` }],
+      ["rev-parse --verify --quiet --end-of-options refs/heads/norn/gone^{commit}", { code: 1 }],
+      ["branch -D", {}],
+    ]);
+    const vcs = vcsOf(h.ctx);
+    expect(await vcs.deleteBranch?.("norn/gh-12")).toEqual({ ok: true, value: undefined });
+    expect(h.calls.at(-1)).toEqual(["git", "branch", "-D", "--end-of-options", "norn/gh-12"]);
+    expect(await vcs.deleteBranch?.("norn/gone")).toEqual({ ok: true, value: undefined });
+    expect(h.calls.filter((c) => c[1] === "branch")).toHaveLength(1);
+    expect(h.cwds.every((c) => c === ROOT)).toBe(true);
+  });
+
+  test("a branch that reads as an option is refused before git runs; a branch git will not delete is a failure", async () => {
+    const h = gitHost([
+      ["rev-parse", { stdout: `${SHA}\n` }],
+      ["branch -D", { code: 1, stderr: "error: cannot delete branch 'norn/gh-12' used by worktree at '/x'" }],
+    ]);
+    const vcs = vcsOf(h.ctx);
+    const option = await vcs.deleteBranch?.("-D");
+    expect(option?.ok ? null : option?.failure.code).toBe("invalid");
+    const used = await vcs.deleteBranch?.("norn/gh-12");
+    expect(used?.ok ? null : used?.failure.message).toContain("used by worktree");
+  });
+});

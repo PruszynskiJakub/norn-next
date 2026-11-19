@@ -6,6 +6,7 @@
 import { type DecisionOf, validateMailboxLetter } from "@norn/kernel";
 import { fail, ok, type PluginResult, parseStoryKey } from "@norn/plugin-api";
 import { deriveUlid } from "@norn/schema";
+import { dropUnitBranch } from "./branch-cleanup.ts";
 import { ensureWorktree } from "./branches.ts";
 import type { TickContext } from "./env.ts";
 import { mirrorSpec } from "./inputs.ts";
@@ -96,8 +97,8 @@ export async function flush(t: TickContext, d: DecisionOf<"flush">): Promise<Plu
 }
 
 /**
- * The item is closed first, the worktrees after and the units' logs last: a closed item is what a
- * person sees, and a worktree left behind by a failure is only disk. Both are idempotent (closing a closed item,
+ * The item is closed first, the worktrees after, then their branches, and the units' logs last: a
+ * closed item is what a person sees, and a worktree or branch left behind by a failure is only disk. Both are idempotent (closing a closed item,
  * removing a missing worktree), so a failure is carried out again whole next tick under that
  * tick's id; the tick keeps the claim until it succeeds.
  */
@@ -120,6 +121,18 @@ export async function finishStory(t: TickContext, d: DecisionOf<"finish_story">)
       removed.push(unit);
     }
   }
+  // slices before their story, whose branch is where an integrated slice's commits are found; a branch
+  // that cannot go is reported and never fails the finish, which would keep the claim for it
+  const branchesRemoved: string[] = [];
+  const branchesKept: Array<{ branch: string; reason: string }> = [];
+  if (env.slots.vcs.capabilities.worktrees) {
+    for (const unit of [...d.worktrees].sort((a, b) => Number(a === d.story) - Number(b === d.story))) {
+      const fate = await dropUnitBranch(env, unit);
+      if (!fate.ok) t.problems?.push(`${unit}: branch: ${fate.failure.message}`);
+      else if (fate.value?.deleted) branchesRemoved.push(fate.value.branch);
+      else if (fate.value) branchesKept.push({ branch: fate.value.branch, reason: fate.value.reason });
+    }
+  }
   // the logs last, once no worktree is left whose agent could still write them; a log left behind is
   // only disk, so it is reported and never fails the finish, which would keep the claim for it
   let logs = 0;
@@ -128,5 +141,5 @@ export async function finishStory(t: TickContext, d: DecisionOf<"finish_story">)
     logs += gone.removed;
     t.problems?.push(...gone.problems);
   }
-  return ok({ closed, removed, logs_removed: logs });
+  return ok({ closed, removed, branches_removed: branchesRemoved, branches_kept: branchesKept, logs_removed: logs });
 }
