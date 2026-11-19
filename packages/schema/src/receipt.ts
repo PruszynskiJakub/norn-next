@@ -58,8 +58,8 @@ function receipt<K extends string, P extends TProperties>(kind: K, props: P) {
 
 /**
  * A receipt a person may send through the mailbox (answer, approve, reject, unstick).
- * `attempt` is absent only when a non-holder made it for a `local` story: stamped with the step its last
- * boundary led to (`Norn-Next`), the holder matches it by step alone.
+ * `attempt` is absent only when a non-holder made it for a `local` story: stamped with the step it was
+ * made at, the holder matches it by step alone.
  */
 function mailboxReceipt<K extends string, P extends TProperties>(kind: K, props: P) {
   return Type.Object({ kind: Type.Literal(kind), ...header, attempt: Type.Optional(PosInt), ...props }, { additionalProperties: false });
@@ -220,9 +220,9 @@ export const ClassifyReceipt = receipt("classify", {
         head: Type.Optional(GitSha),
         /** A `done` update made a merge commit (false = already up to date) */
         merged: Type.Optional(Type.Boolean()),
-        /** A `done` update completed its conflicts without an agent: the paths it took from the base */
+        /** Nothing writes or reads it now; kept so a receipt written with it still validates */
         regenerated: Type.Optional(Type.Array(NonEmpty)),
-        /** A `conflict` update tried the regenerate commands first: what they printed and why they did not finish it */
+        /** Nothing writes or reads it now; kept so a receipt written with it still validates */
         regenerate: Type.Optional(Type.Object({ output: Type.String() }, { additionalProperties: false })),
       },
       { additionalProperties: false },

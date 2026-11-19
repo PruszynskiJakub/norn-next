@@ -32,7 +32,5 @@ export const ExitCode = {
   busy: 5,
   /** a config file a person wrote needs fixing; no unit is broken */
   config: 6,
-  /** `norn story wait` ran out of time before its condition held */
-  timeout: 7,
 } as const;
 export type ExitCode = (typeof ExitCode)[keyof typeof ExitCode];
