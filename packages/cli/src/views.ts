@@ -3,7 +3,7 @@
  * gathered and never acted on, shaped for a person. What waits for a person (a gate, a question, a
  * parked or stuck unit) is named per unit, so `status` reads as a list of what needs doing.
  */
-import type { KernelCapabilities, KernelWorkflows, StoryFacts, UnitFacts } from "@norn/kernel";
+import { ITEM_CLOSED_REASON, isChangeClosedReason, type KernelCapabilities, type KernelWorkflows, type StoryFacts, type UnitFacts } from "@norn/kernel";
 import { gatherFacts, newTickId, type RuntimeEnv } from "@norn/runtime";
 import { refuse } from "./output.ts";
 
@@ -76,7 +76,11 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
   const id = u.id;
   const rerun = `norn run rerun ${id}`;
   const decide = `norn story approve ${id}, or norn story reject ${id} --reason "<what to change>"`;
-  if (s.ended) return { for: "person", text: `ended ${s.ended}${s.ended_reason ? `: ${s.ended_reason}` : ""}`, ...(s.ended === "stuck" && { next: rerun }) };
+  const newWork = 'norn story create "<title>" for the new work';
+  if (s.ended) {
+    const next = s.ended_reason === ITEM_CLOSED_REASON ? `reopen the item, then ${rerun}; or ${newWork}` : rerun;
+    return { for: "person", text: `ended ${s.ended}${s.ended_reason ? `: ${s.ended_reason}` : ""}`, ...(s.ended === "stuck" && { next }) };
+  }
   const reason = s.parked?.reason;
   const permission = u.session?.permission;
   // a park a rule derived from facts is named by its rule; the view says what that rule waits for
@@ -106,7 +110,9 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
     case "gate.park":
       return { for: "gate", text: prompt ?? s.step, next: decide };
     default:
-      // a park no rule derives (a closed change, slice files that failed validation) holds until a person moves the unit on
+      // a rerun alone would see the closed change park the unit again on the next tick
+      if (isChangeClosedReason(reason)) return { for: "person", text: reason, next: `reopen the change on the forge, then ${rerun}; or ${newWork}` };
+      // a park no rule derives (slice files that failed validation) holds until a person moves the unit on
       return { for: "person", text: STUCK_PARKS[reason] ?? reason, next: rerun };
   }
   if (u.session?.ask) return { for: "answer", text: u.session.ask.question, next: `norn story answer ${id} "<answer>"` };
