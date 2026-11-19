@@ -65,6 +65,7 @@ back as the unit's `corrupt_marked` fact.
 | `remote.issue_closed` | `close_story` | `story.item_closed` | `apply_receipts` (`unit.marked` stuck, reason: the item closed); `claim.release` follows |
 | (none) | | `story.change_merged.stop`, `story.item_closed.stop` | `stop_run` (with a `stop.sent` intent) when the unit's run may still be going (an agent session not ended, a check or step run running) and no stop was ordered; the mark follows the next tick, the order applied with it |
 | `remote.park` | `park` | `story.change_closed` | `park` (inbox `stuck`: the change closed unmerged), at any step once no receipt waits and no run is live, so a story polled at merge parks too |
+| (none) | | `story.change_merged_elsewhere` | `park` (inbox `stuck`: the change merged into a branch other than the config's base), under the same conditions as `story.change_closed`; the story is not ended and its worktree stays |
 | `remote.unpark_finished` | `apply_receipts` | dropped: a park the facts no longer support is lifted by a person's receipt, never by decide reading a tracker | |
 | `story.halted` | `noop` | `unit.parked` | `noop` (the unit waits on its park) |
 | `remote.mirror` | `update_story_mirror` | dropped: labels and comments are display; the host's tracker plugin mirrors after a commit, decide never reads them back | |

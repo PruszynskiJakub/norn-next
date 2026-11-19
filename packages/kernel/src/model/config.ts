@@ -43,6 +43,11 @@ export const KernelConfig = Type.Object(
     intakeWorkflowLabelPrefix: Type.Optional(NonEmpty),
     /** the workflow each slice runs */
     sliceWorkflow: NonEmpty,
+    /**
+     * The branch a story's change is for, as the forge names it: a change merged into any other
+     * branch did not land the story. Absent: a change merged into any branch lands it.
+     */
+    base: Type.Optional(NonEmpty),
     /** how long a claim holds, and how long before it expires the holder renews it */
     claimTtlMs: PosInt,
     claimRenewBeforeMs: PosInt,
@@ -68,6 +73,7 @@ export const DEFAULT_KERNEL_CONFIG: KernelConfig = {
   workflow: "story",
   intakeWorkflowLabelPrefix: DEFAULT_WORKFLOW_LABEL_PREFIX,
   sliceWorkflow: "slice",
+  base: "main",
   claimTtlMs: 10 * 60_000,
   claimRenewBeforeMs: 400_000,
 };

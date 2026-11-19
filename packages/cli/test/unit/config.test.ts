@@ -244,6 +244,7 @@ describe("the runtime config derived from the person's", () => {
       silentAfterMs: 300_000,
       deadlineMs: null,
       executor: "claude",
+      base: "trunk",
       counterDefaults: { ...DEFAULT_KERNEL_CONFIG.counterDefaults, checkFail: 9 },
     });
   });

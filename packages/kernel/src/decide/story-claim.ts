@@ -14,9 +14,19 @@ export function unitIds(story: StoryFacts): string[] {
   return [story.key, ...story.units.map((u) => u.id).filter((id) => id !== story.key)];
 }
 
-/** The story ended by its change merging or its item closing, which no unit of it can undo. */
-export function storyFinished(story: StoryFacts): boolean {
-  return story.change?.state === "merged" || (story.item !== null && !story.item.open);
+/** The story's change merged into the story's base; one merged into another branch landed nothing the story is for. */
+export function changeLanded(story: StoryFacts, base: string | undefined): boolean {
+  return story.change?.state === "merged" && (base === undefined || story.change.base_branch === base);
+}
+
+/** The story's change merged, but into a branch other than its base: a person must say what happens next. */
+export function mergedElsewhere(story: StoryFacts, base: string | undefined): boolean {
+  return story.change?.state === "merged" && !changeLanded(story, base);
+}
+
+/** The story ended by its change landing on its base or its item closing, which no unit of it can undo. */
+export function storyFinished(story: StoryFacts, base: string | undefined): boolean {
+  return changeLanded(story, base) || (story.item !== null && !story.item.open);
 }
 
 /**
@@ -24,11 +34,11 @@ export function storyFinished(story: StoryFacts): boolean {
  * receipt not applied, a letter not imported, or a story not started that nothing finished. A slice
  * not started is the slices step's to start and keeps nothing open by itself.
  */
-export function isOpen(story: StoryFacts): boolean {
+export function isOpen(story: StoryFacts, base: string | undefined): boolean {
   if (story.mailbox.length > 0) return true;
   if (story.units.some((u) => u.corrupt !== undefined || u.receipts.length > 0 || (u.state !== null && u.state.ended === undefined))) return true;
   const own = story.units.find((u) => u.id === story.key);
-  return !own?.state && !storyFinished(story);
+  return !own?.state && !storyFinished(story, base);
 }
 
 /** One noop per unit: nothing of the story is decided while the claim is not this machine's to act on. */

@@ -210,6 +210,14 @@ describe("await-merge", () => {
     expect(value(await poll()).outcome).toBe("merged");
   });
 
+  test("a change merged into a branch other than the story's base waits for a person: nothing reached the base", async () => {
+    const { world } = await opened({ "gh-12-login": ZERO, "origin/release": BASE }, {});
+    await world.merge?.(1, "9".repeat(40));
+    const { vcs } = fakeVcs({ "gh-12-login": ZERO }, {});
+    const elsewhere = await awaitMerge.run(input<Record<string, never>>({}, { step: "merge", base: { branch: "release", ref: "origin/release" }, slots: { forge: world.forge, vcs } }), memoryHost());
+    expect(value(elsewhere)).toMatchObject({ outcome: "waiting", detail: { reason: "the change merged into main, not the story's base release" } });
+  });
+
   test("a base the story lacks is never answered stale here: the host's base_stale fact decides that by the workflow's policy", async () => {
     const { poll } = await opened({ "gh-12-login": ZERO, "origin/main": BASE }, {});
     expect(value(await poll()).outcome).toBe("waiting");

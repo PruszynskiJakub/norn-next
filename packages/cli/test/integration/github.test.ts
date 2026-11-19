@@ -4,7 +4,7 @@
  * and the shipped CI checks, every norn call a subprocess of the binary from source.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { nodeExec } from "@norn/host-node";
 import { parse } from "yaml";
@@ -439,6 +439,68 @@ describe("a new round on a finished story whose PR is still open", () => {
     expect(edits.length).toBe(1);
     expect(edits[0]).toEqual(expect.arrayContaining(["--body-file", "-"]));
     expect(body).toBe(`Closes ${WEB}/issues/1\n\nDelivered by norn (story ${KEY}).`);
+  });
+});
+
+/** The story's worktree, as git lists it in the repo. */
+async function worktreeOf(w: World, key: string): Promise<string | undefined> {
+  return (await sh(w.root, "git", "worktree", "list", "--porcelain"))
+    .split("\n")
+    .filter((l) => l.startsWith("worktree "))
+    .map((l) => l.slice("worktree ".length))
+    .find((p) => p.endsWith(`/worktrees/${key}`));
+}
+
+describe("a story's pull request merged into a branch other than its base", () => {
+  let w: World;
+  const rules: string[] = [];
+  let parked: UnitShown | null;
+  let worktree: string | undefined;
+  let wtExists = false;
+
+  beforeAll(async () => {
+    w = await world("work");
+    fakeGh(w);
+    const shipped = [
+      "name: shipped",
+      "start: look",
+      "steps:",
+      "  look:",
+      "    gate: Ship it.",
+      "    outcomes: { approve: open-pr, reject: $stuck }",
+      "  open-pr:",
+      "    open-pr:",
+      "    outcomes: { done: merge }",
+      "  merge:",
+      "    await-merge:",
+      "    outcomes: { merged: $done, stale: $stuck, unpushed: open-pr }",
+      "",
+    ].join("\n");
+    await setUp(w, { tracker: "github", forge: "github", workflows: { shipped } });
+    await norn(w, ["doctor", "--json"]);
+    await norn(w, ["story", "create", "Ship it", "--workflow", "shipped", "--json"]);
+    await tickUntil(w, rules, (u) => u?.step === "look" && u.parked !== undefined, 60_000, KEY);
+    await norn(w, ["story", "approve", KEY, "--json"]);
+    await tickUntil(w, rules, (u) => u?.step === "merge", 60_000, KEY);
+
+    // a person retargets the PR to release on github.com and merges it there
+    editGh(w, (s) => {
+      for (const p of s.prs) Object.assign(p, { base: "release", state: "MERGED", mergeSha: "e".repeat(40), mergedAt: "2026-10-21T10:00:00Z" });
+    });
+    await tickUntil(w, rules, (u) => u?.parked !== undefined || u?.ended !== undefined, 60_000, KEY);
+    for (let i = 0; i < 2; i++) await norn(w, ["tick", "--json"]);
+    parked = await unitOf(w, KEY);
+    worktree = await worktreeOf(w, KEY);
+    wtExists = worktree !== undefined && existsSync(worktree);
+  }, SLOW);
+
+  test("the story is not ended done: it parks naming release, and its worktree stays", () => {
+    expect(rules.filter((r) => r.endsWith("!"))).toEqual([]);
+    expect(rules).not.toContain("story.change_merged");
+    expect(parked?.ended).toBeUndefined();
+    expect(parked?.step).toBe("merge");
+    expect(parked?.parked).toContain("release");
+    expect(wtExists).toBe(true);
   });
 });
 

@@ -21,6 +21,10 @@ async function run(input: StepKindInput<Record<string, never>>, _ctx: HostContex
   const found = await forge.findChanges([branch]);
   if (!found.ok) return found;
   const change = found.value[branch] ?? null;
+  const base = input.base?.branch;
+  // a merge into another branch landed nothing on the story's base: the kernel parks the story for a person, and the step must not end it done
+  if (change?.state === "merged" && base !== undefined && change.base_branch !== base)
+    return ok({ outcome: "waiting", detail: { change, reason: `the change merged into ${change.base_branch}, not the story's base ${base}` } });
   if (change?.state === "merged") return ok({ outcome: "merged", detail: { change } });
 
   // a person closed the change: the kernel parks the story for them, and nothing here may send it on to open a new one
