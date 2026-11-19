@@ -344,6 +344,42 @@ describe("limitations: the hooks entry", () => {
   });
 });
 
+describe("limitations: Dropped from 0.35", () => {
+  // A person who used 0.35 looks for the verb they knew; each one gone must say what to do instead,
+  // and a verb restored later must leave this list, or the doc would call a live command dropped.
+  const DROPPED_COMMANDS = ["run list", "run view", "run attach", "upgrade", "uninstall", "sync", "story reopen", "story edit", "story reset", "story start"];
+  const DROPPED_FLAGS: ReadonlyArray<readonly [string, string]> = [
+    ["done", "evidence"],
+    ["ask", "option"],
+    ["status", "details"],
+    ["status", "notes"],
+    ["status", "history"],
+    ["story view", "web"],
+  ];
+  const section = (): string => {
+    const text = read(join(ROOT, "docs", "limitations.md"));
+    const start = text.indexOf("\n## Dropped from 0.35\n");
+    expect(start).toBeGreaterThan(-1);
+    const end = text.indexOf("\n## ", start + 1);
+    return text.slice(start, end < 0 ? undefined : end);
+  };
+
+  test("names every 0.35 command and flag this norn no longer has", () => {
+    const body = section();
+    const missing = [
+      ...DROPPED_COMMANDS.filter((c) => !body.includes(`\`${c}`)),
+      ...DROPPED_FLAGS.filter(([c, f]) => !body.includes(`\`${c} --${f}`)).map(([c, f]) => `${c} --${f}`),
+    ];
+    expect(missing).toEqual([]);
+  });
+
+  test("names none that Reference lists as a live command or flag", () => {
+    const table = commandTable(read(REFERENCE));
+    const live = [...DROPPED_COMMANDS.filter((c) => table.has(c)), ...DROPPED_FLAGS.filter(([c, f]) => table.get(c)?.has(f) === true).map(([c, f]) => `${c} --${f}`)];
+    expect(live).toEqual([]);
+  });
+});
+
 describe("Development › Skills", () => {
   test("says when a bundled skill is exact and when it gives principles", () => {
     const dev = read(join(ROOT, "docs", "development.md"));
