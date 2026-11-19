@@ -107,7 +107,32 @@ describe("a local gathering", () => {
     expect(local.value.facts.stories.map((s) => [s.key, s.item, s.change])).toEqual([["lt-1", null, null]]);
     expect(local.value.facts.intake).toEqual([]);
     await gatherFacts(spied, h.tickIds[0] as string, { readOnly: true });
-    expect(remote).toEqual(["forge.findChanges", "vcs.fetch", "tracker.get", "tracker.intake"]);
+    expect(remote).toEqual(["forge.findChanges", "tracker.intake", "vcs.fetch", "tracker.get"]);
+  });
+});
+
+describe("the remote fetch", () => {
+  /** The env with a vcs that pushes, its fetches counted. */
+  function counting(h: ReturnType<typeof harness>) {
+    const fetches: string[] = [];
+    const vcs = h.env.slots.vcs;
+    const env = { ...h.env, slots: { ...h.env.slots, vcs: { ...vcs, capabilities: { ...vcs.capabilities, push: true }, fetch: () => (fetches.push("vcs.fetch"), vcs.fetch()) } } };
+    return { env, fetches };
+  }
+
+  /** No tick ran yet, so no tick id was handed out: any id of the shape does. */
+  const TICK = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+
+  test("an item to take in with no story yet fetches, so the tick that takes it cuts its branch from the base as the remote has it", async () => {
+    const h = harness({ workflow: "stepped" });
+    const { env, fetches } = counting(h);
+    await gatherFacts(env, TICK);
+    expect(fetches).toEqual([]);
+    h.items.push(trackerItem(1));
+    const g = await gatherFacts(env, TICK);
+    if (!g.ok) throw new Error(g.failure.message);
+    expect(g.value.facts.intake).toHaveLength(1);
+    expect(fetches).toEqual(["vcs.fetch"]);
   });
 });
 

@@ -28,6 +28,18 @@ export async function revParse(ctx: HostContext, ref: string): Promise<PluginRes
   return ok(sha);
 }
 
+/**
+ * The commit a change's base branch is at: the local branch, else the remote's copy of it. A clone
+ * holds only the remote's default branch locally, so a story on another base (`develop`) finds that
+ * base only as `origin/develop`, which is also where a teammate's merge into it lands. `origin` is
+ * the remote the vcs pushes to unless its config names another.
+ */
+export async function baseTip(ctx: HostContext, branch: string): Promise<PluginResult<string | null>> {
+  const local = await revParse(ctx, branch);
+  if (!local.ok || local.value !== null) return local;
+  return revParse(ctx, `refs/remotes/origin/${branch}`);
+}
+
 /** Whether commit `a` is reachable from commit `b`. */
 export async function isAncestor(ctx: HostContext, a: string, b: string): Promise<PluginResult<boolean>> {
   if (a === b) return ok(true);

@@ -17,7 +17,7 @@ import {
 } from "@norn/plugin-api";
 import { type Observed, observe, toChange } from "./observe.ts";
 import { type ChangeRecord, encode, io, readAll, readRecord, recordPath } from "./record.ts";
-import { revParse } from "./git.ts";
+import { baseTip, revParse } from "./git.ts";
 
 /** How many taken ids `open` steps past before giving up: only racing writers take them. */
 const ALLOCATE_TRIES = 16;
@@ -54,7 +54,7 @@ async function open(ctx: HostContext, e: Extract<ForgeEffect, { kind: "open" }>,
   const head = await revParse(ctx, e.head);
   if (!head.ok) return head;
   if (head.value === null) return fail("not_found", `forge none: no branch ${e.head}`, false);
-  const base = await revParse(ctx, e.base);
+  const base = await baseTip(ctx, e.base);
   if (!base.ok) return base;
   if (base.value === null) return fail("not_found", `forge none: no branch ${e.base}`, false);
   let id = all.value.reduce((m, r) => Math.max(m, r.id), 0) + 1;

@@ -4,7 +4,7 @@
  * `merge_sha` do not drift as the base moves on or the head branch is deleted.
  */
 import { type ChangeRequest, type ChangeRequestState, type HostContext, ok, type PluginResult } from "@norn/plugin-api";
-import { isAncestor, revParse } from "./git.ts";
+import { baseTip, isAncestor, revParse } from "./git.ts";
 import type { ChangeRecord } from "./record.ts";
 
 export interface Observed {
@@ -20,7 +20,7 @@ export async function observe(ctx: HostContext, rec: ChangeRecord): Promise<Plug
   const head = await revParse(ctx, rec.head_branch);
   if (!head.ok) return head;
   const headSha = head.value ?? rec.head_sha;
-  const base = await revParse(ctx, rec.base_branch);
+  const base = await baseTip(ctx, rec.base_branch);
   if (!base.ok) return base;
   if (base.value === null) return ok({ state: "open", head_sha: headSha, record: rec });
   const inBase = await isAncestor(ctx, headSha, base.value);

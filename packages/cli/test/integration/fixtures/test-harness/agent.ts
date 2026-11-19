@@ -33,6 +33,13 @@
  * - report: the reports TEST_AGENT_REPORTS names for the visit (`"<step>#<attempt>"`, then
  *   `"<step>"`): `{criteria?, tries}`, each try a `norn` verb's argv run in turn, the criteria
  *   report written outside the worktree and passed to each try as `--criteria <file>`.
+ * - resolve: merges the base commit its `base_side` input names (the conflict norn aborted), keeps
+ *   both sides of every conflicted path, commits the merge and reports done. A script at
+ *   `$TEST_FLAGS/before-report.sh` runs once between the commit and the report, so a test can move
+ *   the base under a resolver that has just finished.
+ * - resolve-ask: merges as resolve does, resolves and stages only the last conflicted path, then
+ *   asks with the merge kept in progress; the resumed launch notes the merge it found, resolves the
+ *   rest, commits and reports done.
  * - logged-out: its start hook, then a line on stdout and an exit 1 before any prompt, as `claude -p`
  *   does without a login (TEST_AGENT_PLAN only: it exits before the brief that names the step).
  */
@@ -213,6 +220,77 @@ async function permission(): Promise<void> {
   await hook("end");
 }
 
+/** The base commit the `base_side` input names, as the resolver is told to merge it. */
+function baseToMerge(): string {
+  const text = readFileSync(join(cwd, ".agents", "inputs", "base_side.md"), "utf8");
+  const sha = text.match(/git merge ([0-9a-f]{40})/)?.[1];
+  if (sha === undefined) throw new Error(`base_side names no commit to merge:\n${text}`);
+  return sha;
+}
+
+async function unmerged(): Promise<string[]> {
+  return (await sh("git diff --name-only --diff-filter=U")).stdout.split("\n").filter(Boolean);
+}
+
+/** The merge as it stands: its MERGE_HEAD (null when none) and `git status --porcelain`. */
+async function mergeState(): Promise<{ merge_head: string | null; porcelain: string }> {
+  const mh = await sh("git rev-parse -q --verify MERGE_HEAD");
+  return { merge_head: mh.code === 0 ? mh.stdout.trim() : null, porcelain: (await sh("git status --porcelain --untracked-files=no")).stdout };
+}
+
+/** Each path as both sides wrote it, the story's lines first, staged: a resolution that keeps the two. */
+async function keepBoth(paths: string[]): Promise<void> {
+  for (const path of paths) {
+    const ours = await sh(`git show :2:${quote(path)}`);
+    const theirs = await sh(`git show :3:${quote(path)}`);
+    await Bun.write(join(cwd, path), `${ours.stdout}${theirs.stdout}`);
+    await git("add", "--", path);
+  }
+}
+
+async function commitAndReport(): Promise<void> {
+  await git("-c", "user.email=agent@test", "-c", "user.name=agent", "commit", "-q", "--no-edit");
+  const before = join(process.env.TEST_FLAGS ?? "", "before-report.sh");
+  if (process.env.TEST_FLAGS && existsSync(before)) {
+    const ran = await sh(`sh ${quote(before)}`);
+    rmSync(before, { force: true });
+    note("before-report", ran);
+  }
+  note("done", await nornJson(["done", "done"]));
+  await hook("end");
+}
+
+/** `git merge <base>` as a resolver starts it: a conflict is what it expects. */
+async function startMerge(): Promise<string[]> {
+  const sha = baseToMerge();
+  note("merging", sha);
+  await sh(`git merge --no-ff --no-edit ${sha}`);
+  const paths = await unmerged();
+  note("conflicts", paths);
+  return paths;
+}
+
+async function resolve(): Promise<void> {
+  await keepBoth(await startMerge());
+  await commitAndReport();
+}
+
+/** Part of the conflict resolved and staged, the rest left for the person's answer. */
+async function resolveAsk(): Promise<void> {
+  const paths = await startMerge();
+  await keepBoth(paths.slice(-1));
+  note("merge.at-ask", await mergeState());
+  note("ask", await nornJson(["ask", "Which side of the conflict should win?"]));
+  note("stop.after-ask", await hook("stop"));
+  await hook("end");
+}
+
+async function resolveAnswered(): Promise<void> {
+  note("merge.at-answer", await mergeState());
+  await keepBoth(await unmerged());
+  await commitAndReport();
+}
+
 interface Reports {
   criteria?: unknown[];
   tries: string[][];
@@ -260,11 +338,14 @@ if (named !== undefined) note("handoff.read", existsSync(named) ? readFileSync(n
 if (resumed) {
   note("answered", { session: resumed, prompt });
   if (plan === "hang") await hang();
+  else if (plan === "resolve-ask") await resolveAnswered();
   else if (plan === "ask-then-stuck") {
     note("stuck", await nornJson(["stuck", "The answer leaves nothing to build."]));
     await hook("end");
   } else await work();
-} else if (plan === "ask" || plan === "ask-then-stuck") {
+} else if (plan === "resolve") await resolve();
+else if (plan === "resolve-ask") await resolveAsk();
+else if (plan === "ask" || plan === "ask-then-stuck") {
   note("ask", await nornJson(["ask", "Which colour should the button be?"]));
   // the stop hook allows a run that has asked, and a non-interactive agent exits on that
   note("stop.after-ask", await hook("stop"));
