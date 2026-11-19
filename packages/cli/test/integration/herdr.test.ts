@@ -3,11 +3,13 @@
  * source and herdr the fake on PATH (fixtures/fake-herdr), whose panes run the agent for real: one
  * workspace per story, one tab per run in the unit's worktree, the tab of a run nobody sits beside
  * closed once its report is applied, a permission prompt and a pane dialog answered from
- * `norn story answer` as keys pressed once, and init inside herdr. The last block runs the same story
- * against a real herdr, only under NORN_TEST_HERDR=1 and in a named herdr session of its own.
+ * `norn story answer` as keys pressed once, doctor with a herdr that answers nothing, and init inside
+ * herdr. The last block runs the same story against a real herdr, only under NORN_TEST_HERDR=1 and in
+ * a named herdr session of its own; it covers workspaces and tabs only, as the permission and trust
+ * prompts take a real Claude Code to draw them.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { nodeExec } from "@norn/host-node";
 import { fakeGh } from "./fake-gh.ts";
@@ -349,6 +351,45 @@ describe("a dialog in a herdr pane before the agent's first event", () => {
     expect(noteOf(w, "trusted")).toBe("<enter>");
     expect(ended?.ended).toBe("done");
   });
+});
+
+interface DoctorSeen {
+  ok: boolean;
+  checks: { name: string; ok: boolean; skipped?: true; code?: string; do_instead?: string | null }[];
+}
+
+/**
+ * A herdr that answers nothing is a failed check in either mode, never a warning: in manual mode the
+ * tick opens no pane, but `norn run start` still launches the agent in herdr, so the first start a
+ * person makes would fail where doctor said all was well.
+ */
+describe("doctor with a herdr that answers nothing", () => {
+  const seen: Record<string, { code: number; body: DoctorSeen }> = {};
+
+  beforeAll(async () => {
+    const { w } = await herdrWorld("work");
+    const dead = join(w.dir, "dead-herdr-bin");
+    mkdirSync(dead, { recursive: true });
+    writeFileSync(join(dead, "herdr"), "#!/bin/sh\necho 'herdr: cannot reach the herdr server' >&2\nexit 1\n");
+    chmodSync(join(dead, "herdr"), 0o755);
+    w.env.PATH = `${dead}:${w.env.PATH ?? ""}`;
+    for (const mode of ["auto", "manual"]) {
+      const set = await norn(w, ["config", "set", "kernel.mode", mode, "--json"]);
+      if (set.code !== 0) throw new Error(`config set kernel.mode: ${set.stdout}${set.stderr}`);
+      const d = await norn(w, ["doctor", "--json"]);
+      seen[mode] = { code: d.code, body: d.body as unknown as DoctorSeen };
+    }
+  }, SLOW);
+
+  for (const mode of ["auto", "manual"]) {
+    test(`in ${mode} mode doctor fails on herdr alone, exits 1 and names how to fix it`, () => {
+      const r = seen[mode];
+      expect(r?.code).toBe(1);
+      expect(r?.body.ok).toBe(false);
+      expect(r?.body.checks.filter((c) => !c.ok && c.skipped !== true).map((c) => [c.name, c.code])).toEqual([["tool herdr", "tool_missing"]]);
+      expect(r?.body.checks.find((c) => c.name === "tool herdr")?.do_instead).toContain("runner headless");
+    });
+  }
 });
 
 describe("init inside herdr", () => {
