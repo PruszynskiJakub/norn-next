@@ -117,7 +117,7 @@ function takeoverLine(t: TakeoverView): string {
 function markdown(s: StoryView, { takeovers, branch_updates, criteria, notes }: PersonRecord): string {
   const out = [`# ${storyHead(s)}`, ""];
   if (s.url) out.push(`Item: ${s.url}`);
-  if (s.change?.url) out.push(`Change: ${s.change.url}`);
+  if (s.change?.url) out.push(`Change: ${s.change.url}${s.change.merge_sha ? ` (merged as ${s.change.merge_sha.slice(0, 12)})` : ""}`);
   if (s.url || s.change?.url) out.push("");
   out.push("## Units", "", ...s.units.map((u) => `- ${unitLine(u)}${u.pending_receipts ? ` (${u.pending_receipts} receipts not applied yet)` : ""}`));
   if (criteria.length) out.push("", "## Criteria to check", "", ...criteria.flatMap(criteriaLines));
