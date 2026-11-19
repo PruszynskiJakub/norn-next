@@ -113,7 +113,7 @@ describe("an agent that asks, and a person who answers", () => {
   }, SLOW);
 
   test("`norn ask` parks the story on the question; `norn story answer` resumes the same session, which works on and reports", () => {
-    expect(parked?.units[0]).toMatchObject({ step: "build", parked: "Which colour should the button be?", waiting: { for: "person", text: "Which colour should the button be?" } });
+    expect(parked?.units[0]).toMatchObject({ step: "build", parked: "Which colour should the button be?", waiting: { for: "answer", text: "Which colour should the button be?", next: `norn story answer ${KEY} "<answer>"` } });
     expect(noteOf(w, "ask")).toMatchObject({ code: 0, body: { unit: KEY, verb: "ask", replayed: false } });
     expect(noteOf(w, "stop.after-ask")).toEqual({ kind: "allow" });
     expect(answered.code).toBe(0);
