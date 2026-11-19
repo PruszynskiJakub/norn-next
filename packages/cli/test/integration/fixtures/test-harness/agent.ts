@@ -5,7 +5,9 @@
  *
  * Every launch notes `norn brief` (markdown, and `--json` as `brief.json`), then follows its plan.
  * The plan is TEST_AGENT_PLAN, unless the JSON file TEST_AGENT_PLANS maps the step (`"<step>"`) or
- * one visit of it (`"<step>#<attempt>"`) to another, so one story can mix plans per step.
+ * one visit of it (`"<step>#<attempt>"`) to another, so one story can mix plans per step. A key may
+ * name the unit first (`"<unit>:<step>"`, `"<unit>:<step>#<attempt>"`), so two slices on one slice
+ * workflow can follow different plans; such a key wins over the bare step.
  *
  * Plans:
  * - work: a write in the worktree and one into norn's machine dir, a commit, a stop before
@@ -40,12 +42,18 @@
  * - resolve-ask: merges as resolve does, resolves and stages only the last conflicted path, then
  *   asks with the merge kept in progress; the resumed launch notes the merge it found, resolves the
  *   rest, commits and reports done.
+ * - slicer: writes the slice files TEST_AGENT_SLICES lists (`[{file, depends_on?}]`, default
+ *   `01-form.md` and `02-list.md`, independent) into the story's spec folder, commits `plan.txt`
+ *   and reports done.
+ * - slice-work: as a slice's build step: writes `<slug>.txt` (the slug of its slice file's name)
+ *   naming the unit, commits it and reports done.
+ * - slice-ask: asks first; the resumed launch works as slice-work does.
  * - logged-out: its start hook, then a line on stdout and an exit 1 before any prompt, as `claude -p`
  *   does without a login (TEST_AGENT_PLAN only: it exits before the brief that names the step).
  */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { appendFileSync, existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { HOOK_FILE } from "./plugin.ts";
 
@@ -55,6 +63,7 @@ const hookCommand = (await Bun.file(join(cwd, HOOK_FILE)).text()).trim();
 const norn = "norn";
 const notesDir = process.env.TEST_AGENT_NOTES as string;
 const runId = process.env.NORN_RUN_ID as string;
+const unit = process.env.NORN_UNIT ?? "";
 const resumed = process.env.TEST_AGENT_RESUME;
 const prompt = process.argv[2] ?? "";
 /** A run id no launch made: the shape of one, so only the run check refuses it. */
@@ -118,7 +127,7 @@ function planFor(step: string | undefined, attempt: number | undefined): string 
   const file = process.env.TEST_AGENT_PLANS;
   if (!file || !existsSync(file) || step === undefined) return fallback;
   const plans = JSON.parse(readFileSync(file, "utf8")) as Record<string, string>;
-  return plans[`${step}#${attempt}`] ?? plans[step] ?? fallback;
+  return plans[`${unit}:${step}#${attempt}`] ?? plans[`${unit}:${step}`] ?? plans[`${step}#${attempt}`] ?? plans[step] ?? fallback;
 }
 
 async function work(): Promise<void> {
@@ -309,6 +318,43 @@ async function report(step: string | undefined, attempt: number | undefined): Pr
   await hook("end");
 }
 
+/** The story's spec folder in this worktree, where norn puts the story's documents and reads them back. */
+const specFolder = () => join(cwd, ".agents", "specs", unit.split("/")[0] as string);
+
+/** Slice files in the spec folder: frontmatter only, which is all decide reads of them. */
+async function slicer(): Promise<void> {
+  const file = process.env.TEST_AGENT_SLICES;
+  const listed = (file && existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : [{ file: "01-form.md" }, { file: "02-list.md" }]) as { file: string; depends_on?: string[] }[];
+  const story = unit.split("/")[0] as string;
+  for (const s of listed) {
+    const nn = s.file.split("-")[0] as string;
+    const deps = (s.depends_on ?? []).map((d) => JSON.stringify(d)).join(", ");
+    await Bun.write(join(specFolder(), "slices", s.file), ["---", `id: ${story}/${nn}`, `depends_on: [${deps}]`, "---", `## Goal`, "", `Slice ${nn}.`, ""].join("\n"));
+  }
+  note("slices.written", listed.map((s) => s.file));
+  // a commit of the story's own, so its head is not the base's and a slice cut from the base shows
+  await Bun.write(join(cwd, "plan.txt"), "the plan\n");
+  await git("add", "plan.txt");
+  await git("-c", "user.email=agent@test", "-c", "user.name=agent", "commit", "-q", "-m", "agent: plan.txt");
+  note("done", await nornJson(["done", "done"]));
+  await hook("end");
+}
+
+/** `<slug>.txt` for this slice, the slug taken from its slice file's name in the spec folder. */
+async function sliceWork(): Promise<void> {
+  const nn = unit.split("/")[1];
+  const dir = join(specFolder(), "slices");
+  const found = existsSync(dir) ? readdirSync(dir).find((f) => f.startsWith(`${nn}-`)) : undefined;
+  if (nn === undefined || found === undefined) throw new Error(`slice-work: no slice file for ${unit} in ${dir}`);
+  const name = `${found.replace(/^[0-9]+-/, "").replace(/\.md$/, "")}.txt`;
+  note("slice.file", found);
+  await Bun.write(join(cwd, name), `written by ${unit}\n`);
+  await git("add", name);
+  await git("-c", "user.email=agent@test", "-c", "user.name=agent", "commit", "-q", "-m", `agent: ${name} for ${unit}`);
+  note("done", await nornJson(["done", "done"]));
+  await hook("end");
+}
+
 if (process.env.TEST_AGENT_ONLY === "stop.after-report") {
   note("stop.after-report", await hook("stop"));
   process.exit(0);
@@ -339,13 +385,16 @@ if (resumed) {
   note("answered", { session: resumed, prompt });
   if (plan === "hang") await hang();
   else if (plan === "resolve-ask") await resolveAnswered();
+  else if (plan === "slice-ask") await sliceWork();
   else if (plan === "ask-then-stuck") {
     note("stuck", await nornJson(["stuck", "The answer leaves nothing to build."]));
     await hook("end");
   } else await work();
 } else if (plan === "resolve") await resolve();
 else if (plan === "resolve-ask") await resolveAsk();
-else if (plan === "ask" || plan === "ask-then-stuck") {
+else if (plan === "slicer") await slicer();
+else if (plan === "slice-work") await sliceWork();
+else if (plan === "ask" || plan === "ask-then-stuck" || plan === "slice-ask") {
   note("ask", await nornJson(["ask", "Which colour should the button be?"]));
   // the stop hook allows a run that has asked, and a non-interactive agent exits on that
   note("stop.after-ask", await hook("stop"));
