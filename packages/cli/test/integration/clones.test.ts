@@ -156,6 +156,86 @@ describe("a clone's flushes of the shared record", () => {
   });
 });
 
+describe("another clone while one clone holds the story", () => {
+  let a: World;
+  let b: World;
+  let host = "";
+  let pid = 0;
+  let aliceRun = "";
+  const bob: string[] = [];
+  let bobStatus: NornOut;
+  let bobRerun: NornOut;
+  let bobStop: NornOut;
+  let aliveAfterVerbs = false;
+  let tooOld: NornOut;
+  let lookBelowFloor: NornOut;
+  let viewBelowFloor: NornOut;
+  let offlineTake: NornOut;
+  let offlineStatus: NornOut;
+
+  beforeAll(async () => {
+    a = await world("hang");
+    b = await otherMachine(a);
+    await setUp(a, { store: "refs", workflow: "hold", workflows: { hold: HOLD } });
+    await setUp(b, { store: "refs", workflow: "hold", workflows: { hold: HOLD } });
+    await norn(a, ["story", "create", "Build it", "--json"], ALICE);
+    await tickUntil(a, ALICE, [], (u) => u?.step === "build" && (u as { run?: unknown }).run != null);
+    pid = (await awaitNote(a, "pid")) as number;
+    aliceRun = agentNotes(a).find((n) => n.note === "pid")?.run ?? "";
+    host = machineName(a);
+
+    await tickAs(b, BOB, bob);
+    bobStatus = await norn(b, ["status", "--json"], BOB);
+    bobRerun = await norn(b, ["run", "rerun", KEY, "--json"], BOB);
+    bobStop = await norn(b, ["run", "stop", KEY, "--json"], BOB);
+    aliveAfterVerbs = (await Bun.$`kill -0 ${pid}`.nothrow().quiet()).exitCode === 0;
+
+    await forgeFloor(a, "0.40.0");
+    tooOld = await norn(b, ["tick", "--json"], BOB);
+    lookBelowFloor = await norn(b, ["status", "--json"], BOB);
+    viewBelowFloor = await norn(b, ["story", "view", KEY, "--json"], BOB);
+
+    await sh(b.root, "git", "remote", "set-url", "origin", join(a.dir, "gone.git"));
+    offlineTake = await norn(b, ["story", "take", KEY, "--force", "--json"], BOB);
+    offlineStatus = await norn(b, ["status", "--json"], BOB);
+  }, SLOW);
+
+  afterAll(async () => {
+    if (pid) await Bun.$`kill -9 ${pid}`.nothrow().quiet();
+  });
+
+  test("the other clone's tick leaves the story alone, and its status shows the holder's step and run", () => {
+    expect(bob.filter((r) => r !== "claim.held_elsewhere")).toEqual([]);
+    expect(bob).toContain("claim.held_elsewhere");
+    const story = ((bobStatus.body.stories ?? []) as { key: string; claim: { holder: string } | null; units: { step: string | null; run: { id: string } | null }[] }[]).find((s) => s.key === KEY);
+    expect(story?.claim?.holder).toBe(`alice@${host}`);
+    expect(story?.units[0]?.step).toBe("build");
+    expect(story?.units[0]?.run?.id).toBe(aliceRun);
+  });
+
+  test("the other clone can neither rerun nor stop the holder's run, and the holder's agent lives on", () => {
+    expect(bobRerun.code).toBe(3);
+    expect(bobRerun.body).toMatchObject({ code: "claim_held" });
+    expect(bobStop.code).toBe(3);
+    expect(bobStop.body).toMatchObject({ code: "claim_held", error: expect.stringContaining(`alice@${host}`), do_instead: expect.stringContaining(`norn story take ${KEY} --force`) });
+    expect(aliveAfterVerbs).toBe(true);
+  });
+
+  test("a norn below the store's version floor is refused when it acts, and still shows the story", () => {
+    expect(tooOld.code).toBe(3);
+    expect(tooOld.body).toMatchObject({ code: "version_too_old", details: { floor: "0.40.0" }, do_instead: expect.stringContaining("upgrade norn to 0.40.0") });
+    expect(lookBelowFloor.code).toBe(0);
+    expect(viewBelowFloor.code).toBe(0);
+  });
+
+  test("with the remote out of reach an acting command is refused with what to do, notes the unchecked floor, and status still works", () => {
+    expect(offlineTake.code).not.toBe(0);
+    expect(offlineTake.body).toMatchObject({ error: expect.any(String), do_instead: expect.any(String) });
+    expect(offlineTake.stderr).toContain("norn version floor not checked");
+    expect(offlineStatus.code).toBe(0);
+  });
+});
+
 describe("the default local store", () => {
   let w: World;
   let remoteRefs: string[] = [];

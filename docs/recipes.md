@@ -74,7 +74,7 @@ norn run stop gh-18/02
 norn story answer gh-18/02 "Stop rewriting the parser; only fix the off-by-one in tokenize()"
 ```
 
-`norn run stop` parks the unit before it stops the run, so the stopped session is not read as died and retried. Your answer lifts the park and goes into the session.
+`norn run stop` parks the unit before it stops the run, so the stopped session is not read as died and retried. Your answer lifts the park and goes into the session. Run it on the machine that holds the story: elsewhere it is refused (`claim_held`), as the session lives on the holder's machine.
 
 ## An agent died, hung or went quiet
 
