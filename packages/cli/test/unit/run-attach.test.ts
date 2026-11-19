@@ -49,6 +49,19 @@ describe("norn run attach", () => {
     expect(json(r.stdout)).toEqual({ unit: UNIT, run: RUN, focused: true });
   });
 
+  test("--next passes over a waiting run whose pane cannot be brought in front here, such as one launched on another machine", async () => {
+    const m = inPanes();
+    const asking = { parked: { reason: "agent.asking.park", since: "2026-11-17T10:00:00.000Z" } };
+    const OTHER = "01JBBBBBBBBBBBBBBBBBBBBBBB";
+    // both runs started at once, so lt-1 is listed first; it was launched on another machine, with no launch record here
+    await seedUnit(m, { step: AGENT_STEP, extra: asking });
+    await seedUnit(m, { unit: "lt-2", step: AGENT_STEP, run: OTHER, extra: asking });
+    const env = await envOf(m);
+    await env.ctx.files.write(launchRecordPath(env.ctx, "lt-2", OTHER), JSON.stringify({ executor: "claude", cwd: "/wt", title: "lt-2", workspace: "lt-2", logPath: "/m/log" }));
+    const r = await runCli(["run", "attach", "--next", "--json"], m.io);
+    expect(json(r.stdout)).toEqual({ unit: "lt-2", run: OTHER, focused: true });
+  });
+
   test("refused nothing_to_attach, naming what to do instead: no live run, nobody waiting, a runner with no pane, a run launched elsewhere", async () => {
     const m = inPanes();
     await seedUnit(m, { step: GATE_STEP, run: null });

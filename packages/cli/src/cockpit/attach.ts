@@ -9,10 +9,29 @@ import type { ProjectView, UnitView } from "../views.ts";
 
 export const NOTHING_TO_ATTACH = "nothing_to_attach";
 
-/** The unit an agent waits on the person in for longest: a question or prompt in its pane, or an attended run. */
-export function nextToAttach(view: ProjectView): UnitView | null {
+/** The units an agent waits on the person in, longest first: a question or prompt in its pane, or an attended run. */
+export function waitingToAttach(view: ProjectView): UnitView[] {
   const waiting = view.stories.flatMap((s) => s.units).filter((u) => u.run && u.ended === undefined && (u.waiting?.for === "answer" || u.waiting?.for === "permission" || (!u.waiting && u.run.attended)));
-  return waiting.sort((a, b) => (a.run?.started_at ?? "").localeCompare(b.run?.started_at ?? ""))[0] ?? null;
+  return waiting.sort((a, b) => (a.run?.started_at ?? "").localeCompare(b.run?.started_at ?? ""));
+}
+
+/**
+ * Focus the pane of the agent waiting longest whose pane can be brought in front here: a run another
+ * machine launched, or one with no pane, is passed over for the next, so a key bound to this always
+ * lands on an agent the person can answer. Refused with the oldest one's reason when none can be.
+ */
+export async function attachNext(env: RuntimeEnv, view: ProjectView): Promise<{ unit: string; run: string; focused: true }> {
+  const waiting = waitingToAttach(view);
+  if (!waiting.length) throw refuse("No agent waits for you", "norn status", NOTHING_TO_ATTACH);
+  let first: unknown = null;
+  for (const u of waiting) {
+    try {
+      return await attachUnit(env, u.id, u.waiting?.next);
+    } catch (e) {
+      first ??= e;
+    }
+  }
+  throw first;
 }
 
 /** Focus the pane of `unit`'s live run; `instead` is what resolves the unit when it has no run. */
