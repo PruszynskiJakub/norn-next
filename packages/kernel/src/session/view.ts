@@ -85,6 +85,8 @@ export interface SessionFacts {
   last_message?: string;
   /** the error the last turn stopped on, which a run ending there unreported names */
   error?: string;
+  /** when the newest event came, so decide can judge silence by a workflow's own `stalled` window */
+  last_event_at?: string;
   pending_tools: number;
   subagents: number;
   pane_answers: number;

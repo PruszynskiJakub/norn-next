@@ -6,13 +6,15 @@
  * deadline, a run past its deadline is stopped once, and a quiet agent is nudged. Every nudge and retry is bounded by
  * the step's `nudges` and `retries`; running out routes the classified outcome, which ends `$stuck`
  * unless the step routes it. A quiet agent takes the step's `stalled` route when it has one, else the
- * silent rules.
+ * silent rules; how long it goes without an event before it counts as quiet is the workflow's
+ * `defaults.stalled`, else the config's `kernel.silent_after`.
  */
 import type { Mode } from "@norn/schema";
 import type { Decision } from "../model/actions.ts";
 import type { ExecutorCapabilities } from "../model/capabilities.ts";
 import type { ClassifiedOutcome } from "../model/receipts.ts";
 import type { RunInfo } from "../model/run-state.ts";
+import type { SessionFacts } from "../session/view.ts";
 import type { AgentStepSpec } from "../workflow/graph.ts";
 import { ageMs, applyDecision, applyOrPark, intentFor, noop, parkDecision, takeAgentSlot, type UnitView } from "./unit-support.ts";
 
@@ -141,7 +143,7 @@ function judgeRun(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
   }
   if (spec.deadline_ms !== null && ageMs(v.ctx, deadlineFrom(run)) > spec.deadline_ms) return overdue(v, spec, run);
   if (session.activity === "limited") return quiet(v, spec, run, "agent.limited");
-  if (session.silent) return quiet(v, spec, run, "agent.silent");
+  if (silentNow(v, session)) return quiet(v, spec, run, "agent.silent");
   if (session.activity === "turn_ended") return quiet(v, spec, run, "agent.turn_ended");
   return noop(v, "agent.running", `run ${run.id} ${session.activity}`);
 }
@@ -155,6 +157,21 @@ function noEventsText(v: UnitView, run: RunInfo): string {
     `Trust the folder there${fromHere}; the run goes on with its first event.`,
     `If the pane shows something else, start the step again with norn run rerun ${v.unit.id}.`,
   ].join(" ");
+}
+
+/** How long an agent goes without an event before it reads as quiet: the workflow's `defaults.stalled`, else the config's window. */
+function quietWindowMs(v: UnitView): number {
+  return v.graph.stalled_ms ?? v.ctx.config.silentAfterMs;
+}
+
+/**
+ * Whether a working agent has gone quiet. The session source judges it by the config's window, which
+ * holds unless the workflow sets its own; with its own, the newest event's time is judged again here.
+ */
+function silentNow(v: UnitView, session: SessionFacts): boolean {
+  if (v.graph.stalled_ms === null || session.last_event_at === undefined) return session.silent;
+  // only a working agent with nothing outstanding can be silent; any wait has a reason to be quiet
+  return session.activity === "working" && session.pending_tools === 0 && session.subagents === 0 && ageMs(v.ctx, session.last_event_at) > v.graph.stalled_ms;
 }
 
 /** A run's deadline counts from its start, or from the reset of a usage limit it waited out, whichever is later. */
@@ -195,7 +212,7 @@ function quiet(v: UnitView, spec: AgentStepSpec, run: RunInfo, base: string): De
   // a session with no activity is what a workflow names `stalled`; a turn ended or a limit waited out is `silent`
   if (base === "agent.silent" && routes(v, "stalled")) return classified(v, run, "stalled", "agent.stalled.route");
   if (routes(v, "silent")) return classified(v, run, "silent", `${base}.route`);
-  if (run.last_nudge_at !== undefined && ageMs(v.ctx, run.last_nudge_at) < v.ctx.config.silentAfterMs)
+  if (run.last_nudge_at !== undefined && ageMs(v.ctx, run.last_nudge_at) < quietWindowMs(v))
     return noop(v, `${base}.nudged`, `nudged at ${run.last_nudge_at}; waiting for the agent to take it`);
   if (personDrives(v)) return parkDecision(v, `${base}.manual`, "stuck", { text: `run ${run.id} went quiet without a report` });
   if (run.nudges >= spec.nudges) return classified(v, run, "silent", `${base}.exhausted`);

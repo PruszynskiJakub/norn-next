@@ -44,5 +44,6 @@ export function classifySession(view: SessionView, now: string, opts: ClassifyOp
   if (view.report) facts.report = { ...view.report };
   if (view.last_message !== undefined) facts.last_message = view.last_message;
   if (view.error !== undefined) facts.error = view.error;
+  if (view.last_event_at !== undefined) facts.last_event_at = view.last_event_at;
   return facts;
 }

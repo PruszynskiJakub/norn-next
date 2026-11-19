@@ -179,6 +179,28 @@ describe("an agent run, judged from its session", () => {
     expect(decideCase({ state: stateAt("build", { run: run() }, only), workflows: [only], session: session("turn_ended") })?.rule).toBe("agent.turn_ended.nudge");
   });
 
+  test("a workflow's defaults.stalled is how long a working agent goes without an event before it reads as silent, in place of the config's window", () => {
+    const within = (stalled_ms: number) => loaded({ ...graph(), stalled_ms });
+    const short = within(2 * 60_000);
+    const quietFor3 = session("working", { silent: false, last_event_at: minutesAgo(3) });
+    expect(decideCase({ state: stateAt("build", { run: run() }, short), workflows: [short], session: quietFor3 })).toMatchObject({ kind: "nudge", rule: "agent.silent.nudge" });
+    expect(decideCase({ state: stateAt("build", { run: run() }, short), workflows: [short], session: session("working", { last_event_at: minutesAgo(1) }) })?.rule).toBe("agent.running");
+    const long = within(60 * 60_000);
+    const quietFor20 = session("working", { silent: true, last_event_at: minutesAgo(20) });
+    expect(decideCase({ state: stateAt("build", { run: run() }, long), workflows: [long], session: quietFor20 })?.rule).toBe("agent.running");
+    // an agent with a call or a subagent outstanding has a reason to be quiet, however long
+    expect(decideCase({ state: stateAt("build", { run: run() }, short), workflows: [short], session: session("working", { pending_tools: 1, last_event_at: minutesAgo(30) }) })?.rule).toBe("agent.running");
+    // without the setting the config's window holds
+    expect(decideCase({ state: running(), session: quietFor3 })?.rule).toBe("agent.running");
+  });
+
+  test("a nudge is waited on for the workflow's stalled window, not the config's", () => {
+    const short = loaded({ ...graph(), stalled_ms: 2 * 60_000 });
+    const nudged = { run: run({ nudges: 1, last_nudge_at: minutesAgo(3) }) };
+    expect(decideCase({ state: stateAt("build", nudged, short), workflows: [short], session: session("turn_ended") })?.kind).toBe("nudge");
+    expect(decideCase({ state: stateAt("build", nudged), session: session("turn_ended") })?.rule).toBe("agent.turn_ended.nudged");
+  });
+
   test("a step that routes silent takes its route instead of the nudges", () => {
     const wf = loaded(graph({ build: { routes: { done: { to: "test" }, silent: { to: "$stuck" } } } }));
     const d = decideCase({ state: stateAt("build", { run: run() }, wf), workflows: [wf], session: session("working", { silent: true }) });

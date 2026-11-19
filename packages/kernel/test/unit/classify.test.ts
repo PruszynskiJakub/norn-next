@@ -74,6 +74,12 @@ describe("classifySession: silence", () => {
     expect(at(events, 1 + 61).silent).toBe(true);
   });
 
+  test("the newest event's time goes with the facts, so a workflow's own window can judge silence", () => {
+    const events = stream(START, BRIEF, shell("t1"), { type: "tool.finished", id: "t1", ok: true });
+    expect(at(events, 10).last_event_at).toBe(iso(3));
+    expect(at([], 10).last_event_at).toBeUndefined();
+  });
+
   test("silence counts from the newest event", () => {
     const events = stream(START, BRIEF, shell("t1"), { type: "tool.finished", id: "t1", ok: true });
     expect(at(events, 3 + 59).silent).toBe(false);
@@ -181,6 +187,7 @@ describe("classifySession: the rest of the facts", () => {
       silent: false,
       report: { verb: "done", outcome: "approve" },
       last_message: "here it is",
+      last_event_at: iso(6),
       pending_tools: 0,
       subagents: 0,
       pane_answers: 1,
