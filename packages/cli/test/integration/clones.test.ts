@@ -1,8 +1,9 @@
 /**
  * The shared refs store between clones of one remote, through the CLI alone. One clone's ticks
- * publish a story's run data only when it changed, keep a story's claim while the remote refuses its
- * last flush and publish before they give the claim up; `norn tidy` leaves run data alone. A second
- * clone with its own norn home sees the holder's story but neither reruns nor stops its run, and a
+ * publish a story's run data only when it changed, keep a finished story's claim and worktree while
+ * the remote refuses its last flush, even past the claim's expiry, and publish before they give the
+ * claim up; `norn tidy` leaves run data alone. A second clone with its own norn home sees the
+ * holder's story but neither reruns nor stops its run, never takes the holder's expired claim, and a
  * norn below the store's version floor is refused while it can still look. With the default local
  * store the remote never gets run data at all.
  */
@@ -24,6 +25,7 @@ import {
   sh,
   type UnitShown,
   unitOf,
+  worktreeOf,
   type World,
   world,
 } from "./world.ts";
@@ -56,6 +58,16 @@ async function tickUntil(w: World, env: Record<string, string>, rules: string[],
   throw new Error(`no convergence; rules: ${rules.join(", ")}`);
 }
 
+/**
+ * A claim lifetime short enough for a test to outwait, set before the claim is taken (a claim keeps
+ * the lifetime it was taken or renewed with), yet longer than a tick, which renews it every time.
+ */
+const SHORT_TTL_MS = 5_000;
+async function shortClaims(w: World): Promise<void> {
+  const set = await norn(w, ["config", "set", "kernel.claim_ttl", `${SHORT_TTL_MS}ms`, "--json"]);
+  if (set.code !== 0) throw new Error(`config set: ${set.stdout}${set.stderr}`);
+}
+
 /** The commit a ref names on the remote, or "" when it has none. */
 const remoteRef = (w: World, ref: string): Promise<string> => sh(w.root, "git", "ls-remote", w.remote, ref).then((l) => l.split(/\s/)[0] ?? "");
 
@@ -82,6 +94,9 @@ describe("a clone's flushes of the shared record", () => {
   let claimWhileRefused = "";
   let remoteRunWhileRefused = "";
   let refusedUnit: UnitShown | null = null;
+  let worktreeWhileRefused: string | null = null;
+  const expiredRefused: string[] = [];
+  let claimAfterExpiry = "";
   let localRun = "";
   let releasedAt = "";
   let floorText = "";
@@ -93,6 +108,7 @@ describe("a clone's flushes of the shared record", () => {
     a = await world("work");
     logPushes(a);
     await setUp(a, { store: "refs", workflow: "gated", workflows: { gated: GATED } });
+    await shortClaims(a);
     await norn(a, ["story", "create", "Look into it", "--json"]);
     await tickUntil(a, {}, toGate, (u) => u?.step === "look" && u.parked !== undefined);
     runPushesAtGate = pushes(a, RUN_REF).length;
@@ -103,8 +119,16 @@ describe("a clone's flushes of the shared record", () => {
     await norn(a, ["story", "approve", KEY, "--json"]);
     for (let i = 0; i < 3; i++) await tickAs(a, {}, refused);
     refusedUnit = await unitOf(a, KEY);
+    worktreeWhileRefused = await worktreeOf(a, KEY);
     claimWhileRefused = await sh(a.remote, "git", "show", `${CLAIM_REF}:claim.json`);
     remoteRunWhileRefused = await remoteRef(a, RUN_REF);
+    // a finished story's claim is never renewed, so it runs out: past it, the story must still not be released over its unpublished record
+    for (let i = 0; i < 2; i++) {
+      await Bun.sleep(SHORT_TTL_MS + 1_000);
+      await tickAs(a, {}, expiredRefused);
+      await tickAs(a, {}, expiredRefused);
+    }
+    claimAfterExpiry = await sh(a.remote, "git", "show", `${CLAIM_REF}:claim.json`);
     lift();
     await tickUntil(a, {}, after, () => after.includes("claim.release"));
     localRun = await sh(a.root, "git", "rev-parse", RUN_REF);
@@ -131,9 +155,18 @@ describe("a clone's flushes of the shared record", () => {
     expect(refusedUnit).toMatchObject({ ended: "done" });
     expect(refused).toContain("store.flush!");
     expect(refused).toContain("claim.release!");
+    expect(refused).toContain("story.finish!");
     expect(refused).not.toContain("claim.release");
     expect(JSON.parse(claimWhileRefused)).not.toHaveProperty("released_at");
     expect(remoteRunWhileRefused).not.toBe(localRun);
+    expect(worktreeWhileRefused).not.toBeNull();
+  });
+
+  test("past the kept claim's expiry a tick takes it back rather than releasing it over the unpublished record", () => {
+    expect(expiredRefused).toContain("claim.reacquire");
+    expect(expiredRefused).toContain("store.flush!");
+    expect(expiredRefused).not.toContain("claim.release");
+    expect(JSON.parse(claimAfterExpiry)).not.toHaveProperty("released_at");
   });
 
   test("once the remote takes pushes again the next tick publishes the record, then gives the claim up", async () => {
@@ -179,7 +212,7 @@ describe("another clone while one clone holds the story", () => {
     await setUp(a, { store: "refs", workflow: "hold", workflows: { hold: HOLD } });
     await setUp(b, { store: "refs", workflow: "hold", workflows: { hold: HOLD } });
     await norn(a, ["story", "create", "Build it", "--json"], ALICE);
-    await tickUntil(a, ALICE, [], (u) => u?.step === "build" && (u as { run?: unknown }).run != null);
+    await tickUntil(a, ALICE, [], (u) => u?.step === "build" && u.run != null);
     pid = (await awaitNote(a, "pid")) as number;
     aliceRun = agentNotes(a).find((n) => n.note === "pid")?.run ?? "";
     host = machineName(a);
@@ -215,24 +248,57 @@ describe("another clone while one clone holds the story", () => {
 
   test("the other clone can neither rerun nor stop the holder's run, and the holder's agent lives on", () => {
     expect(bobRerun.code).toBe(3);
-    expect(bobRerun.body).toMatchObject({ code: "claim_held" });
+    expect(structuredClone(bobRerun.body)).toMatchObject({ code: "claim_held" });
     expect(bobStop.code).toBe(3);
-    expect(bobStop.body).toMatchObject({ code: "claim_held", error: expect.stringContaining(`alice@${host}`), do_instead: expect.stringContaining(`norn story take ${KEY} --force`) });
+    expect(structuredClone(bobStop.body)).toMatchObject({ code: "claim_held", error: expect.stringContaining(`alice@${host}`), do_instead: expect.stringContaining(`norn story take ${KEY} --force`) });
     expect(aliveAfterVerbs).toBe(true);
   });
 
   test("a norn below the store's version floor is refused when it acts, and still shows the story", () => {
     expect(tooOld.code).toBe(3);
-    expect(tooOld.body).toMatchObject({ code: "version_too_old", details: { floor: "0.40.0" }, do_instead: expect.stringContaining("upgrade norn to 0.40.0") });
+    expect(structuredClone(tooOld.body)).toMatchObject({ code: "version_too_old", details: { floor: "0.40.0" }, do_instead: expect.stringContaining("upgrade norn to 0.40.0") });
     expect(lookBelowFloor.code).toBe(0);
     expect(viewBelowFloor.code).toBe(0);
   });
 
   test("with the remote out of reach an acting command is refused with what to do, notes the unchecked floor, and status still works", () => {
-    expect(offlineTake.code).not.toBe(0);
-    expect(offlineTake.body).toMatchObject({ error: expect.any(String), do_instead: expect.any(String) });
+    expect(offlineTake.code).toBe(1);
+    expect(structuredClone(offlineTake.body)).toMatchObject({ code: "unavailable", error: expect.stringContaining(`cannot sync the run data of ${KEY}`), do_instead: `norn story take ${KEY} again once the remote is reachable` });
     expect(offlineTake.stderr).toContain("norn version floor not checked");
     expect(offlineStatus.code).toBe(0);
+  });
+});
+
+describe("another holder's expired claim", () => {
+  let a: World;
+  let b: World;
+  let host = "";
+  let bobTick: NornOut;
+  let claimAfter: { holder: string; released_at?: string } | null = null;
+
+  beforeAll(async () => {
+    a = await world("work");
+    b = await otherMachine(a);
+    await setUp(a, { store: "refs", workflow: "gated", workflows: { gated: GATED } });
+    await setUp(b, { store: "refs", workflow: "gated", workflows: { gated: GATED } });
+    await shortClaims(a);
+    await norn(a, ["story", "create", "Look into it", "--json"], ALICE);
+    await tickUntil(a, ALICE, [], (u) => u?.step === "look" && u.parked !== undefined);
+    host = machineName(a);
+    // alice's ticks stop, so her claim runs out with no renew
+    await Bun.sleep(SHORT_TTL_MS + 1_000);
+    bobTick = await norn(b, ["tick", "--json"], BOB);
+    claimAfter = JSON.parse(await sh(a.remote, "git", "show", `${CLAIM_REF}:claim.json`));
+  }, SLOW);
+
+  test("is never taken by another clone's tick, which names the take a person runs", () => {
+    expect(bobTick.code).toBe(0);
+    const outcomes = (bobTick.body.outcomes ?? []) as { decision: { rule: string; reason?: string } }[];
+    expect(outcomes.map((o) => o.decision.rule)).toEqual(["claim.held_elsewhere"]);
+    expect(outcomes[0]?.decision.reason).toContain(`the claim of alice@${host} expired`);
+    expect(outcomes[0]?.decision.reason).toContain(`norn story take ${KEY} --force`);
+    expect(claimAfter?.holder).toBe(`alice@${host}`);
+    expect(claimAfter).not.toHaveProperty("released_at");
   });
 });
 

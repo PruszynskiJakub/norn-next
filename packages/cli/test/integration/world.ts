@@ -156,6 +156,7 @@ export interface UnitShown {
   ended_reason?: string;
   parked?: string;
   waiting: { for: string; text: string; next?: string } | null;
+  run?: { id: string } | null;
 }
 
 export interface StoryShown {
