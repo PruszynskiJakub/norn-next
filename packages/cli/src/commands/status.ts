@@ -108,6 +108,10 @@ export const statusCommand = defineCommand({
     "--ttl <duration>": "with --segment: how long a sidebar token stays without the next segment (default 30s)",
   },
   async run(ctx, args) {
+    const given = (["watch", "interval", "pane", "segment", "ttl"] as const).filter((o) => args.values[o] !== undefined);
+    // a flag of the other mode would be dropped without a word
+    const clash = given.includes("segment") ? given.find((o) => o === "watch" || o === "interval" || o === "pane") : given.includes("watch") && given.includes("ttl") ? "ttl" : undefined;
+    if (clash) throw usageError(`--${clash} does not go with --${clash === "ttl" ? "watch" : "segment"}`, "norn status --watch [--interval 5s] [--pane], or norn status --segment [--ttl 30s]");
     if (opt.bool(args, "segment")) return segment(ctx, args);
     if (opt.bool(args, "watch")) return watch(ctx, args);
     const stray = (["interval", "pane", "ttl"] as const).find((o) => args.values[o] !== undefined);

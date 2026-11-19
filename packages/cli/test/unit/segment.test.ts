@@ -64,4 +64,11 @@ describe("norn status --segment", () => {
     const r = await runCli(["status", "--ttl", "30s", "--json"], configured().io);
     expect(r.exit).toBe(ExitCode.usage);
   });
+
+  test("--segment with a flag of --watch, or --watch with --ttl, is a usage error rather than a flag dropped", async () => {
+    for (const argv of [["--segment", "--watch"], ["--segment", "--interval", "5s"], ["--segment", "--pane"], ["--watch", "--ttl", "30s"]]) {
+      const r = await runCli(["status", ...argv, "--json"], configured().io);
+      expect({ argv, exit: r.exit }).toEqual({ argv, exit: ExitCode.usage });
+    }
+  });
 });
