@@ -5,6 +5,7 @@ import { fail, type Harness, type HarnessEvent, type LaunchRequest, ok, type Plu
 import {
   type AgentRunRequest,
   answerFor,
+  answerPromptId,
   appendEvents,
   claimReceived,
   decodeLaunchHandle,
@@ -46,7 +47,7 @@ function fakeHarness(over: Partial<Harness["capabilities"]> = {}): FakeHarness {
     },
     normalize: () => [],
     respond: () => ({ stdout: "", exit_code: 0 }),
-    dialogKeys: (answer) => (/^\d$/.test(answer) ? [{ text: answer }, { key: "enter" }] : null),
+    dialogKeys: (answer) => (/^\d$/.test(answer) ? [{ text: answer }, { key: "enter" }] : answer === "no" ? [{ key: "esc" }] : null),
   };
 }
 
@@ -530,6 +531,28 @@ describe("harness launcher answering a dialog in the agent's pane", () => {
     await appendEvents(s.ctx, UNIT, RUN_ID, [...permissionOpen, ev(3, { type: "tool.finished", id: "t1", ok: true })]);
     expect(await s.launcher.answer(started.value.handle, dialogInputId(openPermission(), RUN_ID), "1", { dialog: true })).toEqual(ok(undefined));
     expect(s.pane.pressed).toEqual([]);
+  });
+
+  test("a refused permission is followed by a prompt telling the agent so, as a refusal ends its turn with no hook that closes the permission", async () => {
+    const s = setup();
+    const started = await s.launcher.start(run());
+    if (!started.ok) throw new Error("start failed");
+    await appendEvents(s.ctx, UNIT, RUN_ID, permissionOpen);
+    const id = dialogInputId(openPermission(), RUN_ID);
+    expect(await s.launcher.answer(started.value.handle, id, "no", { dialog: true })).toEqual(ok(undefined));
+    expect(s.pane.pressed).toEqual([{ handle: "proc|1", keys: [{ key: "esc" }] }]);
+    expect(s.pane.sent).toHaveLength(1);
+    const told = s.pane.sent[0] as { handle: string; text: string };
+    expect(told.handle).toBe("proc|1");
+    expect(readPromptMark(told.text)).toEqual({ source: "answer", id: answerPromptId(id) });
+    expect(told.text).toContain("Bash(rm -rf build)");
+    // the prompt starts a turn, and a new turn closes the permission, so the unit is not parked on it again
+    const prompted = [...permissionOpen, ev(3, { type: "turn.started" })];
+    expect(reduceSession(prompted).permission).toBeUndefined();
+    // a replay neither presses nor types again
+    expect(await s.launcher.answer(started.value.handle, id, "no", { dialog: true })).toEqual(ok(undefined));
+    expect(s.pane.pressed).toHaveLength(1);
+    expect(s.pane.sent).toHaveLength(1);
   });
 
   test("a run this machine never launched is not probed and gets no keys: its pane id may name another agent's pane here", async () => {

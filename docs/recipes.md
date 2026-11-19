@@ -20,7 +20,7 @@ The next tick delivers your answer to the same session, or starts a fresh sessio
 norn story answer gh-18 1     # the first option, which lets it run; `no` refuses it
 ```
 
-The next tick presses the keys for that option in the agent's pane. Only a runner with a pane can do that (herdr); in a headless run, rerun the step instead. Claude Code runs in its `auto` permission mode by default, so this is rare; an executor's `args` replaces that default whole ([Use another agent tool or model](#use-another-agent-tool-or-model)).
+The next tick presses the keys for that option in the agent's pane; after a `no` it also tells the agent the call was refused, so it goes on without it. Only a runner with a pane can do that (herdr); in a headless run, rerun the step instead. Claude Code runs in its `auto` permission mode by default, so this is rare; an executor's `args` replaces that default whole ([Use another agent tool or model](#use-another-agent-tool-or-model)).
 
 ## An agent in a pane sends nothing
 

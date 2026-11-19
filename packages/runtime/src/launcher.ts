@@ -20,7 +20,7 @@
  *   answer pressed through the runner, only for a run this machine launched, only while the run's
  *   events still show that dialog open, and not again once recorded as sent (recorded after the keys
  *   went in: a crash between the two presses them again, which beats never), as keys pressed after
- *   it closed would land in the agent's prompt.
+ *   it closed would land in the agent's prompt. A refusal is followed by a prompt saying so.
  * - stop / alive: the runner, on the run's newest process (its latest resume, else the first).
  * The handle is launcher-handle.ts's: executor, unit, run and the runner's own handle.
  */
@@ -37,6 +37,14 @@ import { currentRunnerHandle, launchedHere, recordLaunch, resumesOf, resumeWith 
 import { shellQuote } from "./shell.ts";
 import { installSkills, type PackSkills } from "./skills.ts";
 import type { AgentLauncher, AgentRunRequest, AnswerOptions, ExecutorModes, LauncherModes } from "./types.ts";
+
+/** `no` refuses, as the dialog contract names it for every harness. */
+const isRefusal = (answer: string): boolean => /^(no|n)$/i.test(answer.trim());
+
+function refusalText(permission: { prompt: string; call?: { tool: string } }): string {
+  const what = permission.call ? permission.call.tool : permission.prompt;
+  return `The person refused the permission for ${what}. Do not try that call again; go on without it, or ask with norn ask if the step cannot be done without it.`;
+}
 
 export interface Executor {
   harness: Harness;
@@ -291,6 +299,12 @@ export class HarnessLauncher implements AgentLauncher {
     const pane = await currentRunnerHandle(ctx, h);
     const pressed = await runner.keys(pane, keys);
     if (!pressed.ok) return pressed;
+    // a refused call ends the agent's turn with no hook that closes the permission, so the run would
+    // park on it again while the agent waits at an empty prompt; the prompt starts a turn, which closes it
+    if (permission && isRefusal(text) && this.modesOf(h.executor)?.paneInput === true) {
+      const told = await runner.send(pane, markPrompt(refusalText(permission), { source: "answer", id }));
+      if (!told.ok) return told;
+    }
     const recorded = await recordSentPrompt(ctx, h.unit, h.run_id, { id, source: "answer", at: ctx.now(), input_id: inputId });
     return recorded.ok ? ok(undefined) : recorded;
   }
