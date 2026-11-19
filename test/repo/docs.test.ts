@@ -347,7 +347,7 @@ describe("limitations: the hooks entry", () => {
 describe("limitations: Dropped from 0.35", () => {
   // A person who used 0.35 looks for the verb they knew; each one gone must say what to do instead,
   // and a verb restored later must leave this list, or the doc would call a live command dropped.
-  const DROPPED_COMMANDS = ["run list", "run view", "run attach", "upgrade", "uninstall", "sync", "story reopen", "story edit", "story reset", "story start"];
+  const DROPPED_COMMANDS = ["run list", "run view", "upgrade", "uninstall", "sync", "story reopen", "story edit", "story reset", "story start"];
   const DROPPED_FLAGS: ReadonlyArray<readonly [string, string]> = [
     ["done", "evidence"],
     ["ask", "option"],

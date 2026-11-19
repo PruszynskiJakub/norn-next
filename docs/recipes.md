@@ -251,6 +251,8 @@ norn config set kernel.mode manual
 
 The herdr runner opens one Herdr workspace per story and one tab per run, labelled `<unit> <step>`, with the agent in its pane: you can watch it and type into it. A run norn stops (its report applied, a retry, a deadline) ends its agent and keeps its tab, so every run of a story, attended or not, is a tab in the story's one workspace. The story's finish closes the tabs of its units that ended done, and the workspace with the last one; `norn tidy` closes the rest once the story ended. In auto mode norn starts each agent step in its pane on its own, and you can look in or type at any time; in manual mode you start each one with `norn run start <unit>`. An attended step always waits for `norn run start`, and then runs in its pane with you. A decision given by typing into the pane is not on norn's record; give it with `norn story answer` too.
 
+`norn run attach <unit>` brings the pane of a unit's live run in front, and `norn run attach --next` the agent that has waited on you longest.
+
 ## Share run data with a team
 
 ```sh

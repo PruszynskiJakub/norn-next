@@ -18,6 +18,7 @@ import { pluginAddCommand } from "./plugin-add.ts";
 import { pluginListCommand } from "./plugin-list.ts";
 import { pluginRemoveCommand } from "./plugin-remove.ts";
 import { pluginUpdateCommand } from "./plugin-update.ts";
+import { runAttachCommand } from "./run-attach.ts";
 import { runRerunCommand } from "./run-rerun.ts";
 import { runStartCommand } from "./run-start.ts";
 import { runStopCommand } from "./run-stop.ts";
@@ -54,7 +55,7 @@ export const COMMANDS: readonly Command[] = [
 
 export const NOUNS: readonly Noun[] = [
   defineNoun({ name: "story", summary: "Stories: list, view, create, the person's decisions, the next round, taking one to this machine, and updating a finished one's branch", verbs: [storyListCommand, storyViewCommand, storyCreateCommand, storyApproveCommand, storyRejectCommand, storyAnswerCommand, storyRoundCommand, storyTakeCommand, storyUpdateBranchCommand, storyCloseCommand] }),
-  defineNoun({ name: "run", summary: "Runs: start one manual mode holds, stop a live one, run a step again", verbs: [runStartCommand, runStopCommand, runRerunCommand] }),
+  defineNoun({ name: "run", summary: "Runs: start one manual mode holds, stop a live one, run a step again, bring one's pane in front", verbs: [runStartCommand, runStopCommand, runRerunCommand, runAttachCommand] }),
   defineNoun({ name: "config", summary: "Read and change the config", verbs: [configGetCommand, configSetCommand, configShowCommand] }),
   defineNoun({ name: "plugin", summary: "Install, list, update and remove plugins", verbs: [pluginAddCommand, pluginListCommand, pluginRemoveCommand, pluginUpdateCommand] }),
 ];

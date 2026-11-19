@@ -242,7 +242,7 @@ norn story close <key>
 
 ##### `norn run` (noun)
 
-Runs: start one manual mode holds, stop a live one, run a step again
+Runs: start one manual mode holds, stop a live one, run a step again, bring one's pane in front
 
 ##### `norn run start`
 
@@ -271,6 +271,16 @@ norn run rerun <unit> [--step <step>] [--reset <counter>]... [--reason <text>]
 - `--step <step>`: the step of the unit's pinned workflow to run (default: the step it is at)
 - `--reset <counter>`: set a counter of the workflow back to 0 (repeatable)
 - `--reason <text>`: why, kept on the record
+
+##### `norn run attach`
+
+Bring the pane of a unit's live run in front; --next: the agent waiting for you longest
+
+```sh
+norn run attach <unit> | norn run attach --next
+```
+
+- `--next`: the agent that has waited on you longest, without naming it
 
 #### Background: run by a person, cron or a terminal multiplexer
 
