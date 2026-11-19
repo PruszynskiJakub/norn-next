@@ -107,6 +107,11 @@ export interface AgentLauncher {
   /** the dialog the handle's pane shows, as its runner reads it; null when none shows or it cannot tell */
   dialog?(handle: string): Promise<string | null>;
   /**
+   * Whether the dialog as the handle's pane shows it takes the answer, with the dialog's text; null
+   * when the pane cannot be read here, which leaves the answer for the tick that presses it.
+   */
+  dialogTakes?(handle: string, answer: string): Promise<{ takes: boolean; dialog: string } | null>;
+  /**
    * The head of the log the handle's process wrote, where an agent nobody watches leaves why it
    * ended; null when it left none, or the launcher cannot read it.
    */

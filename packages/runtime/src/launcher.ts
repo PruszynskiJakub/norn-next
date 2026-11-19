@@ -269,6 +269,21 @@ export class HarnessLauncher implements AgentLauncher {
     }
   }
 
+  async dialogTakes(handle: string, answer: string): Promise<{ takes: boolean; dialog: string } | null> {
+    const found = this.resolve(handle);
+    if (!found.ok) return null;
+    const { runner, harness } = found.value.executor;
+    if (!runner.dialog || !harness.dialogKeys) return null;
+    try {
+      if (!(await launchedHere(this.opts.ctx, found.value.handle.unit, found.value.handle.run_id))) return null;
+      const shown = await runner.dialog(await currentRunnerHandle(this.opts.ctx, found.value.handle), { anyStatus: true });
+      if (!shown.ok || shown.value === null) return null;
+      return { takes: harness.dialogKeys(answer, shown.value) !== null, dialog: shown.value };
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * The head of the run's log: its first non-empty lines, joined and cut, so a process that ended
    * before it said anything through a hook can still say why. Null for a run launched elsewhere (its

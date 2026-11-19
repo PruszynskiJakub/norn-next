@@ -51,14 +51,21 @@ async function openQuestion(env: RuntimeEnv, u: UnitJournal): Promise<OpenQuesti
   return null;
 }
 
-/** A dialog is answered only by keys its executor can press and its harness names for the answer. */
-function checkDialog(env: RuntimeEnv, q: OpenQuestion, text: string): void {
+/**
+ * A dialog is answered only by keys its executor can press and its harness names for the answer, on
+ * the dialog as its pane shows it when the pane can be read here: an answer recorded for an option the
+ * menu lacks could never be pressed, and as the answer to that dialog it could not be replaced.
+ */
+async function checkDialog(env: RuntimeEnv, q: OpenQuestion, text: string): Promise<void> {
   const run = q.unit.state?.run;
   if (!q.dialog || !run) return;
   const rerun = `answer it in the agent's pane, or start the step again with norn run rerun ${q.unit.unit}`;
   if (env.launcher.modesOf?.(run.executor)?.dialogKeys !== true) throw refuse(`${q.unit.unit}'s executor '${run.executor}' cannot answer a dialog in its pane`, rerun, "dialog_unanswerable");
-  if (!env.slots.executors[run.executor]?.dialogKeys?.(text))
-    throw refuse(`the dialog takes no ${JSON.stringify(text)}: answer with an option's number, yes or no`, `norn story answer ${q.unit.unit} 1`, "not_an_option");
+  if (!env.slots.executors[run.executor]?.dialogKeys?.(text)) throw refuse(`the dialog takes no ${JSON.stringify(text)}: answer with an option's number, yes or no`, `norn story answer ${q.unit.unit} 1`, "not_an_option");
+  const shown = run.session ? await env.launcher.dialogTakes?.(run.session, text) : null;
+  // yes, never a number: on a menu whose cursor starts on its refusal, option 1 is the refusal
+  if (shown && !shown.takes)
+    throw refuse(`the dialog in ${q.unit.unit}'s pane takes no ${JSON.stringify(text)}: answer with an option's number as it shows, yes or no. It shows: ${shown.dialog.split("\n").filter((l) => l.trim() !== "").join(" | ")}`, `norn story answer ${q.unit.unit} yes`, "not_an_option");
 }
 
 async function answer(ctx: CliContext, key: string, text: string) {
@@ -74,7 +81,7 @@ async function answer(ctx: CliContext, key: string, text: string) {
   if (open.length === 0) throw refuse(`no agent of ${key} waits on an answer`, `norn story view ${key}`, "no_question");
   if (open.length > 1) ambiguous(`more than one unit of ${key} waits on an answer`, open.map((q) => q.unit.unit), (u) => `norn story answer ${u} "<answer>"`);
   const q = open[0] as OpenQuestion;
-  checkDialog(env, q, text);
+  await checkDialog(env, q, text);
   const state = q.unit.state as NonNullable<UnitJournal["state"]>;
   const id = receiptId("answer", q.input_id);
   const route = await routeDecision(env, key.split("/")[0] as string, retry);
