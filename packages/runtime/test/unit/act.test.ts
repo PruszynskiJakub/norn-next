@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { type Decision, type DecisionOf, renderBrief } from "@norn/kernel";
 import { deriveUlid } from "@norn/schema";
 import { layout } from "@norn/store-local";
+import { fail, ok } from "@norn/plugin-api";
 import { act, type AgentRunRequest, appendEvents, briefRenderInput, EventLogSessionSource, nudgePromptId, readStepRun } from "../../src/index.ts";
 import { decided, decisionOf, type Harnessed, has, harness, MINUTE, record, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
 
@@ -416,6 +417,26 @@ describe("the mailbox and the store", () => {
     expect((await record(h, "lt-1")).receipts.find((x) => x.id === "01JD5G0000LETTER0000000001")?.data.kind).toBe("gate.decided");
     await tickUntil(h, has("claim.release"));
     expect((await record(h, "lt-1")).state?.ended).toBe("done");
+  });
+
+  test("a flush publishes every unit's branch head before the run data; a head refused is reported and never holds the run data back", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    const { t } = await decided(h);
+    const order: string[] = [];
+    const vcs = { ...t.env.slots.vcs, publishHead: async (branch: string) => (order.push(`publish ${branch}`), branch === "norn/lt-1" ? ok({ pushed: true }) : fail<{ pushed: boolean }>("conflict", "diverged")) };
+    const store = { ...t.env.slots.store, flush: async (story: string) => (order.push(`flush ${story}`), ok({ pushed: true })) };
+    const facts = structuredClone(t.facts);
+    const own = facts.stories[0]?.units[0];
+    if (!own) throw new Error("no unit");
+    facts.stories[0]?.units.push({ ...structuredClone(own), id: "lt-1/01" });
+    const problems: string[] = [];
+    const shared = { ...t, facts, problems, env: { ...t.env, slots: { ...t.env.slots, vcs, store } } };
+    const r = await act(shared, { kind: "flush", unit: null, rule: "store.flush", story: "lt-1" }, 0);
+    expect(r).toMatchObject({ ok: true, detail: { pushed: true, heads: ["norn/lt-1"] } });
+    expect(order).toEqual(["publish norn/lt-1", "publish norn/lt-1-01", "flush lt-1"]);
+    expect(problems).toEqual(["lt-1/01: publishing norn/lt-1-01: diverged"]);
   });
 
   test("a store without flush publishes nothing, and says so", async () => {

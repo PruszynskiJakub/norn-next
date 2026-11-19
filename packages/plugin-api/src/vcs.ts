@@ -51,7 +51,11 @@ export interface VcsPushOptions {
 }
 
 export interface VcsWorktrees {
-  /** make the unit's worktree on `branch` (when the branch is new, cut from the remote's copy of it if there is one, else from `base`), or find the one there */
+  /**
+   * make the unit's worktree on `branch`, or find the one there. A new branch is cut from the newest of
+   * the remote's copy of it and its published head (`publishHead`), else from `base`; a branch this
+   * clone has but checks out nowhere is first moved forward to them when it is behind
+   */
   ensure(unit: string, branch: string, base: string): Promise<PluginResult<{ path: string }>>;
   /** remove the unit's worktree; removing a missing one is not an error */
   remove(unit: string): Promise<PluginResult<void>>;
@@ -121,6 +125,15 @@ export interface Vcs {
    * checked out. Optional (plugin API 1.14); without it a finished unit's branch stays.
    */
   deleteBranch?(branch: string): Promise<PluginResult<void>>;
+  /**
+   * push `branch`'s commit to a ref of the remote that only norn reads (never a branch, so it starts no
+   * build and opens nothing), so another clone that carries the unit on starts from this work.
+   * Fast-forward only: `pushed` is false when the remote already had it or holds more of the
+   * branch's commits; a published head that diverged from the branch is `conflict`. Read again
+   * after `fetch`. Optional (plugin API 1.16); without it a takeover starts from the base, or from a
+   * push of the branch itself.
+   */
+  publishHead?(branch: string): Promise<PluginResult<{ pushed: boolean }>>;
   push(branch: string, opts?: VcsPushOptions): Promise<PluginResult<void>>;
   fetch(): Promise<PluginResult<void>>;
 }

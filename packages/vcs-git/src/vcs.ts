@@ -3,6 +3,7 @@ import { fail, type HostContext, ok, type Vcs, type VcsFactory } from "@norn/plu
 import { GitVcsConfig } from "./config.ts";
 import { conflictMarkers } from "./markers.ts";
 import { mergeInto } from "./merge.ts";
+import { publishHead } from "./heads.ts";
 import { fetchRemote, pushBranch } from "./push.ts";
 import { deleteBranch, isAncestor, mergeBase, remoteIfAny, revParse, trialConflicts, uncommitted, unfinished, untracked, worktreeList } from "./refs.ts";
 import { gitWorktrees } from "./worktree.ts";
@@ -49,6 +50,7 @@ export function createGitVcs(ctx: HostContext, config: GitVcsConfig): Vcs {
       if (!has.ok) return has;
       return has.value === null ? ok(null) : revParse(ctx, root, `refs/remotes/${remote}/${branch}`);
     },
+    publishHead: (branch) => publishHead(ctx, root, remote, branch),
     async push(branch, opts) {
       const r = await pushBranch(ctx, root, remote, branch, opts?.lease);
       return r.ok ? ok(undefined) : r;

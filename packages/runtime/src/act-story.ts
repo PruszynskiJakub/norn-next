@@ -7,7 +7,7 @@ import { type DecisionOf, validateMailboxLetter } from "@norn/kernel";
 import { fail, ok, type PluginResult, parseStoryKey } from "@norn/plugin-api";
 import { deriveUlid } from "@norn/schema";
 import { dropUnitBranch } from "./branch-cleanup.ts";
-import { ensureWorktree } from "./branches.ts";
+import { branchOf, ensureWorktree } from "./branches.ts";
 import type { TickContext } from "./env.ts";
 import { mirrorSpec } from "./inputs.ts";
 import { removeUnitLogs } from "./retention.ts";
@@ -90,10 +90,30 @@ export async function importMailbox(t: TickContext, d: DecisionOf<"import_mailbo
   return ok({ imported, acknowledged: d.ids });
 }
 
+/**
+ * Publish the story: each unit's branch head first, then the run data. In that order, the record on
+ * the remote never names a step whose work the remote lacks, so a machine that takes the story over
+ * starts from that work. A head that cannot be published is reported and never holds the run data
+ * back, which would keep every other machine from seeing where the story stands.
+ */
 export async function flush(t: TickContext, d: DecisionOf<"flush">): Promise<PluginResult<unknown>> {
-  const store = t.env.slots.store;
-  if (!store.flush) return ok({ pushed: false });
-  return store.flush(d.story);
+  const { env } = t;
+  const heads: string[] = [];
+  const publish = env.slots.vcs.publishHead;
+  if (publish && env.slots.vcs.capabilities.worktrees) {
+    const units = t.facts.stories.find((s) => s.key === d.story)?.units ?? [];
+    for (const u of units) {
+      const branch = branchOf(u.id);
+      const published = await publish(branch);
+      if (!published.ok) t.problems?.push(`${u.id}: publishing ${branch}: ${published.failure.message}`);
+      else if (published.value.pushed) heads.push(branch);
+    }
+  }
+  const store = env.slots.store;
+  const published = heads.length > 0 ? { heads } : {};
+  if (!store.flush) return ok({ pushed: false, ...published });
+  const flushed = await store.flush(d.story);
+  return flushed.ok ? ok({ ...flushed.value, ...published }) : flushed;
 }
 
 /**
