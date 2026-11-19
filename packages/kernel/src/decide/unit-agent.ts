@@ -160,7 +160,7 @@ function dialogText(v: UnitView, run: RunInfo, dialog: string): string {
 }
 
 function noEventsText(v: UnitView, run: RunInfo): string {
-  const fromHere = answerFromHere(v, run).replace("<option>", "1");
+  const fromHere = answerFromHere(v, run).replace("<option>", "yes");
   return [
     `run ${run.id}'s agent runs in its pane but has sent no event since it started, so its hooks never loaded;`,
     "the pane most likely shows a trust dialog.",

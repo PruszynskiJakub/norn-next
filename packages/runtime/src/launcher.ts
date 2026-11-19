@@ -350,7 +350,11 @@ export class HarnessLauncher implements AgentLauncher {
     // answered in the pane meanwhile: nothing waits for the keys
     if (!open) return ok(undefined);
     const pane = await currentRunnerHandle(ctx, h);
-    const pressed = await runner.keys(pane, keys);
+    // a menu with no numbers is moved through from where its cursor stands, which only the pane shows
+    const shown = runner.dialog ? await runner.dialog(pane) : null;
+    const chosen = shown?.ok && shown.value !== null ? harness.dialogKeys(text, shown.value) : keys;
+    if (!chosen) return fail("invalid", `${harness.name}'s dialog takes no ${JSON.stringify(text)}: answer with an option's number, yes or no`, false);
+    const pressed = await runner.keys(pane, chosen);
     if (!pressed.ok) return pressed;
     // a refused call ends the agent's turn with no hook that closes the permission, so the run would
     // park on it again while the agent waits at an empty prompt; the prompt starts a turn, which closes it

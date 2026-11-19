@@ -29,7 +29,7 @@ The next tick presses the keys for that option in the agent's pane; after a `no`
 Trust the folder in the pane, or answer the prompt from here:
 
 ```sh
-norn story answer gh-18 1
+norn story answer gh-18 yes   # the option that trusts the folder, wherever the menu lists it
 ```
 
 The run goes on with its first event. If the pane shows something else, start the step again with `norn run rerun gh-18`.

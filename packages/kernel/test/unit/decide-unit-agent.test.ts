@@ -315,7 +315,7 @@ describe("an agent run, judged from its session", () => {
     const d = kindOf(decideCase({ state: quiet(), session: null, run_alive: true, executors: pane }), "park");
     expect(d).toMatchObject({ rule: "agent.no_events.park", inbox: { kind: "permission" } });
     expect(d.inbox?.text).toContain("Trust the folder there");
-    expect(d.inbox?.text).toContain("norn story answer gh-1 1");
+    expect(d.inbox?.text).toContain("norn story answer gh-1 yes");
     // parked, each later tick holds it: no retry loop while the dialog waits
     const parked = quiet({ parked: { reason: "agent.no_events.park", since: minutesAgo(1) } });
     expect(decideCase({ state: parked, session: null, run_alive: true, executors: pane })).toMatchObject({ kind: "noop", rule: "unit.parked" });

@@ -138,10 +138,11 @@ export interface Harness {
   respond(input: RespondInput): NativeReply;
   /**
    * Pure: the keys that choose `answer` in the agent's own choice dialog, a permission or a trust
-   * prompt: an option's number, `yes` or `no` (plugin API 1.12). Null for an answer the dialog takes
-   * no key for. `no` refuses the call; norn then types a prompt saying so, as a refused call may end
+   * prompt: an option's number, `yes` or `no` (plugin API 1.12). `dialog` is the dialog as the pane
+   * shows it, when the runner can read it (plugin API 1.15), for a menu whose keys depend on where its
+   * cursor stands. Null for an answer the dialog takes no key for. `no` refuses the call; norn then types a prompt saying so, as a refused call may end
    * the agent's turn with no hook to say the dialog closed. Absent: such a dialog is answered in the
    * agent's pane by a person, never by norn.
    */
-  dialogKeys?(answer: string): readonly RunnerKey[] | null;
+  dialogKeys?(answer: string, dialog?: string): readonly RunnerKey[] | null;
 }

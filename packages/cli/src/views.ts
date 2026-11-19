@@ -108,7 +108,7 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
         text: u.run_dialog
           ? `its agent waits on a dialog in its pane: ${u.run_dialog}`
           : "its agent runs in its pane but has sent no event, so its hooks never loaded: the pane most likely shows a trust prompt; trust the folder there",
-        next: `${dialogKeys ? `norn story answer ${id} 1, or ` : ""}${rerun} if the pane shows something else`,
+        next: `${dialogKeys ? `norn story answer ${id} yes, or ` : ""}${rerun} if the pane shows something else`,
       };
     case "gate.park":
       return { for: "gate", text: prompt ?? s.step, next: decide };
