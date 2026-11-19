@@ -58,7 +58,7 @@ export async function launchedHere(ctx: HostContext, unit: string, runId: string
   return (await ctx.files.read(launchRecordPath(ctx, unit, runId))) !== null;
 }
 
-async function readLaunch(ctx: HostContext, unit: string, runId: string): Promise<PluginResult<LaunchRecord>> {
+export async function readLaunch(ctx: HostContext, unit: string, runId: string): Promise<PluginResult<LaunchRecord>> {
   const path = launchRecordPath(ctx, unit, runId);
   const text = await ctx.files.read(path);
   if (text === null) return fail("not_found", `${unit} run ${runId} has no launch record at ${path}`, false);

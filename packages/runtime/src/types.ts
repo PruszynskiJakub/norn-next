@@ -104,6 +104,11 @@ export interface AgentLauncher {
   stop(handle: string): Promise<PluginResult<void>>;
   /** whether the handle's process still runs; null when it cannot tell, which is never read as dead */
   alive?(handle: string): Promise<boolean | null>;
+  /**
+   * The head of the log the handle's process wrote, where an agent nobody watches leaves why it
+   * ended; null when it left none, or the launcher cannot read it.
+   */
+  output?(handle: string): Promise<string | null>;
 }
 
 /**
