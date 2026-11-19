@@ -233,8 +233,12 @@ export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherO
         reads.map((r) => r.key),
         problems,
       );
-  // a base or change that moved on the remote is only seen once fetched
-  if (!opts.local && reads.length > 0 && env.slots.vcs.capabilities.push) {
+  const intake = opts.local ? ok([]) : await env.slots.tracker.intake(env.config.intake);
+  if (!intake.ok) problems.push(`tracker intake: ${intake.failure.message}`);
+  // a base or change that moved on the remote is only seen once fetched, and an item taken in this
+  // tick has its branch cut from the base as fetched
+  const taking = intake.ok && intake.value.length > 0;
+  if (!opts.local && (reads.length > 0 || taking) && env.slots.vcs.capabilities.push) {
     const fetched = await env.slots.vcs.fetch();
     if (!fetched.ok) problems.push(`vcs fetch: ${fetched.failure.message}`);
   }
@@ -263,8 +267,6 @@ export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherO
     }
     stories.push(story);
   }
-  const intake = opts.local ? ok([]) : await env.slots.tracker.intake(env.config.intake);
-  if (!intake.ok) problems.push(`tracker intake: ${intake.failure.message}`);
   const facts: KernelFacts = {
     tick_id: tickId,
     now: env.ctx.now(),
