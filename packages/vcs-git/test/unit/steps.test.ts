@@ -148,6 +148,14 @@ describe("update-branch", () => {
     expect(r.ok ? null : r.failure.message).toBe(`update-branch: ${WT} has uncommitted changes: new.txt, notes.txt, old.txt, r.txt`);
   });
 
+  test("a refusal names the first 10 uncommitted paths in order, then counts the rest", async () => {
+    const names = Array.from({ length: 13 }, (_, i) => `f${String(13 - i).padStart(2, "0")}.txt`);
+    const h = host(storyRouter((line) => (line.startsWith("status --porcelain") ? { stdout: names.map((n) => `?? ${n}\0`).join("") } : undefined), { head: HEAD }));
+    const r = await updateBranch.run(input({}), h.ctx);
+    const shown = Array.from({ length: 10 }, (_, i) => `f${String(i + 1).padStart(2, "0")}.txt`).join(", ");
+    expect(r.ok ? null : r.failure.message).toBe(`update-branch: ${WT} has uncommitted changes: ${shown} and 3 more`);
+  });
+
   test("a worktree on another branch than the host's is refused", async () => {
     const h = host(storyRouter(() => undefined, { head: HEAD }));
     const r = await updateBranch.run(input({}, { branch: "gh-12-other" }), h.ctx);
