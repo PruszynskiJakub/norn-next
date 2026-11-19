@@ -48,6 +48,7 @@ export function kernelConfigOf(config: NornConfig, executor: string): KernelConf
     workflow: k.workflow ?? d.workflow,
     ...(k.intake_workflow_label_prefix ?? d.intakeWorkflowLabelPrefix ? { intakeWorkflowLabelPrefix: k.intake_workflow_label_prefix ?? d.intakeWorkflowLabelPrefix } : {}),
     sliceWorkflow: k.slice_workflow ?? d.sliceWorkflow,
+    base: config.base,
     claimTtlMs: k.claim_ttl ? durationMs(k.claim_ttl) : d.claimTtlMs,
     claimRenewBeforeMs: k.claim_renew_before ? durationMs(k.claim_renew_before) : d.claimRenewBeforeMs,
   };

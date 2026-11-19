@@ -1,8 +1,8 @@
 /**
  * Story rules: what holds or ends a story's units as a whole, and what is decided per story rather
  * than per unit. Claims (take, renew, reacquire, expiry, release), slices (start, blocked, stuck), a
- * new round, a person moving a unit to a step, a merged change ending the story, a closed item closing it (a live run stopped before
- * either mark), corrupt units, a pinned
+ * new round, a person moving a unit to a step, a change merged into the story's base ending the story
+ * (one merged elsewhere parking it), a closed item closing it (a live run stopped before either mark), corrupt units, a pinned
  * workflow missing or invalid, importing the mailbox, and flushing a shared store. A tracker or forge
  * is read for facts only, never as a record of where a story stands.
  */
@@ -11,7 +11,7 @@ import type { Decision } from "../model/actions.ts";
 import { DEFAULT_WORKFLOW_LABEL_PREFIX } from "../model/config.ts";
 import type { StoryFacts, UnitFacts } from "../model/facts.ts";
 import type { DecideContext } from "./context.ts";
-import { hasPendingUnitWork, held, isOpen, mailboxDecisions, unitIds } from "./story-claim.ts";
+import { changeLanded, hasPendingUnitWork, held, isOpen, mailboxDecisions, mergedElsewhere, unitIds } from "./story-claim.ts";
 import { decideSlices } from "./story-slices.ts";
 import { applyWith, corruptRule, endedRule, liveRun, moveRule, park, roundRule, startRule } from "./story-unit.ts";
 
@@ -34,6 +34,11 @@ export function isChangeClosedReason(reason: string): boolean {
   return CHANGE_CLOSED.test(reason);
 }
 
+/** The park a change merged into another branch holds: nothing reached the story's base, so the story is not done. */
+export function mergedElsewhereReason(url: string | undefined, into: string, base: string): string {
+  return `the change${url ? ` ${url}` : ""} merged into ${into}, not the story's base ${base}`;
+}
+
 /**
  * The story's decisions: story-wide ones (`unit: null`) and at most one per unit. A unit given a
  * decision here is not passed to the unit rules this tick.
@@ -44,7 +49,7 @@ export function decideStory(story: StoryFacts, ctx: DecideContext): Decision[] {
   const now = Date.parse(facts.now);
   const out: Decision[] = [];
 
-  if (!isOpen(story)) return unitIds(story).flatMap((id) => endedNoop(story, id));
+  if (!isOpen(story, config.base)) return unitIds(story).flatMap((id) => endedNoop(story, id));
 
   if (claim === null) {
     // a story nobody holds is taken only when no round of it is under way; one in progress was released on purpose
@@ -87,7 +92,7 @@ export function decideStoryTail(story: StoryFacts, ctx: DecideContext): Decision
   const out: Decision[] = [];
   const live = Date.parse(facts.now) < Date.parse(claim.expires_at);
   if (live && facts.capabilities.store.shared && story.unsynced !== true) out.push({ kind: "flush", unit: null, rule: "store.flush", story: story.key });
-  if (!isOpen(story)) {
+  if (!isOpen(story, ctx.config.base)) {
     const finish = finishRule(story, ctx);
     if (finish) out.push(finish);
     out.push({ kind: "release_claim", unit: null, rule: "claim.release", story: story.key });
@@ -106,7 +111,7 @@ export function decideStoryTail(story: StoryFacts, ctx: DecideContext): Decision
 function finishRule(story: StoryFacts, ctx: DecideContext): Decision | null {
   const worktrees = story.units.filter((u) => u.state?.ended === "done").map((u) => u.id);
   const own = story.units.find((u) => u.id === story.key);
-  const landed = story.change?.state === "merged";
+  const landed = changeLanded(story, ctx.config.base);
   const closeItem = own?.state?.ended === "done" && landed && story.item?.open === true && ctx.facts.capabilities.tracker?.close === true;
   if (worktrees.length === 0 && !closeItem) return null;
   return { kind: "finish_story", unit: null, rule: "story.finish", story: story.key, worktrees, close_item: closeItem, effect_id: ctx.nextId() };
@@ -152,7 +157,7 @@ function unitRule(story: StoryFacts, id: string, u: UnitFacts | null, ctx: Decid
   const corrupt = corruptRule(u, ctx);
   if (corrupt) return corrupt;
   const isStory = id === story.key;
-  const merged = story.change?.state === "merged";
+  const merged = changeLanded(story, ctx.config.base);
   const itemClosed = story.item !== null && !story.item.open;
   const state = u?.state ?? null;
 
@@ -191,6 +196,11 @@ function unitRule(story: StoryFacts, id: string, u: UnitFacts | null, ctx: Decid
   // stays on the record between polls, and would otherwise poll a change a person closed forever
   if (isStory && story.change?.state === "closed" && u.receipts.length === 0 && state.parked === undefined && !liveRun(u, state, ctx)) {
     return park(u.id, u, state, "story.change_closed", "stuck", changeClosedReason(story.change.url), ctx);
+  }
+  // nothing reached the base, so the story is not done; the worktree stays for the person, who decides where the work goes
+  const base = ctx.config.base;
+  if (isStory && story.change && base !== undefined && mergedElsewhere(story, base) && u.receipts.length === 0 && state.parked === undefined && !liveRun(u, state, ctx)) {
+    return park(u.id, u, state, "story.change_merged_elsewhere", "stuck", mergedElsewhereReason(story.change.url, story.change.base_branch, base), ctx);
   }
   // the unit rules apply what is on the record, and settle a run, before anything here reads the step
   if (hasPendingUnitWork(u, state)) return null;

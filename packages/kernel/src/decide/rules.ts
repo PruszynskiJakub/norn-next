@@ -30,6 +30,7 @@ export const RULE_IDS: readonly string[] = [
   "story.item_closed",
   "story.item_closed.stop",
   "story.change_closed",
+  "story.change_merged_elsewhere",
   "round.start",
   "round.workflow_invalid",
   "unit.move",

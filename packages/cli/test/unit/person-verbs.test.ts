@@ -348,6 +348,20 @@ describe("story round", () => {
     expect(await receiptsOf(m)).toEqual([]);
   });
 
+  test("story view and status name the commit a merged change landed as", async () => {
+    const m = configured();
+    await seedUnit(m, { step: AGENT_STEP, ...ended });
+    const env = await envOf(m);
+    const sha = "a".repeat(40);
+    const landed = "b".repeat(40);
+    const merged = { id: 1, head_branch: `norn/${UNIT}`, base_branch: "main", title: "Look", body: "", draft: false, opened_at: "2026-11-17T10:00:00.000Z", receipts: ["r1"], base_sha_at_open: sha, head_sha: sha, merged_at: "2026-11-17T11:00:00.000Z", merge_sha: landed };
+    await env.ctx.files.write(`${env.ctx.repo.dataDir}/changes/1.json`, JSON.stringify(merged));
+    const view = await runCli(["story", "view", UNIT, "--json"], m.io);
+    expect((json(view.stdout) as { change: unknown }).change).toMatchObject({ id: 1, state: "merged", merge_sha: landed });
+    const status = await runCli(["status", "--json"], m.io);
+    expect((json(status.stdout) as { stories: { change: unknown }[] }).stories[0]?.change).toMatchObject({ merge_sha: landed });
+  });
+
   test("a closed item, a slice, a step agent, another holder's claim and receipts waiting to be applied are refused", async () => {
     const m = configured();
     expect((await runCli(["story", "create", "Look", "--json"], m.io)).exit).toBe(ExitCode.ok);

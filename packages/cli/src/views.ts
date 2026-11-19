@@ -38,7 +38,8 @@ export interface StoryView {
   url: string | null;
   open: boolean | null;
   claim: { holder: string; expires_at: string } | null;
-  change: { id: number; state: string; url: string | null } | null;
+  /** `merge_sha` once the change merged and the forge names the commit it landed as */
+  change: { id: number; state: string; url: string | null; merge_sha?: string } | null;
   /**
    * This clone's run data of the story and the remote's diverged: no flush can publish it, and while
    * this machine holds the claim its ticks hold the story. Absent when they agree. `waiting`: only a
@@ -177,7 +178,7 @@ export function storyView(s: StoryFacts, workflows: KernelWorkflows, executors: 
     url: s.item?.url ?? null,
     open: s.item ? s.item.open : null,
     claim: s.claim ? { holder: s.claim.holder, expires_at: s.claim.expires_at } : null,
-    change: s.change ? { id: s.change.id, state: s.change.state, url: s.change.url ?? null } : null,
+    change: s.change ? { id: s.change.id, state: s.change.state, url: s.change.url ?? null, ...(s.change.merge_sha !== undefined && { merge_sha: s.change.merge_sha }) } : null,
     ...(unsynced && { unsynced }),
     units: s.units.map((u) => unitView(u, workflows, executors)),
   };

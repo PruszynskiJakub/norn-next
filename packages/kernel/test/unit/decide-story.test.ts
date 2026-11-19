@@ -270,6 +270,29 @@ describe("the change and the item", () => {
     expect(d.expect_version).toBe(3);
   });
 
+  test("a change merged into a branch other than the story's base parks the story unit naming that branch, and ends nothing", () => {
+    const elsewhere = change({ state: "merged", base_branch: "release", url: "https://x/5" });
+    const s = story({ change: elsewhere, units: [unit("gh-1", state("gh-1", "plan")), unit("gh-1/01", state("gh-1/01", "build", { ended: "done" }))] });
+    const ds = storyDecisions(s);
+    expect(rules(ds)).toEqual(["story.change_merged_elsewhere", "unit.ended.done"]);
+    const d = ds[0] as DecisionOf<"park">;
+    expect(d.intent.data).toEqual({ kind: "unit.parked", reason: "the change https://x/5 merged into release, not the story's base main", step: "plan", attempt: 1 });
+    expect(ds.some((x) => x.kind === "mark_done" || x.kind === "finish_story" || x.kind === "release_claim")).toBe(false);
+  });
+
+  test("a change merged elsewhere neither ends a story not started nor finishes one whose units ended", () => {
+    const elsewhere = change({ state: "merged", base_branch: "release" });
+    expect(rules(storyDecisions(story({ change: elsewhere, units: [unit("gh-1", null)] })))).not.toContain("story.ended");
+    const done = story({ change: elsewhere, units: [unit("gh-1", state("gh-1", "split", { ended: "done" }))] });
+    const finish = storyDecisions(done).find((d): d is DecisionOf<"finish_story"> => d.kind === "finish_story");
+    expect(finish?.close_item).toBe(false);
+  });
+
+  test("the story's base is the config's", () => {
+    const merged = story({ change: change({ state: "merged", base_branch: "release" }) });
+    expect(rules(storyDecisions(merged, {}, workflows(), { ...CONFIG, base: "release" }))).toEqual(["story.change_merged"]);
+  });
+
   test("a closed change does not park a unit already parked or with a live run", () => {
     const parked = unit("gh-1", state("gh-1", "plan", { parked: { reason: "ask", since: minutesAgo(3) } }));
     expect(storyDecisions(story({ change: change({ state: "closed" }), units: [parked] }))).toEqual([]);
