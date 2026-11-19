@@ -11,8 +11,9 @@ import type { HostFiles } from "@norn/plugin-api";
 import { parse } from "yaml";
 import { parseLayer } from "./load.ts";
 import { getKey, isMapping } from "./merge.ts";
-import { type ConfigPaths, OLD_LOCAL_CONFIG_FILE, REPO_LOCAL_FILE } from "./paths.ts";
+import { type ConfigPaths, layerFileName, OLD_LOCAL_CONFIG_FILE, REPO_LOCAL_FILE } from "./paths.ts";
 import type { ConfigLayer } from "./schema.ts";
+import { overrideOf } from "./set.ts";
 import { setKeyInText } from "./write.ts";
 
 export interface OldLocalConfig {
@@ -89,6 +90,12 @@ async function configuredExecutors(files: HostFiles, paths: ConfigPaths): Promis
   return out;
 }
 
+/** One file's layer, or null when it is absent or does not parse: the load names a broken file. */
+async function parsedLayer(files: HostFiles, layer: "repo", path: string): Promise<ConfigLayer | null> {
+  const parsed = parseLayer(layer, await files.read(path));
+  return parsed.ok ? parsed.value : null;
+}
+
 /**
  * Move the old file into the repo-local one; null when there is none, or when no config of this
  * norn is there yet and `setUp` asks for one. The old text is kept before anything else is
@@ -112,11 +119,15 @@ export async function migrateOldLocalConfig(
   // a repo-local file that does not parse is the person's to fix; the load names it
   if (!parsed.ok) return null;
   const layer: ConfigLayer | null = parsed.value;
+  const above = { user: null, local: layer, repo: await parsedLayer(files, "repo", paths.repo) };
   let next = current;
   const mapped: string[] = [];
   const ignored = [...m.ignored];
   for (const s of m.set) {
+    // a key the committed file sets never applies from the person's file: taking it would claim a fix that is not in effect
+    const wins = overrideOf(above, paths, "local", s.key, s.value);
     if (opts.carried?.includes(s.key)) mapped.push(`${s.from} → ${s.key}`);
+    else if (wins) ignored.push(`${s.from}: ${layerFileName(wins.layer)} sets ${s.key} (${typeof wins.value === "string" ? wins.value : JSON.stringify(wins.value)}), and it wins`);
     else if (getKey(layer, s.key) !== undefined) ignored.push(`${s.from}: ${REPO_LOCAL_FILE} sets ${s.key} already`);
     else {
       next = setKeyInText(next, s.key, s.value);

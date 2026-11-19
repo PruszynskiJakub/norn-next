@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
 import { parse } from "yaml";
 import { join } from "node:path";
-import { AGENTS_DIR, configPaths, REPO_LOCAL_FILE, ExitCode, OLD_LOCAL_CONFIG_FILE, OLD_REPO_CONFIG_FILE, runCli } from "../../src/index.ts";
+import { AGENTS_DIR, configPaths, REPO_COMMITTED_FILE, REPO_LOCAL_FILE, ExitCode, OLD_LOCAL_CONFIG_FILE, OLD_REPO_CONFIG_FILE, runCli } from "../../src/index.ts";
 import { COMMON, fakeGh, HOME, LOCAL_CONFIG, machine, ROOT } from "./support.ts";
 
 const PATHS = configPaths(HOME, ROOT);
@@ -305,6 +305,15 @@ describe("the old norn's repo-local config", () => {
     const r = await runCli(["config", "get", "kernel.mode", "--json"], m.io);
     expect(json(r.stdout).value).toBe("auto");
     expect(r.stderr).toContain(`ignored mode: ${REPO_LOCAL_FILE} sets kernel.mode already`);
+  });
+
+  test("a key the committed file sets is left out, named as the committed file's, since that file wins", async () => {
+    const m = machine({ script: world({ tools: ["claude"] }), seed: { [PATHS.repo]: `${LOCAL_CONFIG}kernel: { mode: auto }\n`, [OLD_LOCAL]: "mode: manual\n" } });
+    const r = await runCli(["config", "get", "kernel.mode", "--json"], m.io);
+    expect(json(r.stdout).value).toBe("auto");
+    expect(r.stderr).toContain(`took nothing; ignored mode: ${REPO_COMMITTED_FILE} sets kernel.mode (auto), and it wins`);
+    expect(await m.files.read(PATHS.local)).toBeNull();
+    expect(await m.files.read(`${OLD_LOCAL}.old`)).toBe("mode: manual\n");
   });
 
   test("before init it stays, and init takes its mode over detection and moves the rest", async () => {
