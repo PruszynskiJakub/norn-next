@@ -9,7 +9,7 @@
  * so a new call shows up as a failing test rather than a guess.
  *
  * A pane is a real process: `pane run` starts the line with `sh -c` in the pane's cwd, with the
- * pane's `--env` over a bare login env (PATH, HOME, TMPDIR), as a fresh herdr shell would give it, and
+ * pane's `--env` over a bare login env (PATH, HOME, TMPDIR, USER, LOGNAME), as a fresh herdr shell would give it, and
  * its output goes to the pane's screen file. `process-info` reports that process in the foreground
  * while it lives. Keys and text typed into a pane are appended to its input file, whose path the pane
  * gets as `FAKE_HERDR_INPUT`, so an agent waiting on a dialog sees the answer arrive. A test makes a
@@ -118,7 +118,9 @@ function closePane(s: HerdrState, p: HerdrPane): void {
 
 function run(s: HerdrState, p: HerdrPane, line: string): void {
   const out = openSync(outputPath(statePath, p.pane_id), "a");
-  const base = { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME ?? "/", TMPDIR: process.env.TMPDIR ?? "/tmp" };
+  // a login shell names its user: without it the agent's norn claims as another holder than the tick's
+  const user = Object.fromEntries(["USER", "LOGNAME"].flatMap((k) => (process.env[k] !== undefined ? [[k, process.env[k] as string]] : [])));
+  const base = { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME ?? "/", TMPDIR: process.env.TMPDIR ?? "/tmp", ...user };
   const env = { ...base, ...p.env, HERDR_ENV: "1", HERDR_PANE_ID: p.pane_id, FAKE_HERDR_INPUT: inputPath(statePath, p.pane_id) };
   const child = spawn("sh", ["-c", line], { cwd: p.cwd, env, detached: true, stdio: ["ignore", out, out] });
   child.unref();
