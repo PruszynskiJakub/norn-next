@@ -13,8 +13,9 @@
 import { type BriefCommands, type Journal, type ReportHintInput, reduceSession, renderReportHint, renderStepReminder } from "@norn/kernel";
 import { type Harness, type HarnessAnswer, type HarnessEvent, type HostContext, type NativeReply, RUN_ENV } from "@norn/plugin-api";
 import { liveStepOf, reportOnRecord } from "../live-run.ts";
-import { answerFor, MAX_STOP_BLOCKS, owesReportBlock } from "./answer.ts";
+import { type AnswerContext, answerFor, MAX_STOP_BLOCKS, owesReportBlock, resolvePath } from "./answer.ts";
 import { appendEvents, readEvents } from "./log.ts";
+import { realPath } from "./real-path.ts";
 import { claimReceived, claimStopBlock, type Injection, markDelivered, pendingInjections, readSentPrompt } from "./outbox.ts";
 
 export interface IngestDeps {
@@ -61,6 +62,19 @@ const ALLOW: HarnessAnswer = { kind: "allow" };
 const SILENT: NativeReply = { stdout: "", exit_code: 0 };
 const nothing = async (): Promise<void> => {};
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/** The worktree, the protected paths and each write's path with their links followed, for the guard's second look. */
+async function realPaths(ctx: HostContext, worktree: string, protectedPaths: readonly string[], events: readonly HarnessEvent[]): Promise<AnswerContext["real"]> {
+  const folded = resolvePath("/", worktree);
+  const writes: Record<string, string> = {};
+  for (const e of events) if (e.type === "tool.requested" && e.kind === "write" && e.detail) writes[resolvePath(folded, e.detail)] = await realPath(ctx.files, folded, e.detail);
+  if (Object.keys(writes).length === 0) return undefined;
+  return {
+    worktree: await realPath(ctx.files, "/", folded),
+    protectedPaths: await Promise.all(protectedPaths.map((p) => realPath(ctx.files, "/", p))),
+    writes,
+  };
+}
 
 function allowWith(harness: Harness | undefined, hook: string, problems: string[]): IngestResult {
   let reply = SILENT;
@@ -193,9 +207,13 @@ export async function ingestHook(deps: IngestDeps, input: IngestInput): Promise<
         problems.push(`stop blocks: ${errorText(e)}`);
       }
     }
+    const worktree = deps.worktreeOf(unit);
+    const protectedPaths = deps.protectedPaths ?? [ctx.repo.dataDir];
+    const real = await realPaths(ctx, worktree, protectedPaths, fresh);
     const computed = answerFor(fresh, {
-      worktree: deps.worktreeOf(unit),
-      protectedPaths: deps.protectedPaths ?? [ctx.repo.dataDir],
+      worktree,
+      protectedPaths,
+      ...(real && { real }),
       ...(deps.writableRoots && { writableRoots: deps.writableRoots }),
       reported,
       needsReport,

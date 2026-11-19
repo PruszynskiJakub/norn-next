@@ -100,6 +100,8 @@ export interface ResumeInput {
   env?: Record<string, string>;
   /** the executor's extra arguments, as the first launch had them */
   args?: readonly string[];
+  /** run in the launch's folder before the relaunch: what the session needs there that a clean of the worktree took (its hooks) */
+  prepare?(cwd: string): Promise<PluginResult<void>>;
 }
 
 /**
@@ -118,6 +120,10 @@ export async function resumeWith(input: ResumeInput): Promise<PluginResult<void>
   if (session === undefined) return fail("unavailable", `${what}: its session has ended and never reported a harness session to resume`, false);
   const launch = await readLaunch(ctx, h.unit, h.run_id);
   if (!launch.ok) return launch;
+  if (input.prepare) {
+    const prepared = await input.prepare(launch.value.cwd);
+    if (!prepared.ok) return prepared;
+  }
   const env = { ...input.env, [RUN_ENV.unit]: h.unit, [RUN_ENV.run]: h.run_id };
   let spec: ReturnType<Harness["launch"]>;
   try {

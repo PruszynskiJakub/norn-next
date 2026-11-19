@@ -111,6 +111,53 @@ describe("agent runs", () => {
     expect(h.launcher.of("answer")).toEqual([[st?.run?.session, "q1", "left"]]);
   });
 
+  const parkedWithAnswer = async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const st = (await record(h, "lt-1")).state;
+    h.sessions.byUnit.set("lt-1", session("asking", { ask: { id: "q1", question: "Which way?" } }));
+    await tickUntil(h, has("agent.asking.park"));
+    await h.env.journal.record("lt-1", { id: "01JD5G0000ANSWER000000000Q", data: { kind: "answer.sent", input_id: "q1", text: "left", by: "person", step: st?.step, attempt: st?.attempt } });
+    h.sessions.byUnit.set("lt-1", session("working"));
+    h.vcsCalls.length = 0;
+    return { h, st };
+  };
+  const ensures = (h: ReturnType<typeof harness>) => h.vcsCalls.filter((c) => c.op === "ensure").map((c) => c.args[0]);
+
+  test("a removed worktree is made again before an answer resumes the ended session, as the resumed agent runs in it", async () => {
+    const { h, st } = await parkedWithAnswer();
+    h.launcher.aliveAnswer = false;
+    const ensuredBeforeAnswer: unknown[] = [];
+    const answer = h.launcher.answer.bind(h.launcher);
+    h.launcher.answer = async (...args) => {
+      ensuredBeforeAnswer.push(...ensures(h));
+      return answer(...args);
+    };
+    await tickUntil(h, has("receipts.apply"));
+    expect(h.launcher.of("answer")).toEqual([[st?.run?.session, "q1", "left"]]);
+    expect(ensuredBeforeAnswer).toEqual(["lt-1"]);
+    expect(ensures(h)).toEqual(["lt-1"]);
+  });
+
+  test("an answer to a live session leaves the worktree alone, so no catch-up moves the files under the working agent", async () => {
+    const { h, st } = await parkedWithAnswer();
+    h.launcher.aliveAnswer = true;
+    await tickUntil(h, has("receipts.apply"));
+    expect(h.launcher.of("answer")).toEqual([[st?.run?.session, "q1", "left"]]);
+    expect(ensures(h)).toEqual([]);
+  });
+
+  test("an answer to an ended session whose worktree is still there resumes it without a catch-up, which a diverged branch would refuse", async () => {
+    const { h, st } = await parkedWithAnswer();
+    h.launcher.aliveAnswer = false;
+    await h.env.ctx.files.write(`${h.env.slots.vcs.worktree.path("lt-1")}/.git`, "gitdir: elsewhere\n");
+    await tickUntil(h, has("receipts.apply"));
+    expect(h.launcher.of("answer")).toEqual([[st?.run?.session, "q1", "left"]]);
+    expect(ensures(h)).toEqual([]);
+  });
+
   test("an answer to a dialog in the agent's pane goes to the session as a dialog answer, never as a typed prompt", async () => {
     const h = harness({ workflow: "agented" });
     h.items.push(trackerItem(1));

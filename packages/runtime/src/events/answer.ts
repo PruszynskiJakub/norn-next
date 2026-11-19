@@ -34,6 +34,11 @@ export interface AnswerContext {
    */
   writableRoots?: readonly string[];
   /**
+   * The same paths with their symlinks followed: `writes` maps each write's folded path to its real
+   * one. A write whose real path lands in run state is denied though its folded path is in the worktree.
+   */
+  real?: { worktree: string; protectedPaths: readonly string[]; writes: Readonly<Record<string, string>> };
+  /**
    * What to restate when a session starts again having lost its brief (a resume, a compaction);
    * absent on the first start, where the brief itself is about to be read.
    */
@@ -69,7 +74,11 @@ function guard(events: readonly HarnessEvent[], ctx: AnswerContext): HarnessAnsw
     const path = resolvePath(worktree, e.detail);
     // a protected folder may hold the worktree (a data dir with the worktrees inside it): the worktree stays the agent's
     const hit = under(worktree, path) ? undefined : ctx.protectedPaths.map((p) => resolvePath("/", p)).find((p) => under(p, path));
-    if (hit !== undefined)
+    // a link in the worktree can carry a write elsewhere: the path it really lands on is judged too
+    const real = ctx.real;
+    const landed = real?.writes[path];
+    const realHit = real === undefined || landed === undefined || under(real.worktree, landed) ? undefined : real.protectedPaths.find((p) => under(p, landed));
+    if (hit !== undefined || realHit !== undefined)
       return { kind: "deny", reason: `norn: \`${path}\` is norn's run state. Never edit it: a hand-edited file fails validation and makes the unit corrupt.` };
     const roots = [worktree, ...(ctx.writableRoots ?? []).map((r) => resolvePath("/", r))];
     if (!roots.some((r) => under(r, path)))

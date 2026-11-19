@@ -139,6 +139,23 @@ export class HarnessLauncher implements AgentLauncher {
     return bin.ok ? ok({ ...this.opts.agentEnv, ...bin.value }) : bin;
   }
 
+  /** The harness's hooks and the pack's skills in the worktree; both are ignored by git, so a clean of the worktree takes them away. */
+  private async install(harness: Harness, worktree: string): Promise<PluginResult<void>> {
+    try {
+      await harness.install({ worktree, hookCommand: shellQuote([...this.opts.hookCommand, harness.name]) });
+    } catch (err) {
+      return fail("unavailable", `${harness.name}: installing hooks in ${worktree} failed: ${message(err)}`);
+    }
+    if (harness.skillsDir !== undefined && this.opts.skills !== undefined) {
+      try {
+        await installSkills(this.opts.ctx.files, worktree, harness.skillsDir, this.opts.skills);
+      } catch (err) {
+        return fail("unavailable", `${harness.name}: writing the pack's skills to ${worktree}/${harness.skillsDir} failed: ${message(err)}`);
+      }
+    }
+    return ok(undefined);
+  }
+
   /** Any executor that can run headless or attended makes the launcher able to. */
   get modes(): LauncherModes {
     const runners = Object.values(this.opts.executors).map((e) => e.runner.capabilities);
@@ -162,18 +179,8 @@ export class HarnessLauncher implements AgentLauncher {
     const e = this.opts.executors[run.executor];
     if (!e) return fail("not_found", `no executor ${JSON.stringify(run.executor)} is configured`, false);
     const { ctx } = this.opts;
-    try {
-      await e.harness.install({ worktree: run.worktree, hookCommand: shellQuote([...this.opts.hookCommand, e.harness.name]) });
-    } catch (err) {
-      return fail("unavailable", `${e.harness.name}: installing hooks in ${run.worktree} failed: ${message(err)}`);
-    }
-    if (e.harness.skillsDir !== undefined && this.opts.skills !== undefined) {
-      try {
-        await installSkills(ctx.files, run.worktree, e.harness.skillsDir, this.opts.skills);
-      } catch (err) {
-        return fail("unavailable", `${e.harness.name}: writing the pack's skills to ${run.worktree}/${e.harness.skillsDir} failed: ${message(err)}`);
-      }
-    }
+    const installed = await this.install(e.harness, run.worktree);
+    if (!installed.ok) return installed;
     const brief = await this.opts.renderBrief(run);
     if (!brief.ok) return brief;
     // the brief's id is the run's own: a replayed start records and sends the same prompt
@@ -384,7 +391,17 @@ export class HarnessLauncher implements AgentLauncher {
     const resume = async (): Promise<PluginResult<void>> => {
       const agentEnv = await this.agentEnv();
       if (!agentEnv.ok) return agentEnv;
-      return resumeWith({ ctx, handle: h, harness: executor.harness, runner: executor.runner, id, text: marked, env: agentEnv.value, ...(executor.args !== undefined ? { args: executor.args } : {}) });
+      return resumeWith({
+        ctx,
+        handle: h,
+        harness: executor.harness,
+        runner: executor.runner,
+        id,
+        text: marked,
+        env: agentEnv.value,
+        prepare: (cwd) => this.install(executor.harness, cwd),
+        ...(executor.args !== undefined ? { args: executor.args } : {}),
+      });
     };
     const alive = await this.alive(handle);
     if (alive === false) return resume();
