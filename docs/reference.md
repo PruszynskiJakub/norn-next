@@ -131,11 +131,14 @@ norn plugin update <name>
 
 ##### `norn status`
 
-Show every story and unit, read-only
+Show every story and unit, read-only; --segment: one line for herdr's tab bar
 
 ```sh
-norn status
+norn status | norn status --segment [--ttl 30s]
 ```
+
+- `--segment`: one line for herdr's tab bar, empty outside a norn repo; inside herdr also each story's $norn sidebar token
+- `--ttl <duration>`: with --segment: how long a sidebar token stays without the next segment (default 30s)
 
 ##### `norn story` (noun)
 
