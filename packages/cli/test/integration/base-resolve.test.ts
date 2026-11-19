@@ -447,6 +447,8 @@ describe("an update that finds the worktree busy", () => {
   let rebaseView: NornOut;
   let dirtyStuck: UnitShown;
   let dirtyHead = "";
+  let baseMoved = "";
+  let baseMerged = true;
   let dirtyStatus: string[] = [];
   let mergingStuck: UnitShown;
   let side = "";
@@ -478,9 +480,16 @@ describe("an update that finds the worktree busy", () => {
     // uncommitted work the update would carry into its merge
     writeFileSync(join(wt, "r.txt"), "an edit not committed\n");
     writeFileSync(join(wt, "notes.txt"), "a file not added\n");
+    // a base that moved, so an update that went ahead would have something to merge
+    baseMoved = await personPush(w, "main", { "sibling.txt": "a teammate's work\n" }, "sibling: unrelated work");
     await approve(w);
     dirtyStuck = await ticks.until((u) => u?.ended === "stuck");
     dirtyHead = await sh(wt, "git", "rev-parse", "HEAD");
+    await sh(wt, "git", "fetch", "-q", "origin");
+    baseMerged = await sh(wt, "git", "merge-base", "--is-ancestor", baseMoved, "HEAD").then(
+      () => true,
+      () => false,
+    );
     dirtyStatus = (await sh(wt, "git", "status", "--porcelain")).split("\n").map((l) => l.trim()).filter(Boolean);
 
     // a merge a resolver left in progress, then an update sent at it
@@ -503,6 +512,7 @@ describe("an update that finds the worktree busy", () => {
 
   test("an update on a dirty worktree merges nothing, and the unit ends stuck naming the paths", () => {
     expect(dirtyHead).toBe(headAtGate);
+    expect(baseMerged).toBe(false);
     expect(dirtyStatus).toEqual(["M r.txt", "?? notes.txt"]);
     expect(dirtyStuck).toMatchObject({ step: "update", ended: "stuck" });
     expect(dirtyStuck.ended_reason).toContain(`${wt} has uncommitted changes: notes.txt, r.txt`);
