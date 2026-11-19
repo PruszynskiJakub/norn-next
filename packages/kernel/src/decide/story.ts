@@ -40,13 +40,17 @@ export function mergedElsewhereReason(url: string | undefined, into: string, bas
 }
 
 /**
- * The story's decisions: story-wide ones (`unit: null`) and at most one per unit. A unit given a
- * decision here is not passed to the unit rules this tick.
+ * A story with nothing left to decide, whether it finished or ended stuck: every unit ended and
+ * nothing waits on its record or in its mailbox.
  */
-/** A story with nothing left to decide: every unit ended and nothing waits on its record or in its mailbox. */
 export function storyFinishedHere(story: StoryFacts, ctx: DecideContext): boolean {
   return !isOpen(story, ctx.config.base);
 }
+
+/**
+ * The story's decisions: story-wide ones (`unit: null`) and at most one per unit. A unit given a
+ * decision here is not passed to the unit rules this tick.
+ */
 
 export function decideStory(story: StoryFacts, ctx: DecideContext): Decision[] {
   const { facts, config } = ctx;
