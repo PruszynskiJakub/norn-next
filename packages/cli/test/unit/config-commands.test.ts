@@ -74,6 +74,14 @@ describe("norn config set", () => {
     expect(await m.files.read(PATHS.local)).not.toContain("max_agents");
   });
 
+  test("a set of a mapping that holds a key this norn no longer reads is refused too", async () => {
+    const m = machine({ seed: { [PATHS.local]: LOCAL_CONFIG } });
+    const r = await runCli(["config", "set", "kernel", "{max_agents: 3}", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.config);
+    expect(json(r.stdout).error).toContain("kernel.max_agents is no longer read");
+    expect(await m.files.read(PATHS.local)).not.toContain("max_agents");
+  });
+
   test("--unset removes the key", async () => {
     const m = machine({ seed: { [PATHS.local]: `${LOCAL_CONFIG}base: dev\n` } });
     const r = await runCli(["config", "set", "base", "--unset", "--json"], m.io);

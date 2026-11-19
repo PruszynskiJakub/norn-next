@@ -39,6 +39,7 @@ export function planSet(loaded: Pick<LoadedConfig, "layers" | "paths">, current:
   // a retired key would load and be ignored, so setting one would only look like it worked
   const why = value === undefined ? undefined : retiredWhy(key);
   if (why) return { ok: false, problems: [{ layer, path: `/${key.split(".").join("/")}`, message: retiredText(key, why), do_instead: unsetCommand(key, layer) }] };
+  const setPath = `/${key.split(".").join("/")}`;
   let text: string;
   try {
     text = setKeyInText(current, key, value);
@@ -47,6 +48,9 @@ export function planSet(loaded: Pick<LoadedConfig, "layers" | "paths">, current:
   }
   const parsed = parseLayer(layer, text);
   if (!parsed.ok) return parsed;
+  // a mapping value can carry a retired key the dotted check above never sees
+  const carried = value === undefined ? [] : parsed.retired.filter((p) => p.path.startsWith(`${setPath}/`));
+  if (carried.length > 0) return { ok: false, problems: carried };
   const merged: ConfigLoad = mergeConfig({ ...loaded.layers, [layer]: parsed.value }, loaded.paths, parsed.retired);
   return merged.ok ? { ok: true, text, next: merged.value } : { ok: false, problems: merged.problems };
 }
