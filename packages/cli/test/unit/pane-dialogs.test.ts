@@ -248,6 +248,7 @@ describe("status and story view say what a parked unit waits for, never the rule
       ["Which colour should the button be?", { for: "answer", text: "Which colour should the button be?", next: answer }],
       [`run ${RUN} stopped by me@box`, { for: "answer", text: `run ${RUN} stopped by me@box`, next: answer }],
       ["agent.silent.manual", { for: "person", text: "its run went quiet without a report", next: `norn run rerun ${UNIT}` }],
+      ["agent.reporting.lost", { for: "person", text: "its agent's session shows a report that is not on the record", next: `norn run rerun ${UNIT}` }],
     ];
     for (const [reason, expected] of cases) {
       const m = configured();

@@ -153,7 +153,8 @@ function judgeRun(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
  * report landed sees the event alone and the next tick finds the receipt. Writing one here would
  * record the report a second time without its text. A refused receipt parks the unit with the
  * refusal; a report whose receipt never comes (a reporting path that broke that order) is handed to
- * a person once the agent has been quiet for the window, never guessed at.
+ * a person once the agent has been quiet for the window, never guessed at. That park is derived, so
+ * a later event from the agent lifts it until the next quiet window passes.
  */
 function reportWithoutReceipt(v: UnitView, run: RunInfo, session: SessionFacts): Decision {
   const rejected = v.unit.report_rejected;
