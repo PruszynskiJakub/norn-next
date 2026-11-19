@@ -57,6 +57,7 @@ export const RULE_IDS: readonly string[] = [
   "check.run",
   "check.rerun",
   "check.rerun.exhausted",
+  "check.queued",
   "check.running",
   "check.finished",
   "check.finished.rejected",

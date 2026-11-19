@@ -10,7 +10,7 @@ import { WAITING_OUTCOME } from "@norn/plugin-api";
 import type { Decision } from "../model/actions.ts";
 import type { RunInfo } from "../model/run-state.ts";
 import type { CheckStepSpec } from "../workflow/graph.ts";
-import { applyDecision, applyOrPark, endStuckDecision, intentFor, noop, parkDecision, type UnitView } from "./unit-support.ts";
+import { applyDecision, applyOrPark, endStuckDecision, intentFor, noop, parkDecision, takeAgentSlot, type UnitView } from "./unit-support.ts";
 
 /** The step run the facts show, when it belongs to the step the unit is at. */
 function stepRunOf(v: UnitView) {
@@ -54,7 +54,10 @@ function exitOf(check: CheckStepSpec, outcome: string): number {
 
 export function decideCheck(v: UnitView, check: CheckStepSpec): Decision {
   const run = v.state.run;
-  if (!run) return runCheck(v, check, "check.run");
+  if (!run) {
+    if (!takeAgentSlot(v.ctx)) return noop(v, "check.queued", `queued: ${v.ctx.config.maxAgents} agent and check runs in use`);
+    return runCheck(v, check, "check.run");
+  }
   const sr = stepRunOf(v);
   if (sr?.running) return noop(v, "check.running", `check run ${run.id} in progress`);
   if (sr?.outcome !== undefined) {
