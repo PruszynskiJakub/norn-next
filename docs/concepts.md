@@ -64,7 +64,7 @@ Checks and the git and forge steps always run on their own. Gates, attended step
 
 ## What needs you
 
-`norn status` shows every story and unit, the ones that wait for a person first: a gate to decide, a question to answer (`norn story answer <story> "…"`), a manual step to start, a stuck unit. `norn story list` lists the stories and `norn story view <story>` shows one: its units, runs, gates and questions. An agent that asks waits; a person's answer goes to the same session when it is still there, or to a fresh one with the answer in its brief.
+`norn status` shows every story and unit, the ones that wait for a person first: a gate to decide, a question to answer (`norn story answer <story> "…"`), a manual step to start, a stuck unit. A finished story (every unit ended done) is one line under Finished while its item is open and leaves the markdown once the item closed (`--json` still lists it), and its ticks decide nothing for it. `norn story list` lists the stories and `norn story view <story>` shows one: its units, runs, gates and questions. An agent that asks waits; a person's answer goes to the same session when it is still there, or to a fresh one with the answer in its brief.
 
 ## One tick
 

@@ -2744,18 +2744,6 @@
       "rejected": []
     },
     {
-      "kind": "noop",
-      "unit": "gh-41",
-      "rule": "unit.ended.stuck",
-      "reason": "silent: nudges 2/2 used at slice"
-    },
-    {
-      "kind": "noop",
-      "unit": "gh-42",
-      "rule": "unit.ended.stuck",
-      "reason": "died: retries 1/1 used at qa"
-    },
-    {
       "kind": "renew_claim",
       "unit": null,
       "rule": "claim.renew",

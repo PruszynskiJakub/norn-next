@@ -43,13 +43,20 @@ export function mergedElsewhereReason(url: string | undefined, into: string, bas
  * The story's decisions: story-wide ones (`unit: null`) and at most one per unit. A unit given a
  * decision here is not passed to the unit rules this tick.
  */
+/** A story with nothing left to decide: every unit ended and nothing waits on its record or in its mailbox. */
+export function storyFinishedHere(story: StoryFacts, ctx: DecideContext): boolean {
+  return !isOpen(story, ctx.config.base);
+}
+
 export function decideStory(story: StoryFacts, ctx: DecideContext): Decision[] {
   const { facts, config } = ctx;
   const claim = story.claim;
   const now = Date.parse(facts.now);
   const out: Decision[] = [];
 
-  if (!isOpen(story, config.base)) return unitIds(story).flatMap((id) => endedNoop(story, id));
+  // a finished story's units are left alone: their ends are facts status reads, and a noop per unit
+  // on every tick would only bury what did act
+  if (!isOpen(story, config.base)) return [];
 
   if (claim === null) {
     // a story nobody holds is taken only when no round of it is under way; one in progress was released on purpose
@@ -146,12 +153,6 @@ function intakeWorkflow(item: TrackerItem, ctx: DecideContext): string | null {
   return null;
 }
 
-function endedNoop(story: StoryFacts, id: string): Decision[] {
-  const u = story.units.find((x) => x.id === id);
-  if (!u) return [];
-  return [endedRule(u) ?? { kind: "noop", unit: id, rule: "story.ended", reason: "the story ended; nothing to start" }];
-}
-
 /** The story rule for one unit of a held story, or null to leave it to the unit rules. */
 function unitRule(story: StoryFacts, id: string, u: UnitFacts | null, ctx: DecideContext): Decision | null {
   const corrupt = corruptRule(u, ctx);
@@ -163,7 +164,8 @@ function unitRule(story: StoryFacts, id: string, u: UnitFacts | null, ctx: Decid
 
   if (!u || !state) {
     if (!isStory) return { kind: "noop", unit: id, rule: "slice.not_started", reason: "started by the story's slices step" };
-    if (merged || itemClosed) return { kind: "noop", unit: id, rule: "story.ended", reason: merged ? "the change merged before the story started" : "the item closed before the story started" };
+    // nothing to start: the story ended before it began, and only a letter in its mailbox brought it here
+    if (merged || itemClosed) return null;
     return startRule(story, u, ctx);
   }
   const round = roundRule(u, state, ctx);

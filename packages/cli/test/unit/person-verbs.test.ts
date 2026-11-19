@@ -245,6 +245,23 @@ describe("run start", () => {
   });
 });
 
+describe("a finished story in status", () => {
+  test("is one line under Finished while its item is open, and drops out of the markdown once the item closed; --json keeps it", async () => {
+    const m = configured();
+    expect((await runCli(["story", "create", "Add", "a", "login", "page", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    await seedUnit(m, { step: GATE_STEP, run: null, extra: { ended: "done" } });
+    const open = (await runCli(["status"], m.io)).stdout;
+    expect(open).toContain(`## Finished\n\n- ${UNIT} Add a login page\n`);
+    expect(open).not.toContain(`## Stories\n\n- ${UNIT}`);
+    expect(open).not.toContain(`  - ${UNIT}: ${GATE_STEP}`);
+    expect((await runCli(["story", "close", UNIT, "--json"], m.io)).exit).toBe(ExitCode.ok);
+    const closed = (await runCli(["status"], m.io)).stdout;
+    expect(closed).not.toContain(UNIT);
+    const shown = json((await runCli(["status", "--json"], m.io)).stdout) as { stories: { key: string }[] };
+    expect(shown.stories.map((x) => x.key)).toEqual([UNIT]);
+  });
+});
+
 describe("story create and close on the local tracker", () => {
   test("create makes an item intake takes in; close closes it", async () => {
     const m = configured();

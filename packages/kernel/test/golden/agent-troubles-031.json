@@ -2328,22 +2328,10 @@
       "reason": "run run-gh-40-1 working"
     },
     {
-      "kind": "noop",
-      "unit": "gh-41",
-      "rule": "unit.ended.stuck",
-      "reason": "silent: nudges 2/2 used at slice"
-    },
-    {
       "kind": "release_claim",
       "unit": null,
       "rule": "claim.release",
       "story": "gh-41"
-    },
-    {
-      "kind": "noop",
-      "unit": "gh-42",
-      "rule": "unit.ended.stuck",
-      "reason": "died: retries 1/1 used at qa"
     },
     {
       "kind": "renew_claim",

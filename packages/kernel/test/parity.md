@@ -47,7 +47,7 @@ back as the unit's `corrupt_marked` fact.
 | (none) | | `claim.pending` | `noop` (the claim is taken or reacquired this tick; units wait for it) |
 | (none) | | `claim.release` | `release_claim` (nothing of the story is left open) |
 | (none) | | `story.finish` | `finish_story` before `release_claim`: remove the worktrees of units that ended done; close the item when the story ended done, its change merged, the item is open and `capabilities.tracker.close` |
-| `story.finished` | `noop` | `story.ended` | `noop` |
+| `story.finished` | `noop` | dropped: a finished story (every unit ended, nothing on its record or in its mailbox) is decided nothing at all, so no tick reports a noop per unit of it; status reads its units' ends from the facts | |
 | `story.corrupt` | `mark_corrupt` | `unit.corrupt` | `mark_corrupt` (each unit whose record fails validation, once: its `unit.marked` receipt is read back as `corrupt_marked`; there is no story-wide record to fail) |
 | `story.record_only` | `noop` | dropped: a record without a branch is an old-layout case; the store holds the record | |
 | `start.record_unplaced` | `noop` | dropped: the store holds the record; there is nothing to place | |

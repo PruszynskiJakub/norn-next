@@ -10,7 +10,7 @@ import type { KernelConfig } from "../model/config.ts";
 import type { KernelFacts } from "../model/facts.ts";
 import type { KernelWorkflows } from "../workflow/graph.ts";
 import { decideContext, Decisions } from "./context.ts";
-import { decideIntake, decideStory, decideStoryTail } from "./story.ts";
+import { decideIntake, decideStory, decideStoryTail, storyFinishedHere } from "./story.ts";
 import { decideUnit } from "./unit.ts";
 
 export function decide(facts: KernelFacts, workflows: KernelWorkflows, config: KernelConfig): Decision[] {
@@ -19,7 +19,8 @@ export function decide(facts: KernelFacts, workflows: KernelWorkflows, config: K
   // facts come in queue order (the host sorts stories oldest first), so decisions come out in an order the facts fix
   for (const story of facts.stories) {
     for (const d of decideStory(story, ctx)) out.add(d);
-    for (const unit of story.units) {
+    const finished = storyFinishedHere(story, ctx);
+    for (const unit of finished ? [] : story.units) {
       if (out.has(unit.id)) continue;
       const d = decideUnit(story, unit, ctx);
       if (d) out.add(d);

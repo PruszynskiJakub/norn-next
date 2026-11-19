@@ -742,12 +742,6 @@
   },
   "decisions": [
     {
-      "kind": "noop",
-      "unit": "gh-31",
-      "rule": "unit.ended.stuck",
-      "reason": "counter ship.rejected ran out (2/2) at ready.reject"
-    },
-    {
       "kind": "release_claim",
       "unit": null,
       "rule": "claim.release",

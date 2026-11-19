@@ -19,8 +19,10 @@ describe("a story from intake to done", () => {
       ["lt-1 check.run"],
       ["lt-1 receipts.apply"],
       ["- claim.renew", "lt-1 check.finished"],
-      ["lt-1 unit.ended.done", "- story.finish", "- claim.release"],
+      ["- story.finish", "- claim.release"],
     ]);
+    // finished: the ticks after decide nothing, rather than a noop per ended unit on every one
+    expect(rulesOf(await h.runtime.tick())).toEqual([]);
     const unit = await record(h, "lt-1");
     expect(unit.state?.ended).toBe("done");
     expect(unit.receipts.map((r) => r.data.kind)).toEqual(["round.started", "run.started", "check.finished"]);

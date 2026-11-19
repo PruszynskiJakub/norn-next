@@ -928,12 +928,6 @@
       "rejected": []
     },
     {
-      "kind": "noop",
-      "unit": "gh-85",
-      "rule": "unit.ended.stuck",
-      "reason": "the item closed"
-    },
-    {
       "kind": "release_claim",
       "unit": null,
       "rule": "claim.release",

@@ -753,12 +753,6 @@
   },
   "decisions": [
     {
-      "kind": "noop",
-      "unit": "gh-7",
-      "rule": "unit.ended.done",
-      "reason": "the change merged"
-    },
-    {
       "kind": "finish_story",
       "unit": null,
       "rule": "story.finish",
