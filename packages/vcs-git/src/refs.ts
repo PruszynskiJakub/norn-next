@@ -24,6 +24,17 @@ export async function isAncestor(ctx: HostContext, cwd: string, a: string, b: st
   return gitFailure(out, "merge-base");
 }
 
+/**
+ * The paths that differ between commits `a` and `b`, sorted. Renames are not followed, so a moved
+ * file names both its sides; read with `-z` so a path git would quote comes back as it is named.
+ */
+export async function changedPaths(ctx: HostContext, cwd: string, a: string, b: string): Promise<PluginResult<string[]>> {
+  if (optionLike(a) || optionLike(b)) return fail("invalid", `git: ${a} or ${b} is not a ref`, false);
+  const out = await git(ctx, cwd, ["diff", "--name-only", "-z", "--no-renames", a, b, "--"]);
+  if (out.code !== 0) return gitFailure(out, "diff");
+  return ok([...new Set(out.stdout.split("\0").filter((p) => p !== ""))].sort());
+}
+
 /** Delete the local branch whatever it holds; a branch already gone is not an error. */
 export async function deleteBranch(ctx: HostContext, cwd: string, branch: string): Promise<PluginResult<void>> {
   if (optionLike(branch)) return fail("invalid", `git: ${branch} is not a branch`, false);

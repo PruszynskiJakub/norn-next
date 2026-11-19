@@ -32,6 +32,17 @@ describe("git vcs over real git", () => {
     expect(value(await w.vcs.mergeBase("gh-12-login", "origin/main"))).toBe(base);
   });
 
+  test("changedPaths names the paths two commits differ in, a spaced name as it is", async () => {
+    const w = await world();
+    const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));
+    const from = value(await w.vcs.head("gh-12-login")) as string;
+    mkdirSync(join(path, ".agents", "specs", "gh-12"), { recursive: true });
+    mkdirSync(join(path, "src"));
+    const to = await commit(path, "notes", { ".agents/specs/gh-12/a note.md": "note\n", "src/b.ts": "b\n" });
+    expect(value(await w.vcs.changedPaths?.(from, to) ?? { ok: true, value: [] })).toEqual([".agents/specs/gh-12/a note.md", "src/b.ts"]);
+    expect(value(await w.vcs.changedPaths?.(to, to) ?? { ok: true, value: ["x"] })).toEqual([]);
+  });
+
   test("a conflicting merge reports its paths and stays in progress for a resolver", async () => {
     const w = await world();
     const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));

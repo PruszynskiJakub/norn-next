@@ -102,6 +102,28 @@ describe("vcs facts", () => {
     expect(ahead.ok && ahead.value.facts.stories[0]?.unpushed).toBe(true);
   });
 
+  test("unpushed counts no commit that touches only the story's spec folder, when the vcs can name the paths", async () => {
+    const h = harness({ workflow: "stepped" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    h.heads["norn/lt-1"] = "c3";
+    h.changes["norn/lt-1"] = { id: 4, state: "open", draft: true, head_branch: "norn/lt-1", base_branch: "main", head_sha: "b2", title: "Story 1" };
+    h.env.slots.vcs.isAncestor = async () => ({ ok: true, value: true });
+    const asked: string[][] = [];
+    let paths = [".agents/specs/lt-1/notes.md", ".agents/specs/lt-1/pr.md"];
+    h.env.slots.vcs.changedPaths = async (a, b) => {
+      asked.push([a, b]);
+      return { ok: true, value: paths };
+    };
+    const specOnly = await gatherFacts(h.env, h.tickIds[0] as string);
+    expect(specOnly.ok && specOnly.value.facts.stories[0]?.unpushed).toBe(false);
+    expect(asked).toEqual([["b2", "c3"]]);
+    // another story's spec folder is code to this one
+    paths = [".agents/specs/lt-1/notes.md", ".agents/specs/lt-10/spec.md"];
+    const other = await gatherFacts(h.env, h.tickIds[0] as string);
+    expect(other.ok && other.value.facts.stories[0]?.unpushed).toBe(true);
+  });
+
   test("base_stale under stale: conflict: a clean base move is not stale, a conflicting one is, and a clean one that fails base.verify is", async () => {
     const h = harness({ workflow: "based" });
     const verified: string[] = [];

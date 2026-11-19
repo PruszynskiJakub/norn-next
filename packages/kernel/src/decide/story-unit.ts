@@ -11,7 +11,7 @@ import type { RunInfo, RunState } from "../model/run-state.ts";
 import type { LoadedWorkflow, WorkflowLoad } from "../workflow/graph.ts";
 import type { DecideContext } from "./context.ts";
 import { applyAction, lastSeq, markCorrupt, parkWith } from "./record.ts";
-import { storyFinished } from "./story-claim.ts";
+import { changeLanded, storyFinished } from "./story-claim.ts";
 
 /** The seq the store gives the next receipt of the unit: receipts are numbered n+1 with no gaps. */
 export function nextSeq(u: UnitFacts | null): number {
@@ -170,7 +170,7 @@ export function moveRule(story: StoryFacts, u: UnitFacts, state: RunState, ctx: 
   }
   const r = u.receipts[0] as KernelReceipt;
   const refuse = (reason: string): Decision => applyAction(u.id, u, "receipts.reject", [], { ...state, applied_through: r.seq }, [{ seq: r.seq, reason }], ctx);
-  if (storyFinished(story)) return refuse(story.change?.state === "merged" ? "the story's change merged" : "the story's item closed");
+  if (storyFinished(story, ctx.config.base)) return refuse(changeLanded(story, ctx.config.base) ? "the story's change merged" : "the story's item closed");
   const res = applyReceipts(state, [r], loaded.graph);
   const refused = res.rejected[0];
   if (refused) return refuse(refused.reason);

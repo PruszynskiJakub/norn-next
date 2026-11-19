@@ -386,6 +386,18 @@ export const MATRIX: Scenario[] = [
     2,
   ),
   scenario(
+    "change-merged-elsewhere-at-merge",
+    "A person merges the story's change into a branch other than the story's base while it is polled at merge: nothing reached the base, so the story parks for them, once, naming that branch, rather than ending done and tidying its worktree.",
+    { files: shippedFiles("quick") },
+    (w) => {
+      seed(w, "gh-178", { workflow: "quick", step: "merge", run: { executor: "await-merge" } });
+      w.unit("gh-178").step_run = { kind: "await-merge", running: false, outcome: "waiting" };
+      w.story("gh-178").change = { id: 78, state: "merged", draft: false, head_branch: "norn/gh-178", base_branch: "release", head_sha: "a78", merge_sha: "m78", merged_at: "2026-11-17T09:00:00.000Z", title: "Story 178" };
+    },
+    ["story.change_merged_elsewhere", "unit.parked"],
+    2,
+  ),
+  scenario(
     "steps-cut-short",
     "Runs that keep ending without an answer decide accepts: a check and an effect step cut short with their retries spent end the unit stuck, naming the limit; a check, a plugin step and an agent answering an outcome the step does not declare park the unit for a person, and the next tick writes nothing again.",
     { files: shippedFiles("quick") },
