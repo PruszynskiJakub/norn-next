@@ -93,6 +93,36 @@ describe("two clones racing", () => {
   });
 });
 
+describe("a diverged story", () => {
+  test("is told apart from one that is only ahead or behind, and adopting the remote's keeps this clone's commits under a ref of their own", async () => {
+    const t = await team();
+    const a = machine(await t.clone("a"));
+    const b = machine(await t.clone("b"));
+    value(await a.store.appendReceipt("gh-12", { id: "r1", data: 1 }));
+    value(await a.store.flush?.("gh-12"));
+    value(await b.store.sync?.());
+    expect(value(await b.store.diverged?.("gh-12"))).toBe(false);
+    value(await b.store.appendReceipt("gh-12", { id: "late", data: "b" }));
+    expect(value(await b.store.diverged?.("gh-12"))).toBe(false);
+    expect(value(await b.store.adoptRemote?.("gh-12"))).toEqual({ dropped: null });
+
+    value(await a.store.appendReceipt("gh-12", { id: "r2", data: 2 }));
+    value(await a.store.flush?.("gh-12"));
+    value(await b.store.sync?.());
+    expect(value(await b.store.diverged?.("gh-12"))).toBe(true);
+    const own = (await refs(b.path))["refs/norn/v2/runs/gh-12"] as string;
+
+    const adopted = value(await b.store.adoptRemote?.("gh-12"));
+    expect(adopted).toEqual({ dropped: own, kept_at: `refs/norn/v2/dropped/runs/gh-12/${own}` });
+    expect((await refs(b.path))[`refs/norn/v2/dropped/runs/gh-12/${own}`]).toBe(own);
+    expect(value(await b.store.readUnit("gh-12")).receipts.map((r) => r.id)).toEqual(["r1", "r2"]);
+    expect(value(await b.store.diverged?.("gh-12"))).toBe(false);
+    value(await b.store.appendReceipt("gh-12", { id: "r3", data: 3 }));
+    expect(value(await b.store.flush?.("gh-12"))).toEqual({ pushed: true });
+    expect(Object.keys(await refs(t.remote)).some((r) => r.includes("dropped"))).toBe(false);
+  });
+});
+
 describe("claims and mailboxes are shared at once", () => {
   test("a claim taken on one machine is seen, refused and released across machines", async () => {
     const t = await team();

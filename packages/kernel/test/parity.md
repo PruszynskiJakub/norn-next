@@ -55,6 +55,7 @@ back as the unit's `corrupt_marked` fact.
 | `record.released` | `set_aside_record` | dropped: the store's compare-and-swap settles a lost race, and the journal re-reads | |
 | `record.superseded` | `set_aside_record` | dropped: same as `record.released` | |
 | `record.push` | `push_record` | `store.flush` | `flush` (shared stores only, by `capabilities.store.shared`, after the story's other decisions) |
+| (none) | | `store.diverged` | `noop` for every unit of a held story whose run data in this clone and on the remote diverged (the store's `unsynced` fact), and no `flush`; the claim is still renewed, and a person carries the story on from the remote's record with `norn story take --force` |
 | `recover.commit` | `commit_push` | dropped: run state is committed through the store, never git | |
 
 ### Tracker and forge facts (old `decide/story.ts`)

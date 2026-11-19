@@ -1,6 +1,7 @@
 /** Pushing and fetching: the only calls that reach the remote. */
 import { fail, type HostContext, ok, type PluginResult } from "@norn/plugin-api";
 import { git, said } from "./git.ts";
+import { PUBLISHED_PREFIX, publishedCopyPrefix } from "./heads.ts";
 import { remoteIfAny } from "./refs.ts";
 
 export interface PushOutcome {
@@ -34,11 +35,16 @@ function rejection(stdout: string): string | null {
   return line ? line.split("\t").slice(2).join(" ").trim() || null : null;
 }
 
-/** Fetch every branch of `remote`; a repo without that remote has nothing to fetch. */
+/**
+ * Fetch every branch of `remote` and its published heads; a repo without that remote has nothing to
+ * fetch. Both refspecs are named, so one round trip brings both and prunes what the remote dropped.
+ */
 export async function fetchRemote(ctx: HostContext, cwd: string, remote: string): Promise<PluginResult<{ fetched: boolean }>> {
   const has = await remoteIfAny(ctx, cwd, remote);
   if (!has.ok) return has;
   if (has.value === null) return ok({ fetched: false });
-  const out = await git(ctx, cwd, ["fetch", "--quiet", "--no-tags", "--prune", remote]);
+  const branches = `+refs/heads/*:refs/remotes/${remote}/*`;
+  const heads = `+${PUBLISHED_PREFIX}*:${publishedCopyPrefix(remote)}*`;
+  const out = await git(ctx, cwd, ["fetch", "--quiet", "--no-tags", "--prune", remote, branches, heads]);
   return out.code === 0 ? ok({ fetched: true }) : fail("unavailable", `git fetch ${remote}: ${said(out)}`);
 }

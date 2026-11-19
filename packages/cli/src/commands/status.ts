@@ -1,6 +1,6 @@
 /**
  * `norn status`: show every story and unit, read-only. Units waiting for a person come first, as the
- * list of what needs doing; then the rest of the stories, and the intake a tick has not taken yet.
+ * list of what needs doing, after any story whose run data here and on the remote diverged; then the rest of the stories, and the intake a tick has not taken yet.
  */
 import { defineCommand } from "../command.ts";
 import { gateNotes, type OpenNote } from "../notes.ts";
@@ -16,7 +16,9 @@ function needsLine(s: StoryView, u: UnitView, notes: readonly OpenNote[]): strin
 function markdown(v: ProjectView, notes: readonly OpenNote[]): string {
   const out = ["# norn status", ""];
   const waiting = v.stories.flatMap((s) => s.units.filter((u) => u.waiting).map((u) => ({ s, u })));
-  if (waiting.length) out.push("## Needs you", "", ...waiting.map(({ s, u }) => needsLine(s, u, notes)), "");
+  const unsynced = v.stories.filter((s) => s.unsynced?.waiting);
+  if (waiting.length || unsynced.length)
+    out.push("## Needs you", "", ...unsynced.map((s) => `- ${s.key}: run data unsynced: ${s.unsynced?.text} → ${s.unsynced?.next}`), ...waiting.map(({ s, u }) => needsLine(s, u, notes)), "");
   out.push("## Stories", "");
   if (v.stories.length === 0) out.push("No stories yet.");
   for (const s of v.stories) out.push(`- ${storyHead(s)}`, ...s.units.map((u) => `  - ${unitLine(u)}`));

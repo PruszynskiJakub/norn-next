@@ -34,7 +34,7 @@ export { readRunState, RUN_STATE_UPGRADES, type RunStateRead, type RunStateUpgra
 export { type DecideContext, decideContext, Decisions } from "./decide/context.ts";
 export { decide } from "./decide/index.ts";
 export { decideUnit } from "./decide/unit.ts";
-export { changeClosedReason, decideIntake, decideStory, decideStoryTail, ITEM_CLOSED_REASON, isChangeClosedReason } from "./decide/story.ts";
+export { changeClosedReason, decideIntake, decideStory, decideStoryTail, ITEM_CLOSED_REASON, isChangeClosedReason, unsyncedReason } from "./decide/story.ts";
 export { loadProblem } from "./decide/story-unit.ts";
 export { RULE_IDS } from "./decide/rules.ts";
 export { type CriteriaCheck, type CriteriaCheckInput, type CriteriaRefusal, type CriteriaRefusalCode, checkCriteriaReport, verdictCounts, wantsCriteria, worstVerdict } from "./workflow/criteria.ts";

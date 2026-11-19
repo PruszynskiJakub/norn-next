@@ -272,6 +272,21 @@ export interface Store {
    * was last fetched; `pushed` is false when the remote already had everything
    */
   flush?(story: string): Promise<PluginResult<{ pushed: boolean }>>;
+  /**
+   * shared stores: whether this clone's run data of the story and the remote's as last synced each
+   * hold writes the other lacks, so flush can publish neither over the other. Reads this clone only.
+   * Optional (plugin API 1.16); without it a host cannot tell a diverged story from a flush that
+   * failed for a moment.
+   */
+  diverged?(story: string): Promise<PluginResult<boolean>>;
+  /**
+   * shared stores: when the story's run data diverged, replace this clone's with the remote's as last
+   * synced, keeping what it drops where a person can still read it (`kept_at`); `dropped` is null when
+   * nothing diverged and nothing changed. Optional (plugin API 1.16); the host calls it at a tick's
+   * sync for a story another machine holds, whose writes alone are published, and for one this clone
+   * holds only once a person said to carry the story on from the remote's record.
+   */
+  adoptRemote?(story: string): Promise<PluginResult<{ dropped: string | null; kept_at?: string }>>;
 }
 
 /** How a plugin offers a store; the host validates the config against `configSchema` before `create`. */

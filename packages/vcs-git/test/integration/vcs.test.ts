@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { createNodeHost } from "@norn/host-node";
+import { createGitVcs } from "../../src/index.ts";
 import { commit, git, moveBase, value, world } from "./world.ts";
 
 describe("git vcs over real git", () => {
@@ -157,6 +159,50 @@ describe("git vcs over real git", () => {
     expect(value(await conflicts(head, clash))).toEqual(["shared.txt"]);
     expect(await git(wt.path, "rev-parse", "HEAD")).toBe(head);
     expect(await git(wt.path, "status", "--porcelain")).toBe("");
+  });
+
+  test("a published head reaches the remote off every branch, fast-forward only, and another clone cuts its worktree from it", async () => {
+    const w = await world();
+    const publish = w.vcs.publishHead;
+    if (!publish) throw new Error("the git vcs publishes heads");
+    const { path } = value(await w.vcs.worktree.ensure("gh-12", "norn/gh-12", "origin/main"));
+    const work = await commit(path, "implement", { "feature.txt": "f\n" });
+    expect(value(await publish("norn/gh-12"))).toEqual({ pushed: true });
+    expect(await git(w.remote, "rev-parse", "refs/norn/heads/norn/gh-12")).toBe(work);
+    expect(await git(w.remote, "for-each-ref", "--format=%(refname)", "refs/heads")).toBe("refs/heads/main");
+    expect(value(await publish("norn/gh-12"))).toEqual({ pushed: false });
+
+    // another machine: its own clone and machine folder, carrying the unit on after a takeover
+    const other = await w.person();
+    const otherCtx = createNodeHost({ root: other, dataDir: join(w.dir, "machine-b") });
+    const b = createGitVcs(otherCtx, {});
+    value(await b.fetch());
+    const theirs = value(await b.worktree.ensure("gh-12", "norn/gh-12", "origin/main")).path;
+    expect(await git(theirs, "rev-parse", "HEAD")).toBe(work);
+    const more = await commit(theirs, "review fix", { "feature.txt": "g\n" });
+    expect(value(await (b.publishHead as NonNullable<typeof b.publishHead>)("norn/gh-12"))).toEqual({ pushed: true });
+
+    // the first machine, behind now, pushes nothing over it; its worktree, still there, is moved forward to the newer head
+    value(await w.vcs.fetch());
+    expect(value(await publish("norn/gh-12"))).toEqual({ pushed: false });
+    const again = value(await w.vcs.worktree.ensure("gh-12", "norn/gh-12", "origin/main")).path;
+    expect(again).toBe(path);
+    expect(await git(again, "rev-parse", "HEAD")).toBe(more);
+    expect(await git(again, "status", "--porcelain")).toBe("");
+
+    // a branch that diverged from the published head is never pushed over it
+    await commit(theirs, "b again", { "b.txt": "b\n" });
+    value(await (b.publishHead as NonNullable<typeof b.publishHead>)("norn/gh-12"));
+    await commit(again, "a again", { "a.txt": "a\n" });
+    value(await w.vcs.fetch());
+    const diverged = await publish("norn/gh-12");
+    expect(diverged.ok ? null : diverged.failure.code).toBe("conflict");
+    expect(await git(w.remote, "rev-parse", "refs/norn/heads/norn/gh-12")).toBe(await git(theirs, "rev-parse", "HEAD"));
+    // nor is a worktree that diverged from it run on as if it held the other clone's work
+    const local = await git(again, "rev-parse", "HEAD");
+    const split = await w.vcs.worktree.ensure("gh-12", "norn/gh-12", "origin/main");
+    expect(split.ok ? null : split.failure).toMatchObject({ code: "conflict", message: expect.stringContaining("diverged") });
+    expect(await git(again, "rev-parse", "HEAD")).toBe(local);
   });
 
   test("fetch brings the remote's branches into the checkout", async () => {

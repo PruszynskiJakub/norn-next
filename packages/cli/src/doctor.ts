@@ -1,8 +1,8 @@
 /**
  * The doctor's checks, in the order each needs the last: the config, the plugins it picks (installed
  * and on this norn's plugin API), the slots they build, the workflows (the pack's and the repo's
- * own), the labels norn puts on items, the harness hooks, the pack's skills in the main checkout, and
- * the tools on PATH the config needs
+ * own), the labels norn puts on items, the harness hooks, the pack's skills in the main checkout, a
+ * shared store's run data against the remote's, and the tools on PATH the config needs
  * (git followed by its remote, gh by its login). A
  * check that cannot run because an earlier one failed is skipped rather than failed, so the first
  * failure is the one to fix. `init` runs the same checks.
@@ -194,6 +194,41 @@ async function skillsCheck(env: RuntimeEnv): Promise<DoctorCheck> {
   return passed("skills", `norn's copy of ${count - kept.length} of ${count} pack skills in ${dirs.join(", ")}${r.value ? ` (${r.value} files written or removed)` : ""}${keptText}`);
 }
 
+/**
+ * The stories whose run data in this clone and on the remote (as last synced) diverged. One this
+ * machine holds is held by every tick until a person carries it on from the remote's record, so it
+ * fails the check; one another machine holds only keeps writes here the remote never had, dropped
+ * when this machine takes it, so it is named and passes.
+ */
+async function storeCheck(env: RuntimeEnv): Promise<DoctorCheck | null> {
+  const store = env.slots.store;
+  if (!store.capabilities.shared || !store.diverged) return null;
+  const r = await attempt("store", async () => {
+    const listed = await store.listUnits();
+    if (!listed.ok) throw new Error(`the store cannot list its units: ${listed.failure.message}`);
+    const held: string[] = [];
+    const elsewhere: string[] = [];
+    for (const story of [...new Set(listed.value.map((u) => u.split("/")[0] as string))]) {
+      const split = await store.diverged?.(story);
+      if (!split?.ok || !split.value) continue;
+      const claim = await store.claims.read(story);
+      (claim.ok && claim.value?.holder === env.config.holder ? held : elsewhere).push(story);
+    }
+    return { held, elsewhere };
+  });
+  if (r.check || !r.value) return r.check;
+  const { held, elsewhere } = r.value;
+  const others = elsewhere.length ? `; ${elsewhere.join(", ")} keep run data here the remote never had, dropped for the remote's record at the next tick (norn tick)` : "";
+  if (held.length === 0) return passed("store", `this clone's run data agrees with the remote's for every story it holds${others}`);
+  return {
+    name: "store",
+    ok: false,
+    error: `the run data of ${held.join(", ")} here and on the remote diverged, so no flush can publish it and every tick holds ${held.length === 1 ? "it" : "them"}${others}`,
+    do_instead: held.map((k) => `norn story take ${k} --force`).join("; "),
+    code: "store_diverged",
+  };
+}
+
 export interface DoctorOptions {
   /**
    * Only what the repo's tree decides: its config (the repo's own files, never the user's), the
@@ -225,7 +260,11 @@ export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Prom
         checks.push(passed("slots", "every slot builds from its config"));
         const workflows = await attempt("workflows", () => ctx.workflowEnv());
         checks.push(workflows.check ?? passed("workflows", workflowsDetail(env.value)));
-        if (!opts.repoOnly) checks.push(await labelsCheck(env.value), await hooksCheck(ctx, cwd, env.value.slots.executors), await skillsCheck(env.value));
+        if (!opts.repoOnly) {
+          checks.push(await labelsCheck(env.value), await hooksCheck(ctx, cwd, env.value.slots.executors), await skillsCheck(env.value));
+          const store = await storeCheck(env.value);
+          if (store) checks.push(store);
+        }
       }
     }
   }
