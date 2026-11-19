@@ -223,7 +223,8 @@
           "limits": true,
           "paneInput": true,
           "headless": true,
-          "attended": true
+          "attended": true,
+          "dialogKeys": true
         }
       }
     },

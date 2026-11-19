@@ -284,7 +284,7 @@ describe("an agent run, judged from its session", () => {
   });
 
   test("an agent alive in its pane that has sent no event past the silent window parks for a person, never retried; its first event lifts the park", () => {
-    const pane = { claude: caps({ paneInput: true }) };
+    const pane = { claude: caps({ paneInput: true, dialogKeys: true }) };
     const quiet = (over = {}) => stateAt("build", { run: run({ started_at: minutesAgo(16) }), ...over });
     const d = kindOf(decideCase({ state: quiet(), session: null, run_alive: true, executors: pane }), "park");
     expect(d).toMatchObject({ rule: "agent.no_events.park", inbox: { kind: "permission" } });
@@ -296,6 +296,14 @@ describe("an agent run, judged from its session", () => {
     expect(decideCase({ state: parked, session: session("working"), executors: pane })).toMatchObject({ kind: "apply_receipts", rule: "unit.unpark" });
     // its process gone, the run is dead as before
     expect(decideCase({ state: quiet(), session: null, run_alive: false, executors: pane })).toMatchObject({ kind: "retry_run", rule: "agent.died.retry" });
+  });
+
+  test("a silent run in a pane whose executor cannot press a dialog's keys is sent to the pane, never to story answer", () => {
+    const quiet = stateAt("build", { run: run({ started_at: minutesAgo(16) }) });
+    const d = kindOf(decideCase({ state: quiet, session: null, run_alive: true, executors: { claude: caps({ paneInput: true }) } }), "park");
+    expect(d.rule).toBe("agent.no_events.park");
+    expect(d.inbox?.text).toContain("Trust the folder there");
+    expect(d.inbox?.text).not.toContain("norn story answer");
   });
 
   test("a live process with no pane that has sent no event is still judged dead: nobody could answer a dialog in it", () => {

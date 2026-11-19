@@ -134,6 +134,14 @@ describe("status and story view say what a parked unit waits for, never the rule
     expect(w?.next).toBe(`norn story answer ${UNIT} 1, or norn run rerun ${UNIT} if the pane shows something else`);
   });
 
+  test("a silent run whose executor cannot press keys in its pane is sent to the pane or a rerun, never to story answer", async () => {
+    const m = configured();
+    await seedUnit(m, { step: AGENT_STEP, extra: { parked: { reason: "agent.no_events.park", since: "2026-11-17T10:20:00.000Z" } } });
+    const w = waitingIn((await runCli(["status", "--json"], m.io)).stdout);
+    expect(w?.text).toContain("trust the folder there");
+    expect(w?.next).toBe(`norn run rerun ${UNIT} if the pane shows something else`);
+  });
+
   test("an attended step names run start, a stuck park names rerun, and a gate shows its prompt", async () => {
     const cases: Array<[string, string, Partial<Waiting & object>]> = [
       [AGENT_STEP, "agent.ready.attended", { for: "person", next: `norn run start ${UNIT}` }],

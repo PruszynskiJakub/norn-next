@@ -285,7 +285,7 @@ export const MATRIX: Scenario[] = [
   scenario(
     "agent-silent-pane",
     "An agent alive in its pane that has sent no event past the silent window (its hooks never loaded, as behind a trust dialog) parks for a person rather than being retried into the same dialog in a fresh pane; one whose process is gone is dead and retried as before.",
-    { files: shippedFiles("slice"), capabilities: capabilities({ executors: { claude: executor({ paneInput: true }) } }) },
+    { files: shippedFiles("slice"), capabilities: capabilities({ executors: { claude: executor({ paneInput: true, dialogKeys: true }) } }) },
     (w) => {
       seed(w, "gh-123", { workflow: "slice", step: "implement", run: { minutesAgo: 20 } });
       w.unit("gh-123").run_alive = true;

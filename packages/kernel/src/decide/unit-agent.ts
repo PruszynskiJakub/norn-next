@@ -147,10 +147,12 @@ function judgeRun(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
 }
 
 function noEventsText(v: UnitView, run: RunInfo): string {
+  // only an executor that can press keys in its pane takes the answer from story answer
+  const fromHere = capsOf(v, run.executor)?.dialogKeys === true ? `, or answer it from here with norn story answer ${v.unit.id} 1` : "";
   return [
     `run ${run.id}'s agent runs in its pane but has sent no event since it started, so its hooks never loaded;`,
     "the pane most likely shows a trust dialog.",
-    `Trust the folder there, or answer it from here with norn story answer ${v.unit.id} 1; the run goes on with its first event.`,
+    `Trust the folder there${fromHere}; the run goes on with its first event.`,
     `If the pane shows something else, start the step again with norn run rerun ${v.unit.id}.`,
   ].join(" ");
 }

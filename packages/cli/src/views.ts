@@ -3,7 +3,7 @@
  * gathered and never acted on, shaped for a person. What waits for a person (a gate, a question, a
  * parked or stuck unit) is named per unit, so `status` reads as a list of what needs doing.
  */
-import type { KernelWorkflows, StoryFacts, UnitFacts } from "@norn/kernel";
+import type { KernelCapabilities, KernelWorkflows, StoryFacts, UnitFacts } from "@norn/kernel";
 import { gatherFacts, newTickId, type RuntimeEnv } from "@norn/runtime";
 import { refuse } from "./output.ts";
 
@@ -70,7 +70,7 @@ const STUCK_PARKS: Readonly<Record<string, string>> = {
 };
 
 /** What the unit waits on a person for, said as the question or prompt itself, and the command that answers it. */
-function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined): UnitView["waiting"] {
+function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined, dialogKeys: boolean): UnitView["waiting"] {
   const s = u.state;
   if (!s || s.ended === "done") return null;
   const id = u.id;
@@ -100,7 +100,7 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
       return {
         for: "permission",
         text: "its agent runs in its pane but has sent no event, so its hooks never loaded: the pane most likely shows a trust prompt; trust the folder there",
-        next: `norn story answer ${id} 1, or ${rerun} if the pane shows something else`,
+        next: `${dialogKeys ? `norn story answer ${id} 1, or ` : ""}${rerun} if the pane shows something else`,
       };
     case "gate.park":
       return { for: "gate", text: prompt ?? s.step, next: `norn story approve ${id}, or norn story reject ${id} --reason "<what to change>"` };
@@ -115,7 +115,8 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
   return null;
 }
 
-export function unitView(u: UnitFacts, workflows: KernelWorkflows): UnitView {
+/** `executors`: what each executor can do; without them no dialog is offered to story answer */
+export function unitView(u: UnitFacts, workflows: KernelWorkflows, executors: KernelCapabilities["executors"] = {}): UnitView {
   const s = u.state;
   const step = s ? workflows.byHash[s.workflow.hash]?.graph.steps[s.step] : undefined;
   const kind = step?.kind ?? null;
@@ -130,12 +131,12 @@ export function unitView(u: UnitFacts, workflows: KernelWorkflows): UnitView {
     ...(s?.parked ? { parked: s.parked.reason } : {}),
     ...(u.corrupt ? { corrupt: u.corrupt } : {}),
     run: s?.run ? { id: s.run.id, executor: s.run.executor, started_at: s.run.started_at, activity: u.session?.activity ?? null } : null,
-    waiting: u.corrupt ? { for: "person", text: `corrupt: ${u.corrupt}` } : waitingOf(u, kind, step?.gate?.prompt),
+    waiting: u.corrupt ? { for: "person", text: `corrupt: ${u.corrupt}` } : waitingOf(u, kind, step?.gate?.prompt, s?.run ? executors[s.run.executor]?.dialogKeys === true : false),
     pending_receipts: u.receipts.length,
   };
 }
 
-export function storyView(s: StoryFacts, workflows: KernelWorkflows): StoryView {
+export function storyView(s: StoryFacts, workflows: KernelWorkflows, executors: KernelCapabilities["executors"] = {}): StoryView {
   return {
     key: s.key,
     title: s.item?.title ?? null,
@@ -143,7 +144,7 @@ export function storyView(s: StoryFacts, workflows: KernelWorkflows): StoryView 
     open: s.item ? s.item.open : null,
     claim: s.claim ? { holder: s.claim.holder, expires_at: s.claim.expires_at } : null,
     change: s.change ? { id: s.change.id, state: s.change.state, url: s.change.url ?? null } : null,
-    units: s.units.map((u) => unitView(u, workflows)),
+    units: s.units.map((u) => unitView(u, workflows, executors)),
   };
 }
 
@@ -154,7 +155,7 @@ export async function loadProjectView(env: RuntimeEnv): Promise<ProjectView> {
   if (!gathered.ok) throw refuse(`the store could not be read: ${gathered.failure.message}`, "norn doctor", "facts_unavailable");
   const { facts, workflows, problems } = gathered.value;
   return {
-    stories: facts.stories.map((s) => storyView(s, workflows)),
+    stories: facts.stories.map((s) => storyView(s, workflows, facts.capabilities.executors)),
     // an item a tick took is a story from then on, whatever the tracker's query still matches
     intake: facts.intake.filter((i) => !facts.stories.some((s) => s.key === i.key)).map((i) => ({ key: i.key, title: i.title, url: i.url ?? null })),
     problems,
