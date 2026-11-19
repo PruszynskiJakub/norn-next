@@ -30,6 +30,8 @@ export interface UnitView {
   } | null;
   /** receipts taken but not yet applied by a tick */
   pending_receipts: number;
+  /** the counters the unit has spent, each against its bound: what is left before a loop ends it stuck */
+  counters: Record<string, { value: number; max: number }>;
 }
 
 export interface StoryView {
@@ -85,7 +87,9 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
   const decide = `norn story approve ${id}, or norn story reject ${id} --reason "<what to change>"`;
   const newWork = 'norn story create "<title>" for the new work';
   if (s.ended) {
-    const next = s.ended_reason === ITEM_CLOSED_REASON ? `reopen the item, then ${rerun}; or ${newWork}` : rerun;
+    // a rerun keeps the spent counter, so the loop that ran it out would end the unit stuck again at once
+    const again = s.exhausted !== undefined ? `${rerun} --reset ${s.exhausted}` : rerun;
+    const next = s.ended_reason === ITEM_CLOSED_REASON ? `reopen the item, then ${rerun}; or ${newWork}` : again;
     return { for: "person", text: `ended ${s.ended}${s.ended_reason ? `: ${s.ended_reason}` : ""}`, ...(s.ended === "stuck" && { next }) };
   }
   const reason = s.parked?.reason;
@@ -140,7 +144,8 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
 /** `executors`: what each executor can do; without them no dialog is offered to story answer */
 export function unitView(u: UnitFacts, workflows: KernelWorkflows, executors: KernelCapabilities["executors"] = {}): UnitView {
   const s = u.state;
-  const step = s ? workflows.byHash[s.workflow.hash]?.graph.steps[s.step] : undefined;
+  const graph = s ? workflows.byHash[s.workflow.hash]?.graph : undefined;
+  const step = s ? graph?.steps[s.step] : undefined;
   const kind = step?.kind ?? null;
   return {
     id: u.id,
@@ -155,7 +160,17 @@ export function unitView(u: UnitFacts, workflows: KernelWorkflows, executors: Ke
     run: s?.run ? { id: s.run.id, executor: s.run.executor, started_at: s.run.started_at, activity: u.session?.activity ?? null } : null,
     waiting: u.corrupt ? { for: "person", text: `corrupt: ${u.corrupt}` } : waitingOf(u, kind, step?.gate?.prompt, s?.run ? executors[s.run.executor]?.dialogKeys === true : false),
     pending_receipts: u.receipts.length,
+    counters: spentCounters(s?.counters ?? {}, graph?.counters ?? {}),
   };
+}
+
+function spentCounters(values: Readonly<Record<string, number>>, bounds: Readonly<Record<string, { max: number }>>): UnitView["counters"] {
+  const out: UnitView["counters"] = {};
+  for (const [name, value] of Object.entries(values)) {
+    const max = bounds[name]?.max;
+    if (value > 0 && max !== undefined) out[name] = { value, max };
+  }
+  return out;
 }
 
 /** What a diverged store means for the story on this machine, and the command that carries it on from the remote's record. */
@@ -204,7 +219,8 @@ export async function loadProjectView(env: RuntimeEnv): Promise<ProjectView> {
 export function unitLine(u: UnitView): string {
   if (u.corrupt !== undefined) return `${u.id}: corrupt — ${u.corrupt}`;
   if (!u.step) return `${u.id}: not started`;
-  const where = `${u.id}: ${u.step}${u.kind ? ` (${u.kind})` : ""}${u.attempt && u.attempt > 1 ? ` attempt ${u.attempt}` : ""}`;
+  const spent = Object.entries(u.counters ?? {}).map(([name, c]) => `${name} ${c.value}/${c.max}`);
+  const where = `${u.id}: ${u.step}${u.kind ? ` (${u.kind})` : ""}${u.attempt && u.attempt > 1 ? ` attempt ${u.attempt}` : ""}${spent.length ? ` [${spent.join(", ")}]` : ""}`;
   if (u.ended === "done") return `${where}, done`;
   const run = u.run ? `, run by ${u.run.executor}${u.run.activity ? ` (${u.run.activity})` : ""}` : "";
   const waiting = u.waiting ? ` — waits for ${u.waiting.for}: ${u.waiting.text}${u.waiting.next ? ` → ${u.waiting.next}` : ""}` : "";
