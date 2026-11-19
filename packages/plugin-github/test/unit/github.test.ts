@@ -44,15 +44,34 @@ describe("how gh is run", () => {
   test("every call runs gh in the checkout, bounded, never prompting, on the configured repository", async () => {
     const { tracker, exec, gh } = rig();
     gh.seed([{ id: 1, title: "t", body: "", open: true, assignees: [LOGIN], labels: ["norn"] }]);
-    await tracker.intake({ label: "norn", assignee: "me" });
     await tracker.get(1);
-    expect(exec.calls.length).toBe(2);
+    await tracker.intake({ label: "norn", assignee: "me" });
     for (const c of exec.calls) {
       expect(c.argv[0]).toBe("gh");
-      expect(c.argv.slice(-2)).toEqual(["-R", REPO]);
       expect(c.opts).toMatchObject({ cwd: ROOT, timeoutMs: GH_TIMEOUT_MS, env: { GH_PROMPT_DISABLED: "1", NO_COLOR: "1" } });
     }
-    expect(exec.calls[0]?.argv).toEqual(["gh", "issue", "list", "--label", "norn", "--assignee", "@me", "--state", "open", "--limit", "500", "--json", "number,url,title,body,state,assignees,labels,updatedAt", "-R", REPO]);
+    expect(exec.calls[0]?.argv.slice(-2)).toEqual(["-R", REPO]);
+  });
+
+  test("intake lists the repository's issues by label, never through GitHub's search, whose index lags a fresh issue", async () => {
+    const { tracker, exec, gh } = rig();
+    gh.seed([
+      { id: 1, title: "mine", body: "", open: true, assignees: [LOGIN], labels: ["norn"] },
+      { id: 2, title: "theirs", body: "", open: true, assignees: ["someone"], labels: ["norn"] },
+      { id: 3, title: "unlabelled", body: "", open: true, assignees: [LOGIN], labels: [] },
+    ]);
+    expect(valueOf(await tracker.intake({ label: "norn", assignee: "me" })).map((i) => i.id)).toEqual([1]);
+    expect(valueOf(await tracker.intake({ label: "norn", assignee: null })).map((i) => i.id).sort()).toEqual([1, 2]);
+    expect(exec.calls.some((c) => c.argv[1] === "issue" && c.argv[2] === "list")).toBe(false);
+    const listing = exec.calls.find((c) => c.argv[1] === "api" && c.argv[2] === "graphql");
+    expect(listing?.argv.find((a) => a.startsWith("query="))).toContain("issues(");
+    expect(listing?.argv.join(" ")).not.toContain("search(");
+  });
+
+  test("intake reads every page of the listing", async () => {
+    const { tracker, gh } = rig();
+    gh.seed(Array.from({ length: 130 }, (_, i) => ({ id: i + 1, title: `s${i + 1}`, body: "", open: true, assignees: [], labels: ["norn"] })));
+    expect(valueOf(await tracker.intake({ label: "norn", assignee: null }))).toHaveLength(130);
   });
 
   test("without a configured repository gh is asked once, and a failed lookup is asked again", async () => {
@@ -87,7 +106,7 @@ describe("answers gh gives that the plugin must not trust", () => {
     const { tracker, gh } = rig();
     gh.override("issue view", { stdout: "<html>oops</html>" });
     expect(failureOf(await tracker.get(1))).toMatchObject({ code: "invalid", retryable: false });
-    gh.override("issue list", { stdout: JSON.stringify([{ number: "one" }]) });
+    gh.override("api graphql", { stdout: JSON.stringify({ data: { repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [{ number: "one" }] } } } }) });
     expect(failureOf(await tracker.intake({ label: "norn", assignee: null })).code).toBe("invalid");
   });
 
@@ -110,7 +129,8 @@ describe("answers gh gives that the plugin must not trust", () => {
   test("intake drops a closed issue even if gh let one through", async () => {
     const { tracker, gh } = rig();
     gh.seed([{ id: 3, title: "closed", body: "", open: false, assignees: [], labels: ["norn"] }]);
-    gh.override("issue list", { stdout: JSON.stringify([{ number: 3, url: "u", title: "closed", body: "", state: "CLOSED", assignees: [], labels: [{ name: "norn" }], updatedAt: "2026-10-20T09:15:00Z" }]) });
+    const closed = { number: 3, url: "u", title: "closed", body: "", state: "CLOSED", assignees: { nodes: [] }, labels: { nodes: [{ name: "norn" }] }, updatedAt: "2026-10-20T09:15:00Z" };
+    gh.override("api graphql", { stdout: JSON.stringify({ data: { repository: { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [closed] } } } }) });
     expect(valueOf(await tracker.intake({ label: "norn", assignee: null }))).toEqual([]);
   });
 });

@@ -235,6 +235,21 @@ export function fakeGh(login = LOGIN): FakeGh {
       const [owner, name] = REPO.split("/");
       if (!fs.includes(`owner=${owner}`) || !fs.includes(`name=${name}`)) return err("GraphQL: Could not resolve to a Repository with the name 'x'. (repository)");
       const query = fs.find((f) => f.startsWith("query="))?.slice("query=".length) ?? "";
+      const variable = (n: string) => fs.find((f) => f.startsWith(`${n}=`))?.slice(n.length + 1);
+      if (/\bissues\(/.test(query)) {
+        // the repository's issue connection, as GitHub pages it: open, by label and assignee, newest first
+        const label = variable("label");
+        const assignee = variable("assignee");
+        const rows = newestFirst(world.issues.filter((i) => i.open && (!label || i.labels.includes(label)) && (!assignee || i.assignees.includes(assignee))));
+        const from = Number(variable("after") ?? 0);
+        const page = rows.slice(from, from + 100);
+        const nodes = page.map((i) => {
+          const r = issueRow(i);
+          return { ...pick(r, "number,url,title,body,state,updatedAt"), assignees: { nodes: i.assignees.map((login) => ({ login })) }, labels: { nodes: i.labels.map((name) => ({ name })) } };
+        });
+        const more = from + page.length < rows.length;
+        return json({ data: { repository: { issues: { pageInfo: { hasNextPage: more, endCursor: more ? String(from + page.length) : null }, nodes } } } });
+      }
       const repository: Record<string, { nodes: unknown[] }> = {};
       for (const m of query.matchAll(/(b\d+): pullRequests\(headRefName: ("(?:[^"\\]|\\.)*")/g)) {
         const head = JSON.parse(m[2] as string) as string;
