@@ -54,8 +54,11 @@ export function kernelConfigOf(config: NornConfig, executor: string): KernelConf
   };
 }
 
-export function runtimeConfigOf(loaded: LoadedConfig, holder: string): RuntimeConfig {
+export function runtimeConfigOf(loaded: LoadedConfig, holder: string, formerHolders: readonly string[] = []): RuntimeConfig {
   const { config } = loaded;
+  const effective = config.holder ?? holder;
+  // the derived name stays this machine's when the config names another: a claim taken under it is not stranded
+  const former = [...new Set([holder, ...formerHolders])].filter((n) => n !== effective);
   const executors: Record<string, ExecutorChoice> = {};
   for (const [name, e] of Object.entries(config.executors))
     executors[name] = { name: e.harness, runner: runnerChoice(e.runner), ...(e.model !== undefined && { model: e.model }), ...(e.args !== undefined && { args: [...e.args] }) };
@@ -72,7 +75,8 @@ export function runtimeConfigOf(loaded: LoadedConfig, holder: string): RuntimeCo
     intake: { label: config.tracker.intake.label, assignee: config.tracker.intake.assignee === undefined ? "me" : config.tracker.intake.assignee },
     base: config.base,
     ...(config.base_ref ? { baseRef: config.base_ref } : {}),
-    holder: config.holder ?? holder,
+    holder: effective,
+    ...(former.length > 0 ? { formerHolders: former } : {}),
     ...(lockStale ? { lockStaleMs: durationMs(lockStale) } : {}),
     ...(retain ? { traceRetainMs: retain === "keep" ? null : durationMs(retain) } : {}),
     ...(config.checks ? { checks: { ...config.checks } } : {}),

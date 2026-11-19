@@ -220,3 +220,8 @@ export async function otherMachine(a: World, name = "b"): Promise<World> {
 
 /** The machine dir of the checkout: where `plugin add` pinned the lock. */
 export const machineOf = (added: NornOut): string => dirname(added.body.lock as string);
+
+/** The machine name `w`'s norn home claims under, as its first command fixed it: holders are `<user>@<this>`. */
+export function machineName(w: World): string {
+  return (JSON.parse(readFileSync(join(w.home, "holder.json"), "utf8")) as { machine: string }).machine;
+}

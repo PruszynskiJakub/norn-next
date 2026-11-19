@@ -11,9 +11,8 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
 import { join } from "node:path";
-import { agentNotes, awaitNote, machineOf, type NornOut, norn, otherMachine, plans, sh, TEST_PLUGIN, type World, world } from "./world.ts";
+import { agentNotes, awaitNote, machineName, machineOf, type NornOut, norn, otherMachine, plans, sh, TEST_PLUGIN, type World, world } from "./world.ts";
 
 const KEY = "lt-1";
 const SLOW = 300_000;
@@ -90,7 +89,7 @@ async function reportAs(w: World, env: Record<string, string>, worktree: string,
 describe("a story taken over on the refs store, and taken back", () => {
   let a: World;
   let b: World;
-  const host = hostname();
+  let host = "";
   const alice: string[] = [];
   const bob: string[] = [];
   const aliceBack: string[] = [];
@@ -168,6 +167,7 @@ describe("a story taken over on the refs store, and taken back", () => {
     bobLate = await reportAs(b, BOB, bobWorktree, bobReview);
     await tickAs(b, BOB, bobAfter);
     bobAfterStatus = await storyOf(b, BOB);
+    host = machineName(a);
   }, SLOW);
 
   afterAll(async () => {
