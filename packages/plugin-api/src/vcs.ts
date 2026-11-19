@@ -116,6 +116,12 @@ export interface Vcs {
    */
   conflictMarkers?(base: string, head: string): Promise<PluginResult<VcsConflictMarker[]>>;
   /**
+   * the paths that differ between commits `a` and `b`, both sides of a rename, sorted. Optional
+   * (plugin API 1.16); without it every commit a change lacks counts as one to push, the story's
+   * own spec folder included.
+   */
+  changedPaths?(a: string, b: string): Promise<PluginResult<string[]>>;
+  /**
    * delete the local `branch` whatever it holds; deleting a missing one is not an error. The host
    * asks only once the branch's commits are somewhere else, and never for a branch a worktree has
    * checked out. Optional (plugin API 1.14); without it a finished unit's branch stays.

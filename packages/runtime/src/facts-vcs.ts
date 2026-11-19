@@ -9,6 +9,7 @@ import type { RunState, StoryFacts, WorkflowGraph } from "@norn/kernel";
 import { baseRefOf, branchOf } from "./branches.ts";
 import { checkCommandOf } from "./check-command.ts";
 import type { RuntimeEnv } from "./env.ts";
+import { specOnly } from "./spec-only.ts";
 
 export type VcsFacts = Pick<StoryFacts, "base_stale" | "unpushed">;
 
@@ -91,12 +92,15 @@ async function verifyBroken(env: RuntimeEnv, story: string, graph: WorkflowGraph
   }
 }
 
-/** The story branch moved past its open change's head, which it still contains: commits the change lacks. */
-async function unpushed(env: RuntimeEnv, change: ChangeRequest | null, storyHead: string): Promise<boolean | undefined> {
+/** The story branch moved past its open change's head, which it still contains, with commits the change lacks beyond the spec folder. */
+async function unpushed(env: RuntimeEnv, story: string, change: ChangeRequest | null, storyHead: string): Promise<boolean | undefined> {
   if (change?.state !== "open") return undefined;
   if (change.head_sha === storyHead) return false;
   const contains = await env.slots.vcs.isAncestor(change.head_sha, storyHead);
-  return contains.ok ? contains.value : undefined;
+  if (!contains.ok) return undefined;
+  if (!contains.value) return false;
+  const notes = await specOnly(env.slots.vcs, story, change.head_sha, storyHead);
+  return notes.ok ? !notes.value : undefined;
 }
 
 export async function vcsFacts(
@@ -113,7 +117,7 @@ export async function vcsFacts(
   const out: VcsFacts = {};
   const stale = await baseStale(env, story, state, graph, head.value, problems);
   if (stale !== undefined) out.base_stale = stale;
-  const ahead = await unpushed(env, change, head.value);
+  const ahead = await unpushed(env, story, change, head.value);
   if (ahead !== undefined) out.unpushed = ahead;
   return out;
 }

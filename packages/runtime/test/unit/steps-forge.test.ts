@@ -195,7 +195,7 @@ describe("await-merge", () => {
     const { vcs } = fakeVcs(refs, parents);
     value(await openPr.run(input({}, { slots: { forge: world.forge, vcs } }), memoryHost()));
     const poll = () => awaitMerge.run(input<Record<string, never>>({}, { step: "merge", slots: { forge: world.forge, vcs } }), memoryHost());
-    return { world, poll };
+    return { world, poll, vcs };
   }
 
   test("waits while the change holds the branch and the branch holds the base", async () => {
@@ -230,6 +230,15 @@ describe("await-merge", () => {
     const { vcs } = fakeVcs({ "gh-12-login": HEAD }, {});
     const none = await awaitMerge.run(input<Record<string, never>>({}, { step: "merge", slots: { forge: world.forge, vcs } }), memoryHost());
     expect(value(none).outcome).toBe("unpushed");
+  });
+
+  test("commits past the change that touch only the story's spec folder keep it waiting; one touching code is unpushed", async () => {
+    const { poll, vcs } = await opened({ "gh-12-login": HEAD, "origin/main": BASE }, { [HEAD]: [ZERO], [ZERO]: [BASE] });
+    let paths = [".agents/specs/gh-12/notes.md"];
+    vcs.changedPaths = async () => ok(paths);
+    expect(value(await poll()).outcome).toBe("waiting");
+    paths = [".agents/specs/gh-12/notes.md", "src/a.ts"];
+    expect(value(await poll()).outcome).toBe("unpushed");
   });
 
   test("a closed change waits for a person, even with commits it lacks; without a vcs only the merge is watched", async () => {

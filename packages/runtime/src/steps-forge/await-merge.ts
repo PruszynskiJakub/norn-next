@@ -1,6 +1,6 @@
 /**
  * `await-merge`: wait for the story's change to merge. Answers `unpushed` when the branch holds
- * commits the change lacks, so the workflow can route it back; otherwise `waiting`, polled every tick.
+ * commits the change lacks beyond the story's spec folder, so the workflow can route it back; otherwise `waiting`, polled every tick.
  * `stale` is declared for the workflow's route but never answered here: whether a base move is stale
  * depends on the workflow's `base.stale` and `base.verify`, which the host reads as the story's
  * `base_stale` fact and decide routes between polls. Merged is asked first, so a change that merged
@@ -8,6 +8,7 @@
  */
 import { fail, type HostContext, ok, type PluginResult, type StepKindDefinition, type StepKindInput, type StepKindOutcome } from "@norn/plugin-api";
 import { Type } from "@sinclair/typebox";
+import { specOnly } from "../spec-only.ts";
 
 export const AwaitMergeConfig = Type.Object({}, { additionalProperties: false });
 
@@ -38,8 +39,16 @@ async function run(input: StepKindInput<Record<string, never>>, _ctx: HostContex
   if (change === null) return ok({ outcome: "unpushed", detail: { head: head.value, reason: "no change holds the branch" } });
   const holds = change.head_sha === head.value ? ok(true) : await vcs.isAncestor(head.value, change.head_sha);
   if (!holds.ok) return holds;
-  if (!holds.value) return ok({ outcome: "unpushed", detail: { head: head.value, change } });
-  return ok({ outcome: "waiting", detail: { change } });
+  if (holds.value) return ok({ outcome: "waiting", detail: { change } });
+  // commits past the change that touch only the story's spec folder go with its next code push
+  const ahead = await vcs.isAncestor(change.head_sha, head.value);
+  if (!ahead.ok) return ahead;
+  if (ahead.value) {
+    const notes = await specOnly(vcs, input.story, change.head_sha, head.value);
+    if (!notes.ok) return notes;
+    if (notes.value) return ok({ outcome: "waiting", detail: { change } });
+  }
+  return ok({ outcome: "unpushed", detail: { head: head.value, change } });
 }
 
 export const awaitMerge: StepKindDefinition<typeof AwaitMergeConfig> = {

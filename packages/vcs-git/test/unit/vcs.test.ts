@@ -181,6 +181,22 @@ describe("git vcs unfinished", () => {
   });
 });
 
+describe("git vcs changedPaths", () => {
+  test("names every path that differs between two commits, both sides of a rename, sorted", async () => {
+    const h = gitHost([["diff --name-only -z --no-renames", { stdout: ["src/b.ts", ".agents/specs/gh-12/notes.md", "a file.txt", ""].join("\0") }]]);
+    expect(await vcsOf(h.ctx).changedPaths?.("a1", "b2")).toEqual({ ok: true, value: [".agents/specs/gh-12/notes.md", "a file.txt", "src/b.ts"] });
+    expect(h.calls.at(-1)).toEqual(expect.arrayContaining(["a1", "b2"]));
+  });
+
+  test("an option-like ref is refused without running git, and a failing diff is a failure", async () => {
+    const h = gitHost([["diff", { code: 128, stderr: "fatal: bad revision" }]]);
+    const vcs = vcsOf(h.ctx);
+    expect((await vcs.changedPaths?.("--output=x", "b2"))?.ok).toBe(false);
+    expect(h.calls.length).toBe(0);
+    expect((await vcs.changedPaths?.("a1", "b2"))?.ok).toBe(false);
+  });
+});
+
 describe("git vcs untracked", () => {
   const wtList = `worktree ${ROOT}\nHEAD ${SHA}\nbranch refs/heads/main\n\nworktree ${DATA}/worktrees/gh-12\nHEAD ${SHA}\nbranch refs/heads/gh-12-login\n\n`;
   const WT = `${DATA}/worktrees/gh-12`;
