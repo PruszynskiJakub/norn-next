@@ -32,6 +32,12 @@ describe("--version and help", () => {
     expect(Object.keys(verb.options)).toEqual(["--commit", "--user", "--unset", "--json"]);
     expect((await runCli(["done", "--help"], machine().io)).stdout).toStartWith("# norn done\n");
   });
+
+  test("story create's help names whatever tracker is configured, never only the local one", async () => {
+    const help = (await runCli(["story", "create", "--help"], machine().io)).stdout;
+    expect(help).not.toContain("local tracker");
+    expect(help).toContain("Create an item on the configured tracker (a GitHub issue, a local markdown file)");
+  });
 });
 
 describe("the machine contract", () => {
