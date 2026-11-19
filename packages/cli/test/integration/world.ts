@@ -40,7 +40,7 @@ export async function sh(cwd: string, ...argv: string[]): Promise<string> {
 }
 
 /** The test harness agent's plans (fixtures/test-harness/agent.ts names what each does). */
-export type AgentPlan = "work" | "ask" | "ask-then-stuck" | "hang" | "protocol" | "findings" | "attended" | "logged-out";
+export type AgentPlan = "work" | "ask" | "ask-then-stuck" | "hang" | "protocol" | "findings" | "attended" | "permission" | "trust" | "logged-out";
 
 /**
  * A fresh clone of an empty bare remote with one commit on main, and a norn home beside it. The
@@ -103,8 +103,8 @@ export async function norn(w: World, args: string[], env: Record<string, string>
 export interface SetUpOptions {
   /** how stories run (default auto) */
   mode?: "auto" | "manual";
-  /** where the agent's process lives: the bundled headless runner (default), or the test plugin's */
-  runner?: "headless" | "test";
+  /** where the agent's process lives: the bundled headless runner (default), the test plugin's, or herdr (`fakeHerdr` first) */
+  runner?: "headless" | "test" | "herdr";
   /** the workflow a story takes when it names none (default the pack's e2e) */
   workflow?: string;
   /** repo workflows by name, written into `.agents/workflows/<name>.yaml` */

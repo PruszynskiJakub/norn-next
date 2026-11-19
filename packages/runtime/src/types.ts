@@ -124,6 +124,12 @@ export interface AgentLauncher {
   /** Show `text` beside the story's group of runs in every runner that groups them; true when one showed it. */
   label?(workspace: string, text: string, ttlMs: number): Promise<PluginResult<boolean>>;
   /**
+   * Whether the dialog as the handle's pane shows it takes the answer, with the dialog's text and an
+   * answer it does take; null when the pane cannot be read here, which leaves the answer for the tick
+   * that presses it.
+   */
+  dialogTakes?(handle: string, answer: string): Promise<{ takes: boolean; dialog: string; instead: string } | null>;
+  /**
    * The head of the log the handle's process wrote, where an agent nobody watches leaves why it
    * ended; null when it left none, or the launcher cannot read it.
    */

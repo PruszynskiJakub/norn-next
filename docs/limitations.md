@@ -64,7 +64,7 @@ What norn 0.35 did that this norn leaves out on purpose, each with what to do in
 ## Not yet proven in real use
 
 - **Two real machines.** Claims and the mailbox on the `refs` store are git refs with compare-and-swap, which is sound on paper and passes its contract suite, and a gate decision made on one clone reaches the clone holding the story through the mailbox in the integration tier, but no two real machines have shared a story.
-- **The herdr runner.** Its test against a real Herdr runs only when asked (`NORN_TEST_HERDR=1`), never in CI, and no long dogfood run has used it yet.
+- **The herdr runner.** CI drives it through a fake `herdr`; its tests against a real Herdr run only when asked (`NORN_TEST_HERDR=1`, with `NORN_TEST_HERDR_SESSION` naming the herdr session to use), never in CI, and no long dogfood run has used it yet.
 - **Real agents in long runs.** The live canary runs one real turn of each agent tool when asked (`NORN_TEST_LIVE=1`); pi in particular has run few real stories, and reports no subagents and no usage limits, so norn cannot wait on either for it.
 - **A browser criterion checked live.** Nobody has yet had an agent with a browser pass a criterion seen in a web page.
 
