@@ -317,6 +317,20 @@ export const WORKFLOWS: Record<string, string> = {
     "base: { stale: conflict, verify: test }",
     "",
   ].join("\n"),
+  "misbased.yaml": [
+    "name: misbased",
+    "start: ready",
+    "steps:",
+    "  ready:",
+    "    gate: Ready?",
+    "    outcomes: { approve: $done, reject: $stuck, stale: test }",
+    "  test:",
+    '    check: "{checks.nope}"',
+    "    timeout: 5m",
+    "    outcomes: { pass: ready, fail: $stuck }",
+    "base: { stale: conflict, verify: test }",
+    "",
+  ].join("\n"),
 };
 
 export interface Harnessed {

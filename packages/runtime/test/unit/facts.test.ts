@@ -137,6 +137,48 @@ describe("vcs facts", () => {
     expect(await stale()).toBeUndefined();
   });
 
+  test("base.verify runs the command the config's checks name for the verify step, and a name it lacks leaves base_stale unsaid", async () => {
+    const run = async (workflow: string) => {
+      const h = harness({ workflow, checks: { test: "npm test" } });
+      const verified: string[] = [];
+      const verifier = defineNornPlugin({
+        name: "verifier",
+        api: "^1.4",
+        provides: {
+          stepKinds: {
+            "verify-base": {
+              name: "verify-base",
+              configSchema: Type.Object({ command: Type.String(), timeout_ms: Type.Optional(Type.Integer()) }),
+              outcomes: ["verified", "broken"],
+              mode: "wait",
+              run: async (input) => {
+                verified.push((input.config as { command: string }).command);
+                return ok({ outcome: "verified" });
+              },
+            },
+          },
+        },
+      });
+      const built = createRuntimeEnv({ ctx: h.ctx, plugins: [...h.plugins, verifier], config: h.config, launcher: h.launcher, sessions: h.sessions });
+      if (!built.ok) throw new Error(built.failure.message);
+      h.items.push(trackerItem(1));
+      await tickUntil(h, has("gate.park"));
+      h.heads["norn/lt-1"] = "s1";
+      h.heads.main = "b2";
+      built.value.slots.vcs.conflicts = async () => ok([]);
+      const r = await gatherFacts(built.value, h.tickIds[0] as string);
+      if (!r.ok) throw new Error(r.failure.message);
+      return { verified, stale: r.value.facts.stories[0]?.base_stale, problems: r.value.problems };
+    };
+    const named = await run("based");
+    expect(named.verified).toEqual(["npm test"]);
+    expect(named.stale).toBe(false);
+    const missing = await run("misbased");
+    expect(missing.verified).toEqual([]);
+    expect(missing.stale).toBeUndefined();
+    expect(missing.problems.some((p) => p.includes("base.verify test") && p.includes("checks.nope") && p.includes("the base move is not verified"))).toBe(true);
+  });
+
   test("a story with no branch yet, or one that ended, has no vcs facts", async () => {
     const h = harness();
     h.items.push(trackerItem(1));
