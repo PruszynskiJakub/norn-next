@@ -38,7 +38,7 @@ describe("norn doctor", () => {
     const { r, body } = await doctor({ config: LOCAL_CONFIG });
     expect(r.exit).toBe(ExitCode.ok);
     expect(body.ok).toBe(true);
-    expect(body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "labels", "hooks", "tool git", "remote", "tool claude"]);
+    expect(body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "labels", "hooks", "skills", "tool git", "remote", "tool claude"]);
   });
 
   test("labels: doctor defines the labels norn uses on the tracker, the intake label, one per workflow and the triage set, once", async () => {
@@ -78,7 +78,7 @@ describe("norn doctor", () => {
     const { r, body, check } = await doctor();
     expect(r.exit).toBe(ExitCode.error);
     expect(check("config")).toMatchObject({ ok: false, code: "config_missing", do_instead: "norn init" });
-    expect(body.checks.filter((c) => c.skipped).map((c) => c.name)).toEqual(["plugins", "slots", "workflows", "labels", "hooks"]);
+    expect(body.checks.filter((c) => c.skipped).map((c) => c.name)).toEqual(["plugins", "slots", "workflows", "labels", "hooks", "skills"]);
     expect(check("tool git").ok).toBe(true);
   });
 
@@ -98,7 +98,7 @@ describe("norn doctor", () => {
     expect(missing.check("tool claude")).toBeUndefined();
     const present = await doctor({ config: pi, have: ["git", "norn", "pi"] });
     expect(present.body.ok).toBe(true);
-    expect(present.body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "labels", "hooks", "tool git", "remote", "tool pi"]);
+    expect(present.body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "labels", "hooks", "skills", "tool git", "remote", "tool pi"]);
   });
 
   test("gh is needed with the github tracker or forge, herdr with the herdr runner", async () => {

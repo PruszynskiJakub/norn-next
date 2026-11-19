@@ -1,13 +1,14 @@
 /**
  * The doctor's checks, in the order each needs the last: the config, the plugins it picks (installed
  * and on this norn's plugin API), the slots they build, the workflows (the pack's and the repo's
- * own), the labels norn puts on items, the harness hooks, and the tools on PATH the config needs
+ * own), the labels norn puts on items, the harness hooks, the pack's skills in the main checkout, and
+ * the tools on PATH the config needs
  * (git followed by its remote, gh by its login). A
  * check that cannot run because an earlier one failed is skipped rather than failed, so the first
  * failure is the one to fix. `init` runs the same checks.
  */
 import { RUN_ENV } from "@norn/plugin-api";
-import { REPO_WORKFLOWS_DIR, repoFileOf, type RuntimeEnv, shellQuote } from "@norn/runtime";
+import { installSkills, REPO_WORKFLOWS_DIR, repoFileOf, repoSkills, type RuntimeEnv, SKILLS_DIR, shellQuote } from "@norn/runtime";
 import type { NornConfig } from "./config/schema.ts";
 import type { CliContext } from "./context.ts";
 import { GIT_UPGRADE, gitTooOld, MIN_GIT_TEXT } from "./git-version.ts";
@@ -159,14 +160,37 @@ async function hooksCheck(ctx: CliContext, cwd: string, harnesses: Readonly<Reco
 }
 
 /**
- * The labels norn puts on items, defined where missing: the one check that changes something, since
- * a label is missing only on a repository norn has never set up, and init runs this check.
+ * The labels norn puts on items, defined where missing: a label is missing only on a repository norn
+ * has never set up, and init runs this check.
  */
 async function labelsCheck(env: RuntimeEnv): Promise<DoctorCheck> {
   const labels = nornLabels(env);
   const r = await attempt("labels", () => ensureLabels(env, labels));
   if (r.check) return r.check;
   return passed("labels", env.slots.tracker.capabilities.labels ? `${labels.length} labels defined on the ${env.slots.tracker.name} tracker` : `the ${env.slots.tracker.name} tracker keeps no labels`);
+}
+
+/**
+ * The pack's skills written into the main checkout, where a person's own session finds the ones a
+ * person runs (norn-fsd, norn-retro, norn-triage): a launch writes them only into unit worktrees.
+ * The same marked copies and links a launch writes, so a later run brings norn's up to date and
+ * never touches a folder of the same name the person or the repo keeps; init runs this check, and
+ * doctor again after an upgrade.
+ */
+async function skillsCheck(env: RuntimeEnv): Promise<DoctorCheck> {
+  const root = env.ctx.repo.root;
+  const dirs = [...new Set(Object.values(env.slots.executors).map((h) => h.skillsDir ?? SKILLS_DIR))];
+  const r = await attempt("skills", async () => {
+    let changed = 0;
+    for (const dir of dirs) changed += (await installSkills(env.ctx.files, root, dir, env.slots.pack.skills)).length;
+    return changed;
+  });
+  if (r.check) return { ...r.check, do_instead: r.check.do_instead ?? `make ${root} writable, then norn doctor` };
+  const count = Object.keys(env.slots.pack.skills).length;
+  // a repo set up by an older norn may have committed whole copies, which read as its own and never update
+  const kept = await repoSkills(env.ctx.files, root, env.slots.pack.skills);
+  const keptText = kept.length ? `; kept the repo's own ${kept.join(", ")} (delete a folder from ${SKILLS_DIR} and run norn doctor to take norn's copy)` : "";
+  return passed("skills", `norn's copy of ${count - kept.length} of ${count} pack skills in ${dirs.join(", ")}${r.value ? ` (${r.value} files written or removed)` : ""}${keptText}`);
 }
 
 export interface DoctorOptions {
@@ -187,19 +211,19 @@ export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Prom
   const config = await attempt("config", () => ctx.config());
   checks.push(config.check ?? passed("config", `executor ${config.value?.executor}; tracker ${config.value?.config.tracker.use}, forge ${config.value?.config.forge.use}, store ${config.value?.config.store.use}`));
 
-  if (config.check) checks.push(skipped("plugins", "config"), skipped("slots", "config"), skipped("workflows", "config"), ...(opts.repoOnly ? [] : [skipped("labels", "config"), skipped("hooks", "config")]));
+  if (config.check) checks.push(skipped("plugins", "config"), skipped("slots", "config"), skipped("workflows", "config"), ...(opts.repoOnly ? [] : [skipped("labels", "config"), skipped("hooks", "config"), skipped("skills", "config")]));
   else {
     const plugins = await attempt("plugins", () => ctx.plugins());
     checks.push(plugins.check ?? passed("plugins", `${plugins.value?.plugins.length} plugins (${plugins.value?.lock.plugins.length} installed), every one on this plugin API`));
-    if (plugins.check) checks.push(skipped("slots", "plugins"), skipped("workflows", "plugins"), ...(opts.repoOnly ? [] : [skipped("labels", "plugins"), skipped("hooks", "plugins")]));
+    if (plugins.check) checks.push(skipped("slots", "plugins"), skipped("workflows", "plugins"), ...(opts.repoOnly ? [] : [skipped("labels", "plugins"), skipped("hooks", "plugins"), skipped("skills", "plugins")]));
     else {
       const env = await attempt("slots", () => ctx.runtimeEnv());
-      if (env.check) checks.push(env.check, skipped("workflows", "slots"), ...(opts.repoOnly ? [] : [skipped("labels", "slots"), skipped("hooks", "slots")]));
+      if (env.check) checks.push(env.check, skipped("workflows", "slots"), ...(opts.repoOnly ? [] : [skipped("labels", "slots"), skipped("hooks", "slots"), skipped("skills", "slots")]));
       else if (env.value) {
         checks.push(passed("slots", "every slot builds from its config"));
         const workflows = await attempt("workflows", () => ctx.workflowEnv());
         checks.push(workflows.check ?? passed("workflows", workflowsDetail(env.value)));
-        if (!opts.repoOnly) checks.push(await labelsCheck(env.value), await hooksCheck(ctx, cwd, env.value.slots.executors));
+        if (!opts.repoOnly) checks.push(await labelsCheck(env.value), await hooksCheck(ctx, cwd, env.value.slots.executors), await skillsCheck(env.value));
       }
     }
   }

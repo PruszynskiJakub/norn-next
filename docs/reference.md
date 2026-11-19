@@ -51,7 +51,7 @@ norn init [--tracker <name>] [--forge <name>] [--store <name>] [--executor <harn
 
 ##### `norn doctor`
 
-Check the config, plugins, workflows, harness hooks and tools this repo needs
+Check the config, plugins, workflows, harness hooks and tools this repo needs, and bring the pack's skills in the checkout up to date
 
 ```sh
 norn doctor [--repo]
