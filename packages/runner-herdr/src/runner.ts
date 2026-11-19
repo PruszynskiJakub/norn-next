@@ -1,7 +1,8 @@
 /**
  * The herdr runner: one herdr workspace per story (labelled with the request's `workspace`), one tab
  * per run labelled with its title, the agent started in the tab's pane with the launch env. A person
- * can watch and type, and `send` types text and submits it. The handle is herdr's pane id.
+ * can watch and type, `send` types text and submits it, and `keys` presses keys in the pane, as a
+ * dialog there takes them. The handle is herdr's pane id.
  *
  * `start` is idempotent by key. The key's record (`<dataDir>/runners/herdr/<key>.json`) is made with
  * `ctx.files.create` before any pane is opened, holding no pane yet; it names the pane once one is
@@ -322,6 +323,28 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
       if (!typed.ok) return typed;
       const entered = await herdr(["pane", "send-keys", handle, "enter"]);
       return entered.ok ? ok(undefined) : entered;
+    },
+
+    async keys(handle, keys) {
+      // a dialog reads keystrokes, never herdr's `agent prompt`; named keys in a row go as one call
+      let named: string[] = [];
+      const flush = async (): Promise<PluginResult<void>> => {
+        if (named.length === 0) return ok(undefined);
+        const sent = await herdr(["pane", "send-keys", handle, ...named]);
+        named = [];
+        return sent.ok ? ok(undefined) : sent;
+      };
+      for (const k of keys) {
+        if ("key" in k) {
+          named.push(k.key);
+          continue;
+        }
+        const flushed = await flush();
+        if (!flushed.ok) return flushed;
+        const typed = await herdr(["pane", "send-text", handle, k.text]);
+        if (!typed.ok) return typed;
+      }
+      return flush();
     },
 
     async stop(handle) {

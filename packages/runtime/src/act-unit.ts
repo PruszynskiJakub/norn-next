@@ -27,7 +27,8 @@ async function deliverAnswers(t: TickContext, unit: string, through: number, bef
   for (const r of unitInFacts(t.facts, unit)?.receipts ?? []) {
     if (r.seq > through || r.data.kind !== "answer.sent" || undelivered.includes(r.id)) continue;
     // an answer that did not reach the agent must not be applied, or the unit unparks with nobody told
-    const sent = await t.env.launcher.answer(handle, r.data.input_id, r.data.text);
+    // a dialog's answer is keys pressed in the pane; typed as a prompt it would reach the agent as words
+    const sent = r.data.to === "dialog" ? await t.env.launcher.answer(handle, r.data.input_id, r.data.text, { dialog: true }) : await t.env.launcher.answer(handle, r.data.input_id, r.data.text);
     if (!sent.ok) return sent;
   }
   return ok(null);

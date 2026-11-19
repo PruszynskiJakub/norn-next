@@ -50,6 +50,12 @@ export const UnitFacts = Type.Object(
     corrupt_marked: Type.Optional(Type.Boolean()),
     /** the classified session of the unit's current agent run, when there is one */
     session: Type.Union([SessionFactsSchema, Type.Null()]),
+    /**
+     * Whether the run's process still runs, probed only while its session has sent no event: an
+     * agent whose hooks never loaded (a trust dialog in its pane) sends none, and is not dead.
+     * Absent: not probed, or the runner could not tell.
+     */
+    run_alive: Type.Optional(Type.Boolean()),
     step_run: Type.Optional(StepRunFacts),
   },
   { ...closed, title: "UnitFacts" },

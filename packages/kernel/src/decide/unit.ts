@@ -25,6 +25,7 @@ export const DERIVED_PARKS: ReadonlySet<string> = new Set([
   "agent.no_executor",
   "agent.asking.park",
   "agent.permission.park",
+  "agent.no_events.park",
   "agent.died.manual",
   "agent.silent.manual",
   "agent.turn_ended.manual",
@@ -80,15 +81,18 @@ export function decideUnit(story: StoryFacts, unit: UnitFacts, ctx: DecideContex
 /**
  * The answers waiting on a session that can no longer take them: it ended and its executor cannot
  * resume a session to hand one over, or none of its events are here (a story taken from another
- * machine: its session and what a resume would start from stayed there). Delivery would be refused on
- * every tick and the unit would stay parked for good; applied undelivered, the unit unparks, the
- * session is judged dead and retried, and the retry's brief carries the answers.
+ * machine: its session and what a resume would start from stayed there, unless its process runs here).
+ * Delivery would be refused on every tick and the unit would stay parked for good; applied
+ * undelivered, the unit unparks, the session is judged dead and retried, and the retry's brief
+ * carries the answers.
  */
 function undeliverableAnswers(unit: UnitFacts, state: RunState, ctx: DecideContext): string[] {
   const run = state.run;
   if (!run?.session || run.attended) return [];
   const session = unit.session;
   if (session !== null && session.activity !== "ended") return [];
+  // no event yet, but its process runs here: a dialog in its pane holds it, and takes the answer as keys
+  if (session === null && unit.run_alive === true) return [];
   if (session !== null && ctx.facts.capabilities.executors[run.executor]?.resume === true) return [];
   return unit.receipts.filter((r) => r.data.kind === "answer.sent").map((r) => r.id);
 }

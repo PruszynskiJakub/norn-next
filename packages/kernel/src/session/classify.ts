@@ -39,7 +39,7 @@ export function classifySession(view: SessionView, now: string, opts: ClassifyOp
     errors: view.errors.map((e) => e.message),
   };
   if (view.input) facts.ask = view.input.options ? { ...view.input, options: [...view.input.options] } : { ...view.input };
-  if (view.permission) facts.permission = { ...view.permission };
+  if (view.permission) facts.permission = structuredClone(view.permission);
   if (activity === "limited" && view.limit) facts.limit = { ...view.limit };
   if (view.report) facts.report = { ...view.report };
   if (view.last_message !== undefined) facts.last_message = view.last_message;

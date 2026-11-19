@@ -69,6 +69,19 @@ export function harnessConformance(label: string, harness: Harness, recordings: 
     test("every scenario the contract promises has exactly one recording", () => {
       expect(recordings.map((s) => s.scenario).sort()).toEqual(HARNESS_SCENARIOS.map((s) => s.scenario).sort());
     });
+
+    const dialogKeys = harness.dialogKeys;
+    if (dialogKeys) {
+      // a person answers a dialog the way `norn story answer` offers: an option's number, yes or no
+      test("dialog keys: the first option, yes and no each name keys, and free text names none, so it is never typed into a dialog", () => {
+        for (const answer of ["1", "yes", "no"]) {
+          const keys = dialogKeys(answer);
+          expect({ answer, some: (keys?.length ?? 0) > 0 }).toEqual({ answer, some: true });
+          for (const k of keys ?? []) expect("text" in k ? typeof k.text : ["enter", "up", "down", "esc"].includes(k.key)).toBe("text" in k ? "string" : true);
+        }
+        expect(dialogKeys("please go ahead and do it")).toBeNull();
+      });
+    }
   });
 
   describe.each(recordings.map((s) => [s.scenario, s] as const))(`${label} conformance: %s`, (_name, s) => {

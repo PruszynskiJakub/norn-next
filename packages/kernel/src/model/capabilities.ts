@@ -43,7 +43,13 @@ export const HarnessCapabilitiesSchema = Type.Object(
  * with nobody watching (auto mode needs it); `attended` opens where a person works beside it.
  */
 export const ExecutorCapabilities = Type.Object(
-  { ...HarnessCapabilitiesSchema.properties, headless: Type.Boolean(), attended: Type.Boolean() },
+  {
+    ...HarnessCapabilitiesSchema.properties,
+    headless: Type.Boolean(),
+    attended: Type.Boolean(),
+    /** a dialog in the agent's pane can be answered with keys from outside it; absent: it cannot */
+    dialogKeys: Type.Optional(Type.Boolean()),
+  },
   { ...closed, title: "ExecutorCapabilities" },
 );
 export type ExecutorCapabilities = Static<typeof ExecutorCapabilities>;

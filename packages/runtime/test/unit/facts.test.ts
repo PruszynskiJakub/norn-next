@@ -39,6 +39,31 @@ describe("pinned workflows", () => {
   });
 });
 
+describe("agent run facts", () => {
+  test("a run whose session has sent no event is probed for its process, so a live one is told from a dead launch", async () => {
+    const h = harness({ workflow: "agented" });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("agent.start"));
+    await tickUntil(h, has("receipts.apply"));
+    const handle = (await record(h, "lt-1")).state?.run?.session;
+    h.launcher.aliveAnswer = true;
+    const live = await gatherFacts(h.env, h.tickIds[0] as string, { readOnly: true });
+    expect(live.ok && live.value.facts.stories[0]?.units[0]?.run_alive).toBe(true);
+    expect(h.launcher.probed.at(-1)).toBe(handle as string);
+    // a runner that cannot tell leaves it unsaid, never dead
+    h.launcher.aliveAnswer = null;
+    const unknown = await gatherFacts(h.env, h.tickIds[0] as string, { readOnly: true });
+    expect(unknown.ok && unknown.value.facts.stories[0]?.units[0]).not.toHaveProperty("run_alive");
+    // a session with events needs no probe: its events say how it is
+    const probes = h.launcher.probed.length;
+    h.sessions.byUnit.set("lt-1", { activity: "working", silent: false, pending_tools: 0, subagents: 0, pane_answers: 0, errors: [] });
+    h.launcher.aliveAnswer = true;
+    const seen = await gatherFacts(h.env, h.tickIds[0] as string, { readOnly: true });
+    expect(seen.ok && seen.value.facts.stories[0]?.units[0]).not.toHaveProperty("run_alive");
+    expect(h.launcher.probed).toHaveLength(probes);
+  });
+});
+
 describe("vcs facts", () => {
   test("unpushed: the story branch moved past its open change's head", async () => {
     const h = harness({ workflow: "stepped" });

@@ -118,12 +118,17 @@ function judgeRun(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
     const ask = session.ask;
     return parkDecision(v, "agent.asking.park", "ask", { text: ask.question, input_id: ask.id, ...(ask.options ? { options: ask.options } : {}) });
   }
-  if (session?.activity === "permission" && session.permission)
-    return parkDecision(v, "agent.permission.park", "permission", { text: session.permission.prompt, input_id: session.permission.id });
+  if (session?.activity === "permission" && session.permission) {
+    const { prompt, call, id } = session.permission;
+    return parkDecision(v, "agent.permission.park", "permission", { text: call ? `${call.tool}: ${prompt}` : prompt, input_id: id });
+  }
   if (!session) {
-    // the launch was recorded and never produced a session (a crash between the two, a launch that failed): dead once the grace passes
-    if (ageMs(v.ctx, run.started_at) > v.ctx.config.silentAfterMs) return died(v, spec, run);
-    return noop(v, "agent.unobserved", `run ${run.id} is on the record; no session seen yet`);
+    if (ageMs(v.ctx, run.started_at) <= v.ctx.config.silentAfterMs) return noop(v, "agent.unobserved", `run ${run.id} is on the record; no session seen yet`);
+    // alive in a pane yet silent: its hooks never loaded, as behind a trust dialog, and a fresh
+    // session in a fresh pane would stop at the same dialog, so a person answers it instead
+    if (v.unit.run_alive === true && capsOf(v, run.executor)?.paneInput === true) return parkDecision(v, "agent.no_events.park", "permission", { text: noEventsText(v, run) });
+    // the launch was recorded and never produced a session (a crash between the two, a launch that failed): dead
+    return died(v, spec, run);
   }
   // a limit outranks the deadline: the agent cannot act until the reset, and stopping it would only meet the limit again
   if (session.activity === "limited") {
@@ -139,6 +144,17 @@ function judgeRun(v: UnitView, spec: AgentStepSpec, run: RunInfo): Decision {
   if (session.silent) return quiet(v, spec, run, "agent.silent");
   if (session.activity === "turn_ended") return quiet(v, spec, run, "agent.turn_ended");
   return noop(v, "agent.running", `run ${run.id} ${session.activity}`);
+}
+
+function noEventsText(v: UnitView, run: RunInfo): string {
+  // only an executor that can press keys in its pane takes the answer from story answer
+  const fromHere = capsOf(v, run.executor)?.dialogKeys === true ? `, or answer it from here with norn story answer ${v.unit.id} 1` : "";
+  return [
+    `run ${run.id}'s agent runs in its pane but has sent no event since it started, so its hooks never loaded;`,
+    "the pane most likely shows a trust dialog.",
+    `Trust the folder there${fromHere}; the run goes on with its first event.`,
+    `If the pane shows something else, start the step again with norn run rerun ${v.unit.id}.`,
+  ].join(" ");
 }
 
 /** A run's deadline counts from its start, or from the reset of a usage limit it waited out, whichever is later. */

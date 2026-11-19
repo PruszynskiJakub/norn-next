@@ -83,6 +83,7 @@ export const RULE_IDS: readonly string[] = [
   "agent.reported.rejected",
   "agent.running",
   "agent.unobserved",
+  "agent.no_events.park",
   "agent.asking.park",
   "agent.ask.route",
   "agent.permission.park",

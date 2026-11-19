@@ -1,4 +1,5 @@
 import { defineNornPlugin, type Harness } from "@norn/plugin-api";
+import { dialogKeys } from "./dialog.ts";
 import { install, LOCAL_SETTINGS, uninstall } from "./install.ts";
 import { launch } from "./launch.ts";
 import { normalize } from "./normalize.ts";
@@ -20,6 +21,7 @@ export const claudeHarness: Harness = Object.freeze({
   launch,
   normalize,
   respond,
+  dialogKeys,
 });
 
 export const claudePlugin = defineNornPlugin({ name: "norn-harness-claude", api: "^1", provides: { harness: { claude: claudeHarness } } });

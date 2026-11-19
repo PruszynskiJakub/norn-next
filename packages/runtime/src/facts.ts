@@ -66,6 +66,7 @@ function capabilitiesOf(env: RuntimeEnv): KernelCapabilities {
       ...(resume !== undefined && { resume }),
       headless: own?.headless ?? env.launcher.modes.headless,
       attended: own?.attended ?? env.launcher.modes.attended,
+      ...(own?.dialogKeys === true && { dialogKeys: true }),
     };
   }
   return { tracker: { ...env.slots.tracker.capabilities }, forge: { ...env.slots.forge.capabilities }, store: { ...env.slots.store.capabilities }, executors };

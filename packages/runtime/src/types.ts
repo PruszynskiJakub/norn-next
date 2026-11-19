@@ -74,6 +74,13 @@ export interface LauncherModes {
 export interface ExecutorModes extends LauncherModes {
   /** the harness reads typed prompts and the runner has a pane to type them into */
   paneInput: boolean;
+  /** a dialog in the agent's pane (a permission or trust prompt) can be answered: the harness names its keys and the runner presses them */
+  dialogKeys: boolean;
+}
+
+export interface AnswerOptions {
+  /** the answer chooses an option in a dialog the agent's pane shows, so it goes in as keys */
+  dialog?: boolean;
 }
 
 /**
@@ -91,7 +98,7 @@ export interface AgentLauncher {
   start(run: AgentRunRequest): Promise<PluginResult<{ handle: string }>>;
   /** `promptId` is derived from the nudge's decision, so a replayed nudge is the same prompt and sent once */
   nudge(handle: string, text: string, promptId: string): Promise<PluginResult<void>>;
-  answer(handle: string, inputId: string, text: string): Promise<PluginResult<void>>;
+  answer(handle: string, inputId: string, text: string, opts?: AnswerOptions): Promise<PluginResult<void>>;
   stop(handle: string): Promise<PluginResult<void>>;
   /** whether the handle's process still runs; null when it cannot tell, which is never read as dead */
   alive?(handle: string): Promise<boolean | null>;

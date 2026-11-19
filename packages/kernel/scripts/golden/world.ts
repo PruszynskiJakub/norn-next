@@ -36,6 +36,8 @@ export interface SimUnit {
   version: number | null;
   receipts: KernelReceipt[];
   session: SessionFacts | null;
+  /** the run's process still runs, as the host probes it while the session has sent no event */
+  run_alive?: boolean;
   step_run?: StepRunFacts;
   corrupt?: string;
   /** the corrupt record holds decide's mark, as the journal reads it back */
@@ -156,6 +158,7 @@ export class World {
         const through = u.state?.applied_through ?? 0;
         const f: UnitFacts = { id: u.id, state: structuredClone(u.state), version: u.version, receipts: structuredClone(u.receipts.filter((r) => r.seq > through)), session: structuredClone(u.session) };
         if (u.step_run) f.step_run = { ...u.step_run };
+        if (u.run_alive !== undefined && u.session === null) f.run_alive = u.run_alive;
         if (u.corrupt !== undefined) {
           f.corrupt = u.corrupt;
           f.state = null;
@@ -234,6 +237,7 @@ export class World {
     // a session or step run belongs to one run of one attempt; a new one starts with no facts
     if ((before?.run && before.run.id !== state.run?.id) || before?.step !== state.step || before?.attempt !== state.attempt) {
       u.session = null;
+      delete u.run_alive;
       delete u.step_run;
     }
   }

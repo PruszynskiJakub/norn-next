@@ -21,9 +21,9 @@ export const runEnv = (unit = UNIT, run = RUN): Record<string, string> => ({ [RU
  * repo's own checkout as its only worktree, so a unit's worktree has nothing in progress, and its
  * diff since the base adds no conflict.
  */
-export function configured(opts: { env?: Record<string, string>; stdin?: string; script?: ExecScript; revParse?: ExecScript } = {}): TestMachine {
+export function configured(opts: { env?: Record<string, string>; stdin?: string; script?: ExecScript; revParse?: ExecScript; runner?: string } = {}): TestMachine {
   // the local tracker names its user from the config: no git answers `config user.email` here
-  const config = LOCAL_CONFIG.replace("  intake: { label: norn }", "  intake: { label: norn }\n  user: me@box");
+  const config = LOCAL_CONFIG.replace("  intake: { label: norn }", "  intake: { label: norn }\n  user: me@box").replace("runner: headless", `runner: ${opts.runner ?? "headless"}`);
   const script: ExecScript = (argv, o) =>
     opts.script?.(argv, o) ??
     (argv[0] === "git" && argv[1] === "worktree" && argv[2] === "list"
