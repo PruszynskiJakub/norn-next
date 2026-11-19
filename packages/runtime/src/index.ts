@@ -34,7 +34,7 @@ export {
   recordSentPrompt,
   SentPrompt,
 } from "./events/outbox.ts";
-export { batchesDir, batchName, batchSeq, deliveredDir, EVENTS_DIR, outboxDir, RUN_EVENT_FOLDERS, receivedDir, runEventsDir, sentDir, unitEventsDir } from "./events/paths.ts";
+export { batchesDir, batchName, batchSeq, deliveredDir, EVENTS_DIR, launchRecordPath, outboxDir, RUN_EVENT_FOLDERS, receivedDir, runEventsDir, sentDir, unitEventsDir } from "./events/paths.ts";
 export { EventLogSessionSource, type EventLogSessionSourceOptions } from "./events/session-source.ts";
 export { AGENT_BIN_NAME, agentBinDir, agentBinEnv, cliOfHookCommand, shimScript } from "./agent-bin.ts";
 export { createHarnessLauncher, DEFAULT_HOOK_COMMAND, resolveExecutors } from "./executors.ts";

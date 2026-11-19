@@ -50,6 +50,14 @@ export async function recordLaunch(ctx: HostContext, unit: string, runId: string
   }
 }
 
+/**
+ * Whether this machine launched the run. A runner's handle (a pane id) is only unique on the machine
+ * that made it, so a run launched elsewhere is never probed or sent keys through it here.
+ */
+export async function launchedHere(ctx: HostContext, unit: string, runId: string): Promise<boolean> {
+  return (await ctx.files.read(launchRecordPath(ctx, unit, runId))) !== null;
+}
+
 async function readLaunch(ctx: HostContext, unit: string, runId: string): Promise<PluginResult<LaunchRecord>> {
   const path = launchRecordPath(ctx, unit, runId);
   const text = await ctx.files.read(path);

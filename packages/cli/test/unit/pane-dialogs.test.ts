@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
 import type { HarnessEvent } from "@norn/plugin-api";
-import { appendEvents } from "@norn/runtime";
+import { appendEvents, gatherFacts, launchRecordPath, newTickId } from "@norn/runtime";
 import { ExitCode, runCli } from "../../src/index.ts";
 import { AGENT_STEP, configured, envOf, GATE_STEP, RUN, receiptsOf, seedUnit, UNIT } from "./units.ts";
 import type { TestMachine } from "./support.ts";
@@ -25,6 +25,19 @@ const inPanes = (): TestMachine => configured({ runner: "herdr", script: herdr }
 const at = (seq: number) => new Date(Date.parse("2026-11-17T10:00:00.000Z") + seq * 1000).toISOString();
 const ev = (seq: number, body: Record<string, unknown>) => ({ run_id: RUN, seq, at: at(seq), ...body }) as HarnessEvent;
 
+/** the launch record this machine writes when it starts a run: only such a run's pane is probed or sent keys */
+async function launchedHere(m: TestMachine): Promise<void> {
+  const env = await envOf(m);
+  await env.ctx.files.write(launchRecordPath(env.ctx, UNIT, RUN), JSON.stringify({ executor: "claude", cwd: "/wt", title: UNIT, workspace: "gh-1", logPath: "/m/log" }));
+}
+
+async function runAliveOf(m: TestMachine): Promise<boolean | undefined> {
+  const env = await envOf(m);
+  const gathered = await gatherFacts(env, newTickId(env.ctx.now()), { readOnly: true });
+  if (!gathered.ok) throw new Error(gathered.failure.message);
+  return gathered.value.facts.stories[0]?.units[0]?.run_alive;
+}
+
 async function permissionOpen(m: TestMachine): Promise<void> {
   const env = await envOf(m);
   const wrote = await appendEvents(env.ctx, UNIT, RUN, [
@@ -39,6 +52,7 @@ describe("a permission prompt in an agent's pane", () => {
   test("story answer records a dialog answer naming the call, and the next tick presses its keys in the pane", async () => {
     const m = inPanes();
     await seedUnit(m, { step: AGENT_STEP });
+    await launchedHere(m);
     await permissionOpen(m);
     const r = await runCli(["story", "answer", UNIT, "1", "--json"], m.io);
     expect(r.exit).toBe(ExitCode.ok);
@@ -72,6 +86,15 @@ describe("a run whose agent has sent no event, parked for the dialog in its pane
     const r = await runCli(["story", "answer", UNIT, "yes", "--json"], m.io);
     expect(r.exit).toBe(ExitCode.ok);
     expect((await receiptsOf(m)).at(-1)?.data).toEqual({ kind: "answer.sent", input_id: `dialog-${RUN}`, text: "yes", by: "me@box", to: "dialog", step: AGENT_STEP, attempt: 1 });
+  });
+
+  test("a run launched on another machine is not probed: its pane id may name an unrelated pane here", async () => {
+    const m = inPanes();
+    await seedUnit(m, { step: AGENT_STEP });
+    expect(await runAliveOf(m)).toBeUndefined();
+    expect(m.exec.calls.some((c) => c.argv[0] === "herdr")).toBe(false);
+    await launchedHere(m);
+    expect(await runAliveOf(m)).toBe(true);
   });
 
   test("an executor that cannot press keys in a pane is refused, sent to the pane or a rerun", async () => {

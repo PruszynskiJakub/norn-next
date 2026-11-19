@@ -532,6 +532,19 @@ describe("harness launcher answering a dialog in the agent's pane", () => {
     expect(s.pane.pressed).toEqual([]);
   });
 
+  test("a run this machine never launched is not probed and gets no keys: its pane id may name another agent's pane here", async () => {
+    const s = setup();
+    const started = await s.launcher.start(run());
+    if (!started.ok) throw new Error("start failed");
+    // the same run as another machine launched it: its record and its events stayed there
+    const foreign = started.value.handle.replace(RUN_ID, "01JRUN0000000000000000000F");
+    expect(await s.launcher.alive(foreign)).toBeNull();
+    const pressed = await s.launcher.answer(foreign, dialogInputId(null, "01JRUN0000000000000000000F"), "1", { dialog: true });
+    expect(pressed.ok ? null : pressed.failure.code).toBe("not_found");
+    expect(s.pane.pressed).toEqual([]);
+    expect(s.pane.sent).toEqual([]);
+  });
+
   test("a run that has sent no event yet gets the keys for the dialog that holds it, until its first event", async () => {
     const s = setup();
     const started = await s.launcher.start(run());

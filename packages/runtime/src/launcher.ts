@@ -17,9 +17,10 @@
  * - every launch, resumed ones too, puts agent-bin.ts's folder first on the agent's PATH, so the
  *   `norn` the brief tells the agent to run is the build that launched it.
  * - a dialog answer (a permission or trust prompt in the agent's pane): the harness's keys for the
- *   answer pressed through the runner, only while the run's events still show that dialog open and
- *   only once (recorded as sent after the keys went in), as keys pressed after it closed would land
- *   in the agent's prompt.
+ *   answer pressed through the runner, only for a run this machine launched, only while the run's
+ *   events still show that dialog open, and not again once recorded as sent (recorded after the keys
+ *   went in: a crash between the two presses them again, which beats never), as keys pressed after
+ *   it closed would land in the agent's prompt.
  * - stop / alive: the runner, on the run's newest process (its latest resume, else the first).
  * The handle is launcher-handle.ts's: executor, unit, run and the runner's own handle.
  */
@@ -32,7 +33,7 @@ import { readEvents } from "./events/log.ts";
 import { markDelivered, pendingInjections, queueInjection, readSentPrompt, recordSentPrompt } from "./events/outbox.ts";
 import { receivedDir } from "./events/paths.ts";
 import { decodeLaunchHandle, encodeLaunchHandle, type LaunchHandle } from "./launcher-handle.ts";
-import { currentRunnerHandle, recordLaunch, resumesOf, resumeWith } from "./launcher-resume.ts";
+import { currentRunnerHandle, launchedHere, recordLaunch, resumesOf, resumeWith } from "./launcher-resume.ts";
 import { shellQuote } from "./shell.ts";
 import { installSkills, type PackSkills } from "./skills.ts";
 import type { AgentLauncher, AgentRunRequest, AnswerOptions, ExecutorModes, LauncherModes } from "./types.ts";
@@ -208,12 +209,14 @@ export class HarnessLauncher implements AgentLauncher {
 
   /**
    * Whether the handle's process still runs, for the session source's died detection; null when the
-   * runner cannot tell (or the handle is not this launcher's), which is never read as dead.
+   * runner cannot tell (or the handle is not this launcher's, or its run was launched on another
+   * machine, whose pane id may name an unrelated pane here), which is never read as dead.
    */
   async alive(handle: string): Promise<boolean | null> {
     const found = this.resolve(handle);
     if (!found.ok) return null;
     try {
+      if (!(await launchedHere(this.opts.ctx, found.value.handle.unit, found.value.handle.run_id))) return null;
       const alive = await found.value.executor.runner.alive(await currentRunnerHandle(this.opts.ctx, found.value.handle));
       return alive.ok ? alive.value : null;
     } catch {
@@ -276,6 +279,8 @@ export class HarnessLauncher implements AgentLauncher {
       return fail("invalid", `${h.unit} run ${h.run_id} cannot answer a dialog in its pane: ${runner.keys ? `${harness.name} names no keys for its dialogs` : `${runner.name} cannot press keys in a pane`}`, false);
     const keys = harness.dialogKeys(text);
     if (!keys) return fail("invalid", `${harness.name}'s dialog takes no ${JSON.stringify(text)}: answer with an option's number, yes or no`, false);
+    if (!(await launchedHere(ctx, h.unit, h.run_id)))
+      return fail("not_found", `${h.unit} run ${h.run_id} was not launched on this machine: its pane is not here to take the keys`, false);
     const id = answerPromptId(inputId);
     if ((await readSentPrompt(ctx, h.unit, h.run_id, id)) !== null) return ok(undefined);
     const read = await readEvents(ctx, h.unit, h.run_id);
@@ -283,7 +288,8 @@ export class HarnessLauncher implements AgentLauncher {
     const open = permission ? dialogInputId(permission, h.run_id) === inputId : read.events.length === 0 && dialogInputId(null, h.run_id) === inputId;
     // answered in the pane meanwhile: nothing waits for the keys
     if (!open) return ok(undefined);
-    const pressed = await runner.keys(await currentRunnerHandle(ctx, h), keys);
+    const pane = await currentRunnerHandle(ctx, h);
+    const pressed = await runner.keys(pane, keys);
     if (!pressed.ok) return pressed;
     const recorded = await recordSentPrompt(ctx, h.unit, h.run_id, { id, source: "answer", at: ctx.now(), input_id: inputId });
     return recorded.ok ? ok(undefined) : recorded;
