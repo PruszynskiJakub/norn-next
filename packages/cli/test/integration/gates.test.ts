@@ -376,7 +376,7 @@ describe("checks routed by exit code, and counters run out and reset", () => {
     expect(rulesToStuck.filter((r) => r.startsWith("agent.start")).length).toBeGreaterThanOrEqual(2);
     expect(stuckAtCheck).toMatchObject({ step: "test", ended: "stuck" });
     expect(stuckAtCheck.ended_reason).toContain("ran out");
-    expect(stuckAtCheck.waiting?.next).toMatch(new RegExp(`^norn run rerun ${KEY} --reset test\\.`));
+    expect(stuckAtCheck.waiting?.next).toBe(`norn run rerun ${KEY} --reset test.fail`);
   });
 
   test("--reset with an unknown counter is refused, naming the workflow's counters", () => {
