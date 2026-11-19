@@ -190,6 +190,31 @@ describe("norn doctor", () => {
     expect(await check(LOCAL_CONFIG, null)).toMatchObject({ ok: true });
   });
 
+  test("remote: the refs store checks its own remote, which need not be the vcs remote", async () => {
+    const remotes = (have: string[]): ExecScript => (argv, o) => {
+      if (argv[0] === "git" && argv[1] === "remote" && argv[2] === "get-url")
+        return have.includes(argv[3] as string) ? { stdout: `git@example.com:${argv[3]}.git\n` } : { code: 2, stderr: `error: No such remote '${argv[3]}'\n` };
+      if (argv[0] === "gh" && argv[1] === "auth") return { stdout: "" };
+      return tools("git", "norn", "claude", "gh")(argv, o);
+    };
+    const remoteChecks = async (config: string, have: string[]) => {
+      const m = machine({ seed: { [PATHS.local]: config }, script: remotes(have) });
+      return (Bun.JSONL.parse((await runCli(["doctor", "--json"], m.io)).stdout)[0] as { checks: Check[] }).checks.filter((c) => c.name.startsWith("remote"));
+    };
+    const refs = LOCAL_CONFIG.replace("store: { use: local }", "store: { use: refs }");
+    const alone = await remoteChecks(refs, []);
+    expect(alone.map((c) => [c.name, c.ok, c.code ?? null, c.do_instead ?? null])).toEqual([["remote", false, "no_remote", "git remote add origin <url>"]]);
+    expect(alone[0]?.error).toContain("the refs store");
+    const upstream = LOCAL_CONFIG.replace("store: { use: local }", "store: { use: refs, remote: upstream }").replace("forge: { use: none }", "forge: { use: github }");
+    const split = await remoteChecks(upstream, ["origin"]);
+    expect(split.map((c) => [c.name, c.ok, c.code ?? null])).toEqual([
+      ["remote origin", true, null],
+      ["remote upstream", false, "no_remote"],
+    ]);
+    expect(split[1]?.do_instead).toBe("git remote add upstream <url>");
+    expect((await remoteChecks(upstream, ["origin", "upstream"])).every((c) => c.ok)).toBe(true);
+  });
+
   test("--repo reads the repo's own config files, never the user's", async () => {
     const seed = { [PATHS.user]: "bogus: 1\n" };
     const whole = await doctor({ config: LOCAL_CONFIG, seed });

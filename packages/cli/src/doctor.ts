@@ -89,19 +89,47 @@ async function ghAuthCheck(ctx: CliContext, cwd: string): Promise<DoctorCheck> {
   return { name: "gh auth", ok: false, error: `gh is not logged in: ${firstLine(r)}`, do_instead: "gh auth login", code: "gh_logged_out" };
 }
 
+const DEFAULT_REMOTE = "origin";
+
+const remoteKey = (slot: object): string | null => {
+  const r = (slot as { remote?: unknown }).remote;
+  return typeof r === "string" ? r : null;
+};
+
 /**
- * The git remote a code host's forge opens changes through and a refs store shares run data through.
- * Without it every push fails; a repo on forge none with a local store keeps its work local and needs none.
+ * The git remotes this config pushes to, each with what pushes there: the vcs remote for a code host's
+ * forge, and the refs store's own remote, which need not be the same one. Without one every push to it
+ * fails; a repo on forge none with a local store keeps its work local and needs none.
  */
-async function remoteCheck(ctx: CliContext, cwd: string, config: NornConfig): Promise<DoctorCheck | null> {
-  if (config.vcs.use !== "git") return null;
-  const configured = (config.vcs as { remote?: unknown }).remote;
-  const remote = typeof configured === "string" ? configured : "origin";
-  const r = await (await ctx.host()).exec(["git", "remote", "get-url", remote], { cwd, timeoutMs: TOOL_TIMEOUT_MS });
-  if (r.code === 0) return passed("remote", `${remote} is ${r.stdout.trim()}`);
-  const needs = [config.forge.use !== "none" ? `the ${config.forge.use} forge` : null, config.store.use === "refs" ? "the refs store" : null].filter((x): x is string => x !== null);
-  if (needs.length === 0) return passed("remote", `no remote ${remote}; none needed with forge ${config.forge.use} and store ${config.store.use}`);
-  return { name: "remote", ok: false, error: `this repository has no git remote ${remote}, which ${needs.join(" and ")} pushes to`, do_instead: `git remote add ${remote} <url>`, code: "no_remote" };
+function remotesNeeded(config: NornConfig): Map<string, string[]> {
+  const needed = new Map<string, string[]>();
+  const need = (remote: string, who: string) => needed.set(remote, [...(needed.get(remote) ?? []), who]);
+  if (config.vcs.use === "git" && config.forge.use !== "none") need(remoteKey(config.vcs) ?? DEFAULT_REMOTE, `the ${config.forge.use} forge`);
+  if (config.store.use === "refs") need(remoteKey(config.store) ?? DEFAULT_REMOTE, "the refs store");
+  return needed;
+}
+
+async function remoteChecks(ctx: CliContext, cwd: string, config: NornConfig): Promise<DoctorCheck[]> {
+  const needed = remotesNeeded(config);
+  const host = await ctx.host();
+  const url = async (remote: string) => host.exec(["git", "remote", "get-url", remote], { cwd, timeoutMs: TOOL_TIMEOUT_MS });
+  if (needed.size === 0) {
+    if (config.vcs.use !== "git") return [];
+    const remote = remoteKey(config.vcs) ?? DEFAULT_REMOTE;
+    const r = await url(remote);
+    return [passed("remote", r.code === 0 ? `${remote} is ${r.stdout.trim()}` : `no remote ${remote}; none needed with forge ${config.forge.use} and store ${config.store.use}`)];
+  }
+  const checks: DoctorCheck[] = [];
+  for (const [remote, needs] of needed) {
+    const name = needed.size === 1 ? "remote" : `remote ${remote}`;
+    const r = await url(remote);
+    checks.push(
+      r.code === 0
+        ? passed(name, `${remote} is ${r.stdout.trim()}`)
+        : { name, ok: false, error: `this repository has no git remote ${remote}, which ${needs.join(" and ")} pushes to`, do_instead: `git remote add ${remote} <url>`, code: "no_remote" },
+    );
+  }
+  return checks;
 }
 
 /** The hook name the probe passes: any name will do, as norn answers a hook outside a run before it reads the name. */
@@ -110,7 +138,9 @@ const HOOK_PROBE = "doctor-probe";
 /**
  * Runs the hook line each harness writes, the way an agent runs it: through a shell, outside any run.
  * `norn --version` alone is not enough: run by bun without its script, the binary runs while every
- * hook line fails, which leaves an agent unguarded whose events never reach norn.
+ * hook line fails, which leaves an agent unguarded whose events never reach norn. Outside a run norn
+ * answers a hook before it reads any config, so the probe proves only that the line dispatches, not
+ * that a hook inside a run records its event.
  */
 async function hooksCheck(ctx: CliContext, cwd: string, harnesses: Readonly<Record<string, { name: string; install?: unknown }>>): Promise<DoctorCheck> {
   const lacking = Object.entries(harnesses).filter(([, h]) => typeof h.install !== "function").map(([name]) => name);
@@ -180,8 +210,7 @@ export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Prom
       checks.push(tool);
       if (!tool.ok) continue;
       if (t.tool === "git" && config.value) {
-        const remote = await remoteCheck(ctx, cwd, config.value.config);
-        if (remote) checks.push(remote);
+        checks.push(...(await remoteChecks(ctx, cwd, config.value.config)));
       }
       if (t.tool === "gh") checks.push(await ghAuthCheck(ctx, cwd));
     }
