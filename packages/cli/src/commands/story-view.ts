@@ -72,7 +72,7 @@ async function recordOf(env: RuntimeEnv, key: string, story: StoryView): Promise
     if (left) out.criteria.push(left);
     out.notes.push(...openNotesOf(u.id, receipts));
   }
-  // a record from before rounds were recorded is in its first
+  // a record with no round.started is in its first round
   out.round = Math.max(out.round, 1);
   return out;
 }

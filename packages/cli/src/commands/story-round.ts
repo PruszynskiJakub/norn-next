@@ -10,7 +10,7 @@ import type { RunState, UnitJournal, WorkflowGraph } from "@norn/kernel";
 import { parseUnitId, RUN_ENV } from "@norn/plugin-api";
 import type { RuntimeEnv } from "@norn/runtime";
 import { defineCommand, opt } from "../command.ts";
-import { corruptError, failure, refuse, rendered, usageError } from "../output.ts";
+import { type CliFailure, corruptError, failure, refuse, rendered, usageError } from "../output.ts";
 import { receiptId, refuseFinished, syncStore, workflowRefusal } from "./person-support.ts";
 
 const USAGE = "norn story round <key> --workflow <name> [--at <step>] [--force] [--reason <text>]";
@@ -105,10 +105,9 @@ export const storyRoundCommand = defineCommand({
     const env = await ctx.runtimeEnv();
     await syncStore(env, key, `norn story round ${key} --workflow ${name}`);
 
-    const refused = workflowRefusal(env, name);
-    if (refused) throw refused;
     const load = env.workflows[name];
-    if (!load?.ok) throw refuse(`workflow ${name} is invalid`, `fix the workflow ${name}, then norn doctor`, "invalid_workflow");
+    // a workflow that is missing or does not load always has a refusal
+    if (!load?.ok) throw workflowRefusal(env, name) as CliFailure;
     const graph = load.workflow.graph;
     if (at !== undefined && !graph.steps[at]) {
       throw refuse(`workflow ${name} has no step ${at}`, `name one of ${Object.keys(graph.steps).join(", ")}`, "unknown_step");

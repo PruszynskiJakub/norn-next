@@ -9,7 +9,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { awaitNote, type NornOut, norn, personPush, plans, refsUnder, setUp, sh, status, type StoryShown, tickUntil, type UnitShown, type World, world, worktreeOf } from "./world.ts";
+import { agentNotes, awaitNote, type NornOut, norn, personPush, plans, refsUnder, setUp, sh, status, type StoryShown, tickUntil, type UnitShown, type World, world, worktreeOf } from "./world.ts";
 
 const KEY = "lt-1";
 const SLOW = 300_000;
@@ -423,6 +423,7 @@ describe("a new round of a finished story whose base moved under it", () => {
   let startUnit: UnitShown | undefined;
   let base = "";
   let headsHoldBase: boolean[] = [];
+  let resolverRuns = 0;
 
   beforeAll(async () => {
     w = await world("work");
@@ -451,6 +452,7 @@ describe("a new round of a finished story whose base moved under it", () => {
     headsHoldBase = await Promise.all(
       ["lt-1", "lt-2"].map(async (key) => (await Bun.$`git -C ${w.root} merge-base --is-ancestor ${base} origin/norn/${key}`.nothrow().quiet()).exitCode === 0),
     );
+    resolverRuns = new Set(agentNotes(w).filter((n) => n.note === "plan" && n.value === "resolve").map((n) => n.run)).size;
   }, SLOW);
 
   test("the branch update is refused over the conflict, naming a round at the update step", () => {
@@ -473,6 +475,7 @@ describe("a new round of a finished story whose base moved under it", () => {
   test("both rounds meet the conflict, the resolver merges the base, and each story publishes a branch holding it", () => {
     expect(rules.filter((r) => r === "round.start").length).toBeGreaterThanOrEqual(4);
     expect(rules.filter((r) => r.endsWith("!"))).toEqual([]);
+    expect(resolverRuns).toBe(2);
     expect(headsHoldBase).toEqual([true, true]);
   });
 });
