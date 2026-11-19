@@ -16,7 +16,9 @@ function who(d: Outcome["decision"]): string {
 
 export function outcomeLine(o: Outcome): string {
   const base = `${who(o.decision)}  ${o.decision.rule} → ${o.decision.kind}`;
-  return o.ok ? base : `${base}  FAILED: ${o.error}${o.retryable ? " (retried next tick)" : ""}`;
+  if (o.ok) return base;
+  if (lostRace(o)) return `${base}  lost a race, decided again next tick: ${o.error}`;
+  return `${base}  FAILED: ${o.error}${o.retryable ? " (retried next tick)" : ""}`;
 }
 
 /**
@@ -39,7 +41,11 @@ export function watchLine(r: TickReport, time: string, said: ReadonlySet<string>
   return parts.length === 0 ? null : `${time}  ${parts.join("; ")}`;
 }
 
-export const failedCount = (r: TickReport): number => r.outcomes.filter((o) => !o.ok).length;
+/** Another writer moved the record after the tick read it: nothing was committed and the next tick decides again. */
+export const lostRace = (o: Outcome): boolean => !o.ok && o.retryable && o.error.startsWith("conflict:");
+
+/** A lost race is not a failure: it changed nothing, and the next tick reads the record as it is. */
+export const failedCount = (r: TickReport): number => r.outcomes.filter((o) => !o.ok && !lostRace(o)).length;
 
 export function tickLines(r: TickReport): string[] {
   return [...r.outcomes.map(outcomeLine), ...r.problems.map((p) => `problem: ${p}`)];

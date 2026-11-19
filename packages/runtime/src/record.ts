@@ -48,7 +48,7 @@ export async function writeAndCommit(
     seqs.push(wrote.value.seq);
     // a corrupt record shows decide no receipts, so there is no numbering of its to hold the store to
     if (seen?.corrupt === undefined && wrote.value.seq !== first + i)
-      return fail("conflict", `${unit}: receipt ${intent.id} landed at seq ${wrote.value.seq}, decide numbered it ${first + i}; the record moved since facts were read`);
+      return fail("conflict", `${unit}: receipt ${intent.id} landed at seq ${wrote.value.seq}, decide numbered it ${first + i}; the record moved since facts were read`, true);
   }
   if (before) {
     // a failed hook keeps the state uncommitted, so the receipts stay unapplied and the next tick tries again
@@ -57,6 +57,7 @@ export async function writeAndCommit(
   }
   if (state === null) return ok({ seqs, version: null });
   const committed = await env.journal.commit(unit, state, expectVersion);
-  if (!committed.ok) return committed;
+  // a commit that lost its compare-and-swap is read again by the next tick, never forced
+  if (!committed.ok) return committed.failure.code === "conflict" ? fail("conflict", committed.failure.message, true) : committed;
   return ok({ seqs, version: committed.value.version });
 }
