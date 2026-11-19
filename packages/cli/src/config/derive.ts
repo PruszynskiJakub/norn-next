@@ -57,8 +57,9 @@ export function kernelConfigOf(config: NornConfig, executor: string): KernelConf
 export function runtimeConfigOf(loaded: LoadedConfig, holder: string, formerHolders: readonly string[] = []): RuntimeConfig {
   const { config } = loaded;
   const effective = config.holder ?? holder;
-  // the derived name stays this machine's when the config names another: a claim taken under it is not stranded
-  const former = [...new Set([holder, ...formerHolders])].filter((n) => n !== effective);
+  // a configured holder exists to tell this home apart from another on the same machine that claims as
+  // the derived user@machine names, so none of them is evidence that a claim is this home's
+  const former = config.holder === undefined ? formerHolders.filter((n) => n !== effective) : [];
   const executors: Record<string, ExecutorChoice> = {};
   for (const [name, e] of Object.entries(config.executors))
     executors[name] = { name: e.harness, runner: runnerChoice(e.runner), ...(e.model !== undefined && { model: e.model }), ...(e.args !== undefined && { args: [...e.args] }) };

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
-import { ExitCode, homePaths, runCli } from "../../src/index.ts";
-import { HOME, type TestMachine } from "./support.ts";
+import { configPaths, ExitCode, homePaths, runCli } from "../../src/index.ts";
+import { HOME, ROOT, type TestMachine } from "./support.ts";
 import { AGENT_STEP, configured, envOf, runEnv, seedUnit, UNIT, withEnv } from "./units.ts";
 
 const json = (stdout: string): unknown => Bun.JSONL.parse(stdout)[0];
@@ -55,6 +55,21 @@ describe("a machine claims under one holder for as long as its norn home lives",
     await claimAs(m, "me@desk");
     const refused = await runCli(["done", "done", "--json"], m.io);
     expect({ exit: refused.exit, out: json(refused.stdout) }).toMatchObject({ exit: ExitCode.refused, out: { code: "claim_moved" } });
+  });
+
+  test("a home whose config names a holder never takes, or reports under, a claim held as user@ its machine by another home", async () => {
+    const m = configured({ env: runEnv() });
+    const local = configPaths(HOME, ROOT).local;
+    await m.files.write(local, `${(await m.files.read(local)) ?? ""}holder: b\n`);
+    await seedUnit(m, { step: AGENT_STEP });
+    await envOf(renamed(m, "box.lan"));
+    // another clone on this machine, under the default holder, holds the story
+    await claimAs(m, "me@box");
+    const refused = await runCli(["done", "done", "--json"], m.io);
+    expect({ exit: refused.exit, out: json(refused.stdout) }).toMatchObject({ exit: ExitCode.refused, out: { code: "claim_moved" } });
+    await runCli(["tick", "--json"], withEnv(m, {}).io);
+    const held = await (await envOf(m)).slots.store.claims.read(UNIT);
+    expect(held.ok && held.value?.holder).toBe("me@box");
   });
 
   test("a holder file that does not validate is refused, never replaced by a new name", async () => {

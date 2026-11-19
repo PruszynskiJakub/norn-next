@@ -2,9 +2,9 @@
  * Who this machine claims as. A hostname is no identity: macOS's follows the network, so one
  * machine answers `mac.home` on one network and `MacBook-Pro.local` on the next, and a claim taken
  * under one name would read as another machine's. The machine's name is fixed once per norn home, from
- * its LocalHostName where it has one, and every process reads it back. Names the hostname gave
- * besides it (before the home had one, or from a binary that still derives it) are kept as former
- * names, so a claim taken under one is still this machine's.
+ * its LocalHostName where it has one, and every process reads it back. Other names the hostname
+ * gives are kept as former names, since a claim may have been taken under one, and it is still this
+ * machine's.
  */
 import { type HostContext, parseJson } from "@norn/plugin-api";
 import { NonEmpty } from "@norn/schema";
