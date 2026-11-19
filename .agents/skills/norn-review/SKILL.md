@@ -29,7 +29,7 @@ The order below matters where it is numbered; how deep each part goes is yours t
      - No writes under the delivery tool's run state (its `runs/` folders and their state files) — the tool reads them as the record of what happened; a stray write corrupts the record or makes it guess.
 5. **Verify each blocking candidate** before you decide, because an axis that raised a finding is the worst judge of it. A candidate is anything Decide (below) would make blocking. Check it again in a fresh subagent given only the finding, the diff command and the sources it cites: it reads the code at the file and line and the spec or rule cited, tries the input if one is named, and answers holds or does not hold with the line it read. When you cannot start subagents, re-read the cited code and source yourself. Drop a candidate that does not hold, or that cites a path `REVIEW.md` ignores; keep one that holds. Never drop a red suite or an `UNTRACED` row this way: re-run or re-read to confirm, and keep it when it still stands.
 6. **Decide.** Every Spec finding, every bug and every hard Standards breach is blocking. An `UNTRACED` row is a blocking Spec finding, unless the criterion's `verifier` in the slice (or story) frontmatter `criteria` is `agent` or `person`: no test is expected for those, so the row reads `QA (agent)` or `QA (person)` and points at QA, which gives its verdict in the criteria report. A user story or criterion with no frontmatter entry counts as `verifier: test`. Add a smell only when it is worth a round of rework on its own; otherwise it is minor or a nit. Any blocking finding means changes requested; none means approve. Only blocking findings are rework: minor and nit ones are notes, left for the person, never fixed in another round.
-7. **Write the table into the handoff's Proof section**, replacing the table an earlier review left there, so QA and the PR body can reuse it; each `UNTRACED` row also goes under Not proven yet:
+7. **Write the table into the handoff's State section**, replacing the table an earlier review left there, so QA and the PR body can reuse it; each `UNTRACED` row also goes under its Notes:
 
 ```markdown
 | Criterion or story | What it says | Verifier | Proven by |
@@ -40,7 +40,7 @@ The order below matters where it is numbered; how deep each part goes is yours t
 ```
 
    One row per acceptance criterion, by its id and what it says; a user story no criterion covers gets a row of its own, in words with no id. The words column is never empty: the next reader, agent or person, has only the table. Every `UNTRACED` row has its finding.
-8. **Write the findings** as JSON to a file outside the repository (e.g. under `$TMPDIR`) unless told where, and hand that file over with your verdict. Keep the axes separate; do not merge or rerank them. The fields are read by code, so keep them exactly as below.
+8. **Write the findings** as JSON to a file outside the repository (e.g. under `$TMPDIR`) unless told where, and report it with your verdict: `norn done <outcome> --findings <file>` (or the report command your instructions name). An outcome that sends the work back is refused without findings, and the rework reads them from that report, not from the handoff. Keep the axes separate; do not merge or rerank them. The fields are read by code, so keep them exactly as below.
 
 ```json
 {
