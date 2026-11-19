@@ -10,6 +10,7 @@ import { failure, refuse, rendered } from "../output.ts";
 
 export const storyCloseCommand = defineCommand({
   name: "story close",
+  acts: true,
   summary: "Close a story and stop its runs",
   usage: "norn story close <key>",
   positionals: { min: 1, max: 1 },

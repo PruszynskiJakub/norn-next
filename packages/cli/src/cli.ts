@@ -68,7 +68,7 @@ export async function runCli(argv: readonly string[], io: CliIo): Promise<CliRes
 async function dispatch(command: Command, rest: readonly string[], json: boolean, io: CliIo): Promise<CliResult> {
   const end = rest.indexOf("--");
   const own = [...flagsOf(rest).filter((a) => a !== JSON_FLAG), ...(end < 0 ? [] : rest.slice(end))];
-  const ctx = new CliContext(io);
+  const ctx = new CliContext(io, { acts: command.acts === true });
   const withStderr = (r: CliResult): CliResult => (ctx.stderr.length > 0 ? { ...r, stderr: ctx.stderr.map((l) => `${l}\n`).join("") } : r);
   try {
     const args = parseCommandArgs(command, own, json);

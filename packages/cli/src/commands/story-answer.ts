@@ -89,6 +89,7 @@ async function answer(ctx: CliContext, key: string, text: string) {
 
 export const storyAnswerCommand = defineCommand({
   name: "story answer",
+  acts: true,
   summary: "Answer the question a story's agent asked, or the permission or trust prompt in its pane",
   usage: "norn story answer <key> <text>   (a prompt in the pane: an option's number, yes or no)",
   positionals: { min: 2, max: 2 },

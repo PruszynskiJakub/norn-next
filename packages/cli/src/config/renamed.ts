@@ -54,7 +54,7 @@ const OLD_KEYS: Record<string, Renamed | Replaced | Gone> = {
   limits: { by: "kernel.counters, or each workflow's own counters", owner: "team" },
   notify: { gone: "this norn sends no notifications" },
   notifiers: { gone: "this norn sends no notifications" },
-  norn_version: { gone: "this norn records no version in its config" },
+  norn_version: { gone: "the store keeps the norn version floor; no config holds it" },
   regenerate: { gone: "this norn regenerates nothing" },
   record: { gone: "the store slot (store.use) keeps run data" },
   slots: { gone: "kernel.max_agents bounds the agents that run at once" },

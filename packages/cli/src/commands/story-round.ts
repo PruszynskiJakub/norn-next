@@ -74,6 +74,7 @@ async function refuseOldSlices(env: RuntimeEnv, key: string, graph: WorkflowGrap
 
 export const storyRoundCommand = defineCommand({
   name: "story round",
+  acts: true,
   summary: "Start a story's next round on a workflow",
   usage: USAGE,
   options: {

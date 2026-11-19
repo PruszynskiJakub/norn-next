@@ -36,6 +36,7 @@ function whereAre(units: readonly UnitJournal[]): string {
 
 export const runStartCommand = defineCommand({
   name: "run start",
+  acts: true,
   summary: "Start the agent of a step manual mode holds, or of an attended step",
   usage: "norn run start <unit>",
   positionals: { min: 1, max: 1 },

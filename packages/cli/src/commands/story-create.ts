@@ -11,6 +11,7 @@ import { failure, refuse, rendered, usageError } from "../output.ts";
 
 export const storyCreateCommand = defineCommand({
   name: "story create",
+  acts: true,
   summary: "Create a tracker item with the intake label (local tracker)",
   usage: "norn story create <title> [--body <text>] [--workflow <name>]",
   options: {

@@ -17,6 +17,7 @@ const USAGE = "norn run rerun <unit> [--step <step>] [--reset <counter>]... [--r
 
 export const runRerunCommand = defineCommand({
   name: "run rerun",
+  acts: true,
   summary: "Run a unit's step again, or move it to another step, counters reset",
   usage: USAGE,
   options: {

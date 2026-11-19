@@ -36,6 +36,7 @@ function take(env: RuntimeEnv, key: string, held: ClaimRecord | null, live: bool
 
 export const storyTakeCommand = defineCommand({
   name: "story take",
+  acts: true,
   summary: "Take a story's claim to this machine, so its next tick carries the story on",
   usage: USAGE,
   options: {
