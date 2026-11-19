@@ -78,6 +78,22 @@ export interface Tick {
 const SEED = "01JD5G00000000000000000000";
 const MINUTE = 60_000;
 
+/**
+ * The session's report as the host hands it to decide: dropped once its receipt stands on the record,
+ * and named refused when that receipt was rejected.
+ */
+function reportAsRecorded(u: SimUnit, f: UnitFacts): void {
+  const report = f.session?.report;
+  const runId = u.state?.run?.id;
+  if (!report || !f.session || runId === undefined) return;
+  const refusals = new Map(u.receipts.flatMap((r) => (r.data.kind === "receipt.rejected" ? [[r.data.seq, r.data.reason] as const] : [])));
+  const r = u.receipts.findLast((x) => x.data.kind === "run.reported" && x.data.run_id === runId && x.data.verb === report.verb && x.data.outcome === report.outcome);
+  if (!r) return;
+  const refused = refusals.get(r.seq);
+  if (refused === undefined) delete f.session.report;
+  else f.report_rejected = refused;
+}
+
 export const session = (activity: SessionFacts["activity"], over: Partial<SessionFacts> = {}): SessionFacts => ({
   activity,
   silent: false,
@@ -142,6 +158,18 @@ export class World {
     return r;
   }
 
+  /**
+   * An agent reports as the reporting API does: its `run.reported` receipt on the record first, then
+   * the event the session reads as reported.
+   */
+  report(id: string, verb: "done" | "ask" | "stuck", outcome?: string, text?: string): void {
+    const u = this.unit(id);
+    const st = u.state as RunState;
+    if (!st.run) throw new Error(`${id}: no run to report`);
+    this.append(id, { kind: "run.reported", run_id: st.run.id, verb, ...(outcome !== undefined && { outcome }), ...(text !== undefined && { text }), step: st.step, attempt: st.attempt });
+    u.session = session("reported", { report: { verb, ...(outcome !== undefined && { outcome }) } });
+  }
+
   /** A gate decision a person makes on the unit's current step and attempt. */
   decideGate(id: string, outcome: "approve" | "reject", reason?: string): void {
     const st = this.unit(id).state as RunState;
@@ -160,6 +188,7 @@ export class World {
         const f: UnitFacts = { id: u.id, state: structuredClone(u.state), version: u.version, receipts: structuredClone(u.receipts.filter((r) => r.seq > through)), session: structuredClone(u.session) };
         if (u.step_run) f.step_run = { ...u.step_run };
         if (u.run_alive !== undefined && u.session === null) f.run_alive = u.run_alive;
+        reportAsRecorded(u, f);
         if (u.corrupt !== undefined) {
           f.corrupt = u.corrupt;
           f.state = null;
@@ -359,9 +388,11 @@ export class World {
       for (const u of s.units) {
         const run = u.state?.run;
         if (!run || u.session !== null || this.manual.has(u.id) || u.receipts.some((r) => r.seq > (u.state?.applied_through ?? 0))) continue;
+        // only an agent reports; a plugin step of the same name answers through its step run
+        if (!this.workflows.byHash[u.state?.workflow.hash ?? ""]?.graph.steps[run.step]?.agent) continue;
         const outcome = this.scripted(this.script.agent, u.id, run.step, this.nextCall(`${u.id}:${run.step}:agent`));
         if (outcome === undefined) continue;
-        u.session = session("reported", { report: { verb: "done", outcome } });
+        this.report(u.id, "done", outcome);
       }
   }
 }

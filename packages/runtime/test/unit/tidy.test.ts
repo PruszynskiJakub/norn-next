@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { fail } from "@norn/plugin-api";
-import { tidy, writeStoryDoc } from "../../src/index.ts";
+import { reportRun, tidy, writeStoryDoc } from "../../src/index.ts";
 import { has, harness, record, session, tickUntil, trackerItem } from "./support.ts";
 
 /** Three stories that each end stuck at their first step, their claims given up, each with a worktree on disk. */
@@ -44,6 +44,8 @@ describe("tidy", () => {
     await tickUntil(h, has("agent.start"));
     await tickUntil(h, has("receipts.apply"));
     const handle = (await record(h, "lt-1")).state?.run?.session as string;
+    const runId = (await record(h, "lt-1")).state?.run?.id as string;
+    expect(await reportRun(h.env, "lt-1", runId, { verb: "stuck", reason: "blocked" }, "r1")).toMatchObject({ ok: true });
     h.sessions.byUnit.set("lt-1", session("reported", { report: { verb: "stuck" } }));
     await tickUntil(h, has("claim.release"));
     expect((await record(h, "lt-1")).state?.ended).toBe("stuck");

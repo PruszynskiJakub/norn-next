@@ -10,7 +10,7 @@ import type { GatherOptions } from "./facts.ts";
 import { removeLeftovers } from "./check-leftovers.ts";
 import { OUTPUT_TAIL, readDetachedCheck, stopDetachedCheck } from "./checks-detached.ts";
 import { worktreeOf } from "./inputs.ts";
-import { sessionReportOnRecord } from "./live-run.ts";
+import { sessionReportOnRecord, sessionReportRejected } from "./live-run.ts";
 import { readStepRun, type StepRunRecord, stepRunFact, writeStepRun } from "./step-runs.ts";
 
 export interface UnitRead {
@@ -106,6 +106,8 @@ export async function readUnitFacts(env: RuntimeEnv, unit: string, problems: str
     try {
       const session = await env.sessions.facts(unit, run.id, run.session);
       if (session?.report && sessionReportOnRecord(j, run.id, session.report)) delete session.report;
+      const refused = session?.report ? sessionReportRejected(j, run.id, session.report) : undefined;
+      if (refused !== undefined) facts.report_rejected = refused;
       facts.session = session;
     } catch (e) {
       problems.push(`${unit}: the session source failed: ${e instanceof Error ? e.message : String(e)}`);

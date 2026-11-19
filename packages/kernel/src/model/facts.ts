@@ -62,6 +62,11 @@ export const UnitFacts = Type.Object(
      * so the pane is the only place it can be seen. Absent: none, not probed, or the runner cannot read one.
      */
     run_dialog: Type.Optional(NonEmpty),
+    /**
+     * Why the kernel refused the report the run's session shows: its `run.reported` receipt was
+     * rejected. Absent while the session shows no report, or one whose receipt still stands.
+     */
+    report_rejected: Type.Optional(NonEmpty),
     step_run: Type.Optional(StepRunFacts),
   },
   { ...closed, title: "UnitFacts" },

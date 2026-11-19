@@ -16,7 +16,7 @@ import {
   reportRun,
   writeStoryDoc,
 } from "../../src/index.ts";
-import { has, harness, type Harnessed, record, session, tickUntil, trackerItem } from "./support.ts";
+import { has, harness, type Harnessed, record, type Report, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
 
 const UNIT = "lt-1";
 const WORKTREE = "/machine/repo/worktrees/lt-1";
@@ -296,6 +296,41 @@ describe("reporting", () => {
     expect(facts?.activity).toBe("reported");
     await tickUntil(h, has("receipts.apply"));
     expect((await record(h, UNIT)).state?.ended).toBe("done");
+  });
+
+  test("a report that lands between a tick's read of the record and of the session is applied from its own receipt, text and all, and recorded once", async () => {
+    const { h, runId } = await running();
+    // the agent's report lands after this tick read the unit's record and before it reads the session
+    const read = h.sessions.facts.bind(h.sessions);
+    let landed = false;
+    h.sessions.facts = async (unit: string) => {
+      if (unit === UNIT && !landed) {
+        landed = true;
+        const r = await reportRun(h.env, UNIT, runId, { verb: "ask", question: "which db?" }, "r1");
+        if (!r.ok) throw new Error(r.refusal.error);
+        h.sessions.byUnit.set(UNIT, session("reported", { report: { verb: "ask" } }));
+      }
+      return read(unit);
+    };
+    const [raced] = await tickUntil(h, () => true, 1);
+    expect(landed).toBe(true);
+    expect(rulesOf(raced as Report).filter((r) => r.startsWith(UNIT))).toEqual([`${UNIT} agent.reporting`]);
+    await tickUntil(h, async () => (await record(h, UNIT)).state?.parked !== undefined);
+    const after = await record(h, UNIT);
+    expect(after.receipts.filter((x) => x.data.kind === "run.reported").map((x) => x.id)).toEqual(["report-r1"]);
+    expect(after.state?.parked).toMatchObject({ text: "which db?" });
+  });
+
+  test("a report whose receipt the kernel refused parks the unit with the refusal and writes no report of its own", async () => {
+    const { h, runId } = await running();
+    // an outcome the step does not route, as a report recorded before its workflow changed would carry
+    await h.env.journal.record(UNIT, { id: "report-r1", data: { kind: "run.reported", run_id: runId, verb: "done", outcome: "bogus", text: "built", step: "build", attempt: 1 } });
+    h.sessions.byUnit.set(UNIT, session("reported", { report: { verb: "done", outcome: "bogus" } }));
+    await tickUntil(h, has("agent.reported.rejected"));
+    const after = await record(h, UNIT);
+    expect(after.state?.parked?.reason).toBe("agent.reported.rejected");
+    expect(after.receipts.filter((x) => x.data.kind === "run.reported").map((x) => x.id)).toEqual(["report-r1"]);
+    expect((await tickUntil(h, () => true, 1)).flatMap(rulesOf).filter((r) => r.startsWith(UNIT))).toEqual([`${UNIT} unit.parked`]);
   });
 
   test("a report is idempotent by its report id", async () => {

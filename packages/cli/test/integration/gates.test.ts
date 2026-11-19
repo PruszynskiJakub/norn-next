@@ -46,9 +46,6 @@ interface Outcome {
   error?: string;
 }
 
-/** A commit that lost the race to a receipt written meanwhile: the next tick decides again from the record. */
-const lostRace = (o: Outcome): boolean => o.error?.includes("the record moved since facts were read") === true;
-
 /** Every rule a tick fired, a failed action marked `!`. */
 class Ticks {
   readonly rules: string[] = [];
@@ -58,7 +55,7 @@ class Ticks {
     const t = await norn(this.w, ["tick", "--json"]);
     const outcomes = (t.body.outcomes ?? []) as Outcome[];
     this.rules.push(...outcomes.map((o) => `${o.decision.rule}${o.ok ? "" : "!"}`));
-    if (t.code !== 0 && !outcomes.every((o) => o.ok || lostRace(o))) throw new Error(`tick exited ${t.code}: ${t.stdout}${t.stderr}`);
+    if (t.code !== 0 && !outcomes.every((o) => o.ok)) throw new Error(`tick exited ${t.code}: ${t.stdout}${t.stderr}`);
     return t;
   }
 

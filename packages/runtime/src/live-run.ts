@@ -99,3 +99,14 @@ export function sessionReportOnRecord(unit: UnitJournal, runId: string, report: 
   const r = standingReport(unit, runId);
   return r !== null && r.verb === report.verb && r.outcome === report.outcome;
 }
+
+/**
+ * Why the kernel refused the run's report a session shows: its newest matching `run.reported`
+ * receipt was rejected and no report of the run stands since. Undefined when none was refused.
+ */
+export function sessionReportRejected(unit: UnitJournal, runId: string, report: { verb: string; outcome?: string }): string | undefined {
+  if (standingReport(unit, runId) !== null) return undefined;
+  const refusals = new Map(unit.receipts.flatMap((r) => (r.data.kind === "receipt.rejected" ? [[r.data.seq, r.data.reason] as const] : [])));
+  const r = unit.receipts.findLast((x) => x.data.kind === "run.reported" && x.data.run_id === runId && x.data.verb === report.verb && x.data.outcome === report.outcome);
+  return r === undefined ? undefined : refusals.get(r.seq);
+}
