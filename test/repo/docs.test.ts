@@ -378,6 +378,18 @@ describe("limitations: Dropped from 0.35", () => {
     const live = [...DROPPED_COMMANDS.filter((c) => table.has(c)), ...DROPPED_FLAGS.filter(([c, f]) => table.get(c)?.has(f) === true).map(([c, f]) => `${c} --${f}`)];
     expect(live).toEqual([]);
   });
+
+  test("says norn's own commits on a story branch are merge commits", () => {
+    // vcs-git's update-branch, integrate and fetch fallback all write `git merge --no-ff` commits
+    const body = section();
+    expect(body).not.toContain("makes no commits of its own");
+    expect(body).toContain("merge commits");
+  });
+
+  test("lists the .git/info/exclude entry among what removing norn leaves", () => {
+    // init can exclude all of .agents/, which would keep the folder hidden from git after norn is gone
+    expect(section()).toContain("`.git/info/exclude`");
+  });
 });
 
 describe("Development › Skills", () => {
