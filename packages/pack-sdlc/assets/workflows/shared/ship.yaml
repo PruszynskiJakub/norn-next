@@ -67,8 +67,9 @@ steps:
       stale:   { exit: stale }
       # the story branch holds commits its PR lacks: push them through open-pr before a person merges
       unpushed: open-pr
-  # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
-  # move it counts as stale (base.stale) leaves through `stale` by itself
+  # a story past ready waits here for a person to merge its PR, marked ready for review first (a forge
+  # merges no draft); the merge ends the story, and a base move it counts as stale (base.stale) leaves
+  # through `stale` by itself
   merge:
     await-merge:
     outcomes:

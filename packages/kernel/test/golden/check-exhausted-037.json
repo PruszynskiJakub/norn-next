@@ -1160,18 +1160,6 @@
   },
   "decisions": [
     {
-      "kind": "noop",
-      "unit": "gh-30",
-      "rule": "unit.ended.stuck",
-      "reason": "slices.stuck routes to $stuck"
-    },
-    {
-      "kind": "noop",
-      "unit": "gh-30/01",
-      "rule": "unit.ended.stuck",
-      "reason": "counter test.fail ran out (5/5) at test.fail"
-    },
-    {
       "kind": "release_claim",
       "unit": null,
       "rule": "claim.release",

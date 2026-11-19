@@ -4,7 +4,7 @@ What to do when something happens, and how to set norn up the way you work. Each
 
 ## An agent asked a question
 
-**You see:** the unit under "Needs you", waiting on the agent's question; `norn story view <story>` shows it in full.
+**You see:** the unit under "Needs you", waiting for `answer` on the agent's question (`parked: agent.asked` in `--json`, the question in `waiting.text`); `norn story view <story>` shows it in full. An agent that reports `norn stuck` with a question (its reason ends in `?`) is asking it, and waits here too.
 
 ```sh
 norn story answer gh-18 "Keep the old endpoint and mark it deprecated in the docs"
@@ -78,7 +78,7 @@ norn story answer gh-18/02 "Stop rewriting the parser; only fix the off-by-one i
 
 ## An agent died, hung or went quiet
 
-norn handles this itself: an agent that dies is retried in a fresh session, one that goes quiet is nudged, one that runs past its deadline is stopped. Each is bounded (`kernel.max_retries`, `kernel.max_nudges`, `kernel.silent_after`, `kernel.deadline` in the config, or `retries`, `nudges` and `deadline` on the step; a workflow's `defaults.stalled` replaces `kernel.silent_after` for its own steps). You only see it when the bound is reached and the unit is stuck. An agent that exits before its first event (a bad flag, a missing login) is read as died at once, and the reason it ends with is the head of its log.
+norn handles this itself: an agent that dies is retried in a fresh session, one that goes quiet is nudged, one that runs past its deadline is stopped. Each is bounded (`kernel.max_retries`, `kernel.max_nudges`, `kernel.silent_after`, `kernel.deadline` in the config, or `retries`, `nudges` and `deadline` on the step; a workflow's `defaults.stalled` replaces `kernel.silent_after` for its own steps). You only see it when the bound is reached and the unit is stuck. An agent that exits before its first event or before it acted (a bad flag, a missing login) is read as died, and the reason it ends with, on its retry too, is the head of its log.
 
 ## A unit is stuck
 
@@ -249,7 +249,7 @@ norn config set executors.claude.runner herdr
 norn config set kernel.mode manual
 ```
 
-The herdr runner opens one Herdr workspace per story and one tab per run, with the agent in its pane: you can watch it and type into it. In auto mode norn starts each agent step in its pane on its own, and you can look in or type at any time; in manual mode you start each one with `norn run start <unit>`. An attended step always waits for `norn run start`, and then runs in its pane with you. A decision given by typing into the pane is not on norn's record; give it with `norn story answer` too.
+The herdr runner opens one Herdr workspace per story and one tab per run, labelled `<unit> <step>`, with the agent in its pane: you can watch it and type into it. A run norn stops (its report applied, a retry, a deadline) ends its agent and keeps its tab, so every run of a story, attended or not, is a tab in the story's one workspace. The story's finish closes the tabs of its units that ended done, and the workspace with the last one; `norn tidy` closes the rest once the story ended. In auto mode norn starts each agent step in its pane on its own, and you can look in or type at any time; in manual mode you start each one with `norn run start <unit>`. An attended step always waits for `norn run start`, and then runs in its pane with you. A decision given by typing into the pane is not on norn's record; give it with `norn story answer` too.
 
 ## Share run data with a team
 

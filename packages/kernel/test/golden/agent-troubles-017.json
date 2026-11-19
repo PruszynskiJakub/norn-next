@@ -2334,12 +2334,6 @@
     },
     {
       "kind": "noop",
-      "unit": "gh-42",
-      "rule": "unit.ended.stuck",
-      "reason": "died: retries 1/1 used at qa"
-    },
-    {
-      "kind": "noop",
       "unit": "gh-43",
       "rule": "agent.limited.wait",
       "reason": "limited until 2026-11-17T09:30:00.000Z"

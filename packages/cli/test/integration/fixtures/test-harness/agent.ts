@@ -24,6 +24,8 @@
  *   wait out, so no tick ends the run between the two reports.
  * - findings: `norn done changes_requested --findings <file>`.
  * - attended: a stop before reporting, then `norn done done`.
+ * - logged-out: its start hook, then a line on stdout and an exit 1 before any prompt, as `claude -p`
+ *   does without a login (TEST_AGENT_PLAN only: it exits before the brief that names the step).
  */
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -169,6 +171,10 @@ if (process.env.TEST_AGENT_ONLY === "stop.after-report") {
 }
 
 note(resumed ? "resume.start" : "start", await hook("start"));
+if (process.env.TEST_AGENT_PLAN === "logged-out") {
+  process.stdout.write("Not logged in · Please run /login\n");
+  process.exit(1);
+}
 note(resumed ? "resume.prompt" : "prompt", await hook("prompt", { prompt }));
 note("norn", (await sh("command -v norn")).stdout.trim());
 const brief = await sh(`${norn} brief`);

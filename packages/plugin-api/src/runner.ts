@@ -65,6 +65,13 @@ export interface Runner {
   dialog?(handle: string, opts?: { anyStatus?: boolean }): Promise<PluginResult<string | null>>;
   /** end the process; stopping one already gone is not an error */
   stop(handle: string): Promise<PluginResult<void>>;
+  /**
+   * Close what the start under `key` opened for a run that has ended: its pane, and with it a tab or
+   * group left empty (plugin API 1.17). True when something closed. Never closes what that start did
+   * not open (a pane id reused, a person's own pane); one already gone closes nothing. Absent on a
+   * runner that leaves nothing open once its process ends.
+   */
+  close?(handle: string, key: string): Promise<PluginResult<boolean>>;
 }
 
 export interface RunnerFactory<S extends TSchema = TSchema> {

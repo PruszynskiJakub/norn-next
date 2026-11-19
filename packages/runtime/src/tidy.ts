@@ -1,6 +1,7 @@
 /**
  * What `norn tidy` removes: the worktrees and local branches of stories whose every unit ended
- * (stuck, closed, done but left behind), which nothing else ever removes. A finished story removes
+ * (stuck, closed, done but left behind), which nothing else ever removes, and what their runs left
+ * open on this machine (a herdr pane per run), which a finish closes only for units that ended done. A finished story removes
  * only the work of units that ended done; a stuck unit keeps its worktree for a person to look into,
  * and this is where the person says they are done looking.
  *
@@ -13,6 +14,7 @@
 import { ok, type PluginResult, parseUnitId } from "@norn/plugin-api";
 import { branchHome, dropUnitBranch } from "./branch-cleanup.ts";
 import type { RuntimeEnv } from "./env.ts";
+import { closeUnitRuns } from "./run-panes.ts";
 
 export interface TidyRemoved {
   story: string;
@@ -30,10 +32,20 @@ export interface TidyKept {
   reason: string;
 }
 
+/** A unit whose ended runs had something left open on this machine (a herdr pane), closed now. */
+export interface TidyClosed {
+  story: string;
+  unit: string;
+  /** how many of its runs had something to close */
+  runs: number;
+}
+
 export interface TidyReport {
   dry_run: boolean;
   removed: TidyRemoved[];
   kept: TidyKept[];
+  /** none on a dry run: what a pane holds is read only by closing it */
+  closed: TidyClosed[];
 }
 
 async function hasWorktree(env: RuntimeEnv, unit: string): Promise<boolean> {
@@ -108,7 +120,7 @@ async function tidyUnit(env: RuntimeEnv, story: string, unit: string, dryRun: bo
 
 export async function tidy(env: RuntimeEnv, opts: { dryRun?: boolean } = {}): Promise<PluginResult<TidyReport>> {
   const dryRun = opts.dryRun === true;
-  const out: TidyReport = { dry_run: dryRun, removed: [], kept: [] };
+  const out: TidyReport = { dry_run: dryRun, removed: [], kept: [], closed: [] };
   const listed = await env.slots.store.listUnits();
   if (!listed.ok) return listed;
   const byStory = new Map<string, string[]>();
@@ -127,6 +139,12 @@ export async function tidy(env: RuntimeEnv, opts: { dryRun?: boolean } = {}): Pr
     }
     // slices before their story, whose branch is where an integrated slice's commits are found
     for (const unit of [...units].sort((a, b) => Number(a === story) - Number(b === story) || a.localeCompare(b))) {
+      // its panes before its worktree, so no pane is left in a folder that is gone
+      if (!dryRun) {
+        const shut = await closeUnitRuns(env, unit);
+        if (shut.closed > 0) out.closed.push({ story, unit, runs: shut.closed });
+        for (const p of shut.problems) out.kept.push({ story, unit, reason: p });
+      }
       const done = await tidyUnit(env, story, unit, dryRun, out);
       if (!done.ok) return done;
     }

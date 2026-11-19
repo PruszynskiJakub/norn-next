@@ -2332,12 +2332,6 @@
       "reason": "nudged at 2026-11-17T09:00:00.000Z; waiting for the agent to take it"
     },
     {
-      "kind": "noop",
-      "unit": "gh-42",
-      "rule": "unit.ended.stuck",
-      "reason": "died: retries 1/1 used at qa"
-    },
-    {
       "kind": "release_claim",
       "unit": null,
       "rule": "claim.release",

@@ -113,14 +113,18 @@ describe("claims", () => {
     expect(storyDecisions(story())).toEqual([]);
   });
 
-  test("the claim is released once every unit ended, after the units' noops and the story's finish", () => {
+  test("the claim is released once every unit ended, after the story's finish", () => {
     const s = story({ units: [unit("gh-1", state("gh-1", "split", { ended: "done" })), unit("gh-1/01", state("gh-1/01", "build", { ended: "done" }))] });
     expect(storyDecisions(s).map((d) => [d.unit, d.rule])).toEqual([
-      ["gh-1", "unit.ended.done"],
-      ["gh-1/01", "unit.ended.done"],
       [null, "story.finish"],
       [null, "claim.release"],
     ]);
+  });
+
+  test("a finished story decides nothing once its claim is given up, tick after tick: its units' ends are facts status reads", () => {
+    const ended = [unit("gh-1", state("gh-1", "split", { ended: "done" })), unit("gh-1/01", state("gh-1/01", "build", { ended: "stuck", ended_reason: "no" }))];
+    expect(decideAll(facts([story({ claim: null, units: ended })]))).toEqual([]);
+    expect(decideAll(facts([story({ claim: null, change: change({ state: "merged" }), units: [unit("gh-1", null)] })]))).toEqual([]);
   });
 
   test("a held story whose run data diverged from the remote's is held with the command that carries it on, renewed but never flushed", () => {
@@ -213,7 +217,7 @@ describe("the change and the item", () => {
 
   test("a merged change before the story started ends it with nothing to start", () => {
     const ds = storyDecisions(story({ claim: null, change: change({ state: "merged" }), units: [unit("gh-1", null)] }));
-    expect(rules(ds)).toEqual(["story.ended"]);
+    expect(rules(ds)).toEqual([]);
   });
 
   test("a closed item marks the open units stuck, applying what was on the record first", () => {
@@ -282,7 +286,7 @@ describe("the change and the item", () => {
 
   test("a change merged elsewhere neither ends a story not started nor finishes one whose units ended", () => {
     const elsewhere = change({ state: "merged", base_branch: "release" });
-    expect(rules(storyDecisions(story({ change: elsewhere, units: [unit("gh-1", null)] })))).not.toContain("story.ended");
+    expect(rules(storyDecisions(story({ change: elsewhere, units: [unit("gh-1", null)] })))).toContain("round.start");
     const done = story({ change: elsewhere, units: [unit("gh-1", state("gh-1", "split", { ended: "done" }))] });
     const finish = storyDecisions(done).find((d): d is DecisionOf<"finish_story"> => d.kind === "finish_story");
     expect(finish?.close_item).toBe(false);
@@ -328,7 +332,7 @@ describe("corrupt units and pinned workflows", () => {
 
   test("a unit already marked corrupt is never touched", () => {
     const ds = storyDecisions(story({ units: [unit("gh-1", state("gh-1", "plan", { ended: "corrupt", ended_reason: "bad" })), unit("gh-1/01", null)] }));
-    expect(rules(ds)).toEqual(["unit.corrupt.held", "story.ended", "claim.release"]);
+    expect(rules(ds)).toEqual(["claim.release"]);
   });
 
   test("a unit whose pinned workflow is not loaded is marked corrupt", () => {
@@ -642,7 +646,7 @@ describe("flush", () => {
 
   test("a story released this tick is flushed before the release", () => {
     const s = story({ units: [unit("gh-1", state("gh-1", "split", { ended: "done" }))] });
-    expect(rules(storyDecisions(s, { capabilities: caps({ shared: true }) }))).toEqual(["unit.ended.done", "store.flush", "story.finish", "claim.release"]);
+    expect(rules(storyDecisions(s, { capabilities: caps({ shared: true }) }))).toEqual(["store.flush", "story.finish", "claim.release"]);
   });
 });
 

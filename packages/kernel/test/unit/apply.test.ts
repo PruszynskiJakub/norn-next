@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   type AgentStepSpec,
+  ASKED_PARK,
   applyReceipts,
   type CompiledStep,
   type KernelReceipt,
@@ -375,13 +376,18 @@ describe("applyReceipts: runs, nudges and classified outcomes", () => {
     expect(res.state).toMatchObject({ ended: "stuck", ended_reason: "silent: pi stopped on an error: Codex error: model not supported; nudges 0/2 used at implement", run: null });
   });
 
-  test("an ask with no ask route parks the unit; an answer lifts the park and keeps the run", () => {
+  test("an ask with no ask route parks the unit under a reason code, the question beside it; an answer lifts the park and keeps the run", () => {
     const parked = apply(fresh(), journal(1, started("a1"), { kind: "run.reported", run_id: "a1", verb: "ask", text: "which base?" })).state;
-    expect(parked.parked).toEqual({ reason: "which base?", since: iso(2) });
+    expect(parked.parked).toEqual({ reason: ASKED_PARK, since: iso(2), text: "which base?" });
     const res = apply(parked, journal(3, { kind: "answer.sent", input_id: "q1", text: "main", by: "a-person" }));
     expect(res.state.parked).toBeUndefined();
     expect(res.state.run?.id).toBe("a1");
   });
+});
+
+test("an ask classified off the session parks under the same reason code, with no question of its own", () => {
+  const res = apply(fresh(), journal(1, started("a1"), { kind: "run.classified", run_id: "a1", outcome: "ask", rule: "agent.ask" }));
+  expect(res.state.parked).toEqual({ reason: ASKED_PARK, since: iso(2) });
 });
 
 describe("applyReceipts: waiting steps", () => {

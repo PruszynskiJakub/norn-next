@@ -592,12 +592,6 @@
       "expect_version": 1
     },
     {
-      "kind": "noop",
-      "unit": "gh-71",
-      "rule": "unit.corrupt.held",
-      "reason": "run state v3: /step must match pattern"
-    },
-    {
       "kind": "release_claim",
       "unit": null,
       "rule": "claim.release",

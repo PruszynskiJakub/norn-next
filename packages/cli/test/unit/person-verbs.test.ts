@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { ASKED_PARK } from "@norn/kernel";
 import { reportOnRecord } from "@norn/runtime";
 import { decisionRoute } from "../../src/commands/decision-route.ts";
 import { CliFailure, configPaths, ExitCode, runCli } from "../../src/index.ts";
@@ -153,6 +154,29 @@ describe("story answer", () => {
     expect(refusal(await runCli(["story", "answer", UNIT, "again", "--json"], m.io))).toEqual({ exit: ExitCode.refused, code: "no_question" });
   });
 
+  test("an agent's question parks under a reason code: status shows the question and names story answer, also once a headless agent exited", async () => {
+    const m = configured();
+    await seedUnit(m, { step: AGENT_STEP, extra: { parked: { reason: ASKED_PARK, since: "2026-11-17T10:00:00.000Z", text: "Which db?" } } });
+    const shown = json((await runCli(["status", "--json"], m.io)).stdout) as { stories: { units: unknown[] }[] };
+    expect(shown.stories[0]?.units[0]).toMatchObject({ parked: ASKED_PARK, waiting: { for: "answer", text: "Which db?", next: `norn story answer ${UNIT} "<answer>"` } });
+  });
+
+  test("an agent that reports stuck with a question asks it: the unit waits on an answer, never on a rerun", async () => {
+    const m = configured();
+    await seedUnit(m, { step: AGENT_STEP });
+    const r = await runCli(["stuck", "Which", "db", "should", "it", "use?", "--json"], withEnv(m, runEnv()).io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(json(r.stdout)).toMatchObject({ verb: "ask" });
+    const ask = (await receiptsOf(m))[0];
+    expect(ask?.data).toMatchObject({ kind: "run.reported", verb: "ask", text: "Which db should it use?" });
+    const answered = await runCli(["story", "answer", UNIT, "postgres", "--json"], m.io);
+    expect(json(answered.stdout)).toMatchObject({ unit: UNIT, input_id: ask?.id, question: "Which db should it use?" });
+    // a reason that asks nothing stays a stuck report
+    const m2 = configured();
+    await seedUnit(m2, { step: AGENT_STEP });
+    expect(json((await runCli(["stuck", "the", "base", "is", "gone", "--json"], withEnv(m2, runEnv()).io)).stdout)).toMatchObject({ verb: "stuck" });
+  });
+
   test("a story whose agent asked nothing refuses", async () => {
     const m = configured();
     await seedUnit(m, { step: AGENT_STEP });
@@ -218,6 +242,23 @@ describe("run start", () => {
     const m = configured();
     const r = await runCli(["help", "run", "start"], m.io);
     expect(r.stdout).toContain("norn run start <unit>");
+  });
+});
+
+describe("a finished story in status", () => {
+  test("is one line under Finished while its item is open, and drops out of the markdown once the item closed; --json keeps it", async () => {
+    const m = configured();
+    expect((await runCli(["story", "create", "Add", "a", "login", "page", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    await seedUnit(m, { step: GATE_STEP, run: null, extra: { ended: "done" } });
+    const open = (await runCli(["status"], m.io)).stdout;
+    expect(open).toContain(`## Finished\n\n- ${UNIT} Add a login page\n`);
+    expect(open).not.toContain(`## Stories\n\n- ${UNIT}`);
+    expect(open).not.toContain(`  - ${UNIT}: ${GATE_STEP}`);
+    expect((await runCli(["story", "close", UNIT, "--json"], m.io)).exit).toBe(ExitCode.ok);
+    const closed = (await runCli(["status"], m.io)).stdout;
+    expect(closed).not.toContain(UNIT);
+    const shown = json((await runCli(["status", "--json"], m.io)).stdout) as { stories: { key: string }[] };
+    expect(shown.stories.map((x) => x.key)).toEqual([UNIT]);
   });
 });
 

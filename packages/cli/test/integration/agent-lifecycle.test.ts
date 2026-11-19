@@ -290,11 +290,11 @@ describe("what an agent meets: refusals, one report, findings, the handoff, ask 
     // the person is sent to answer the question, never to a rerun that would throw it away
     expect(atAsk).toMatchObject({
       attempt: 2,
-      parked: "Which colour should the button be?",
+      parked: "agent.asked",
       waiting: { for: "answer", text: "Which colour should the button be?", next: `norn story answer ${KEY} "<answer>"` },
     });
     expect(rerunAtAsk).toMatchObject({ code: 0, body: { from: "review", step: "review", attempt: 2, replayed: false } });
-    expect(afterAskRerun).toMatchObject({ attempt: 3, parked: "Which colour should the button be?" });
+    expect(afterAskRerun).toMatchObject({ attempt: 3, parked: "agent.asked", waiting: { text: "Which colour should the button be?" } });
     expect(afterAskRerun?.run?.id).not.toBe(atAsk?.run?.id);
   });
 
@@ -513,5 +513,29 @@ describe("an agent binary that is not there", () => {
     expect(ended?.ended_reason).toContain(MISSING_BIN);
     expect(ended?.ended_reason).toContain("retries 1/1 used");
     expect(tookMs).toBeLessThan(60_000);
+  });
+});
+
+describe("an agent that exits at once, as one without a login does", () => {
+  let w: World;
+  let ticks: Ticks;
+  let ended: UnitSeen | null;
+  let statusMd: NornOut;
+
+  beforeAll(async () => {
+    w = await world("logged-out");
+    await setUp(w, { workflow: "solo", workflows: { solo: SOLO }, config: [["kernel.silent_after", "30m"]] });
+    ticks = new Ticks(w);
+    await norn(w, ["story", "create", "Cannot log in", "--json"]);
+    ended = await ticks.until((u) => u?.ended !== undefined);
+    statusMd = await norn(w, ["status"]);
+  }, SLOW);
+
+  test("its retry exits the same way, and the unit ends stuck with the head of its log in the reason status shows", () => {
+    expect(ticks.rules).toContain("agent.died.retry");
+    expect(ended?.ended).toBe("stuck");
+    expect(ended?.ended_reason).toStartWith("died: the agent exited before it acted: Not logged in · Please run /login");
+    expect(ended?.ended_reason).toContain("retries 1/1 used");
+    expect(statusMd.stdout).toContain("Not logged in · Please run /login");
   });
 });

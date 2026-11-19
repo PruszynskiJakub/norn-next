@@ -286,7 +286,7 @@ describe("a story's pull request on GitHub", () => {
   let pushesBeforePr = -1;
   let reworkBrief = "";
   let atReady: { pr: GhPr | undefined; prCreates: number; pushes: number };
-  let atMerge: { url: unknown; remote: string; local: string; pushes: number };
+  let atMerge: { url: unknown; remote: string; local: string; pushes: number; draft: boolean | undefined; readies: number };
   let approveAtMerge: NornOut;
   let rejectAtMerge: NornOut;
   let stillAtMerge: UnitShown | null;
@@ -330,7 +330,16 @@ describe("a story's pull request on GitHub", () => {
     await norn(w, ["story", "approve", KEY, "--json"]);
     await tickUntil(w, rules, (u) => u?.step === "merge", 60_000, KEY);
     const shown = (await status(w)).stories.find((st) => st.key === KEY) as unknown as { change?: { url?: string } };
-    atMerge = { url: shown.change?.url, remote: await sh(w.remote, "git", "rev-parse", BRANCH), local: await sh(w.root, "git", "rev-parse", BRANCH), pushes: storyPushes(w).length };
+    // the merge step's first poll marks the draft ready, so a person can merge it
+    await norn(w, ["tick", "--json"]);
+    atMerge = {
+      url: shown.change?.url,
+      remote: await sh(w.remote, "git", "rev-parse", BRANCH),
+      local: await sh(w.root, "git", "rev-parse", BRANCH),
+      pushes: storyPushes(w).length,
+      draft: openPr(w, BRANCH)?.draft,
+      readies: callsOf(ghCalls(w), "pr ready").length,
+    };
     mergeView = await norn(w, ["story", "view", KEY]);
     const pendingBefore = pendingOf(await norn(w, ["story", "view", KEY, "--json"]));
     approveAtMerge = await norn(w, ["story", "approve", KEY, "--json"]);
@@ -395,6 +404,11 @@ describe("a story's pull request on GitHub", () => {
   test("a red CI sends the story back to build with the failing check's URL in its brief, and its rework is pushed through open-pr again", () => {
     expect(reworkBrief).toContain(`${WEB}/actions/runs/1/job/7`);
     expect(atReady.pushes).toBe(2);
+  });
+
+  test("at merge the draft PR is marked ready once, so a person can merge it", () => {
+    expect(atMerge.draft).toBe(false);
+    expect(atMerge.readies).toBe(1);
   });
 
   test("at merge, status names the PR's URL, the PR's head is the story's head, and approve pushed nothing", () => {

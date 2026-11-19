@@ -1063,12 +1063,6 @@
       "rejected": []
     },
     {
-      "kind": "noop",
-      "unit": "gh-212",
-      "rule": "unit.ended.done",
-      "reason": "ended done at integrate"
-    },
-    {
       "kind": "finish_story",
       "unit": null,
       "rule": "story.finish",
@@ -1084,12 +1078,6 @@
       "unit": null,
       "rule": "claim.release",
       "story": "gh-212"
-    },
-    {
-      "kind": "noop",
-      "unit": "gh-213",
-      "rule": "unit.ended.stuck",
-      "reason": "review: the agent reported stuck"
     },
     {
       "kind": "release_claim",

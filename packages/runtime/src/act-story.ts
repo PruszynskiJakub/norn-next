@@ -11,6 +11,7 @@ import { branchOf, ensureWorktree } from "./branches.ts";
 import type { TickContext } from "./env.ts";
 import { mirrorSpec } from "./inputs.ts";
 import { removeUnitLogs } from "./retention.ts";
+import { closeUnitRuns } from "./run-panes.ts";
 
 /**
  * Ids the host derives for receipts no decision carries, offset past any decide can mint from the
@@ -118,7 +119,7 @@ export async function flush(t: TickContext, d: DecisionOf<"flush">): Promise<Plu
 }
 
 /**
- * The item is closed first, the worktrees after, then their branches, and the units' logs last: a
+ * The item is closed first, then what the ended runs left open (their panes), the worktrees after, then their branches, and the units' logs last: a
  * closed item is what a person sees, and a worktree or branch left behind by a failure is only disk. Every
  * phase is idempotent (closing a closed item, removing a missing worktree or branch), so a failure is carried out again whole next tick under that
  * tick's id; the tick keeps the claim until it succeeds.
@@ -133,6 +134,14 @@ export async function finishStory(t: TickContext, d: DecisionOf<"finish_story">)
     const done = await tracker.perform({ kind: "close", id: key.id }, { receipt_id: d.effect_id });
     if (!done.ok) return done;
     closed = true;
+  }
+  // what the ended runs left open goes before their worktrees, so no pane is left in a folder that is gone;
+  // a pane left open is only clutter, so it is reported and never fails the finish
+  let panes = 0;
+  for (const unit of d.worktrees) {
+    const shut = await closeUnitRuns(env, unit);
+    panes += shut.closed;
+    t.problems?.push(...shut.problems);
   }
   const removed: string[] = [];
   if (env.slots.vcs.capabilities.worktrees) {
@@ -162,5 +171,5 @@ export async function finishStory(t: TickContext, d: DecisionOf<"finish_story">)
     logs += gone.removed;
     t.problems?.push(...gone.problems);
   }
-  return ok({ closed, removed, branches_removed: branchesRemoved, branches_kept: branchesKept, logs_removed: logs });
+  return ok({ closed, panes_closed: panes, removed, branches_removed: branchesRemoved, branches_kept: branchesKept, logs_removed: logs });
 }

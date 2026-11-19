@@ -1458,30 +1458,6 @@
   },
   "decisions": [
     {
-      "kind": "noop",
-      "unit": "gh-12",
-      "rule": "unit.ended.done",
-      "reason": "ended done at merge"
-    },
-    {
-      "kind": "noop",
-      "unit": "gh-12/01",
-      "rule": "unit.ended.done",
-      "reason": "ended done at integrate"
-    },
-    {
-      "kind": "noop",
-      "unit": "gh-12/03",
-      "rule": "unit.ended.done",
-      "reason": "ended done at integrate"
-    },
-    {
-      "kind": "noop",
-      "unit": "gh-12/02",
-      "rule": "unit.ended.done",
-      "reason": "ended done at integrate"
-    },
-    {
       "kind": "finish_story",
       "unit": null,
       "rule": "story.finish",

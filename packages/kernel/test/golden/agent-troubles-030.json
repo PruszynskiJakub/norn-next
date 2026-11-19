@@ -2757,12 +2757,6 @@
       "rejected": []
     },
     {
-      "kind": "noop",
-      "unit": "gh-42",
-      "rule": "unit.ended.stuck",
-      "reason": "died: retries 1/1 used at qa"
-    },
-    {
       "kind": "nudge",
       "unit": "gh-43",
       "rule": "agent.limited.nudge",

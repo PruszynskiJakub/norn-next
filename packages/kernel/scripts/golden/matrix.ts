@@ -180,7 +180,7 @@ export const MATRIX: Scenario[] = [
   ),
   scenario(
     "story-ended-outside",
-    "Stories ended from outside the workflow: an item closed mid-round marks the unit stuck, a change closed without merging parks the story for a person, and a story whose item closed before it started has nothing to do.",
+    "Stories ended from outside the workflow: an item closed mid-round marks the unit stuck, a change closed without merging parks the story for a person, and a story whose item closed before it started is decided nothing.",
     SLICE(),
     (w) => {
       seed(w, "gh-80", { workflow: "slice", step: "implement", item: item(80, "Story 80", { open: false }) });
@@ -188,7 +188,7 @@ export const MATRIX: Scenario[] = [
       w.story("gh-81").change = { id: 3, url: "https://forge.example/pr/3", state: "closed", draft: true, head_branch: "gh-81-x", base_branch: "main", head_sha: "c3", title: "Story 81" };
       w.stories.push({ key: "gh-82", item: item(82, "Story 82", { open: false }), change: null, claim: claim(w, "gh-82"), units: [{ id: "gh-82", state: null, version: null, receipts: [], session: null }], mailbox: [] });
     },
-    ["story.item_closed", "story.change_closed", "story.ended"],
+    ["story.item_closed", "story.change_closed"],
   ),
   scenario(
     "workflow-invalid",

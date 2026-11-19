@@ -83,7 +83,7 @@ describe("a story taken over by another holder, through the CLI alone", () => {
     expect(bob).toEqual(expect.arrayContaining(["receipts.apply", "story.finish", "claim.release"]));
     expect(bob.filter((r) => r.endsWith("!"))).toEqual([]);
     expect(ended).toMatchObject({ ended: "done" });
-    expect(aliceAfter.every((r) => r === "claim.held_elsewhere" || r === "unit.ended.done" || r === "story.ended")).toBe(true);
+    expect(aliceAfter.every((r) => r === "claim.held_elsewhere")).toBe(true);
     expect(aliceAfter).toContain("claim.held_elsewhere");
   });
 });

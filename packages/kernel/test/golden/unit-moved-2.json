@@ -1032,18 +1032,6 @@
           "attempt": 2
         }
       }
-    },
-    {
-      "kind": "noop",
-      "unit": "gh-212",
-      "rule": "unit.ended.done",
-      "reason": "ended done at integrate"
-    },
-    {
-      "kind": "noop",
-      "unit": "gh-213",
-      "rule": "unit.ended.stuck",
-      "reason": "review: the agent reported stuck"
     }
   ]
 }

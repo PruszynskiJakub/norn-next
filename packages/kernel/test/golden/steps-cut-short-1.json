@@ -2212,22 +2212,10 @@
   },
   "decisions": [
     {
-      "kind": "noop",
-      "unit": "gh-180",
-      "rule": "unit.ended.stuck",
-      "reason": "check run run-gh-180-1 at test ended without an outcome after 1/1 retries"
-    },
-    {
       "kind": "release_claim",
       "unit": null,
       "rule": "claim.release",
       "story": "gh-180"
-    },
-    {
-      "kind": "noop",
-      "unit": "gh-181",
-      "rule": "unit.ended.stuck",
-      "reason": "open-pr run run-gh-181-1 at open-pr ended without an outcome after 1/1 retries: forge: 401 bad credentials"
     },
     {
       "kind": "release_claim",
