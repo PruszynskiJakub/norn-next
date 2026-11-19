@@ -7,12 +7,26 @@ import { type DecisionOf, newRunState, type RunState } from "@norn/kernel";
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
 import { ensureWorktree } from "./branches.ts";
 import type { TickContext } from "./env.ts";
+import { worktreeOf } from "./inputs.ts";
 import { unitInFacts, writeAndCommit } from "./record.ts";
 
 const unitOf = (d: { unit: string | null; rule: string }): string => {
   if (d.unit === null) throw new Error(`${d.rule}: a unit decision without a unit`);
   return d.unit;
 };
+
+/**
+ * A session that ended is resumed in the unit's worktree, which a person may have removed while the
+ * unit was parked. Only a missing worktree is made again: ensuring an existing one catches its branch
+ * up, which would move files under a live agent, and refuses a branch that diverged from its remote
+ * copy, which would hold the answer back for good.
+ */
+async function restoreRemovedWorktree(t: TickContext, unit: string, handle: string): Promise<PluginResult<unknown>> {
+  if ((await t.env.launcher.alive?.(handle)) !== false) return ok(null);
+  // a git worktree always holds its `.git` entry, so an empty listing is a folder that is gone
+  if ((await t.env.ctx.files.list(worktreeOf(t.env, unit))).length > 0) return ok(null);
+  return ensureWorktree(t.env, unit);
+}
 
 /**
  * Answers a person sent (`answer.sent`) that this commit applies go to the live session first: the
@@ -24,15 +38,14 @@ const unitOf = (d: { unit: string | null; rule: string }): string => {
 async function deliverAnswers(t: TickContext, unit: string, through: number, before: RunState | null, undelivered: readonly string[]): Promise<PluginResult<unknown>> {
   const handle = before?.run?.session;
   if (!handle) return ok(null);
-  let worktreeReady = false;
+  let worktreeChecked = false;
   for (const r of unitInFacts(t.facts, unit)?.receipts ?? []) {
     if (r.seq > through || r.data.kind !== "answer.sent" || undelivered.includes(r.id)) continue;
-    // a session that ended is resumed in the worktree, which a person may have removed while the unit
-    // was parked; a dialog's keys go to a live pane, which resumes nothing
-    if (!worktreeReady && r.data.to !== "dialog") {
-      const worktree = await ensureWorktree(t.env, unit);
-      if (!worktree.ok) return worktree;
-      worktreeReady = true;
+    // a dialog's keys go to a live pane, which resumes nothing
+    if (!worktreeChecked && r.data.to !== "dialog") {
+      const restored = await restoreRemovedWorktree(t, unit, handle);
+      if (!restored.ok) return restored;
+      worktreeChecked = true;
     }
     // an answer that did not reach the agent must not be applied, or the unit unparks with nobody told
     // a dialog's answer is keys pressed in the pane; typed as a prompt it would reach the agent as words
