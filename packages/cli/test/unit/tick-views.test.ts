@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { ExecScript } from "@norn/conformance";
-import { CliContext, configPaths, ExitCode, machineDir, machineId, runCli } from "../../src/index.ts";
+import { ok, PLUGIN_API_VERSION, type StoreFactory } from "@norn/plugin-api";
+import { localStoreFactory } from "@norn/store-local";
+import { CliContext, configPaths, ExitCode, machineDir, machineId, type PluginImporter, runCli } from "../../src/index.ts";
 import { COMMON, HOME, LOCAL_CONFIG, machine, ROOT, type TestMachine } from "./support.ts";
 
 const PATHS = configPaths(HOME, ROOT);
@@ -130,6 +132,28 @@ function timedWatch(m: TestMachine, during: Record<number, () => Promise<void>> 
   return { events, ticks, gaps };
 }
 
+const LOCK = `${MACHINE}/plugins.lock`;
+const TIDY = `${ROOT}/.agents/workflows/tidy.yaml`;
+/** one agent step that nobody starts on its own: the unit parks and waits for a person */
+const TIDY_YAML = ["name: tidy", "start: work", "steps:", "  work:", "    agent: Do the work.", "    outcomes: { done: $done }", ""].join("\n");
+/** The local store as a shared one, so decide flushes a held story every tick, as it does over store-refs. */
+const sharedFactory: StoreFactory = {
+  configSchema: localStoreFactory.configSchema,
+  create(ctx, config) {
+    const store = localStoreFactory.create(ctx, config as Parameters<typeof localStoreFactory.create>[1]);
+    return Object.assign(Object.create(store), {
+      capabilities: { ...store.capabilities, shared: true },
+      sync: async () => ok({ fetched: 0 }),
+      flush: async () => ok({ pushed: false }),
+    });
+  },
+};
+const sharedStore: PluginImporter = async (name) => {
+  if (name !== "norn-store-shared") throw new Error(`Cannot find package '${name}'`);
+  const api = `^${PLUGIN_API_VERSION.split(".").slice(0, 2).join(".")}`;
+  return { plugin: { name: "shared", api, provides: { store: { shared: sharedFactory } } } };
+};
+
 describe("norn watch's cadence", () => {
   test("a tick that acted is followed at once, up to three in a row; its own receipts never wake the pause after", async () => {
     const m = repo();
@@ -140,6 +164,27 @@ describe("norn watch's cadence", () => {
     // the first four ticks each act (intake, round, ...); the fourth acting tick in a row waits the interval
     expect(w.ticks.slice(0, 4).every((t) => t.actions > 0)).toBe(true);
     expect(w.gaps()).toEqual([0, 0, 0, 30_000]);
+  });
+
+  test("a story in flight whose ticks only wait (a parked unit) waits out the whole interval after each", async () => {
+    const m = repo({ seed: { [PATHS.local]: `${CONFIG}kernel: { workflow: tidy }\n`, [TIDY]: TIDY_YAML } });
+    await addItem(m, "First");
+    const w = timedWatch(m);
+    await runCli(["watch", "--interval", "30s", "--max-ticks", "7", "--json"], m.io);
+    expect(w.ticks[3]?.lines).toEqual(["lt-1  agent.ready.manual → park"]);
+    expect(w.ticks.slice(4).every((t) => t.lines.every((l) => l.endsWith("→ noop")))).toBe(true);
+    expect(w.gaps()).toEqual([0, 0, 0, 30_000, 30_000, 30_000]);
+  });
+
+  test("with a shared store, the flush every tick of a held story makes no tick count as acting", async () => {
+    const lock = JSON.stringify({ format: 1, plugins: [{ name: "norn-store-shared", spec: "norn-store-shared@^1", version: "1.0.0", api: "^1.5" }] });
+    const config = `${CONFIG.replace("store: { use: local }", "store: { use: shared }")}plugins:\n  norn-store-shared: norn-store-shared@^1\nkernel: { workflow: tidy }\n`;
+    const m = repo({ seed: { [PATHS.local]: config, [LOCK]: lock, [TIDY]: TIDY_YAML }, importer: sharedStore });
+    await addItem(m, "First");
+    const w = timedWatch(m);
+    await runCli(["watch", "--interval", "30s", "--max-ticks", "7", "--json"], m.io);
+    expect(w.ticks[5]?.lines).toEqual(["lt-1  unit.parked → noop", "lt-1  store.flush → flush"]);
+    expect(w.gaps()).toEqual([0, 0, 0, 30_000, 30_000, 30_000]);
   });
 
   test("a tick that did nothing waits out the whole interval", async () => {

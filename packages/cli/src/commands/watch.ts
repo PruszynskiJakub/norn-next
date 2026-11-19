@@ -5,8 +5,9 @@
  * happens; stdout gets one summary when the loop ends.
  *
  * The interval is the longest a watch waits, not the pace of a story:
- * - a tick that carried out an action is followed at once, up to `SETTLE_TICKS` in a row, since its
- *   action usually leaves the next one ready (a report applied, a step to start);
+ * - a tick that moved a story on is followed at once, up to `SETTLE_TICKS` in a row, since its action
+ *   usually leaves the next one ready (a report applied, a step to start); a tick of only waiting
+ *   (noops, a shared store's flush, a claim renewed) pauses the whole interval;
  * - a receipt another process records during the pause (`norn done`, a person's answer) or a detached
  *   check that finishes rewrites the wake stamp, which ends the pause within about a second;
  * - before each tick the files the runtime is built from are read again, and a change rebuilds it, so a
@@ -128,8 +129,20 @@ const progress = (r: TickReport) => ({
   lines: tickLines(r),
 });
 
-/** A failed action is retried an interval later, never at once: what failed now (an outage) most likely fails again now. */
-const acted = (r: TickReport): boolean => r.outcomes.some((o) => o.ok);
+type ActionKind = TickReport["decisions"][number]["kind"];
+
+/**
+ * Kinds that only keep a story where it is: decide asks for them again on every tick a unit waits (an
+ * agent or check running, a unit parked or ended) or a shared store's story is held, so counting them
+ * would follow every pause with a burst of ticks that change nothing.
+ */
+const STANDING: ReadonlySet<ActionKind> = new Set<ActionKind>(["noop", "notify", "flush", "renew_claim"]);
+
+/**
+ * Whether the tick moved a story on, so the next one likely has work ready. A failed action is retried
+ * an interval later, never at once: what failed now (an outage) most likely fails again now.
+ */
+const acted = (r: TickReport): boolean => r.outcomes.some((o) => o.ok && !STANDING.has(o.decision.kind));
 
 export const watchCommand = defineCommand({
   name: "watch",
