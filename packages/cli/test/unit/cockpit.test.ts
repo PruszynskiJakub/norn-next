@@ -112,6 +112,107 @@ describe("norn status --watch", () => {
     expect((await receiptsOf(m)).at(-1)?.data).toMatchObject({ kind: "claim.taken", reason: "alice is away" });
   });
 
+  test("enter shows the story in full in place of the preview, esc goes back to the preview", async () => {
+    const m = configured();
+    await seedUnit(m, { step: AGENT_STEP });
+    const { io, frames } = terminal(m, ["\r", "\x1b", "q"]);
+    await runCli(["status", "--watch"], io);
+    const view = (await runCli(["story", "view", UNIT], m.io)).stdout.split("\n")[0] as string;
+    expect(frames[1]).toContain(`norn story view ${UNIT} — esc closes it`);
+    expect(frames[1]).toContain(view.slice(0, 30));
+    expect(frames[2]).toContain("LINKS");
+  });
+
+  test("g brings the pane of the story's live run in front through herdr", async () => {
+    const m = inPanes();
+    await seedUnit(m, { step: AGENT_STEP });
+    await launchedHere(m);
+    const { io, frames } = terminal(m, ["g", "q"]);
+    await runCli(["status", "--watch"], io);
+    expect(herdrCalls(m).filter((c) => c[1] === "focus")).toEqual([["agent", "focus", "4242@boot"]]);
+    expect(frames.at(-1)).toContain(`focused the pane of ${UNIT}`);
+  });
+
+  test("x rejects the gate with the reason typed in the footer", async () => {
+    const m = configured();
+    await seedUnit(m, { step: GATE_STEP, run: null });
+    const { io, frames } = terminal(m, ["x", "tests are thin\r", "q"]);
+    await runCli(["status", "--watch"], io);
+    expect((await receiptsOf(m)).find((x) => x.data.kind === "gate.decided")?.data).toMatchObject({ outcome: "reject", reason: "tests are thin" });
+    expect(frames.at(-1)).toContain(`ok: norn story reject ${UNIT}`);
+  });
+
+  test("2 lists the intake no tick took in yet, 3 the finished stories", async () => {
+    // a local tracker with nobody to assign to: every labelled open item is intake
+    const m = machine({ seed: { [configPaths(HOME, ROOT).local]: LOCAL_CONFIG.replace("{ label: norn }", "{ label: norn, assignee: null }") } });
+    await (await envOf(m)).slots.tracker.perform({ kind: "create", title: "Add search", body: "", labels: ["norn"] }, { receipt_id: "01JAAAAAAAAAAAAAAAAAAAAAAA" });
+    await seedUnit(m, { unit: "lt-2", step: AGENT_STEP, run: null, extra: { ended: "done" } });
+    const { io, frames } = terminal(m, ["2", "3", "q"]);
+    await runCli(["status", "--watch"], io);
+    expect(frames[1]).toContain("INTAKE 1");
+    expect(frames[1]).toContain("lt-1");
+    expect(frames[1]).toContain("Add search");
+    expect(frames[2]).toContain("DONE 1");
+    expect(frames[2]).toContain("lt-2");
+  });
+
+  test("i opens the story's issue with the system opener", async () => {
+    const gh = fakeGh(["norn"]);
+    const issue = { number: 1, url: "https://github.com/acme/app/issues/1", title: "Fix login", body: "", state: "OPEN", assignees: [], labels: [{ name: "norn" }], updatedAt: "2026-11-17T10:00:00Z" };
+    const script: ExecScript = (argv, o) => {
+      if (argv[0] === "open" || argv[0] === "xdg-open") return { stdout: "" };
+      return argv[0] === "gh" && argv[1] === "issue" && argv[2] === "view" ? { stdout: JSON.stringify(issue) } : gh.script(argv, o);
+    };
+    const m = machine({ seed: { [configPaths(HOME, ROOT).local]: GITHUB_CONFIG }, script });
+    await seedUnit(m, { unit: "gh-1", step: AGENT_STEP });
+    const { io, frames } = terminal(m, ["i", "q"]);
+    await runCli(["status", "--watch"], io);
+    expect(m.exec.calls.map((c) => c.argv).filter((a) => a[0] === "open" || a[0] === "xdg-open")).toEqual([[process.platform === "darwin" ? "open" : "xdg-open", issue.url]]);
+    expect(frames.at(-1)).toContain(`opened ${issue.url}`);
+  });
+
+  test("frames between are read from this machine's record alone: the code host is asked again on r, not every interval", async () => {
+    const gh = fakeGh(["norn"]);
+    const issue = { number: 1, url: "https://github.com/acme/app/issues/1", title: "Fix login", body: "", state: "OPEN", assignees: [], labels: [{ name: "norn" }], updatedAt: "2026-11-17T10:00:00Z" };
+    const script: ExecScript = (argv, o) => (argv[0] === "gh" && argv[1] === "issue" && argv[2] === "view" ? { stdout: JSON.stringify(issue) } : gh.script(argv, o));
+    const m = machine({ seed: { [configPaths(HOME, ROOT).local]: GITHUB_CONFIG }, script });
+    await seedUnit(m, { unit: "gh-1", step: AGENT_STEP });
+    const asked = () => m.exec.calls.filter((c) => c.argv[0] === "gh" && c.argv[1] === "issue" && c.argv[2] === "view").length;
+    const seen: number[] = [];
+    const frames: string[] = [];
+    const io: CliIo = {
+      ...m.io,
+      log: (line) => frames.push(line),
+      terminal: () => ({
+        keys: (async function* () {
+          await Bun.sleep(60);
+          seen.push(asked());
+          yield "r";
+          await Bun.sleep(60);
+          seen.push(asked());
+          yield "q";
+        })(),
+        columns: 120,
+        rows: 30,
+        color: false,
+        close: () => {},
+      }),
+    };
+    await runCli(["status", "--watch", "--interval", "5ms"], io);
+    expect(frames.length).toBeGreaterThan(4);
+    // once at start, once on r, whatever number of frames was read in between
+    expect(seen).toEqual([1, 2]);
+    expect(frames.at(-1)).toContain("Fix login");
+  });
+
+  test("inside herdr each frame's read writes the story's $norn sidebar token", async () => {
+    const m = inPanes({ HERDR_ENV: "1" });
+    await seedUnit(m, { step: GATE_STEP, run: null });
+    const { io } = terminal(m, []);
+    await runCli(["status", "--watch"], io);
+    expect(herdrCalls(m).filter((c) => c[1] === "report-metadata")).toEqual([["workspace", "report-metadata", "w1", "--source", "norn", "--token", "norn=● approve", "--ttl-ms", "15000"]]);
+  });
+
   test("a stdin that ends draws one frame and ends the cockpit", async () => {
     const m = configured();
     const { io, frames } = terminal(m, []);
