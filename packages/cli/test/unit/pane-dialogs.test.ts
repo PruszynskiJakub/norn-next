@@ -3,7 +3,7 @@ import type { ExecScript } from "@norn/conformance";
 import type { HarnessEvent } from "@norn/plugin-api";
 import { appendEvents } from "@norn/runtime";
 import { ExitCode, runCli } from "../../src/index.ts";
-import { AGENT_STEP, configured, envOf, RUN, receiptsOf, seedUnit, UNIT } from "./units.ts";
+import { AGENT_STEP, configured, envOf, GATE_STEP, RUN, receiptsOf, seedUnit, UNIT } from "./units.ts";
 import type { TestMachine } from "./support.ts";
 
 const json = (stdout: string): Record<string, unknown> => Bun.JSONL.parse(stdout)[0] as Record<string, unknown>;
@@ -81,5 +81,51 @@ describe("a run whose agent has sent no event, parked for the dialog in its pane
     expect({ exit: r.exit, code: json(r.stdout).code }).toEqual({ exit: ExitCode.refused, code: "dialog_unanswerable" });
     expect(json(r.stdout).do_instead).toContain(`norn run rerun ${UNIT}`);
     expect(await receiptsOf(m)).toEqual([]);
+  });
+});
+
+type Waiting = { for: string; text: string; next?: string } | null;
+const waitingIn = (stdout: string): Waiting => ((json(stdout).stories as Array<{ units: Array<{ waiting: Waiting }> }>)[0]?.units[0]?.waiting ?? null) as Waiting;
+
+describe("status and story view say what a parked unit waits for, never the rule that parked it", () => {
+  test("a permission park shows the call and the prompt, and the answer that lets it run", async () => {
+    const m = inPanes();
+    await seedUnit(m, { step: AGENT_STEP, extra: { parked: { reason: "agent.permission.park", since: "2026-11-17T10:00:00.000Z" } } });
+    await permissionOpen(m);
+    expect(waitingIn((await runCli(["status", "--json"], m.io)).stdout)).toEqual({
+      for: "permission",
+      text: "Bash(rm -rf build): Claude needs your permission to use Bash",
+      next: `norn story answer ${UNIT} <option> (1 allows it, no refuses it)`,
+    });
+    const md = (await runCli(["status"], m.io)).stdout;
+    expect(md).toContain("waits for permission: Bash(rm -rf build): Claude needs your permission to use Bash");
+    expect(md).not.toContain("agent.permission.park");
+    expect((await runCli(["story", "view", UNIT], m.io)).stdout).toContain(`→ norn story answer ${UNIT} <option>`);
+  });
+
+  test("a silent run's park tells the person to trust the folder in the pane", async () => {
+    const m = inPanes();
+    await seedUnit(m, { step: AGENT_STEP, extra: { parked: { reason: "agent.no_events.park", since: "2026-11-17T10:20:00.000Z" } } });
+    const w = waitingIn((await runCli(["status", "--json"], m.io)).stdout);
+    expect(w?.text).toContain("trust the folder there");
+    expect(w?.next).toBe(`norn story answer ${UNIT} 1, or norn run rerun ${UNIT} if the pane shows something else`);
+  });
+
+  test("an attended step names run start, a stuck park names rerun, and a gate shows its prompt", async () => {
+    const cases: Array<[string, string, Partial<Waiting & object>]> = [
+      [AGENT_STEP, "agent.ready.attended", { for: "person", next: `norn run start ${UNIT}` }],
+      [AGENT_STEP, "agent.died.manual", { for: "person", text: "its run ended without a report", next: `norn run rerun ${UNIT}` }],
+      [GATE_STEP, "gate.park", { for: "gate", next: `norn story approve ${UNIT}, or norn story reject ${UNIT} --reason "<what to change>"` }],
+    ];
+    for (const [step, reason, expected] of cases) {
+      const m = configured();
+      await seedUnit(m, { step, run: null, extra: { parked: { reason, since: "2026-11-17T10:00:00.000Z" } } });
+      const w = waitingIn((await runCli(["status", "--json"], m.io)).stdout);
+      expect([reason, w]).toMatchObject([reason, expected]);
+      expect(w?.text).not.toBe(reason);
+    }
+    const gate = configured();
+    await seedUnit(gate, { step: GATE_STEP, run: null, extra: { parked: { reason: "gate.park", since: "2026-11-17T10:00:00.000Z" } } });
+    expect(waitingIn((await runCli(["status", "--json"], gate.io)).stdout)?.text).toContain("Review the slice files");
   });
 });

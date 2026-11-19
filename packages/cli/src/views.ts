@@ -21,7 +21,13 @@ export interface UnitView {
   corrupt?: string;
   run: { id: string; executor: string; started_at: string; activity: string | null } | null;
   /** what a person is asked for, when anything */
-  waiting: { for: "gate" | "answer" | "permission" | "person"; text: string } | null;
+  waiting: {
+    for: "gate" | "answer" | "permission" | "person";
+    /** the question, prompt or reason itself, never a rule id */
+    text: string;
+    /** the command that answers it, when one does */
+    next?: string;
+  } | null;
   /** receipts taken but not yet applied by a tick */
   pending_receipts: number;
 }
@@ -49,16 +55,63 @@ export interface ProjectView {
   problems: string[];
 }
 
+/** Why a park a rule derived from facts waits for `norn run rerun`, said for a person. */
+const STUCK_PARKS: Readonly<Record<string, string>> = {
+  "agent.no_executor": "its step's executor is not configured",
+  "agent.died.manual": "its run ended without a report",
+  "agent.silent.manual": "its run went quiet without a report",
+  "agent.turn_ended.manual": "its run ended its turn without a report",
+  "agent.limited.manual": "its run came back from a usage limit without a report",
+  "agent.limited.unknown": "its run hit a usage limit with no reset time given",
+  "agent.retry.no_headless": "its run needs a fresh session, and its executor cannot run headless",
+  "agent.reported.rejected": "what its agent reported is not an outcome of its step",
+  "check.finished.rejected": "its check's outcome is not one the step declares",
+  "step.finished.rejected": "its step's outcome is not one the step declares",
+};
+
+/** What the unit waits on a person for, said as the question or prompt itself, and the command that answers it. */
 function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined): UnitView["waiting"] {
   const s = u.state;
   if (!s || s.ended === "done") return null;
-  if (s.ended) return { for: "person", text: `ended ${s.ended}${s.ended_reason ? `: ${s.ended_reason}` : ""}` };
-  // manual mode's park is lifted only by a person's start, so the view names the verb that does it
-  if (s.parked?.reason === "agent.ready.manual") return { for: "person", text: `${s.parked.reason}: start its agent with norn run start ${u.id}` };
-  if (s.parked) return { for: "person", text: s.parked.reason };
-  if (u.session?.ask) return { for: "answer", text: u.session.ask.question };
-  if (u.session?.permission) return { for: "permission", text: u.session.permission.prompt };
-  if (kind === "gate") return { for: "gate", text: prompt ?? s.step };
+  const id = u.id;
+  const rerun = `norn run rerun ${id}`;
+  if (s.ended) return { for: "person", text: `ended ${s.ended}${s.ended_reason ? `: ${s.ended_reason}` : ""}`, ...(s.ended === "stuck" && { next: rerun }) };
+  const reason = s.parked?.reason;
+  const permission = u.session?.permission;
+  // a park a rule derived from facts is named by its rule; the view says what that rule waits for
+  switch (reason) {
+    case undefined:
+      break;
+    case "agent.ready.manual":
+      return { for: "person", text: "manual mode: its agent waits for a person to start it", next: `norn run start ${id}` };
+    case "agent.ready.attended":
+      return { for: "person", text: "an attended step: its agent starts where a person works beside it", next: `norn run start ${id}` };
+    case "agent.ready.no_headless":
+      return { for: "person", text: "auto mode, but its executor cannot run headless: a person starts it in a pane", next: `norn run start ${id}` };
+    case "agent.asking.park":
+      return { for: "answer", text: u.session?.ask?.question ?? "its agent asks a question", next: `norn story answer ${id} "<answer>"` };
+    case "agent.permission.park":
+      return {
+        for: "permission",
+        text: permission ? (permission.call ? `${permission.call.tool}: ${permission.prompt}` : permission.prompt) : "its agent waits for a permission in its pane",
+        next: `norn story answer ${id} <option> (1 allows it, no refuses it)`,
+      };
+    case "agent.no_events.park":
+      return {
+        for: "permission",
+        text: "its agent runs in its pane but has sent no event, so its hooks never loaded: the pane most likely shows a trust prompt; trust the folder there",
+        next: `norn story answer ${id} 1, or ${rerun} if the pane shows something else`,
+      };
+    case "gate.park":
+      return { for: "gate", text: prompt ?? s.step, next: `norn story approve ${id}, or norn story reject ${id} --reason "<what to change>"` };
+    default: {
+      const stuck = STUCK_PARKS[reason];
+      return stuck !== undefined ? { for: "person", text: stuck, next: rerun } : { for: "person", text: reason };
+    }
+  }
+  if (u.session?.ask) return { for: "answer", text: u.session.ask.question, next: `norn story answer ${id} "<answer>"` };
+  if (permission) return { for: "permission", text: permission.call ? `${permission.call.tool}: ${permission.prompt}` : permission.prompt, next: `norn story answer ${id} <option>` };
+  if (kind === "gate") return { for: "gate", text: prompt ?? s.step, next: `norn story approve ${id}` };
   return null;
 }
 
@@ -114,7 +167,7 @@ export function unitLine(u: UnitView): string {
   const where = `${u.id}: ${u.step}${u.kind ? ` (${u.kind})` : ""}${u.attempt && u.attempt > 1 ? ` attempt ${u.attempt}` : ""}`;
   if (u.ended === "done") return `${where}, done`;
   const run = u.run ? `, run by ${u.run.executor}${u.run.activity ? ` (${u.run.activity})` : ""}` : "";
-  const waiting = u.waiting ? ` — waits for ${u.waiting.for}: ${u.waiting.text}` : "";
+  const waiting = u.waiting ? ` — waits for ${u.waiting.for}: ${u.waiting.text}${u.waiting.next ? ` → ${u.waiting.next}` : ""}` : "";
   return `${where}${run}${waiting}`;
 }
 
