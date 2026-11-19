@@ -127,6 +127,42 @@ describe("norn init: detection", () => {
   });
 });
 
+describe("norn init: the test command", () => {
+  const at = (name: string) => join(ROOT, name);
+  const pkg = (test?: string) => JSON.stringify({ name: "app", scripts: test === undefined ? {} : { test } });
+  const testOf = async (seed: Record<string, string>) => {
+    const { m, body } = await init([], { seed });
+    return { checks: (await written(m, PATHS.local)).checks, test: body.test };
+  };
+
+  test("detected from the lockfile beside package.json's test script, installing first, as a check runs in a fresh worktree", async () => {
+    expect((await testOf({ [at("package.json")]: pkg("jest"), [at("package-lock.json")]: "{}" })).checks).toEqual({ test: "npm ci && npm test" });
+    expect((await testOf({ [at("package.json")]: pkg("vitest"), [at("pnpm-lock.yaml")]: "" })).checks).toEqual({ test: "pnpm install --frozen-lockfile && pnpm test" });
+    expect((await testOf({ [at("package.json")]: pkg("vitest"), [at("yarn.lock")]: "" })).checks).toEqual({ test: "yarn install && yarn test" });
+    expect((await testOf({ [at("package.json")]: pkg("vitest") })).checks).toEqual({ test: "npm install && npm test" });
+    expect((await testOf({ [at("package.json")]: pkg("bun test --bail"), [at("bun.lock")]: "" })).checks).toEqual({ test: "bun install --frozen-lockfile && bun run test" });
+    expect((await testOf({ [at("package.json")]: pkg(), [at("bun.lock")]: "" })).checks).toEqual({ test: "bun install --frozen-lockfile && bun test" });
+  });
+
+  test("npm's placeholder is no test script; other build files and a Makefile's test target are read too", async () => {
+    expect((await testOf({ [at("package.json")]: pkg('echo "Error: no test specified" && exit 1'), [at("package-lock.json")]: "{}" })).checks).toBeUndefined();
+    expect((await testOf({ [at("Cargo.toml")]: "" })).checks).toEqual({ test: "cargo test" });
+    expect((await testOf({ [at("go.mod")]: "" })).checks).toEqual({ test: "go test ./..." });
+    expect((await testOf({ [at("pyproject.toml")]: "" })).checks).toEqual({ test: "pytest" });
+    expect((await testOf({ [at("Makefile")]: "build:\n\tcc x.c\ntest: build\n\t./x\n" })).checks).toEqual({ test: "make test" });
+    expect((await testOf({ [at("Makefile")]: "build:\n\tcc x.c\n" })).checks).toBeUndefined();
+  });
+
+  test("the answer and the markdown name where it came from, or that the checks run the default", async () => {
+    expect((await testOf({ [at("package.json")]: pkg("jest"), [at("package-lock.json")]: "{}" })).test).toEqual({ command: "npm ci && npm test", from: "package.json" });
+    expect((await testOf({})).test).toBeNull();
+    const found = await runCli(["init"], machine({ script: world({}), seed: { [at("go.mod")]: "" } }).io);
+    expect(found.stdout).toContain("- test: go test ./... (from go.mod), as checks.test");
+    const none = await runCli(["init"], machine({ script: world({}) }).io);
+    expect(none.stdout).toContain('- test: none detected, so the checks run bun test; norn config set checks.test "<command>" names yours');
+  });
+});
+
 describe("norn init: flags", () => {
   test("every flag wins over detection", async () => {
     const { m, body } = await init(["--tracker", "local", "--forge", "none", "--store", "refs", "--executor", "claude", "--runner", "headless", "--yes"], {

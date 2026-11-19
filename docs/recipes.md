@@ -164,7 +164,7 @@ When the merge conflicts, norn aborts it and refuses with the conflicting paths 
     means:
       done: "every criterion has a passing test"
   test:
-    check: npm ci && npm test
+    check: "{checks.test}"
     timeout: 15m
     outcomes: { pass: review, fail: { to: implement, max: 3 } }
   ready:
@@ -172,6 +172,7 @@ When the merge conflicts, norn aborts it and refuses with the conflicting paths 
     outcomes: { approve: merge, reject: implement }
 ```
 
+   A check's head is a shell command. `{checks.<name>}` in it stands for the command the config sets under that name: the pack's test steps run `{checks.test}`, which `norn init` detects from your build files and `norn config set checks.test "npm ci && npm test"` changes (default `bun test`).
 3. Commit it, or keep it local: norn loads the files in `.agents/workflows/` of the main checkout. `norn doctor` shows a workflow that does not load, naming the file and the step.
 4. Use it: label an item `norn:wf:docs`, or `norn story create "…" --workflow docs` with the local tracker.
 

@@ -18,7 +18,7 @@ import { AGENTS_DIR, configPaths, type Layer, layerFileName, OLD_REPO_CONFIG_FIL
 import type { ConfigLayer } from "../config/schema.ts";
 import { CliContext } from "../context.ts";
 import { doctorLines, runDoctor } from "../doctor.ts";
-import { choose, completable, completedText, detect, initLayer, initText, offerLine, withExcluded } from "../init.ts";
+import { choose, completable, completedText, detect, detectTestCommand, initLayer, initText, offerLine, testLine, withExcluded } from "../init.ts";
 import { refuse, rendered, usageError } from "../output.ts";
 import { wirePlugins } from "../wiring.ts";
 
@@ -124,7 +124,8 @@ export const initCommand = defineCommand({
       yes: opt.bool(args, "yes"),
     };
     const { choices, offered } = choose(old?.base ? { ...detected, base: old.base } : detected, flags);
-    const doc = withOldKernelKeys(initLayer(choices), old);
+    const test = await detectTestCommand(files, w.repo.root);
+    const doc = withOldKernelKeys(initLayer(choices, test), old);
     const text = current !== null && existing?.ok && existing.value ? completedText(current, existing.value, doc) : initText(doc);
 
     // checked as the next command will load it, with the other files, before a byte is written
@@ -159,6 +160,7 @@ export const initCommand = defineCommand({
       chose: choices,
       detected,
       offered,
+      test,
       exclude,
       ...(!commit && { excluded }),
       ...(migrated && { migrated }),
@@ -176,6 +178,7 @@ export const initCommand = defineCommand({
       `- executor: ${choices.executor} in ${choices.runner}${flags.executor || (choices.executor === "pi" ? detected.pi : detected.claude) ? "" : ` (${choices.executor} is not on PATH)`}`,
       `- mode: ${choices.mode}${flags.mode ? "" : choices.mode === "auto" ? ` (the ${choices.runner} runner has nobody beside the agent: agent steps start on their own)` : ` (agents run in ${choices.runner} beside a person: start each agent step with norn run start <unit>)`}`,
       `- base: ${choices.base}`,
+      testLine(test),
       `- .git/info/exclude: ${exclude === "added" ? `added ${excluded}` : exclude === "present" ? `${excluded} already there` : "untouched (team mode)"}`,
       ...offered.map((o) => offerLine(o, choices)),
       ...(old ? oldConfigLines(old) : []),

@@ -1,11 +1,14 @@
 /**
- * What `norn init` detects and chooses. Detection only reads (git's remote and branches, which tools
- * answer `--version`); every choice can be given as a flag instead, and a flag always wins. The herdr
+ * What `norn init` detects and chooses. Detection only reads (git's remote and branches, the build
+ * files that name the test command, which tools answer `--version`); every choice can be given as a flag instead, and a flag always wins. The herdr
  * runner is offered, never taken unasked: agents in panes are a person's choice, so it takes
  * `--runner herdr` or `--yes`. The executor is claude unless only pi is on PATH; pi beside claude is
  * offered, since which agent does the work is a person's choice too.
  */
-import type { HostContext } from "@norn/plugin-api";
+import { join } from "node:path";
+import { type HostContext, type HostFiles, parseJson } from "@norn/plugin-api";
+import { DEFAULT_CHECKS } from "@norn/runtime";
+import { Type } from "@sinclair/typebox";
 import { stringify } from "yaml";
 import type { ConfigLayer } from "./config/schema.ts";
 import { setKeyInText } from "./config/write.ts";
@@ -101,10 +104,59 @@ export function offerLine(offer: string, c: Choices): string {
   return `- offered: this shell runs inside ${offer}; norn config set executors.${c.executor}.runner ${offer} runs agents in its panes`;
 }
 
+export interface DetectedTestCommand {
+  command: string;
+  /** the file it was read from, such as `package.json` */
+  from: string;
+}
+
+/** The part of package.json init reads; a malformed one names no test script. */
+const PackageJson = Type.Object({ scripts: Type.Optional(Type.Record(Type.String(), Type.Unknown())) });
+
+/** npm's placeholder for a project without tests */
+const NPM_NO_TEST = /no test specified/;
+
+/**
+ * The repo's test command from its build files, or null when nothing says. A check runs in a fresh
+ * worktree with no installed dependencies, so a JS command installs first.
+ */
+export async function detectTestCommand(files: HostFiles, root: string): Promise<DetectedTestCommand | null> {
+  const read = (f: string) => files.read(join(root, f));
+  const has = async (f: string) => (await read(f)) !== null;
+  const pkgText = await read("package.json");
+  if (pkgText !== null) {
+    const pkg = parseJson(PackageJson, pkgText, "package.json");
+    const script = pkg.ok ? pkg.value.scripts?.test : undefined;
+    const hasScript = typeof script === "string" && !NPM_NO_TEST.test(script);
+    const from = "package.json";
+    if ((await has("bun.lock")) || (await has("bun.lockb"))) return { command: `bun install --frozen-lockfile && ${hasScript ? "bun run test" : "bun test"}`, from };
+    if (hasScript) {
+      if (await has("pnpm-lock.yaml")) return { command: "pnpm install --frozen-lockfile && pnpm test", from };
+      if (await has("yarn.lock")) return { command: "yarn install && yarn test", from };
+      return { command: (await has("package-lock.json")) ? "npm ci && npm test" : "npm install && npm test", from };
+    }
+  }
+  if (await has("Cargo.toml")) return { command: "cargo test", from: "Cargo.toml" };
+  if (await has("go.mod")) return { command: "go test ./...", from: "go.mod" };
+  if (await has("uv.lock")) return { command: "uv run pytest", from: "uv.lock" };
+  for (const f of ["pyproject.toml", "pytest.ini", "setup.py", "tox.ini"]) if (await has(f)) return { command: "pytest", from: f };
+  if (await has("mix.exs")) return { command: "mix test", from: "mix.exs" };
+  if (await has("gradlew")) return { command: "./gradlew test", from: "gradlew" };
+  if (await has("pom.xml")) return { command: "mvn test", from: "pom.xml" };
+  if (/^test\s*:/m.test((await read("Makefile")) ?? "")) return { command: "make test", from: "Makefile" };
+  return null;
+}
+
+/** init's line on the test command: what it found, or what the checks run without one. */
+export function testLine(test: DetectedTestCommand | null): string {
+  if (test) return `- test: ${test.command} (from ${test.from}), as checks.test`;
+  return `- test: none detected, so the checks run ${DEFAULT_CHECKS.test}; norn config set checks.test "<command>" names yours`;
+}
+
 export const INTAKE_LABEL = "norn";
 
 /** The config file init writes: every slot named, so a person reads what was chosen in one place. */
-export function initLayer(c: Choices): ConfigLayer {
+export function initLayer(c: Choices, test: DetectedTestCommand | null = null): ConfigLayer {
   return {
     format: 1,
     // a local tracker has nobody to assign to: every open item with the label is intake
@@ -114,6 +166,7 @@ export function initLayer(c: Choices): ConfigLayer {
     executors: { [c.executor]: { harness: c.executor, runner: c.runner } },
     base: c.base,
     kernel: { mode: c.mode },
+    ...(test && { checks: { test: test.command } }),
   };
 }
 
