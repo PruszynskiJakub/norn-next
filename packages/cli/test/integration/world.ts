@@ -198,7 +198,7 @@ export async function tickUntil(w: World, rules: string[], done: (u: UnitShown |
     if (done(await unitOf(w, key))) return;
     await Bun.sleep(300);
   }
-  throw new Error(`no convergence; rules: ${rules.join(", ")}`);
+  throw new Error(`no convergence; rules: ${rules.join(", ")}; unit: ${JSON.stringify(await unitOf(w, key))}`);
 }
 
 /** What the agent of each run noted, run by run in launch order of their files' names. */
