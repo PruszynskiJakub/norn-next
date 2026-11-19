@@ -61,11 +61,12 @@ async function checkDialog(env: RuntimeEnv, q: OpenQuestion, text: string): Prom
   if (!q.dialog || !run) return;
   const rerun = `answer it in the agent's pane, or start the step again with norn run rerun ${q.unit.unit}`;
   if (env.launcher.modesOf?.(run.executor)?.dialogKeys !== true) throw refuse(`${q.unit.unit}'s executor '${run.executor}' cannot answer a dialog in its pane`, rerun, "dialog_unanswerable");
-  if (!env.slots.executors[run.executor]?.dialogKeys?.(text)) throw refuse(`the dialog takes no ${JSON.stringify(text)}: answer with an option's number, yes or no`, `norn story answer ${q.unit.unit} 1`, "not_an_option");
-  const shown = run.session ? await env.launcher.dialogTakes?.(run.session, text) : null;
   // yes, never a number: on a menu whose cursor starts on its refusal, option 1 is the refusal
+  if (!env.slots.executors[run.executor]?.dialogKeys?.(text)) throw refuse(`the dialog takes no ${JSON.stringify(text)}: answer with an option's number, yes or no`, `norn story answer ${q.unit.unit} yes`, "not_an_option");
+  const shown = run.session ? await env.launcher.dialogTakes?.(run.session, text) : null;
+  // the hint is what the shown dialog takes: a pane read with no menu drawn yet takes no yes
   if (shown && !shown.takes)
-    throw refuse(`the dialog in ${q.unit.unit}'s pane takes no ${JSON.stringify(text)}: answer with an option's number as it shows, yes or no. It shows: ${shown.dialog.split("\n").filter((l) => l.trim() !== "").join(" | ")}`, `norn story answer ${q.unit.unit} yes`, "not_an_option");
+    throw refuse(`the dialog in ${q.unit.unit}'s pane takes no ${JSON.stringify(text)}: answer with an option's number as it shows, yes or no. It shows: ${shown.dialog.split("\n").filter((l) => l.trim() !== "").join(" | ")}`, `norn story answer ${q.unit.unit} ${shown.instead}`, "not_an_option");
 }
 
 async function answer(ctx: CliContext, key: string, text: string) {

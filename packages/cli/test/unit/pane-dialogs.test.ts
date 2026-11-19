@@ -74,6 +74,7 @@ describe("a permission prompt in an agent's pane", () => {
     await permissionOpen(m);
     const r = await runCli(["story", "answer", UNIT, "sure thing", "--json"], m.io);
     expect({ exit: r.exit, code: json(r.stdout).code }).toEqual({ exit: ExitCode.refused, code: "not_an_option" });
+    expect(json(r.stdout).do_instead).toBe(`norn story answer ${UNIT} yes`);
     expect(await receiptsOf(m)).toEqual([]);
   });
 });
@@ -143,6 +144,18 @@ describe("a dialog herdr reports blocking the agent before its first event", () 
     expect(json(r.stdout).do_instead).toBe(`norn story answer ${UNIT} yes`);
     expect(await receiptsOf(m)).toEqual([]);
     expect(m.exec.calls.some((c) => c.argv[0] === "herdr" && c.argv[2]?.startsWith("send-"))).toBe(false);
+  });
+
+  test("a pane that shows no menu yet refuses yes and points at an answer it takes, never at the refused command", async () => {
+    const drawing: ExecScript = (argv, o) => (argv[0] === "herdr" && argv[1] === "pane" && argv[2] === "read" ? { stdout: "Do you want to proceed?\n" } : blocked(argv, o));
+    const m = configured({ runner: "herdr", script: drawing });
+    await seedUnit(m, { step: AGENT_STEP });
+    await launchedHere(m);
+    await permissionOpen(m);
+    const r = await runCli(["story", "answer", UNIT, "yes", "--json"], m.io);
+    expect({ exit: r.exit, code: json(r.stdout).code }).toEqual({ exit: ExitCode.refused, code: "not_an_option" });
+    expect(json(r.stdout).do_instead).toBe(`norn story answer ${UNIT} 1`);
+    expect(await receiptsOf(m)).toEqual([]);
   });
 
   test("a run launched on another machine has its answer recorded unread: its pane is not here to read", async () => {

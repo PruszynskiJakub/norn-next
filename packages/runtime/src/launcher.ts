@@ -269,7 +269,7 @@ export class HarnessLauncher implements AgentLauncher {
     }
   }
 
-  async dialogTakes(handle: string, answer: string): Promise<{ takes: boolean; dialog: string } | null> {
+  async dialogTakes(handle: string, answer: string): Promise<{ takes: boolean; dialog: string; instead: string } | null> {
     const found = this.resolve(handle);
     if (!found.ok) return null;
     const { runner, harness } = found.value.executor;
@@ -278,7 +278,10 @@ export class HarnessLauncher implements AgentLauncher {
       if (!(await launchedHere(this.opts.ctx, found.value.handle.unit, found.value.handle.run_id))) return null;
       const shown = await runner.dialog(await currentRunnerHandle(this.opts.ctx, found.value.handle), { anyStatus: true });
       if (!shown.ok || shown.value === null) return null;
-      return { takes: harness.dialogKeys(answer, shown.value) !== null, dialog: shown.value };
+      const dialog = shown.value;
+      const takes = (a: string) => harness.dialogKeys?.(a, dialog) != null;
+      // no is offered last: it refuses what the agent asked for
+      return { takes: takes(answer), dialog, instead: ["yes", "1", "no"].find(takes) ?? "no" };
     } catch {
       return null;
     }
