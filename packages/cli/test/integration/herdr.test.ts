@@ -399,8 +399,9 @@ describe("init inside herdr", () => {
 
   beforeAll(async () => {
     w = await world("work");
-    fakeHerdr(w);
+    // gh first: it puts its bin on the process PATH, which would drop the fake herdr's
     fakeGh(w);
+    fakeHerdr(w);
     w.env.HERDR_ENV = "1";
     await sh(w.root, "git", "remote", "set-url", "origin", "https://github.com/acme/app.git");
     await norn(w, ["plugin", "add", TEST_PLUGIN, "--json"]);
