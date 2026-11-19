@@ -33,6 +33,23 @@ async function readFloor(m: TestMachine): Promise<string | null> {
   return r.value;
 }
 
+/**
+ * The machine with its store's floor file answered by `read` instead of the file: the n-th read
+ * (from 1) returns the file's text, null for none, or throws as an unreadable file would.
+ */
+function floorFileAnswers(m: TestMachine, read: (n: number) => string | null): void {
+  const host = m.io.hosts.host;
+  let n = 0;
+  m.io.hosts = {
+    ...m.io.hosts,
+    host: (r) => {
+      const h = host(r);
+      const files = h.files;
+      return { ...h, files: { ...files, read: (path: string) => (path.endsWith("/floor.json") ? Promise.resolve(read(++n)) : files.read(path)) } };
+    },
+  };
+}
+
 async function addItem(m: TestMachine, title: string): Promise<void> {
   const env = await new CliContext(m.io).runtimeEnv();
   const made = await env.slots.tracker.perform({ kind: "create", title, body: "", labels: ["norn"] }, { receipt_id: "01JAAAAAAAAAAAAAAAAAAAAAAA" });
@@ -76,12 +93,52 @@ describe("the norn version floor", () => {
 
   test("read-only commands still work below the floor and leave it where it is", async () => {
     const m = repo();
+    await addItem(m, "First");
+    expect((await runCli(["tick", "--json"], m.io)).exit).toBe(ExitCode.ok);
     await floorAt(m, "10.0.0");
-    for (const argv of [["status"], ["story", "list"], ["config", "show"]]) {
+    for (const argv of [["status"], ["story", "list"], ["story", "view", "lt-1"], ["config", "show"]]) {
       const r = await runCli([...argv, "--json"], m.io);
       expect({ argv, exit: r.exit }).toEqual({ argv, exit: ExitCode.ok });
     }
     expect(await readFloor(m)).toBe("10.0.0");
+  });
+
+  test("a floor the store cannot read lets the command act and says so on stderr", async () => {
+    const m = repo();
+    floorFileAnswers(m, () => {
+      throw new Error("disk gone");
+    });
+    const r = await runCli(["tick", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(r.stderr).toContain("norn version floor not checked");
+  });
+
+  test("a newer norn that raised the floor between the read and the raise still refuses this one", async () => {
+    const m = repo();
+    // the raise re-reads the floor under its lock and finds the newer norn's
+    floorFileAnswers(m, (n) => (n === 1 ? null : JSON.stringify({ version: "10.0.0" })));
+    await addItem(m, "First");
+    const r = await runCli(["tick", "--json"], m.io);
+    const body = json(r.stdout);
+    expect({ exit: r.exit, code: body.code, details: body.details }).toEqual({ exit: ExitCode.refused, code: "version_too_old", details: { running: "9.9.9", floor: "10.0.0" } });
+    const env = await new CliContext(m.io).runtimeEnv();
+    expect(await env.slots.store.listUnits()).toEqual({ ok: true, value: [] });
+  });
+
+  test("a paused watch counts each paused interval toward --max-ticks, so it ends", async () => {
+    const m = repo();
+    await floorAt(m, "10.0.0");
+    const lines: string[] = [];
+    let sleeps = 0;
+    m.io.log = (line) => lines.push(line);
+    m.io.sleep = async () => {
+      sleeps++;
+    };
+    const r = await runCli(["watch", "--interval", "30s", "--max-ticks", "3", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(json(r.stdout)).toMatchObject({ ticks: 0 });
+    expect(sleeps).toBe(2);
+    expect(lines.filter((l) => l.includes("paused"))).toHaveLength(1);
   });
 
   test("a build that names no version is never refused and records no floor", async () => {

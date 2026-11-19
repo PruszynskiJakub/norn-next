@@ -170,7 +170,7 @@ export const watchCommand = defineCommand({
   },
   optionHelp: {
     "--interval <duration>": `the longest pause between ticks, as 30s or 2m (default ${DEFAULT_INTERVAL})`,
-    "--max-ticks <n>": "stop after this many ticks",
+    "--max-ticks <n>": "stop after this many ticks; an interval paused below the store's version floor counts as one",
   },
   async run(ctx, args) {
     const interval = opt.str(args, "interval") ?? DEFAULT_INTERVAL;
@@ -188,17 +188,21 @@ export const watchCommand = defineCommand({
     const summary: WatchSummary = { ticks: 0, failed_actions: 0, skipped_locked: 0, interval };
     let settling = 0;
     let paused = false;
+    // a paused interval counts toward --max-ticks, or a scripted watch below the floor never ends
+    let pausedIntervals = 0;
     let floorNote: string | null = null;
     const noteFloor = (line: string) => {
       if (line !== floorNote) log(JSON.stringify({ floor: line }));
       floorNote = line;
     };
-    while (summary.ticks < max && !signal?.aborted) {
+    while (summary.ticks + pausedIntervals < max && !signal?.aborted) {
       if (summary.ticks > 0 || paused) await built.refresh(log);
       const refusal = await floorRefusal(built.env.slots.store, ctx.version, noteFloor);
       if (refusal) {
         if (!paused) log(JSON.stringify({ paused: refusal.body.code, error: refusal.body.error, do_instead: refusal.body.do_instead }));
         paused = true;
+        pausedIntervals++;
+        if (summary.ticks + pausedIntervals >= max) break;
         await sleep(ms, signal);
         continue;
       }
