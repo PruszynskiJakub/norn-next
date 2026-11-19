@@ -30,6 +30,9 @@
  * - trust: waits for keys in its pane before it fires any hook, as an agent behind a trust dialog
  *   does whose hooks have not loaded, then works as `work` does. The wait is read from
  *   TEST_AGENT_PLAN alone, since a plans file is read only after the first hooks.
+ * - report: the reports TEST_AGENT_REPORTS names for the visit (`"<step>#<attempt>"`, then
+ *   `"<step>"`): `{criteria?, tries}`, each try a `norn` verb's argv run in turn, the criteria
+ *   report written outside the worktree and passed to each try as `--criteria <file>`.
  * - logged-out: its start hook, then a line on stdout and an exit 1 before any prompt, as `claude -p`
  *   does without a login (TEST_AGENT_PLAN only: it exits before the brief that names the step).
  */
@@ -210,6 +213,24 @@ async function permission(): Promise<void> {
   await hook("end");
 }
 
+interface Reports {
+  criteria?: unknown[];
+  tries: string[][];
+}
+
+/** Each try in turn, every outcome noted as `try.<n>`: a refused try is what a test looks at. */
+async function report(step: string | undefined, attempt: number | undefined): Promise<void> {
+  const file = process.env.TEST_AGENT_REPORTS;
+  const all = (file && existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {}) as Record<string, Reports>;
+  const mine = all[`${step}#${attempt}`] ?? all[step ?? ""];
+  if (!mine) throw new Error(`the report plan has nothing for ${step}#${attempt}`);
+  // outside the worktree: a file left in it would make the done refused as uncommitted work
+  const criteria = join(notesDir, `criteria-${runId}.json`);
+  if (mine.criteria) await Bun.write(criteria, JSON.stringify(mine.criteria));
+  for (const [i, argv] of mine.tries.entries()) note(`try.${i + 1}`, await nornJson(mine.criteria ? [...argv, "--criteria", criteria] : argv));
+  await hook("end");
+}
+
 if (process.env.TEST_AGENT_ONLY === "stop.after-report") {
   note("stop.after-report", await hook("stop"));
   process.exit(0);
@@ -256,6 +277,7 @@ else if (plan === "findings") {
   note("done", await nornJson(["done", "changes_requested", "--findings", file]));
   await hook("end");
 } else if (plan === "permission") await permission();
+else if (plan === "report") await report(visit?.[1], visit ? Number(visit[2]) : undefined);
 else if (plan === "attended") {
   note("stop.before-report", await hook("stop"));
   note("done", await nornJson(["done", "done"]));
