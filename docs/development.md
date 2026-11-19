@@ -37,7 +37,7 @@ packages/store-refs       @norn/store-refs       a store on git refs (refs/norn/
 packages/harness-claude   @norn/harness-claude   the Claude Code harness: hooks in .claude/settings.local.json, launch, normalize, respond
 packages/harness-pi       @norn/harness-pi       the pi harness: an extension pi loads, launch, normalize, respond
 packages/runner-headless  @norn/runner-headless  agents as detached processes, output to a log
-packages/runner-herdr     @norn/runner-herdr     agents in Herdr panes, one workspace per story and one tab per run, closed by `close` (plugin API 1.17) once the run's unit is done with
+packages/runner-herdr     @norn/runner-herdr     agents in Herdr panes, one workspace per story and one tab per run, closed by `close` (plugin API 1.17) once the run's unit is done with; `focus`, `split` and `label` (plugin API 1.18) bring a run's pane in front, open the cockpit below a person's pane and write a story workspace's `$norn` sidebar token
 packages/pack-sdlc        @norn/pack-sdlc        the sdlc pack: workflows, shared files and skills, imported as text
 packages/conformance      @norn/conformance      contract suites (store, tracker, forge, harness), in-memory fakes, recorded-session replay
 packages/cli              @norn/cli              wiring + commands, the layered config, plugin install and lock, init and doctor; bin `norn` → src/main.ts

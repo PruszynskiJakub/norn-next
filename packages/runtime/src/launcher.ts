@@ -26,7 +26,7 @@
  * The handle is launcher-handle.ts's: executor, unit, run and the runner's own handle.
  */
 import { DEFAULT_KERNEL_CONFIG, reduceSession } from "@norn/kernel";
-import type { Harness, HostContext, NornPromptSource, PluginResult, Runner } from "@norn/plugin-api";
+import type { Harness, HostContext, NornPromptSource, PluginResult, Runner, RunnerSplitRequest } from "@norn/plugin-api";
 import { fail, markPrompt, ok, RUN_ENV } from "@norn/plugin-api";
 import { agentBinEnv, cliOfHookCommand } from "./agent-bin.ts";
 import { dialogInputId } from "./dialog.ts";
@@ -154,6 +154,7 @@ export class HarnessLauncher implements AgentLauncher {
       attended: r.attended,
       paneInput: r.paneInput && e.harness.capabilities.paneInput,
       dialogKeys: typeof e.runner.keys === "function" && typeof e.harness.dialogKeys === "function",
+      focus: typeof e.runner.focus === "function",
     };
   }
 
@@ -286,6 +287,35 @@ export class HarnessLauncher implements AgentLauncher {
     } catch {
       return null;
     }
+  }
+
+  async focus(handle: string): Promise<PluginResult<boolean>> {
+    const found = this.resolve(handle);
+    if (!found.ok) return found;
+    const { handle: h, executor } = found.value;
+    const runner = executor.runner;
+    if (!runner.focus) return fail("invalid", `${h.unit} run ${h.run_id} runs in ${runner.name}, which has no pane to bring in front`, false);
+    // a pane id names a pane only on the machine that opened it
+    if (!(await launchedHere(this.opts.ctx, h.unit, h.run_id))) return fail("invalid", `${h.unit} run ${h.run_id} was launched on another machine: its pane is there`, false);
+    return runner.focus(await currentRunnerHandle(this.opts.ctx, h));
+  }
+
+  async split(req: RunnerSplitRequest): Promise<PluginResult<{ handle: string }>> {
+    const runners = Object.values(this.opts.executors).map((e) => e.runner);
+    const opens = runners.find((r) => typeof r.split === "function");
+    if (!opens?.split) return fail("invalid", `no configured runner opens a pane a person sees (${[...new Set(runners.map((r) => r.name))].join(", ")})`, false);
+    return opens.split(req);
+  }
+
+  async label(workspace: string, text: string, ttlMs: number): Promise<PluginResult<boolean>> {
+    let shown = false;
+    for (const runner of new Set(Object.values(this.opts.executors).map((e) => e.runner))) {
+      if (!runner.label) continue;
+      const r = await runner.label(workspace, text, ttlMs);
+      if (!r.ok) return r;
+      shown ||= r.value;
+    }
+    return ok(shown);
   }
 
   /**

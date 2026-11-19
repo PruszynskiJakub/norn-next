@@ -4,7 +4,7 @@
  * tested with fakes; the runners and the hook ingestion that fill them live outside this package.
  */
 import type { BriefInputs, Decision, KernelConfig, SessionFacts } from "@norn/kernel";
-import type { HostContext, IntakeQuery, NornPlugin, PluginResult } from "@norn/plugin-api";
+import type { HostContext, IntakeQuery, NornPlugin, PluginResult, RunnerSplitRequest } from "@norn/plugin-api";
 import type { RepoWorkflows } from "./repo-workflows.ts";
 
 /** One slot as the config selects it: the provider's name and the config its factory validates. */
@@ -78,6 +78,8 @@ export interface ExecutorModes extends LauncherModes {
   paneInput: boolean;
   /** a dialog in the agent's pane (a permission or trust prompt) can be answered: the harness names its keys and the runner presses them */
   dialogKeys: boolean;
+  /** the runner can bring a run's pane in front of a person */
+  focus: boolean;
 }
 
 export interface AnswerOptions {
@@ -112,6 +114,15 @@ export interface AgentLauncher {
   alive?(handle: string): Promise<boolean | null>;
   /** the dialog the handle's pane shows, as its runner reads it; null when none shows or it cannot tell */
   dialog?(handle: string): Promise<string | null>;
+  /**
+   * Bring the handle's pane in front of a person; false when the pane is gone. Refused for a run whose
+   * runner has no pane, or one launched on another machine, whose pane id names nothing here.
+   */
+  focus?(handle: string): Promise<PluginResult<boolean>>;
+  /** Open a pane below the person's own through the first configured runner that opens panes; refused when none does. */
+  split?(req: RunnerSplitRequest): Promise<PluginResult<{ handle: string }>>;
+  /** Show `text` beside the story's group of runs in every runner that groups them; true when one showed it. */
+  label?(workspace: string, text: string, ttlMs: number): Promise<PluginResult<boolean>>;
   /**
    * The head of the log the handle's process wrote, where an agent nobody watches leaves why it
    * ended; null when it left none, or the launcher cannot read it.

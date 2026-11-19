@@ -2,8 +2,9 @@
  * The herdr runner: one herdr workspace per story (labelled with the request's `workspace`), one tab
  * per run labelled with its title, the agent started in the tab's pane with the launch env. A person
  * can watch and type, `send` types text and submits it, `keys` presses keys in the pane, as a
- * dialog there takes them, and `dialog` reads one while herdr reports the agent blocked on it. The
- * handle is herdr's pane id. `stop` ends the agent and leaves its tab: herdr closes a workspace with
+ * dialog there takes them, and `dialog` reads one while herdr reports the agent blocked on it. For
+ * a person, `focus` brings a run's pane in front, `split` opens norn's cockpit below their own pane,
+ * and `label` writes the `$norn` sidebar token of a story's workspace. The handle is herdr's pane id. `stop` ends the agent and leaves its tab: herdr closes a workspace with
  * its last pane, so closing each run's pane would give every run of a story a workspace of its own.
  *
  * `start` is idempotent by key. The key's record (`<dataDir>/runners/herdr/<key>.json`) is made with
@@ -88,7 +89,14 @@ const Created = Type.Object({ result: Type.Object({ root_pane: RootPane, tab: Ty
 const MaybeId = Type.Optional(Type.Union([Type.Integer(), Type.Null()]));
 const ProcessInfoAnswer = Type.Object({ result: Type.Object({ process_info: Type.Object({ foreground_process_group_id: MaybeId, shell_pid: MaybeId }) }) });
 type ProcessInfo = Static<typeof ProcessInfoAnswer>["result"]["process_info"];
-const PaneInfo = Type.Object({ result: Type.Object({ pane: Type.Object({ agent_status: Type.Optional(Type.String()) }) }) });
+const PaneInfo = Type.Object({ result: Type.Object({ pane: Type.Object({ agent_status: Type.Optional(Type.String()), tab_id: Type.Optional(Type.String()) }) }) });
+const SplitAnswer = Type.Object({ result: Type.Object({ pane: Type.Object({ pane_id: Type.String() }) }) });
+
+/** The share of the asking pane a split takes: enough for norn's cockpit, leaving the pane above its room. */
+const SPLIT_RATIO = "0.3";
+/** The source herdr files norn's sidebar tokens under, and the token's name (`$norn` in a sidebar row). */
+const TOKEN_SOURCE = "norn";
+const TOKEN = "norn";
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const isGone = (r: PluginResult<unknown>) => !r.ok && r.failure.code === "not_found";
@@ -420,6 +428,42 @@ export function createHerdrRunner(ctx: HostContext, config: HerdrConfig, deps: H
       await forget(path);
       await forget(launchScriptPath(ctx, key));
       return ok(ours);
+    },
+
+    async focus(handle) {
+      const info = await herdrJson(herdr, ["pane", "get", handle], PaneInfo);
+      if (isGone(info)) return ok(false);
+      if (!info.ok) return info;
+      const focused = await herdr(["agent", "focus", handle]);
+      if (focused.ok) return ok(true);
+      // herdr finds an agent target only where it recognized an agent; the pane's tab holds the run all the same
+      const tab = info.value.result.pane.tab_id;
+      if (herdrErrorCode(focused.failure.message) !== "agent_not_found" || !tab) return focused;
+      const shown = await herdr(["tab", "focus", tab]);
+      if (isGone(shown)) return ok(false);
+      return shown.ok ? ok(true) : shown;
+    },
+
+    async split(req) {
+      const at = req.beside ? ["--pane", req.beside] : [];
+      const env = Object.entries(req.env ?? {}).flatMap(([k, v]) => ["--env", `${k}=${v}`]);
+      const made = await herdrJson(herdr, ["pane", "split", ...at, "--direction", "down", "--ratio", SPLIT_RATIO, "--cwd", req.cwd, ...env, "--no-focus"], SplitAnswer);
+      if (!made.ok) return made;
+      const pane = made.value.result.pane.pane_id;
+      const named = await herdr(["pane", "rename", pane, req.title]);
+      if (!named.ok) return closeAfter(pane, named);
+      const ran = await herdr(["pane", "run", pane, shellJoin(req.argv)]);
+      return ran.ok ? ok({ handle: pane }) : closeAfter(pane, ran);
+    },
+
+    async label(workspace, text, ttlMs) {
+      const ws = await findWorkspace(workspace);
+      if (!ws.ok) return ws;
+      if (ws.value === null) return ok(false);
+      const ttl = String(Math.max(1, Math.round(ttlMs)));
+      const shown = await herdr(["workspace", "report-metadata", ws.value, "--source", TOKEN_SOURCE, "--token", `${TOKEN}=${text}`, "--ttl-ms", ttl]);
+      if (isGone(shown)) return ok(false);
+      return shown.ok ? ok(true) : shown;
     },
 
     async stop(handle) {
