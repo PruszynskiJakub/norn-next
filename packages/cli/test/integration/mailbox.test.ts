@@ -8,7 +8,7 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { hostname } from "node:os";
 import { join } from "node:path";
-import { type NornOut, norn, sh, TEST_PLUGIN, type UnitShown, unitOf, type World, world } from "./world.ts";
+import { type NornOut, norn, otherMachine, TEST_PLUGIN, type UnitShown, unitOf, type World, world } from "./world.ts";
 
 const KEY = "lt-1";
 const SLOW = 240_000;
@@ -23,14 +23,6 @@ async function setUpRefs(w: World): Promise<void> {
   if (init.code !== 0) throw new Error(`init: ${init.stdout}${init.stderr}`);
   mkdirSync(join(w.root, ".agents", "workflows"), { recursive: true });
   writeFileSync(join(w.root, ".agents", "workflows", "gated.yaml"), GATED);
-}
-
-/** A second clone of `a`'s remote with a norn home of its own: another machine. */
-async function otherMachine(a: World): Promise<World> {
-  const root = join(a.dir, "repo-b");
-  const home = join(a.dir, "home-b");
-  await sh(a.dir, "git", "clone", "-q", a.remote, root);
-  return { ...a, root, home, env: { ...a.env, NORN_HOME_DIR: home } };
 }
 
 async function tickAs(w: World, env: Record<string, string>, rules: string[]): Promise<void> {
