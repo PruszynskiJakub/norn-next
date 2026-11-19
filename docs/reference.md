@@ -131,12 +131,15 @@ norn plugin update <name>
 
 ##### `norn status`
 
-Show every story and unit, read-only; --segment: one line for herdr's tab bar
+Show every story and unit, read-only; --watch: the live cockpit; --segment: one line for herdr's tab bar
 
 ```sh
-norn status | norn status --segment [--ttl 30s]
+norn status | norn status --watch [--interval 5s] [--pane] | norn status --segment [--ttl 30s]
 ```
 
+- `--watch`: the live cockpit: what needs you and every story, acted on by key; q or Esc quits
+- `--interval <duration>`: with --watch: how often it reads the stories again (default 5s)
+- `--pane`: with --watch: open it in a herdr pane below this one, leaving the focus here
 - `--segment`: one line for herdr's tab bar, empty outside a norn repo; inside herdr also each story's $norn sidebar token
 - `--ttl <duration>`: with --segment: how long a sidebar token stays without the next segment (default 30s)
 

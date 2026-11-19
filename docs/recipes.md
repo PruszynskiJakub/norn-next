@@ -253,6 +253,10 @@ The herdr runner opens one Herdr workspace per story and one tab per run, labell
 
 `norn run attach <unit>` brings the pane of a unit's live run in front, and `norn run attach --next` the agent that has waited on you longest.
 
+## Keep norn's cockpit in Herdr
+
+`norn status --watch` is the cockpit: what needs you (your turn, an answer, a gate, a stuck unit), then one row per story, the selected row's story beside it, and the keys its row offers in the footer. Each key runs the norn command you would type: `s` is `norn run start`, `a` is `norn story answer`, `y` and `x` are `norn story approve` and `reject`, `u` is `norn run rerun`, `t` is `norn story take`, `g` is `norn run attach`, `enter` shows `norn story view`, and `o` and `i` open the PR and the issue; `?` lists them all. `--pane` opens it in a pane below the one you are in, leaving the focus where it was.
+
 ## Share run data with a team
 
 ```sh
