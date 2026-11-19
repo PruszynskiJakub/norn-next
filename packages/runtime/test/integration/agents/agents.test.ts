@@ -48,8 +48,10 @@ describe("an agent step and a check, both detached", () => {
     expect(noteOf(m, runId, "write.inside")).toEqual({ kind: "allow" });
     expect(noteOf(m, runId, "write.run-state")).toMatchObject({ kind: "deny", reason: expect.stringContaining("run state") });
     expect(noteOf(m, runId, "stop.before-report")).toMatchObject({ kind: "block", reason: expect.stringContaining("norn done") });
-    await waitUntil(async () => noteOf(m, runId, "done") !== undefined);
-    expect(noteOf(m, runId, "done")).toMatchObject({ code: 0 });
+    // the report is its receipt; the agent's own note of `norn done` returning may never be written,
+    // since the tick that applies the report stops the agent, which can be before the command returns
+    expect(record.receipts.filter((r) => r.data.kind === "run.reported" && r.data.run_id === runId).map((r) => (r.data.kind === "run.reported" ? r.data.verb : ""))).toContain("done");
+    expect(noteOf(m, runId, "done") ?? { code: 0 }).toMatchObject({ code: 0 });
     // the tick applying the report stopped the agent: a headless run the unit has left works no more
     expect(await m.env.launcher.alive?.(started?.data.kind === "run.started" ? (started.data.session as string) : "")).toBe(false);
     // a retried `norn done` is the same report, wherever the unit has moved since
@@ -133,9 +135,8 @@ describe("an agent that asks a person", () => {
     expect(rules(m).filter((r) => r.includes("died"))).toEqual([]);
     expect(noteOf(m, runId, "answered")).toMatchObject({ session: `s-${runId}`, prompt: expect.stringContaining("Blue.") });
     expect(noteOf(m, runId, "resume.prompt")).toEqual({ kind: "allow" });
-    // the agent notes its report only once `norn done` returns, which can be after the tick has applied it
-    await waitUntil(async () => noteOf(m, runId, "done") !== undefined);
-    expect(noteOf(m, runId, "done")).toMatchObject({ code: 0 });
+    // the agent's note of `norn done` returning may never be written: the tick that applies the report stops it
+    expect(noteOf(m, runId, "done") ?? { code: 0 }).toMatchObject({ code: 0 });
     const record = await unitOf(m, UNIT);
     expect(record.receipts.filter((r) => r.data.kind === "run.reported").map((r) => (r.data.kind === "run.reported" ? r.data.verb : ""))).toEqual(["ask", "done"]);
   }, 90_000);
