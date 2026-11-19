@@ -142,6 +142,12 @@ describe("update-branch", () => {
     expect(h.lines().some((l) => l.startsWith("fetch") || l.startsWith("merge "))).toBe(false);
   });
 
+  test("uncommitted changes are refused naming each path, so the person knows what to commit or remove", async () => {
+    const h = host(storyRouter((line) => (line.startsWith("status --porcelain") ? { stdout: " M r.txt\0?? notes.txt\0R  new.txt\0old.txt\0" } : undefined), { head: HEAD }));
+    const r = await updateBranch.run(input({}), h.ctx);
+    expect(r.ok ? null : r.failure.message).toBe(`update-branch: ${WT} has uncommitted changes: new.txt, notes.txt, old.txt, r.txt`);
+  });
+
   test("a worktree on another branch than the host's is refused", async () => {
     const h = host(storyRouter(() => undefined, { head: HEAD }));
     const r = await updateBranch.run(input({}, { branch: "gh-12-other" }), h.ctx);

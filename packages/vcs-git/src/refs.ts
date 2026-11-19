@@ -142,7 +142,12 @@ export async function uncommitted(ctx: HostContext, root: string, path: string):
   if (!list.value.some((w) => samePath(w.path, path))) return ok([]);
   const st = await git(ctx, path, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]);
   if (st.code !== 0) return gitFailure(st, "status");
-  const fields = st.stdout.split("\0");
+  return ok(statusPaths(st.stdout));
+}
+
+/** The paths of `git status --porcelain=v1 -z` output, sorted; a rename names both of its sides. */
+function statusPaths(stdout: string): string[] {
+  const fields = stdout.split("\0");
   const paths = new Set<string>();
   for (let i = 0; i < fields.length; i++) {
     const entry = fields[i] as string;
@@ -154,8 +159,11 @@ export async function uncommitted(ctx: HostContext, root: string, path: string):
       if (from) paths.add(from);
     }
   }
-  return ok([...paths].sort());
+  return [...paths].sort();
 }
+
+/** How many uncommitted paths a refusal names before it counts the rest. */
+const PATHS_SHOWN = 10;
 
 /**
  * Why `cwd` cannot take a merge now, or null when it can: someone's merge or rebase in progress (a
@@ -165,9 +173,12 @@ export async function notReady(ctx: HostContext, cwd: string): Promise<PluginRes
   const op = await stoppedOperation(ctx, cwd);
   if (!op.ok) return op;
   if (op.value !== null) return ok(`a ${op.value} is in progress in ${cwd}`);
-  const st = await git(ctx, cwd, ["status", "--porcelain", "--untracked-files=normal"]);
+  const st = await git(ctx, cwd, ["status", "--porcelain=v1", "-z", "--untracked-files=normal"]);
   if (st.code !== 0) return gitFailure(st, "status");
-  return ok(st.stdout.trim() === "" ? null : `${cwd} has uncommitted changes`);
+  const paths = statusPaths(st.stdout);
+  if (paths.length === 0) return ok(null);
+  const named = paths.slice(0, PATHS_SHOWN).join(", ") + (paths.length > PATHS_SHOWN ? ` and ${paths.length - PATHS_SHOWN} more` : "");
+  return ok(`${cwd} has uncommitted changes: ${named}`);
 }
 
 /** Paths a stopped merge left unmerged, sorted. */
