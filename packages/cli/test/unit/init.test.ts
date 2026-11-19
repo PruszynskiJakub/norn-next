@@ -323,6 +323,54 @@ describe("norn init: the person's own skills in the main checkout", () => {
     expect(await m.files.read(`${ROOT}/.agents/skills/norn-fsd/SKILL.md`)).toBe(FSD);
     expect(await m.files.read(`${ROOT}/.agents/skills/norn-retro/SKILL.md`)).toBe("my retro\n");
   });
+
+  test("norn doctor removes a skill and a skill file the pack no longer has, and its link, and leaves the repo's own", async () => {
+    const { m } = await init([], { w: { tools: ["claude"] } });
+    // what an older norn left: its marked copy of a skill this pack dropped, linked and listed in the harness folder's ignore file
+    const mark = (await m.files.read(`${ROOT}/.agents/skills/norn-fsd/.gitignore`)) as string;
+    await m.files.write(`${ROOT}/.agents/skills/norn-gone/.gitignore`, mark);
+    await m.files.write(`${ROOT}/.agents/skills/norn-gone/SKILL.md`, "# gone\n");
+    await m.files.write(`${ROOT}/.agents/skills/norn-gone/refs/more.md`, "more\n");
+    await m.files.symlink?.("../../.agents/skills/norn-gone", `${ROOT}/.claude/skills/norn-gone`);
+    const ignore = (await m.files.read(`${ROOT}/.claude/skills/.gitignore`)) as string;
+    await m.files.write(`${ROOT}/.claude/skills/.gitignore`, `${ignore}/norn-gone\n`);
+    await m.files.write(`${ROOT}/.agents/skills/norn-fsd/dropped.md`, "a file the pack dropped\n");
+    // the repo's own skill, not the pack's, linked the same way and committed
+    await m.files.write(`${ROOT}/.agents/skills/mine/SKILL.md`, "# mine\n");
+    await m.files.symlink?.("../../.agents/skills/mine", `${ROOT}/.claude/skills/mine`);
+
+    const r = await runCli(["doctor", "--json"], m.io);
+    expect((json(r.stdout).checks as Array<{ name: string; ok: boolean }>).find((c) => c.name === "skills")?.ok).toBe(true);
+    expect(await m.files.list(`${ROOT}/.agents/skills/norn-gone`)).toEqual([]);
+    expect(await m.files.readLink(`${ROOT}/.claude/skills/norn-gone`)).toBeNull();
+    expect((await m.files.read(`${ROOT}/.claude/skills/.gitignore`))?.split("\n")).not.toContain("/norn-gone");
+    expect(await m.files.read(`${ROOT}/.agents/skills/norn-fsd/dropped.md`)).toBeNull();
+    expect(await m.files.read(`${ROOT}/.agents/skills/norn-fsd/SKILL.md`)).toBe(FSD);
+    expect(await m.files.read(`${ROOT}/.agents/skills/mine/SKILL.md`)).toBe("# mine\n");
+    expect(await m.files.readLink(`${ROOT}/.claude/skills/mine`)).toBe("../../.agents/skills/mine");
+  });
+
+  test("the skills check names the folders it kept as the repo's own, and how to take norn's copy instead", async () => {
+    const { body } = await init([], { w: { tools: ["claude"] }, seed: { [`${ROOT}/.agents/skills/norn-retro/SKILL.md`]: "my retro\n" } });
+    const skills = (body.doctor as { checks: Array<{ name: string; ok: boolean; detail?: string }> }).checks.find((c) => c.name === "skills");
+    expect(skills?.ok).toBe(true);
+    const count = Object.keys(SDLC_PACK.skills).length;
+    expect(skills?.detail).toContain(`${count - 1} of ${count} pack skills`);
+    expect(skills?.detail).toContain("norn-retro");
+    expect(skills?.detail).toContain("delete");
+  });
+
+  test("a skills folder norn cannot write fails the check, with what to do", async () => {
+    const m = machine({ script: world({ tools: ["claude"] }) });
+    await runCli(["init", "--json"], m.io);
+    await m.files.write(`${ROOT}/.agents/skills/norn-fsd/SKILL.md`, "an older norn's fsd\n");
+    m.files.failWrites(true);
+    const r = await runCli(["doctor", "--json"], m.io);
+    m.files.failWrites(false);
+    const skills = (json(r.stdout).checks as Array<{ name: string; ok: boolean; do_instead?: string }>).find((c) => c.name === "skills");
+    expect(skills?.ok).toBe(false);
+    expect(skills?.do_instead).toBe(`make ${ROOT} writable, then norn doctor`);
+  });
 });
 
 describe("the old norn's repo-local config", () => {

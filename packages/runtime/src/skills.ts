@@ -49,6 +49,45 @@ async function writeCopy(files: HostFiles, dir: string, content: Readonly<Record
     await files.write(path, text);
     changed.push(path);
   }
+  // a copy outlives a launch in the main checkout, so a file the pack dropped would stay readable
+  const keep = new Set([IGNORE_FILE, ...Object.keys(content)]);
+  for (const rel of await filesUnder(files, dir)) {
+    if (keep.has(rel)) continue;
+    await files.remove(`${dir}/${rel}`);
+    changed.push(`${dir}/${rel}`);
+  }
+}
+
+/** Every file below `dir`, relative to it. A folder reads as no file, so it is walked into instead. */
+async function filesUnder(files: HostFiles, dir: string, prefix = ""): Promise<string[]> {
+  const found: string[] = [];
+  for (const name of await files.list(dir)) {
+    const path = `${dir}/${name}`;
+    if ((await readOr(files, path)) !== null) found.push(`${prefix}${name}`);
+    else found.push(...(await filesUnder(files, path, `${prefix}${name}/`)));
+  }
+  return found;
+}
+
+/**
+ * Remove norn's copy of a skill the pack no longer has. The mark goes last, so a removal cut short
+ * is still norn's and is finished next time.
+ */
+async function removeCopy(files: HostFiles, dir: string, changed: string[]): Promise<void> {
+  for (const rel of (await filesUnder(files, dir)).filter((r) => r !== IGNORE_FILE)) {
+    await files.remove(`${dir}/${rel}`);
+    changed.push(`${dir}/${rel}`);
+  }
+  await files.remove(`${dir}/${IGNORE_FILE}`);
+  changed.push(`${dir}/${IGNORE_FILE}`);
+}
+
+/** Remove every marked copy in `dir` whose skill is not in `skills`; a folder without the mark is the repo's. */
+async function pruneCopies(files: HostFiles, dir: string, skills: PackSkills, changed: string[]): Promise<void> {
+  for (const name of await files.list(dir)) {
+    if (name in skills || !marked(await readOr(files, `${dir}/${name}/${IGNORE_FILE}`))) continue;
+    await removeCopy(files, `${dir}/${name}`, changed);
+  }
 }
 
 type Linker = Required<Pick<HostFiles, "symlink" | "readLink">>;
@@ -69,8 +108,8 @@ async function linkSkill(files: HostFiles & Linker, dir: string, name: string, t
 }
 
 /**
- * Write every skill to `<worktree>/.agents/skills/` and make it reachable from `skillsDir`, and
- * answer the paths written. A `skillsDir` that is not a plain relative folder is refused: the links
+ * Write every skill to `<worktree>/.agents/skills/` and make it reachable from `skillsDir`, remove
+ * norn's copies and links of skills the pack no longer has, and answer the paths written or removed. A `skillsDir` that is not a plain relative folder is refused: the links
  * climb out of it by its depth.
  */
 export async function installSkills(files: HostFiles, worktree: string, skillsDir: string, skills: PackSkills): Promise<string[]> {
@@ -80,18 +119,47 @@ export async function installSkills(files: HostFiles, worktree: string, skillsDi
   for (const [name, content] of Object.entries(skills)) {
     if (!(await repoOwned(files, `${own}/${name}`))) await writeCopy(files, `${own}/${name}`, content, changed);
   }
+  await pruneCopies(files, own, skills, changed);
   if (skillsDir === SKILLS_DIR) return changed;
   const dir = `${worktree}/${skillsDir}`;
   if (!files.symlink || !files.readLink) {
     for (const [name, content] of Object.entries(skills)) if (!(await repoOwned(files, `${dir}/${name}`))) await writeCopy(files, `${dir}/${name}`, content, changed);
+    await pruneCopies(files, dir, skills, changed);
     return changed;
   }
   const linker = files as HostFiles & Linker;
   const up = "../".repeat(skillsDir.split("/").length);
   const linked: string[] = [];
   for (const name of Object.keys(skills)) if (await linkSkill(linker, dir, name, `${up}${SKILLS_DIR}/${name}`, changed)) linked.push(name);
+  await pruneLinks(linker, worktree, dir, up, skills, changed);
   await ignoreLinks(files, dir, linked, changed);
   return changed;
+}
+
+/**
+ * Remove norn's link to a skill the pack no longer has, so it neither lingers in the agent's skills
+ * nor shows to git once the ignore file stops naming it. A link is norn's only when norn's ignore
+ * file names it and it still points at its own `.agents` copy; a link to a skill the repo keeps there
+ * is left, as the repo may have committed it.
+ */
+async function pruneLinks(files: HostFiles & Linker, worktree: string, dir: string, up: string, skills: PackSkills, changed: string[]): Promise<void> {
+  const ignore = await readOr(files, `${dir}/${IGNORE_FILE}`);
+  if (!marked(ignore)) return;
+  for (const line of (ignore as string).split("\n").slice(1)) {
+    const name = line.startsWith("/") ? line.slice(1) : "";
+    if (name === "" || name === IGNORE_FILE || name in skills) continue;
+    if ((await files.readLink(`${dir}/${name}`)) !== `${up}${SKILLS_DIR}/${name}`) continue;
+    if (await repoOwned(files, `${worktree}/${SKILLS_DIR}/${name}`)) continue;
+    await files.remove(`${dir}/${name}`);
+    changed.push(`${dir}/${name}`);
+  }
+}
+
+/** The pack's skills whose folder in `<worktree>/.agents/skills` is the repo's own, which installSkills leaves as it is. */
+export async function repoSkills(files: HostFiles, worktree: string, skills: PackSkills): Promise<string[]> {
+  const kept: string[] = [];
+  for (const name of Object.keys(skills)) if (await repoOwned(files, `${worktree}/${SKILLS_DIR}/${name}`)) kept.push(name);
+  return kept;
 }
 
 /**
@@ -110,10 +178,9 @@ export function skillLinks(skillsDir: string | undefined, skills: PackSkills): s
  * repo's and is never rewritten.
  */
 async function ignoreLinks(files: HostFiles, dir: string, linked: readonly string[], changed: string[]): Promise<void> {
-  if (linked.length === 0) return;
   const path = `${dir}/${IGNORE_FILE}`;
   const current = await readOr(files, path);
-  if (current !== null && !marked(current)) return;
+  if (current === null ? linked.length === 0 : !marked(current)) return;
   const text = `${OWNER_MARK}\n/${IGNORE_FILE}\n${linked.map((n) => `/${n}`).join("\n")}\n`;
   if (current === text) return;
   await files.write(path, text);

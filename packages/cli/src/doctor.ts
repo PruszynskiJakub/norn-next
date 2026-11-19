@@ -8,7 +8,7 @@
  * failure is the one to fix. `init` runs the same checks.
  */
 import { RUN_ENV } from "@norn/plugin-api";
-import { installSkills, REPO_WORKFLOWS_DIR, repoFileOf, type RuntimeEnv, SKILLS_DIR, shellQuote } from "@norn/runtime";
+import { installSkills, REPO_WORKFLOWS_DIR, repoFileOf, repoSkills, type RuntimeEnv, SKILLS_DIR, shellQuote } from "@norn/runtime";
 import type { NornConfig } from "./config/schema.ts";
 import type { CliContext } from "./context.ts";
 import { GIT_UPGRADE, gitTooOld, MIN_GIT_TEXT } from "./git-version.ts";
@@ -187,7 +187,10 @@ async function skillsCheck(env: RuntimeEnv): Promise<DoctorCheck> {
   });
   if (r.check) return { ...r.check, do_instead: r.check.do_instead ?? `make ${root} writable, then norn doctor` };
   const count = Object.keys(env.slots.pack.skills).length;
-  return passed("skills", `${count} pack skills in ${dirs.join(", ")}${r.value ? ` (${r.value} files written)` : ""}`);
+  // a repo set up by an older norn may have committed whole copies, which read as its own and never update
+  const kept = await repoSkills(env.ctx.files, root, env.slots.pack.skills);
+  const keptText = kept.length ? `; kept the repo's own ${kept.join(", ")} (delete a folder from ${SKILLS_DIR} and run norn doctor to take norn's copy)` : "";
+  return passed("skills", `norn's copy of ${count - kept.length} of ${count} pack skills in ${dirs.join(", ")}${r.value ? ` (${r.value} files written or removed)` : ""}${keptText}`);
 }
 
 export interface DoctorOptions {
