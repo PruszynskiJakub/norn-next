@@ -34,6 +34,14 @@ describe("cockpit model", () => {
     expect(rowOf(m, "story:gh-6").actions.map((a) => a.key)).toEqual(["enter"]);
   });
 
+  test("the answer prompt names the option the unit's next asks for", () => {
+    const trust = unit("gh-7", { run: RUN, waiting: { for: "permission", text: "a trust prompt", next: "norn story answer gh-7 yes, or norn run rerun gh-7 if the pane shows something else" } });
+    const allow = unit("gh-8", { run: RUN, waiting: { for: "permission", text: "Bash: rm", next: "norn story answer gh-8 <option> (1 allows it, no refuses it)" } });
+    const m = model(view([story("gh-7", { units: [trust] }), story("gh-8", { units: [allow] })]));
+    expect(rowOf(m, "unit:gh-7").actions.find((a) => a.key === "a")?.input?.prompt).toBe("Option (yes trusts the folder)");
+    expect(rowOf(m, "unit:gh-8").actions.find((a) => a.key === "a")?.input?.prompt).toBe("Option (1 allows, no refuses)");
+  });
+
   test("withInput fills the typed text in place of {input}", () => {
     expect(withInput(["story", "take", "gh-5", "--force", "--reason", "{input}"], "alice is away")).toEqual(["story", "take", "gh-5", "--force", "--reason", "alice is away"]);
   });

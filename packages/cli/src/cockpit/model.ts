@@ -92,13 +92,19 @@ function storyActions(s: StoryView, holder: string, o: CockpitOptions, unit: Uni
   return out;
 }
 
+/** What the answer prompt asks for: a pane's option names the one its `next` offers. */
+function answerPrompt(u: UnitView): string {
+  if (u.waiting?.for !== "permission") return "Your answer";
+  return u.waiting.next?.startsWith(`norn story answer ${u.id} yes`) ? "Option (yes trusts the folder)" : "Option (1 allows, no refuses)";
+}
+
 /** The actions what a unit waits for offers, each the command its `next` names. */
 function itemActions(u: UnitView, group: CockpitGroup): CockpitAction[] {
   const next = u.waiting?.next ?? "";
   if (group === "your_turn" && next.startsWith(`norn run start ${u.id}`)) return [action("start", { kind: "verb", argv: ["run", "start", u.id] })];
   if (group === "answer")
     return [
-      action("answer", { kind: "verb", argv: ["story", "answer", u.id, "{input}"] }, { prompt: u.waiting?.for === "permission" ? "Option (1 allows, no refuses)" : "Your answer", required: true }),
+      action("answer", { kind: "verb", argv: ["story", "answer", u.id, "{input}"] }, { prompt: answerPrompt(u), required: true }),
     ];
   if (group === "approve")
     return [action("approve", { kind: "verb", argv: ["story", "approve", u.id] }), action("reject", { kind: "verb", argv: ["story", "reject", u.id, "--reason", "{input}"] }, { prompt: "What to change", required: true })];
