@@ -13,7 +13,8 @@
  *   ends), handed to a resumed launch of its session (launcher-resume.ts). A nudge to a live process
  *   with no hook activity for the silent window is not queued: a hung agent fires no hook, so its
  *   process is stopped and the session resumed with the nudge. With none of these, refused: a nudge
- *   is never dropped silently, nor counted when it cannot arrive.
+ *   is never dropped silently. A refused nudge still counts against the step's nudges, as its intent
+ *   is recorded before the send, which also bounds the nudges spent on a session that cannot take one.
  * - every launch, resumed ones too, puts agent-bin.ts's folder first on the agent's PATH, so the
  *   `norn` the brief tells the agent to run is the build that launched it.
  * - a dialog answer (a permission or trust prompt in the agent's pane): the harness's keys for the
