@@ -14,14 +14,20 @@ import { fakeGh, HOME, machine, ROOT } from "./support.ts";
 
 const REPO = join(import.meta.dir, "..", "..", "..", "..");
 const WORKFLOWS = join(".agents", "workflows");
+const SKILLS = join(".agents", "skills");
 const PATHS = configPaths(HOME, ROOT);
 
 const yamlIn = (dir: string): string[] => readdirSync(join(REPO, dir)).filter((f) => /\.ya?ml$/.test(f));
 
-/** Every workflow and shared file of this repo, at the same paths under the test machine's checkout. */
+/** Every workflow and shared file of this repo, and its own skills, at the same paths under the test machine's checkout. */
 function repoFiles(): Record<string, string> {
   const out: Record<string, string> = {};
   for (const dir of [WORKFLOWS, join(WORKFLOWS, "shared")]) for (const f of yamlIn(dir)) out[join(ROOT, dir, f)] = readFileSync(join(REPO, dir, f), "utf8");
+  // norn's copies of the pack skills are never committed; the repo's own are, and its workflows name them
+  for (const skill of readdirSync(join(REPO, SKILLS))) {
+    const file = join(SKILLS, skill, "SKILL.md");
+    if (!skill.startsWith("norn") && existsSync(join(REPO, file))) out[join(ROOT, file)] = readFileSync(join(REPO, file), "utf8");
+  }
   return out;
 }
 

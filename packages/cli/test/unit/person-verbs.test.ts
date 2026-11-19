@@ -283,7 +283,9 @@ describe("story create and close on the local tracker", () => {
     const env = await envOf(m);
     const intake = await env.slots.tracker.intake({ label: "norn", assignee: null });
     expect(intake.ok && intake.value.map((i) => i.key)).toEqual(["lt-1"]);
-    expect(refusal(await runCli(["story", "create", "x", "--workflow", "nope", "--json"], m.io))).toEqual({ exit: ExitCode.refused, code: "unknown_workflow" });
+    const unknown = await runCli(["story", "create", "x", "--workflow", "nope", "--json"], m.io);
+    expect(refusal(unknown)).toEqual({ exit: ExitCode.refused, code: "unknown_workflow" });
+    expect((json(unknown.stdout) as { do_instead: string }).do_instead).toBe("name one of quick, refinement, reproduce, slice, story, triage, or write .agents/workflows/nope.yaml");
 
     const closed = await runCli(["story", "close", "lt-1", "--json"], m.io);
     expect(json(closed.stdout)).toEqual({ key: "lt-1", closed: true, was_open: true, stopping: [] });
@@ -337,7 +339,9 @@ describe("story round", () => {
     await seedUnit(m, { step: AGENT_STEP, ...ended });
     const bad = await runCli(["story", "round", UNIT, "--workflow", "refinement", "--at", "nowhere", "--json"], m.io);
     expect(refusal(bad)).toEqual({ exit: ExitCode.refused, code: "unknown_step" });
-    expect(refusal(await runCli(["story", "round", UNIT, "--workflow", "nope", "--json"], m.io))).toEqual({ exit: ExitCode.refused, code: "unknown_workflow" });
+    const unknown = await runCli(["story", "round", UNIT, "--workflow", "nope", "--json"], m.io);
+    expect(refusal(unknown)).toEqual({ exit: ExitCode.refused, code: "unknown_workflow" });
+    expect((json(unknown.stdout) as { do_instead: string }).do_instead).toBe("name one of quick, refinement, reproduce, slice, story, triage, or write .agents/workflows/nope.yaml");
     expect(await receiptsOf(m)).toEqual([]);
     const r = await runCli(["story", "round", UNIT, "--workflow", "refinement", "--at", "plan", "--json"], m.io);
     expect(json(r.stdout)).toMatchObject({ workflow: "refinement", at: "plan" });

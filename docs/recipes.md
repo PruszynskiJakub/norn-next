@@ -219,7 +219,7 @@ Every route back to an earlier step is counted, and a unit whose counter passes 
 
 ## Name your own skill in a step
 
-Write the skill under a name without the `norn-` prefix in `.agents/skills/<name>/SKILL.md`, commit it, and list it in the step: `skills: [my-review]`. To change how a pack skill works, commit your own folder under the pack skill's name: norn finds no mark of its own in it and leaves it alone, so your version is the one the agent loads.
+Write the skill under a name without the `norn-` prefix in `.agents/skills/<name>/SKILL.md`, commit it, and list it in the step: `skills: [my-review]`. A skill a step lists that neither the pack ships nor the repo keeps (in `.agents/skills/` or a harness's skills folder) draws a warning from `norn doctor`; the tick still runs the workflow, because the harness may load the skill from a user-level folder or a plugin (`plugin:skill`, which is not looked for). To change how a pack skill works, commit your own folder under the pack skill's name: norn finds no mark of its own in it and leaves it alone, so your version is the one the agent loads.
 
 ## Run without GitHub
 

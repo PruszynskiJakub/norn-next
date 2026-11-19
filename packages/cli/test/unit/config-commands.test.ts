@@ -8,9 +8,17 @@ const json = (stdout: string): Record<string, unknown> => Bun.JSONL.parse(stdout
 describe("norn config get", () => {
   test("a key of the merged config, a default included; a mapping prints as YAML", async () => {
     const m = machine({ seed: { [PATHS.local]: LOCAL_CONFIG } });
-    expect(json((await runCli(["config", "get", "tracker.intake.label", "--json"], m.io)).stdout)).toEqual({ key: "tracker.intake.label", value: "norn" });
+    expect(json((await runCli(["config", "get", "tracker.intake.label", "--json"], m.io)).stdout)).toEqual({ key: "tracker.intake.label", value: "norn", source: "local", file: PATHS.local });
     expect((await runCli(["config", "get", "vcs.use"], m.io)).stdout).toBe("git\n");
     expect((await runCli(["config", "get", "executors"], m.io)).stdout).toBe("claude:\n  harness: claude\n  runner: headless\n");
+  });
+
+  test("each key names the file that set it, the highest holding it, or the defaults", async () => {
+    const m = machine({ seed: { [PATHS.local]: LOCAL_CONFIG, [PATHS.user]: "format: 1\nkernel: { mode: manual }\n" } });
+    expect(json((await runCli(["config", "get", "kernel.mode", "--json"], m.io)).stdout)).toEqual({ key: "kernel.mode", value: "manual", source: "user", file: PATHS.user });
+    await runCli(["config", "set", "kernel.mode", "auto"], m.io);
+    expect(json((await runCli(["config", "get", "kernel.mode", "--json"], m.io)).stdout)).toEqual({ key: "kernel.mode", value: "auto", source: "local", file: PATHS.local });
+    expect(json((await runCli(["config", "get", "vcs.use", "--json"], m.io)).stdout)).toEqual({ key: "vcs.use", value: "git", source: "default" });
   });
 
   test("a key nothing sets is refused, never printed as empty", async () => {

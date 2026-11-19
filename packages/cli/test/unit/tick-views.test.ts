@@ -4,7 +4,7 @@ import { ok, PLUGIN_API_VERSION, type StoreFactory } from "@norn/plugin-api";
 import { localStoreFactory } from "@norn/store-local";
 import { CliContext, configPaths, ExitCode, machineDir, machineId, type PluginImporter, runCli } from "../../src/index.ts";
 import { COMMON, HOME, LOCAL_CONFIG, machine, ROOT, type TestMachine } from "./support.ts";
-import { configured, GATE_STEP, seedUnit, UNIT } from "./units.ts";
+import { AGENT_STEP, configured, envOf, GATE_STEP, seedUnit, UNIT } from "./units.ts";
 
 const PATHS = configPaths(HOME, ROOT);
 const MACHINE = machineDir(HOME, machineId(COMMON));
@@ -386,6 +386,54 @@ describe("norn status, story list and story view", () => {
   test("a story no store holds is refused, naming story list", async () => {
     const r = await runCli(["story", "view", "lt-9", "--json"], repo().io);
     expect(json(r.stdout)).toMatchObject({ code: "story_not_found", do_instead: "norn story list" });
+  });
+});
+
+describe("rounds, slices and worktrees in the views", () => {
+  test("story view says which round the story is in, from the rounds its record started; round 1 says nothing of it", async () => {
+    /** The story at the gate after `rounds` rounds started, each applied. */
+    async function inRound(rounds: number): Promise<TestMachine> {
+      const m = configured();
+      const seeded = await seedUnit(m, { step: GATE_STEP, run: null });
+      const env = await envOf(m);
+      for (let n = 1; n <= rounds; n++) {
+        const recorded = await env.journal.record(UNIT, { id: `round-${n}`, data: { kind: "round.started", workflow: seeded.workflow } });
+        if (!recorded.ok) throw new Error(recorded.failure.message);
+      }
+      const read = await env.journal.readUnit(UNIT);
+      if (!read.ok) throw new Error(read.failure.message);
+      const committed = await env.journal.commit(UNIT, { ...seeded, applied_through: rounds }, read.value.version);
+      if (!committed.ok) throw new Error(committed.failure.message);
+      return m;
+    }
+    const second = await inRound(2);
+    expect(json((await runCli(["story", "view", UNIT, "--json"], second.io)).stdout)).toMatchObject({ round: 2 });
+    expect((await runCli(["story", "view", UNIT], second.io)).stdout).toContain("\nRound 2, of story.\n");
+    const first = await inRound(1);
+    expect(json((await runCli(["story", "view", UNIT, "--json"], first.io)).stdout)).toMatchObject({ round: 1 });
+    expect((await runCli(["story", "view", UNIT], first.io)).stdout).not.toContain("Round");
+  });
+
+  test("story view names each unit's worktree while it is on disk", async () => {
+    const m = configured();
+    await seedUnit(m, { step: GATE_STEP, run: null });
+    const none = json((await runCli(["story", "view", UNIT, "--json"], m.io)).stdout) as { units: Record<string, unknown>[] };
+    expect(none.units[0]).toMatchObject({ worktree: null });
+    const path = (await envOf(m)).slots.vcs.worktree.path(UNIT);
+    await m.files.write(`${path}/README.md`, "x");
+    const shown = json((await runCli(["story", "view", UNIT, "--json"], m.io)).stdout) as { units: Record<string, unknown>[] };
+    expect(shown.units[0]).toMatchObject({ worktree: path });
+    expect((await runCli(["story", "view", UNIT], m.io)).stdout).toContain(`  - worktree: ${path}`);
+  });
+
+  test("a slice's key shows the story it belongs to; a slice the story lacks is refused naming the story", async () => {
+    const m = configured();
+    await seedUnit(m, { step: AGENT_STEP, run: null, extra: { ended: "done" } });
+    await seedUnit(m, { unit: `${UNIT}/01`, step: GATE_STEP, run: null, workflow: "slice" });
+    const shown = json((await runCli(["story", "view", `${UNIT}/01`, "--json"], m.io)).stdout) as { key: string; units: { id: string }[] };
+    expect({ key: shown.key, units: shown.units.map((u) => u.id) }).toEqual({ key: UNIT, units: [UNIT, `${UNIT}/01`] });
+    const missing = await runCli(["story", "view", `${UNIT}/07`, "--json"], m.io);
+    expect({ exit: missing.exit, body: json(missing.stdout) }).toMatchObject({ exit: ExitCode.refused, body: { code: "story_not_found", do_instead: `norn story view ${UNIT}` } });
   });
 });
 

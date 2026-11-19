@@ -60,7 +60,11 @@ export function decideStory(story: StoryFacts, ctx: DecideContext): Decision[] {
 
   // a finished story's units are left alone: their ends are facts status reads, and a noop per unit
   // on every tick would only bury what did act
-  if (!isOpen(story, config.base)) return [];
+  if (!isOpen(story, config.base)) {
+    // its change merged after the claim was given up: the item it left open is closed under the claim, by the tail's finish
+    if (claim === null && itemToClose(story, ctx)) return [{ kind: "claim", unit: null, rule: "claim.take", story: story.key, expect_version: null }, ...held(story, "claim.pending", "waiting for the claim taken this tick")];
+    return [];
+  }
 
   if (claim === null) {
     // a story nobody holds is taken only when no round of it is under way; one in progress was released on purpose
@@ -124,11 +128,15 @@ export function decideStoryTail(story: StoryFacts, ctx: DecideContext): Decision
  */
 function finishRule(story: StoryFacts, ctx: DecideContext): Decision | null {
   const worktrees = story.units.filter((u) => u.state?.ended === "done").map((u) => u.id);
-  const own = story.units.find((u) => u.id === story.key);
-  const landed = changeLanded(story, ctx.config.base);
-  const closeItem = own?.state?.ended === "done" && landed && story.item?.open === true && ctx.facts.capabilities.tracker?.close === true;
+  const closeItem = itemToClose(story, ctx);
   if (worktrees.length === 0 && !closeItem) return null;
   return { kind: "finish_story", unit: null, rule: "story.finish", story: story.key, worktrees, close_item: closeItem, effect_id: ctx.nextId() };
+}
+
+/** The story's own round ended done and its change landed on its base, yet its item is open and the tracker can close it. */
+function itemToClose(story: StoryFacts, ctx: DecideContext): boolean {
+  const own = story.units.find((u) => u.id === story.key);
+  return own?.state?.ended === "done" && changeLanded(story, ctx.config.base) && story.item?.open === true && ctx.facts.capabilities.tracker?.close === true;
 }
 
 /** One `intake_story` per open item that is not a story yet, when a tracker is configured. */

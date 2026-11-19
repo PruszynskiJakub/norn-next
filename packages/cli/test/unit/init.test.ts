@@ -392,7 +392,7 @@ describe("the old norn's repo-local config", () => {
   test("a set-up repo moves it into the repo-local file on the next command, once, with a one-line notice, the old text kept", async () => {
     const m = machine({ script: world({ tools: ["claude"] }), seed: { [PATHS.local]: LOCAL_CONFIG, [OLD_LOCAL]: OLD_LOCAL_TEXT } });
     const r = await runCli(["config", "get", "kernel.mode", "--json"], m.io);
-    expect(json(r.stdout)).toEqual({ key: "kernel.mode", value: "manual" });
+    expect(json(r.stdout)).toEqual({ key: "kernel.mode", value: "manual", source: "local", file: PATHS.local });
     expect(r.stderr?.trim().split("\n")).toHaveLength(1);
     expect(r.stderr).toContain(`moved ${OLD_LOCAL_CONFIG_FILE} (the old norn's) into ${REPO_LOCAL_FILE}: took mode → kernel.mode, agent → executor, agents.claude.model → executors.claude.model, agents.claude.args → executors.claude.args`);
     expect(r.stderr).toContain("ignored agents.codex: no executor codex is configured");
