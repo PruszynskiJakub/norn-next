@@ -151,6 +151,7 @@ describe("norn init: the test command", () => {
     expect((await testOf({ [at("pyproject.toml")]: "" })).checks).toEqual({ test: "pytest" });
     expect((await testOf({ [at("Makefile")]: "build:\n\tcc x.c\ntest: build\n\t./x\n" })).checks).toEqual({ test: "make test" });
     expect((await testOf({ [at("Makefile")]: "build:\n\tcc x.c\n" })).checks).toBeUndefined();
+    expect((await testOf({ [at("Makefile")]: "test := unit\nbuild:\n\tcc x.c\n" })).checks).toBeUndefined();
   });
 
   test("the answer and the markdown name where it came from, or that the checks run the default", async () => {

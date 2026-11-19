@@ -144,7 +144,7 @@ export async function detectTestCommand(files: HostFiles, root: string): Promise
   if (await has("mix.exs")) return { command: "mix test", from: "mix.exs" };
   if (await has("gradlew")) return { command: "./gradlew test", from: "gradlew" };
   if (await has("pom.xml")) return { command: "mvn test", from: "pom.xml" };
-  if (/^test\s*:/m.test((await read("Makefile")) ?? "")) return { command: "make test", from: "Makefile" };
+  if (/^test\s*:(?!=)/m.test((await read("Makefile")) ?? "")) return { command: "make test", from: "Makefile" };
   return null;
 }
 
