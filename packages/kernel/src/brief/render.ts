@@ -248,7 +248,7 @@ export function renderBrief(input: BriefRenderInput): string {
     out.push(
       "## Handoff",
       "",
-      `\`${input.handoff}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary, and refresh it right before you report. \`${c.done}\` refuses one over ${HANDOFF_MAX_BYTES / 1024} KB: long repros and logs go in a findings file, named there.`,
+      `\`${input.handoff}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary, and refresh it right before you report. \`${c.done}\` refuses one over ${HANDOFF_MAX_BYTES / 1024} KB: long repros and logs go in the findings \`${c.done} --findings\` hands back, or in a file of their own in the spec folder above it, named there.`,
       "",
     );
   if (input.history && input.history.length > 0) out.push("## History", "", "What this unit's steps did this round, oldest first:", "", ...input.history.map((l) => `- ${l}`), "");

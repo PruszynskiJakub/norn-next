@@ -360,7 +360,7 @@ describe("reporting", () => {
     const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
     expect(r).toMatchObject({
       ok: false,
-      refusal: { code: "handoff_too_large", error: expect.stringMatching(/handoffs\/lt-1\.md is 10 KB; it may hold at most 8 KB$/), do_instead: expect.stringMatching(/current state.*State, Notes.*report again/) },
+      refusal: { code: "handoff_too_large", error: expect.stringMatching(/handoffs\/lt-1\.md is 10 KB; it may hold at most 8 KB$/), do_instead: expect.stringMatching(/current state.*State, Notes.*norn done --findings.*under \.agents\/specs\/lt-1\/.*report again/) },
     });
     expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
     expect(await reportRun(h.env, UNIT, runId, { verb: "ask", question: "may the repro stay?" }, "r2")).toMatchObject({ ok: true });

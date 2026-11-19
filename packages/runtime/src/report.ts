@@ -243,7 +243,7 @@ async function handoffSizeRefusal(env: RuntimeEnv, unit: string): Promise<Refusa
   const kb = (n: number) => `${Math.ceil(n / 1024)} KB`;
   return refuse(
     `the handoff ${file} is ${kb(bytes)}; it may hold at most ${kb(HANDOFF_MAX_BYTES)}`,
-    "rewrite it as the unit's current state (State, Notes): drop what the brief's history already says and the attempts that led nowhere, move long repros and logs into a findings file or a file outside the repository and name it there, then report again",
+    `rewrite it as the unit's current state (State, Notes): drop what the brief's history already says and the attempts that led nowhere, move long repros and logs into the findings of \`norn done --findings\` when the outcome hands findings back, or into a file of their own under ${specFolder(unit)}/, and name it there, then report again`,
     "handoff_too_large",
   );
 }
