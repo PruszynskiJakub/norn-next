@@ -92,7 +92,13 @@ class Rebuilding {
   }
 
   async refresh(log: (line: string) => void): Promise<void> {
-    const now = await wiringSources(await this.ctx.repo());
+    let now: string;
+    try {
+      now = await wiringSources(await this.ctx.repo());
+    } catch (e) {
+      // a source that cannot be read (permissions, a path turned directory) is a refused change too
+      return this.refuse(`unreadable: ${toFailure(e).body.error}`, e, log);
+    }
     if (now === this.sources || now === this.refused) return;
     this.ctx.reload();
     try {
@@ -102,10 +108,17 @@ class Rebuilding {
       this.refused = null;
       log(JSON.stringify({ config: "reloaded" }));
     } catch (e) {
-      this.refused = now;
-      const { error, do_instead } = toFailure(e).body;
-      log(JSON.stringify({ config: "refused", error, do_instead, kept: "the last config that loaded" }));
+      this.refuse(now, e, log);
     }
+  }
+
+  private refuse(sources: string, e: unknown, log: (line: string) => void): void {
+    if (sources === this.refused) return;
+    this.refused = sources;
+    // drop what the failed build cached, so a later use reads the files again instead of the rejection
+    this.ctx.reload();
+    const { error, do_instead } = toFailure(e).body;
+    log(JSON.stringify({ config: "refused", error, do_instead, kept: "the last config that loaded" }));
   }
 }
 

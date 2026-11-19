@@ -238,6 +238,56 @@ describe("norn watch's cadence", () => {
     expect(w.events.filter((e) => e.startsWith("config "))).toEqual(["config refused"]);
   });
 
+  test("a valid repo workflow written during the pause decides the next tick", async () => {
+    const m = repo();
+    const w = timedWatch(m, {
+      1: async () => {
+        // the repo's own file of the shipped workflow's name replaces it: its first step waits for a person
+        await m.files.write(`${ROOT}/.agents/workflows/story.yaml`, TIDY_YAML.replace("name: tidy", "name: story"));
+        await addItem(m, "First");
+      },
+    });
+    await runCli(["watch", "--interval", "30s", "--max-ticks", "5", "--json"], m.io);
+    expect(w.events).toContain("config reloaded");
+    expect(w.ticks[4]?.lines).toEqual(["lt-1  agent.ready.manual → park"]);
+  });
+
+  test("a plugin added during the pause (its lock entry and config) is used from the next tick", async () => {
+    const lock = JSON.stringify({ format: 1, plugins: [{ name: "norn-store-shared", spec: "norn-store-shared@^1", version: "1.0.0", api: "^1.5" }] });
+    const config = `${CONFIG.replace("store: { use: local }", "store: { use: shared }")}plugins:\n  norn-store-shared: norn-store-shared@^1\n`;
+    const m = repo({ importer: sharedStore });
+    const w = timedWatch(m, {
+      1: async () => {
+        await m.files.write(LOCK, lock);
+        await m.files.write(PATHS.local, config);
+        await addItem(m, "First");
+      },
+    });
+    await runCli(["watch", "--interval", "30s", "--max-ticks", "4", "--json"], m.io);
+    expect(w.events).toContain("config reloaded");
+    expect(w.ticks[3]?.lines).toContain("lt-1  store.flush → flush");
+  });
+
+  test("a source that cannot be read during the pause keeps the last runtime instead of ending the watch", async () => {
+    const m = repo();
+    const read = m.files.read.bind(m.files);
+    let denied = false;
+    m.files.read = async (path) => {
+      if (denied && path === PATHS.local) throw new Error(`EACCES: permission denied, open '${path}'`);
+      return read(path);
+    };
+    const w = timedWatch(m, {
+      1: async () => {
+        await addItem(m, "First");
+        denied = true;
+      },
+    });
+    const r = await runCli(["watch", "--interval", "30s", "--max-ticks", "3", "--json"], m.io);
+    expect(r.exit).toBe(ExitCode.ok);
+    expect(w.events.filter((e) => e.startsWith("config "))).toEqual(["config refused"]);
+    expect(w.ticks[1]?.lines).toContain("lt-1  intake.story → intake_story");
+  });
+
   test("a config change that does not load keeps the last good one, and says so once", async () => {
     const m = repo();
     const refused: string[] = [];
