@@ -7,6 +7,9 @@
 import type { HandBack, Verdict } from "@norn/schema";
 import type { BriefInputs } from "../model/actions.ts";
 
+/** The most a handoff may hold, in bytes once trimmed: past it, the current state has turned into a log every later brief carries. */
+export const HANDOFF_MAX_BYTES = 8 * 1024;
+
 /** The commands an agent reports with; the CLI in front decides their spelling. */
 export interface BriefCommands {
   brief: string;
@@ -245,7 +248,7 @@ export function renderBrief(input: BriefRenderInput): string {
     out.push(
       "## Handoff",
       "",
-      `\`${input.handoff}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary, and refresh it right before you report.`,
+      `\`${input.handoff}\` is this unit's current state, for the next agent and the person. Rewrite it in place, never as a diary, and refresh it right before you report. \`${c.done}\` refuses one over ${HANDOFF_MAX_BYTES / 1024} KB: long repros and logs go in a findings file, named there.`,
       "",
     );
   if (input.history && input.history.length > 0) out.push("## History", "", "What this unit's steps did this round, oldest first:", "", ...input.history.map((l) => `- ${l}`), "");

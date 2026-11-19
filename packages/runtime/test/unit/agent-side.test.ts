@@ -353,6 +353,25 @@ describe("reporting", () => {
     expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
   });
 
+  test("a done whose handoff has grown past 8 KB is refused with how to trim it, and records nothing; ask and stuck still go through", async () => {
+    const { h, runId } = await running();
+    const handoff = `${WORKTREE}/.agents/specs/${UNIT}/handoffs/${UNIT}.md`;
+    await h.files.write(handoff, `# Handoff: ${UNIT}\n\n## State\n\n${"a repro line that grew into a log\n".repeat(300)}`);
+    const r = await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1");
+    expect(r).toMatchObject({
+      ok: false,
+      refusal: { code: "handoff_too_large", error: expect.stringMatching(/handoffs\/lt-1\.md is 10 KB; it may hold at most 8 KB$/), do_instead: expect.stringMatching(/current state.*State, Notes.*report again/) },
+    });
+    expect((await record(h, UNIT)).receipts.some((x) => x.data.kind === "run.reported")).toBe(false);
+    expect(await reportRun(h.env, UNIT, runId, { verb: "ask", question: "may the repro stay?" }, "r2")).toMatchObject({ ok: true });
+  });
+
+  test("a handoff of 8 KB or less, counted in bytes once trimmed, is no reason to refuse", async () => {
+    const { h, runId } = await running();
+    await h.files.write(`${WORKTREE}/.agents/specs/${UNIT}/handoffs/${UNIT}.md`, `\n\n${"é".repeat(4096)}\n\n\n`);
+    expect(await reportRun(h.env, UNIT, runId, { verb: "done", outcome: "done" }, "r1")).toMatchObject({ ok: true, value: { replayed: false } });
+  });
+
   test("a refusal names the first ten paths and counts the rest", async () => {
     const { h, runId } = await running();
     h.dirty[WORKTREE] = Array.from({ length: 13 }, (_, i) => `src/f${String(i).padStart(2, "0")}.ts`);
