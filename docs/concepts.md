@@ -70,9 +70,9 @@ Checks and the git and forge steps always run on their own. Gates, attended step
 
 `norn watch` runs the heartbeat until Ctrl-C, which lets the tick in flight finish. `norn tick` runs one by hand. The interval (30 seconds, `--interval` changes it) is the longest watch waits, not the pace of a story:
 
-- a tick that carried out an action is followed at once by up to three more, so a step that ends leads to the next one in the same moment;
-- a receipt recorded during the pause by another process on this machine (`norn done`, `norn story answer`) or a check that finishes ends the pause within about a second. A receipt written on another machine arrives with the next tick's sync;
-- before each tick watch reads the config, the plugin lock and the repo's workflows again, so a `config set`, a merged workflow or a `plugin add` counts from the next tick, with no restart. A change that does not load leaves watch on the last config that did, and says so once on stderr.
+- a tick that moved a story on is followed at once by up to three more, so a step that ends leads to the next one in the same moment. A tick that only waited (an agent or check still running, a unit parked or ended, a shared store's flush) pauses the whole interval;
+- a receipt recorded during the pause by another process on this machine (`norn done`, `norn story answer`) or a check that finishes ends the pause within about a second. A receipt written on another machine arrives with the next tick's sync, and a step kind that waits across ticks (on the forge, say) is looked at again only at the next tick;
+- before each tick watch reads the config, the plugin lock and the repo's workflows again, so a `config set`, a merged workflow or a `plugin add` counts from the next tick, with no restart. A new version of a plugin the watch already loaded takes a restart, since the process keeps the code it imported. A change that does not load leaves watch on the last config that did, and says so once on stderr.
 
 Each tick:
 

@@ -7,11 +7,13 @@
  * The stamp is `<writer> <unit> <receipt id>`: unique per receipt, so two receipts never leave the same
  * text, and its first word names the runtime env that wrote it, so a watch can tell its own tick's
  * receipts from another process's. The stamp is written after the receipt it announces, so a tick that
- * wakes on it reads that receipt. It is only a hint: losing one costs at most an interval, so a stamp
- * that cannot be written never fails the receipt.
+ * wakes on it reads that receipt. It is only a hint, and the last writer wins: another process's stamp
+ * overwritten by the watch's own tick before the pause read it is lost. Losing one costs at most an
+ * interval, so a stamp that cannot be written never fails the receipt.
  *
  * Receipts another machine writes (a shared store's remote, a mailbox) reach this one only when a tick
- * syncs, so they never wake a pause here.
+ * syncs, so they never wake a pause here. A step kind that reports `running` and is polled across ticks
+ * stamps nothing until the tick that sees it finish, so it is seen at the next interval.
  */
 import type { HostContext, NewReceipt, Store } from "@norn/plugin-api";
 import { ulid } from "@norn/schema";
