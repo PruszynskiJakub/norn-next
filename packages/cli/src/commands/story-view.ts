@@ -1,9 +1,10 @@
 /**
- * `norn story view <key>`: show one story: its units, runs, gates and asks, who moved its claim
- * between machines, the branch updates a person made, and for a unit waiting at a gate the criteria
+ * `norn story view <key>`: show one story (a slice's key shows the story it belongs to): the round
+ * it is in, its units with their worktrees, runs, gates and asks, who moved its claim between machines, the branch updates a person made, and for a unit waiting at a gate the criteria
  * its last report left unsettled and the notes for a person not yet acknowledged, read-only. A key no store holds is refused, naming where to look; a story with a
  * corrupt unit is a corrupt error (exit 4).
  */
+import { parseUnitId } from "@norn/plugin-api";
 import type { RuntimeEnv } from "@norn/runtime";
 import type { CriterionVerdict } from "@norn/schema";
 import { defineCommand } from "../command.ts";
@@ -44,6 +45,8 @@ export interface CriteriaToCheck {
 }
 
 interface PersonRecord {
+  /** the rounds the story's record started, the first included: the round it is in */
+  round: number;
   takeovers: TakeoverView[];
   branch_updates: BranchUpdateView[];
   criteria: CriteriaToCheck[];
@@ -54,9 +57,10 @@ interface PersonRecord {
 async function recordOf(env: RuntimeEnv, key: string, story: StoryView): Promise<PersonRecord> {
   const read = await env.journal.readUnit(key);
   if (!read.ok) throw failure(`cannot read ${key}: ${read.failure.message}`, "try again", read.failure.code);
-  const out: PersonRecord = { takeovers: [], branch_updates: [], criteria: [], notes: [] };
+  const out: PersonRecord = { round: 0, takeovers: [], branch_updates: [], criteria: [], notes: [] };
   for (const r of read.value.receipts) {
     const d = r.data;
+    if (d.kind === "round.started") out.round++;
     if (d.kind === "claim.taken") out.takeovers.push({ at: r.at, from: d.from ?? null, to: d.to, by: d.by, reason: d.reason ?? null });
     if (d.kind === "branch.updated")
       out.branch_updates.push({ at: r.at, base: d.base, base_sha: d.base_sha, merged: d.merged, head: d.head, pushed: d.pushed, by: d.by, reason: d.reason ?? null });
@@ -68,7 +72,18 @@ async function recordOf(env: RuntimeEnv, key: string, story: StoryView): Promise
     if (left) out.criteria.push(left);
     out.notes.push(...openNotesOf(u.id, receipts));
   }
+  // a record from before rounds were recorded is in its first
+  out.round = Math.max(out.round, 1);
   return out;
+}
+
+/** Where a unit's worktree is, while it is on disk: where a person looks into its work. */
+async function worktreeOf(env: RuntimeEnv, unit: string): Promise<string | null> {
+  const vcs = env.slots.vcs;
+  if (!vcs.capabilities.worktrees) return null;
+  const path = vcs.worktree.path(unit);
+  const cut = path.lastIndexOf("/");
+  return (await env.ctx.files.list(path.slice(0, cut))).includes(path.slice(cut + 1)) ? path : null;
 }
 
 async function receiptsOf(env: RuntimeEnv, unit: string) {
@@ -114,12 +129,20 @@ function takeoverLine(t: TakeoverView): string {
   return `- ${t.at}: taken${from} to ${t.to}${by}${t.reason ? ` — ${t.reason}` : ""}`;
 }
 
-function markdown(s: StoryView, { takeovers, branch_updates, criteria, notes }: PersonRecord): string {
+type ShownUnit = StoryView["units"][number] & { worktree: string | null };
+
+function markdown(s: Omit<StoryView, "units"> & { units: ShownUnit[] }, { round, takeovers, branch_updates, criteria, notes }: PersonRecord): string {
   const out = [`# ${storyHead(s)}`, ""];
   if (s.url) out.push(`Item: ${s.url}`);
   if (s.change?.url) out.push(`Change: ${s.change.url}${s.change.merge_sha ? ` (merged as ${s.change.merge_sha.slice(0, 12)})` : ""}`);
-  if (s.url || s.change?.url) out.push("");
-  out.push("## Units", "", ...s.units.map((u) => `- ${unitLine(u)}${u.pending_receipts ? ` (${u.pending_receipts} receipts not applied yet)` : ""}`));
+  const workflow = s.units.find((u) => u.id === s.key)?.workflow;
+  if (round > 1) out.push(`Round ${round}${workflow ? `, of ${workflow}` : ""}.`);
+  if (s.url || s.change?.url || round > 1) out.push("");
+  out.push(
+    "## Units",
+    "",
+    ...s.units.flatMap((u) => [`- ${unitLine(u)}${u.pending_receipts ? ` (${u.pending_receipts} receipts not applied yet)` : ""}`, ...(u.worktree ? [`  - worktree: ${u.worktree}`] : [])]),
+  );
   if (criteria.length) out.push("", "## Criteria to check", "", ...criteria.flatMap(criteriaLines));
   if (notes.length) out.push("", "## Notes for you", "", "Left by the agents' reports; an approve at the gate acknowledges them.", "", ...notes.map(noteLine));
   if (takeovers.length) out.push("", "## Claim taken", "", ...takeovers.map(takeoverLine));
@@ -133,10 +156,14 @@ export const storyViewCommand = defineCommand({
   usage: "norn story view <key>",
   positionals: { min: 1, max: 1 },
   async run(ctx, args) {
-    const key = args.positionals[0] as string;
+    const asked = args.positionals[0] as string;
+    // a slice is shown within its story, where its order and the gates between slices are read
+    const slice = parseUnitId(asked)?.slice != null ? asked : null;
+    const key = slice ? (parseUnitId(asked)?.story as string) : asked;
     const env = await ctx.runtimeEnv();
     const view = await loadProjectView(env);
     const story = view.stories.find((s) => s.key === key);
+    if (story && slice && !story.units.some((u) => u.id === slice)) throw refuse(`${key} has no slice ${slice}`, `norn story view ${key}`, "story_not_found", { key: slice });
     if (!story) {
       const queued = view.intake.find((i) => i.key === key);
       throw queued
@@ -152,6 +179,7 @@ export const storyViewCommand = defineCommand({
         { story },
       );
     const record = await recordOf(env, key, story);
-    return rendered({ ...story, ...record, problems: view.problems.filter((p) => p.startsWith(`${key}:`) || p.startsWith(`${key} `)) }, markdown(story, record));
+    const shown = { ...story, units: await Promise.all(story.units.map(async (u) => ({ ...u, worktree: await worktreeOf(env, u.id) }))) };
+    return rendered({ ...shown, ...record, problems: view.problems.filter((p) => p.startsWith(`${key}:`) || p.startsWith(`${key} `)) }, markdown(shown, record));
   },
 });
