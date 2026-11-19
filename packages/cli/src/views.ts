@@ -75,6 +75,7 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
   if (!s || s.ended === "done") return null;
   const id = u.id;
   const rerun = `norn run rerun ${id}`;
+  const decide = `norn story approve ${id}, or norn story reject ${id} --reason "<what to change>"`;
   if (s.ended) return { for: "person", text: `ended ${s.ended}${s.ended_reason ? `: ${s.ended_reason}` : ""}`, ...(s.ended === "stuck" && { next: rerun }) };
   const reason = s.parked?.reason;
   const permission = u.session?.permission;
@@ -103,15 +104,14 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
         next: `${dialogKeys ? `norn story answer ${id} 1, or ` : ""}${rerun} if the pane shows something else`,
       };
     case "gate.park":
-      return { for: "gate", text: prompt ?? s.step, next: `norn story approve ${id}, or norn story reject ${id} --reason "<what to change>"` };
-    default: {
-      const stuck = STUCK_PARKS[reason];
-      return stuck !== undefined ? { for: "person", text: stuck, next: rerun } : { for: "person", text: reason };
-    }
+      return { for: "gate", text: prompt ?? s.step, next: decide };
+    default:
+      // a park no rule derives (a closed change, slice files that failed validation) holds until a person moves the unit on
+      return { for: "person", text: STUCK_PARKS[reason] ?? reason, next: rerun };
   }
   if (u.session?.ask) return { for: "answer", text: u.session.ask.question, next: `norn story answer ${id} "<answer>"` };
   if (permission) return { for: "permission", text: permission.call ? `${permission.call.tool}: ${permission.prompt}` : permission.prompt, next: `norn story answer ${id} <option>` };
-  if (kind === "gate") return { for: "gate", text: prompt ?? s.step, next: `norn story approve ${id}` };
+  if (kind === "gate") return { for: "gate", text: prompt ?? s.step, next: decide };
   return null;
 }
 

@@ -159,4 +159,19 @@ describe("status and story view say what a parked unit waits for, never the rule
     await seedUnit(gate, { step: GATE_STEP, run: null, extra: { parked: { reason: "gate.park", since: "2026-11-17T10:00:00.000Z" } } });
     expect(waitingIn((await runCli(["status", "--json"], gate.io)).stdout)?.text).toContain("Review the slice files");
   });
+
+  test("a gate not yet parked names approve and reject, a unit that ended stuck or holds a park of its own names rerun", async () => {
+    const reject = `norn story approve ${UNIT}, or norn story reject ${UNIT} --reason "<what to change>"`;
+    const cases: Array<[string, Partial<Parameters<typeof seedUnit>[1]["extra"] & object>, Partial<Waiting & object>]> = [
+      [GATE_STEP, {}, { for: "gate", next: reject }],
+      [AGENT_STEP, { ended: "stuck", ended_reason: "counter review_rounds ran out" }, { for: "person", next: `norn run rerun ${UNIT}` }],
+      [AGENT_STEP, { parked: { reason: "the change closed without merging", since: "2026-11-17T10:00:00.000Z" } }, { for: "person", text: "the change closed without merging", next: `norn run rerun ${UNIT}` }],
+    ];
+    for (const [step, extra, expected] of cases) {
+      const m = configured();
+      await seedUnit(m, { step, run: null, extra });
+      const w = waitingIn((await runCli(["status", "--json"], m.io)).stdout);
+      expect([extra, w]).toMatchObject([extra, expected]);
+    }
+  });
 });
