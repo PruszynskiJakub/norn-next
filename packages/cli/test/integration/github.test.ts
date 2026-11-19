@@ -33,6 +33,8 @@ describe("labels on a GitHub repository", () => {
   let createCalls: string[][] = [];
   let intakeBeforeTick: unknown;
   let tickLabelCalls: string[][] = [];
+  let initAgain: NornOut;
+  let createsAtInitAgain: string[][] = [];
 
   beforeAll(async () => {
     w = await world("work");
@@ -67,6 +69,10 @@ describe("labels on a GitHub repository", () => {
     tickLabelCalls = ghCalls(w)
       .slice(before)
       .filter((c) => c[0] === "label" || (c[0] === "issue" && c[1] === "edit"));
+
+    before = ghCalls(w).length;
+    initAgain = await norn(w, ["init", "--tracker", "github", "--forge", "github", "--store", "local", "--executor", "test", "--runner", "headless", "--yes", "--json"]);
+    createsAtInitAgain = callsOf(ghCalls(w).slice(before), "label create");
   }, SLOW);
 
   test("init defines every norn label once, in norn's colour with a description", () => {
@@ -81,9 +87,12 @@ describe("labels on a GitHub repository", () => {
     expect(new Set(createsAtInit.map((c) => c[2])).size).toBe(createsAtInit.length);
   });
 
-  test("doctor on a repository whose labels are defined creates none", () => {
+  test("doctor on a repository whose labels are defined creates none, and a second init, refused, creates none either", () => {
     expect(doctorAgain.code).toBe(0);
     expect(createsAfterDoctor).toEqual([]);
+    expect(initAgain.code).toBe(3);
+    expect(initAgain.body).toMatchObject({ code: "already_initialized" });
+    expect(createsAtInitAgain).toEqual([]);
   });
 
   test("doctor --repo makes no gh label call", () => {
@@ -239,7 +248,7 @@ describe("intake from GitHub issues", () => {
 
   test("a workflow label changed after intake changes nothing", () => {
     expect(afterRelabel?.step).toBe("custom");
-    expect(JSON.stringify(viewAfterRelabel.body)).toContain('"quick"');
+    expect((viewAfterRelabel.body.units as { id: string; workflow: string | null }[]).find((u) => u.id === "gh-1")?.workflow).toBe("quick");
   });
 });
 
@@ -266,6 +275,8 @@ function writeFlow(w: World): void {
 }
 
 const KEY = "gh-1";
+/** The receipts a story's own unit holds that no tick applied yet, as `story view --json` counts them. */
+const pendingOf = (view: NornOut): number => ((view.body.units as { id: string; pending_receipts: number }[]).find((u) => u.id === KEY)?.pending_receipts ?? -1);
 const BRANCH = `norn/${KEY}`;
 const storyPushes = (w: World) => pushes(w).filter((l) => l.startsWith(`refs/heads/${BRANCH} `));
 
@@ -273,13 +284,18 @@ describe("a story's pull request on GitHub", () => {
   let w: World;
   const rules: string[] = [];
   let pushesBeforePr = -1;
-  let afterRedCi: { step: string | null; brief: string };
+  let reworkBrief = "";
   let atReady: { pr: GhPr | undefined; prCreates: number; pushes: number };
   let atMerge: { url: unknown; remote: string; local: string; pushes: number };
   let approveAtMerge: NornOut;
   let rejectAtMerge: NornOut;
   let stillAtMerge: UnitShown | null;
   let editsOnPlainTicks: string[][] = [];
+  let specOnly: { pushes: number; edits: string[][]; step: string | null };
+  let unpushedRules: string[] = [];
+  let receiptsByRefusals = -1;
+  let mergeView: NornOut;
+  let mergedView: NornOut;
   let reopened: { edits: string[][]; title: string | undefined; body: string; pushes: number; step: string | null };
   let ended: UnitShown | null;
   let mergedRules: string[] = [];
@@ -306,16 +322,20 @@ describe("a story's pull request on GitHub", () => {
       for (const p of s.prs) p.checks = "success";
     });
     await tickUntil(w, rules, (u) => u?.step === "ready" && u.parked !== undefined, 90_000, KEY);
-    const briefs = agentNotes(w).filter((n) => n.note === "brief");
-    afterRedCi = { step: "build", brief: String((briefs.at(-1)?.value as { text?: string } | undefined)?.text ?? "") };
+    // the second brief at build is the rework's
+    const briefs = agentNotes(w).filter((n) => n.note === "brief" && String((n.value as { text?: string }).text ?? "").includes("Build the thing."));
+    reworkBrief = String((briefs[1]?.value as { text?: string } | undefined)?.text ?? "");
     atReady = { pr: openPr(w, BRANCH), prCreates: callsOf(ghCalls(w), "pr create").length, pushes: storyPushes(w).length };
 
     await norn(w, ["story", "approve", KEY, "--json"]);
     await tickUntil(w, rules, (u) => u?.step === "merge", 60_000, KEY);
     const shown = (await status(w)).stories.find((st) => st.key === KEY) as unknown as { change?: { url?: string } };
     atMerge = { url: shown.change?.url, remote: await sh(w.remote, "git", "rev-parse", BRANCH), local: await sh(w.root, "git", "rev-parse", BRANCH), pushes: storyPushes(w).length };
+    mergeView = await norn(w, ["story", "view", KEY]);
+    const pendingBefore = pendingOf(await norn(w, ["story", "view", KEY, "--json"]));
     approveAtMerge = await norn(w, ["story", "approve", KEY, "--json"]);
     rejectAtMerge = await norn(w, ["story", "reject", KEY, "--reason", "no", "--json"]);
+    receiptsByRefusals = pendingOf(await norn(w, ["story", "view", KEY, "--json"])) - pendingBefore;
 
     editGh(w, (s) => {
       const issue = s.issues.find((i) => i.number === 1);
@@ -326,22 +346,29 @@ describe("a story's pull request on GitHub", () => {
     editsOnPlainTicks = callsOf(ghCalls(w).slice(before), "pr edit");
     stillAtMerge = await unitOf(w, KEY);
 
-    // a code commit on the story branch the PR lacks sends the story back through open-pr
-    const wt = (await sh(w.root, "git", "worktree", "list", "--porcelain"))
-      .split("\n")
-      .filter((l) => l.startsWith("worktree "))
-      .map((l) => l.slice("worktree ".length))
-      .find((p) => p.endsWith(`/worktrees/${KEY}`));
+    const wt = await worktreeOf(w, KEY);
     if (!wt) throw new Error("the story has no worktree at merge");
-    writeFileSync(join(wt, "code.txt"), "more code\n");
+    // a commit touching only the story's spec folder stays local: it is no change the PR lacks
     mkdirSync(join(wt, ".agents", "specs", KEY), { recursive: true });
+    writeFileSync(join(wt, ".agents", "specs", KEY, "notes.md"), "a note\n");
+    await sh(wt, "git", "add", "-f", join(".agents", "specs", KEY, "notes.md"));
+    await sh(wt, "git", "commit", "-q", "-m", "spec note");
+    before = ghCalls(w).length;
+    let pushesBefore = storyPushes(w).length;
+    for (let i = 0; i < 3; i++) await norn(w, ["tick", "--json"]);
+    specOnly = { pushes: storyPushes(w).length - pushesBefore, edits: callsOf(ghCalls(w).slice(before), "pr edit"), step: (await unitOf(w, KEY))?.step ?? null };
+
+    // a code commit on the story branch the PR lacks sends the story back through open-pr
+    writeFileSync(join(wt, "code.txt"), "more code\n");
     writeFileSync(join(wt, ".agents", "specs", KEY, "pr.md"), "# Ship it\n\nWhat changed.\n");
     // pr.md is read from the worktree: init keeps .agents/ out of git in a repo that does not commit it
     await sh(wt, "git", "add", "code.txt");
     await sh(wt, "git", "commit", "-q", "-m", "more code");
     before = ghCalls(w).length;
-    const pushesBefore = storyPushes(w).length;
+    pushesBefore = storyPushes(w).length;
+    const rulesBefore = rules.length;
     await tickUntil(w, rules, (u) => u?.step === "ready" && u.parked !== undefined, 90_000, KEY);
+    unpushedRules = rules.slice(rulesBefore);
     reopened = { edits: callsOf(ghCalls(w).slice(before), "pr edit"), title: openPr(w, BRANCH)?.title, body: visibleBody(openPr(w, BRANCH)?.body ?? ""), pushes: storyPushes(w).length - pushesBefore, step: (await unitOf(w, KEY))?.step ?? null };
 
     // a person squash-merges the PR while the story waits at its gate
@@ -353,6 +380,7 @@ describe("a story's pull request on GitHub", () => {
     mergedRules = rules.slice(before);
     ended = await unitOf(w, KEY);
     view = await norn(w, ["story", "view", KEY, "--json"]);
+    mergedView = await norn(w, ["story", "view", KEY]);
     prCreates = callsOf(ghCalls(w), "pr create").length;
   }, 400_000);
 
@@ -365,7 +393,7 @@ describe("a story's pull request on GitHub", () => {
   });
 
   test("a red CI sends the story back to build with the failing check's URL in its brief, and its rework is pushed through open-pr again", () => {
-    expect(afterRedCi.brief).toContain(`${WEB}/actions/runs/1/job/7`);
+    expect(reworkBrief).toContain(`${WEB}/actions/runs/1/job/7`);
     expect(atReady.pushes).toBe(2);
   });
 
@@ -375,12 +403,22 @@ describe("a story's pull request on GitHub", () => {
     expect(atMerge.pushes).toBe(atReady.pushes);
   });
 
-  test("approve or reject at merge is refused", () => {
+  test("approve or reject at merge is refused, and records no gate decision", () => {
     for (const r of [approveAtMerge, rejectAtMerge]) {
       expect(r.code).toBe(3);
       expect(String(r.body.error)).toContain("merge");
     }
+    expect(receiptsByRefusals).toBe(0);
     expect(stillAtMerge?.step).toBe("merge");
+  });
+
+  test("story view names the PR without a merge commit while it is open", () => {
+    expect(mergeView.stdout).toContain(`Change: ${WEB}/pull/2\n`);
+    expect(mergeView.stdout).not.toContain("merged as");
+  });
+
+  test("a commit touching only the story's spec folder stays local: no push, no PR edit, still at merge", () => {
+    expect(specOnly).toEqual({ pushes: 0, edits: [], step: "merge" });
   });
 
   test("a renamed issue edits no PR on plain ticks; a commit goes back through open-pr, which retitles the PR, sets its body from pr.md and pushes once", () => {
@@ -391,6 +429,7 @@ describe("a story's pull request on GitHub", () => {
     expect(reopened.body).toBe(`# Ship it\n\nWhat changed.\n\n---\n\nCloses ${WEB}/issues/1\n\nDelivered by norn (story ${KEY}).`);
     expect(reopened.pushes).toBe(1);
     expect(reopened.step).toBe("ready");
+    expect(unpushedRules).toContain("step.unpushed");
   });
 
   test("a squash merge at the gate ends the story done through change_merged, with one PR in all and its merge sha on record", () => {
@@ -399,6 +438,7 @@ describe("a story's pull request on GitHub", () => {
     expect(ended?.ended).toBe("done");
     expect(prCreates).toBe(1);
     expect(JSON.stringify(view.body)).toContain(MERGE_SHA);
+    expect(mergedView.stdout).toContain(`Change: ${WEB}/pull/2 (merged as ${MERGE_SHA.slice(0, 12)})`);
   });
 });
 
@@ -505,6 +545,12 @@ describe("a story's pull request merged into a branch other than its base", () =
 });
 
 const REPO_ROOT = join(import.meta.dir, "..", "..", "..", "..");
+/** A file of this repo the CI scripts are read from; one that moved names itself rather than failing on a bare read error. */
+function repoFile(...parts: string[]): string {
+  const file = join(REPO_ROOT, ...parts);
+  if (!existsSync(file)) throw new Error(`the CI script tests read ${parts.join("/")} from this repo, and it is gone: point them at where it moved`);
+  return file;
+}
 /** A workflow's `ci` check script, read from the file as the workflow loader reads it. */
 const ciScript = (file: string): string => ((parse(readFileSync(file, "utf8")) as { steps: { ci: { check: string } } }).steps.ci.check);
 
@@ -536,12 +582,12 @@ describe("the CI check scripts over the fake gh", () => {
     w = await world("work");
     fakeGh(w);
     mkdirSync(join(w.root, ".agents", "scripts"), { recursive: true });
-    writeFileSync(join(w.root, ".agents", "scripts", "ci-failures.sh"), readFileSync(join(REPO_ROOT, ".agents", "scripts", "ci-failures.sh"), "utf8"));
+    writeFileSync(join(w.root, ".agents", "scripts", "ci-failures.sh"), readFileSync(repoFile(".agents", "scripts", "ci-failures.sh"), "utf8"));
     await sh(w.root, "git", "checkout", "-q", "-b", BRANCH);
     await sh(w.root, "git", "push", "-q", "origin", BRANCH);
 
-    const ship = join(REPO_ROOT, "packages", "pack-sdlc", "assets", "workflows", "shared", "ship.yaml");
-    const ci = join(REPO_ROOT, ".agents", "workflows", "shared", "ci.yaml");
+    const ship = repoFile("packages", "pack-sdlc", "assets", "workflows", "shared", "ship.yaml");
+    const ci = repoFile(".agents", "workflows", "shared", "ci.yaml");
     const empty = join(w.dir, "empty-bin");
     mkdirSync(empty);
     await run("ship green", ship, { checks: "success" });
