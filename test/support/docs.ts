@@ -2,7 +2,7 @@
  * The doc set and the doc-text helpers the repo lints share: which files are docs,
  * and how a line's prose is told from its URLs and inline code.
  */
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 export const URL = /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi;
@@ -11,9 +11,18 @@ export const CODE_SPAN = /`[^`\n]*`/g;
 /** Folders never walked: dependencies, git, build output, coverage and agent worktrees. */
 const SKIPPED_DIRS = new Set(["node_modules", ".git", "dist", "coverage", "worktrees"]);
 
-/** Text files under `dir` (any depth) with one of the extensions; skips SKIPPED_DIRS and never follows a symlinked folder. */
+/**
+ * A folder whose own `.gitignore` ignores everything in it: never repo content. norn writes a live
+ * unit's handoff and inputs into such folders of its worktree, and a lint must not read them as tracked.
+ */
+export function ignoresItself(dir: string): boolean {
+  const file = join(dir, ".gitignore");
+  return existsSync(file) && readFileSync(file, "utf8").split("\n").some((l) => l.trim() === "*");
+}
+
+/** Text files under `dir` (any depth) with one of the extensions; skips SKIPPED_DIRS and self-ignored folders, and never follows a symlinked folder. */
 export function textFiles(dir: string, exts: string[]): string[] {
-  if (!existsSync(dir)) return [];
+  if (!existsSync(dir) || ignoresItself(dir)) return [];
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const p = join(dir, e.name);
     if (e.isDirectory()) return SKIPPED_DIRS.has(e.name) ? [] : textFiles(p, exts);
