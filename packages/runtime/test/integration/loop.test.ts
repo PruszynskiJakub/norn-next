@@ -154,7 +154,7 @@ describe("a base that moves under a story waiting at merge", () => {
 
     await baseMoves(t, "person-2", { broken: "the base broke what the story relies on\n" });
     const back = await tickUntil(m, async () => (await unitRecord(m, unit)).state?.step !== "merge", 3);
-    expect(back.flatMap(rulesOf)).toContain(`${unit} step.stale`);
+    expect(back.flatMap(rulesOf)).toContain(`${unit} await.stale`);
     expect(m.agents.starts.map((s) => s.step)).toEqual(["implement", "review", "describe"]);
   }, 60_000);
 

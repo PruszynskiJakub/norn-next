@@ -1,7 +1,7 @@
 /**
  * The GitHub tracker and forge over a fake `gh` on PATH (fixtures/fake-gh): labels defined at init
  * and by doctor, items created and taken in, a story's PR opened, retitled, waited on and merged,
- * and the shipped CI checks, every norn call a subprocess of the binary from source.
+ * and this repo's CI check script, every norn call a subprocess of the binary from source.
  */
 import { beforeAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -330,7 +330,7 @@ describe("a story's pull request on GitHub", () => {
     await norn(w, ["story", "approve", KEY, "--json"]);
     await tickUntil(w, rules, (u) => u?.step === "merge", 60_000, KEY);
     const shown = (await status(w)).stories.find((st) => st.key === KEY) as unknown as { change?: { url?: string } };
-    // the merge step's first poll marks the draft ready, so a person can merge it
+    // mark-ready has marked the draft ready on the way to merge, so a person can merge it
     await norn(w, ["tick", "--json"]);
     atMerge = {
       url: shown.change?.url,
@@ -401,8 +401,10 @@ describe("a story's pull request on GitHub", () => {
     expect(visibleBody(atReady.pr?.body ?? "")).toBe(`Closes ${WEB}/issues/1\n\nDelivered by norn (story ${KEY}).`);
   });
 
-  test("a red CI sends the story back to build with the failing check's URL in its brief, and its rework is pushed through open-pr again", () => {
+  test("a red CI sends the story back to build with the failing check's URL and annotations in its brief, and its rework is pushed through open-pr again", () => {
     expect(reworkBrief).toContain(`${WEB}/actions/runs/1/job/7`);
+    expect(reworkBrief).toContain("src/feature.ts:3 expected the feature");
+    expect(reworkBrief).not.toContain("Process completed with exit code 1.");
     expect(atReady.pushes).toBe(2);
   });
 
@@ -443,7 +445,7 @@ describe("a story's pull request on GitHub", () => {
     expect(reopened.body).toBe(`# Ship it\n\nWhat changed.\n\n---\n\nCloses ${WEB}/issues/1\n\nDelivered by norn (story ${KEY}).`);
     expect(reopened.pushes).toBe(1);
     expect(reopened.step).toBe("ready");
-    expect(unpushedRules).toContain("step.unpushed");
+    expect(unpushedRules).toContain("await.unpushed");
   });
 
   test("a squash merge at the gate ends the story done through change_merged, with one PR in all and its merge sha on record", () => {
@@ -575,20 +577,20 @@ interface ScriptRun {
 }
 
 /**
- * The CI wait scripts run as the check runner runs them, in the story's checkout on its branch with
+ * This repo's CI wait script runs as the check runner runs them, in the story's checkout on its branch with
  * the fake gh on PATH, one scripted PR state per case.
  */
-describe("the CI check scripts over the fake gh", () => {
+describe("this repo's CI check script over the fake gh", () => {
   let w: World;
   const runs: Record<string, ScriptRun> = {};
 
-  async function run(name: string, file: string, pr: Partial<GhPr>, opts: { path?: string; fail?: GhState["fail"] } = {}): Promise<void> {
+  async function run(name: string, file: string, pr: Partial<GhPr>, opts: { fail?: GhState["fail"] } = {}): Promise<void> {
     editGh(w, (s) => {
       s.fail = opts.fail ?? {};
       s.prs = [{ number: 2, head: BRANCH, base: "main", title: "t", body: "", draft: true, state: "OPEN", mergeable: "MERGEABLE", checks: "none", run: null, ...pr }];
     });
     const before = ghCalls(w).length;
-    const r = await nodeExec(["/bin/sh", "-c", ciScript(file)], { cwd: w.root, env: { ...w.env, ...(opts.path !== undefined && { PATH: opts.path }) }, timeoutMs: 60_000 });
+    const r = await nodeExec(["/bin/sh", "-c", ciScript(file)], { cwd: w.root, env: w.env, timeoutMs: 60_000 });
     runs[name] = { code: r.code, stdout: r.stdout + r.stderr, calls: ghCalls(w).slice(before) };
   }
 
@@ -600,18 +602,7 @@ describe("the CI check scripts over the fake gh", () => {
     await sh(w.root, "git", "checkout", "-q", "-b", BRANCH);
     await sh(w.root, "git", "push", "-q", "origin", BRANCH);
 
-    const ship = repoFile("packages", "pack-sdlc", "assets", "workflows", "shared", "ship.yaml");
     const ci = repoFile(".agents", "workflows", "shared", "ci.yaml");
-    const empty = join(w.dir, "empty-bin");
-    mkdirSync(empty);
-    await run("ship green", ship, { checks: "success" });
-    await run("ship red", ship, { checks: "failure" });
-    await run("ship none", ship, { checks: "none" });
-    await run("ship conflicting", ship, { checks: "success", mergeable: "CONFLICTING" });
-    await run("ship unknown", ship, { checks: "success", mergeable: ["UNKNOWN", "MERGEABLE"] });
-    await run("ship came to conflict", ship, { checks: "none", mergeable: ["MERGEABLE", "CONFLICTING"] });
-    await run("ship no gh", ship, { checks: "failure" }, { path: empty });
-    await run("ship no GitHub remote", ship, { checks: "failure" }, { fail: { "repo view": { code: 1, stderr: "none of the git remotes configured for this repository point to a known GitHub host" } } });
     await run("ci green", ci, { run: "success" });
     await run("ci red", ci, { run: "failure" });
     await run("ci no run", ci, { run: null });
@@ -621,28 +612,6 @@ describe("the CI check scripts over the fake gh", () => {
   }, SLOW);
 
   const mergeableAsks = (r: ScriptRun | undefined) => (r?.calls ?? []).filter((c) => c.join(" ").includes("--json mergeable")).length;
-
-  test("the pack's ship ci: green passes, red fails naming the failed check's URL, no checks passes", () => {
-    expect(runs["ship green"]?.code).toBe(0);
-    expect(runs["ship red"]?.code).toBe(1);
-    expect(runs["ship red"]?.stdout).toContain(`- test (id 7): ${WEB}/actions/runs/1/job/7`);
-    expect(runs["ship none"]?.code).toBe(0);
-    expect(runs["ship none"]?.stdout).toContain("nothing to wait for");
-  });
-
-  test("the pack's ship ci: a conflicting PR is stale (exit 3), UNKNOWN is asked again, and a PR that came to conflict while waiting is stale", () => {
-    expect(runs["ship conflicting"]?.code).toBe(3);
-    expect(runs["ship unknown"]?.code).toBe(0);
-    expect(mergeableAsks(runs["ship unknown"])).toBe(2);
-    expect(runs["ship came to conflict"]?.code).toBe(3);
-  });
-
-  test("the pack's ship ci passes with no gh and with no GitHub remote", () => {
-    expect(runs["ship no gh"]?.code).toBe(0);
-    expect(runs["ship no gh"]?.stdout).toContain("gh not found");
-    expect(runs["ship no GitHub remote"]?.code).toBe(0);
-    expect(runs["ship no GitHub remote"]?.stdout).toContain("no GitHub remote");
-  });
 
   test("this repo's ci: green passes, red fails naming the failed jobs and never the log, no run in 5 minutes fails", () => {
     expect(runs["ci green"]?.code).toBe(0);
