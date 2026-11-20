@@ -770,7 +770,13 @@
           }
         ],
         "mailbox": [],
-        "base_stale": true
+        "signals": [
+          {
+            "type": "stale",
+            "source": "vcs",
+            "id": "b1"
+          }
+        ]
       },
       {
         "key": "gh-176",
@@ -1130,8 +1136,7 @@
             }
           }
         ],
-        "mailbox": [],
-        "base_stale": false
+        "mailbox": []
       }
     ],
     "intake": []
@@ -1140,7 +1145,7 @@
     {
       "kind": "apply_receipts",
       "unit": "gh-175",
-      "rule": "step.stale",
+      "rule": "step.signal",
       "receipts": [
         {
           "id": "01JD5G0000C73G79TPA9EMCVD5",
@@ -1149,6 +1154,11 @@
             "run_id": "run-gh-175-1",
             "step_kind": "await-merge",
             "outcome": "stale",
+            "signal": {
+              "type": "stale",
+              "source": "vcs",
+              "id": "b1"
+            },
             "step": "merge",
             "attempt": 1
           }
@@ -1468,7 +1478,13 @@
         "visits": {
           "merge": 1,
           "update": 1
-        }
+        },
+        "signals_fired": [
+          {
+            "type": "stale",
+            "id": "b1"
+          }
+        ]
       },
       "expect_version": 2,
       "rejected": []

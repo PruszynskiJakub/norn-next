@@ -76,6 +76,7 @@ steps:
     outcomes:
       approve: describe
       reject:  { to: implement, counter: qa_loop }
+    on:
       stale:   { to: update, counter: stale_loop }
   implement:
     agent: "Rework the story in its worktree: the failing check, QA repro, CI failure or person's rejection the inputs name. Each rework point gets a test that fails before the code changes."

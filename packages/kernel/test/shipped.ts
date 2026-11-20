@@ -25,7 +25,7 @@ export const STEP_KINDS: Record<string, StepKindInfo> = {
   integrate: kind("integrate", ["done", "conflict"]),
   "open-pr": kind("open-pr", ["done"]),
   push: kind("push", ["done"]),
-  "await-merge": kind("await-merge", ["merged", "stale"], "wait"),
+  "await-merge": kind("await-merge", ["merged", "unpushed"], "wait"),
 };
 
 export const readShipped = (file: string): Record<string, unknown> => parse(readFileSync(join(SHIPPED, file), "utf8"));

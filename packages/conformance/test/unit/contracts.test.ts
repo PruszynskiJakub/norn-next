@@ -1,10 +1,11 @@
 /**
- * The tracker, forge and store suites run against in-memory references, and against references broken on
- * purpose (as known failures), so the suites are shown both to pass a keeper of the contract and to
- * catch a breaker of it.
+ * The tracker, forge, store and signal source suites run against in-memory references, and against
+ * references broken on purpose (as known failures), so the suites are shown both to pass a keeper of
+ * the contract and to catch a breaker of it.
  */
-import { forgeContract, steppingClock, storeContract, trackerContract } from "@norn/conformance";
+import { forgeContract, signalSourceContract, steppingClock, storeContract, trackerContract } from "@norn/conformance";
 import { absentForge, memoryForge } from "./reference/memory-forge.ts";
+import { memorySignalWorld } from "./reference/memory-signal.ts";
 import { memoryStore } from "./reference/memory-store.ts";
 import { memoryTracker } from "./reference/memory-tracker.ts";
 
@@ -42,4 +43,18 @@ storeContract("memory reference that checks before it yields", () => memoryStore
     "racing takeovers: exactly one holds the claim": "every person takes the claim",
     "racing senders all land, once each": "a message lands twice",
   },
+});
+
+signalSourceContract("memory reference", () => memorySignalWorld());
+
+signalSourceContract("memory reference that names each read anew", () => memorySignalWorld({ freshIds: true }), {
+  failing: { "the same occurrence gives the same id on every read and every machine": "every read gets a new id" },
+});
+
+signalSourceContract("memory reference that notes what it saw", () => memorySignalWorld({ notes: true }), {
+  failing: { "a read performs no effect": "every read writes a note" },
+});
+
+signalSourceContract("memory reference that guesses when it cannot tell", () => memorySignalWorld({ guesses: true }), {
+  failing: { "a source that cannot tell answers a failure, never a signal or null": "answers null when its provider is down" },
 });

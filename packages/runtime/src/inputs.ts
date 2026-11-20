@@ -233,6 +233,33 @@ async function lastCheckText(env: RuntimeEnv, record: UnitJournal): Promise<stri
   return tail ? `${head}\n\nThe end of its output:\n\n${tail}` : head;
 }
 
+/** The input a signal's firing reaches the next agent step as. */
+const SIGNAL_INPUT = "signal";
+const SIGNAL_LABEL = "the signal that moved the story from where it waited, with what its source reported";
+
+type SignalFinished = KernelReceipt & { data: Extract<KernelReceipt["data"], { kind: "step.finished" }> & { signal: NonNullable<Extract<KernelReceipt["data"], { kind: "step.finished" }>["signal"]> } };
+
+/**
+ * The receipt of the last signal that fired this round, while no agent step has run since but the
+ * visit now starting: only the agent step right after the signal reads it, as a later one works from
+ * what that step made of it.
+ */
+function signalReceipt(record: UnitJournal): SignalFinished | undefined {
+  const round = roundOf(record);
+  const at = round.findLastIndex((r) => r.data.kind === "step.finished" && r.data.signal !== undefined);
+  const fired = round[at] as SignalFinished | undefined;
+  if (!fired) return undefined;
+  const now = record.state;
+  const since = round.slice(at + 1).some((r) => r.data.kind === "run.started" && r.data.run_kind === "agent" && (r.data.step !== now?.step || r.data.attempt !== now?.attempt));
+  return since ? undefined : fired;
+}
+
+function signalText(r: SignalFinished): string {
+  const { signal, detail } = r.data;
+  const head = `\`${r.data.step ?? "the step"}\` was moved by the signal \`${signal.type}\`, reported by ${signal.source} for occurrence \`${signal.id}\`.`;
+  return detail === undefined ? head : `${head}\n\nWhat the source reported:\n\n\`\`\`json\n${JSON.stringify(detail, null, 2)}\n\`\`\``;
+}
+
 /** Write `text` as the input's file (and keep it inline when short). */
 async function written(env: RuntimeEnv, worktree: string, name: string, file: string, label: string, text: string): Promise<BriefInputView> {
   const path = `${INPUTS_DIR}/${file}`;
@@ -267,6 +294,13 @@ export async function materializeInputs(env: RuntimeEnv, record: UnitJournal, br
         continue;
       }
       out.inputs.push(await materializeOne(env, record, brief, worktree, input, item, out));
+    }
+    // a signal's detail reaches the agent step after it whether or not the step lists it: the workflow
+    // author routes the signal, and cannot know which source's evidence the next step will need
+    if (!brief.inputs.includes(SIGNAL_INPUT)) {
+      const fired = signalReceipt(record);
+      if (fired?.data.detail !== undefined) out.inputs.push(await written(env, worktree, SIGNAL_INPUT, `${SIGNAL_INPUT}.md`, SIGNAL_LABEL, signalText(fired)));
+      else await env.ctx.files.remove(`${worktree}/${INPUTS_DIR}/${SIGNAL_INPUT}.md`);
     }
     return ok(out);
   } catch (e) {
@@ -311,6 +345,14 @@ async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: Brief
         return { name, label: "the last findings", note: noFindingsNote(record, brief) };
       }
       return written(env, worktree, name, "last_findings.md", "the last findings sent back", text);
+    }
+    case SIGNAL_INPUT: {
+      const fired = signalReceipt(record);
+      if (!fired) {
+        await env.ctx.files.remove(`${worktree}/${INPUTS_DIR}/${SIGNAL_INPUT}.md`);
+        return { name, label: SIGNAL_LABEL, note: "no signal moved the story since its last agent step" };
+      }
+      return written(env, worktree, name, `${SIGNAL_INPUT}.md`, SIGNAL_LABEL, signalText(fired));
     }
     case "diff":
       return { name, label: "the change so far", note: `run \`git diff ${cutFrom(unit, await baseRefOf(env))}...HEAD\` in this worktree` };

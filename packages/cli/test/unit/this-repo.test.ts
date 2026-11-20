@@ -64,6 +64,7 @@ interface WrittenStep {
   [kind: string]: unknown;
   skills?: string[];
   outcomes: Record<string, unknown>;
+  on?: Record<string, unknown>;
 }
 interface Written {
   start: string;
@@ -147,9 +148,11 @@ describe("this repo's workflows, as norn loads them", () => {
     expect(w.steps.prepare?.outcomes).toEqual({ done: "open-pr" });
     expect(w.steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
     expect(w.steps.ci?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: { to: "update", counter: "stale_loop" } });
-    expect(w.steps.ready?.outcomes).toMatchObject({ approve: "merge", reject: { to: "prepare", counter: "ready.reject" }, stale: { to: "update", counter: "stale_loop" } });
+    expect(w.steps.ready?.outcomes).toEqual({ approve: "merge", reject: { to: "prepare", counter: "ready.reject" } });
+    expect(w.steps.ready?.on).toMatchObject({ stale: { to: "update", counter: "stale_loop" } });
     expect(w.counters?.["ready.reject"]).toEqual({ max: 2 });
-    expect(w.steps.merge?.outcomes).toMatchObject({ merged: "$done", stale: { to: "update", counter: "stale_loop" } });
+    expect(w.steps.merge?.outcomes).toEqual({ merged: "$done" });
+    expect(w.steps.merge?.on).toMatchObject({ stale: { to: "update", counter: "stale_loop" } });
     expect(w.base).toEqual({ stale: "behind" });
   });
 

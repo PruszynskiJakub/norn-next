@@ -5,6 +5,8 @@ import { decideCase, factsOf, graph, kindOf, loaded, minutesAgo, receipt, run, s
 const checkRun = run({ id: "chk-1", step: "test", executor: "check" });
 const shipRun = run({ id: "step-1", step: "ship", executor: "open-pr" });
 const mergedRun = run({ id: "step-2", step: "merged", executor: "await-merge" });
+const stale = { type: "stale", source: "vcs", id: "b1" };
+const unpushed = { type: "unpushed", source: "vcs", id: "h1" };
 
 describe("a check step", () => {
   test("starts its command, recording run.started first", () => {
@@ -64,30 +66,70 @@ describe("a gate", () => {
     expect(decideCase({ state: stateAt("approve", { parked: { reason: "gate.park", since: minutesAgo(9) } }) })?.rule).toBe("unit.parked");
   });
 
-  test("takes its stale route when the base moved under it, parked or not", () => {
+  test("takes the route its on: block gives a signal in the facts, parked or not, its receipt naming the occurrence", () => {
     const parked = { reason: "gate.park", since: minutesAgo(9) };
-    const d = kindOf(decideCase({ state: stateAt("approve", { parked }), story: { base_stale: true } }), "apply_receipts");
-    expect(d.rule).toBe("gate.stale");
-    expect(d.receipts[0]?.data).toMatchObject({ kind: "step.finished", step_kind: "gate", outcome: "stale" });
-    expect(d.state).toMatchObject({ step: "build", counters: { "approve.stale": 1 } });
+    const d = kindOf(decideCase({ state: stateAt("approve", { parked }), story: { signals: [stale] } }), "apply_receipts");
+    expect(d.rule).toBe("gate.signal");
+    expect(d.receipts[0]?.data).toEqual({ kind: "step.finished", step_kind: "gate", outcome: "stale", signal: { type: "stale", source: "vcs", id: "b1" }, step: "approve", attempt: 1 });
+    expect(d.state).toMatchObject({ step: "build", counters: { "approve.stale": 1 }, signals_fired: [{ type: "stale", id: "b1" }] });
     expect(d.state.parked).toBeUndefined();
   });
 
-  test("takes its unpushed route when the story's branch holds commits its change lacks, the story's own unit only", () => {
-    const wf = loaded(graph({ approve: { outcomes: ["approve", "reject", "stale", "unpushed"], routes: { approve: { to: "$done" }, reject: { to: "build", counter: "approve.reject" }, unpushed: { to: "ship" } } } }));
+  test("takes a signal for the story's own unit only, and only one the step routes", () => {
+    const wf = loaded(graph({ approve: { routes: { approve: { to: "$done" }, reject: { to: "build", counter: "approve.reject" }, unpushed: { to: "ship" } }, signals: [{ name: "unpushed" }] } }));
     const parked = { reason: "gate.park", since: minutesAgo(9) };
-    const d = kindOf(decideCase({ state: stateAt("approve", { parked }, wf), workflows: [wf], story: { unpushed: true } }), "apply_receipts");
-    expect(d.rule).toBe("gate.unpushed");
-    expect(d.receipts[0]?.data).toMatchObject({ kind: "step.finished", step_kind: "gate", outcome: "unpushed" });
-    expect(d.state.step).toBe("ship");
-    expect(decideCase({ state: stateAt("approve", { parked }), story: { unpushed: true } })?.rule).toBe("unit.parked");
-    expect(decideCase({ state: stateAt("approve", { parked }, wf), workflows: [wf], story: { unpushed: true }, unitId: "gh-1/02" })?.rule).toBe("unit.parked");
+    const d = kindOf(decideCase({ state: stateAt("approve", { parked }, wf), workflows: [wf], story: { signals: [unpushed] } }), "apply_receipts");
+    expect(d).toMatchObject({ rule: "gate.signal", state: { step: "ship" } });
+    expect(decideCase({ state: stateAt("approve", { parked }), story: { signals: [unpushed] } })?.rule).toBe("unit.parked");
+    expect(decideCase({ state: stateAt("approve", { parked }, wf), workflows: [wf], story: { signals: [unpushed] }, unitId: "gh-1/02" })?.rule).toBe("unit.parked");
+  });
+
+  test("fires each occurrence once a round: the same id waits for a person, a new id fires again", () => {
+    const parked = { reason: "gate.park", since: minutesAgo(9) };
+    const fired = stateAt("approve", { parked, signals_fired: [{ type: "stale", id: "b1" }] });
+    expect(decideCase({ state: fired, story: { signals: [stale] } })?.rule).toBe("unit.parked");
+    const again = kindOf(decideCase({ state: fired, story: { signals: [{ ...stale, id: "b2" }] } }), "apply_receipts");
+    expect(again.rule).toBe("gate.signal");
+    expect(again.state.signals_fired).toEqual([
+      { type: "stale", id: "b1" },
+      { type: "stale", id: "b2" },
+    ]);
+    // an id is fired per signal: another signal with the same id is its own occurrence
+    const both = loaded(graph({ approve: { routes: { ...graph().steps.approve?.routes, unpushed: { to: "ship" } }, signals: [{ name: "stale" }, { name: "unpushed" }] } }));
+    expect(kindOf(decideCase({ state: stateAt("approve", { parked, signals_fired: [{ type: "stale", id: "b1" }] }, both), workflows: [both], story: { signals: [stale, { ...unpushed, id: "b1" }] } }), "apply_receipts").state.step).toBe("ship");
+  });
+
+  test("weighs signals in the order its on: block lists them, not the order the facts hold them", () => {
+    const routes = { ...graph().steps.approve?.routes, unpushed: { to: "ship" } };
+    const unpushedFirst = loaded(graph({ approve: { routes, signals: [{ name: "unpushed" }, { name: "stale" }] } }));
+    const staleFirst = loaded(graph({ approve: { routes, signals: [{ name: "stale" }, { name: "unpushed" }] } }));
+    const at = (wf: typeof staleFirst) => kindOf(decideCase({ state: stateAt("approve", {}, wf), workflows: [wf], story: { signals: [stale, unpushed] } }), "apply_receipts");
+    expect(at(unpushedFirst).receipts[0]?.data).toMatchObject({ outcome: "unpushed" });
+    expect(at(staleFirst).receipts[0]?.data).toMatchObject({ outcome: "stale" });
+    // the first listed already fired: the next one present is taken
+    const fired = kindOf(decideCase({ state: stateAt("approve", { signals_fired: [{ type: "unpushed", id: "h1" }] }, unpushedFirst), workflows: [unpushedFirst], story: { signals: [stale, unpushed] } }), "apply_receipts");
+    expect(fired.receipts[0]?.data).toMatchObject({ outcome: "stale" });
+  });
+
+  test("a receipt that leaves it on the same visit keeps its park, so the visit's wait is still counted from when it began", () => {
+    const parked = { reason: "gate.park", since: minutesAgo(3000) };
+    const receipts = [{ seq: 1, id: "r-1", at: minutesAgo(1), data: { kind: "mode.changed" as const, mode: "manual" as const, by: "a-person" } }];
+    const d = kindOf(decideCase({ state: stateAt("approve", { parked }), receipts }), "apply_receipts");
+    expect(d.state).toMatchObject({ step: "approve", attempt: 1, mode: "manual" });
+    expect(d.state.parked).toEqual(parked);
+    // the next tick sees the same park and holds, rather than parking again from now
+    expect(decideCase({ state: d.state })?.rule).toBe("unit.parked");
   });
 
   test("a gate.decided receipt from a person moves it", () => {
     const receipts = [{ seq: 1, id: "r-1", at: minutesAgo(1), data: { kind: "gate.decided" as const, outcome: "approve" as const, by: "a-person", step: "approve", attempt: 1 } }];
     const d = kindOf(decideCase({ state: stateAt("approve", { parked: { reason: "gate.park", since: minutesAgo(9) } }), receipts }), "apply_receipts");
     expect(d.state.ended).toBe("done");
+    expect(d.state.parked).toBeUndefined();
+    const reject = [{ seq: 1, id: "r-1", at: minutesAgo(1), data: { kind: "gate.decided" as const, outcome: "reject" as const, by: "a-person", step: "approve", attempt: 1 } }];
+    const back = kindOf(decideCase({ state: stateAt("approve", { parked: { reason: "gate.park", since: minutesAgo(9) } }), receipts: reject }), "apply_receipts");
+    expect(back.state.step).toBe("build");
+    expect(back.state.parked).toBeUndefined();
   });
 });
 
@@ -142,25 +184,21 @@ describe("a plugin step kind", () => {
     expect(done.state.step).toBe("approve");
   });
 
-  test("a story polled at a wait step goes back to push when its branch holds commits its change lacks and the step routes unpushed", () => {
-    const wf = loaded(graph({ merged: { outcomes: ["merged", "stale", "unpushed"], routes: { merged: { to: "approve" }, stale: { to: "build", counter: "merged.stale" }, unpushed: { to: "ship" } } } }));
-    const at = (unitId?: string) => ({ state: stateAt("merged", { run: mergedRun }, wf), workflows: [wf], story: { unpushed: true }, step_run: { kind: "await-merge", running: false, outcome: "waiting" } as const, ...(unitId ? { unitId } : {}) });
-    const d = kindOf(decideCase(at()), "apply_receipts");
-    expect(d.rule).toBe("step.unpushed");
-    expect(d.receipts[0]?.data).toMatchObject({ kind: "step.finished", run_id: "step-2", step_kind: "await-merge", outcome: "unpushed" });
-    expect(d.state.step).toBe("ship");
-    // a step that does not route it is polled as before
-    expect(decideCase({ state: stateAt("merged", { run: mergedRun }), story: { unpushed: true } })?.rule).toBe("step.poll");
+  test("a story polled at a wait step takes the route its on: block gives a signal between polls; a step that does not route it is polled", () => {
+    const waiting = { kind: "await-merge", running: false, outcome: "waiting" } as const;
+    const d = kindOf(decideCase({ state: stateAt("merged", { run: mergedRun }), story: { signals: [stale] }, step_run: waiting }), "apply_receipts");
+    expect(d.rule).toBe("step.signal");
+    expect(d.receipts[0]?.data).toMatchObject({ kind: "step.finished", run_id: "step-2", step_kind: "await-merge", outcome: "stale", signal: { type: "stale", source: "vcs", id: "b1" } });
+    expect(d.state.step).toBe("build");
+    const plain = loaded(graph({ merged: { routes: { merged: { to: "approve" } }, signals: [] } }));
+    expect(decideCase({ state: stateAt("merged", { run: mergedRun }, plain), workflows: [plain], story: { signals: [stale] } })?.rule).toBe("step.poll");
+    expect(decideCase({ state: stateAt("merged", { run: mergedRun }), story: { signals: [unpushed] } })?.rule).toBe("step.poll");
+    expect(decideCase({ state: stateAt("merged", { run: mergedRun, signals_fired: [{ type: "stale", id: "b1" }] }), story: { signals: [stale] } })?.rule).toBe("step.poll");
   });
 
-  test("a story polled at a wait step takes its stale route when the host reads the base as stale; a step that does not route it is polled", () => {
-    const wf = loaded(graph({ merged: { outcomes: ["merged", "stale", "unpushed"], routes: { merged: { to: "approve" }, stale: { to: "build", counter: "merged.stale" }, unpushed: { to: "ship" } } } }));
-    const d = kindOf(decideCase({ state: stateAt("merged", { run: mergedRun }, wf), workflows: [wf], story: { base_stale: true }, step_run: { kind: "await-merge", running: false, outcome: "waiting" } }), "apply_receipts");
-    expect(d.rule).toBe("step.stale");
-    expect(d.receipts[0]?.data).toMatchObject({ kind: "step.finished", run_id: "step-2", step_kind: "await-merge", outcome: "stale" });
-    expect(d.state.step).toBe("build");
-    const plain = loaded(graph({ merged: { outcomes: ["merged"], routes: { merged: { to: "approve" } } } }));
-    expect(decideCase({ state: stateAt("merged", { run: mergedRun }, plain), workflows: [plain], story: { base_stale: true } })?.rule).toBe("step.poll");
+  test("the wait kind's own answer on the same tick wins over a signal", () => {
+    const d = kindOf(decideCase({ state: stateAt("merged", { run: mergedRun }), story: { signals: [stale] }, step_run: { kind: "await-merge", running: false, outcome: "merged" } }), "apply_receipts");
+    expect(d).toMatchObject({ rule: "step.finished", state: { step: "approve" } });
   });
 
   test("a step run of another kind is not this step's", () => {

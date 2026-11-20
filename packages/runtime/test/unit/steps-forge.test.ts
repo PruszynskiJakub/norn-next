@@ -236,7 +236,7 @@ describe("await-merge", () => {
     expect(value(elsewhere)).toMatchObject({ outcome: "waiting", detail: { reason: "the change merged into main, not the story's base release" } });
   });
 
-  test("a base the story lacks is never answered stale here: the host's base_stale fact decides that by the workflow's policy", async () => {
+  test("a base the story lacks is never answered stale here: the host's stale signal decides that by the workflow's policy", async () => {
     const { poll } = await opened({ "gh-12-login": ZERO, "origin/main": BASE }, {});
     expect(value(await poll()).outcome).toBe("waiting");
   });

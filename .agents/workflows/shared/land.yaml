@@ -9,6 +9,7 @@ steps:
     outcomes:
       approve: merge
       reject:  { exit: rejected }
+    on:
       stale:   { exit: stale }
       unpushed: { exit: unpushed }
   # a story past ready waits here for a person to merge its PR; the merge ends the story, and a base
@@ -17,5 +18,6 @@ steps:
     await-merge:
     outcomes:
       merged: $done
+    on:
       stale: { exit: stale }
       unpushed: { exit: unpushed }

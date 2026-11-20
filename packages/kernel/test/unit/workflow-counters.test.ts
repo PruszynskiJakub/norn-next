@@ -10,7 +10,7 @@ describe("deriveCounters", () => {
     const d = derive({
       build: step("agent", { done: "test" }),
       test: step("check", { pass: "ok", fail: "build", flaky: "build" }, { 4: "flaky" }),
-      ok: step("gate", { approve: "land", reject: "build", stale: "build" }),
+      ok: { ...step("gate", { approve: "land", reject: "build", stale: "build" }), signals: ["stale"] },
       land: step("integrate", { done: "$done", conflict: "build" }),
     });
     expect(d.errors).toEqual([]);

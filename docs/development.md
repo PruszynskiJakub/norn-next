@@ -39,7 +39,7 @@ packages/harness-pi       @norn/harness-pi       the pi harness: an extension pi
 packages/runner-headless  @norn/runner-headless  agents as detached processes, output to a log
 packages/runner-herdr     @norn/runner-herdr     agents in Herdr panes, one workspace per story and one tab per run, closed by `close` (plugin API 1.17) once the run's unit is done with; `focus`, `split` and `label` (plugin API 1.18) bring a run's pane in front, open the cockpit below a person's pane and write a story workspace's `$norn` sidebar token
 packages/pack-sdlc        @norn/pack-sdlc        the sdlc pack: workflows, shared files and skills, imported as text
-packages/conformance      @norn/conformance      contract suites (store, tracker, forge, harness), in-memory fakes, recorded-session replay
+packages/conformance      @norn/conformance      contract suites (store, tracker, forge, signal source, harness), in-memory fakes, recorded-session replay
 packages/cli              @norn/cli              wiring + commands, the layered config, plugin install and lock, init and doctor; bin `norn` → src/main.ts
 ```
 
@@ -59,6 +59,7 @@ A plugin is one value made with `defineNornPlugin({ name, api, provides })`; `ap
 | `runners` | where an agent process runs | `headless`, `herdr` |
 | `stepKinds` | a workflow head key beyond the kernel's own `agent`, `check`, `gate`, `slices` | `update-branch`, `integrate`, `push`, `verify-base` (vcs-git), `open-pr`, `await-merge` (runtime) |
 | `packs` | workflows, shared files and skills shipped together | `sdlc` |
+| `signals` | a signal a waiting step can route under `on:`: its parameters, and `read` (a `Signal` with an occurrence id, `null` when nothing happened, or a failure when it cannot tell); optional since plugin API 1.19 | none: the host reports `stale`, `unpushed` (vcs) and `timeout` (clock) itself, and a plugin may not reuse those names |
 
 Every slot call returns a `PluginResult` and never throws. A plugin gets a `HostContext` (files, exec, processes, clock, the repo's root and data dir) and touches the machine only through it. A tracker, forge or store is never a state store for the kernel's decisions: labels and comments they write are display for people.
 
@@ -104,6 +105,7 @@ A change that keeps behaviour leaves the corpus alone. For an intended change in
 A slot's contract is a suite in `@norn/conformance` that every implementation runs, so a third-party plugin is held to the same reads as a bundled one:
 
 - `storeContract`, `trackerContract` and `forgeContract` state what a store, tracker or forge must do (idempotent effects by receipt id, compare-and-swap that never lets two racing writers both win, refusals as `PluginResult` failures). Each bundled plugin runs its suite: `packages/store-local/test/unit/contract.test.ts`, `packages/store-refs/test/integration/contract.test.ts`, `packages/tracker-local/test/unit/contract.test.ts`, `packages/plugin-github/test/unit/contract.test.ts`, `packages/forge-none/test/unit/contract.test.ts`. Reference implementations in memory sit in `packages/conformance/test/unit/reference/`.
+- `signalSourceContract` states what a signal source must do: nothing happened reads `null`, a signal is valid and of the name asked for, the same occurrence gives the same id on every read and on a fresh world (another machine), a new occurrence a new id, a source that cannot tell answers a failure, and a read performs no effect. The host's own vcs and clock sources run it in `packages/runtime/test/unit/signals.test.ts`; the reference in memory and three broken on purpose are in `packages/conformance/test/unit/reference/memory-signal.ts`.
 - `harnessConformance` replays a recording of each scenario in one catalogue through the harness's `normalize` into the kernel's reducer and classifier, and asserts the read each capability implies. It reads `capabilities`, never `name`. The recordings are in `packages/conformance/test/unit/fixtures/`, run by `packages/conformance/test/unit/claude.test.ts` and `packages/conformance/test/unit/pi.test.ts`.
 - The live canary, `packages/conformance/test/integration/live-canary.test.ts`, runs one real headless turn per harness and replays its hook calls the same way. It starts a real agent and costs money, so it runs only with `NORN_TEST_LIVE=1`, never in CI.
 
@@ -111,7 +113,7 @@ A new plugin gets a contract run; a known break is listed in the suite's options
 
 ## Where the contracts live
 
-- **The plugin contract**: `packages/plugin-api/src/`. `plugin.ts` (`defineNornPlugin`, `PluginProvides`, the checks a plugin passes when it loads), one file per slot (`harness.ts`, `tracker.ts`, `forge.ts`, `store.ts`, `vcs.ts`, `runner.ts`, `step-kind.ts`, `pack.ts`), `host.ts` (`HostContext`), `result.ts` (`PluginResult`, `ok`, `fail`), `events.ts` (the normalized harness events the kernel reads), `story-key.ts`, `version.ts` (`PLUGIN_API_VERSION`, `apiSatisfies`). A slot joins as an optional member, so a plugin written against an older plugin API stays valid.
+- **The plugin contract**: `packages/plugin-api/src/`. `plugin.ts` (`defineNornPlugin`, `PluginProvides`, the checks a plugin passes when it loads), one file per slot (`harness.ts`, `tracker.ts`, `forge.ts`, `store.ts`, `vcs.ts`, `runner.ts`, `step-kind.ts`, `pack.ts`, `signal.ts` with `BUILTIN_SIGNALS`), `host.ts` (`HostContext`), `result.ts` (`PluginResult`, `ok`, `fail`), `events.ts` (the normalized harness events the kernel reads), `story-key.ts`, `version.ts` (`PLUGIN_API_VERSION`, `apiSatisfies`). A slot joins as an optional member, so a plugin written against an older plugin API stays valid.
 - **The kernel's model**: `packages/kernel/src/model/`. `facts.ts` (`KernelFacts`, what a tick gathers), `actions.ts` (`Decision` and every action kind), `receipts.ts` (every receipt kind), `run-state.ts`, `session.ts`, `config.ts` (`KernelConfig`, the counter defaults), `capabilities.ts` (what the configured slots can do, as decide sees it).
 - **decide**: `packages/kernel/src/decide/`. `index.ts` (entry), `story.ts` (intake, claims, the story's tail: flush, finish, release), `unit.ts` with `unit-agent.ts` and `unit-steps.ts`, `rules.ts` (`RULE_IDS`).
 - **The journal**: `packages/kernel/src/journal/`. `journal.ts` holds the write rules (receipts before effects, state last by compare-and-swap, a lost race read again, anything failing validation read as corrupt); `apply.ts` turns receipts into run state; `format.ts` reads older run-state formats forward.

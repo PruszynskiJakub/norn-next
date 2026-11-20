@@ -9,6 +9,7 @@ export * from "./provider.ts";
 export * from "./prompt-mark.ts";
 export * from "./result.ts";
 export * from "./runner.ts";
+export * from "./signal.ts";
 export * from "./step-kind.ts";
 export * from "./store.ts";
 export * from "./story-key.ts";

@@ -53,6 +53,7 @@ steps:
     outcomes:
       approve: merge
       reject:  prepare
+    on:
       stale:   { to: update, counter: stale_loop }
       # the story branch holds commits its PR lacks: push them through open-pr before a person merges
       unpushed: open-pr
@@ -62,6 +63,7 @@ steps:
     await-merge:
     outcomes:
       merged: $done
+    on:
       stale: { to: update, counter: stale_loop }
       unpushed: open-pr
 counters:

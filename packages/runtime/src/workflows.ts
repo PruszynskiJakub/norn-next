@@ -6,10 +6,11 @@
  */
 import { type KernelWorkflows, type LoadedWorkflow, loadWorkflow, type PinnedWorkflow } from "@norn/kernel";
 import type { RuntimeEnv } from "./env.ts";
+import { signalDeclarations } from "./resolve.ts";
 
 /** The workflow a unit pinned, loaded from its own flat document; null when it no longer loads to the same hash. */
 export function loadPinned(env: RuntimeEnv, pinned: PinnedWorkflow): LoadedWorkflow | null {
-  const load = loadWorkflow(structuredClone(pinned.doc), { stepKinds: env.slots.stepKinds, sharedFiles: {}, config: env.config.kernel });
+  const load = loadWorkflow(structuredClone(pinned.doc), { stepKinds: env.slots.stepKinds, sharedFiles: {}, config: env.config.kernel, signals: signalDeclarations(env.slots.signals) });
   if (!load.ok || load.workflow.pinned.hash !== pinned.hash) return null;
   return load.workflow;
 }

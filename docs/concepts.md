@@ -54,6 +54,31 @@ A **step** is one node of a workflow. Its head key says what happens there:
 
 A step written `use:` brings in a shared file's steps, and `like:` copies another step. An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). A step's `outcomes:` maps each outcome to the next step, `$done` or `$stuck`. Every route back (a failed test sends the story back to `implement`) carries a **counter** with a max, derived from the kind of edge and named `<step>.<outcome>`: a check's `fail` 5, a gate's `reject` 2, a `conflict` 2, `stale` 10, an agent sending work back 3. `max:` on an edge changes its bound, and the `kernel.counters` config keys change the defaults.
 
+### Signals
+
+A **signal** is a fact about the world outside a waiting step, which a tick reads: the base moved under the story (`stale`), the story branch holds commits its change lacks (`unpushed`), the step has waited too long (`timeout`). `outcomes:` says how a step ends by itself; a step's `on:` block says what may move it along while it waits, with the same route shape:
+
+```yaml
+ready:
+  gate: "Read the draft PR. Approve to wait for the merge, or reject with what to change."
+  outcomes:
+    approve: merge
+    reject:  { exit: rejected }
+  on:
+    stale:    { exit: stale }
+    unpushed: open-pr
+    timeout:  { after: 48h, to: remind }
+```
+
+- **Only waiting steps.** `on:` sits on a gate or a wait step kind (`await-merge`). A running agent or check is never moved by a signal, and `on:` on one is refused when the workflow loads.
+- **Only declared signals.** The host reports `stale` and `unpushed` (from the vcs) and `timeout` (from the clock) itself; a plugin may declare more. A name no source declares is refused, and so is one under both `outcomes:` and `on:`.
+- **Only the story.** A tick asks a source only for the story's own unit at a waiting step, and only for the signals under that step's `on:`. Slices get none.
+- **Once per occurrence, per round.** Each signal names its occurrence with an id (the base commit for `stale`, the story head for `unpushed`, the step visit for `timeout`). One id moves the story once in a round; a new base move, a new push or a new visit is a new id. The first signal listed that is present wins, one per tick.
+- **Endings and the step's own answer come first.** A merged change, a closed item or a closed change is decided before any signal, and a wait step kind's own outcome on the same tick wins over one.
+- **Bounded.** An `on:` route back carries a counter named `<step>.<signal>`, bounded by the `stale` default (10) unless it sets `max:`.
+
+A signal may carry a small `detail` (a failed check, a review's comments); the next agent step gets it as the `signal` input. A workflow written before `on:` routes `stale` and `unpushed` under a waiting step's `outcomes:`; it still loads, to the same graph, so a story that pinned it decides as before, and `norn doctor` warns about a repo file in that form.
+
 ## Who does what: attended steps, gates and modes
 
 - An **attended step** (`attended: true`) is an agent step done *with* a person in the agent's pane. A person always starts it.
@@ -120,7 +145,7 @@ Config comes in layers, each overriding the one before:
 
 The committed file wins over everyone's own, so a key it sets is the team's: `norn config set` still writes your file, but says when the committed file overrides what it wrote. With `--commit`, `norn init` leaves the mode out of the committed file and writes it to yours.
 
-`norn init` writes `.agents/norn.local.yaml` (or `.agents/norn.yaml` with `--commit`) with every slot named: tracker, forge, store, the executors, the base branch and the mode, and the test command it detects from your build files as `checks.test`, which the shipped workflows' test steps run (default `bun test`): a JS repo's lockfile names its tool, and with none, bun when it is on PATH and a `package.json` script runs it, else npm, installing without writing a lockfile into the unit's worktree. `norn config show` prints the merged config and which file set each key, `norn config get <key>` one key and the file that set it, and `norn config set <key> <value>` changes one (in the local file, the committed one with `--commit`, the user file with `--user`). Each slot is `{use: <plugin name>, …}` with that plugin's own keys beside `use`; the plugin checks them. `norn doctor` checks the config, the plugins it picks, the workflows (a repo workflow naming a skill norn cannot find draws a warning, never a failure: a skill counts as found when the pack ships it or the repo keeps `<name>/SKILL.md` in `.agents/skills/` or a harness's skills folder, and a `plugin:skill` name is not looked for, since the harness may load either kind from outside the repo), the labels norn puts on items (defining any the tracker lacks), that each harness's hook line runs (outside a run, so not that a hook records its event), the pack's skills in the main checkout (written or brought up to date, those a newer pack dropped removed, a folder the repo keeps named), a shared store's run data against the remote's for every story this machine holds, the tools on PATH (git 2.38 or later, `gh` logged in for GitHub) and the git remotes a forge and the refs store push to, and says what to fix first; `norn watch` refuses an older git.
+`norn init` writes `.agents/norn.local.yaml` (or `.agents/norn.yaml` with `--commit`) with every slot named: tracker, forge, store, the executors, the base branch and the mode, and the test command it detects from your build files as `checks.test`, which the shipped workflows' test steps run (default `bun test`): a JS repo's lockfile names its tool, and with none, bun when it is on PATH and a `package.json` script runs it, else npm, installing without writing a lockfile into the unit's worktree. `norn config show` prints the merged config and which file set each key, `norn config get <key>` one key and the file that set it, and `norn config set <key> <value>` changes one (in the local file, the committed one with `--commit`, the user file with `--user`). Each slot is `{use: <plugin name>, …}` with that plugin's own keys beside `use`; the plugin checks them. `norn doctor` checks the config, the plugins it picks, the workflows (a repo file that still routes `stale` or `unpushed` under a waiting step's `outcomes:` draws a warning naming the move to `on:`; a repo workflow naming a skill norn cannot find draws a warning, never a failure: a skill counts as found when the pack ships it or the repo keeps `<name>/SKILL.md` in `.agents/skills/` or a harness's skills folder, and a `plugin:skill` name is not looked for, since the harness may load either kind from outside the repo), the labels norn puts on items (defining any the tracker lacks), that each harness's hook line runs (outside a run, so not that a hook records its event), the pack's skills in the main checkout (written or brought up to date, those a newer pack dropped removed, a folder the repo keeps named), a shared store's run data against the remote's for every story this machine holds, the tools on PATH (git 2.38 or later, `gh` logged in for GitHub) and the git remotes a forge and the refs store push to, and says what to fix first; `norn watch` refuses an older git.
 
 A config left by norn 0.35 or earlier is never read: its keys mean other things here. A repo's `.agents/norn.config.yaml` is refused with a pointer to `norn init`, which writes this norn's config from the keys it can map. An old `~/.norn/config.yaml` (top-level `mode`, `max_agents`) is refused the same way, and `norn init` rewrites it in place (`mode` under `kernel`; `max_agents` is left behind, since norn starts every due agent with no cap), keeping the old text as `config.yaml.old` and naming the keys it left behind.
 
@@ -138,6 +163,7 @@ A config left by norn 0.35 or earlier is never read: its keys mean other things 
 | outcome | How a step ended, spelled as its reporter types it (`done`, `approve`, `stuck`, …). |
 | counter | A bound on a retry, nudge or loop; past its max the unit is stuck. |
 | gate | A step where a person approves or rejects. |
+| signal | A fact about the world outside a waiting step (`stale`, `unpushed`, `timeout`), read on a tick and routed under the step's `on:`. |
 | check | A step that runs a command; its exit code is the outcome. |
 | attended step | An agent step done with a person in the pane. |
 | mode | Who starts a story's unattended agent steps: a person (`manual`) or norn (`auto`). |

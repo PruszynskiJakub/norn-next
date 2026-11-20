@@ -82,6 +82,12 @@ export const RunState = Type.Object(
      * person's move or a new round. Kept on the state because decide sees only receipts not yet applied.
      */
     rework_from: Type.Optional(PosInt),
+    /**
+     * the signals fired this round, each once per occurrence: a level still true at the next visit
+     * (red CI on the same head) is left to the person rather than looping. Kept on the state because
+     * decide sees only receipts not yet applied; a new round starts with none.
+     */
+    signals_fired: Type.Optional(Type.Array(Type.Object({ type: NonEmpty, id: NonEmpty }, closed))),
     /** fresh-session retries used in this visit to the step */
     retries_used: NonNegInt,
     run: Type.Union([RunInfo, Type.Null()]),

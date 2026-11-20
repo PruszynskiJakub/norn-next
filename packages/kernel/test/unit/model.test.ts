@@ -105,7 +105,7 @@ describe("kernel schemas", () => {
             },
           ],
           mailbox: [],
-          base_stale: false,
+          signals: [{ type: "stale", source: "vcs", id: "b1", at: NOW, detail: { base: "origin/main" } }],
         },
       ],
     });

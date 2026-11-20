@@ -227,6 +227,17 @@ describe("the change and the item", () => {
     expect(done.intent.data).toEqual({ kind: "unit.marked", ended: "done", reason: "the change merged", step: "split", attempt: 1 });
   });
 
+  test("a merged change ends the story before any signal is weighed, whatever the waiting step routes", () => {
+    const ready = { name: "ready", kind: "gate", runner: { type: "builtin" as const }, outcomes: ["approve", "reject"], routes: { approve: { to: "$done" }, reject: { to: "plan" }, stale: { to: "plan" } }, signals: [{ name: "stale" }], gate: { prompt: "Ship it?" } };
+    const graph = { ...STORY_WF.graph, hash: "e".repeat(64), steps: { ...STORY_WF.graph.steps, ready } };
+    const gated = { pinned: { ...STORY_WF.pinned, hash: graph.hash }, graph };
+    const wfs = workflows();
+    const at = (c: ReturnType<typeof change> | null) =>
+      decideAll(facts([story({ change: c, signals: [{ type: "stale", source: "vcs", id: "b1" }], units: [unit("gh-1", state("gh-1", "ready", {}, gated))] })]), { ...wfs, byHash: { ...wfs.byHash, [graph.hash]: gated } });
+    expect(rules(at(change({ state: "open" })))).toEqual(["gate.signal"]);
+    expect(rules(at(change({ state: "merged" })))).toEqual(["story.change_merged"]);
+  });
+
   test("a mark already on the record is left to the unit rules to apply", () => {
     const u = unit("gh-1", state("gh-1", "plan"), { receipts: [receipt(1, { kind: "unit.marked", ended: "done" })] });
     expect(storyDecisions(story({ change: change({ state: "merged" }), units: [u] }))).toEqual([]);

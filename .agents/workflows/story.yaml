@@ -66,6 +66,7 @@ steps:
     outcomes:
       approve: describe
       reject:  { to: implement, counter: qa_loop }
+    on:
       stale:   { to: update, counter: stale_loop }
   implement:
     agent: "Run `bun run test` (the unit tier) after each change, and the type check; the integration tier runs in CI, which the `ci` check waits for, so do not run them before handing back."

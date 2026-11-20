@@ -443,12 +443,12 @@ describe("a story's pull request on GitHub", () => {
     expect(reopened.body).toBe(`# Ship it\n\nWhat changed.\n\n---\n\nCloses ${WEB}/issues/1\n\nDelivered by norn (story ${KEY}).`);
     expect(reopened.pushes).toBe(1);
     expect(reopened.step).toBe("ready");
-    expect(unpushedRules).toContain("step.unpushed");
+    expect(unpushedRules).toContain("step.signal");
   });
 
   test("a squash merge at the gate ends the story done through change_merged, with one PR in all and its merge sha on record", () => {
     expect(mergedRules).toContain("story.change_merged");
-    expect(mergedRules).not.toContain("gate.stale");
+    expect(mergedRules).not.toContain("gate.signal");
     expect(ended?.ended).toBe("done");
     expect(prCreates).toBe(1);
     expect(JSON.stringify(view.body)).toContain(MERGE_SHA);

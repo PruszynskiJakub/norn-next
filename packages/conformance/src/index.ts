@@ -28,3 +28,4 @@ export { eventsByStep, project, type Reading, readAt } from "./replay.ts";
 export { type Check, type EventBody, type HookStep, type HostStep, isHostStep, type Scenario, type Step } from "./scenario.ts";
 export { oddJson, storeContract, type StoreContractTest, type StoreWorld } from "./store-contract.ts";
 export { receiptId, type SeedItem, trackerContract, type TrackerContractTest, trackerWorld, type TrackerWorld } from "./tracker-contract.ts";
+export { type SignalContractTest, signalSourceContract, type SignalWorld } from "./signal-contract.ts";

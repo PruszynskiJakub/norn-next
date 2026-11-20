@@ -5,7 +5,7 @@
  * appears here as something to branch on.
  */
 import { ChangeRequest, ClaimRecord, StoredMessage, TrackerItem } from "@norn/plugin-api";
-import { IsoTime, NonEmpty, OutcomeName, PosInt, Ulid } from "@norn/schema";
+import { IsoTime, NonEmpty, OutcomeName, PosInt, Signal, Ulid } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
 import { KernelCapabilities } from "./capabilities.ts";
 import { KernelReceipt } from "./receipts.ts";
@@ -113,16 +113,11 @@ export const StoryFacts = Type.Object(
     /** messages not yet acknowledged; empty when the store has no mailbox */
     mailbox: Type.Array(StoredMessage),
     /**
-     * The base moved under the story the way the workflow's `base.stale` names. Reported by the host's
-     * repository plugin, so a waiting gate can take its `stale` route without decide reading git.
+     * What the host's signal sources report now about the story waiting at a step that routes them
+     * under `on:` (the base went stale, the branch holds unpushed commits, the visit timed out), so
+     * decide moves the story without reading git, the clock or a forge. Absent or empty: nothing.
      */
-    base_stale: Type.Optional(Type.Boolean()),
-    /**
-     * The story's branch holds commits its open change lacks, beyond the spec folder. Reported by the
-     * host's repository plugin, so a gate or wait step that routes `unpushed` sends the story back to
-     * push them without decide reading git.
-     */
-    unpushed: Type.Optional(Type.Boolean()),
+    signals: Type.Optional(Type.Array(Signal)),
     /**
      * This clone's run data of the story and the remote's each hold writes the other lacks, so a
      * flush can publish neither. Reported by a shared store; absent or false otherwise.

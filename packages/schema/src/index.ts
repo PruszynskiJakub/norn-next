@@ -5,6 +5,7 @@ export * from "./criteria.ts";
 export * from "./frontmatter.ts";
 export * from "./ids.ts";
 export * from "./receipt.ts";
+export * from "./signal.ts";
 export * from "./state.ts";
 export * from "./validate.ts";
 export * from "./version.ts";

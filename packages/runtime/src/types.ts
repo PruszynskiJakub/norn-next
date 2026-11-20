@@ -39,7 +39,7 @@ export interface RuntimeConfig {
   /** the branch a story branch is cut from and a merged change lands on */
   base: string;
   /**
-   * the ref the base is measured at for `base_stale` and `unpushed`, such as a remote-tracking
+   * the ref the base is measured at for the `stale` and `unpushed` signals, such as a remote-tracking
    * `origin/main`; absent: `base` itself
    */
   baseRef?: string;

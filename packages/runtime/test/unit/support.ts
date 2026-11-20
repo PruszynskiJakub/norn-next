@@ -327,6 +327,40 @@ export const WORKFLOWS: Record<string, string> = {
     "",
   ].join("\n"),
   "sliced.yaml": "name: sliced\nstart: split\nsteps:\n  split:\n    slices:\n    outcomes: { done: $done, stuck: $stuck }\n",
+  "pushed.yaml": [
+    "name: pushed",
+    "start: ready",
+    "steps:",
+    "  ready:",
+    "    gate: Ready?",
+    "    outcomes: { approve: $done, reject: $stuck }",
+    "    on: { unpushed: push }",
+    "  push:",
+    "    probe: null",
+    "    outcomes: { done: ready, conflict: $stuck }",
+    "",
+  ].join("\n"),
+  "signalled.yaml": [
+    "name: signalled",
+    "start: poke",
+    "steps:",
+    "  poke:",
+    "    probe: null",
+    "    outcomes: { done: wait, conflict: $stuck }",
+    "  wait:",
+    "    await-thing: null",
+    "    outcomes: { ready: ready }",
+    "    on: { timeout: { after: 1h, to: poke } }",
+    "  ready:",
+    "    gate: Ready?",
+    "    outcomes: { approve: $done, reject: $stuck }",
+    "    on: { timeout: { after: 48h, to: $stuck }, ticked: build }",
+    "  build:",
+    "    agent: Build the thing.",
+    "    inputs: [handoff]",
+    "    outcomes: { done: ready }",
+    "",
+  ].join("\n"),
   "based.yaml": [
     "name: based",
     "start: ready",
@@ -424,6 +458,8 @@ export interface HarnessOptions {
   checks?: Record<string, string>;
   /** names this machine claimed under before its current holder */
   formerHolders?: string[];
+  /** plugins beside the fakes and the local store, such as one providing a signal a workflow routes */
+  plugins?: NornPlugin[];
 }
 
 export function harness(opts: HarnessOptions = {}): Harnessed {
@@ -455,7 +491,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
       packs: { test: { workflows: WORKFLOWS, shared: {}, skills: {} } },
     },
   });
-  const plugins: NornPlugin[] = [providers, localStorePlugin];
+  const plugins: NornPlugin[] = [providers, localStorePlugin, ...(opts.plugins ?? [])];
   const config: RuntimeConfig = {
     tracker: { name: "fake" },
     forge: { name: "fake" },

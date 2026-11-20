@@ -3,6 +3,7 @@ import type { Harness } from "./harness.ts";
 import { type Pack, packProblems } from "./pack.ts";
 import { type StepKindDefinition, stepKindProblems } from "./step-kind.ts";
 import type { RunnerFactory } from "./runner.ts";
+import { type SignalSourceDefinition, signalSourceProblems } from "./signal.ts";
 import type { StoreFactory } from "./store.ts";
 import type { TrackerFactory } from "./tracker.ts";
 import type { VcsFactory } from "./vcs.ts";
@@ -25,6 +26,8 @@ export interface PluginProvides {
   packs?: Record<string, Pack>;
   /** where agent processes run (herdr, headless), by name (plugin API 1.5) */
   runners?: Record<string, RunnerFactory>;
+  /** readers of the signals an `on:` block may route, by signal name (plugin API 1.19) */
+  signals?: Record<string, SignalSourceDefinition>;
 }
 
 export interface NornPluginSpec {
@@ -46,6 +49,7 @@ export interface NornPlugin {
     vcs?: Readonly<Record<string, VcsFactory>>;
     packs?: Readonly<Record<string, Pack>>;
     runners?: Readonly<Record<string, RunnerFactory>>;
+    signals?: Readonly<Record<string, SignalSourceDefinition>>;
   }>;
 }
 
@@ -75,6 +79,11 @@ function checkFactory(slot: string): (plugin: string, key: string, f: TrackerFac
 function checkStepKind(plugin: string, key: string, k: StepKindDefinition): void {
   const found = stepKindProblems(key, k);
   if (found.length > 0) refuse(plugin, `step kind ${key} ${found.join("; ")}`);
+}
+
+function checkSignal(plugin: string, key: string, s: SignalSourceDefinition): void {
+  const found = signalSourceProblems(key, s);
+  if (found.length > 0) refuse(plugin, `signal ${key} ${found.join("; ")}`);
 }
 
 function checkPack(plugin: string, key: string, p: Pack): void {
@@ -118,6 +127,7 @@ export function defineNornPlugin(spec: NornPluginSpec): NornPlugin {
   const vcs = slot(name, "vcs", spec.provides?.vcs, checkFactory("vcs"));
   const packs = slot(name, "pack", spec.provides?.packs, checkPack);
   const runners = slot(name, "runner", spec.provides?.runners, checkFactory("runner"));
+  const signals = slot(name, "signal", spec.provides?.signals, checkSignal);
   const provides: NornPlugin["provides"] = {
     ...(harness && { harness }),
     ...(tracker && { tracker }),
@@ -127,6 +137,7 @@ export function defineNornPlugin(spec: NornPluginSpec): NornPlugin {
     ...(vcs && { vcs }),
     ...(packs && { packs: Object.freeze(Object.fromEntries(Object.entries(packs).map(([k, p]) => [k, freezePack(p)]))) }),
     ...(runners && { runners }),
+    ...(signals && { signals }),
   };
   return Object.freeze({ name, api: spec.api, provides: Object.freeze(provides) });
 }
