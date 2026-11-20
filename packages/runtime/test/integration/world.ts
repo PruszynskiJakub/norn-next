@@ -19,7 +19,6 @@ import { localStorePlugin } from "@norn/store-local";
 import { refsStorePlugin } from "@norn/store-refs";
 import { localTrackerPlugin } from "@norn/tracker-local";
 import { vcsGitPlugin } from "@norn/vcs-git";
-import { parse, stringify } from "yaml";
 import { type AgentLauncher, type AgentRunRequest, createRuntimeEnv, newTickId, type RuntimeConfig, type RuntimeEnv, type SessionSource, stepsForgePlugin, type TickReport, tick } from "../../src/index.ts";
 
 export const START = "2026-11-17T09:00:00.000Z";
@@ -98,11 +97,7 @@ export async function team(): Promise<Team> {
  * `gh` script) is a repo with no CI. The test command is the config's `checks.test`.
  */
 function localPack(): NornPlugin {
-  const shared = { ...SDLC_PACK.shared };
-  const ship = parse(shared["ship.yaml"] as string) as { steps: { ci: { check: string } } };
-  ship.steps.ci.check = 'echo "no CI in this repo"';
-  shared["ship.yaml"] = stringify(ship);
-  return defineNornPlugin({ name: "test-pack", api: "^1.4", provides: { packs: { local: { workflows: { ...SDLC_PACK.workflows, ...WORKFLOWS }, shared, skills: {} } } } });
+  return defineNornPlugin({ name: "test-pack", api: "^1.4", provides: { packs: { local: { workflows: { ...SDLC_PACK.workflows, ...WORKFLOWS }, shared: SDLC_PACK.shared, skills: {} } } } });
 }
 
 /** A shorter story for what quick's length would only slow down: build, check, gate, ship. */

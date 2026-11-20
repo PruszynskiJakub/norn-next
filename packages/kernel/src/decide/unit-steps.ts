@@ -1,16 +1,17 @@
 /**
- * Check, gate and plugin step rules. A check and an `effect` step kind run once per attempt; a
+ * Check, gate, await and plugin step rules. A check and an `effect` step kind run once per attempt; a
  * `wait` step kind is polled every tick until it answers something other than `waiting`. Each run is
  * recorded before the host performs it, and how it went comes back as a receipt the next tick
  * applies. A run cut short, or whose plugin failed, runs again under its run while the retries last,
  * each time recorded, and then ends the unit stuck. A gate never decides itself: it waits for a
- * person, or takes its `stale` or `unpushed` route when the story moved under it.
+ * person, or takes its `stale` or `unpushed` route when the story moved under it. An await step
+ * routes on the signals the host gathered for the story.
  */
 import { WAITING_OUTCOME } from "@norn/plugin-api";
 import type { Decision } from "../model/actions.ts";
 import type { RunInfo } from "../model/run-state.ts";
-import type { CheckStepSpec } from "../workflow/graph.ts";
-import { applyDecision, applyOrPark, endStuckDecision, intentFor, noop, parkDecision, type UnitView } from "./unit-support.ts";
+import type { AwaitStepSpec, CheckStepSpec } from "../workflow/graph.ts";
+import { ageMs, applyDecision, applyOrPark, endStuckDecision, intentFor, noop, parkDecision, type UnitView } from "./unit-support.ts";
 
 /** The step run the facts show, when it belongs to the step the unit is at. */
 function stepRunOf(v: UnitView) {
@@ -73,11 +74,71 @@ function unpushed(v: UnitView): boolean {
   return v.unit.id === v.story.key && v.story.unpushed === true && v.step.routes.unpushed !== undefined;
 }
 
+/**
+ * The story moved under a step that waits on it: the base moved the way the workflow's `base.stale`
+ * names, or its branch holds commits its change lacks. Taken only where the step routes it; `prefix`
+ * names the rule (`gate.stale`, `step.unpushed`, ...).
+ */
+function movedUnder(v: UnitView, prefix: string, run_id?: string): Decision | null {
+  const finished = (outcome: string) => intentFor(v, { kind: "step.finished", ...(run_id !== undefined && { run_id }), step_kind: v.step.kind, outcome });
+  // the host's base_stale already reads the workflow's base policy, which a step kind does not know
+  if (v.story.base_stale === true && v.step.routes.stale !== undefined) return applyDecision(v, `${prefix}.stale`, [finished("stale")]);
+  if (unpushed(v)) return applyDecision(v, `${prefix}.unpushed`, [finished("unpushed")]);
+  return null;
+}
+
 export function decideGate(v: UnitView, prompt: string): Decision {
-  if (v.story.base_stale === true && v.step.routes.stale !== undefined)
-    return applyDecision(v, "gate.stale", [intentFor(v, { kind: "step.finished", step_kind: "gate", outcome: "stale" })]);
-  if (unpushed(v)) return applyDecision(v, "gate.unpushed", [intentFor(v, { kind: "step.finished", step_kind: "gate", outcome: "unpushed" })]);
-  return parkDecision(v, "gate.park", "gate", { text: prompt });
+  return movedUnder(v, "gate") ?? parkDecision(v, "gate.park", "gate", { text: prompt });
+}
+
+/**
+ * An await step: its visit is a run recorded on entering, with no host effect, so its grace and
+ * deadline count from the visit. Each tick it takes the first route, in the order the step lists its
+ * kinds, whose signal the story's facts hold; then a move under it; then its deadline; else it waits.
+ */
+export function decideAwait(v: UnitView, spec: AwaitStepSpec): Decision {
+  const run = v.state.run;
+  if (!run) {
+    const run_id = v.ctx.nextId();
+    return applyDecision(v, "await.start", [intentFor(v, { kind: "run.started", run_id, run_kind: "step", executor: "await", attended: false })]);
+  }
+  const signals = v.story.signals ?? [];
+  const age = ageMs(v.ctx, run.started_at);
+  const present = (kind: string) => {
+    if (kind !== "ci.none") return signals.find((s) => s.kind === kind);
+    // a forge shows no check for a while after a push: none reads as pending until the grace has passed, unless the forge never has checks
+    const graced = v.ctx.facts.capabilities.forge?.checks !== true || age >= (spec.grace_ms ?? 0);
+    return graced ? signals.find((s) => s.kind === kind) : undefined;
+  };
+  for (const kind of spec.on) {
+    const s = present(kind);
+    if (!s) continue;
+    const detail = s.data === undefined ? {} : { detail: structuredClone(s.data) };
+    return applyDecision(v, "await.signal", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: "await", outcome: kind, ...detail })]);
+  }
+  const moved = movedUnder(v, "await", run.id);
+  if (moved) return moved;
+  const seen = v.story.signals_error !== undefined ? `signals not read: ${v.story.signals_error}` : `seen ${signals.map((s) => s.kind).join(", ") || "nothing"}`;
+  if (spec.deadline_ms !== null && age >= spec.deadline_ms) {
+    if (v.step.routes.timeout !== undefined)
+      return applyDecision(v, "await.timeout", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: "await", outcome: "timeout" })]);
+    // not a derived park: a late signal must not slip past the person it now waits for
+    return parkDecision(v, "await.timeout", "stuck", { text: `${v.state.step} did not finish within ${formatMs(spec.deadline_ms)} (${seen})` });
+  }
+  const graced = spec.grace_ms !== null && signals.some((s) => s.kind === "ci.none") ? ` (no check yet: ci.none after ${formatMs(spec.grace_ms)})` : "";
+  return noop(v, "await.waiting", `waiting on ${spec.on.join(", ")}; ${seen}${graced}`);
+}
+
+/** `30m`, `1h30m`, `45s`: a duration as a workflow writes one. */
+function formatMs(ms: number): string {
+  const parts: string[] = [];
+  let rest = Math.round(ms / 1000);
+  for (const [unit, secs] of [["h", 3600], ["m", 60], ["s", 1]] as const) {
+    const n = Math.floor(rest / secs);
+    rest -= n * secs;
+    if (n > 0) parts.push(`${n}${unit}`);
+  }
+  return parts.join("") || `${ms}ms`;
 }
 
 export function decidePluginStep(v: UnitView, mode: "effect" | "wait"): Decision {
@@ -95,14 +156,7 @@ export function decidePluginStep(v: UnitView, mode: "effect" | "wait"): Decision
     const detail = sr.detail === undefined ? {} : { detail: structuredClone(sr.detail) };
     return applyOrPark(v, "step.finished", "step.finished.rejected", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: v.step.kind, outcome, ...detail })]);
   }
-  if (mode === "wait") {
-    // checked between polls: the host's base_stale already reads the workflow's base policy, which a step kind does not know
-    if (v.story.base_stale === true && v.step.routes.stale !== undefined)
-      return applyDecision(v, "step.stale", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: v.step.kind, outcome: "stale" })]);
-    // a story waiting on a merge goes back to push what its change lacks
-    if (unpushed(v)) return applyDecision(v, "step.unpushed", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: v.step.kind, outcome: "unpushed" })]);
-    return { ...base, rule: "step.poll", run_id: run.id };
-  }
+  if (mode === "wait") return movedUnder(v, "step", run.id) ?? { ...base, rule: "step.poll", run_id: run.id };
   // an effect kind recorded but never answered was cut short, or its plugin failed: run again under its run while the retries last
   if (!mayResume(v, run)) return endStuckDecision(v, "step.resume.exhausted", resumesSpent(v, run, v.step.kind));
   return { ...base, rule: "step.resume", run_id: run.id, intent: resumed(v, run.id) };

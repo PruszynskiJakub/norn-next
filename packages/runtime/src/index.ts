@@ -59,6 +59,7 @@ export { collectStepKinds, findProvided, loadPackWorkflows, type ResolvedSlots, 
 export { DEFAULT_TRACE_RETAIN_MS, pruneTraces, removeUnitLogs, TRACE_PRUNE_PER_TICK } from "./retention.ts";
 export { createRuntime, createRuntimeEnv } from "./runtime.ts";
 export { awaitMerge } from "./steps-forge/await-merge.ts";
+export { markReady } from "./steps-forge/mark-ready.ts";
 export { openPr } from "./steps-forge/open-pr.ts";
 export { stepsForgePlugin } from "./steps-forge/plugin.ts";
 export { readStepRun, STEP_RUNS_DIR, StepRunRecord, stepRunFact, stepRunPath, writeStepRun } from "./step-runs.ts";

@@ -195,7 +195,7 @@
                   "description": "Outcome → what its norn done must come with",
                   "type": "object",
                   "patternProperties": {
-                    "^[a-z][a-z0-9_-]*$": {
+                    "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
                       "anyOf": [
                         {
                           "const": "findings",
@@ -219,7 +219,7 @@
                   "additionalProperties": false,
                   "type": "object",
                   "patternProperties": {
-                    "^[a-z][a-z0-9_-]*$": {
+                    "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
                       "anyOf": [
                         {
                           "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
@@ -255,7 +255,7 @@
                   "description": "Outcome → what it means, shown to the agent in the brief",
                   "type": "object",
                   "patternProperties": {
-                    "^[a-z][a-z0-9_-]*$": {
+                    "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
                       "minLength": 1,
                       "type": "string"
                     }
@@ -266,7 +266,7 @@
                   "description": "Outcome → the worst criteria verdict it may be reported with",
                   "type": "object",
                   "patternProperties": {
-                    "^[a-z][a-z0-9_-]*$": {
+                    "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
                       "anyOf": [
                         {
                           "const": "fail",
@@ -318,7 +318,7 @@
                   "type": "object",
                   "patternProperties": {
                     "^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$": {
-                      "pattern": "^[a-z][a-z0-9_-]*$",
+                      "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                       "type": "string"
                     }
                   }
@@ -328,7 +328,7 @@
                   "additionalProperties": false,
                   "type": "object",
                   "patternProperties": {
-                    "^[a-z][a-z0-9_-]*$": {
+                    "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
                       "anyOf": [
                         {
                           "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
@@ -917,6 +917,152 @@
               "additionalProperties": false,
               "type": "object",
               "required": [
+                "mark-ready",
+                "outcomes"
+              ],
+              "properties": {
+                "mark-ready": {
+                  "description": "Takes no value",
+                  "type": "null"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "properties": {
+                    "done": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "await",
+                "outcomes"
+              ],
+              "properties": {
+                "await": {
+                  "minItems": 1,
+                  "uniqueItems": true,
+                  "description": "The signal kinds the step waits on; it takes the first route whose kind is present",
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "const": "ci.pending",
+                        "type": "string"
+                      },
+                      {
+                        "const": "ci.passed",
+                        "type": "string"
+                      },
+                      {
+                        "const": "ci.failed",
+                        "type": "string"
+                      },
+                      {
+                        "const": "ci.none",
+                        "type": "string"
+                      },
+                      {
+                        "const": "change.merged",
+                        "type": "string"
+                      },
+                      {
+                        "const": "change.closed",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                },
+                "description": {
+                  "type": "string"
+                },
+                "deadline": {
+                  "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+                  "description": "Duration like 30s, 10m, 1h30m",
+                  "type": "string"
+                },
+                "grace": {
+                  "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+                  "description": "How long no check reads as pending before ci.none; default 5m",
+                  "type": "string"
+                },
+                "outcomes": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
                 "slices",
                 "outcomes"
               ],
@@ -1011,7 +1157,7 @@
                   "additionalProperties": false,
                   "type": "object",
                   "patternProperties": {
-                    "^[a-z][a-z0-9_-]*$": {
+                    "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
                       "anyOf": [
                         {
                           "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
@@ -1079,6 +1225,9 @@
                 "integrate": {},
                 "push": {},
                 "await-merge": {},
+                "mark-ready": {},
+                "await": {},
+                "grace": {},
                 "slices": {}
               }
             }
@@ -1104,7 +1253,7 @@
             "reset_on": {
               "anyOf": [
                 {
-                  "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "description": "<step>.<outcome> whose edge resets the counter",
                   "type": "string"
                 },
@@ -1112,7 +1261,7 @@
                   "minItems": 1,
                   "type": "array",
                   "items": {
-                    "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$",
+                    "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                     "description": "<step>.<outcome> whose edge resets the counter",
                     "type": "string"
                   }

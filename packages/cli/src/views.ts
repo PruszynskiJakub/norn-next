@@ -3,7 +3,7 @@
  * gathered and never acted on, shaped for a person. What waits for a person (a gate, a question, a
  * parked or stuck unit) is named per unit, so `status` reads as a list of what needs doing.
  */
-import { ASKED_PARK, ITEM_CLOSED_REASON, isChangeClosedReason, type KernelCapabilities, type KernelWorkflows, type StoryFacts, type UnitFacts, unsyncedReason } from "@norn/kernel";
+import { ASKED_PARK, type CompiledStep, ITEM_CLOSED_REASON, isChangeClosedReason, type KernelCapabilities, type KernelWorkflows, type StoryFacts, type UnitFacts, unsyncedReason } from "@norn/kernel";
 import { gatherFacts, newTickId, type RuntimeEnv } from "@norn/runtime";
 import { refuse } from "./output.ts";
 
@@ -33,6 +33,11 @@ export interface UnitView {
   pending_receipts: number;
   /** the counters the unit has spent, each against its bound: what is left before a loop ends it stuck */
   counters: Record<string, { value: number; max: number }>;
+  /**
+   * The story's own unit waiting at an await step: the signal kinds it waits on, the signals the forge
+   * reported this read, why they could not be read, and when its deadline passes. Absent elsewhere.
+   */
+  awaiting?: { on: string[]; seen: string[]; error?: string; deadline_at?: string };
 }
 
 export interface StoryView {
@@ -130,6 +135,9 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
       };
     case "gate.park":
       return { for: "gate", text: prompt ?? s.step, next: decide };
+    // a rerun starts a fresh visit, and with it a fresh deadline
+    case "await.timeout":
+      return { for: "person", text: s.parked?.text ?? "its wait passed its deadline", next: rerun };
     default:
       // a rerun alone would see the closed change park the unit again on the next tick
       if (isChangeClosedReason(reason)) return { for: "person", text: reason, next: `reopen the change on the forge, then ${rerun}; or ${newWork}` };
@@ -145,12 +153,26 @@ function waitingOf(u: UnitFacts, kind: string | null, prompt: string | undefined
   return null;
 }
 
-/** `executors`: what each executor can do; without them no dialog is offered to story answer */
-export function unitView(u: UnitFacts, workflows: KernelWorkflows, executors: KernelCapabilities["executors"] = {}): UnitView {
+/** What the story's own unit at an await step waits on, as the facts read it; undefined anywhere else. */
+function awaitingOf(u: UnitFacts, step: CompiledStep | undefined, story: StoryFacts | undefined): UnitView["awaiting"] {
+  const s = u.state;
+  if (!s || !step?.await || s.ended || s.parked || story?.key !== u.id) return undefined;
+  const deadline = s.run && step.await.deadline_ms !== null ? new Date(Date.parse(s.run.started_at) + step.await.deadline_ms).toISOString() : undefined;
+  return {
+    on: [...step.await.on],
+    seen: (story.signals ?? []).map((x) => x.kind),
+    ...(story.signals_error !== undefined && { error: story.signals_error }),
+    ...(deadline !== undefined && { deadline_at: deadline }),
+  };
+}
+
+/** `executors`: what each executor can do; without them no dialog is offered to story answer. `story`: the unit's story, whose signals an await step reads */
+export function unitView(u: UnitFacts, workflows: KernelWorkflows, executors: KernelCapabilities["executors"] = {}, story?: StoryFacts): UnitView {
   const s = u.state;
   const graph = s ? workflows.byHash[s.workflow.hash]?.graph : undefined;
   const step = s ? graph?.steps[s.step] : undefined;
   const kind = step?.kind ?? null;
+  const awaiting = awaitingOf(u, step, story);
   return {
     id: u.id,
     step: s?.step ?? null,
@@ -165,6 +187,7 @@ export function unitView(u: UnitFacts, workflows: KernelWorkflows, executors: Ke
     waiting: u.corrupt ? { for: "person", text: `corrupt: ${u.corrupt}` } : waitingOf(u, kind, step?.gate?.prompt, s?.run ? executors[s.run.executor]?.dialogKeys === true : false),
     pending_receipts: u.receipts.length,
     counters: spentCounters(s?.counters ?? {}, graph?.counters ?? {}),
+    ...(awaiting && { awaiting }),
   };
 }
 
@@ -202,7 +225,7 @@ export function storyView(s: StoryFacts, workflows: KernelWorkflows, executors: 
     claim: s.claim ? { holder: s.claim.holder, expires_at: s.claim.expires_at } : null,
     change: s.change ? { id: s.change.id, state: s.change.state, url: s.change.url ?? null, ...(s.change.merge_sha !== undefined && { merge_sha: s.change.merge_sha }) } : null,
     ...(unsynced && { unsynced }),
-    units: s.units.map((u) => unitView(u, workflows, executors)),
+    units: s.units.map((u) => unitView(u, workflows, executors, s)),
   };
 }
 
@@ -230,9 +253,14 @@ export function unitLine(u: UnitView): string {
   const spent = Object.entries(u.counters ?? {}).map(([name, c]) => `${name} ${c.value}/${c.max}`);
   const where = `${u.id}: ${u.step}${u.kind ? ` (${u.kind})` : ""}${u.attempt && u.attempt > 1 ? ` attempt ${u.attempt}` : ""}${spent.length ? ` [${spent.join(", ")}]` : ""}`;
   if (u.ended === "done") return `${where}, done`;
-  const run = u.run ? `, run by ${u.run.executor}${u.run.activity ? ` (${u.run.activity})` : ""}` : "";
+  // an await step's run is its visit, run by nothing a person needs named
+  const run = u.run && u.kind !== "await" ? `, run by ${u.run.executor}${u.run.activity ? ` (${u.run.activity})` : ""}` : "";
   const waiting = u.waiting ? ` — waits for ${u.waiting.for}: ${u.waiting.text}${u.waiting.next ? ` → ${u.waiting.next}` : ""}` : "";
-  return `${where}${run}${waiting}`;
+  const a = u.awaiting;
+  const awaits = a
+    ? `, awaits ${a.on.join(", ")}: ${a.error !== undefined ? `signals not read: ${a.error}` : `seen ${a.seen.join(", ") || "nothing"}`}${a.deadline_at ? `; deadline ${a.deadline_at}` : ""}`
+    : "";
+  return `${where}${run}${awaits}${waiting}`;
 }
 
 export function storyHead(s: StoryView): string {

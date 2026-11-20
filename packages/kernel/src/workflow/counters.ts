@@ -2,12 +2,13 @@
  * The counter each route back gets from the kind of its edge, so an author writes a counter only to
  * share one between edges or to bound one differently. The bounds are the old engine's, so a shipped
  * workflow loads to the counters it always had: a check's `fail`, a gate's `reject`, a `conflict`
- * (reset whenever its step ends another way), a `stale` or `unpushed`, and an agent's otherwise
- * uncounted route back.
+ * (reset whenever its step ends another way), a `stale` or `unpushed`, and an agent's or an await
+ * step's otherwise uncounted route back.
  * Forward outcomes (`done`, `pass`, `approve`) are never counted unless the author writes `max:`.
  */
 import type { CounterDefaults } from "../model/config.ts";
 import type { CounterDoc, Route } from "./document.ts";
+import { splitEdge } from "./edge.ts";
 import type { CompiledCounter, WorkflowError } from "./graph.ts";
 
 /** One flat step as counting needs it: its head kind and its routes as written (after `use` and `like`). */
@@ -38,7 +39,7 @@ export interface DerivedCounters {
 const FORWARD: readonly string[] = ["done", "pass", "approve"];
 
 /** The kinds of edge a shared exit's feeders can derive by, as a mixed-kind refusal names them. */
-const KIND_LABEL = { check: "check fail", gate: "gate reject", conflict: "conflict", stale: "stale", unpushed: "unpushed", agent: "agent send-back" } as const;
+const KIND_LABEL = { check: "check fail", gate: "gate reject", conflict: "conflict", stale: "stale", unpushed: "unpushed", agent: "agent send-back", signal: "signal" } as const;
 type EdgeKind = keyof typeof KIND_LABEL;
 
 interface Edge {
@@ -84,7 +85,7 @@ export function deriveCounters(
 
   const edges = edgesOf(steps, order);
   const counted = new Set<string>();
-  const agentRow: Edge[] = [];
+  const loopRow: Edge[] = [];
   const count = (e: Edge, spec: CompiledCounter) => {
     out.edges[nameOf(e)] = nameOf(e);
     out.counters[nameOf(e)] = spec;
@@ -103,7 +104,7 @@ export function deriveCounters(
         continue;
       }
       const spec = kindDefault(step, e, defaults);
-      const kind = spec ? kindOf(step, e) : step.kind === "agent" && !FORWARD.includes(e.outcome) ? "agent" : null;
+      const kind = spec ? kindOf(step, e) : loopKind(step, e);
       group.feeders.push({ e, kind, spec });
       if (spec || left.max !== undefined) counted.add(nameOf(e));
       continue;
@@ -121,13 +122,13 @@ export function deriveCounters(
     const spec = kindDefault(step, e, defaults);
     if (spec) count(e, e.max === undefined ? spec : { ...spec, max: e.max });
     else if (e.max !== undefined) count(e, { max: e.max, reset_on: [] });
-    else if (step.kind === "agent" && !FORWARD.includes(e.outcome)) agentRow.push(e);
+    else if (loopKind(step, e) !== null) loopRow.push(e);
   }
 
   // u → v lies on a cycle of the uncounted edges exactly when v reaches u through them
   const next = new Map<string, string[]>();
   for (const e of edges) if (!counted.has(nameOf(e)) && Object.hasOwn(steps, e.to)) next.set(e.step, [...(next.get(e.step) ?? []), e.to]);
-  for (const e of agentRow) if (reaches(next, e.to, e.step)) count(e, { max: defaults.agentBack, reset_on: [] });
+  for (const e of loopRow) if (reaches(next, e.to, e.step)) count(e, loopDefault(loopKind(steps[e.step] as CountedStep, e) as LoopKind, defaults));
   for (const [exit, group] of groups) countExit(out, steps, exit, group, defaults, (e) => reaches(next, e.to, e.step));
   return out;
 }
@@ -144,7 +145,7 @@ function countExit(
   defaults: CounterDefaults,
   onLoop: (e: Edge) => boolean,
 ): void {
-  const [use, name] = exit.split(".") as [string, string];
+  const [use, name] = splitEdge(exit);
   const path = `/steps/${use}/outcomes/${name}`;
   const { max } = group.route;
   if (group.end) {
@@ -152,9 +153,9 @@ function countExit(
     return;
   }
   if (!group.feeders.length) return;
-  // agent feeders derive together, when any one of them closes a loop nothing else counts
-  const agentsDerive = group.feeders.some((f) => f.kind === "agent" && onLoop(f.e));
-  const deriving = group.feeders.filter((f) => f.spec || (f.kind === "agent" && agentsDerive));
+  // feeders of one loop kind derive together, when any one of them closes a loop nothing else counts
+  const loopsDerive = new Set(group.feeders.filter((f) => isLoopKind(f.kind) && onLoop(f.e)).map((f) => f.kind));
+  const deriving = group.feeders.filter((f) => f.spec || loopsDerive.has(f.kind));
   const kinds = [...new Set(deriving.map((f) => f.kind as EdgeKind))];
   let spec: CompiledCounter;
   let counted = deriving;
@@ -173,10 +174,30 @@ function countExit(
 
 /** The default counter of a shared exit whose deriving feeders are all of `kind`; a conflict resets on every other outcome of every feeder step. */
 function exitDefault(kind: EdgeKind, deriving: readonly Feeder[], steps: Readonly<Record<string, CountedStep>>, defaults: CounterDefaults): CompiledCounter {
-  if (kind === "agent") return { max: defaults.agentBack, reset_on: [] };
+  if (isLoopKind(kind)) return loopDefault(kind, defaults);
   if (kind !== "conflict") return deriving[0]?.spec as CompiledCounter;
   const resets = [...new Set(deriving.flatMap((f) => otherOutcomes(steps[f.e.step] as CountedStep, f.e)))];
   return { max: defaults.conflict, reset_on: resets };
+}
+
+/**
+ * Kinds of route back counted only where they close a loop no other counter bounds: an agent's route
+ * other than forward, and any route an await step takes on a signal, bounded as a check's fail is.
+ */
+type LoopKind = "agent" | "signal";
+
+function loopKind(step: CountedStep, e: Edge): LoopKind | null {
+  if (step.kind === "agent" && !FORWARD.includes(e.outcome)) return "agent";
+  if (step.kind === "await") return "signal";
+  return null;
+}
+
+function isLoopKind(kind: EdgeKind | null): kind is LoopKind {
+  return kind === "agent" || kind === "signal";
+}
+
+function loopDefault(kind: LoopKind, defaults: CounterDefaults): CompiledCounter {
+  return { max: kind === "agent" ? defaults.agentBack : defaults.checkFail, reset_on: [] };
 }
 
 function kindOf(step: CountedStep, e: Edge): EdgeKind {

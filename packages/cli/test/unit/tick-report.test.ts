@@ -20,4 +20,11 @@ describe("a tick's report", () => {
     expect(failedCount(report([unavailable, conflict, lost]))).toBe(2);
     expect(outcomeLine(conflict)).toContain("FAILED");
   });
+
+  test("a waiting await step's line names the kinds it waits on and the signals it saw", () => {
+    const waiting = { decision: { kind: "noop", unit: "gh-1", rule: "await.waiting", reason: "waiting on ci.passed, ci.failed, ci.none; seen ci.pending" }, ok: true } as unknown as Outcome;
+    expect(outcomeLine(waiting)).toBe("gh-1  await.waiting → noop: waiting on ci.passed, ci.failed, ci.none; seen ci.pending");
+    const other = { decision: { kind: "noop", unit: "gh-1", rule: "agent.running", reason: "run r-1 at work" }, ok: true } as unknown as Outcome;
+    expect(outcomeLine(other)).toBe("gh-1  agent.running → noop");
+  });
 });

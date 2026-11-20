@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { memoryHost } from "@norn/conformance";
-import { defineNornPlugin, ok } from "@norn/plugin-api";
+import { type ChangeRequest, defineNornPlugin, ok } from "@norn/plugin-api";
 import { packSdlcPlugin } from "@norn/pack-sdlc";
 import { localStorePlugin } from "@norn/store-local";
 import { vcsGitPlugin } from "@norn/vcs-git";
@@ -280,5 +280,87 @@ describe("vcs facts", () => {
     const r = await gatherFacts(h.env, h.tickIds[0] as string);
     const story = r.ok ? r.value.facts.stories[0] : undefined;
     expect([story?.base_stale, story?.unpushed]).toEqual([undefined, undefined]);
+  });
+});
+
+describe("signals", () => {
+  const change = (over: Partial<ChangeRequest> = {}): ChangeRequest => ({ id: 4, state: "open", draft: false, head_branch: "norn/lt-1", base_branch: "main", head_sha: "b2", title: "Story 1", ...over });
+  async function waiting(workflow = "awaited") {
+    const h = harness({ workflow });
+    h.items.push(trackerItem(1));
+    await tickUntil(h, has("round.start"));
+    h.changes["norn/lt-1"] = change();
+    h.forge.calls.length = 0;
+    return h;
+  }
+  const storyOf = async (h: Awaited<ReturnType<typeof waiting>>, opts = {}) => {
+    const g = await gatherFacts(h.env, h.tickIds[0] as string, opts);
+    if (!g.ok) throw new Error(g.failure.message);
+    return { story: g.value.facts.stories[0], problems: g.value.problems };
+  };
+  const kinds = (story: { signals?: Array<{ kind: string }> } | undefined) => story?.signals?.map((s) => s.kind);
+
+  test("a story whose own unit waits at an await step gets the checks on its change as ci signals, from one findChanges and one checks call", async () => {
+    const h = await waiting();
+    for (const [summary, kind] of [["pending", "ci.pending"], ["success", "ci.passed"], ["none", "ci.none"]] as const) {
+      h.forge.checks[4] = summary;
+      expect(kinds((await storyOf(h)).story)).toEqual([kind]);
+    }
+    const { story } = await storyOf(h);
+    expect(story?.signals?.[0]).toEqual({ source: "forge", kind: "ci.none", subject: "change/4", at: h.clock.now() });
+    expect(h.forge.calls.slice(-2)).toEqual(["findChanges norn/lt-1", "checks 4"]);
+  });
+
+  test("the failed checks are asked only once the checks say failure, and ride in ci.failed's data", async () => {
+    const h = await waiting();
+    h.forge.checks[4] = "pending";
+    await storyOf(h);
+    expect(h.forge.calls.some((c) => c.startsWith("failures"))).toBe(false);
+    h.forge.checks[4] = "failure";
+    h.forge.failed[4] = [{ name: "unit", url: "https://ci/1", annotations: [{ path: "src/a.ts", line: 3, message: "boom" }] }];
+    const { story } = await storyOf(h);
+    expect(story?.signals).toEqual([{ source: "forge", kind: "ci.failed", subject: "change/4", at: h.clock.now(), data: { failed: h.forge.failed[4] } }]);
+    expect(h.forge.calls.slice(-2)).toEqual(["checks 4", "failures 4"]);
+  });
+
+  test("a forge that never has checks reports ci.none without being asked", async () => {
+    const h = await waiting();
+    h.env.slots.forge = { ...h.env.slots.forge, capabilities: { ...h.env.slots.forge.capabilities, checks: false } };
+    expect(kinds((await storyOf(h)).story)).toEqual(["ci.none"]);
+    expect(h.forge.calls.some((c) => c.startsWith("checks"))).toBe(false);
+  });
+
+  test("change.merged only for a merge onto the story's base, change.closed for a closed change, and no checks asked of either", async () => {
+    const h = await waiting();
+    h.changes["norn/lt-1"] = change({ state: "merged", merge_sha: "m1", merged_at: h.clock.now() });
+    expect(kinds((await storyOf(h)).story)).toEqual(["change.merged"]);
+    h.changes["norn/lt-1"] = change({ state: "merged", base_branch: "release", merge_sha: "m1", merged_at: h.clock.now() });
+    expect(kinds((await storyOf(h)).story)).toEqual([]);
+    h.changes["norn/lt-1"] = change({ state: "closed" });
+    expect(kinds((await storyOf(h)).story)).toEqual(["change.closed"]);
+    expect(h.forge.calls.some((c) => c.startsWith("checks"))).toBe(false);
+  });
+
+  test("a forge that cannot be read leaves no signals, says why on the story, and is a problem of the tick", async () => {
+    const h = await waiting();
+    h.forge.down = true;
+    const { story, problems } = await storyOf(h);
+    expect(story?.signals).toEqual([]);
+    expect(story?.signals_error).toBe("forge: the fake forge is down");
+    expect(problems).toContain("forge: the fake forge is down");
+    h.forge.down = false;
+    h.env.slots.forge = { ...h.env.slots.forge, checks: async () => ({ ok: false, failure: { code: "unavailable", message: "HTTP 502", retryable: true } }) };
+    const checks = await storyOf(h);
+    expect(checks.story?.signals_error).toBe("forge checks: HTTP 502");
+    expect(checks.problems).toContain("lt-1: forge checks: HTTP 502");
+  });
+
+  test("a story at any other step, and a local gathering, ask the forge for no checks and carry no signals", async () => {
+    const other = await waiting("checked");
+    expect((await storyOf(other)).story?.signals).toBeUndefined();
+    expect(other.forge.calls.some((c) => c.startsWith("checks"))).toBe(false);
+    const h = await waiting();
+    expect((await storyOf(h, { local: true })).story?.signals).toBeUndefined();
+    expect(h.forge.calls).toEqual([]);
   });
 });

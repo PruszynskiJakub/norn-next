@@ -5,7 +5,7 @@
  * appears here as something to branch on.
  */
 import { ChangeRequest, ClaimRecord, StoredMessage, TrackerItem } from "@norn/plugin-api";
-import { IsoTime, NonEmpty, OutcomeName, PosInt, Ulid } from "@norn/schema";
+import { IsoTime, NonEmpty, OutcomeName, PosInt, Signal, Ulid } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
 import { KernelCapabilities } from "./capabilities.ts";
 import { KernelReceipt } from "./receipts.ts";
@@ -128,6 +128,13 @@ export const StoryFacts = Type.Object(
      * flush can publish neither. Reported by a shared store; absent or false otherwise.
      */
     unsynced: Type.Optional(Type.Boolean()),
+    /**
+     * What the forge sees of the story's change now, gathered only while the story's own unit waits
+     * at an await step; read again every tick and never acknowledged. Absent: not gathered.
+     */
+    signals: Type.Optional(Type.Array(Signal)),
+    /** why the signals could not be gathered this tick; shown, never routed on, so the step keeps waiting */
+    signals_error: Type.Optional(NonEmpty),
     /** present once the story has slice files */
     plan: Type.Optional(SlicePlan),
   },

@@ -168,7 +168,11 @@ export function factsOf(c: Case): KernelFacts {
 
 /** Run the unit rules on the case's unit; every decision must validate against the Decision schema. */
 export function decideCase(c: Case): Decision | null {
-  const facts = factsOf(c);
+  return decideCaseWith(c, factsOf(c));
+}
+
+/** decideCase over facts a test changed beyond what a Case says (a capability). */
+export function decideCaseWith(c: Case, facts: KernelFacts): Decision | null {
   const wfs = c.workflows ?? [loaded()];
   const workflows = { byName: {}, byHash: Object.fromEntries(wfs.map((w) => [w.pinned.hash, w])) };
   const config: KernelConfig = { ...DEFAULT_KERNEL_CONFIG, mode: "auto", ...c.config };

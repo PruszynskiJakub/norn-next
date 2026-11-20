@@ -4,7 +4,7 @@
  * host calls `run` and records the outcome as a receipt, so a step kind performs and reports and never
  * picks the next step.
  */
-import { OUTCOME_NAME_PATTERN } from "@norn/schema";
+import { PLAIN_NAME_PATTERN } from "@norn/schema";
 import type { Static, TSchema } from "@sinclair/typebox";
 import type { Forge } from "./forge.ts";
 import type { HostContext } from "./host.ts";
@@ -23,7 +23,7 @@ export interface StepKindSlots {
 }
 
 /** Head keys the kernel runs itself; a plugin may not provide a step kind by these names. */
-export const BUILTIN_STEP_KINDS = ["agent", "check", "gate", "slices"] as const;
+export const BUILTIN_STEP_KINDS = ["agent", "check", "gate", "slices", "await"] as const;
 export type BuiltinStepKind = (typeof BUILTIN_STEP_KINDS)[number];
 
 /**
@@ -45,6 +45,7 @@ export const STEP_KEYWORDS = [
   "criteria",
   "hand_back",
   "deadline",
+  "grace",
   "nudges",
   "retries",
   "timeout",
@@ -110,7 +111,7 @@ export interface StepKindDefinition<S extends TSchema = TSchema> {
 }
 
 const NAME_RE = new RegExp(STEP_KIND_NAME_PATTERN);
-const OUTCOME_RE = new RegExp(OUTCOME_NAME_PATTERN);
+const OUTCOME_RE = new RegExp(PLAIN_NAME_PATTERN);
 const RESERVED: ReadonlySet<string> = new Set([...BUILTIN_STEP_KINDS, ...STEP_KEYWORDS]);
 
 type Loose = Record<string, unknown>;

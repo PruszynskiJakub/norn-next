@@ -26,10 +26,16 @@ export const GIT_SHA_PATTERN = "^[0-9a-f]{40,64}$";
 export const DURATION_PATTERN = "^([0-9]+(ms|s|m|h|d))+$";
 const IDENT = "[a-z][a-z0-9_-]*";
 export const STEP_NAME_PATTERN = `^(?!(${RESERVED_STEP_NAMES.join("|")})$)${IDENT}$`;
-export const OUTCOME_NAME_PATTERN = `^${IDENT}$`;
-export const COUNTER_NAME_PATTERN = `^${IDENT}$`;
-/** A counter name where norn stores one: a declared name, or `<step>.<outcome>` derived from the edge it counts. */
-export const STORED_COUNTER_NAME_PATTERN = `^${IDENT}(\\.${IDENT})?$`;
+/** A name without a dot: an input kind, a plugin step kind's outcome, a declared counter. */
+export const PLAIN_NAME_PATTERN = `^${IDENT}$`;
+/** An outcome: a plain name, or a signal kind (`ci.failed`) an await step routes by. */
+export const OUTCOME_NAME_PATTERN = `^${IDENT}(\\.${IDENT})?$`;
+export const COUNTER_NAME_PATTERN = PLAIN_NAME_PATTERN;
+/**
+ * A counter name where norn stores one: a declared name, or `<step>.<outcome>` derived from the edge
+ * it counts, whose outcome may itself be a dotted signal kind (`ci.ci.failed`).
+ */
+export const STORED_COUNTER_NAME_PATTERN = `^${IDENT}(\\.${IDENT}){0,2}$`;
 export const TARGET_PATTERN = `^(\\$done|\\$stuck|(?!(${RESERVED_STEP_NAMES.join("|")})$)${IDENT})$`;
 
 export const Ulid = Type.String({ pattern: ULID_PATTERN, description: "ULID" });

@@ -3,7 +3,7 @@
  * changes at all: the references the forge suite is proven against.
  */
 import type { ForgeWorld } from "@norn/conformance";
-import { type ChangeRequest, type ChecksSummary, fail, type Forge, type ForgeEffectOutcome, ok, type PluginResult, validateForgeEffect } from "@norn/plugin-api";
+import { type ChangeRequest, type ChecksSummary, type FailedCheck, fail, type Forge, type ForgeEffectOutcome, ok, type PluginResult, validateForgeEffect } from "@norn/plugin-api";
 
 export interface MemoryForgeOptions {
   now: () => string;
@@ -14,6 +14,7 @@ export interface MemoryForgeOptions {
 export function memoryForge(opts: MemoryForgeOptions): ForgeWorld {
   const changes: ChangeRequest[] = [];
   const checks = new Map<number, ChecksSummary>();
+  const failedChecks = new Map<number, FailedCheck[]>();
   const receipts = new Map<string, number>();
   let failing = false;
   const down = <T>(): PluginResult<T> => fail("unavailable", "memory forge: down");
@@ -34,6 +35,7 @@ export function memoryForge(opts: MemoryForgeOptions): ForgeWorld {
       return ok(out);
     },
     checks: async (id) => (failing ? down() : ok(checks.get(id) ?? "none")),
+    failures: async (id) => (failing ? down() : ok(structuredClone(failedChecks.get(id) ?? []))),
     perform: async (effect, meta) => {
       if (failing) return down();
       if (!validateForgeEffect(effect).ok) return fail("invalid", "memory forge: malformed effect");
@@ -68,8 +70,9 @@ export function memoryForge(opts: MemoryForgeOptions): ForgeWorld {
       const c = byId(id);
       if (c) c.state = "closed";
     },
-    setChecks: async (id, summary) => {
+    setChecks: async (id, summary, failed = []) => {
       checks.set(id, summary);
+      failedChecks.set(id, structuredClone(failed));
     },
   };
 }

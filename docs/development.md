@@ -26,7 +26,7 @@ norn is a thin kernel with a plugin contract. The kernel decides; plugins fill *
 packages/schema           @norn/schema           JSON Schemas (TypeBox) + types + ajv validators, ids, the CliError and ExitCode contract
 packages/plugin-api       @norn/plugin-api       the plugin contract: defineNornPlugin, the slots, HostContext, PluginResult, harness events, story keys, the plugin API version
 packages/kernel           @norn/kernel           pure: workflow loader and counters, the model (facts, actions, receipts, run state), decide, the journal's write rules, the session reducer and classifier, the brief
-packages/runtime          @norn/runtime          the host: tick (lock, gather facts, decide, act, trace), slot resolution, the launcher (executor = harness + runner), hook ingest and event log, inputs and skills in worktrees, detached checks, the open-pr and await-merge step kinds
+packages/runtime          @norn/runtime          the host: tick (lock, gather facts, decide, act, trace), slot resolution, the launcher (executor = harness + runner), hook ingest and event log, inputs and skills in worktrees, detached checks, the open-pr, mark-ready and await-merge step kinds, and the forge signals an await step reads
 packages/host-node        @norn/host-node        the HostContext over Bun and node: atomic file writes, exec with a bound, detached processes
 packages/vcs-git          @norn/vcs-git          the vcs slot over git (worktrees, merge, push, refs) and the update-branch, integrate, push and verify-base step kinds
 packages/tracker-local    @norn/tracker-local    a tracker over one markdown file per item
@@ -53,11 +53,11 @@ A plugin is one value made with `defineNornPlugin({ name, api, provides })`; `ap
 |---|---|---|
 | `harness` | the agent tool: install its hooks in a worktree, launch it, normalize its hook payloads into harness events, render norn's answer back | `claude`, `pi` |
 | `tracker` | where stories come from: list items, intake label, comments, close | `github`, `local` |
-| `forge` | changes for review: open or update a change, read its state and checks | `github`, `none` |
+| `forge` | changes for review: open or update a change, read its state and checks, and a red change's failed checks (`failures`, optional) | `github`, `none` |
 | `store` | run data: numbered receipts, state by compare-and-swap, claims, mailbox, artifacts | `local`, `refs` |
 | `vcs` | branches and worktrees: merge (never rebase), conflicts, push | `git` |
 | `runners` | where an agent process runs | `headless`, `herdr` |
-| `stepKinds` | a workflow head key beyond the kernel's own `agent`, `check`, `gate`, `slices` | `update-branch`, `integrate`, `push`, `verify-base` (vcs-git), `open-pr`, `await-merge` (runtime) |
+| `stepKinds` | a workflow head key beyond the kernel's own `agent`, `check`, `gate`, `slices`, `await` | `update-branch`, `integrate`, `push`, `verify-base` (vcs-git), `open-pr`, `mark-ready`, `await-merge` (runtime) |
 | `packs` | workflows, shared files and skills shipped together | `sdlc` |
 
 Every slot call returns a `PluginResult` and never throws. A plugin gets a `HostContext` (files, exec, processes, clock, the repo's root and data dir) and touches the machine only through it. A tracker, forge or store is never a state store for the kernel's decisions: labels and comments they write are display for people.

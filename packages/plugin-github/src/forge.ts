@@ -6,6 +6,7 @@ import {
   type ChangeRequest,
   type ChecksSummary,
   type EffectMeta,
+  type FailedCheck,
   fail,
   type Forge,
   type ForgeEffect,
@@ -16,11 +17,12 @@ import {
   type PluginResult,
   validateForgeEffect,
 } from "@norn/plugin-api";
+import type { Static, TSchema } from "@sinclair/typebox";
 import type { GithubConfig } from "./config.ts";
 import { classify } from "./failure.ts";
 import { createGh, type Gh } from "./gh.ts";
 import { hasMarker, isReceiptId, markersIn, withMarker } from "./marker.ts";
-import { GhChecks, GhPr, GhPrs, GhPrsByBranch, PR_FIELDS, toChange } from "./wire.ts";
+import { GhAnnotations, GhCheckRuns, GhChecks, GhHead, GhNamedChecks, GhPr, GhPrs, GhPrsByBranch, PR_FIELDS, toChange } from "./wire.ts";
 
 /** How many branches one GraphQL query asks about: one alias each, well inside GitHub's query cost. */
 export const BRANCHES_PER_QUERY = 50;
@@ -49,6 +51,10 @@ export function summarize(buckets: readonly string[]): ChecksSummary {
 
 const PR_URL = /\/pull\/(\d+)/;
 const NO_CHECKS = /no checks reported/i;
+
+/** One red change costs at most this many annotation calls, each read to at most this many annotations. */
+export const MAX_FAILED_CHECKS = 10;
+export const MAX_ANNOTATIONS = 20;
 
 type Outcome = PluginResult<ForgeEffectOutcome>;
 
@@ -101,6 +107,35 @@ export function createGithubForge(ctx: HostContext, config: GithubConfig): Forge
     return done("ready", { ...change, draft: false });
   }
 
+  /**
+   * `gh pr checks` as JSON: gh exits 8 while a check is pending and 1 when one failed, printing the
+   * JSON either way; with no check at all it exits 1 saying so, read as none.
+   */
+  async function prChecks<T extends TSchema>(id: number, schema: T, fields: string): Promise<PluginResult<Static<T>>> {
+    const r = await gh.inRepoRaw(["pr", "checks", String(id), "--json", fields]);
+    if (!r.ok) return r;
+    const out = r.value;
+    if (out.timedOut) return classify(out, "gh pr checks");
+    if (out.code !== 0 && NO_CHECKS.test(out.stderr)) return ok([] as Static<T>);
+    const answered = out.code === 0 || ((out.code === 1 || out.code === 8) && out.stdout.trim() !== "");
+    if (!answered) return classify(out, "gh pr checks");
+    return parseJson(schema, out.stdout, "gh pr checks");
+  }
+
+  /** A failed check run's failure-level annotations, without the workflow file's own (`.github`), capped. */
+  async function annotationsOf(repo: string, checkRun: number): Promise<PluginResult<FailedCheck["annotations"]>> {
+    const r = await gh.run(["api", ["repos", repo, "check-runs", String(checkRun), "annotations"].join("/")]);
+    if (!r.ok) return r;
+    const rows = parseJson(GhAnnotations, r.value, "gh api annotations");
+    if (!rows.ok) return rows;
+    return ok(
+      rows.value
+        .filter((a) => a.annotation_level === "failure" && a.path !== ".github" && a.path !== "")
+        .slice(0, MAX_ANNOTATIONS)
+        .map((a) => ({ path: a.path, ...(a.start_line !== null && a.start_line > 0 ? { line: a.start_line } : {}), message: a.message ?? "" })),
+    );
+  }
+
   return {
     name: "github",
     capabilities: { draft: true, checks: true, raw_urls: true },
@@ -131,18 +166,35 @@ export function createGithubForge(ctx: HostContext, config: GithubConfig): Forge
     },
 
     async checks(id) {
-      const r = await gh.inRepoRaw(["pr", "checks", String(id), "--json", "bucket"]);
-      if (!r.ok) return r;
-      const out = r.value;
-      if (out.timedOut) return classify(out, "gh pr checks");
-      // gh exits 8 while a check is pending and 1 when one failed, printing the JSON either way;
-      // with no check at all it exits 1 saying so
-      if (out.code !== 0 && NO_CHECKS.test(out.stderr)) return ok("none");
-      const answered = out.code === 0 || ((out.code === 1 || out.code === 8) && out.stdout.trim() !== "");
-      if (!answered) return classify(out, "gh pr checks");
-      const rows = parseJson(GhChecks, out.stdout, "gh pr checks");
+      const rows = await prChecks(id, GhChecks, "bucket");
       if (!rows.ok) return rows;
       return ok(summarize(rows.value.map((c) => c.bucket)));
+    },
+
+    async failures(id) {
+      const rows = await prChecks(id, GhNamedChecks, "bucket,name,link");
+      if (!rows.ok) return rows;
+      const failed = rows.value.filter((c) => c.bucket === "fail" || c.bucket === "cancel").slice(0, MAX_FAILED_CHECKS);
+      if (failed.length === 0) return ok([]);
+      const repo = await gh.repo();
+      if (!repo.ok) return repo;
+      const head = await gh.json(GhHead, ["pr", "view", String(id), "--json", "headRefOid"]);
+      if (!head.ok) return head;
+      // run, not inRepo: `gh api` refuses -R; the REST path names the repository
+      const runs = await gh.run(["api", `repos/${repo.value}/commits/${head.value.headRefOid}/check-runs?per_page=100`]);
+      if (!runs.ok) return runs;
+      const parsed = parseJson(GhCheckRuns, runs.value, "gh api check-runs");
+      if (!parsed.ok) return parsed;
+      const out: FailedCheck[] = [];
+      for (const row of failed) {
+        const cancelled = row.bucket === "cancel";
+        // a commit status shares the list with check runs but has no run, and so no annotations
+        const run = cancelled ? undefined : parsed.value.check_runs.find((r) => r.name === row.name && r.conclusion === "failure");
+        const annotations = run ? await annotationsOf(repo.value, run.id) : ok([]);
+        if (!annotations.ok) return annotations;
+        out.push({ name: row.name, ...(row.link ? { url: row.link } : {}), ...(cancelled ? { cancelled: true } : {}), annotations: annotations.value });
+      }
+      return ok(out);
     },
 
     async perform(effect: ForgeEffect, meta: EffectMeta): Promise<Outcome> {

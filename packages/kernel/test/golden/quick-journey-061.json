@@ -1,6 +1,6 @@
 {
-  "name": "quick-journey-063",
-  "description": "A quick story in manual mode: the ready agent step waits for a person until they switch the story to auto; a review sends the change back once and CI fails once; the change merges on the forge, which ends the story. Tick 63: gate.park.",
+  "name": "quick-journey-061",
+  "description": "A quick story in manual mode: the ready agent step waits for a person until they switch the story to auto; a review sends the change back once and CI fails once; the change merges on the forge, which ends the story. Tick 61: claim.renew,gate.park.",
   "step_kinds": {
     "update-branch": {
       "outcomes": [
@@ -61,6 +61,17 @@
         "type": "object",
         "properties": {}
       }
+    },
+    "mark-ready": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
     }
   },
   "workflows": {
@@ -83,13 +94,14 @@
             }
           },
           "sync-resolve": {
-            "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+            "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
             "skills": [
               "norn-merge"
             ],
             "inputs": [
               "spec",
-              "handoff"
+              "handoff",
+              "base_side"
             ],
             "outcomes": {
               "done": "sync"
@@ -129,7 +141,7 @@
             }
           },
           "resolve": {
-            "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+            "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
             "skills": [
               "norn-merge"
             ],
@@ -146,7 +158,7 @@
             }
           },
           "test": {
-            "check": "bun test",
+            "check": "{checks.test}",
             "timeout": "15m",
             "outcomes": {
               "pass": "review",
@@ -157,7 +169,7 @@
             }
           },
           "test-merge": {
-            "check": "bun test",
+            "check": "{checks.test}",
             "timeout": "15m",
             "outcomes": {
               "pass": "open-pr",
@@ -168,7 +180,7 @@
             }
           },
           "test-resolution": {
-            "check": "bun test",
+            "check": "{checks.test}",
             "timeout": "15m",
             "outcomes": {
               "pass": "resolution-review",
@@ -201,7 +213,7 @@
             "means": {
               "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
               "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-              "changes_requested": "blocking findings on the resolution in the receipt"
+              "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
             }
           },
           "review": {
@@ -226,7 +238,7 @@
             },
             "means": {
               "approve": "the change does what the story asks and nothing else, no blocking findings",
-              "changes_requested": "blocking findings in the receipt"
+              "changes_requested": "blocking findings, handed back with --findings <file>"
             }
           },
           "describe": {
@@ -253,14 +265,17 @@
             }
           },
           "ci": {
-            "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
-            "timeout": "30m",
-            "exits": {
-              "3": "stale"
-            },
+            "await": [
+              "ci.passed",
+              "ci.failed",
+              "ci.none"
+            ],
+            "deadline": "30m",
+            "grace": "5m",
             "outcomes": {
-              "pass": "ready",
-              "fail": {
+              "ci.passed": "ready",
+              "ci.none": "ready",
+              "ci.failed": {
                 "to": "implement",
                 "counter": "ship.ci-failed"
               },
@@ -273,7 +288,7 @@
           "ready": {
             "gate": "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change.",
             "outcomes": {
-              "approve": "merge",
+              "approve": "mark-ready",
               "reject": {
                 "to": "implement",
                 "counter": "ship.rejected"
@@ -281,17 +296,33 @@
               "stale": {
                 "to": "update",
                 "counter": "ship.stale"
+              },
+              "unpushed": {
+                "to": "open-pr",
+                "counter": "ready.unpushed"
               }
             }
           },
-          "merge": {
-            "await-merge": null,
+          "mark-ready": {
+            "mark-ready": null,
             "outcomes": {
+              "done": "merge"
+            }
+          },
+          "merge": {
+            "await": [
+              "change.merged"
+            ],
+            "outcomes": {
+              "change.merged": "$done",
               "stale": {
                 "to": "update",
                 "counter": "ship.stale"
               },
-              "merged": "$done"
+              "unpushed": {
+                "to": "open-pr",
+                "counter": "merge.unpushed"
+              }
             }
           }
         },
@@ -314,6 +345,12 @@
           },
           "resolution-review.changes_requested": {
             "max": 2
+          },
+          "ready.unpushed": {
+            "max": 10
+          },
+          "merge.unpushed": {
+            "max": 10
           },
           "review.changes_requested": {
             "max": 3
@@ -355,13 +392,15 @@
     "mode": "manual",
     "executor": "claude",
     "workflow": "quick",
+    "intakeWorkflowLabelPrefix": "norn:wf:",
     "sliceWorkflow": "slice",
+    "base": "main",
     "claimTtlMs": 600000,
     "claimRenewBeforeMs": 400000
   },
   "facts": {
-    "tick_id": "01JD5G0000601BDWN5TRDFF575",
-    "now": "2026-11-17T10:03:00.000Z",
+    "tick_id": "01JD5G0000810CAK6A36QPCKHK",
+    "now": "2026-11-17T10:01:00.000Z",
     "holder": "machine-a",
     "capabilities": {
       "tracker": {
@@ -415,8 +454,8 @@
           "story": "gh-7",
           "holder": "machine-a",
           "acquired_at": "2026-11-17T09:01:00.000Z",
-          "expires_at": "2026-11-17T10:11:00.000Z",
-          "version": 16
+          "expires_at": "2026-11-17T10:07:00.000Z",
+          "version": 15
         },
         "units": [
           {
@@ -427,7 +466,7 @@
               "story": "gh-7",
               "workflow": {
                 "name": "quick",
-                "hash": "bdef57c2b350626d17509ce6b582d251c3d459f05063e79226b80d7c73136d55",
+                "hash": "0425a474b66a0d095a46c057c862f791e0373ecb33b0fbd8b8f8a1959019f39a",
                 "doc": {
                   "name": "quick",
                   "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -446,13 +485,14 @@
                       }
                     },
                     "sync-resolve": {
-                      "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
                       "skills": [
                         "norn-merge"
                       ],
                       "inputs": [
                         "spec",
-                        "handoff"
+                        "handoff",
+                        "base_side"
                       ],
                       "outcomes": {
                         "done": "sync"
@@ -492,7 +532,7 @@
                       }
                     },
                     "resolve": {
-                      "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
                       "skills": [
                         "norn-merge"
                       ],
@@ -509,7 +549,7 @@
                       }
                     },
                     "test": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "review",
@@ -520,7 +560,7 @@
                       }
                     },
                     "test-merge": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "open-pr",
@@ -531,7 +571,7 @@
                       }
                     },
                     "test-resolution": {
-                      "check": "bun test",
+                      "check": "{checks.test}",
                       "timeout": "15m",
                       "outcomes": {
                         "pass": "resolution-review",
@@ -564,7 +604,7 @@
                       "means": {
                         "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
                         "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-                        "changes_requested": "blocking findings on the resolution in the receipt"
+                        "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
                       }
                     },
                     "review": {
@@ -589,7 +629,7 @@
                       },
                       "means": {
                         "approve": "the change does what the story asks and nothing else, no blocking findings",
-                        "changes_requested": "blocking findings in the receipt"
+                        "changes_requested": "blocking findings, handed back with --findings <file>"
                       }
                     },
                     "describe": {
@@ -616,14 +656,17 @@
                       }
                     },
                     "ci": {
-                      "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
-                      "timeout": "30m",
-                      "exits": {
-                        "3": "stale"
-                      },
+                      "await": [
+                        "ci.passed",
+                        "ci.failed",
+                        "ci.none"
+                      ],
+                      "deadline": "30m",
+                      "grace": "5m",
                       "outcomes": {
-                        "pass": "ready",
-                        "fail": {
+                        "ci.passed": "ready",
+                        "ci.none": "ready",
+                        "ci.failed": {
                           "to": "implement",
                           "counter": "ship.ci-failed"
                         },
@@ -636,7 +679,7 @@
                     "ready": {
                       "gate": "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change.",
                       "outcomes": {
-                        "approve": "merge",
+                        "approve": "mark-ready",
                         "reject": {
                           "to": "implement",
                           "counter": "ship.rejected"
@@ -644,17 +687,33 @@
                         "stale": {
                           "to": "update",
                           "counter": "ship.stale"
+                        },
+                        "unpushed": {
+                          "to": "open-pr",
+                          "counter": "ready.unpushed"
                         }
                       }
                     },
-                    "merge": {
-                      "await-merge": null,
+                    "mark-ready": {
+                      "mark-ready": null,
                       "outcomes": {
+                        "done": "merge"
+                      }
+                    },
+                    "merge": {
+                      "await": [
+                        "change.merged"
+                      ],
+                      "outcomes": {
+                        "change.merged": "$done",
                         "stale": {
                           "to": "update",
                           "counter": "ship.stale"
                         },
-                        "merged": "$done"
+                        "unpushed": {
+                          "to": "open-pr",
+                          "counter": "merge.unpushed"
+                        }
                       }
                     }
                   },
@@ -677,6 +736,12 @@
                     },
                     "resolution-review.changes_requested": {
                       "max": 2
+                    },
+                    "ready.unpushed": {
+                      "max": 10
+                    },
+                    "merge.unpushed": {
+                      "max": 10
                     },
                     "review.changes_requested": {
                       "max": 3
@@ -707,6 +772,8 @@
                 "sync.conflict": 0,
                 "update.conflict": 0,
                 "resolution-review.changes_requested": 0,
+                "ready.unpushed": 0,
+                "merge.unpushed": 0,
                 "review.changes_requested": 1,
                 "base-update.broken": 0,
                 "ship.ci-failed": 1,
@@ -715,7 +782,7 @@
               },
               "retries_used": 0,
               "run": null,
-              "applied_through": 40,
+              "applied_through": 41,
               "visits": {
                 "sync": 1,
                 "implement": 3,
@@ -741,6 +808,12 @@
   },
   "decisions": [
     {
+      "kind": "renew_claim",
+      "unit": null,
+      "rule": "claim.renew",
+      "story": "gh-7"
+    },
+    {
       "kind": "park",
       "unit": "gh-7",
       "rule": "gate.park",
@@ -749,11 +822,11 @@
         "kind": "gate",
         "unit": "gh-7",
         "step": "ready",
-        "since": "2026-11-17T10:03:00.000Z",
+        "since": "2026-11-17T10:01:00.000Z",
         "text": "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change."
       },
       "intent": {
-        "id": "01JD5G0000PQ58D37F7PCFE4TJ",
+        "id": "01JD5G0000AG9R2J185C38CVH6",
         "data": {
           "kind": "unit.parked",
           "reason": "gate.park",
@@ -767,7 +840,7 @@
         "story": "gh-7",
         "workflow": {
           "name": "quick",
-          "hash": "bdef57c2b350626d17509ce6b582d251c3d459f05063e79226b80d7c73136d55",
+          "hash": "0425a474b66a0d095a46c057c862f791e0373ecb33b0fbd8b8f8a1959019f39a",
           "doc": {
             "name": "quick",
             "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -786,13 +859,14 @@
                 }
               },
               "sync-resolve": {
-                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
                 "skills": [
                   "norn-merge"
                 ],
                 "inputs": [
                   "spec",
-                  "handoff"
+                  "handoff",
+                  "base_side"
                 ],
                 "outcomes": {
                   "done": "sync"
@@ -832,7 +906,7 @@
                 }
               },
               "resolve": {
-                "agent": "Base mode: merge the base commit named in Rework into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
                 "skills": [
                   "norn-merge"
                 ],
@@ -849,7 +923,7 @@
                 }
               },
               "test": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "review",
@@ -860,7 +934,7 @@
                 }
               },
               "test-merge": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "open-pr",
@@ -871,7 +945,7 @@
                 }
               },
               "test-resolution": {
-                "check": "bun test",
+                "check": "{checks.test}",
                 "timeout": "15m",
                 "outcomes": {
                   "pass": "resolution-review",
@@ -904,7 +978,7 @@
                 "means": {
                   "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
                   "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
-                  "changes_requested": "blocking findings on the resolution in the receipt"
+                  "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
                 }
               },
               "review": {
@@ -929,7 +1003,7 @@
                 },
                 "means": {
                   "approve": "the change does what the story asks and nothing else, no blocking findings",
-                  "changes_requested": "blocking findings in the receipt"
+                  "changes_requested": "blocking findings, handed back with --findings <file>"
                 }
               },
               "describe": {
@@ -956,14 +1030,17 @@
                 }
               },
               "ci": {
-                "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
-                "timeout": "30m",
-                "exits": {
-                  "3": "stale"
-                },
+                "await": [
+                  "ci.passed",
+                  "ci.failed",
+                  "ci.none"
+                ],
+                "deadline": "30m",
+                "grace": "5m",
                 "outcomes": {
-                  "pass": "ready",
-                  "fail": {
+                  "ci.passed": "ready",
+                  "ci.none": "ready",
+                  "ci.failed": {
                     "to": "implement",
                     "counter": "ship.ci-failed"
                   },
@@ -976,7 +1053,7 @@
               "ready": {
                 "gate": "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change.",
                 "outcomes": {
-                  "approve": "merge",
+                  "approve": "mark-ready",
                   "reject": {
                     "to": "implement",
                     "counter": "ship.rejected"
@@ -984,17 +1061,33 @@
                   "stale": {
                     "to": "update",
                     "counter": "ship.stale"
+                  },
+                  "unpushed": {
+                    "to": "open-pr",
+                    "counter": "ready.unpushed"
                   }
                 }
               },
-              "merge": {
-                "await-merge": null,
+              "mark-ready": {
+                "mark-ready": null,
                 "outcomes": {
+                  "done": "merge"
+                }
+              },
+              "merge": {
+                "await": [
+                  "change.merged"
+                ],
+                "outcomes": {
+                  "change.merged": "$done",
                   "stale": {
                     "to": "update",
                     "counter": "ship.stale"
                   },
-                  "merged": "$done"
+                  "unpushed": {
+                    "to": "open-pr",
+                    "counter": "merge.unpushed"
+                  }
                 }
               }
             },
@@ -1017,6 +1110,12 @@
               },
               "resolution-review.changes_requested": {
                 "max": 2
+              },
+              "ready.unpushed": {
+                "max": 10
+              },
+              "merge.unpushed": {
+                "max": 10
               },
               "review.changes_requested": {
                 "max": 3
@@ -1047,6 +1146,8 @@
           "sync.conflict": 0,
           "update.conflict": 0,
           "resolution-review.changes_requested": 0,
+          "ready.unpushed": 0,
+          "merge.unpushed": 0,
           "review.changes_requested": 1,
           "base-update.broken": 0,
           "ship.ci-failed": 1,
@@ -1055,7 +1156,7 @@
         },
         "retries_used": 0,
         "run": null,
-        "applied_through": 41,
+        "applied_through": 42,
         "visits": {
           "sync": 1,
           "implement": 3,
@@ -1070,7 +1171,7 @@
         "mode": "auto",
         "parked": {
           "reason": "gate.park",
-          "since": "2026-11-17T10:03:00.000Z"
+          "since": "2026-11-17T10:01:00.000Z"
         }
       },
       "expect_version": 41

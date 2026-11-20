@@ -302,7 +302,11 @@ function answer(): Answer {
     if (!p) return noPr(n);
     if (p.checks === "none") return err(`no checks reported on the '${p.head}' branch`);
     const code = p.checks === "pending" ? 8 : p.checks === "failure" ? 1 : 0;
-    if (flag("--json") === "bucket") return { code, stdout: JSON.stringify([{ bucket: "pass" }, { bucket: { success: "pass", pending: "pending", failure: "fail" }[p.checks] }]) };
+    const bucket = { success: "pass", pending: "pending", failure: "fail" }[p.checks];
+    if (flag("--json") === "bucket") return { code, stdout: JSON.stringify([{ bucket: "pass" }, { bucket }]) };
+    if (flag("--json") === "bucket,name,link") {
+      return { code, stdout: JSON.stringify([{ bucket: "pass", name: "lint", link: `${web}/actions/runs/1/job/6` }, { bucket, name: "test", link: `${web}/actions/runs/1/job/7` }]) };
+    }
     if (flag("--json") !== undefined) return unknown();
     // --watch waits the checks out; here they are already settled, or stay pending as scripted
     return { code, stdout: `lint\tpass\t10s\t${web}/actions/runs/1/job/6\ntest\t${p.checks === "failure" ? "fail" : p.checks === "pending" ? "pending" : "pass"}\t1m\t${web}/actions/runs/1/job/7\n` };
@@ -312,6 +316,20 @@ function answer(): Answer {
     const p = state.prs.find((x) => remoteHead(x.head) === sha);
     if (!p || p.checks !== "failure") return { stdout: "" };
     return { stdout: `- test (id 7): ${web}/actions/runs/1/job/7\n` };
+  }
+  // the forge's own reads name the repository in the REST path, as `gh api` refuses -R
+  if (a === "api" && b === `repos/${state.repo}/commits/${b?.split("/")[4]}/check-runs?per_page=100`) {
+    const sha = b.split("/")[4];
+    const p = state.prs.find((x) => remoteHead(x.head) === sha);
+    if (!p) return out({ total_count: 0, check_runs: [] });
+    const conclusion = p.checks === "pending" ? null : p.checks;
+    return out({ total_count: 2, check_runs: [{ id: 6, name: "lint", conclusion: "success" }, { id: 7, name: "test", conclusion }] });
+  }
+  if (a === "api" && b === `repos/${state.repo}/check-runs/7/annotations`) {
+    return out([
+      { path: ".github", start_line: 1, annotation_level: "failure", message: "Process completed with exit code 1." },
+      { path: "src/feature.ts", start_line: 3, annotation_level: "failure", message: "expected the feature" },
+    ]);
   }
   if (cmd === "run list") {
     const sha = flag("--commit");

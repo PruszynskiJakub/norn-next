@@ -6,7 +6,7 @@
 import { loadWorkflow, type RunState } from "../../src/index.ts";
 import type { GoldenCase } from "../../test/golden.ts";
 import { STEP_KINDS } from "../../test/shipped.ts";
-import { capabilities, caseOf, claim, config, DEPLOY_DOC, executor, item, ROUTED_DOC, type Seed, seed, shippedFiles, type WorldSetup, world } from "./catalog.ts";
+import { capabilities, caseOf, claim, config, DEPLOY_DOC, executor, item, oldQuickDoc, ROUTED_DOC, type Seed, seed, shippedFiles, type WorldSetup, world } from "./catalog.ts";
 import type { Scenario } from "./journeys.ts";
 import { session, type World } from "./world.ts";
 
@@ -359,38 +359,59 @@ export const MATRIX: Scenario[] = [
   ),
   scenario(
     "unpushed",
-    "A story whose branch holds commits its change lacks: waiting at the ready gate or polled at merge, it goes back to open-pr to push them; a slice is never sent, since only the story pushes its change.",
-    { files: shippedFiles("quick", "slice") },
+    "A story whose branch holds commits its change lacks: waiting at the ready gate, at an await merge step, or polled at a pinned await-merge, it goes back to open-pr to push them; a slice is never sent, since only the story pushes its change.",
+    { files: { ...shippedFiles("quick", "slice"), "quick-old": oldQuickDoc() } },
     (w) => {
       seed(w, "gh-170", { workflow: "quick", step: "ready" });
       w.story("gh-170").unpushed = true;
-      seed(w, "gh-171", { workflow: "quick", step: "merge", run: { executor: "await-merge" } });
+      seed(w, "gh-171", { workflow: "quick-old", step: "merge", run: { executor: "await-merge" } });
       w.unit("gh-171").step_run = { kind: "await-merge", running: false, outcome: "waiting" };
       w.story("gh-171").unpushed = true;
+      seed(w, "gh-172", { workflow: "quick", step: "merge", run: { executor: "await" } });
+      w.story("gh-172").unpushed = true;
     },
-    ["gate.unpushed", "step.unpushed"],
+    ["gate.unpushed", "step.unpushed", "await.unpushed"],
   ),
   scenario(
     "base-stale-at-merge",
-    "A story polled at merge whose base the host reads as stale (a conflicting move, or a clean one that failed base.verify) goes back through its stale route; one whose base only moved clean keeps waiting.",
-    { files: shippedFiles("quick") },
+    "A story waiting at merge whose base the host reads as stale (a conflicting move, or a clean one that failed base.verify) goes back through its stale route, at an await step or a pinned await-merge; one whose base only moved clean keeps waiting.",
+    { files: { ...shippedFiles("quick"), "quick-old": oldQuickDoc() } },
     (w) => {
-      seed(w, "gh-175", { workflow: "quick", step: "merge", run: { executor: "await-merge" } });
+      seed(w, "gh-175", { workflow: "quick-old", step: "merge", run: { executor: "await-merge" } });
       w.unit("gh-175").step_run = { kind: "await-merge", running: false, outcome: "waiting" };
       w.story("gh-175").base_stale = true;
-      seed(w, "gh-176", { workflow: "quick", step: "merge", run: { executor: "await-merge" } });
+      seed(w, "gh-176", { workflow: "quick-old", step: "merge", run: { executor: "await-merge" } });
       w.unit("gh-176").step_run = { kind: "await-merge", running: false, outcome: "waiting" };
       w.story("gh-176").base_stale = false;
+      seed(w, "gh-173", { workflow: "quick", step: "merge", run: { executor: "await" } });
+      w.story("gh-173").base_stale = true;
+      seed(w, "gh-174", { workflow: "quick", step: "merge", run: { executor: "await" } });
+      w.story("gh-174").base_stale = false;
     },
-    ["step.stale", "step.poll"],
+    ["step.stale", "step.poll", "await.stale", "await.waiting"],
+  ),
+  scenario(
+    "await-ci",
+    "Stories at ship's ci step, waiting on the forge's signals: one entering records its visit's run; one whose PR shows no check yet keeps waiting inside the grace, another past it takes ci.none to ready; a red CI sends the work back to implement with the failed checks; CI pending past the deadline parks the story for a person; a forge that cannot be read keeps the step waiting.",
+    { files: shippedFiles("quick") },
+    (w) => {
+      seed(w, "gh-210", { workflow: "quick", step: "ci" });
+      seed(w, "gh-211", { workflow: "quick", step: "ci", run: { executor: "await", minutesAgo: 2 } });
+      seed(w, "gh-212", { workflow: "quick", step: "ci", run: { executor: "await", minutesAgo: 6 } });
+      seed(w, "gh-213", { workflow: "quick", step: "ci", run: { executor: "await", minutesAgo: 3 } });
+      seed(w, "gh-214", { workflow: "quick", step: "ci", run: { executor: "await", minutesAgo: 31 } });
+      seed(w, "gh-215", { workflow: "quick", step: "ci", run: { executor: "await", minutesAgo: 3 } });
+      w.story("gh-215").signals_error = "forge: HTTP 502";
+      Object.assign(w.script.signal, { "gh-211:ci": ["ci.none"], "gh-212:ci": ["ci.none"], "gh-213:ci": ["ci.failed"], "gh-214:ci": ["ci.pending"] });
+    },
+    ["await.start", "await.waiting", "await.signal", "await.timeout"],
   ),
   scenario(
     "change-closed-at-merge",
-    "A person closes the story's change while it is polled at merge: the story parks for them, once, rather than polling a closed change forever or opening a new one.",
+    "A person closes the story's change while it waits at merge: the story parks for them, once, rather than waiting on a closed change forever or opening a new one.",
     { files: shippedFiles("quick") },
     (w) => {
-      seed(w, "gh-177", { workflow: "quick", step: "merge", run: { executor: "await-merge" } });
-      w.unit("gh-177").step_run = { kind: "await-merge", running: false, outcome: "waiting" };
+      seed(w, "gh-177", { workflow: "quick", step: "merge", run: { executor: "await" } });
       w.story("gh-177").change = { id: 77, state: "closed", draft: false, head_branch: "norn/gh-177", base_branch: "main", head_sha: "a77", title: "Story 177" };
     },
     ["story.change_closed", "unit.parked"],
@@ -401,8 +422,7 @@ export const MATRIX: Scenario[] = [
     "A person merges the story's change into a branch other than the story's base while it is polled at merge: nothing reached the base, so the story parks for them, once, naming that branch, rather than ending done and tidying its worktree.",
     { files: shippedFiles("quick") },
     (w) => {
-      seed(w, "gh-178", { workflow: "quick", step: "merge", run: { executor: "await-merge" } });
-      w.unit("gh-178").step_run = { kind: "await-merge", running: false, outcome: "waiting" };
+      seed(w, "gh-178", { workflow: "quick", step: "merge", run: { executor: "await" } });
       w.story("gh-178").change = { id: 78, state: "merged", draft: false, head_branch: "norn/gh-178", base_branch: "release", head_sha: "a78", merge_sha: "m78", merged_at: "2026-11-17T09:00:00.000Z", title: "Story 178" };
     },
     ["story.change_merged_elsewhere", "unit.parked"],

@@ -1,7 +1,7 @@
 /**
  * Gathering KernelFacts: the tracker's intake and items, the forge's changes, every unit read through
  * the Journal with its version, claims, the mailbox, sessions, in-flight step runs, base_stale and
- * unpushed from the vcs, and the slice plan of a story at its slices step. Facts are read, never acted on as run state, so gathering twice changes nothing.
+ * unpushed from the vcs, the forge's signals for a story at an await step, and the slice plan of a story at its slices step. Facts are read, never acted on as run state, so gathering twice changes nothing.
  *
  * A story whose record or claim cannot be read is left out of the tick whole: half a story (a slice
  * missing, a claim read as nobody's) would let decide start what is already running. A tracker or
@@ -26,6 +26,7 @@ import type { RuntimeEnv } from "./env.ts";
 import { readUnitFacts } from "./facts-unit.ts";
 import { readBackDocs } from "./inputs.ts";
 import { readSlicePlan } from "./slice-plan.ts";
+import { signalFacts } from "./facts-signals.ts";
 import { vcsFacts } from "./facts-vcs.ts";
 import { tickWorkflows } from "./workflows.ts";
 
@@ -124,12 +125,14 @@ async function itemOf(env: RuntimeEnv, key: string, problems: string[]): Promise
   return null;
 }
 
-async function changesOf(env: RuntimeEnv, keys: string[], problems: string[]): Promise<Record<string, ChangeRequest | null>> {
-  if (keys.length === 0) return {};
+/** Every story's change in one lookup, or why the forge could not say. */
+async function changesOf(env: RuntimeEnv, keys: string[], problems: string[]): Promise<{ changes: Record<string, ChangeRequest | null>; error?: string }> {
+  if (keys.length === 0) return { changes: {} };
   const got = await env.slots.forge.findChanges(keys.map(branchOf));
-  if (got.ok) return got.value;
-  problems.push(`forge: ${got.failure.message}`);
-  return {};
+  if (got.ok) return { changes: got.value };
+  const error = `forge: ${got.failure.message}`;
+  problems.push(error);
+  return { changes: {}, error };
 }
 
 /** Every unit id the store lists, by its story. */
@@ -226,8 +229,8 @@ export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherO
     env,
     reads.flatMap((r) => r.pinned),
   );
-  const changes = opts.local
-    ? {}
+  const { changes, error: changesError } = opts.local
+    ? { changes: {} as Record<string, ChangeRequest | null>, error: undefined }
     : await changesOf(
         env,
         reads.map((r) => r.key),
@@ -248,7 +251,7 @@ export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherO
     const change = changes[branchOf(r.key)] ?? null;
     const graph = own ? workflows.byHash[own.workflow.hash]?.graph : undefined;
     const story: StoryFacts = { key: r.key, item: opts.local ? null : await itemOf(env, r.key, problems), change, claim: r.claim, units: r.units, mailbox: r.mailbox };
-    if (!opts.local) Object.assign(story, await vcsFacts(env, r.key, own, graph, change, problems));
+    if (!opts.local) Object.assign(story, await vcsFacts(env, r.key, own, graph, change, problems), await signalFacts(env, r.key, own, graph, change, changesError, problems));
     if (store.capabilities.shared && store.diverged) {
       const split = await store.diverged(r.key);
       if (!split.ok) problems.push(`${r.key}: store: ${split.failure.message}`);

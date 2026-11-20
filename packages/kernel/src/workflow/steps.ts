@@ -4,7 +4,7 @@
  * so a host that lacks a kind learns its name (`missing_kind`) and can say which plugin to add.
  */
 import { BUILTIN_STEP_KINDS, STEP_KEYWORDS } from "@norn/plugin-api";
-import { check } from "@norn/schema";
+import { check, isSignalKind, SIGNAL_KINDS } from "@norn/schema";
 import type { Route, WorkflowStepDoc } from "./document.ts";
 import type { StepKindInfo } from "./load.ts";
 import { BUILTIN_STEP_OUTCOMES, OVERRIDABLE_OUTCOMES, type StepRunner, type WorkflowError } from "./graph.ts";
@@ -29,6 +29,7 @@ const KEYS_OF: Readonly<Record<string, readonly string[]>> = {
   check: ["description", "outcomes", "timeout", "exits"],
   gate: ["description", "outcomes"],
   slices: ["description", "outcomes"],
+  await: ["description", "outcomes", "deadline", "grace"],
 };
 const PLUGIN_KEYS: readonly string[] = ["description", "outcomes"];
 
@@ -37,11 +38,13 @@ const PLUGIN_KEYS: readonly string[] = ["description", "outcomes"];
  * under a story waiting there, and `unpushed` when the story's branch holds commits its change lacks,
  * each only through a route the workflow gives it.
  */
-const ROUTED_ONLY: Readonly<Record<string, readonly string[]>> = { gate: ["stale", "unpushed"] };
+const ROUTED_ONLY: Readonly<Record<string, readonly string[]>> = { gate: ["stale", "unpushed"], await: ["stale", "unpushed"] };
 /** A story waiting on a `wait` step kind leaves it the same way a waiting gate does, by the kind's mode rather than its name. */
 const WAIT_ROUTED_ONLY: readonly string[] = ["unpushed"];
 
-function routedOnly(head: string, plugin: StepKindInfo | undefined): readonly string[] {
+function routedOnly(head: string, step: WorkflowStepDoc, plugin: StepKindInfo | undefined): readonly string[] {
+  // an await step ends `timeout` only once a deadline it sets has passed, and only where it routes it
+  if (head === "await") return [...(ROUTED_ONLY.await ?? []), ...(step.deadline === undefined ? [] : ["timeout"])];
   if (!plugin) return ROUTED_ONLY[head] ?? [];
   return plugin.mode === "wait" ? WAIT_ROUTED_ONLY.filter((o) => !plugin.outcomes.includes(o)) : [];
 }
@@ -68,8 +71,8 @@ export function readStep(
   const allowed = plugin ? PLUGIN_KEYS : (KEYS_OF[head] ?? []);
   const errors: WorkflowError[] = [];
   for (const k of keys)
-    if (k !== head && KEYWORDS.includes(k) && !allowed.includes(k)) errors.push({ path: `${at}/${k}`, message: `\`${k}\` is not a key of a ${head} step` });
-  if (!plugin) for (const k of loose) errors.push({ path: `${at}/${k}`, message: `\`${k}\` is not a key of a ${head} step` });
+    if (k !== head && KEYWORDS.includes(k) && !allowed.includes(k)) errors.push({ path: `${at}/${k}`, message: `\`${k}\` is not a key of ${article(head)} ${head} step` });
+  if (!plugin) for (const k of loose) errors.push({ path: `${at}/${k}`, message: `\`${k}\` is not a key of ${article(head)} ${head} step` });
 
   const routes = (step.outcomes ?? {}) as Record<string, Route>;
   let config: Record<string, unknown> | undefined;
@@ -81,9 +84,9 @@ export function readStep(
   }
   if (head === "check" && step.timeout === undefined) errors.push({ path: at, message: "a check needs a timeout" });
 
-  const ends = endsOf(head, step, plugin, routes, at, errors);
+  const ends = endsOf(name, head, step, plugin, routes, at, errors);
   for (const o of ends) if (!Object.hasOwn(routes, o)) errors.push({ path: `${at}/outcomes`, message: `step '${name}' can end with '${o}' but routes it nowhere` });
-  const optional = routedOnly(head, plugin);
+  const optional = routedOnly(head, step, plugin);
   for (const o of Object.keys(routes)) {
     if (ends.includes(o) || optional.includes(o) || (head === "agent" && OVERRIDABLE.includes(o))) continue;
     errors.push({ path: `${at}/outcomes/${o}`, message: `step '${name}' (${head}) never ends with '${o}'` });
@@ -95,7 +98,7 @@ export function readStep(
 }
 
 /** The outcomes a step can end with that must each be routed; agent steps declare their own by routing them. */
-function endsOf(head: string, step: WorkflowStepDoc, plugin: StepKindInfo | undefined, routes: Record<string, Route>, at: string, errors: WorkflowError[]): string[] {
+function endsOf(name: string, head: string, step: WorkflowStepDoc, plugin: StepKindInfo | undefined, routes: Record<string, Route>, at: string, errors: WorkflowError[]): string[] {
   if (plugin) return [...plugin.outcomes];
   if (head === "check") {
     const named: string[] = [];
@@ -106,12 +109,25 @@ function endsOf(head: string, step: WorkflowStepDoc, plugin: StepKindInfo | unde
     return ["pass", "fail", ...named];
   }
   if (head === "agent") return agentEnds(step, routes, at, errors);
+  if (head === "await") return awaitEnds(name, step, at, errors);
   const optional = ROUTED_ONLY[head] ?? [];
   return (BUILTIN_STEP_OUTCOMES[head as keyof typeof BUILTIN_STEP_OUTCOMES] ?? []).filter((o) => !optional.includes(o));
 }
 
+/** An await step ends with each signal kind it lists, which must each be one norn knows. */
+function awaitEnds(name: string, step: WorkflowStepDoc, at: string, errors: WorkflowError[]): string[] {
+  const on = step.await ?? [];
+  on.forEach((k, i) => {
+    if (!isSignalKind(k)) errors.push({ path: `${at}/await/${i}`, message: `\`${k}\` is not a signal kind: one of ${SIGNAL_KINDS.join(", ")}` });
+  });
+  if (step.grace !== undefined && !on.includes("ci.none")) errors.push({ path: `${at}/grace`, message: `grace counts down to ci.none, which step '${name}' does not wait on` });
+  return [...on];
+}
+
 function agentEnds(step: WorkflowStepDoc, routes: Record<string, Route>, at: string, errors: WorkflowError[]): string[] {
   const reportable = Object.keys(routes).filter((o) => !OVERRIDABLE.includes(o));
+  // a dotted name is a signal kind, which only an await step takes
+  for (const o of reportable) if (o.includes(".")) errors.push({ path: `${at}/outcomes/${o}`, message: `'${o}' is a signal kind's spelling: an agent reports a plain outcome` });
   if (Object.hasOwn(routes, "exhausted")) errors.push({ path: `${at}/outcomes/exhausted`, message: "'exhausted' always routes to $stuck and cannot be declared" });
   if (!reportable.length) errors.push({ path: `${at}/outcomes`, message: "an agent step declares at least one outcome it reports" });
   const about = { hand_back: step.hand_back, means: step.means, verdict: step.verdict };
@@ -123,6 +139,10 @@ function agentEnds(step: WorkflowStepDoc, routes: Record<string, Route>, at: str
           message: OVERRIDABLE.includes(o) ? `${key} names '${o}', a route the kernel takes, never one an agent reports` : `${key} names outcome '${o}', but the step declares no route for it in outcomes`,
         });
   return reportable.filter((o) => o !== "exhausted");
+}
+
+function article(word: string): string {
+  return /^[aeiou]/.test(word) ? "an" : "a";
 }
 
 function refused(e: WorkflowError): { ok: false; errors: WorkflowError[] } {

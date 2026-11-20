@@ -90,10 +90,23 @@ export type CheckStepSpec = Static<typeof CheckStepSpec>;
 export const GateStepSpec = Type.Object({ prompt: NonEmpty }, closed);
 export type GateStepSpec = Static<typeof GateStepSpec>;
 
+/** What an await step waits on: the signal kinds it routes, in the order it takes them, and its clocks from its visit's run. */
+export const AwaitStepSpec = Type.Object(
+  {
+    on: Type.Array(OutcomeName),
+    /** passing it ends the step `timeout`; null: the step waits for as long as it takes */
+    deadline_ms: Type.Union([PosInt, Type.Null()]),
+    /** how long no check on the change reads as pending rather than `ci.none`; null when the step does not wait on `ci.none` */
+    grace_ms: Type.Union([PosInt, Type.Null()]),
+  },
+  closed,
+);
+export type AwaitStepSpec = Static<typeof AwaitStepSpec>;
+
 export const CompiledStep = Type.Object(
   {
     name: StepName,
-    /** the head key: `agent`, `check`, `gate`, `slices`, or a plugin step kind's name */
+    /** the head key: `agent`, `check`, `gate`, `slices`, `await`, or a plugin step kind's name */
     kind: NonEmpty,
     runner: StepRunner,
     description: Type.Optional(Type.String()),
@@ -104,6 +117,7 @@ export const CompiledStep = Type.Object(
     agent: Type.Optional(AgentStepSpec),
     check: Type.Optional(CheckStepSpec),
     gate: Type.Optional(GateStepSpec),
+    await: Type.Optional(AwaitStepSpec),
     /** a plugin step's extra keys, validated against its kind's configSchema */
     config: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
   },

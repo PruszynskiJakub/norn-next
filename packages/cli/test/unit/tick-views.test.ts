@@ -3,7 +3,7 @@ import type { ExecScript } from "@norn/conformance";
 import { ok, PLUGIN_API_VERSION, type StoreFactory } from "@norn/plugin-api";
 import { localStoreFactory } from "@norn/store-local";
 import { CliContext, configPaths, ExitCode, machineDir, machineId, type PluginImporter, runCli } from "../../src/index.ts";
-import { COMMON, HOME, LOCAL_CONFIG, machine, ROOT, type TestMachine } from "./support.ts";
+import { COMMON, fakeGh, GITHUB_CONFIG, HOME, LOCAL_CONFIG, machine, ROOT, type TestMachine } from "./support.ts";
 import { AGENT_STEP, configured, envOf, GATE_STEP, seedUnit, UNIT } from "./units.ts";
 
 const PATHS = configPaths(HOME, ROOT);
@@ -381,6 +381,33 @@ describe("norn status, story list and story view", () => {
     expect((await runCli(["story", "view", "lt-1"], m.io)).stdout).toStartWith("# lt-1 First, claimed by me@box\n");
     // reads only: no worktree, branch or push was asked of git while viewing
     expect(m.exec.calls.slice(writes).filter((c) => c.argv[1] === "worktree" || c.argv[1] === "push" || c.argv[1] === "branch")).toEqual([]);
+  });
+
+  test("a unit at an await step: story view names the kinds it waits on, the signals seen and when its deadline passes", async () => {
+    const m = configured();
+    await seedUnit(m, { workflow: "quick", step: "ci", executor: "await" });
+    const view = json((await runCli(["story", "view", UNIT, "--json"], m.io)).stdout) as { units: Array<Record<string, unknown>> };
+    expect(view.units[0]).toMatchObject({ step: "ci", kind: "await", waiting: null, awaiting: { on: ["ci.passed", "ci.failed", "ci.none"], seen: ["ci.none"], deadline_at: "2026-11-17T10:30:00.000Z" } });
+    expect((await runCli(["story", "view", UNIT], m.io)).stdout).toContain(`- ${UNIT}: ci (await), awaits ci.passed, ci.failed, ci.none: seen ci.none; deadline 2026-11-17T10:30:00.000Z`);
+  });
+
+  test("a forge that cannot be read: story view says the signals were not read, and why", async () => {
+    // gh answers nothing about pull requests here, so the change lookup fails
+    const gh = fakeGh();
+    const m = machine({ seed: { [PATHS.local]: GITHUB_CONFIG.replace("forge: { use: none }", "forge: { use: github }") }, script: (argv, o) => gh.script(argv, o) ?? gitAgrees(argv, o) });
+    await seedUnit(m, { unit: "gh-1", workflow: "quick", step: "ci", executor: "await" });
+    const view = json((await runCli(["story", "view", "gh-1", "--json"], m.io)).stdout) as { units: Array<{ awaiting?: { seen: string[]; error?: string } }> };
+    expect(view.units[0]?.awaiting?.seen).toEqual([]);
+    expect(view.units[0]?.awaiting?.error).toStartWith("forge: ");
+    expect((await runCli(["story", "view", "gh-1"], m.io)).stdout).toContain("- gh-1: ci (await), awaits ci.passed, ci.failed, ci.none: signals not read: forge: ");
+  });
+
+  test("an await step past its deadline waits for a person, with why and the rerun that starts a fresh wait", async () => {
+    const m = configured();
+    await seedUnit(m, { workflow: "quick", step: "ci", executor: "await", extra: { parked: { reason: "await.timeout", since: "2026-11-17T10:30:00.000Z", text: "ci did not finish within 30m (seen ci.pending)" } } });
+    const view = json((await runCli(["story", "view", UNIT, "--json"], m.io)).stdout) as { units: Array<Record<string, unknown>> };
+    expect(view.units[0]).toMatchObject({ waiting: { for: "person", text: "ci did not finish within 30m (seen ci.pending)", next: `norn run rerun ${UNIT}` } });
+    expect(view.units[0]?.awaiting).toBeUndefined();
   });
 
   test("a story no store holds is refused, naming story list", async () => {

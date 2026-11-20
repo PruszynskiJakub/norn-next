@@ -7,7 +7,7 @@
  * stale version, a receipt for a unit that does not exist) throws: that is a defect in decide.
  */
 import type { ChangeRequest, ClaimRecord, StoredMessage, TrackerItem } from "@norn/plugin-api";
-import { deriveUlid } from "@norn/schema";
+import { deriveUlid, type Signal } from "@norn/schema";
 import {
   type Decision,
   decide,
@@ -55,6 +55,8 @@ export interface SimStory {
   unpushed?: boolean;
   unsynced?: boolean;
   plan?: SlicePlan;
+  /** the forge could not be read this tick: the host gathers no signals and says why */
+  signals_error?: string;
 }
 
 /** What each step answers, per call at that unit and step: the n-th run takes the n-th entry, the last repeats. */
@@ -67,6 +69,11 @@ export interface Script {
   check: Answers;
   /** step name → a plugin step kind's outcome (`waiting` for a wait kind still waiting) */
   step: Answers;
+  /**
+   * await step name → the CI signal kinds the forge reports through each visit, comma-separated (the
+   * n-th visit takes the n-th entry, the last repeats); `change.*` comes from the story's change, as the host derives it
+   */
+  signal: Answers;
 }
 
 export interface Tick {
@@ -109,7 +116,7 @@ export class World {
   stories: SimStory[] = [];
   intake: TrackerItem[] = [];
   readonly ticks: Tick[] = [];
-  readonly script: Script = { agent: {}, check: {}, step: {} };
+  readonly script: Script = { agent: {}, check: {}, step: {}, signal: {} };
   /** agent runs the scripted agents should leave alone: a scenario shows their session by hand */
   readonly manual = new Set<string>();
   /** units whose session outlives a stop order: a harness that cannot end it */
@@ -208,6 +215,11 @@ export class World {
         if (s.unpushed !== undefined) out.unpushed = s.unpushed;
         if (s.unsynced !== undefined) out.unsynced = s.unsynced;
         if (s.plan) out.plan = structuredClone(s.plan);
+        const signals = this.signals(s);
+        if (signals && s.signals_error !== undefined) {
+          out.signals = [];
+          out.signals_error = s.signals_error;
+        } else if (signals) out.signals = signals;
         return out;
       }),
       intake: structuredClone(this.intake),
@@ -215,6 +227,23 @@ export class World {
     const v = validateKernelFacts(facts);
     if (!v.ok) throw new Error(`tick ${this.n}: facts fail validation: ${JSON.stringify(v.errors)}`);
     return facts;
+  }
+
+  /**
+   * The signals the host gathers for a story whose own unit waits at an await step, neither ended nor
+   * parked: the scripted CI kinds of this visit, and the change's merge onto `main` or its closing.
+   */
+  private signals(s: SimStory): Signal[] | undefined {
+    const st = s.units.find((u) => u.id === s.key)?.state;
+    const step = st && !st.ended && !st.parked ? this.workflows.byHash[st.workflow.hash]?.graph.steps[st.step] : undefined;
+    if (!st || !step?.await) return undefined;
+    const subject = `change/${s.change?.id ?? 0}`;
+    const out: Signal[] = [];
+    const ci = this.scripted(this.script.signal, s.key, st.step, st.attempt - 1);
+    for (const kind of (ci ?? "").split(",").filter(Boolean)) out.push({ source: "forge", kind: kind as Signal["kind"], subject, at: this.iso() });
+    if (s.change?.state === "merged" && s.change.base_branch === "main") out.push({ source: "forge", kind: "change.merged", subject, at: this.iso() });
+    if (s.change?.state === "closed") out.push({ source: "forge", kind: "change.closed", subject, at: this.iso() });
+    return out;
   }
 
   /** Gather facts, decide, perform every decision, and keep the tick. */

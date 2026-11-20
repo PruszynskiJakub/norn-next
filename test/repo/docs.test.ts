@@ -3,7 +3,8 @@
  * first, then swept over the real doc set expecting no hits; each hit names file, line and the fix.
  */
 import { describe, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { SLICE_NN_PATTERN } from "@norn/schema";
 import { allDocs, CODE_SPAN, textFiles, URL, userDocs } from "../support/docs.ts";
@@ -64,6 +65,20 @@ describe("no stray handoff (B34)", () => {
     expect(strayHandoff(".agents/specs/gh-1-x/runs/_story/handoff.md")).toBe(false);
     expect(strayHandoff(".agents/specs/gh-1-x/runs/01-a/handoff.md")).toBe(false);
     expect(strayHandoff("packages/core/src/handoff.ts")).toBe(false);
+  });
+
+  test("the sweep skips a folder that ignores itself, where norn keeps a live unit's handoff", () => {
+    const root = mkdtempSync(join(tmpdir(), "norn-stray-handoff-"));
+    try {
+      const live = join(root, ".agents", "specs", "gh-1", "handoffs");
+      mkdirSync(live, { recursive: true });
+      writeFileSync(join(live, "gh-1.md"), "# handoff\n");
+      expect(textFiles(root, [".md"]).map((f) => relative(root, f)).filter(strayHandoff)).toEqual([".agents/specs/gh-1/handoffs/gh-1.md"]);
+      writeFileSync(join(root, ".agents", "specs", "gh-1", ".gitignore"), "*\n");
+      expect(textFiles(root, [".md"]).map((f) => relative(root, f)).filter(strayHandoff)).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test("no handoff in the repo outside a spec folder's handoffs/ (or an older norn's runs/)", () => {

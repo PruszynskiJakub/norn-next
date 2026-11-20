@@ -7,9 +7,10 @@ import type { StepKindDefinition } from "@norn/plugin-api";
 import { check, parseDuration } from "@norn/schema";
 import type { KernelConfig } from "../model/config.ts";
 import { type CountedStep, deriveCounters } from "./counters.ts";
+import { splitEdge } from "./edge.ts";
 import { type CounterDoc, type Route, WorkflowDocument, type WorkflowStepDoc } from "./document.ts";
 import { type Flat, flatten } from "./flatten.ts";
-import type { AgentStepSpec, CompiledCounter, CompiledRoute, CompiledStep, PinnedWorkflow, WorkflowError, WorkflowGraph, WorkflowLoad } from "./graph.ts";
+import type { AgentStepSpec, AwaitStepSpec, CompiledCounter, CompiledRoute, CompiledStep, PinnedWorkflow, WorkflowError, WorkflowGraph, WorkflowLoad } from "./graph.ts";
 import { checkGraph } from "./shape.ts";
 import { type ReadStep, readStep } from "./steps.ts";
 
@@ -102,7 +103,7 @@ function targetErrors(flat: Flat, read: Readonly<Record<string, ReadStep>>, decl
     if (c.includes(".") && !named.has(c)) errors.push({ path: `/counters/${c}`, message: `counter name '${c}' is derived from its edge, never declared` });
     const resets = spec.reset_on === undefined ? [] : Array.isArray(spec.reset_on) ? spec.reset_on : [spec.reset_on];
     resets.forEach((edge, i) => {
-      const [from, outcome] = edge.split(".") as [string, string];
+      const [from, outcome] = splitEdge(edge);
       if (!Object.hasOwn(read[from]?.routes ?? {}, outcome))
         errors.push({ path: `/counters/${c}/reset_on${Array.isArray(spec.reset_on) ? `/${i}` : ""}`, message: `counter '${c}' resets on '${edge}', but step '${from}' routes no outcome '${outcome}'` });
     });
@@ -161,6 +162,7 @@ function compile(
     if (s.kind === "agent") step.agent = agentSpec(written, d, config);
     else if (s.kind === "check") step.check = { command: written.check as string, timeout_ms: parseDuration(written.timeout as string), exits: { ...(written.exits ?? {}) } };
     else if (s.kind === "gate") step.gate = { prompt: written.gate as string };
+    else if (s.kind === "await") step.await = awaitSpec(written);
     else if (s.config) step.config = s.config;
     steps[name] = step;
   }
@@ -173,6 +175,18 @@ function compile(
     steps,
     counters,
     ...(doc.base && { base: doc.base }),
+  };
+}
+
+/** No check on a change reads as pending for this long before it reads as `ci.none`: a forge shows none for a while after a push. */
+const DEFAULT_GRACE = "5m";
+
+function awaitSpec(s: WorkflowStepDoc): AwaitStepSpec {
+  const on = [...(s.await ?? [])];
+  return {
+    on,
+    deadline_ms: s.deadline === undefined ? null : parseDuration(s.deadline),
+    grace_ms: on.includes("ci.none") ? parseDuration(s.grace ?? DEFAULT_GRACE) : null,
   };
 }
 

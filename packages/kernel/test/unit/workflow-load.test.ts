@@ -10,7 +10,7 @@ import {
   type WorkflowError,
   type WorkflowLoad,
 } from "../../src/index.ts";
-import { kind, shipped, STEP_KINDS } from "../shipped.ts";
+import { kind, readOldShip, shipped, STEP_KINDS } from "../shipped.ts";
 
 const CONFIG = DEFAULT_KERNEL_CONFIG;
 const opts = (over: Partial<LoadWorkflowOptions> = {}): LoadWorkflowOptions => ({ stepKinds: STEP_KINDS, sharedFiles: {}, config: CONFIG, ...over });
@@ -48,7 +48,7 @@ const OLD_COUNTERS: Record<string, { edges: Record<string, string>; counters: Re
       "test-resolution.fail": "base-update.broken",
       "resolution-review.changes_requested": "resolution-review.changes_requested",
       "review.changes_requested": "review.changes_requested",
-      "ci.fail": "ship.ci-failed",
+      "ci.ci.failed": "ship.ci-failed",
       "ci.stale": "ship.stale",
       "ready.reject": "ship.rejected",
       "ready.stale": "ship.stale",
@@ -88,7 +88,7 @@ const OLD_COUNTERS: Record<string, { edges: Record<string, string>; counters: Re
       "human-qa.reject": "qa_loop",
       "human-qa.stale": "stale_loop",
       "review.changes_requested": "review.changes_requested",
-      "ci.fail": "ship.ci-failed",
+      "ci.ci.failed": "ship.ci-failed",
       "ci.stale": "stale_loop",
       "ready.reject": "ship.rejected",
       "ready.stale": "stale_loop",
@@ -141,12 +141,20 @@ describe("the shipped workflows", () => {
     expect(again.graph).toEqual(w.graph);
   });
 
+  test.each(["story.yaml", "quick.yaml"])("%s still loads with a repo's own copy of the old ship (its ci script and await-merge), exits and counters unchanged", (file) => {
+    const w = loaded(loadWorkflow(edited.workflows[file], opts({ sharedFiles: { ...edited.shared, ship: readOldShip() } })));
+    expect(w.graph.steps.ci?.kind).toBe("check");
+    expect(w.graph.steps.merge?.kind).toBe("await-merge");
+    const { "ci.ci.failed": ciFailed, ...edges } = (OLD_COUNTERS[file] as ReturnType<typeof countersOf>).edges;
+    expect(countersOf(w)).toEqual({ edges: { ...edges, "ci.fail": ciFailed as string }, counters: (OLD_COUNTERS[file] as ReturnType<typeof countersOf>).counters });
+  });
+
   test("an unrouted outcome inside a shared file is refused, naming the file", () => {
     const shared = structuredClone(edited.shared) as Record<string, { steps: Record<string, { outcomes: Record<string, unknown> }> }>;
-    delete shared.ship?.steps.merge?.outcomes.merged;
+    delete shared.ship?.steps.merge?.outcomes["change.merged"];
     const errors = errorsOf(loadWorkflow(edited.workflows["quick.yaml"], opts({ sharedFiles: shared })));
     expect(errors.map((e) => e.shared)).toEqual(["ship"]);
-    expect(errors[0]?.message).toBe("shared/ship.yaml: step 'merge' can end with 'merged' but routes it nowhere");
+    expect(errors[0]?.message).toBe("shared/ship.yaml: step 'merge' can end with 'change.merged' but routes it nowhere");
   });
 
   test("a story workflow's graph: use steps brought in, entered at their file's start, exits routed", () => {
@@ -154,9 +162,11 @@ describe("the shipped workflows", () => {
     expect(w.graph.start).toBe("sync");
     expect(w.graph.steps["sync-base"]).toBeUndefined();
     expect(w.graph.steps.sync?.routes.done).toEqual({ to: "slice" });
-    expect(w.graph.steps.merge).toMatchObject({ kind: "await-merge", runner: { type: "plugin", mode: "wait" }, outcomes: ["merged", "stale", "unpushed"] });
+    expect(w.graph.steps.merge).toMatchObject({ kind: "await", runner: { type: "builtin" }, outcomes: ["change.merged", "stale", "unpushed"], await: { on: ["change.merged"], deadline_ms: null, grace_ms: null } });
+    expect(w.graph.steps["mark-ready"]).toMatchObject({ kind: "mark-ready", runner: { type: "plugin", mode: "effect" }, routes: { done: { to: "merge" } } });
+    expect(w.graph.steps.ready?.routes.approve).toEqual({ to: "mark-ready" });
     expect(w.graph.steps["test-merge"]?.check).toEqual({ command: "{checks.test}", timeout_ms: 15 * 60_000, exits: {} });
-    expect(w.graph.steps.ci?.outcomes).toEqual(["pass", "fail", "stale"]);
+    expect(w.graph.steps.ci).toMatchObject({ kind: "await", outcomes: ["ci.passed", "ci.failed", "ci.none", "stale"], await: { on: ["ci.passed", "ci.failed", "ci.none"], deadline_ms: 30 * 60_000, grace_ms: 5 * 60_000 } });
     expect(w.graph.steps["approve-slices"]?.outcomes).toEqual(["approve", "reject"]);
     expect(w.graph.steps["human-qa"]?.outcomes).toEqual(["approve", "reject", "stale"]);
     expect(w.graph.steps.qa?.agent).toMatchObject({ criteria: true, hand_back: { fail: "findings" }, nudges: CONFIG.maxNudges, deadline_ms: CONFIG.deadlineMs });
@@ -380,5 +390,69 @@ describe("loading", () => {
     const doc = wf({ work: agent({ done: "test" }), test: { check: "x", timeout: "1m", outcomes: { pass: "$done", fail: "work" } } });
     const w = loaded(loadWorkflow(doc, opts({ config: { ...CONFIG, counterDefaults: { ...CONFIG.counterDefaults, checkFail: 9 } } })));
     expect(w.graph.counters["test.fail"]).toEqual({ max: 9, reset_on: [] });
+  });
+});
+
+describe("an await step", () => {
+  const ci = (extra: Record<string, unknown> = {}, outcomes: Record<string, unknown> = { "ci.passed": "$done", "ci.failed": "fix", "ci.none": "$done" }) => ({
+    await: ["ci.passed", "ci.failed", "ci.none"],
+    outcomes,
+    ...extra,
+  });
+  const fix = agent({ done: "ci" });
+
+  test("lists the signal kinds it waits on and routes each, with stale, unpushed and a deadline's timeout routed only where written", () => {
+    const doc = wf({ ci: ci({ deadline: "30m", grace: "2m" }, { "ci.passed": "$done", "ci.failed": "fix", "ci.none": "$done", stale: "$stuck", timeout: "$stuck" }), fix });
+    const w = loaded(loadWorkflow(doc, opts()));
+    expect(w.graph.steps.ci?.kind).toBe("await");
+    expect(w.graph.steps.ci?.runner).toEqual({ type: "builtin" });
+    expect(w.graph.steps.ci?.outcomes).toEqual(["ci.passed", "ci.failed", "ci.none", "stale", "timeout"]);
+    expect(w.graph.steps.ci?.await).toEqual({ on: ["ci.passed", "ci.failed", "ci.none"], deadline_ms: 1_800_000, grace_ms: 120_000 });
+  });
+
+  test("waits out a 5m grace before ci.none by default, and has no deadline unless it sets one", () => {
+    const w = loaded(loadWorkflow(wf({ ci: ci(), fix }), opts()));
+    expect(w.graph.steps.ci?.await).toEqual({ on: ["ci.passed", "ci.failed", "ci.none"], deadline_ms: null, grace_ms: 300_000 });
+    const merge = loaded(loadWorkflow(wf({ merge: { await: ["change.merged"], outcomes: { "change.merged": "$done" } } }), opts()));
+    expect(merge.graph.steps.merge?.await).toEqual({ on: ["change.merged"], deadline_ms: null, grace_ms: null });
+  });
+
+  test("a route back on a signal is bounded by a signal counter with a check fail's default", () => {
+    const w = loaded(loadWorkflow(wf({ ci: ci(), fix }), opts()));
+    expect(countersOf(w)).toEqual({ edges: { "ci.ci.failed": "ci.ci.failed" }, counters: { "ci.ci.failed": c(CONFIG.counterDefaults.checkFail) } });
+    expect(w.pinned.doc.steps.ci?.outcomes).toEqual({ "ci.passed": "$done", "ci.failed": { to: "fix", counter: "ci.ci.failed" }, "ci.none": "$done" });
+    expect(loaded(loadWorkflow(w.pinned.doc, opts())).pinned.hash).toBe(w.pinned.hash);
+  });
+
+  test("an unknown kind, a kind routed but not listed, a listed kind left unrouted, timeout without deadline and grace without ci.none are refused, naming the key", () => {
+    expect(errorsOf(loadWorkflow(wf({ ci: { await: ["ci.passed", "ci.faild"], outcomes: { "ci.passed": "$done", "ci.faild": "$stuck" } } }), opts()))).toEqual([
+      { path: "/steps/ci/await/1", message: "`ci.faild` is not a signal kind: one of ci.pending, ci.passed, ci.failed, ci.none, change.merged, change.closed" },
+    ]);
+    expect(errorsOf(loadWorkflow(wf({ ci: { await: ["ci.passed"], outcomes: { "ci.passed": "$done", "ci.failed": "$stuck" } } }), opts()))).toEqual([
+      { path: "/steps/ci/outcomes/ci.failed", message: "step 'ci' (await) never ends with 'ci.failed'" },
+    ]);
+    expect(errorsOf(loadWorkflow(wf({ ci: { await: ["ci.passed", "ci.failed"], outcomes: { "ci.passed": "$done" } } }), opts()))).toEqual([
+      { path: "/steps/ci/outcomes", message: "step 'ci' can end with 'ci.failed' but routes it nowhere" },
+    ]);
+    expect(errorsOf(loadWorkflow(wf({ ci: { await: ["ci.passed"], outcomes: { "ci.passed": "$done", timeout: "$stuck" } } }), opts()))).toEqual([
+      { path: "/steps/ci/outcomes/timeout", message: "step 'ci' (await) never ends with 'timeout'" },
+    ]);
+    expect(errorsOf(loadWorkflow(wf({ ci: { await: ["ci.passed"], grace: "1m", outcomes: { "ci.passed": "$done" } } }), opts()))).toEqual([
+      { path: "/steps/ci/grace", message: "grace counts down to ci.none, which step 'ci' does not wait on" },
+    ]);
+  });
+
+  test("only an await step routes a signal kind: an agent reporting a dotted outcome is refused", () => {
+    expect(errorsOf(loadWorkflow(wf({ work: agent({ "ci.failed": "$done" }) }), opts()))).toEqual([
+      { path: "/steps/work/outcomes/ci.failed", message: "'ci.failed' is a signal kind's spelling: an agent reports a plain outcome" },
+    ]);
+  });
+
+  test("takes a list of kinds and only its own keys", () => {
+    expect(errorsOf(loadWorkflow(wf({ ci: { await: [], outcomes: { stale: "$done" } } }), opts()))[0]?.path).toBe("/steps/ci/await");
+    expect(errorsOf(loadWorkflow(wf({ ci: { await: "ci.passed", outcomes: { "ci.passed": "$done" } } }), opts()))[0]?.path).toBe("/steps/ci/await");
+    expect(errorsOf(loadWorkflow(wf({ ci: { await: ["ci.passed"], timeout: "1m", outcomes: { "ci.passed": "$done" } } }), opts()))).toEqual([
+      { path: "/steps/ci/timeout", message: "`timeout` is not a key of an await step" },
+    ]);
   });
 });

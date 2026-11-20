@@ -48,8 +48,9 @@ function storyJourney(): GoldenCase[] {
   const w = world({ files: shippedFiles("story", "slice") });
   const key = "gh-12";
   w.intake.push(item(12, "Sign in with a passkey"));
-  Object.assign(w.script.step, { sync: ["done"], update: ["done"], "open-pr": ["done"], merge: ["waiting", "waiting", "merged"], integrate: ["done"], [`${key}/02:integrate`]: ["conflict", "done"] });
-  Object.assign(w.script.check, { [`${key}/01:test`]: ["fail", "pass"], test: ["pass"], ci: ["pass"] });
+  Object.assign(w.script.step, { sync: ["done"], update: ["done"], "open-pr": ["done"], integrate: ["done"], [`${key}/02:integrate`]: ["conflict", "done"] });
+  Object.assign(w.script.check, { [`${key}/01:test`]: ["fail", "pass"], test: ["pass"] });
+  Object.assign(w.script.signal, { ci: ["ci.passed"] });
   Object.assign(w.script.agent, { slice: ["done"], implement: ["done"], review: ["approve"], [`${key}/03:review`]: ["changes_requested", "approve"], merge: ["done"], qa: ["pass"], describe: ["done"] });
   w.tick();
   w.run(parkedAt(key, "approve-slices"));
@@ -68,19 +69,23 @@ function storyJourney(): GoldenCase[] {
   w.run(parkedAt(key, "ready"));
   w.tick();
   w.decideGate(key, "approve");
-  w.run(ended(key));
+  w.run(at(key, "merge"));
+  w.tick();
+  w.tick();
   story.change = { id: 41, url: "https://forge.example/pr/41", state: "merged", draft: false, head_branch: "gh-12-passkey", base_branch: "main", head_sha: "a1", merge_sha: "m1", merged_at: w.iso(), title: "Sign in with a passkey" };
+  w.run(ended(key));
   w.run((x) => x.story(key).claim === null);
   w.tick();
-  return distinct(w, "story-journey", "A story from intake through sync, slicing, an approved slice plan, three slices (a red check, a review sent back, an integration conflict), the story's base update, QA, PR, CI, the ready gate and the merge, to the claim's release.");
+  return distinct(w, "story-journey", "A story from intake through sync, slicing, an approved slice plan, three slices (a red check, a review sent back, an integration conflict), the story's base update, QA, PR, CI, the ready gate, marking the PR ready and the merge, to the claim's release.");
 }
 
 function quickJourney(): GoldenCase[] {
   const w = world({ files: shippedFiles("quick"), config: config({ mode: "manual", workflow: "quick" }) });
   const key = "gh-7";
   w.intake.push(item(7, "Fix the typo in the help text"));
-  Object.assign(w.script.step, { sync: ["done"], update: ["done"], "open-pr": ["done"], merge: ["waiting"] });
-  Object.assign(w.script.check, { test: ["pass"], ci: ["fail", "pass"] });
+  Object.assign(w.script.step, { sync: ["done"], update: ["done"], "open-pr": ["done"] });
+  Object.assign(w.script.check, { test: ["pass"] });
+  Object.assign(w.script.signal, { ci: ["ci.failed", "ci.passed"] });
   Object.assign(w.script.agent, { implement: ["done"], review: ["changes_requested", "approve"], describe: ["done"] });
   w.run(parkedAt(key, "implement"));
   w.tick();
@@ -117,7 +122,8 @@ function gateRejected(): GoldenCase[] {
   const key = "gh-31";
   seed(w, key, { workflow: "quick", step: "describe" });
   Object.assign(w.script.step, { update: ["done"], "open-pr": ["done"] });
-  Object.assign(w.script.check, { test: ["pass"], ci: ["pass"] });
+  Object.assign(w.script.check, { test: ["pass"] });
+  Object.assign(w.script.signal, { ci: ["ci.passed"] });
   Object.assign(w.script.agent, { implement: ["done"], review: ["approve"], describe: ["done"] });
   for (let i = 1; i <= 3; i++) {
     w.run(parkedAt(key, "ready"), 60);

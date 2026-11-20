@@ -12,6 +12,7 @@ import {
   Target,
 } from "./common.ts";
 import { Verdict } from "./criteria.ts";
+import { SignalKindSchema } from "./signal.ts";
 
 /** What an agent's report of an outcome must come with: a findings file or an evidence folder. */
 export const HandBack = Type.Union([Type.Literal("findings"), Type.Literal("evidence")]);
@@ -234,6 +235,17 @@ function fileStepTypes<R extends TSchema>(route: R) {
     IntegrateStep: verb("integrate", ["done", "conflict"]),
     PushStep: verb("push", ["done", "conflict"]),
     AwaitMergeStep: verb("await-merge", ["stale"]),
+    MarkReadyStep: verb("mark-ready", ["done"]),
+    AwaitStep: Type.Object(
+      {
+        await: Type.Array(SignalKindSchema, { minItems: 1, uniqueItems: true, description: "The signal kinds the step waits on; it takes the first route whose kind is present" }),
+        ...common,
+        deadline: Type.Optional(Duration),
+        grace: Type.Optional(Type.String({ pattern: Duration.pattern, description: "How long no check reads as pending before ci.none; default 5m" })),
+        outcomes: routes,
+      },
+      { additionalProperties: false },
+    ),
     SlicesStep: verb("slices", ["done", "stuck"]),
   };
 }
@@ -250,7 +262,7 @@ export const Step = TaggedUnion("type", [AgentStep, CheckStep, GateStep, GitStep
 export type Step = Static<typeof Step>;
 export type StepType = Step["type"];
 
-const ResetEdge = Type.String({ pattern: "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$", description: "<step>.<outcome> whose edge resets the counter" });
+const ResetEdge = Type.String({ pattern: "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$", description: "<step>.<outcome> whose edge resets the counter" });
 
 export const CounterSpec = Type.Object(
   {

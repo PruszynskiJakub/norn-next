@@ -14,8 +14,13 @@ function who(d: Outcome["decision"]): string {
   return typeof loose.item?.key === "string" ? loose.item.key : "-";
 }
 
+/** Rules whose reason says what they wait on, worth a line of its own: an await step names the kinds it waits on and the signals it saw. */
+const SAID_WAITS: ReadonlySet<string> = new Set(["await.waiting"]);
+
 export function outcomeLine(o: Outcome): string {
-  const base = `${who(o.decision)}  ${o.decision.rule} → ${o.decision.kind}`;
+  const d = o.decision;
+  const said = d.kind === "noop" && SAID_WAITS.has(d.rule) ? `: ${d.reason}` : "";
+  const base = `${who(d)}  ${d.rule} → ${d.kind}${said}`;
   if (o.ok) return base;
   if (lostRace(o)) return `${base}  lost a race, decided again next tick: ${o.error}`;
   return `${base}  FAILED: ${o.error}${o.retryable ? " (retried next tick)" : ""}`;
