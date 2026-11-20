@@ -10,6 +10,7 @@
 import type { AnsweredAsk, BriefInputs, BriefRenderInput, CompiledStep, KernelReceipt, LoadedWorkflow, RunState, UnitJournal } from "@norn/kernel";
 import { wantsCriteria } from "@norn/kernel";
 import { fail, ok, type PluginResult } from "@norn/plugin-api";
+import { isRedCi, redCiText } from "./ci-failures.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { readEvents } from "./events/log.ts";
 import { historyOf, rulingsOf } from "./input-history.ts";
@@ -42,7 +43,7 @@ async function reworkText(env: RuntimeEnv, unit: string, receipt: KernelReceipt 
     case "run.reported":
       return `\`${d.step ?? "a step"}\` reported \`${d.verb}${d.outcome ? ` ${d.outcome}` : ""}\`${d.text ? `: ${d.text}` : "."}${findingsList(d.findings)}${unsettledCriteria(d.criteria)}`;
     case "step.finished":
-      return `\`${d.step ?? d.step_kind}\` ended \`${d.outcome}\`.`;
+      return isRedCi(receipt) ? redCiText(receipt) : `\`${d.step ?? d.step_kind}\` ended \`${d.outcome}\`.`;
     default:
       return undefined;
   }

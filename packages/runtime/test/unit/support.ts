@@ -8,7 +8,9 @@ import { type ExecScript, manualClock, memoryFiles, memoryHost, scriptedExec } f
 import { DEFAULT_KERNEL_CONFIG, decide, type KernelConfig, type SessionFacts } from "@norn/kernel";
 import {
   type ChangeRequest,
+  type ChecksSummary,
   defineNornPlugin,
+  type FailedCheck,
   fail,
   type Forge,
   type Harness,
@@ -23,6 +25,7 @@ import {
   type Vcs,
   type VcsUnfinished,
 } from "@norn/plugin-api";
+import { SDLC_PACK } from "@norn/pack-sdlc";
 import { deriveUlid } from "@norn/schema";
 import { localStorePlugin } from "@norn/store-local";
 import { Type } from "@sinclair/typebox";
@@ -67,13 +70,38 @@ export function fakeTracker(items: TrackerItem[]): Tracker {
   };
 }
 
-/** A forge whose changes are a map by branch the test edits. */
-export function fakeForge(changes: Record<string, ChangeRequest>): Forge {
+/** What the fake forge reports beyond its changes, and every call it took, for a test to edit and read. */
+export interface FakeForgeWorld {
+  /** the checks on each change's head, by change id; absent: none */
+  checks: Record<number, ChecksSummary>;
+  /** the failed checks of each red change, by change id */
+  failed: Record<number, FailedCheck[]>;
+  /** `findChanges <branches>`, `checks <id>`, `failures <id>`, in order */
+  calls: string[];
+  /** while true, every call fails as an unreachable code host does */
+  down: boolean;
+}
+
+export const fakeForgeWorld = (): FakeForgeWorld => ({ checks: {}, failed: {}, calls: [], down: false });
+
+/** A forge whose changes are a map by branch the test edits, and whose checks a test sets per change. */
+export function fakeForge(changes: Record<string, ChangeRequest>, world: FakeForgeWorld = fakeForgeWorld()): Forge {
+  const down = <T>(): PluginResult<T> => fail("unavailable", "the fake forge is down");
   return {
     name: "fake",
     capabilities: { draft: true, checks: true, raw_urls: false },
-    findChanges: async (branches) => ok(Object.fromEntries(branches.map((b) => [b, changes[b] ?? null]))),
-    checks: async () => ok("none"),
+    findChanges: async (branches) => {
+      world.calls.push(`findChanges ${branches.join(",")}`);
+      return world.down ? down() : ok(Object.fromEntries(branches.map((b) => [b, changes[b] ?? null])));
+    },
+    checks: async (id) => {
+      world.calls.push(`checks ${id}`);
+      return world.down ? down() : ok(world.checks[id] ?? "none");
+    },
+    failures: async (id) => {
+      world.calls.push(`failures ${id}`);
+      return world.down ? down() : ok(structuredClone(world.failed[id] ?? []));
+    },
     perform: async () => fail("invalid", "the fake forge performs nothing"),
   };
 }
@@ -239,6 +267,9 @@ export function fakeStepKinds(answers: Record<string, StepAnswer[]>, calls: Step
     // named as the vcs plugin's kind, so the inputs that read the base update's receipts find it
     "update-branch": kind("update-branch", "effect", ["done", "conflict", "resolved"]),
     integrate: kind("integrate", "effect", ["done", "conflict"]),
+    // named as the forge steps', so the shipped ship runs over the fakes with only the forge's signals real
+    "open-pr": kind("open-pr", "effect", ["done"]),
+    "mark-ready": kind("mark-ready", "effect", ["done"]),
   };
 }
 
@@ -326,6 +357,37 @@ export const WORKFLOWS: Record<string, string> = {
     "    outcomes: { done: integrate }",
     "",
   ].join("\n"),
+  "awaited.yaml": [
+    "name: awaited",
+    "start: ci",
+    "steps:",
+    "  ci:",
+    "    await: [ci.passed, ci.failed, ci.none]",
+    "    deadline: 30m",
+    "    outcomes: { ci.passed: merge, ci.none: merge, ci.failed: fix }",
+    "  fix:",
+    '    agent: "Fix what CI found."',
+    "    inputs: [last_check]",
+    "    outcomes: { done: ci }",
+    "  merge:",
+    "    await: [change.merged]",
+    "    outcomes: { change.merged: $done }",
+    "",
+  ].join("\n"),
+  "shipping.yaml": [
+    "name: shipping",
+    "start: ship",
+    "base: { stale: conflict }",
+    "steps:",
+    "  ship:",
+    "    use: ship",
+    "    outcomes: { ci-failed: { to: fix, max: 3 }, rejected: fix, stale: fix }",
+    "  fix:",
+    '    agent: "Fix it."',
+    "    inputs: [last_check]",
+    "    outcomes: { done: ship }",
+    "",
+  ].join("\n"),
   "sliced.yaml": "name: sliced\nstart: split\nsteps:\n  split:\n    slices:\n    outcomes: { done: $done, stuck: $stuck }\n",
   "based.yaml": [
     "name: based",
@@ -364,6 +426,8 @@ export interface Harnessed {
   exec: ReturnType<typeof scriptedExec>;
   items: TrackerItem[];
   changes: Record<string, ChangeRequest>;
+  /** the fake forge's checks, failed checks, calls and outage */
+  forge: FakeForgeWorld;
   heads: Record<string, string>;
   vcsCalls: VcsCall[];
   /** operations stopped half-way, by checkout path, as the fake vcs reports them */
@@ -434,6 +498,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
   const ctx: HostContext = opts.processes ? { ...base, ...opts.processes.host } : base;
   const items: TrackerItem[] = [];
   const changes: Record<string, ChangeRequest> = {};
+  const forge = fakeForgeWorld();
   const heads: Record<string, string> = {};
   const vcsCalls: VcsCall[] = [];
   const stopped: Record<string, VcsUnfinished> = {};
@@ -448,11 +513,11 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     api: "^1.4",
     provides: {
       tracker: { fake: { configSchema: Type.Object({}), create: () => fakeTracker(items) } },
-      forge: { fake: { configSchema: Type.Object({}), create: () => fakeForge(changes) } },
+      forge: { fake: { configSchema: Type.Object({}), create: () => fakeForge(changes, forge) } },
       vcs: { fake: { configSchema: Type.Object({}), create: (c: HostContext) => fakeVcs(c, heads, vcsCalls, stopped, dirty, untracked) } },
       harness: { fake: HARNESS },
       stepKinds: fakeStepKinds(stepAnswers, stepCalls),
-      packs: { test: { workflows: WORKFLOWS, shared: {}, skills: {} } },
+      packs: { test: { workflows: WORKFLOWS, shared: { "ship.yaml": SDLC_PACK.shared["ship.yaml"] as string }, skills: {} } },
     },
   });
   const plugins: NornPlugin[] = [providers, localStorePlugin];
@@ -480,7 +545,7 @@ export function harness(opts: HarnessOptions = {}): Harnessed {
     return id;
   };
   const runtime: Runtime = { tick: () => tick(env, nextId()) };
-  return { ctx, files, clock, exec, items, changes, heads, vcsCalls, stopped, dirty, untracked, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
+  return { ctx, files, clock, exec, items, changes, forge, heads, vcsCalls, stopped, dirty, untracked, stepCalls, stepAnswers, launcher, sessions, plugins, config, env, runtime, tickIds };
 }
 
 export type Report = Awaited<ReturnType<Runtime["tick"]>>;

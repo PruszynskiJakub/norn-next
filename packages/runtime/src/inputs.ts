@@ -17,6 +17,7 @@ import type { BriefInputs, BriefInputView, BriefStory, KernelReceipt, UnitJourna
 import { ok, type PluginResult, parseStoryKey, parseUnitId, type TrackerItem } from "@norn/plugin-api";
 import type { CriterionVerdict, Finding } from "@norn/schema";
 import { baseRefOf, cutFrom } from "./branches.ts";
+import { isRedCi, redCiText } from "./ci-failures.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { mirrorItem, SPEC_ARTIFACT } from "./spec-mirror.ts";
 import { readStepRun } from "./step-runs.ts";
@@ -152,7 +153,7 @@ function handoffTemplate(unit: string): string {
 function findingsReceipt(record: UnitJournal, reworkFrom: number | undefined): KernelReceipt | undefined {
   if (reworkFrom !== undefined) {
     const r = record.receipts.find((x) => x.seq === reworkFrom);
-    return r && r.data.kind !== "check.finished" ? r : undefined;
+    return r && r.data.kind !== "check.finished" && !isRedCi(r) ? r : undefined;
   }
   const round = roundOf(record);
   const at = round.findLastIndex((x) => carriesFindings(record, x));
@@ -180,6 +181,7 @@ function settles(record: UnitJournal, found: KernelReceipt, later: KernelReceipt
 
 function noFindingsNote(record: UnitJournal, brief: BriefInputs): string {
   const by = brief.rework_from !== undefined ? record.receipts.find((x) => x.seq === brief.rework_from) : undefined;
+  if (by !== undefined && isRedCi(by)) return `CI on the change sent the work back, with no findings: its failed checks are ${brief.inputs.includes("last_check") ? "under Rework and in `last_check`" : "under Rework"}`;
   if (by?.data.kind !== "check.finished") return "no findings sent this work back";
   const where = brief.inputs.includes("last_check") ? "under Rework and in `last_check`" : "under Rework";
   return `the check \`${by.data.step ?? "check"}\` sent the work back, with no findings: its output is ${where}`;
@@ -223,8 +225,10 @@ function findingsText(r: KernelReceipt): string | null {
   return null;
 }
 
+/** The latest red or green check, or red CI from an await step: whichever came last is what the work answers. */
 async function lastCheckText(env: RuntimeEnv, record: UnitJournal): Promise<string | null> {
-  const r = record.receipts.findLast((x) => x.data.kind === "check.finished");
+  const r = record.receipts.findLast((x) => x.data.kind === "check.finished" || isRedCi(x));
+  if (r && isRedCi(r)) return redCiText(r);
   if (!r || r.data.kind !== "check.finished") return null;
   const d = r.data;
   const head = `Check \`${d.step ?? "check"}\` exited ${d.exit} (\`${d.outcome}\`).`;
