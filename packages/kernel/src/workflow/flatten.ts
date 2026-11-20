@@ -7,6 +7,7 @@
 import { check, StepName } from "@norn/schema";
 import { type Route, SharedWorkflowDocument, type WorkflowDocument, type WorkflowStepDoc } from "./document.ts";
 import type { ExitLeft } from "./counters.ts";
+import { splitEdge } from "./edge.ts";
 import type { WorkflowError } from "./graph.ts";
 
 type Obj = Record<string, unknown>;
@@ -191,7 +192,7 @@ function useStepNamedWhereAStepMustBe(doc: WorkflowDocument, byUse: Map<string, 
   for (const [c, spec] of Object.entries(doc.counters ?? {})) {
     const edges = spec.reset_on === undefined ? [] : Array.isArray(spec.reset_on) ? spec.reset_on : [spec.reset_on];
     for (const edge of edges) {
-      const inc = byUse.get(edge.split(".")[0] as string);
+      const inc = byUse.get(splitEdge(edge)[0]);
       if (inc) out.push({ path: `/counters/${c}/reset_on`, message: `\`${inc.by}\` is a use step: name the step of ${fileOf(inc.name)} whose edge resets the counter` });
     }
   }

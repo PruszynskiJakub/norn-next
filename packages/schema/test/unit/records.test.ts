@@ -220,7 +220,10 @@ describe("a counter derived from its edge, named <step>.<outcome>", () => {
   test("validates in a receipt's reset list", () => {
     expect(validate("receipt", { ...receipts.unstick, reset: ["review.changes_requested"] }).ok).toBe(true);
   });
-  test.each([["two dots", "a.b.c"], ["a trailing dot", "review."], ["a capital", "Review.x"]])("a stored name with %s is still refused", (_n, name) => {
+  test("a derived name whose outcome is a signal kind validates: <step>.<kind>", () => {
+    expect(validate("receipt", { ...receipts.unstick, reset: ["ci.ci.failed"] }).ok).toBe(true);
+  });
+  test.each([["three dots", "a.b.c.d"], ["a trailing dot", "review."], ["a capital", "Review.x"]])("a stored name with %s is still refused", (_n, name) => {
     expect(validate("receipt", { ...receipts.unstick, reset: [name] }).ok).toBe(false);
   });
 });

@@ -83,7 +83,7 @@
       "type": "object",
       "patternProperties": {
         "^[1-9][0-9]*$": {
-          "pattern": "^[a-z][a-z0-9_-]*$",
+          "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
           "type": "string"
         }
       }

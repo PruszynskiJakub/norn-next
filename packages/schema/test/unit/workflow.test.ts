@@ -202,6 +202,8 @@ describe("workflow-source and workflow-shared schemas", () => {
     integrate: { integrate: null, outcomes: { done: "$done" } },
     push: { push: null, outcomes: { done: "$done" } },
     "await-merge": { "await-merge": null, outcomes: { stale: "$done" } },
+    "mark-ready": { "mark-ready": null, outcomes: { done: "$done" } },
+    await: { await: ["ci.passed", "ci.none"], deadline: "30m", grace: "5m", outcomes: { "ci.passed": "$done", "ci.none": "$done" } },
     slices: { slices: null, outcomes: { done: "$done" } },
   };
   const source = (step: unknown) => ({ name: "x", start: "a", steps: { a: step } });

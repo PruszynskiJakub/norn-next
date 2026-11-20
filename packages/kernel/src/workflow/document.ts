@@ -1,12 +1,12 @@
 /**
  * A workflow as its file is written, in the wording the shipped workflows use, so they carry over
  * with at most mechanical edits. A step holds exactly one head key: a kernel built-in (`agent`,
- * `check`, `gate`, `slices`), `use` (a shared file's steps) or `like` (a copy of a sibling), or a step
+ * `check`, `gate`, `slices`, `await`), `use` (a shared file's steps) or `like` (a copy of a sibling), or a step
  * kind a plugin provides (`open-pr:`, `await-merge:`), whose extra keys its `configSchema` checks.
  * The schema checks the keys it knows and lets the rest through; `loadWorkflow` decides which key is
  * the head and refuses a step whose head is unknown.
  */
-import { Duration, Mode, NonEmpty, OUTCOME_NAME_PATTERN, OutcomeName, PosInt, StepName, StoredCounterName, Target, Verdict } from "@norn/schema";
+import { Duration, Mode, NonEmpty, OutcomeName, PLAIN_NAME_PATTERN, PosInt, StepName, StoredCounterName, Target, Verdict } from "@norn/schema";
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
 
 const closed = { additionalProperties: false } as const;
@@ -41,7 +41,7 @@ export type HandBack = Static<typeof HandBack>;
  * brief builder resolves, or a file. Decide passes them through and never opens them.
  */
 export const StepInputDoc = Type.Union([
-  Type.String({ pattern: OUTCOME_NAME_PATTERN }),
+  Type.String({ pattern: PLAIN_NAME_PATTERN }),
   Type.Object({ file: NonEmpty, label: Type.Optional(NonEmpty) }, closed),
 ]);
 export type StepInputDoc = Static<typeof StepInputDoc>;
@@ -57,6 +57,7 @@ function stepDoc<R extends TSchema>(route: R) {
       check: Type.Optional(NonEmpty),
       gate: Type.Optional(Type.String({ minLength: 1, pattern: "\\S", description: "What the person decides; shown in the inbox" })),
       slices: Type.Optional(Type.Null({ description: "Takes no value" })),
+      await: Type.Optional(Type.Array(OutcomeName, { minItems: 1, uniqueItems: true, description: "The signal kinds the step waits on" })),
       use: Type.Optional(SharedName),
       like: Type.Optional(StepName),
       description: Type.Optional(Type.String()),
@@ -71,6 +72,7 @@ function stepDoc<R extends TSchema>(route: R) {
       criteria: Type.Optional(Type.Literal("required")),
       hand_back: Type.Optional(Type.Record(OutcomeName, HandBack, { ...closed, minProperties: 1 })),
       deadline: Type.Optional(Duration),
+      grace: Type.Optional(Duration),
       nudges: Type.Optional(Type.Integer({ minimum: 0 })),
       retries: Type.Optional(Type.Integer({ minimum: 0 })),
       timeout: Type.Optional(Duration),
@@ -86,7 +88,7 @@ export type WorkflowStepDoc = Static<typeof WorkflowStepDoc>;
 export const SharedStepDoc = stepDoc(SharedRoute);
 export type SharedStepDoc = Static<typeof SharedStepDoc>;
 
-const ResetEdge = Type.String({ pattern: "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$", description: "<step>.<outcome> whose edge resets the counter" });
+const ResetEdge = Type.String({ pattern: "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$", description: "<step>.<outcome> whose edge resets the counter" });
 
 export const CounterDoc = Type.Object(
   { max: PosInt, reset_on: Type.Optional(Type.Union([ResetEdge, Type.Array(ResetEdge, { minItems: 1 })])) },

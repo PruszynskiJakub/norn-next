@@ -111,7 +111,7 @@
           "type": "boolean"
         },
         "outcome": {
-          "pattern": "^[a-z][a-z0-9_-]*$",
+          "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
           "type": "string"
         },
         "handoff": {
@@ -1140,7 +1140,7 @@
           "uniqueItems": true,
           "type": "array",
           "items": {
-            "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
+            "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*){0,2}$",
             "type": "string"
           }
         },
@@ -1391,7 +1391,7 @@
           "type": "boolean"
         },
         "outcome": {
-          "pattern": "^[a-z][a-z0-9_-]*$",
+          "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
           "type": "string"
         },
         "command": {
@@ -1744,7 +1744,7 @@
           "type": "boolean"
         },
         "outcome": {
-          "pattern": "^[a-z][a-z0-9_-]*$",
+          "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
           "type": "string"
         },
         "rule": {

@@ -97,7 +97,7 @@
         "counters": {
           "type": "object",
           "patternProperties": {
-            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*){0,2}$": {
               "minimum": 0,
               "type": "integer"
             }
@@ -136,7 +136,7 @@
                   "type": "string"
                 },
                 "outcome": {
-                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "type": "string"
                 },
                 "source": {
@@ -305,7 +305,7 @@
         "counters": {
           "type": "object",
           "patternProperties": {
-            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*){0,2}$": {
               "minimum": 0,
               "type": "integer"
             }
@@ -463,7 +463,7 @@
                   "type": "string"
                 },
                 "outcome": {
-                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "type": "string"
                 },
                 "source": {
@@ -724,7 +724,7 @@
               ],
               "properties": {
                 "name": {
-                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*){0,2}$",
                   "type": "string"
                 },
                 "max": {
@@ -732,7 +732,7 @@
                   "type": "integer"
                 },
                 "outcome": {
-                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "type": "string"
                 },
                 "to": {
@@ -746,7 +746,7 @@
         "counters": {
           "type": "object",
           "patternProperties": {
-            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*){0,2}$": {
               "minimum": 0,
               "type": "integer"
             }
@@ -911,7 +911,7 @@
                   "type": "string"
                 },
                 "outcome": {
-                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "type": "string"
                 },
                 "source": {
@@ -1180,7 +1180,7 @@
               ],
               "properties": {
                 "name": {
-                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*){0,2}$",
                   "type": "string"
                 },
                 "max": {
@@ -1188,7 +1188,7 @@
                   "type": "integer"
                 },
                 "outcome": {
-                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "type": "string"
                 },
                 "to": {
@@ -1202,7 +1202,7 @@
         "counters": {
           "type": "object",
           "patternProperties": {
-            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*){0,2}$": {
               "minimum": 0,
               "type": "integer"
             }
@@ -1367,7 +1367,7 @@
                   "type": "string"
                 },
                 "outcome": {
-                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "type": "string"
                 },
                 "source": {
@@ -1617,7 +1617,7 @@
                   ],
                   "properties": {
                     "name": {
-                      "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
+                      "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*){0,2}$",
                       "type": "string"
                     },
                     "max": {
@@ -1625,7 +1625,7 @@
                       "type": "integer"
                     },
                     "outcome": {
-                      "pattern": "^[a-z][a-z0-9_-]*$",
+                      "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                       "type": "string"
                     },
                     "to": {
@@ -1641,7 +1641,7 @@
         "counters": {
           "type": "object",
           "patternProperties": {
-            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*){0,2}$": {
               "minimum": 0,
               "type": "integer"
             }
@@ -1680,7 +1680,7 @@
                   "type": "string"
                 },
                 "outcome": {
-                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "type": "string"
                 },
                 "source": {
@@ -1957,7 +1957,7 @@
               ],
               "properties": {
                 "name": {
-                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*){0,2}$",
                   "type": "string"
                 },
                 "max": {
@@ -1965,7 +1965,7 @@
                   "type": "integer"
                 },
                 "outcome": {
-                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "type": "string"
                 },
                 "to": {
@@ -1979,7 +1979,7 @@
         "counters": {
           "type": "object",
           "patternProperties": {
-            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$": {
+            "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*){0,2}$": {
               "minimum": 0,
               "type": "integer"
             }
@@ -2144,7 +2144,7 @@
                   "type": "string"
                 },
                 "outcome": {
-                  "pattern": "^[a-z][a-z0-9_-]*$",
+                  "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$",
                   "type": "string"
                 },
                 "source": {
