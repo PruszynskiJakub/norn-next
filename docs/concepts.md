@@ -22,7 +22,7 @@ norn is a small **kernel** (the workflow model, decide, the journal's write rule
 | vcs | branches and worktrees | `git` |
 | harness | the agent tool | `claude` (Claude Code), `pi` |
 | runner | where an agent process runs | `headless` (a detached process), `herdr` (a Herdr pane) |
-| step kinds | workflow steps beyond `agent`, `check`, `gate` and `slices` | `update-branch`, `integrate`, `push`, `verify-base`, `open-pr`, `await-merge` |
+| step kinds | workflow steps beyond `agent`, `check`, `gate`, `slices` and `await` | `update-branch`, `integrate`, `push`, `verify-base`, `open-pr`, `mark-ready`, `await-merge` |
 | pack | workflows and skills shipped together | `sdlc` |
 
 An **executor** is a harness in a runner, under a name: `claude` in `headless`, say, or `pi` in `herdr`. A workflow step picks one with `by:`; without it, the config's default executor runs it. The bundled plugins ship in the binary; `norn plugin add <spec>` installs another (an npm spec, a git URL or a local path), and `norn plugin list` shows each plugin and what it provides.
@@ -49,10 +49,11 @@ A **step** is one node of a workflow. Its head key says what happens there:
 | `check:` | norn runs a command, such as your tests, in the unit's worktree; the exit code is the outcome (`pass` on 0, else `fail`, unless `exits` names another outcome for that code). Files it leaves there that git neither tracks nor ignores (a lockfile an install wrote, a report) are removed once it ends, and its output names them |
 | `gate:` | a person decides: `approve` or `reject` |
 | `slices:` | the story waits while its slices run, each with the slice workflow |
+| `await:` | the story waits on **signals**, what the forge sees of its change: the checks on its head (`ci.pending`, `ci.passed`, `ci.failed`, `ci.none`) and its merge onto the base or its closing (`change.merged`, `change.closed`). Each tick the step takes the first route, in the order it lists its kinds, whose signal holds; `deadline:` ends it `timeout`, and `grace:` (default 5m) is how long a change with no check yet reads as pending rather than `ci.none` |
 | `update-branch:`, `integrate:`, `push:`, `verify-base:` | git work by the vcs plugin: merge the base into the story (never a rebase), integrate a slice into the story branch, push, check the merged tree after the base moved |
-| `open-pr:`, `await-merge:` | forge work: open the change (or rewrite its body), then wait for a person to merge it; the merge ends the story |
+| `open-pr:`, `mark-ready:`, `await-merge:` | forge work: open the change (or rewrite its body), mark a draft ready for review, and (for a unit pinned to a workflow from before `await`) wait for a person to merge it; the merge ends the story |
 
-A step written `use:` brings in a shared file's steps, and `like:` copies another step. An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). A step's `outcomes:` maps each outcome to the next step, `$done` or `$stuck`. Every route back (a failed test sends the story back to `implement`) carries a **counter** with a max, derived from the kind of edge and named `<step>.<outcome>`: a check's `fail` 5, a gate's `reject` 2, a `conflict` 2, `stale` 10, an agent sending work back 3. `max:` on an edge changes its bound, and the `kernel.counters` config keys change the defaults.
+A step written `use:` brings in a shared file's steps, and `like:` copies another step. An **outcome** is how a step ended (`done`, `pass`, `fail`, `approve`, `stuck`, …). A step's `outcomes:` maps each outcome to the next step, `$done` or `$stuck`. Every route back (a failed test sends the story back to `implement`) carries a **counter** with a max, derived from the kind of edge and named `<step>.<outcome>`: a check's `fail` 5, a gate's `reject` 2, a `conflict` 2, `stale` 10, an agent sending work back 3, an await step's route back on a signal (a red CI) 5. `max:` on an edge changes its bound, and the `kernel.counters` config keys change the defaults.
 
 ## Who does what: attended steps, gates and modes
 
@@ -132,13 +133,14 @@ A config left by norn 0.35 or earlier is never read: its keys mean other things 
 | slice | A piece of a story with its own branch and worktree, merged back into the story. |
 | unit | A story or a slice: anything that runs a workflow and has its own run data and handoff. |
 | workflow | A YAML graph of steps, shipped in a pack or written in `.agents/workflows/`. |
-| step | One node of a workflow, named by its head key: `agent`, `check`, `gate`, `slices`, or a plugin's step kind. |
+| step | One node of a workflow, named by its head key: `agent`, `check`, `gate`, `slices`, `await`, or a plugin's step kind. |
 | run | One attempt at a step; it produces receipts. |
 | round | One run of a workflow over a story, from its first step to its end; a person starts the next with `norn story round`. |
 | outcome | How a step ended, spelled as its reporter types it (`done`, `approve`, `stuck`, …). |
 | counter | A bound on a retry, nudge or loop; past its max the unit is stuck. |
 | gate | A step where a person approves or rejects. |
 | check | A step that runs a command; its exit code is the outcome. |
+| signal | What a plugin saw outside norn (a CI result, a merge), named by a kind such as `ci.failed` that an `await` step routes on; read again every tick, never acknowledged. |
 | attended step | An agent step done with a person in the pane. |
 | mode | Who starts a story's unattended agent steps: a person (`manual`) or norn (`auto`). |
 | receipt | An immutable, numbered record of something that happened to a unit, written before its effect. |

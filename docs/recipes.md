@@ -133,7 +133,7 @@ A tick takes a lock, so a cron tick and `norn watch` take turns. cron has a mini
 
 ## The base moved under a story
 
-norn merges the base into the story branch in an `update-branch:` step, never by rebasing. When the merge conflicts, the shipped workflows send it to an agent step that resolves it, and the story goes on. A story waiting at a gate or at `await-merge:` goes back through its update step when the base moves under it in a way that conflicts (`base.stale` in the workflow). A base move without a conflict can still break the story; `base.verify: <check step>` runs that check on the merge of the base into the story head, once per base move, and sends the story back through update when it fails.
+norn merges the base into the story branch in an `update-branch:` step, never by rebasing. When the merge conflicts, the shipped workflows send it to an agent step that resolves it, and the story goes on. A story waiting at a gate or an `await:` step goes back through its update step when the base moves under it in a way that conflicts (`base.stale` in the workflow). A base move without a conflict can still break the story; `base.verify: <check step>` runs that check on the merge of the base into the story head, once per base move, and sends the story back through update when it fails.
 
 You may also push to the story branch yourself at any time: norn merges your push in and never loses it.
 
@@ -193,6 +193,23 @@ Steps that several workflows run the same way (the CI wait, the base update, ope
 
 The shared steps keep their own names, so the brief and the record show `open-pr` and `ci`, never `ship`.
 
+### Wait on CI and the merge with `await:`
+
+An `await:` step lists the signal kinds it waits on and routes each one; the forge plugin reports them, so the same step works on every forge. The shipped `shared/ship.yaml` waits on CI and on the merge this way:
+
+```yaml
+  ci:
+    await: [ci.passed, ci.failed, ci.none]
+    deadline: 30m
+    grace: 5m
+    outcomes: { ci.passed: ready, ci.none: ready, ci.failed: { exit: ci-failed }, stale: { exit: stale } }
+  merge:
+    await: [change.merged]
+    outcomes: { change.merged: $done, stale: { exit: stale }, unpushed: open-pr }
+```
+
+Each tick the step takes the first route, in the order `await:` lists its kinds, whose signal the forge reports; with none it keeps waiting, and `norn story view` shows what it waits on and what it saw. `ci.none` counts only once the step has waited out its `grace` (default 5m, since a forge shows no check for a while after a push), at once on a forge without checks. `ci.failed` hands the step it routes to the failed checks, with their links and, where the forge has them, the file and line they failed at, as `last_check`. Past `deadline` the step ends `timeout` where it routes it; unrouted, the story parks for a person, and `norn run rerun` starts a fresh wait. `stale` and `unpushed` are taken as on a gate. A kind norn does not know is refused when the workflow loads, and `norn doctor` warns of the ci kinds a forge without checks never reports. The forge merges no draft, so ship's `mark-ready:` step marks the PR ready for review once the person approves at `ready`.
+
 ### Copy a step with `like:`
 
 A step written `like: <step>` copies that step of the same file and replaces each key it writes, whole:
@@ -214,6 +231,7 @@ Every route back to an earlier step is counted, and a unit whose counter passes 
 | a `conflict` | 2 | on any other outcome of the same step |
 | `stale`, on any kind of step | 10 | never |
 | an agent outcome that sends work back on an otherwise uncounted loop | 3 | never |
+| an await step's route back on a signal (`ci.failed`), on an otherwise uncounted loop | 5 (`check_fail`) | never |
 
 `max:` on an edge replaces its default. To share one budget between edges, or reset it on chosen edges, write `counter: <name>` on them and declare it under `counters:` (`qa_loop: { max: 2, reset_on: human-qa.approve }`). The defaults for every workflow are the config's `kernel.counters` keys (`check_fail`, `gate_reject`, `conflict`, `stale`, `agent_back`).
 
