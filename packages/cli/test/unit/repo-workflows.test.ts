@@ -72,7 +72,7 @@ describe("the repo's own workflows in .agents/workflows", () => {
     expect((await runCli(["doctor"], m.io)).stdout).toContain("user-level-skill (step work)");
     await m.files.write(`${ROOT}/.agents/skills/user-level-skill/SKILL.md`, "---\nname: user-level-skill\n---\n");
     const again = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; warning?: string }>).find((c) => c.name === "workflows");
-    expect(again?.warning).toBeUndefined();
+    expect(again?.warning ?? "").not.toContain("names a skill");
   });
 
   test("a broken repo shared file is named for the pack workflow that loads it", async () => {

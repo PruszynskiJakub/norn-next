@@ -41,6 +41,16 @@ describe("norn doctor", () => {
     expect(body.checks.map((c) => c.name)).toEqual(["config", "plugins", "slots", "workflows", "labels", "hooks", "skills", "tool git", "remote", "tool claude"]);
   });
 
+  test("a forge without checks: the workflows still load, and doctor warns which await steps wait on ci kinds it never reports", async () => {
+    const { r, check } = await doctor({ config: LOCAL_CONFIG });
+    expect(r.exit).toBe(ExitCode.ok);
+    const workflows = check("workflows") as Check & { warning?: string };
+    expect(workflows.ok).toBe(true);
+    expect(workflows.warning).toBe("forge none reports no checks, so these await steps never see the ci kinds they wait on: quick step ci (ci.passed, ci.failed), story step ci (ci.passed, ci.failed); each takes ci.none at once");
+    const github = await doctor({ config: GITHUB_CONFIG.replace("forge: { use: none }", "forge: { use: github }"), have: ["git", "norn", "claude", "gh"] });
+    expect((github.check("workflows") as Check & { warning?: string }).warning).toBeUndefined();
+  });
+
   test("a config that still sets kernel.max_agents passes, and the config check names the key to delete", async () => {
     const { r, body, check } = await doctor({ config: `${LOCAL_CONFIG}kernel:\n  max_agents: 2\n` });
     expect(r.exit).toBe(ExitCode.ok);

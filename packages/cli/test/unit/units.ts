@@ -58,6 +58,8 @@ export interface SeedOptions {
   workflow?: string;
   /** whether the run on the record was started where a person works beside it */
   attended?: boolean;
+  /** the run's executor: an agent's (`claude`, with a launch handle as its session) or a step's own (`await`) */
+  executor?: string;
 }
 
 /** The same, through any runtime env: the integration tier seeds a real machine dir with it. */
@@ -80,10 +82,10 @@ export async function seedIn(env: RuntimeEnv, opts: SeedOptions): Promise<RunSta
             step: opts.step,
             attempt: 1,
             started_at: "2026-11-17T10:00:00.000Z",
-            executor: "claude",
+            executor: opts.executor ?? "claude",
             attended: opts.attended ?? false,
             nudges: 0,
-            session: encodeLaunchHandle({ executor: "claude", unit, run_id: runId, runner: "4242@boot" }),
+            ...((opts.executor ?? "claude") === "claude" && { session: encodeLaunchHandle({ executor: "claude", unit, run_id: runId, runner: "4242@boot" }) }),
           },
   };
   const committed = await env.journal.commit(unit, state, null);

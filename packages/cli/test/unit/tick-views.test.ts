@@ -383,6 +383,22 @@ describe("norn status, story list and story view", () => {
     expect(m.exec.calls.slice(writes).filter((c) => c.argv[1] === "worktree" || c.argv[1] === "push" || c.argv[1] === "branch")).toEqual([]);
   });
 
+  test("a unit at an await step: story view names the kinds it waits on, the signals seen and when its deadline passes", async () => {
+    const m = configured();
+    await seedUnit(m, { workflow: "quick", step: "ci", executor: "await" });
+    const view = json((await runCli(["story", "view", UNIT, "--json"], m.io)).stdout) as { units: Array<Record<string, unknown>> };
+    expect(view.units[0]).toMatchObject({ step: "ci", kind: "await", waiting: null, awaiting: { on: ["ci.passed", "ci.failed", "ci.none"], seen: ["ci.none"], deadline_at: "2026-11-17T10:30:00.000Z" } });
+    expect((await runCli(["story", "view", UNIT], m.io)).stdout).toContain(`- ${UNIT}: ci (await), awaits ci.passed, ci.failed, ci.none: seen ci.none; deadline 2026-11-17T10:30:00.000Z`);
+  });
+
+  test("an await step past its deadline waits for a person, with why and the rerun that starts a fresh wait", async () => {
+    const m = configured();
+    await seedUnit(m, { workflow: "quick", step: "ci", executor: "await", extra: { parked: { reason: "await.timeout", since: "2026-11-17T10:30:00.000Z", text: "ci did not finish within 30m (seen ci.pending)" } } });
+    const view = json((await runCli(["story", "view", UNIT, "--json"], m.io)).stdout) as { units: Array<Record<string, unknown>> };
+    expect(view.units[0]).toMatchObject({ waiting: { for: "person", text: "ci did not finish within 30m (seen ci.pending)", next: `norn run rerun ${UNIT}` } });
+    expect(view.units[0]?.awaiting).toBeUndefined();
+  });
+
   test("a story no store holds is refused, naming story list", async () => {
     const r = await runCli(["story", "view", "lt-9", "--json"], repo().io);
     expect(json(r.stdout)).toMatchObject({ code: "story_not_found", do_instead: "norn story list" });

@@ -15,6 +15,7 @@ import type { CliContext } from "./context.ts";
 import { GIT_UPGRADE, gitTooOld, MIN_GIT_TEXT } from "./git-version.ts";
 import { ensureLabels, nornLabels } from "./labels.ts";
 import { CliFailure, toFailure } from "./output.ts";
+import { forgeKindsWarning } from "./plugins/forge-kinds.ts";
 import { unseenSkillWarning } from "./plugins/skill-check.ts";
 
 export interface DoctorCheck {
@@ -264,7 +265,7 @@ export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Prom
         const workflows = await attempt("workflows", () => ctx.workflowEnv());
         if (workflows.check) checks.push(workflows.check);
         else {
-          const warning = await unseenSkillWarning(env.value);
+          const warning = [await unseenSkillWarning(env.value), forgeKindsWarning(env.value)].filter((w) => w !== null).join("; ") || null;
           checks.push({ ...passed("workflows", workflowsDetail(env.value)), ...(warning ? { warning } : {}) });
         }
         if (!opts.repoOnly) {
