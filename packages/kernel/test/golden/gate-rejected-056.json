@@ -1,0 +1,1172 @@
+{
+  "name": "gate-rejected-056",
+  "description": "A ready gate a person rejects three times: the first two send the story back to implement and through review and CI again, the third runs the counter ship.rejected (2) out and the story ends stuck. Tick 56: receipts.apply.",
+  "step_kinds": {
+    "update-branch": {
+      "outcomes": [
+        "done",
+        "conflict",
+        "clean",
+        "resolved"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "integrate": {
+      "outcomes": [
+        "done",
+        "conflict"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "open-pr": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "push": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "await-merge": {
+      "outcomes": [
+        "merged",
+        "stale"
+      ],
+      "mode": "wait",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    },
+    "mark-ready": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  "workflows": {
+    "files": {
+      "quick": {
+        "name": "quick",
+        "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
+        "start": "sync",
+        "steps": {
+          "sync": {
+            "update-branch": null,
+            "outcomes": {
+              "done": "implement",
+              "conflict": {
+                "to": "sync-resolve",
+                "counter": "sync.conflict"
+              },
+              "clean": "implement",
+              "resolved": "implement"
+            }
+          },
+          "sync-resolve": {
+            "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
+            "skills": [
+              "norn-merge"
+            ],
+            "inputs": [
+              "spec",
+              "handoff",
+              "base_side"
+            ],
+            "outcomes": {
+              "done": "sync"
+            },
+            "means": {
+              "done": "base merged into the story branch, conflicts resolved and committed"
+            }
+          },
+          "implement": {
+            "agent": "Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one, otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask. A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Notes and the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before changing any code, then fix the cause.",
+            "skills": [
+              "norn-implement"
+            ],
+            "inputs": [
+              "spec",
+              "handoff",
+              "last_check",
+              "last_findings"
+            ],
+            "outcomes": {
+              "done": "update"
+            },
+            "means": {
+              "done": "the change is made; each behaviour change and rework point has a passing test"
+            }
+          },
+          "update": {
+            "update-branch": null,
+            "outcomes": {
+              "done": "test",
+              "clean": "test-merge",
+              "resolved": "test-resolution",
+              "conflict": {
+                "to": "resolve",
+                "counter": "update.conflict"
+              }
+            }
+          },
+          "resolve": {
+            "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+            "skills": [
+              "norn-merge"
+            ],
+            "inputs": [
+              "spec",
+              "handoff",
+              "base_side"
+            ],
+            "outcomes": {
+              "done": "update"
+            },
+            "means": {
+              "done": "base merged into the story branch, conflicts resolved and committed"
+            }
+          },
+          "test": {
+            "check": "{checks.test}",
+            "timeout": "15m",
+            "outcomes": {
+              "pass": "review",
+              "fail": {
+                "to": "implement",
+                "counter": "base-update.broken"
+              }
+            }
+          },
+          "test-merge": {
+            "check": "{checks.test}",
+            "timeout": "15m",
+            "outcomes": {
+              "pass": "open-pr",
+              "fail": {
+                "to": "implement",
+                "counter": "base-update.broken"
+              }
+            }
+          },
+          "test-resolution": {
+            "check": "{checks.test}",
+            "timeout": "15m",
+            "outcomes": {
+              "pass": "resolution-review",
+              "fail": {
+                "to": "implement",
+                "counter": "base-update.broken"
+              }
+            }
+          },
+          "resolution-review": {
+            "agent": "Review only the resolution: each remerge-diff under Inputs is where a merge differs from git's own merge of its parents, a base change the resolver dropped included. Judge whether it keeps the intent of both sides. Report `redescribe` when the merge danger pr.md describes no longer holds.",
+            "skills": [
+              "norn-review"
+            ],
+            "inputs": [
+              "spec",
+              "resolution"
+            ],
+            "hand_back": {
+              "changes_requested": "findings"
+            },
+            "outcomes": {
+              "approve": "open-pr",
+              "redescribe": "describe",
+              "changes_requested": {
+                "to": "resolve",
+                "counter": "resolution-review.changes_requested"
+              }
+            },
+            "means": {
+              "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
+              "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
+              "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
+            }
+          },
+          "review": {
+            "agent": "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else.",
+            "skills": [
+              "norn-review"
+            ],
+            "inputs": [
+              "spec",
+              "diff",
+              "last_findings"
+            ],
+            "hand_back": {
+              "changes_requested": "findings"
+            },
+            "outcomes": {
+              "approve": "describe",
+              "changes_requested": {
+                "to": "implement",
+                "counter": "review.changes_requested"
+              }
+            },
+            "means": {
+              "approve": "the change does what the story asks and nothing else, no blocking findings",
+              "changes_requested": "blocking findings, handed back with --findings <file>"
+            }
+          },
+          "describe": {
+            "agent": "Write the PR body to pr.md in the spec folder; norn puts the issue link under it.",
+            "skills": [
+              "norn-pr"
+            ],
+            "inputs": [
+              "spec",
+              "diff",
+              "handoff"
+            ],
+            "outcomes": {
+              "done": "open-pr"
+            },
+            "means": {
+              "done": "pr.md describes the branch as it is now: summary, evidence, merge danger"
+            }
+          },
+          "open-pr": {
+            "open-pr": null,
+            "outcomes": {
+              "done": "ci"
+            }
+          },
+          "ci": {
+            "await": [
+              "ci.passed",
+              "ci.failed",
+              "ci.none"
+            ],
+            "deadline": "30m",
+            "grace": "5m",
+            "outcomes": {
+              "ci.passed": "ready",
+              "ci.none": "ready",
+              "ci.failed": {
+                "to": "implement",
+                "counter": "ship.ci-failed"
+              },
+              "stale": {
+                "to": "update",
+                "counter": "ship.stale"
+              }
+            }
+          },
+          "ready": {
+            "gate": "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change.",
+            "outcomes": {
+              "approve": "mark-ready",
+              "reject": {
+                "to": "implement",
+                "counter": "ship.rejected"
+              },
+              "stale": {
+                "to": "update",
+                "counter": "ship.stale"
+              },
+              "unpushed": {
+                "to": "open-pr",
+                "counter": "ready.unpushed"
+              }
+            }
+          },
+          "mark-ready": {
+            "mark-ready": null,
+            "outcomes": {
+              "done": "merge"
+            }
+          },
+          "merge": {
+            "await": [
+              "change.merged"
+            ],
+            "outcomes": {
+              "change.merged": "$done",
+              "stale": {
+                "to": "update",
+                "counter": "ship.stale"
+              },
+              "unpushed": {
+                "to": "open-pr",
+                "counter": "merge.unpushed"
+              }
+            }
+          }
+        },
+        "counters": {
+          "sync.conflict": {
+            "max": 2,
+            "reset_on": [
+              "sync.done",
+              "sync.clean",
+              "sync.resolved"
+            ]
+          },
+          "update.conflict": {
+            "max": 2,
+            "reset_on": [
+              "update.done",
+              "update.clean",
+              "update.resolved"
+            ]
+          },
+          "resolution-review.changes_requested": {
+            "max": 2
+          },
+          "ready.unpushed": {
+            "max": 10
+          },
+          "merge.unpushed": {
+            "max": 10
+          },
+          "review.changes_requested": {
+            "max": 3
+          },
+          "base-update.broken": {
+            "max": 5
+          },
+          "ship.ci-failed": {
+            "max": 3
+          },
+          "ship.stale": {
+            "max": 10
+          },
+          "ship.rejected": {
+            "max": 2
+          }
+        },
+        "base": {
+          "stale": "conflict",
+          "step": "update",
+          "verify": "test"
+        }
+      }
+    },
+    "pinned": []
+  },
+  "config": {
+    "counterDefaults": {
+      "checkFail": 5,
+      "gateReject": 2,
+      "conflict": 2,
+      "stale": 10,
+      "agentBack": 3
+    },
+    "silentAfterMs": 900000,
+    "maxNudges": 2,
+    "maxRetries": 1,
+    "deadlineMs": 3600000,
+    "mode": "auto",
+    "executor": "claude",
+    "workflow": "story",
+    "intakeWorkflowLabelPrefix": "norn:wf:",
+    "sliceWorkflow": "slice",
+    "base": "main",
+    "claimTtlMs": 600000,
+    "claimRenewBeforeMs": 400000
+  },
+  "facts": {
+    "tick_id": "01JD5G00008B7VAHD0Y1AQZMNB",
+    "now": "2026-11-17T09:56:00.000Z",
+    "holder": "machine-a",
+    "capabilities": {
+      "tracker": {
+        "assign": true,
+        "labels": true,
+        "comment": true,
+        "create": true,
+        "close": true
+      },
+      "forge": {
+        "draft": true,
+        "checks": true,
+        "raw_urls": true
+      },
+      "store": {
+        "shared": false,
+        "claims": "local",
+        "mailbox": true,
+        "artifacts": true
+      },
+      "executors": {
+        "claude": {
+          "blockStop": true,
+          "denyTool": true,
+          "injectContext": true,
+          "subagents": true,
+          "limits": true,
+          "paneInput": false,
+          "headless": true,
+          "attended": true
+        }
+      }
+    },
+    "stories": [
+      {
+        "key": "gh-31",
+        "item": {
+          "id": 31,
+          "key": "gh-31",
+          "title": "Story 31",
+          "body": "",
+          "open": true,
+          "assignees": [],
+          "labels": [
+            "norn"
+          ],
+          "updated_at": "2026-11-17T09:00:00.000Z"
+        },
+        "change": null,
+        "claim": {
+          "story": "gh-31",
+          "holder": "machine-a",
+          "acquired_at": "2026-11-17T08:59:00.000Z",
+          "expires_at": "2026-11-17T10:05:00.000Z",
+          "version": 17
+        },
+        "units": [
+          {
+            "id": "gh-31",
+            "state": {
+              "format": 1,
+              "unit": "gh-31",
+              "story": "gh-31",
+              "workflow": {
+                "name": "quick",
+                "hash": "0425a474b66a0d095a46c057c862f791e0373ecb33b0fbd8b8f8a1959019f39a",
+                "doc": {
+                  "name": "quick",
+                  "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
+                  "start": "sync",
+                  "steps": {
+                    "sync": {
+                      "update-branch": null,
+                      "outcomes": {
+                        "done": "implement",
+                        "conflict": {
+                          "to": "sync-resolve",
+                          "counter": "sync.conflict"
+                        },
+                        "clean": "implement",
+                        "resolved": "implement"
+                      }
+                    },
+                    "sync-resolve": {
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                      "skills": [
+                        "norn-merge"
+                      ],
+                      "inputs": [
+                        "spec",
+                        "handoff",
+                        "base_side"
+                      ],
+                      "outcomes": {
+                        "done": "sync"
+                      },
+                      "means": {
+                        "done": "base merged into the story branch, conflicts resolved and committed"
+                      }
+                    },
+                    "implement": {
+                      "agent": "Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one, otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask. A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Notes and the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before changing any code, then fix the cause.",
+                      "skills": [
+                        "norn-implement"
+                      ],
+                      "inputs": [
+                        "spec",
+                        "handoff",
+                        "last_check",
+                        "last_findings"
+                      ],
+                      "outcomes": {
+                        "done": "update"
+                      },
+                      "means": {
+                        "done": "the change is made; each behaviour change and rework point has a passing test"
+                      }
+                    },
+                    "update": {
+                      "update-branch": null,
+                      "outcomes": {
+                        "done": "test",
+                        "clean": "test-merge",
+                        "resolved": "test-resolution",
+                        "conflict": {
+                          "to": "resolve",
+                          "counter": "update.conflict"
+                        }
+                      }
+                    },
+                    "resolve": {
+                      "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                      "skills": [
+                        "norn-merge"
+                      ],
+                      "inputs": [
+                        "spec",
+                        "handoff",
+                        "base_side"
+                      ],
+                      "outcomes": {
+                        "done": "update"
+                      },
+                      "means": {
+                        "done": "base merged into the story branch, conflicts resolved and committed"
+                      }
+                    },
+                    "test": {
+                      "check": "{checks.test}",
+                      "timeout": "15m",
+                      "outcomes": {
+                        "pass": "review",
+                        "fail": {
+                          "to": "implement",
+                          "counter": "base-update.broken"
+                        }
+                      }
+                    },
+                    "test-merge": {
+                      "check": "{checks.test}",
+                      "timeout": "15m",
+                      "outcomes": {
+                        "pass": "open-pr",
+                        "fail": {
+                          "to": "implement",
+                          "counter": "base-update.broken"
+                        }
+                      }
+                    },
+                    "test-resolution": {
+                      "check": "{checks.test}",
+                      "timeout": "15m",
+                      "outcomes": {
+                        "pass": "resolution-review",
+                        "fail": {
+                          "to": "implement",
+                          "counter": "base-update.broken"
+                        }
+                      }
+                    },
+                    "resolution-review": {
+                      "agent": "Review only the resolution: each remerge-diff under Inputs is where a merge differs from git's own merge of its parents, a base change the resolver dropped included. Judge whether it keeps the intent of both sides. Report `redescribe` when the merge danger pr.md describes no longer holds.",
+                      "skills": [
+                        "norn-review"
+                      ],
+                      "inputs": [
+                        "spec",
+                        "resolution"
+                      ],
+                      "hand_back": {
+                        "changes_requested": "findings"
+                      },
+                      "outcomes": {
+                        "approve": "open-pr",
+                        "redescribe": "describe",
+                        "changes_requested": {
+                          "to": "resolve",
+                          "counter": "resolution-review.changes_requested"
+                        }
+                      },
+                      "means": {
+                        "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
+                        "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
+                        "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
+                      }
+                    },
+                    "review": {
+                      "agent": "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else.",
+                      "skills": [
+                        "norn-review"
+                      ],
+                      "inputs": [
+                        "spec",
+                        "diff",
+                        "last_findings"
+                      ],
+                      "hand_back": {
+                        "changes_requested": "findings"
+                      },
+                      "outcomes": {
+                        "approve": "describe",
+                        "changes_requested": {
+                          "to": "implement",
+                          "counter": "review.changes_requested"
+                        }
+                      },
+                      "means": {
+                        "approve": "the change does what the story asks and nothing else, no blocking findings",
+                        "changes_requested": "blocking findings, handed back with --findings <file>"
+                      }
+                    },
+                    "describe": {
+                      "agent": "Write the PR body to pr.md in the spec folder; norn puts the issue link under it.",
+                      "skills": [
+                        "norn-pr"
+                      ],
+                      "inputs": [
+                        "spec",
+                        "diff",
+                        "handoff"
+                      ],
+                      "outcomes": {
+                        "done": "open-pr"
+                      },
+                      "means": {
+                        "done": "pr.md describes the branch as it is now: summary, evidence, merge danger"
+                      }
+                    },
+                    "open-pr": {
+                      "open-pr": null,
+                      "outcomes": {
+                        "done": "ci"
+                      }
+                    },
+                    "ci": {
+                      "await": [
+                        "ci.passed",
+                        "ci.failed",
+                        "ci.none"
+                      ],
+                      "deadline": "30m",
+                      "grace": "5m",
+                      "outcomes": {
+                        "ci.passed": "ready",
+                        "ci.none": "ready",
+                        "ci.failed": {
+                          "to": "implement",
+                          "counter": "ship.ci-failed"
+                        },
+                        "stale": {
+                          "to": "update",
+                          "counter": "ship.stale"
+                        }
+                      }
+                    },
+                    "ready": {
+                      "gate": "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change.",
+                      "outcomes": {
+                        "approve": "mark-ready",
+                        "reject": {
+                          "to": "implement",
+                          "counter": "ship.rejected"
+                        },
+                        "stale": {
+                          "to": "update",
+                          "counter": "ship.stale"
+                        },
+                        "unpushed": {
+                          "to": "open-pr",
+                          "counter": "ready.unpushed"
+                        }
+                      }
+                    },
+                    "mark-ready": {
+                      "mark-ready": null,
+                      "outcomes": {
+                        "done": "merge"
+                      }
+                    },
+                    "merge": {
+                      "await": [
+                        "change.merged"
+                      ],
+                      "outcomes": {
+                        "change.merged": "$done",
+                        "stale": {
+                          "to": "update",
+                          "counter": "ship.stale"
+                        },
+                        "unpushed": {
+                          "to": "open-pr",
+                          "counter": "merge.unpushed"
+                        }
+                      }
+                    }
+                  },
+                  "counters": {
+                    "sync.conflict": {
+                      "max": 2,
+                      "reset_on": [
+                        "sync.done",
+                        "sync.clean",
+                        "sync.resolved"
+                      ]
+                    },
+                    "update.conflict": {
+                      "max": 2,
+                      "reset_on": [
+                        "update.done",
+                        "update.clean",
+                        "update.resolved"
+                      ]
+                    },
+                    "resolution-review.changes_requested": {
+                      "max": 2
+                    },
+                    "ready.unpushed": {
+                      "max": 10
+                    },
+                    "merge.unpushed": {
+                      "max": 10
+                    },
+                    "review.changes_requested": {
+                      "max": 3
+                    },
+                    "base-update.broken": {
+                      "max": 5
+                    },
+                    "ship.ci-failed": {
+                      "max": 3
+                    },
+                    "ship.stale": {
+                      "max": 10
+                    },
+                    "ship.rejected": {
+                      "max": 2
+                    }
+                  },
+                  "base": {
+                    "stale": "conflict",
+                    "step": "update",
+                    "verify": "test"
+                  }
+                }
+              },
+              "step": "ready",
+              "attempt": 3,
+              "counters": {
+                "sync.conflict": 0,
+                "update.conflict": 0,
+                "resolution-review.changes_requested": 0,
+                "ready.unpushed": 0,
+                "merge.unpushed": 0,
+                "review.changes_requested": 0,
+                "base-update.broken": 0,
+                "ship.ci-failed": 0,
+                "ship.stale": 0,
+                "ship.rejected": 2
+              },
+              "retries_used": 0,
+              "run": null,
+              "applied_through": 39,
+              "visits": {
+                "describe": 3,
+                "open-pr": 3,
+                "ci": 3,
+                "ready": 3,
+                "implement": 2,
+                "update": 2,
+                "test": 2,
+                "review": 2
+              },
+              "parked": {
+                "reason": "gate.park",
+                "since": "2026-11-17T09:54:00.000Z"
+              }
+            },
+            "version": 40,
+            "receipts": [
+              {
+                "seq": 40,
+                "id": "01JD5G00005E8K1JZRRGV1JF20",
+                "at": "2026-11-17T09:56:00.000Z",
+                "data": {
+                  "kind": "gate.decided",
+                  "outcome": "reject",
+                  "by": "person",
+                  "reason": "round 3: the PR body misses the migration note",
+                  "step": "ready",
+                  "attempt": 3
+                }
+              }
+            ],
+            "session": null
+          }
+        ],
+        "mailbox": []
+      }
+    ],
+    "intake": []
+  },
+  "decisions": [
+    {
+      "kind": "apply_receipts",
+      "unit": "gh-31",
+      "rule": "receipts.apply",
+      "receipts": [],
+      "state": {
+        "format": 1,
+        "unit": "gh-31",
+        "story": "gh-31",
+        "workflow": {
+          "name": "quick",
+          "hash": "0425a474b66a0d095a46c057c862f791e0373ecb33b0fbd8b8f8a1959019f39a",
+          "doc": {
+            "name": "quick",
+            "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
+            "start": "sync",
+            "steps": {
+              "sync": {
+                "update-branch": null,
+                "outcomes": {
+                  "done": "implement",
+                  "conflict": {
+                    "to": "sync-resolve",
+                    "counter": "sync.conflict"
+                  },
+                  "clean": "implement",
+                  "resolved": "implement"
+                }
+              },
+              "sync-resolve": {
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase.",
+                "skills": [
+                  "norn-merge"
+                ],
+                "inputs": [
+                  "spec",
+                  "handoff",
+                  "base_side"
+                ],
+                "outcomes": {
+                  "done": "sync"
+                },
+                "means": {
+                  "done": "base merged into the story branch, conflicts resolved and committed"
+                }
+              },
+              "implement": {
+                "agent": "Work from what the story already holds: the Plan section of spec.md when a refinement round wrote one, otherwise the issue mirrored in spec.md and its latest `## Triage` comment. Keep to what they ask. A change in behaviour gets a test first; a change to docs or a pure refactor needs none beyond the suite staying green. A bug comes from a reproduce round with a red loop in the handoff's Notes and the issue's latest `## Reproduce` comment: turn it into a failing test at the seam named there before changing any code, then fix the cause.",
+                "skills": [
+                  "norn-implement"
+                ],
+                "inputs": [
+                  "spec",
+                  "handoff",
+                  "last_check",
+                  "last_findings"
+                ],
+                "outcomes": {
+                  "done": "update"
+                },
+                "means": {
+                  "done": "the change is made; each behaviour change and rework point has a passing test"
+                }
+              },
+              "update": {
+                "update-branch": null,
+                "outcomes": {
+                  "done": "test",
+                  "clean": "test-merge",
+                  "resolved": "test-resolution",
+                  "conflict": {
+                    "to": "resolve",
+                    "counter": "update.conflict"
+                  }
+                }
+              },
+              "resolve": {
+                "agent": "Base mode: merge the base commit the base_side input names into the story branch in this worktree, resolve, commit the merge; never rebase. When Rework holds the resolution review's findings instead, fix the resolution they name and commit; never rebase.",
+                "skills": [
+                  "norn-merge"
+                ],
+                "inputs": [
+                  "spec",
+                  "handoff",
+                  "base_side"
+                ],
+                "outcomes": {
+                  "done": "update"
+                },
+                "means": {
+                  "done": "base merged into the story branch, conflicts resolved and committed"
+                }
+              },
+              "test": {
+                "check": "{checks.test}",
+                "timeout": "15m",
+                "outcomes": {
+                  "pass": "review",
+                  "fail": {
+                    "to": "implement",
+                    "counter": "base-update.broken"
+                  }
+                }
+              },
+              "test-merge": {
+                "check": "{checks.test}",
+                "timeout": "15m",
+                "outcomes": {
+                  "pass": "open-pr",
+                  "fail": {
+                    "to": "implement",
+                    "counter": "base-update.broken"
+                  }
+                }
+              },
+              "test-resolution": {
+                "check": "{checks.test}",
+                "timeout": "15m",
+                "outcomes": {
+                  "pass": "resolution-review",
+                  "fail": {
+                    "to": "implement",
+                    "counter": "base-update.broken"
+                  }
+                }
+              },
+              "resolution-review": {
+                "agent": "Review only the resolution: each remerge-diff under Inputs is where a merge differs from git's own merge of its parents, a base change the resolver dropped included. Judge whether it keeps the intent of both sides. Report `redescribe` when the merge danger pr.md describes no longer holds.",
+                "skills": [
+                  "norn-review"
+                ],
+                "inputs": [
+                  "spec",
+                  "resolution"
+                ],
+                "hand_back": {
+                  "changes_requested": "findings"
+                },
+                "outcomes": {
+                  "approve": "open-pr",
+                  "redescribe": "describe",
+                  "changes_requested": {
+                    "to": "resolve",
+                    "counter": "resolution-review.changes_requested"
+                  }
+                },
+                "means": {
+                  "approve": "the resolution keeps both sides' intent, no blocking findings; pr.md still describes the merge danger",
+                  "redescribe": "the resolution is sound, but the merge danger pr.md describes changed",
+                  "changes_requested": "blocking findings on the resolution, handed back with --findings <file>"
+                }
+              },
+              "review": {
+                "agent": "Review the change against what the story asks (its Plan, or the issue and its latest triage): it does that and nothing else.",
+                "skills": [
+                  "norn-review"
+                ],
+                "inputs": [
+                  "spec",
+                  "diff",
+                  "last_findings"
+                ],
+                "hand_back": {
+                  "changes_requested": "findings"
+                },
+                "outcomes": {
+                  "approve": "describe",
+                  "changes_requested": {
+                    "to": "implement",
+                    "counter": "review.changes_requested"
+                  }
+                },
+                "means": {
+                  "approve": "the change does what the story asks and nothing else, no blocking findings",
+                  "changes_requested": "blocking findings, handed back with --findings <file>"
+                }
+              },
+              "describe": {
+                "agent": "Write the PR body to pr.md in the spec folder; norn puts the issue link under it.",
+                "skills": [
+                  "norn-pr"
+                ],
+                "inputs": [
+                  "spec",
+                  "diff",
+                  "handoff"
+                ],
+                "outcomes": {
+                  "done": "open-pr"
+                },
+                "means": {
+                  "done": "pr.md describes the branch as it is now: summary, evidence, merge danger"
+                }
+              },
+              "open-pr": {
+                "open-pr": null,
+                "outcomes": {
+                  "done": "ci"
+                }
+              },
+              "ci": {
+                "await": [
+                  "ci.passed",
+                  "ci.failed",
+                  "ci.none"
+                ],
+                "deadline": "30m",
+                "grace": "5m",
+                "outcomes": {
+                  "ci.passed": "ready",
+                  "ci.none": "ready",
+                  "ci.failed": {
+                    "to": "implement",
+                    "counter": "ship.ci-failed"
+                  },
+                  "stale": {
+                    "to": "update",
+                    "counter": "ship.stale"
+                  }
+                }
+              },
+              "ready": {
+                "gate": "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change.",
+                "outcomes": {
+                  "approve": "mark-ready",
+                  "reject": {
+                    "to": "implement",
+                    "counter": "ship.rejected"
+                  },
+                  "stale": {
+                    "to": "update",
+                    "counter": "ship.stale"
+                  },
+                  "unpushed": {
+                    "to": "open-pr",
+                    "counter": "ready.unpushed"
+                  }
+                }
+              },
+              "mark-ready": {
+                "mark-ready": null,
+                "outcomes": {
+                  "done": "merge"
+                }
+              },
+              "merge": {
+                "await": [
+                  "change.merged"
+                ],
+                "outcomes": {
+                  "change.merged": "$done",
+                  "stale": {
+                    "to": "update",
+                    "counter": "ship.stale"
+                  },
+                  "unpushed": {
+                    "to": "open-pr",
+                    "counter": "merge.unpushed"
+                  }
+                }
+              }
+            },
+            "counters": {
+              "sync.conflict": {
+                "max": 2,
+                "reset_on": [
+                  "sync.done",
+                  "sync.clean",
+                  "sync.resolved"
+                ]
+              },
+              "update.conflict": {
+                "max": 2,
+                "reset_on": [
+                  "update.done",
+                  "update.clean",
+                  "update.resolved"
+                ]
+              },
+              "resolution-review.changes_requested": {
+                "max": 2
+              },
+              "ready.unpushed": {
+                "max": 10
+              },
+              "merge.unpushed": {
+                "max": 10
+              },
+              "review.changes_requested": {
+                "max": 3
+              },
+              "base-update.broken": {
+                "max": 5
+              },
+              "ship.ci-failed": {
+                "max": 3
+              },
+              "ship.stale": {
+                "max": 10
+              },
+              "ship.rejected": {
+                "max": 2
+              }
+            },
+            "base": {
+              "stale": "conflict",
+              "step": "update",
+              "verify": "test"
+            }
+          }
+        },
+        "step": "ready",
+        "attempt": 3,
+        "counters": {
+          "sync.conflict": 0,
+          "update.conflict": 0,
+          "resolution-review.changes_requested": 0,
+          "ready.unpushed": 0,
+          "merge.unpushed": 0,
+          "review.changes_requested": 0,
+          "base-update.broken": 0,
+          "ship.ci-failed": 0,
+          "ship.stale": 0,
+          "ship.rejected": 2
+        },
+        "retries_used": 0,
+        "run": null,
+        "applied_through": 40,
+        "visits": {
+          "describe": 3,
+          "open-pr": 3,
+          "ci": 3,
+          "ready": 3,
+          "implement": 2,
+          "update": 2,
+          "test": 2,
+          "review": 2
+        },
+        "ended": "stuck",
+        "ended_reason": "counter ship.rejected ran out (2/2) at ready.reject",
+        "exhausted": "ship.rejected"
+      },
+      "expect_version": 40,
+      "rejected": []
+    }
+  ]
+}

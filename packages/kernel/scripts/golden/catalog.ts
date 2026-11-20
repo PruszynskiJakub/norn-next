@@ -6,7 +6,7 @@
 import type { ClaimRecord, TrackerItem } from "@norn/plugin-api";
 import { DEFAULT_KERNEL_CONFIG, type KernelCapabilities, type KernelConfig, newRunState, type RunInfo, type RunState, type ExecutorCapabilities } from "../../src/index.ts";
 import { caseWorkflows, type GoldenCase, type GoldenStepKind, type GoldenWorkflows } from "../../test/golden.ts";
-import { loadShipped, STEP_KINDS } from "../../test/shipped.ts";
+import { loadShipped, readOldShip, STEP_KINDS } from "../../test/shipped.ts";
 import { type SimStory, type SimUnit, type Tick, World } from "./world.ts";
 
 export const START = "2026-11-17T09:00:00.000Z";
@@ -19,6 +19,11 @@ export const GOLDEN_STEP_KINDS: Record<string, GoldenStepKind> = Object.fromEntr
 /** The shipped workflows a story or slice takes, as flat pinned documents. */
 export function shippedFiles(...names: string[]): Record<string, unknown> {
   return Object.fromEntries(names.map((n) => [n, loadShipped(n).pinned.doc]));
+}
+
+/** The quick workflow over the ship 0.37 shipped, as a unit pinned before `await` still runs it: a `ci` script check and `await-merge`. */
+export function oldQuickDoc(): Record<string, unknown> {
+  return { ...loadShipped("quick", { ship: readOldShip() }).pinned.doc, name: "quick-old" };
 }
 
 /** A small workflow whose agent step routes the outcomes norn classifies, so their `route` rules fire. */

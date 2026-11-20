@@ -26,6 +26,7 @@ export const STEP_KINDS: Record<string, StepKindInfo> = {
   "open-pr": kind("open-pr", ["done"]),
   push: kind("push", ["done"]),
   "await-merge": kind("await-merge", ["merged", "stale"], "wait"),
+  "mark-ready": kind("mark-ready", ["done"]),
 };
 
 export const readShipped = (file: string): Record<string, unknown> => parse(readFileSync(join(SHIPPED, file), "utf8"));
@@ -45,10 +46,13 @@ export function shipped(): { workflows: Record<string, unknown>; shared: Record<
   return { workflows, shared };
 }
 
-/** A shipped workflow (`story`, `quick`, ...) loaded under the default config. */
-export function loadShipped(name: string): LoadedWorkflow {
+/** The ship shared file as 0.37 shipped it (a `ci` script check and `await-merge`), which a repo's copy or a pinned unit may still run. */
+export const readOldShip = (): Record<string, unknown> => parse(readFileSync(join(import.meta.dir, "fixtures", "ship-0.37.yaml"), "utf8"));
+
+/** A shipped workflow (`story`, `quick`, ...) loaded under the default config, with any shared file replaced by `sharedOver`. */
+export function loadShipped(name: string, sharedOver: Record<string, unknown> = {}): LoadedWorkflow {
   const { workflows, shared } = shipped();
-  const r = loadWorkflow(workflows[`${name}.yaml`], { stepKinds: STEP_KINDS, sharedFiles: shared, config: DEFAULT_KERNEL_CONFIG });
+  const r = loadWorkflow(workflows[`${name}.yaml`], { stepKinds: STEP_KINDS, sharedFiles: { ...shared, ...sharedOver }, config: DEFAULT_KERNEL_CONFIG });
   if (!r.ok) throw new Error(`${name}: ${JSON.stringify(r.errors)}`);
   return r.workflow;
 }

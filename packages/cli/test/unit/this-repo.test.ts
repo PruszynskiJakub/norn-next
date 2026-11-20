@@ -186,9 +186,16 @@ describe("this repo's workflows, as norn loads them", () => {
           return [o, { ...rest, bound: w.counters?.[counter] }];
         }),
       );
+    // the repo's ci and merge steps stay on the script and await-merge the released norn that runs this repo still loads;
+    // the pack's await steps and mark-ready reach them only once a release ships await
+    const SHIP_WAITS = new Set(["ci", "ready", "mark-ready", "merge"]);
     const shape = (w: Written) => ({
       start: w.start,
-      steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { kind: Object.keys(step).filter((k) => !NOT_KIND.has(k)), skills: step.skills, outcomes: bounded(w, step.outcomes) }])),
+      steps: Object.fromEntries(
+        Object.entries(w.steps)
+          .filter(([s]) => !SHIP_WAITS.has(s))
+          .map(([s, step]) => [s, { kind: Object.keys(step).filter((k) => !NOT_KIND.has(k)), skills: step.skills, outcomes: bounded(w, step.outcomes) }]),
+      ),
     });
     for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(repo[wf] as Written) }).toEqual({ wf, ...shape(pack[wf] as Written) });
   });

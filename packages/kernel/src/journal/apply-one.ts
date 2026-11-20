@@ -97,7 +97,7 @@ function unparked(state: RunState): RunState {
 }
 
 const RUN_KIND_OF_STEP = (step: CompiledStep): "agent" | "check" | "step" | null =>
-  step.kind === "agent" ? "agent" : step.kind === "check" ? "check" : step.runner.type === "plugin" ? "step" : null;
+  step.kind === "agent" ? "agent" : step.kind === "check" ? "check" : step.runner.type === "plugin" || step.kind === "await" ? "step" : null;
 
 function runStarted(state: RunState, d: ReceiptDataOf<"run.started">, step: CompiledStep, at: string): OneApplied {
   const want = RUN_KIND_OF_STEP(step);

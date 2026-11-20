@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { SIGNAL_KINDS } from "@norn/schema";
 import { ACTION_KINDS, RECEIPT_KINDS, RULE_IDS } from "../../src/index.ts";
 
 const KERNEL = join(import.meta.dir, "..", "..");
@@ -49,8 +50,8 @@ describe("parity.md", () => {
 });
 
 describe("RULE_IDS", () => {
-  /** Quoted dotted names in decide's sources that are not rule ids: receipt kinds, and the bases quiet rules suffix. */
-  const NOT_RULES = new Set<string>([...RECEIPT_KINDS, "agent.silent", "agent.turn_ended", "agent.limited"]);
+  /** Quoted dotted names in decide's sources that are not rule ids: receipt kinds, signal kinds, and the bases quiet rules suffix. */
+  const NOT_RULES = new Set<string>([...RECEIPT_KINDS, ...SIGNAL_KINDS, "agent.silent", "agent.turn_ended", "agent.limited"]);
 
   test("lists every rule id written as a literal in decide's sources", () => {
     const dir = join(KERNEL, "src", "decide");
@@ -64,10 +65,14 @@ describe("RULE_IDS", () => {
     const dir = join(KERNEL, "src", "decide");
     const templates = readdirSync(dir)
       .filter((f) => f.endsWith(".ts") && f !== "rules.ts")
-      .flatMap((f) => [...readFileSync(join(dir, f), "utf8").matchAll(/`(\$\{base\}|unit\.ended)\.([a-z_${}.]+)`/g)].map((m) => `${m[1]}.${m[2]}`));
+      .flatMap((f) => [...readFileSync(join(dir, f), "utf8").matchAll(/`(\$\{base\}|\$\{prefix\}|unit\.ended)\.([a-z_${}.]+)`/g)].map((m) => `${m[1]}.${m[2]}`));
     expect(templates.length).toBeGreaterThan(0);
     for (const t of templates) {
-      const expansions = t.startsWith("${base}") ? ["agent.silent", "agent.turn_ended", "agent.limited"].map((b) => t.replace("${base}", b)) : ["unit.ended.done", "unit.ended.stuck"];
+      const expansions = t.startsWith("${base}")
+        ? ["agent.silent", "agent.turn_ended", "agent.limited"].map((b) => t.replace("${base}", b))
+        : t.startsWith("${prefix}")
+          ? ["gate", "step", "await"].map((p) => t.replace("${prefix}", p))
+          : ["unit.ended.done", "unit.ended.stuck"];
       expect(expansions.filter((e) => !RULE_IDS.includes(e))).toEqual([]);
     }
   });

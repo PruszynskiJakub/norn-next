@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { memoryFiles, memoryHost, steppingClock } from "@norn/conformance";
 import { type ForgeEffect, ok, type PluginResult, type StepKindInput, type Tracker, type Vcs, type VcsMergeOptions, type VcsMergeOutcome } from "@norn/plugin-api";
-import { awaitMerge, openPr, stepsForgePlugin } from "../../src/index.ts";
-import { memoryForge } from "../../../conformance/test/unit/reference/memory-forge.ts";
+import { awaitMerge, markReady, openPr, stepsForgePlugin } from "../../src/index.ts";
+import { absentForge, memoryForge } from "../../../conformance/test/unit/reference/memory-forge.ts";
 
 const ZERO = "0".repeat(40);
 const HEAD = "1".repeat(40);
@@ -79,8 +79,8 @@ const value = <T>(r: PluginResult<T>): T => {
 };
 
 describe("norn-steps-forge", () => {
-  test("provides open-pr and await-merge", () => {
-    expect(Object.keys(stepsForgePlugin.provides.stepKinds ?? {}).sort()).toEqual(["await-merge", "open-pr"]);
+  test("provides open-pr, mark-ready and await-merge", () => {
+    expect(Object.keys(stepsForgePlugin.provides.stepKinds ?? {}).sort()).toEqual(["await-merge", "mark-ready", "open-pr"]);
   });
 });
 
@@ -186,6 +186,37 @@ describe("open-pr", () => {
     expect(r.ok ? "" : r.failure.message).toContain("by hand");
     expect(pushed).toEqual([]);
     expect(value(await world.forge.findChanges(["gh-12-login"]))["gh-12-login"] ?? null).toBeNull();
+  });
+});
+
+describe("mark-ready", () => {
+  const mark = (forge: ReturnType<typeof memoryForge>["forge"], receipt_id = "01JD0000000000000000000003") =>
+    markReady.run(input<Record<string, never>>({}, { step: "mark-ready", receipt_id, slots: { forge } }), memoryHost());
+
+  test("marks the story's open draft change ready, once under its receipt, and answers done", async () => {
+    const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
+    value(await openPr.run(input({}, { slots: { forge: world.forge, vcs: fakeVcs({ "gh-12-login": ZERO }, {}).vcs } }), memoryHost()));
+    const effects = recorded(world);
+    expect(value(await mark(world.forge))).toMatchObject({ outcome: "done", detail: { effect: "ready" } });
+    expect(value(await world.forge.findChanges(["gh-12-login"]))["gh-12-login"]?.draft).toBe(false);
+    expect(value(await mark(world.forge))).toMatchObject({ outcome: "done" });
+    expect(effects.map((e) => e.kind)).toEqual(["ready"]);
+  });
+
+  test("a change already ready, no change, or a forge without drafts: done with nothing performed", async () => {
+    const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
+    const effects = recorded(world);
+    expect(value(await mark(world.forge))).toEqual({ outcome: "done", detail: { reason: "no open draft change" } });
+    expect(value(await mark(absentForge().forge))).toEqual({ outcome: "done", detail: { reason: "the forge has no draft changes" } });
+    const none = await markReady.run(input<Record<string, never>>({}, { step: "mark-ready", slots: {} }), memoryHost());
+    expect(value(none)).toEqual({ outcome: "done", detail: { reason: "the forge has no draft changes" } });
+    expect(effects).toEqual([]);
+  });
+
+  test("a forge that cannot answer fails the step, to be run again", async () => {
+    const world = memoryForge({ now: steppingClock("2026-11-17T00:00:00.000Z") });
+    world.failing(true);
+    expect((await mark(world.forge)).ok).toBe(false);
   });
 });
 

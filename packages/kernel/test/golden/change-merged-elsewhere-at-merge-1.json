@@ -61,6 +61,17 @@
         "type": "object",
         "properties": {}
       }
+    },
+    "mark-ready": {
+      "outcomes": [
+        "done"
+      ],
+      "mode": "effect",
+      "configSchema": {
+        "additionalProperties": false,
+        "type": "object",
+        "properties": {}
+      }
     }
   },
   "workflows": {
@@ -254,14 +265,17 @@
             }
           },
           "ci": {
-            "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
-            "timeout": "30m",
-            "exits": {
-              "3": "stale"
-            },
+            "await": [
+              "ci.passed",
+              "ci.failed",
+              "ci.none"
+            ],
+            "deadline": "30m",
+            "grace": "5m",
             "outcomes": {
-              "pass": "ready",
-              "fail": {
+              "ci.passed": "ready",
+              "ci.none": "ready",
+              "ci.failed": {
                 "to": "implement",
                 "counter": "ship.ci-failed"
               },
@@ -274,7 +288,7 @@
           "ready": {
             "gate": "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change.",
             "outcomes": {
-              "approve": "merge",
+              "approve": "mark-ready",
               "reject": {
                 "to": "implement",
                 "counter": "ship.rejected"
@@ -289,10 +303,18 @@
               }
             }
           },
-          "merge": {
-            "await-merge": null,
+          "mark-ready": {
+            "mark-ready": null,
             "outcomes": {
-              "merged": "$done",
+              "done": "merge"
+            }
+          },
+          "merge": {
+            "await": [
+              "change.merged"
+            ],
+            "outcomes": {
+              "change.merged": "$done",
               "stale": {
                 "to": "update",
                 "counter": "ship.stale"
@@ -454,7 +476,7 @@
               "story": "gh-178",
               "workflow": {
                 "name": "quick",
-                "hash": "f857907e3cab36e4bb9b37e1f9343e220a77c91f3735f2dd7b1b2e4d893a7edd",
+                "hash": "0425a474b66a0d095a46c057c862f791e0373ecb33b0fbd8b8f8a1959019f39a",
                 "doc": {
                   "name": "quick",
                   "description": "Make a small change (refactor, docs, chore, a reproduced bug's fix), check and review it, open the draft PR, wait for CI.",
@@ -644,14 +666,17 @@
                       }
                     },
                     "ci": {
-                      "check": "command -v gh >/dev/null || { echo \"gh not found: no CI to wait for\"; exit 0; }\n# a repo with no GitHub remote (forge none, a local origin) has no PR and so no CI; any other gh failure fails\nif ! out=$(gh repo view --json name 2>&1); then\n  case \"$out\" in *\"none of the git remotes\"*|*\"no git remotes found\"*) echo \"no GitHub remote: no CI to wait for\"; exit 0 ;; esac\n  echo \"$out\"; exit 1\nfi\npr=$(gh pr view --json number -q .number) || exit 1\nsha=$(gh pr view --json headRefOid -q .headRefOid) || exit 1\n# GitHub starts no CI run on a PR that conflicts with its base: exit 3 is stale, the story\n# updates its branch instead of waiting. UNKNOWN is GitHub still computing: asked again briefly.\nmergeable() {\n  m=UNKNOWN\n  for i in 1 2 3 4 5 6; do\n    m=$(gh pr view \"$pr\" --json mergeable -q .mergeable) || return 1\n    [ \"$m\" != UNKNOWN ] && return 0\n    sleep 5\n  done\n}\nconflicting() { [ \"$m\" = CONFLICTING ] && echo \"PR conflicts with its base: no CI runs on it until the branch takes the base\"; }\nmergeable || exit 1\nconflicting && exit 3\nn=0\nfor i in $(seq 1 30); do\n  n=$(gh pr view \"$pr\" --json statusCheckRollup -q '.statusCheckRollup | length') || exit 1\n  [ \"$n\" -gt 0 ] && break\n  sleep 10\ndone\nif [ \"$n\" -eq 0 ]; then\n  mergeable || exit 1\n  conflicting && exit 3\n  echo \"no checks on PR #$pr after 5m (PR mergeable: $m): nothing to wait for\"\n  exit 0\nfi\ngh pr checks \"$pr\" --watch --interval 30 >/dev/null && exit 0\ngh pr checks \"$pr\"\n# where the failures are, never the log: a failed step's log buries the failure in passing output\ngh api \"repos/{owner}/{repo}/commits/$sha/check-runs?per_page=100\" -q '.check_runs[] | select(.conclusion==\"failure\") | \"- \\(.name) (id \\(.id)): \\(.details_url)\"'\necho \"Read a failed check run's annotations (file, line, message):\"\necho \"  gh api \\\"repos/{owner}/{repo}/check-runs/<id>/annotations\\\" -q '.[] | select(.annotation_level==\\\"failure\\\" and .path!=\\\".github\\\") | \\\"\\\\(.path):\\\\(.start_line) \\\\(.message)\\\"'\"\necho \"Only if that is not enough, the full log is behind its link.\"\nexit 1\n",
-                      "timeout": "30m",
-                      "exits": {
-                        "3": "stale"
-                      },
+                      "await": [
+                        "ci.passed",
+                        "ci.failed",
+                        "ci.none"
+                      ],
+                      "deadline": "30m",
+                      "grace": "5m",
                       "outcomes": {
-                        "pass": "ready",
-                        "fail": {
+                        "ci.passed": "ready",
+                        "ci.none": "ready",
+                        "ci.failed": {
                           "to": "implement",
                           "counter": "ship.ci-failed"
                         },
@@ -664,7 +689,7 @@
                     "ready": {
                       "gate": "Read the draft PR. Approve to wait for the merge (a person merges the PR), or reject with what to change.",
                       "outcomes": {
-                        "approve": "merge",
+                        "approve": "mark-ready",
                         "reject": {
                           "to": "implement",
                           "counter": "ship.rejected"
@@ -679,10 +704,18 @@
                         }
                       }
                     },
-                    "merge": {
-                      "await-merge": null,
+                    "mark-ready": {
+                      "mark-ready": null,
                       "outcomes": {
-                        "merged": "$done",
+                        "done": "merge"
+                      }
+                    },
+                    "merge": {
+                      "await": [
+                        "change.merged"
+                      ],
+                      "outcomes": {
+                        "change.merged": "$done",
                         "stale": {
                           "to": "update",
                           "counter": "ship.stale"
@@ -763,7 +796,7 @@
                 "step": "merge",
                 "attempt": 1,
                 "started_at": "2026-11-17T08:55:00.000Z",
-                "executor": "await-merge",
+                "executor": "await",
                 "attended": false,
                 "nudges": 0
               },
@@ -778,12 +811,7 @@
             },
             "version": 3,
             "receipts": [],
-            "session": null,
-            "step_run": {
-              "kind": "await-merge",
-              "running": false,
-              "outcome": "waiting"
-            }
+            "session": null
           }
         ],
         "mailbox": []

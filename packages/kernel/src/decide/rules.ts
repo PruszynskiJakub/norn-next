@@ -73,6 +73,12 @@ export const RULE_IDS: readonly string[] = [
   "step.running",
   "step.finished",
   "step.finished.rejected",
+  "await.start",
+  "await.signal",
+  "await.stale",
+  "await.unpushed",
+  "await.timeout",
+  "await.waiting",
   // agent steps
   "agent.start",
   "agent.no_executor",

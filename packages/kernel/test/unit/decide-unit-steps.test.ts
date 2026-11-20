@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { DEFAULT_KERNEL_CONFIG, decide } from "../../src/index.ts";
-import { decideCase, factsOf, graph, kindOf, loaded, minutesAgo, receipt, run, stateAt } from "./decide-unit-fixtures.ts";
+import type { Signal } from "@norn/schema";
+import { type CompiledStep, DEFAULT_KERNEL_CONFIG, decide, type StoryFacts } from "../../src/index.ts";
+import { decideCase, decideCaseWith, factsOf, graph, kindOf, loaded, minutesAgo, NOW, receipt, run, stateAt } from "./decide-unit-fixtures.ts";
 
 const checkRun = run({ id: "chk-1", step: "test", executor: "check" });
 const shipRun = run({ id: "step-1", step: "ship", executor: "open-pr" });
@@ -219,5 +220,106 @@ describe("no cap on runs at once", () => {
     expect(ds.filter((d) => d.kind === "start_run").map((d) => d.unit)).toEqual(["gh-1", "gh-10", "gh-11", "gh-12", "gh-13"]);
     expect(ds.filter((d) => d.kind === "run_check").map((d) => d.unit)).toEqual(["gh-14", "gh-15", "gh-16", "gh-17", "gh-18"]);
     expect(ds.filter((d) => d.unit !== null && d.kind === "noop")).toEqual([]);
+  });
+});
+
+describe("an await step", () => {
+  const ciStep = (over: Partial<CompiledStep> = {}): CompiledStep => ({
+    name: "ci",
+    kind: "await",
+    runner: { type: "builtin" },
+    outcomes: ["ci.passed", "ci.failed", "ci.none", "stale", "unpushed"],
+    routes: {
+      "ci.passed": { to: "approve" },
+      "ci.failed": { to: "build", counter: "ci.ci.failed" },
+      "ci.none": { to: "approve" },
+      stale: { to: "build", counter: "ci.stale" },
+      unpushed: { to: "ship", counter: "ci.unpushed" },
+    },
+    await: { on: ["ci.passed", "ci.failed", "ci.none"], deadline_ms: 30 * 60_000, grace_ms: 5 * 60_000 },
+    ...over,
+  });
+  const wfWith = (step: CompiledStep = ciStep()) => {
+    const g = graph({ ci: step });
+    return loaded({ ...g, counters: { ...g.counters, "ci.ci.failed": { max: 5, reset_on: [] }, "ci.stale": { max: 10, reset_on: [] }, "ci.unpushed": { max: 10, reset_on: [] } } });
+  };
+  const wf = wfWith();
+  const ciRun = (startedMinutesAgo: number) => run({ id: "await-1", step: "ci", executor: "await", started_at: minutesAgo(startedMinutesAgo) });
+  const signal = (kind: Signal["kind"], data?: unknown): Signal => ({ source: "forge", kind, subject: "change/7", at: minutesAgo(0), ...(data !== undefined && { data }) });
+  const at = (minutes: number, story: Partial<StoryFacts> = {}, step?: CompiledStep, forgeChecks = true) => {
+    const w = step ? wfWith(step) : wf;
+    const c = { state: stateAt("ci", { run: ciRun(minutes) }, w), workflows: [w], story };
+    const facts = factsOf(c);
+    facts.capabilities.forge = { draft: true, checks: forgeChecks, raw_urls: true };
+    return decideCaseWith(c, facts);
+  };
+
+  test("entering it records its visit's run, with no host effect, so its grace and deadline count from it", () => {
+    const d = kindOf(decideCase({ state: stateAt("ci", {}, wf), workflows: [wf] }), "apply_receipts");
+    expect(d.rule).toBe("await.start");
+    expect(d.receipts[0]?.data).toEqual({ kind: "run.started", run_id: d.state.run?.id as string, run_kind: "step", executor: "await", attended: false, step: "ci", attempt: 1 });
+    expect(d.state.run).toMatchObject({ step: "ci", executor: "await", started_at: NOW });
+  });
+
+  test("takes the route of a kind the forge reports, carrying the signal's data into step.finished", () => {
+    const failed = { failed: [{ name: "test", url: "https://ci/1", annotations: [{ path: "a.ts", line: 3, message: "boom" }] }] };
+    const d = kindOf(at(1, { signals: [signal("ci.failed", failed)] }), "apply_receipts");
+    expect(d.rule).toBe("await.signal");
+    expect(d.receipts[0]?.data).toEqual({ kind: "step.finished", run_id: "await-1", step_kind: "await", outcome: "ci.failed", detail: failed, step: "ci", attempt: 1 });
+    expect(d.state).toMatchObject({ step: "build", counters: { "ci.ci.failed": 1 } });
+    expect(kindOf(at(1, { signals: [signal("ci.passed")] }), "apply_receipts").state.step).toBe("approve");
+  });
+
+  test("takes the first declared route whose kind is present", () => {
+    const d = kindOf(at(1, { signals: [signal("ci.failed"), signal("ci.passed")] }), "apply_receipts");
+    expect(d.receipts[0]?.data).toMatchObject({ outcome: "ci.passed" });
+  });
+
+  test("with no listed kind present it waits, naming the kinds it waits on and the signals it saw", () => {
+    const d = kindOf(at(1, { signals: [signal("ci.pending")] }), "noop");
+    expect(d).toEqual({ kind: "noop", unit: "gh-1", rule: "await.waiting", reason: "waiting on ci.passed, ci.failed, ci.none; seen ci.pending" });
+    expect(kindOf(at(1, { signals: [] }), "noop").reason).toBe("waiting on ci.passed, ci.failed, ci.none; seen nothing");
+  });
+
+  test("no check yet reads as pending until the grace since the visit started has passed", () => {
+    expect(at(4, { signals: [signal("ci.none")] })).toMatchObject({ rule: "await.waiting", reason: "waiting on ci.passed, ci.failed, ci.none; seen ci.none (no check yet: ci.none after 5m)" });
+    const d = kindOf(at(5, { signals: [signal("ci.none")] }), "apply_receipts");
+    expect(d.receipts[0]?.data).toMatchObject({ outcome: "ci.none" });
+    expect(d.state.step).toBe("approve");
+  });
+
+  test("on a forge without checks ci.none is taken at once", () => {
+    expect(kindOf(at(0, { signals: [signal("ci.none")] }, undefined, false), "apply_receipts").receipts[0]?.data).toMatchObject({ outcome: "ci.none" });
+  });
+
+  test("the story moving under it takes stale or unpushed between polls, after any kind present", () => {
+    expect(at(1, { base_stale: true })?.rule).toBe("await.stale");
+    expect(kindOf(at(1, { base_stale: true }), "apply_receipts").state.step).toBe("build");
+    expect(kindOf(at(1, { unpushed: true }), "apply_receipts")).toMatchObject({ rule: "await.unpushed", state: { step: "ship" } });
+    expect(kindOf(at(1, { base_stale: true, signals: [signal("ci.passed")] }), "apply_receipts").rule).toBe("await.signal");
+  });
+
+  test("past its deadline it ends timeout where routed, else parks stuck for a person, held until they move it", () => {
+    const routed = ciStep({ outcomes: [...ciStep().outcomes, "timeout"], routes: { ...ciStep().routes, timeout: { to: "$stuck" } } });
+    expect(at(29, { signals: [signal("ci.pending")] }, routed)?.rule).toBe("await.waiting");
+    const t = kindOf(at(30, { signals: [signal("ci.pending")] }, routed), "apply_receipts");
+    expect(t).toMatchObject({ rule: "await.timeout", state: { ended: "stuck" } });
+    expect(t.receipts[0]?.data).toMatchObject({ kind: "step.finished", outcome: "timeout" });
+    const p = kindOf(at(30, { signals: [signal("ci.pending")] }), "park");
+    expect(p).toMatchObject({ rule: "await.timeout", inbox: { kind: "stuck", text: "ci did not finish within 30m (seen ci.pending)" } });
+    const held = stateAt("ci", { run: ciRun(40), parked: { reason: "await.timeout", since: minutesAgo(10) } }, wf);
+    expect(decideCase({ state: held, workflows: [wf], story: { signals: [signal("ci.passed")] } })?.rule).toBe("unit.parked");
+  });
+
+  test("a forge that could not be read keeps it waiting, the error named, the deadline still running", () => {
+    const d = kindOf(at(1, { signals: [], signals_error: "gh: HTTP 502" }), "noop");
+    expect(d.reason).toBe("waiting on ci.passed, ci.failed, ci.none; signals not read: gh: HTTP 502");
+    expect(at(31, { signals: [], signals_error: "gh: HTTP 502" })?.rule).toBe("await.timeout");
+  });
+
+  test("a merge step ends on change.merged", () => {
+    const merge: CompiledStep = { name: "ci", kind: "await", runner: { type: "builtin" }, outcomes: ["change.merged"], routes: { "change.merged": { to: "$done" } }, await: { on: ["change.merged"], deadline_ms: null, grace_ms: null } };
+    expect(kindOf(at(600, { signals: [signal("change.merged")] }, merge), "apply_receipts").state.ended).toBe("done");
+    expect(at(600, { signals: [signal("change.closed")] }, merge)?.rule).toBe("await.waiting");
   });
 });

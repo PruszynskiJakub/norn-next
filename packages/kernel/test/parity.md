@@ -146,6 +146,11 @@ back as the unit's `corrupt_marked` fact.
 | `gate.carried` | `apply_receipts` | dropped: decide never decides a gate; a light path is a route the workflow names | |
 | (none) | | `step.stale` | `apply_receipts` (`step.finished` stale at a `wait` step kind, from `base_stale`, between polls; `await-merge` never answers `stale` itself, since the base policy is the workflow's) |
 | `merge.wait` | `noop` | `step.poll` | `run_step` (step kind `await-merge`, mode `wait`, no intent after the first poll) |
+| (none) | | `await.start` | `apply_receipts` (`run.started` with executor `await` on entering an await step: no host effect, the visit's grace and deadline count from it) |
+| (none) | | `await.signal` | `apply_receipts` (`step.finished` with the first listed signal kind the story's facts hold, its `data` as `detail`; the script `ci` check's `pass`/`fail` become `ci.passed`/`ci.failed`) |
+| (none) | | `await.stale`, `await.unpushed` | `apply_receipts` (`step.finished` stale or unpushed, as `step.stale` and `step.unpushed`) |
+| (none) | | `await.timeout` | `apply_receipts` (`step.finished` timeout where routed), else `park` (inbox `stuck`, held until a person moves the unit; the script check's timeout failed into `ci-failed`) |
+| (none) | | `await.waiting` | `noop` naming the kinds waited on and the signals seen (the script check polled in a detached run) |
 | `open_pr.guard` | `classify` | `gate.unpushed` (a gate), `step.unpushed` (a `wait` step kind, between polls) | `apply_receipts` (`step.finished` unpushed, from the story's `unpushed` fact, the story's own unit only); the workflow routes `unpushed` back to its open-pr step (`shared/ship.yaml`'s `ready` and `merge` gain `unpushed: open-pr` as mechanical edits), counted as a stale route is, where the old engine took it with no edge and no counter |
 | `open_pr.guard.awaits_sync` | `noop` | dropped: as `gate.stale.awaits_sync` | |
 | `git.integrate` | `run_git` | `step.run` | `run_step` (step kind `integrate`, mode `effect`) |

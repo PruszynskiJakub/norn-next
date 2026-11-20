@@ -16,7 +16,7 @@ const load = (file: string) => loadWorkflow(parse(SDLC_PACK.workflows[file] as s
 
 describe("the sdlc pack's workflows", () => {
   test("the real plugins provide every step kind the pack names", () => {
-    expect(Object.keys(STEP_KINDS).sort()).toEqual(["await-merge", "integrate", "open-pr", "push", "update-branch", "verify-base"]);
+    expect(Object.keys(STEP_KINDS).sort()).toEqual(["await-merge", "integrate", "mark-ready", "open-pr", "push", "update-branch", "verify-base"]);
   });
 
   test.each(Object.keys(SDLC_PACK.workflows))("%s loads with no errors", (file) => {

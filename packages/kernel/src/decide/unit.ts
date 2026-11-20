@@ -11,7 +11,7 @@ import type { RunState } from "../model/run-state.ts";
 import type { DecideContext } from "./context.ts";
 import { applyAction, markCorrupt } from "./record.ts";
 import { decideAgent } from "./unit-agent.ts";
-import { decideCheck, decideGate, decidePluginStep } from "./unit-steps.ts";
+import { decideAwait, decideCheck, decideGate, decidePluginStep } from "./unit-steps.ts";
 import { applyDecision, noop, type UnitView } from "./unit-support.ts";
 
 /**
@@ -109,6 +109,7 @@ function decideStep(v: UnitView): Decision | null {
   if (step.agent) return decideAgent(v, step.agent);
   if (step.check) return decideCheck(v, step.check);
   if (step.gate) return decideGate(v, step.gate.prompt);
+  if (step.await) return decideAwait(v, step.await);
   // the slices step is the story rules': they start, wait on and finish slices
   return null;
 }
