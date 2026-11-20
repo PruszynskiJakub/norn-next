@@ -49,9 +49,21 @@ export function forgeWorld(config?: GithubConfig): ForgeWorld {
       const p = at(id);
       if (p) p.state = "CLOSED";
     },
-    setChecks: async (id, summary) => {
+    setChecks: async (id, summary, failed) => {
       const p = at(id);
-      if (p) p.checks = summary;
+      if (!p) return;
+      p.checks = summary;
+      if (failed)
+        p.runs = [
+          { id: 900, name: "build", conclusion: "success", details_url: "https://github.com/acme/app/runs/900", annotations: [] },
+          ...failed.map((f, i) => ({
+            id: 901 + i,
+            name: f.name,
+            conclusion: "failure" as const,
+            details_url: f.url ?? `https://github.com/acme/app/runs/${901 + i}`,
+            annotations: f.annotations.map((a) => ({ path: a.path, start_line: a.line ?? 1, annotation_level: "failure" as const, message: a.message })),
+          })),
+        ];
     },
   };
 }

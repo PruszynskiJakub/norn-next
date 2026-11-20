@@ -40,6 +40,23 @@ export interface FakePr {
   mergeSha?: string;
   mergedAt?: string;
   checks?: Exclude<ChecksSummary, "none">;
+  /** the check runs on the head, as GitHub's checks API reports them; absent: `checks` alone, with no names or annotations */
+  runs?: FakeCheckRun[];
+}
+
+export interface FakeAnnotation {
+  path: string;
+  start_line: number;
+  annotation_level: "failure" | "warning" | "notice";
+  message: string;
+}
+
+export interface FakeCheckRun {
+  id: number;
+  name: string;
+  conclusion: "success" | "failure" | "cancelled" | null;
+  details_url: string;
+  annotations: FakeAnnotation[];
 }
 
 export interface FakeGh {
@@ -223,12 +240,26 @@ export function fakeGh(login = LOGIN): FakeGh {
       return { stderr: `✓ Pull request ${REPO}#${p.number} (${p.title}) is marked as "ready for review"\n` };
     }
     if (cmd === "pr checks") {
-      if (flag(argv, "--json") !== "bucket") return undefined;
+      const fields = flag(argv, "--json");
+      if (fields !== "bucket" && fields !== "bucket,name,link") return undefined;
       const p = prAt(n);
       if (!p) return noPr(n ?? "");
       if (!p.checks) return err(`no checks reported on the '${p.head}' branch`);
-      const buckets = { success: ["pass", "skipping"], pending: ["pass", "pending"], failure: ["pass", "fail"] }[p.checks];
-      return { code: p.checks === "pending" ? 8 : p.checks === "failure" ? 1 : 0, stdout: JSON.stringify(buckets.map((bucket) => ({ bucket }))) };
+      const bucketOf = { success: "pass", failure: "fail", cancelled: "cancel" } as const;
+      const rows = p.runs
+        ? p.runs.map((r) => ({ bucket: r.conclusion === null ? "pending" : bucketOf[r.conclusion], name: r.name, link: r.details_url }))
+        : { success: ["pass", "skipping"], pending: ["pass", "pending"], failure: ["pass", "fail"] }[p.checks].map((bucket, i) => ({ bucket, name: `check-${i}`, link: `${WEB}/actions/runs/${i}` }));
+      return { code: p.checks === "pending" ? 8 : p.checks === "failure" ? 1 : 0, stdout: JSON.stringify(rows.map((r) => pick(r, fields))) };
+    }
+    if (a === "api" && b?.startsWith(`repos/${REPO}/`)) {
+      const path = b.slice(`repos/${REPO}/`.length);
+      const runs = world.prs.flatMap((p) => p.runs ?? []);
+      if (path === `commits/${HEAD_SHA}/check-runs?per_page=100`)
+        return json({ total_count: runs.length, check_runs: runs.map(({ annotations: _a, ...r }) => ({ ...r, head_sha: HEAD_SHA, status: r.conclusion === null ? "in_progress" : "completed" })) });
+      const m = /^check-runs\/(\d+)\/annotations$/.exec(path);
+      const run = m ? runs.find((r) => r.id === Number(m[1])) : undefined;
+      if (run) return json(run.annotations.map((x) => ({ ...x, end_line: x.start_line, blob_href: `${WEB}/blob/${HEAD_SHA}/${x.path}` })));
+      return err("gh: Not Found (HTTP 404)");
     }
     if (cmd === "api graphql") {
       const fs = values(argv, "-f");
@@ -275,7 +306,9 @@ export function fakeGh(login = LOGIN): FakeGh {
       answer(argv, opts.input);
       return o.answer;
     }
-    if (!UNSCOPED.has(cmd) && flag(argv, "-R") !== REPO) return err(`fake gh: ${cmd} without -R ${REPO}`);
+    // a REST path names the repository itself
+    const rest = argv[1] === "api" && argv[2]?.startsWith("repos/");
+    if (!UNSCOPED.has(cmd) && !rest && flag(argv, "-R") !== REPO) return err(`fake gh: ${cmd} without -R ${REPO}`);
     return answer(argv, opts.input);
   };
 

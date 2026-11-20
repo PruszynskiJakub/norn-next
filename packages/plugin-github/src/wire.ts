@@ -92,6 +92,14 @@ export type GhPr = Static<typeof GhPr>;
 export const GhPrs = Type.Array(GhPr);
 
 export const GhChecks = Type.Array(Type.Object({ bucket: Type.String() }));
+/** `gh pr checks --json bucket,name,link`: check runs and commit statuses alike */
+export const GhNamedChecks = Type.Array(Type.Object({ bucket: Type.String(), name: Type.String(), link: Type.Optional(Type.String()) }));
+export const GhHead = Type.Object({ headRefOid: Type.String() });
+/** `commits/<sha>/check-runs`: what the annotations of a check run are asked by */
+export const GhCheckRuns = Type.Object({ check_runs: Type.Array(Type.Object({ id: Type.Integer(), name: Type.String(), conclusion: Type.Union([Type.String(), Type.Null()]) })) });
+export const GhAnnotations = Type.Array(
+  Type.Object({ path: Type.String(), start_line: Type.Union([Type.Integer(), Type.Null()]), annotation_level: Type.Union([Type.String(), Type.Null()]), message: Type.Union([Type.String(), Type.Null()]) }),
+);
 
 export const GhPrsByBranch = Type.Object({
   data: Type.Object({

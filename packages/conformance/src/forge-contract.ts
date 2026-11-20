@@ -4,7 +4,7 @@
  * receipt id, a merge done by a person is seen, and a failing provider changes nothing.
  */
 import { describe, expect } from "bun:test";
-import { type ChangeRequest, type ChecksSummary, type Forge, type ForgeEffect, type ForgeEffectOutcome, validateChangeRequest, validateForgeEffectOutcome } from "@norn/plugin-api";
+import { type ChangeRequest, type ChecksSummary, type FailedCheck, type Forge, type ForgeEffect, type ForgeEffectOutcome, validateChangeRequest, validateFailedChecks, validateForgeEffectOutcome } from "@norn/plugin-api";
 import { type ContractOptions, contractTest, expectValid, failureOf, valueOf } from "./contract.ts";
 import { receiptId } from "./tracker-contract.ts";
 
@@ -16,8 +16,8 @@ export interface ForgeWorld {
   merge?(id: number, sha: string): Promise<void>;
   /** a person closes change `id` unmerged */
   close?(id: number): Promise<void>;
-  /** the checks the provider reports for change `id`'s head from now on */
-  setChecks?(id: number, summary: Exclude<ChecksSummary, "none">): Promise<void>;
+  /** the checks the provider reports for change `id`'s head from now on, and for a failure, which failed and where */
+  setChecks?(id: number, summary: Exclude<ChecksSummary, "none">, failed?: FailedCheck[]): Promise<void>;
 }
 
 export interface ForgeContractOptions extends ContractOptions<ForgeContractTest> {
@@ -38,6 +38,7 @@ export type ForgeContractTest =
   | "a merge by a person is seen, with its merge commit"
   | "a close by a person is seen"
   | "checks: none, then what the provider reports"
+  | "failures: each failed check of a red change, its link and where it failed"
   | "an effect on a missing change is a not_found failure"
   | "a forge without changes refuses every effect as invalid"
   | "a failing provider answers every call with a failure and opens nothing";
@@ -162,6 +163,22 @@ export function forgeContract(name: string, makeWorld: () => ForgeWorld | Promis
       }
     });
 
+    tc("failures: each failed check of a red change, its link and where it failed", async () => {
+      const { world, fg, open } = await made();
+      if (!fg.failures || !fg.capabilities.checks) return;
+      const { change } = await open("gh-1-add-login", 15);
+      const failed: FailedCheck[] = [
+        { name: "unit", url: "https://ci.example/runs/1", annotations: [{ path: "src/login.ts", line: 12, message: "expected 200, got 500" }] },
+        { name: "lint", url: "https://ci.example/runs/2", annotations: [] },
+      ];
+      await need("setChecks", world.setChecks)(change.id, "failure", failed);
+      const got = valueOf(await fg.failures(change.id));
+      expectValid("failures", validateFailedChecks(got));
+      expect(got.map((f) => f.name).sort()).toEqual(["lint", "unit"]);
+      expect(got.find((f) => f.name === "unit")?.annotations).toEqual([{ path: "src/login.ts", line: 12, message: "expected 200, got 500" }]);
+      expect(got.find((f) => f.name === "unit")?.url).toBe("https://ci.example/runs/1");
+    });
+
     tc("an effect on a missing change is a not_found failure", async () => {
       const { fg } = await made();
       for (const [n, e] of ([{ kind: "update", id: 999, title: "x" }, { kind: "ready", id: 999 }] as ForgeEffect[]).entries())
@@ -188,6 +205,7 @@ export function forgeContract(name: string, makeWorld: () => ForgeWorld | Promis
       world.failing(true);
       failureOf(await fg.findChanges(["gh-1-add-login"]));
       failureOf(await fg.checks(change.id));
+      if (fg.failures) failureOf(await fg.failures(change.id));
       failureOf(await fg.perform({ kind: "open", head: "lt-2-lost", base: "main", title: "lost", body: "", draft: true }, { receipt_id: receiptId(300) }));
       failureOf(await fg.perform({ kind: "update", id: change.id, title: "lost" }, { receipt_id: receiptId(301) }));
       failureOf(await fg.perform({ kind: "ready", id: change.id }, { receipt_id: receiptId(302) }));

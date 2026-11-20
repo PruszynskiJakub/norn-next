@@ -238,6 +238,39 @@ describe("forge reads", () => {
     expect(failureOf(await forge.checks(1)).code).toBe("auth");
   });
 
+  test("failures name each failed or cancelled check with its link, and the failure-level annotations of each failed check run, .github ones dropped", async () => {
+    const { forge, gh, exec } = rig();
+    const ann = (path: string, line: number, level: "failure" | "warning" = "failure") => ({ path, start_line: line, annotation_level: level, message: `${path}:${line} broke` });
+    gh.prs.push({ number: 7, head: "gh-7-x", base: "main", title: "x", body: "", draft: false, state: "OPEN", checks: "failure", runs: [
+      { id: 1, name: "build", conclusion: "success", details_url: "https://ci/1", annotations: [ann("ok.ts", 1)] },
+      { id: 2, name: "unit", conclusion: "failure", details_url: "https://ci/2", annotations: [ann("src/a.ts", 3), ann("src/b.ts", 4, "warning"), ann(".github", 1)] },
+      { id: 3, name: "shard-2", conclusion: "cancelled", details_url: "https://ci/3", annotations: [] },
+    ] });
+    expect(valueOf(await (forge.failures as NonNullable<typeof forge.failures>)(7))).toEqual([
+      { name: "unit", url: "https://ci/2", annotations: [{ path: "src/a.ts", line: 3, message: "src/a.ts:3 broke" }] },
+      { name: "shard-2", url: "https://ci/3", cancelled: true, annotations: [] },
+    ]);
+    // annotations are asked only of the failed check run, never of a passing or cancelled one
+    expect(exec.calls.filter((c) => c.argv[1] === "api" && c.argv[2]?.endsWith("/annotations")).map((c) => c.argv[2])).toEqual(["repos/acme/app/check-runs/2/annotations"]);
+  });
+
+  test("failures cap the checks and annotations they read, so one red change costs a bounded number of calls", async () => {
+    const { forge, gh, exec } = rig();
+    const runs = Array.from({ length: 12 }, (_, i) => ({ id: 10 + i, name: `job-${i}`, conclusion: "failure" as const, details_url: `https://ci/${i}`, annotations: Array.from({ length: 25 }, (_, j) => ({ path: "a.ts", start_line: j + 1, annotation_level: "failure" as const, message: "x" })) }));
+    gh.prs.push({ number: 8, head: "gh-8-x", base: "main", title: "x", body: "", draft: false, state: "OPEN", checks: "failure", runs });
+    const got = valueOf(await (forge.failures as NonNullable<typeof forge.failures>)(8));
+    expect(got).toHaveLength(10);
+    expect(got.every((f) => f.annotations.length === 20)).toBe(true);
+    expect(exec.calls.filter((c) => c.argv[1] === "api" && c.argv[2]?.endsWith("/annotations"))).toHaveLength(10);
+  });
+
+  test("failures of a change with no failed check ask nothing past the checks", async () => {
+    const { forge, gh, exec } = rig();
+    gh.prs.push({ number: 9, head: "gh-9-x", base: "main", title: "x", body: "", draft: false, state: "OPEN", checks: "success" });
+    expect(valueOf(await (forge.failures as NonNullable<typeof forge.failures>)(9))).toEqual([]);
+    expect(exec.calls.filter((c) => c.argv[1] === "api")).toEqual([]);
+  });
+
   test("findChanges asks about at most a query's worth of branches per call, and each branch once", async () => {
     const { forge, exec } = rig();
     const branches = Array.from({ length: BRANCHES_PER_QUERY + 3 }, (_, i) => `gh-${i + 1}-b`);

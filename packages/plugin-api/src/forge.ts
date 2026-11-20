@@ -3,7 +3,7 @@
  * all, ...). A FORGE IS NEVER A STATE STORE. It reports what a change request is and performs effects
  * on it; whether a step finished is norn's own record, never read back from a title or a label.
  */
-import { check, IsoTime, NonEmpty, PosInt, TaggedUnion, type ValidationResult } from "@norn/schema";
+import { check, FailedCheck, IsoTime, NonEmpty, PosInt, TaggedUnion, type ValidationResult } from "@norn/schema";
 import { type Static, type TSchema, Type } from "@sinclair/typebox";
 import type { HostContext } from "./host.ts";
 import type { PluginResult } from "./result.ts";
@@ -78,6 +78,12 @@ export interface Forge {
   /** every branch asked about, mapped to its newest change request (any state) or null */
   findChanges(branches: string[]): Promise<PluginResult<Record<string, ChangeRequest | null>>>;
   checks(id: number): Promise<PluginResult<ChecksSummary>>;
+  /**
+   * The checks that failed (or were cancelled) on change `id`'s head, each with its link and, where the
+   * forge has them, the file and line it failed at. Asked only after `checks` answered `failure`, so a
+   * pending or passing change costs no call. Optional (plugin API 1.19): a forge without it hands the agent no detail.
+   */
+  failures?(id: number): Promise<PluginResult<FailedCheck[]>>;
   perform(effect: ForgeEffect, meta: EffectMeta): Promise<PluginResult<ForgeEffectOutcome>>;
 }
 
@@ -88,6 +94,13 @@ export interface ForgeFactory<S extends TSchema = TSchema> {
 
 export function validateChangeRequest(value: unknown): ValidationResult<ChangeRequest> {
   return check(ChangeRequest, value);
+}
+
+/** One failed check as a forge reports it; the same shape a `ci.failed` signal carries to the agent. */
+export { FailedCheck };
+
+export function validateFailedChecks(value: unknown): ValidationResult<FailedCheck[]> {
+  return check(Type.Array(FailedCheck), value);
 }
 
 export function validateForgeEffect(value: unknown): ValidationResult<ForgeEffect> {
