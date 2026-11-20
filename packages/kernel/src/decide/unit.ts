@@ -5,7 +5,7 @@
  * without a report → nudge, reported → apply). Every nudge and retry is bounded and running out is a
  * visible stuck. Manual mode leaves a ready agent step for a person; an attended step always waits for one.
  */
-import type { Decision } from "../model/actions.ts";
+import type { Decision, DecisionOf } from "../model/actions.ts";
 import type { StoryFacts, UnitFacts } from "../model/facts.ts";
 import type { RunState } from "../model/run-state.ts";
 import type { DecideContext } from "./context.ts";
@@ -13,6 +13,9 @@ import { applyAction, markCorrupt } from "./record.ts";
 import { decideAgent } from "./unit-agent.ts";
 import { decideCheck, decideGate, decidePluginStep } from "./unit-steps.ts";
 import { applyDecision, noop, type UnitView } from "./unit-support.ts";
+
+/** The park of a gate waiting on its decision. */
+const GATE_PARK = "gate.park";
 
 /**
  * Parks the unit rules derive from facts each tick, by the rule that parks. A park with any other
@@ -36,7 +39,7 @@ export const DERIVED_PARKS: ReadonlySet<string> = new Set([
   "agent.reporting.lost",
   "check.finished.rejected",
   "step.finished.rejected",
-  "gate.park",
+  GATE_PARK,
 ]);
 
 /** The unit's one decision this tick, or null when nothing is to be done (a noop is still a decision). */
@@ -62,7 +65,7 @@ export function decideUnit(story: StoryFacts, unit: UnitFacts, ctx: DecideContex
   const view: UnitView = { story, unit, state: derived ? unparked(state) : state, graph, step, ctx };
   // receipts always win over session and step facts
   if (unit.receipts.length) {
-    const d = applyDecision(view, "receipts.apply", []);
+    const d = keepVisitPark(applyDecision(view, "receipts.apply", []), state);
     if (d.rejected.length === unit.receipts.length) return { ...d, rule: "receipts.reject" };
     const undelivered = undeliverableAnswers(unit, state, ctx);
     return undelivered.length > 0 ? { ...d, rule: "receipts.apply.undelivered", undelivered } : d;
@@ -101,6 +104,20 @@ function undeliverableAnswers(unit: UnitFacts, state: RunState, ctx: DecideConte
 function unparked(state: RunState): RunState {
   const { parked: _lifted, ...rest } = state;
   return rest;
+}
+
+/**
+ * A gate's park is derived, so receipts apply from a view without it, yet its `since` is when the
+ * visit started waiting, which a signal's clock (`timeout`) counts from. A receipt that leaves the unit
+ * on the same visit (a mode change, a take, a branch update, a rejected receipt) keeps the park, or
+ * each would restart that clock and could put a timeout off for good; only a new visit restarts it.
+ */
+function keepVisitPark(d: DecisionOf<"apply_receipts">, before: RunState): DecisionOf<"apply_receipts"> {
+  const parked = before.parked;
+  if (parked?.reason !== GATE_PARK) return d;
+  const next = d.state;
+  if (next.ended !== undefined || next.parked !== undefined || next.step !== before.step || next.attempt !== before.attempt) return d;
+  return { ...d, state: { ...next, parked: { ...parked } } };
 }
 
 function decideStep(v: UnitView): Decision | null {

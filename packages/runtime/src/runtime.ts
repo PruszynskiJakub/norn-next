@@ -9,7 +9,7 @@ import { briefRenderInput } from "./brief-context.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { createHarnessLauncher, DEFAULT_HOOK_COMMAND } from "./executors.ts";
 import { NO_REPO_WORKFLOWS, overlayRepoWorkflows } from "./repo-workflows.ts";
-import { loadPackWorkflows, type ResolvedSlots, resolveSlots } from "./resolve.ts";
+import { loadPackWorkflows, type ResolvedSlots, resolveSlots, signalDeclarations } from "./resolve.ts";
 import { newTickId, tick } from "./tick.ts";
 import type { AgentLauncher, AgentRunRequest, Runtime, RuntimeDeps } from "./types.ts";
 import { newWakeWriter, stampingReceipts } from "./wake.ts";
@@ -48,7 +48,7 @@ export function createRuntimeEnv(deps: Omit<RuntimeDeps, "tickId">): PluginResul
   const slots = resolveSlots(deps.ctx, deps.plugins, deps.config);
   if (!slots.ok) return slots;
   const repoWorkflows = deps.repoWorkflows ?? NO_REPO_WORKFLOWS;
-  const workflows = loadPackWorkflows(overlayRepoWorkflows(slots.value.pack, repoWorkflows), slots.value.stepKinds, deps.config.kernel);
+  const workflows = loadPackWorkflows(overlayRepoWorkflows(slots.value.pack, repoWorkflows), slots.value.stepKinds, deps.config.kernel, signalDeclarations(slots.value.signals));
   if (!workflows.ok) return workflows;
   let env: RuntimeEnv | undefined;
   const launcher = launcherOf(deps, slots.value, () => env);

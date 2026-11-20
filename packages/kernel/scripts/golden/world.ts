@@ -7,7 +7,7 @@
  * stale version, a receipt for a unit that does not exist) throws: that is a defect in decide.
  */
 import type { ChangeRequest, ClaimRecord, StoredMessage, TrackerItem } from "@norn/plugin-api";
-import { deriveUlid } from "@norn/schema";
+import { deriveUlid, type Signal } from "@norn/schema";
 import {
   type Decision,
   decide,
@@ -51,8 +51,8 @@ export interface SimStory {
   claim: ClaimRecord | null;
   units: SimUnit[];
   mailbox: StoredMessage[];
-  base_stale?: boolean;
-  unpushed?: boolean;
+  /** what the host's signal sources report about the story this tick */
+  signals?: Signal[];
   unsynced?: boolean;
   plan?: SlicePlan;
 }
@@ -93,6 +93,9 @@ function reportAsRecorded(u: SimUnit, f: UnitFacts): void {
   if (refused === undefined) delete f.session.report;
   else f.report_rejected = refused;
 }
+
+/** A signal the host's vcs source reports, named by the commit it is about. */
+export const vcsSignal = (type: "stale" | "unpushed", id: string): Signal => ({ type, source: "vcs", id });
 
 export const session = (activity: SessionFacts["activity"], over: Partial<SessionFacts> = {}): SessionFacts => ({
   activity,
@@ -204,8 +207,7 @@ export class World {
       capabilities: structuredClone(this.capabilities),
       stories: this.stories.map((s) => {
         const out: KernelFacts["stories"][number] = { key: s.key, item: structuredClone(s.item), change: structuredClone(s.change), claim: structuredClone(s.claim), units: units(s), mailbox: structuredClone(s.mailbox) };
-        if (s.base_stale !== undefined) out.base_stale = s.base_stale;
-        if (s.unpushed !== undefined) out.unpushed = s.unpushed;
+        if (s.signals?.length) out.signals = structuredClone(s.signals);
         if (s.unsynced !== undefined) out.unsynced = s.unsynced;
         if (s.plan) out.plan = structuredClone(s.plan);
         return out;

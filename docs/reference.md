@@ -1,6 +1,6 @@
 # Reference
 
-Every command and flag, every config key, the workflows the bundled pack ships and the exit codes. The lists between the two marker comments below are generated from the CLI itself (`bun run docs:emit`), so they match the release this file ships with. What the terms mean is in [Concepts](concepts.md).
+Every command and flag, every config key, the signals a workflow can route, the workflows the bundled pack ships and the exit codes. The lists between the two marker comments below are generated from the CLI itself (`bun run docs:emit`), so they match the release this file ships with. What the terms mean is in [Concepts](concepts.md).
 
 ## Output and exit codes
 
@@ -21,6 +21,18 @@ A refusal prints `{error, do_instead, code}` (as markdown without `--json`): wha
 The nearer file wins: the committed file over the local file over the user file over the built-in defaults. Maps merge key by key; lists and scalars replace. A key norn does not know is refused with the file it is in, never ignored; a slot (`tracker`, `forge`, `store`, `vcs`, an executor's `runner`) also takes the keys of the plugin it names, and that plugin checks them. `norn config show` prints the merged config and the file each key came from; `norn config set <key> <value>` changes one key in the local file, or in the committed file with `--commit` or the user file with `--user`.
 
 A slot names a plugin with `use`: the bundled ones are listed by `norn plugin list`, and `norn plugin add <spec>` installs another and pins it in the plugin lock. An executor pairs a harness (the agent: `claude`, `pi`) with a runner (where it runs: `headless`, `herdr`); an agent step runs on `executor`, or on the only executor when there is one.
+
+## Signals
+
+A gate or a wait step kind (`await-merge`) routes signals under `on:`, beside its `outcomes:`. Each entry takes the route shape of `outcomes:` (a step name, `$done`, `$stuck`, or `{to | exit, max, counter}`), plus the signal's own parameters. The edge is `<step>.<signal>`, so `counter:`, `reset_on` and `norn run rerun --reset` name it as they name an outcome's. A route back is bounded by `kernel.counters.stale` (10) unless it sets `max:`.
+
+| Signal | Source | Parameters | Fires when | Occurrence id |
+|---|---|---|---|---|
+| `stale` | vcs | none | the base moved under the story the way the workflow's `base.stale` names: `behind` (the base has a commit the story lacks) or `conflict` (the default: merging the base conflicts, or with `base.verify` breaks the merged tree) | the base commit |
+| `unpushed` | vcs | none | the story branch moved past its open change's head with commits beyond the story's spec folder | the story head |
+| `timeout` | clock | `after:` a duration (`30m`, `48h`, `7d`), required | the step has waited `after:`: a gate since it parked, a wait step since its run started | the step visit (`ready#3`) |
+
+A plugin declares more under `provides.signals`; `norn plugin list` names them, and a workflow that routes one loads only with that plugin configured. A signal fires once per occurrence id in a round, the first listed first, one per tick, and only for the story's own unit. `on:` on an agent, check, effect step or slices step is refused, and so is an undeclared signal or a name under both `outcomes:` and `on:`. A wait step kind that answers a signal's name as its own outcome (`await-merge` answers `unpushed`) takes the one route under `on:` for both. A waiting step written before `on:`, with `stale` or `unpushed` under `outcomes:`, still loads to the same graph; `norn doctor` warns about a repo file in that form.
 
 ## Generated reference
 

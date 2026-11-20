@@ -2090,7 +2090,13 @@
           }
         ],
         "mailbox": [],
-        "base_stale": true
+        "signals": [
+          {
+            "type": "stale",
+            "source": "vcs",
+            "id": "b0"
+          }
+        ]
       },
       {
         "key": "gh-105",
@@ -2860,7 +2866,7 @@
     {
       "kind": "apply_receipts",
       "unit": "gh-104",
-      "rule": "gate.stale",
+      "rule": "gate.signal",
       "receipts": [
         {
           "id": "01JD5G0000DXAZ7T4XPG82QXGC",
@@ -2868,6 +2874,11 @@
             "kind": "step.finished",
             "step_kind": "gate",
             "outcome": "stale",
+            "signal": {
+              "type": "stale",
+              "source": "vcs",
+              "id": "b0"
+            },
             "step": "ready",
             "attempt": 1
           }
@@ -3171,7 +3182,13 @@
         "visits": {
           "ready": 1,
           "update": 1
-        }
+        },
+        "signals_fired": [
+          {
+            "type": "stale",
+            "id": "b0"
+          }
+        ]
       },
       "expect_version": 1,
       "rejected": []

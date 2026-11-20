@@ -98,6 +98,10 @@
                           {
                             "const": "base_side",
                             "type": "string"
+                          },
+                          {
+                            "const": "signal",
+                            "type": "string"
                           }
                         ]
                       },
@@ -508,6 +512,66 @@
                           "properties": {
                             "exit": {
                               "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                "on": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "description": "Signal → route: stale, unpushed, timeout, or one a plugin declares",
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_-]*$": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": true,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "after": {
+                              "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+                              "description": "Duration like 30s, 10m, 1h30m",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        {
+                          "additionalProperties": true,
+                          "type": "object",
+                          "required": [
+                            "exit"
+                          ],
+                          "properties": {
+                            "exit": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "after": {
+                              "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+                              "description": "Duration like 30s, 10m, 1h30m",
                               "type": "string"
                             }
                           }
@@ -1141,6 +1205,66 @@
                       ]
                     }
                   }
+                },
+                "on": {
+                  "minProperties": 1,
+                  "additionalProperties": false,
+                  "description": "Signal → route: stale, unpushed, timeout, or one a plugin declares",
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_-]*$": {
+                      "anyOf": [
+                        {
+                          "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                          "type": "string"
+                        },
+                        {
+                          "additionalProperties": true,
+                          "type": "object",
+                          "required": [
+                            "to"
+                          ],
+                          "properties": {
+                            "to": {
+                              "pattern": "^(\\$done|\\$stuck|(?!(done|stuck|ask|exhausted|silent|died|timeout|stalled|stale)$)[a-z][a-z0-9_-]*)$",
+                              "type": "string"
+                            },
+                            "counter": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "max": {
+                              "minimum": 1,
+                              "type": "integer"
+                            },
+                            "after": {
+                              "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+                              "description": "Duration like 30s, 10m, 1h30m",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        {
+                          "additionalProperties": true,
+                          "type": "object",
+                          "required": [
+                            "exit"
+                          ],
+                          "properties": {
+                            "exit": {
+                              "pattern": "^[a-z][a-z0-9_-]*$",
+                              "type": "string"
+                            },
+                            "after": {
+                              "pattern": "^([0-9]+(ms|s|m|h|d))+$",
+                              "description": "Duration like 30s, 10m, 1h30m",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
                 }
               }
             },
@@ -1290,6 +1414,7 @@
                 "timeout": {},
                 "exits": {},
                 "gate": {},
+                "on": {},
                 "update-branch": {},
                 "open-pr": {},
                 "integrate": {},

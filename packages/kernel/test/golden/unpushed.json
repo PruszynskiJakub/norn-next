@@ -858,7 +858,13 @@
           }
         ],
         "mailbox": [],
-        "unpushed": true
+        "signals": [
+          {
+            "type": "unpushed",
+            "source": "vcs",
+            "id": "a2"
+          }
+        ]
       },
       {
         "key": "gh-171",
@@ -1219,7 +1225,13 @@
           }
         ],
         "mailbox": [],
-        "unpushed": true
+        "signals": [
+          {
+            "type": "unpushed",
+            "source": "vcs",
+            "id": "a3"
+          }
+        ]
       }
     ],
     "intake": []
@@ -1228,7 +1240,7 @@
     {
       "kind": "apply_receipts",
       "unit": "gh-170",
-      "rule": "gate.unpushed",
+      "rule": "gate.signal",
       "receipts": [
         {
           "id": "01JD5G0000C73G79TPA9EMCVD5",
@@ -1236,6 +1248,11 @@
             "kind": "step.finished",
             "step_kind": "gate",
             "outcome": "unpushed",
+            "signal": {
+              "type": "unpushed",
+              "source": "vcs",
+              "id": "a2"
+            },
             "step": "ready",
             "attempt": 1
           }
@@ -1555,7 +1572,13 @@
         "visits": {
           "ready": 1,
           "open-pr": 1
-        }
+        },
+        "signals_fired": [
+          {
+            "type": "unpushed",
+            "id": "a2"
+          }
+        ]
       },
       "expect_version": 1,
       "rejected": []
@@ -1563,7 +1586,7 @@
     {
       "kind": "apply_receipts",
       "unit": "gh-171",
-      "rule": "step.unpushed",
+      "rule": "step.signal",
       "receipts": [
         {
           "id": "01JD5G0000FWPMF8ZZQPVMTVA7",
@@ -1572,6 +1595,11 @@
             "run_id": "run-gh-171-1",
             "step_kind": "await-merge",
             "outcome": "unpushed",
+            "signal": {
+              "type": "unpushed",
+              "source": "vcs",
+              "id": "a3"
+            },
             "step": "merge",
             "attempt": 1
           }
@@ -1891,7 +1919,13 @@
         "visits": {
           "merge": 1,
           "open-pr": 1
-        }
+        },
+        "signals_fired": [
+          {
+            "type": "unpushed",
+            "id": "a3"
+          }
+        ]
       },
       "expect_version": 2,
       "rejected": []

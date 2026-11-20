@@ -15,6 +15,7 @@ import type { CliContext } from "./context.ts";
 import { GIT_UPGRADE, gitTooOld, MIN_GIT_TEXT } from "./git-version.ts";
 import { ensureLabels, nornLabels } from "./labels.ts";
 import { CliFailure, toFailure } from "./output.ts";
+import { legacySignalWarning } from "./plugins/signal-check.ts";
 import { unseenSkillWarning } from "./plugins/skill-check.ts";
 
 export interface DoctorCheck {
@@ -23,7 +24,7 @@ export interface DoctorCheck {
   /** an earlier check failed, so this one could not run */
   skipped?: true;
   detail?: string;
-  /** a passing check's caveat: worth a look, but nothing norn refuses over */
+  /** a passing check's caveat: worth a look, but nothing norn refuses over; a passing check's `do_instead` is its fix */
   warning?: string;
   error?: string;
   do_instead?: string | null;
@@ -264,8 +265,9 @@ export async function runDoctor(ctx: CliContext, opts: DoctorOptions = {}): Prom
         const workflows = await attempt("workflows", () => ctx.workflowEnv());
         if (workflows.check) checks.push(workflows.check);
         else {
-          const warning = await unseenSkillWarning(env.value);
-          checks.push({ ...passed("workflows", workflowsDetail(env.value)), ...(warning ? { warning } : {}) });
+          const legacy = legacySignalWarning(env.value);
+          const warning = [await unseenSkillWarning(env.value), legacy?.warning].filter((w) => w).join("; ");
+          checks.push({ ...passed("workflows", workflowsDetail(env.value)), ...(warning ? { warning } : {}), ...(legacy ? { do_instead: legacy.do_instead } : {}) });
         }
         if (!opts.repoOnly) {
           checks.push(await labelsCheck(env.value), await hooksCheck(ctx, cwd, env.value.slots.executors), await skillsCheck(env.value));
@@ -293,6 +295,7 @@ export function doctorLines(r: DoctorReport): string[] {
   return r.checks.map((c) => {
     const mark = c.ok ? "ok" : c.skipped ? "skipped" : "FAILED";
     const body = c.ok || c.skipped ? (c.detail ?? "") : `${c.error}${c.do_instead ? ` — do instead: ${c.do_instead}` : ""}`;
-    return `- ${c.name}: ${mark}${body ? ` — ${body.replace(/^skipped: /, "")}` : ""}${c.warning ? ` — warning: ${c.warning}` : ""}`;
+    const caveat = c.warning ? ` — warning: ${c.warning}${c.ok && c.do_instead ? ` — do instead: ${c.do_instead}` : ""}` : "";
+    return `- ${c.name}: ${mark}${body ? ` — ${body.replace(/^skipped: /, "")}` : ""}${caveat}`;
   });
 }

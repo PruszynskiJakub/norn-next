@@ -4,9 +4,10 @@
  * recorded before the host performs it, and how it went comes back as a receipt the next tick
  * applies. A run cut short, or whose plugin failed, runs again under its run while the retries last,
  * each time recorded, and then ends the unit stuck. A gate never decides itself: it waits for a
- * person, or takes its `stale` or `unpushed` route when the story moved under it.
+ * person, or takes the route its `on:` block gives a signal, when the world moved under the story.
  */
 import { WAITING_OUTCOME } from "@norn/plugin-api";
+import type { Signal } from "@norn/schema";
 import type { Decision } from "../model/actions.ts";
 import type { RunInfo } from "../model/run-state.ts";
 import type { CheckStepSpec } from "../workflow/graph.ts";
@@ -68,15 +69,38 @@ export function decideCheck(v: UnitView, check: CheckStepSpec): Decision {
   return runCheck(v, check, "check.rerun", run.id);
 }
 
-/** The story's branch holds commits its change lacks and the step routes `unpushed`: only the story's own unit pushes its change. */
-function unpushed(v: UnitView): boolean {
-  return v.unit.id === v.story.key && v.story.unpushed === true && v.step.routes.unpushed !== undefined;
+/**
+ * The signal the waiting step takes now: the first it routes that the facts hold and whose occurrence
+ * has not fired this round. Signals are about the story (its base, change, item), so only the story's
+ * own unit takes them.
+ */
+function routedSignal(v: UnitView): Signal | null {
+  if (v.unit.id !== v.story.key) return null;
+  const present = v.story.signals ?? [];
+  if (!present.length) return null;
+  const fired = new Set((v.state.signals_fired ?? []).map((f) => firedKey(f.type, f.id)));
+  for (const routed of v.step.signals ?? []) {
+    const hit = present.find((s) => s.type === routed.name && !fired.has(firedKey(s.type, s.id)));
+    if (hit) return hit;
+  }
+  return null;
+}
+
+const firedKey = (type: string, id: string): string => JSON.stringify([type, id]);
+
+/**
+ * The step ends with the signal's name, its receipt naming the occurrence so the round fires it once,
+ * and keeping the source's detail for the next agent step's input: facts are gone after the tick.
+ */
+function signalFinished(v: UnitView, rule: string, s: Signal, run_id?: string): Decision {
+  const signal = { type: s.type, source: s.source, id: s.id };
+  const detail = s.detail !== undefined ? { detail: structuredClone(s.detail) } : {};
+  return applyDecision(v, rule, [intentFor(v, { kind: "step.finished", ...(run_id !== undefined && { run_id }), step_kind: v.step.kind, outcome: s.type, ...detail, signal })]);
 }
 
 export function decideGate(v: UnitView, prompt: string): Decision {
-  if (v.story.base_stale === true && v.step.routes.stale !== undefined)
-    return applyDecision(v, "gate.stale", [intentFor(v, { kind: "step.finished", step_kind: "gate", outcome: "stale" })]);
-  if (unpushed(v)) return applyDecision(v, "gate.unpushed", [intentFor(v, { kind: "step.finished", step_kind: "gate", outcome: "unpushed" })]);
+  const signal = routedSignal(v);
+  if (signal) return signalFinished(v, "gate.signal", signal);
   return parkDecision(v, "gate.park", "gate", { text: prompt });
 }
 
@@ -96,11 +120,9 @@ export function decidePluginStep(v: UnitView, mode: "effect" | "wait"): Decision
     return applyOrPark(v, "step.finished", "step.finished.rejected", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: v.step.kind, outcome, ...detail })]);
   }
   if (mode === "wait") {
-    // checked between polls: the host's base_stale already reads the workflow's base policy, which a step kind does not know
-    if (v.story.base_stale === true && v.step.routes.stale !== undefined)
-      return applyDecision(v, "step.stale", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: v.step.kind, outcome: "stale" })]);
-    // a story waiting on a merge goes back to push what its change lacks
-    if (unpushed(v)) return applyDecision(v, "step.unpushed", [intentFor(v, { kind: "step.finished", run_id: run.id, step_kind: v.step.kind, outcome: "unpushed" })]);
+    // checked between polls, after the kind's own answer: a signal reads what the step kind does not know (the workflow's base policy, the clock)
+    const signal = routedSignal(v);
+    if (signal) return signalFinished(v, "step.signal", signal, run.id);
     return { ...base, rule: "step.poll", run_id: run.id };
   }
   // an effect kind recorded but never answered was cut short, or its plugin failed: run again under its run while the retries last

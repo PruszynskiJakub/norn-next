@@ -3,11 +3,11 @@
  * files and passes their parsed contents; every refusal comes back as data, never a throw, so a host
  * can show all of a file's problems at once and a unit whose workflow fails keeps its pinned one.
  */
-import type { StepKindDefinition } from "@norn/plugin-api";
+import { BUILTIN_SIGNALS, type SignalDeclaration, type StepKindDefinition } from "@norn/plugin-api";
 import { check, parseDuration } from "@norn/schema";
 import type { KernelConfig } from "../model/config.ts";
 import { type CountedStep, deriveCounters } from "./counters.ts";
-import { type CounterDoc, type Route, WorkflowDocument, type WorkflowStepDoc } from "./document.ts";
+import { type CounterDoc, type OnRoute, type Route, WorkflowDocument, type WorkflowStepDoc } from "./document.ts";
 import { type Flat, flatten } from "./flatten.ts";
 import type { AgentStepSpec, CompiledCounter, CompiledRoute, CompiledStep, PinnedWorkflow, WorkflowError, WorkflowGraph, WorkflowLoad } from "./graph.ts";
 import { checkGraph } from "./shape.ts";
@@ -23,6 +23,8 @@ export interface LoadWorkflowOptions {
   sharedFiles: Readonly<Record<string, unknown>>;
   /** the bounds and limits a workflow falls back to where it sets none */
   config: Pick<KernelConfig, "counterDefaults" | "maxNudges" | "maxRetries" | "deadlineMs">;
+  /** the signals configured plugins report, by name, beside the host's own (`BUILTIN_SIGNALS`), which they never replace */
+  signals?: Readonly<Record<string, SignalDeclaration>>;
 }
 
 type Fail = { ok: false; errors: WorkflowError[] };
@@ -33,7 +35,9 @@ const fail = (errors: WorkflowError[]): Fail => ({ ok: false, errors });
  * a step without exactly one head key; a head that is neither built in nor a registered step kind
  * (`missing_kind` names it); a plugin step's extra keys failing its kind's configSchema; an outcome a
  * step can end with left unrouted (the overridable built-in outcomes excepted); a target that is not a
- * step, `$done` or `$stuck`; a step no route reaches; and a route back that no counter bounds.
+ * step, `$done` or `$stuck`; a step no route reaches; a route back that no counter bounds; and an
+ * `on:` block on a step that does not wait, naming a signal no source reports, giving parameters the
+ * signal does not take, or naming what `outcomes:` already routes.
  * Counters are derived by edge kind (see `deriveCounters`) and written into the pinned document, so
  * its hash covers them, and loading a pinned document again gives the same hash.
  */
@@ -41,6 +45,7 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
   const schema = check(WorkflowDocument, doc);
   if (!schema.ok) return fail(schema.errors.map((e) => ({ path: e.path, message: e.message })));
   const written = schema.value;
+  const signals: Record<string, SignalDeclaration> = { ...opts.signals, ...BUILTIN_SIGNALS };
   const flat = flatten(written, opts.sharedFiles);
   if (!flat.ok) return flat;
   const { steps: flatSteps, included } = flat.flat;
@@ -52,7 +57,7 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
   const read: Record<string, ReadStep> = {};
   const errors: WorkflowError[] = [];
   for (const [name, step] of Object.entries(flatSteps)) {
-    const r = readStep(name, step, opts.stepKinds);
+    const r = readStep(name, step, opts.stepKinds, signals);
     if (r.ok) read[name] = r.step;
     else errors.push(...r.errors.map(inShared));
   }
@@ -64,7 +69,14 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
 
   const order = Object.keys(read);
   const counted: Record<string, CountedStep> = {};
-  for (const [name, s] of Object.entries(read)) counted[name] = { kind: s.kind, routes: s.routes, ...(flatSteps[name]?.exits && { exits: flatSteps[name].exits }) };
+  for (const [name, s] of Object.entries(read)) {
+    const exits = flatSteps[name]?.exits;
+    // a check that reads an outside fact itself, by an exit named for the signal, is bounded as the signal is
+    const reads = Object.values(exits ?? {}).filter((o) => Object.hasOwn(signals, o));
+    const moved = [...s.signals.map((x) => x.name), ...reads];
+    const on = s.signals.filter((x) => x.on).map((x) => x.name);
+    counted[name] = { kind: s.kind, routes: s.routes, ...(exits && { exits }), ...(moved.length && { signals: moved }), ...(on.length && { on }) };
+  }
   const derived = deriveCounters(counted, order, declared, flat.flat.exits, opts.config.counterDefaults);
   if (derived.errors.length) return fail(derived.errors.map(inShared));
 
@@ -80,7 +92,7 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
   const shape = checkGraph(flat.flat.start, order, routes);
   if (shape.length) return fail(shape.map(inShared));
 
-  const pinned = pin(written, flat.flat, routes, derived.counters);
+  const pinned = pin(written, flat.flat, read, routes, derived.counters);
   const graph = compile(pinned, read, routes, derived.counters, opts.config);
   return { ok: true, workflow: { pinned, graph } };
 }
@@ -95,7 +107,8 @@ function targetErrors(flat: Flat, read: Readonly<Record<string, ReadStep>>, decl
     for (const [o, route] of Object.entries(s.routes)) {
       const to = typeof route === "string" ? route : route.to;
       if (typeof route !== "string" && route.counter !== undefined) named.add(route.counter);
-      if (to !== "$done" && to !== "$stuck" && !isStep(to)) errors.push({ path: `/steps/${name}/outcomes/${o}`, message: `${name}.${o} → '${to}', which is not a step, $done or $stuck` });
+      const block = s.signals.some((x) => x.on && x.name === o) ? "on" : "outcomes";
+      if (to !== "$done" && to !== "$stuck" && !isStep(to)) errors.push({ path: `/steps/${name}/${block}/${o}`, message: `${name}.${o} → '${to}', which is not a step, $done or $stuck` });
     }
   for (const [c, spec] of Object.entries(declared)) {
     // a pinned document carries the counters derived from its edges; a file may not invent one
@@ -117,12 +130,27 @@ function targetErrors(flat: Flat, read: Readonly<Record<string, ReadStep>>, decl
 }
 
 /** The flat document a unit records: shared steps brought in, copies filled, every bounded route naming its counter. */
-function pin(written: WorkflowDocument, flat: Flat, routes: Record<string, Record<string, CompiledRoute>>, counters: Record<string, CompiledCounter>): PinnedWorkflow {
+function pin(
+  written: WorkflowDocument,
+  flat: Flat,
+  read: Readonly<Record<string, ReadStep>>,
+  routes: Record<string, Record<string, CompiledRoute>>,
+  counters: Record<string, CompiledCounter>,
+): PinnedWorkflow {
   const steps: Record<string, WorkflowStepDoc> = {};
   for (const [name, step] of Object.entries(flat.steps)) {
+    const onBlock = new Map((read[name]?.signals ?? []).filter((s) => s.on).map((s) => [s.name, s.params]));
     const out: Record<string, Route> = {};
-    for (const [o, r] of Object.entries(routes[name] ?? {})) out[o] = r.counter === undefined ? r.to : { to: r.to, counter: r.counter };
-    steps[name] = { ...step, outcomes: out };
+    const on: Record<string, OnRoute> = {};
+    for (const [o, r] of Object.entries(routes[name] ?? {})) {
+      const route: Route = r.counter === undefined ? r.to : { to: r.to, counter: r.counter };
+      if (!onBlock.has(o)) out[o] = route;
+      else {
+        const params = onBlock.get(o);
+        on[o] = params === undefined ? route : { ...(typeof route === "string" ? { to: route } : route), ...params };
+      }
+    }
+    steps[name] = { ...step, outcomes: out, ...(onBlock.size && { on }) };
   }
   const docCounters: Record<string, CounterDoc> = {};
   for (const [name, c] of Object.entries(counters))
@@ -158,6 +186,7 @@ function compile(
       outcomes: s.outcomes,
       routes: routes[name] ?? {},
     };
+    if (s.signals.length) step.signals = s.signals.map((x) => ({ name: x.name, ...(x.params && { params: structuredClone(x.params) }) }));
     if (s.kind === "agent") step.agent = agentSpec(written, d, config);
     else if (s.kind === "check") step.check = { command: written.check as string, timeout_ms: parseDuration(written.timeout as string), exits: { ...(written.exits ?? {}) } };
     else if (s.kind === "gate") step.gate = { prompt: written.gate as string };

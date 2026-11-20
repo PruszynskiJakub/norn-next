@@ -2,8 +2,8 @@
  * The counter each route back gets from the kind of its edge, so an author writes a counter only to
  * share one between edges or to bound one differently. The bounds are the old engine's, so a shipped
  * workflow loads to the counters it always had: a check's `fail`, a gate's `reject`, a `conflict`
- * (reset whenever its step ends another way), a `stale` or `unpushed`, and an agent's otherwise
- * uncounted route back.
+ * (reset whenever its step ends another way), a signal (the world moving under a waiting story), and
+ * an agent's otherwise uncounted route back.
  * Forward outcomes (`done`, `pass`, `approve`) are never counted unless the author writes `max:`.
  */
 import type { CounterDefaults } from "../model/config.ts";
@@ -16,6 +16,10 @@ export interface CountedStep {
   routes: Readonly<Record<string, Route>>;
   /** a check's exit code → outcome; an outcome named here counts like `fail` */
   exits?: Readonly<Record<string, string>>;
+  /** outcomes bounded as the world moving under the story: the signals the step routes, and a check's exits named for one */
+  signals?: readonly string[];
+  /** the names written under `on:`, so a refusal points at the block they sit in */
+  on?: readonly string[];
 }
 
 /** The shared-file exit a flat edge left by: edges leaving through one exit with no counter of their own share one. */
@@ -38,7 +42,7 @@ export interface DerivedCounters {
 const FORWARD: readonly string[] = ["done", "pass", "approve"];
 
 /** The kinds of edge a shared exit's feeders can derive by, as a mixed-kind refusal names them. */
-const KIND_LABEL = { check: "check fail", gate: "gate reject", conflict: "conflict", stale: "stale", unpushed: "unpushed", agent: "agent send-back" } as const;
+const KIND_LABEL = { check: "check fail", gate: "gate reject", conflict: "conflict", signal: "signal", agent: "agent send-back" } as const;
 type EdgeKind = keyof typeof KIND_LABEL;
 
 interface Edge {
@@ -47,6 +51,8 @@ interface Edge {
   to: string;
   counter?: string;
   max?: number;
+  /** written under `on:` */
+  on?: boolean;
 }
 
 interface Feeder {
@@ -63,7 +69,7 @@ interface ExitGroup {
 }
 
 const nameOf = (e: { step: string; outcome: string }) => `${e.step}.${e.outcome}`;
-const pathOf = (e: { step: string; outcome: string }) => `/steps/${e.step}/outcomes/${e.outcome}`;
+const pathOf = (e: Edge) => `/steps/${e.step}/${e.on ? "on" : "outcomes"}/${e.outcome}`;
 const resetsOf = (c: CounterDoc): string[] => (c.reset_on === undefined ? [] : Array.isArray(c.reset_on) ? [...c.reset_on] : [c.reset_on]);
 
 /**
@@ -179,17 +185,18 @@ function exitDefault(kind: EdgeKind, deriving: readonly Feeder[], steps: Readonl
   return { max: defaults.conflict, reset_on: resets };
 }
 
+const isSignal = (step: CountedStep, e: Edge): boolean => step.signals?.includes(e.outcome) === true;
+
 function kindOf(step: CountedStep, e: Edge): EdgeKind {
-  if (e.outcome === "stale") return "stale";
-  if (e.outcome === "unpushed") return "unpushed";
+  if (isSignal(step, e)) return "signal";
   if (e.outcome === "conflict") return "conflict";
   return step.kind === "gate" ? "gate" : "check";
 }
 
 /** The default counter of an edge by its kind, or null when its kind derives none. */
 function kindDefault(step: CountedStep, e: Edge, defaults: CounterDefaults): CompiledCounter | null {
-  // an unpushed route back to the push is bounded as a stale one is: both answer the world moving under a waiting story
-  if (e.outcome === "stale" || e.outcome === "unpushed") return { max: defaults.stale, reset_on: [] };
+  // every signal shares the stale bound: each answers the world moving under a waiting story, which no count of the story's own work bounds
+  if (isSignal(step, e)) return { max: defaults.stale, reset_on: [] };
   if (e.outcome === "conflict") return { max: defaults.conflict, reset_on: otherOutcomes(step, e) };
   if (step.kind === "check" && (e.outcome === "fail" || Object.values(step.exits ?? {}).includes(e.outcome))) return { max: defaults.checkFail, reset_on: [] };
   if (step.kind === "gate" && e.outcome === "reject") return { max: defaults.gateReject, reset_on: [] };
@@ -208,11 +215,13 @@ function edgesOf(steps: Readonly<Record<string, CountedStep>>, order: readonly s
     const s = steps[step];
     if (!s) continue;
     for (const [outcome, route] of Object.entries(s.routes)) {
-      if (typeof route === "string") out.push({ step, outcome, to: route });
+      const on = s.on?.includes(outcome) ? { on: true } : {};
+      if (typeof route === "string") out.push({ step, outcome, to: route, ...on });
       else
         out.push({
           step,
           outcome,
+          ...on,
           to: route.to,
           ...(route.counter !== undefined && { counter: route.counter }),
           ...(route.max !== undefined && { max: route.max }),

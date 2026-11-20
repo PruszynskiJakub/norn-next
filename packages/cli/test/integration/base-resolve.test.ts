@@ -240,7 +240,7 @@ describe("a base that moves under a story, over real git", () => {
   });
 
   test("a conflicting base move at ready goes stale, the update conflicts and the resolver starts, in that order", () => {
-    const order = ["gate.stale", "step.finished(conflict)", "agent.start"].map((r) => rulesFromStale.indexOf(r));
+    const order = ["gate.signal", "step.finished(conflict)", "agent.start"].map((r) => rulesFromStale.indexOf(r));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(rulesFromStale.filter((r) => r.endsWith("!"))).toEqual([]);
@@ -306,12 +306,12 @@ describe("a story on another base branch, and the light path after a clean base 
 
   test("the story branches from develop, and a move of main never makes it stale", () => {
     expect(cutFrom).not.toBe("");
-    expect(rulesAfterMain).not.toContain("gate.stale");
+    expect(rulesAfterMain).not.toContain("gate.signal");
     expect(rulesAfterMain.filter((r) => r.endsWith("!"))).toEqual([]);
   });
 
   test("a clean move of develop takes the light path (clean): the update merges develop and never main, with no build restart", async () => {
-    expect(rulesFromStale).toContain("gate.stale");
+    expect(rulesFromStale).toContain("gate.signal");
     expect(rulesFromStale).toContain("step.finished(clean)");
     expect(rulesFromStale).not.toContain("agent.start");
     expect(await onRemoteBranch(w, onDevelop)).toBe(true);

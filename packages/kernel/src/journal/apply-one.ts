@@ -191,6 +191,15 @@ function stepFinished(state: RunState, d: ReceiptDataOf<"step.finished">, step: 
   }
   // a wait step polled and still waiting, or slices still running: recorded, nothing moves
   if (d.outcome === "waiting") return step.kind === "slices" || step.runner.type === "plugin" ? { state } : { reject: `a ${step.kind} step does not wait` };
+  // a routed signal's outcome routes alike with or without its occurrence on the receipt; only one that carries it counts as fired
+  if (step.signals?.some((s) => s.name === d.outcome)) {
+    if (d.signal !== undefined && d.signal.type !== d.outcome) return { reject: `signal ${d.signal.type} recorded as outcome ${d.outcome}` };
+    const routed = route(state, graph, d.outcome);
+    if (d.signal === undefined || "reject" in routed) return routed;
+    const fired = [...(state.signals_fired ?? []), { type: d.signal.type, id: d.signal.id }];
+    return { ...routed, state: { ...routed.state, signals_fired: fired } };
+  }
+  if (d.signal !== undefined) return { reject: `${state.step} routes no signal ${d.signal.type}` };
   return declared(state, step, graph, d.outcome);
 }
 

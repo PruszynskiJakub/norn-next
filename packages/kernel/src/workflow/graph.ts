@@ -42,7 +42,7 @@ export const OVERRIDABLE_OUTCOMES = ["silent", "died", "timeout", "stalled", "as
 /** The outcomes each built-in step kind ends with; a check adds the outcomes its `exits` name, an agent declares its own. */
 export const BUILTIN_STEP_OUTCOMES = {
   check: ["pass", "fail"],
-  gate: ["approve", "reject", "stale", "unpushed"],
+  gate: ["approve", "reject"],
   slices: ["done", "stuck"],
 } as const;
 
@@ -87,6 +87,10 @@ export const CheckStepSpec = Type.Object(
 );
 export type CheckStepSpec = Static<typeof CheckStepSpec>;
 
+/** A signal a step routes, by name, with the parameters its `on:` entry gives the source (`after:` for `timeout`). */
+export const CompiledSignal = Type.Object({ name: OutcomeName, params: Type.Optional(Type.Record(Type.String(), Type.Unknown())) }, closed);
+export type CompiledSignal = Static<typeof CompiledSignal>;
+
 export const GateStepSpec = Type.Object({ prompt: NonEmpty }, closed);
 export type GateStepSpec = Static<typeof GateStepSpec>;
 
@@ -99,8 +103,10 @@ export const CompiledStep = Type.Object(
     description: Type.Optional(Type.String()),
     /** every outcome the step can end with; a plugin kind's are its declared ones */
     outcomes: Type.Array(OutcomeName),
-    /** outcome → route; every outcome in `outcomes` has one, plus any built-in route the step overrides */
+    /** outcome or signal → route; every outcome in `outcomes` and every signal in `signals` has one, plus any built-in route the step overrides */
     routes: Type.Record(OutcomeName, CompiledRoute),
+    /** the signals that may interrupt the step while it waits, first weighed first; only on a gate or a wait step */
+    signals: Type.Optional(Type.Array(CompiledSignal)),
     agent: Type.Optional(AgentStepSpec),
     check: Type.Optional(CheckStepSpec),
     gate: Type.Optional(GateStepSpec),

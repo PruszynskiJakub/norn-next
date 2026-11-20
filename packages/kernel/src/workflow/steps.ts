@@ -1,20 +1,33 @@
 /**
- * Reading one flat step: which key is its head, whether its other keys belong to that head, and which
- * outcomes it can end with. A step kind is told apart by its key alone, never by which plugin gave it,
- * so a host that lacks a kind learns its name (`missing_kind`) and can say which plugin to add.
+ * Reading one flat step: which key is its head, whether its other keys belong to that head, which
+ * outcomes it can end with, and which signals may interrupt it while it waits. A step kind is told
+ * apart by its key alone, never by which plugin gave it, so a host that lacks a kind learns its name
+ * (`missing_kind`) and can say which plugin to add.
  */
-import { BUILTIN_STEP_KINDS, STEP_KEYWORDS } from "@norn/plugin-api";
+import { BUILTIN_STEP_KINDS, type SignalDeclaration, STEP_KEYWORDS } from "@norn/plugin-api";
 import { check } from "@norn/schema";
-import type { Route, WorkflowStepDoc } from "./document.ts";
+import { Type } from "@sinclair/typebox";
+import { ON_ROUTE_KEYS, type OnRoute, type Route, type WorkflowStepDoc } from "./document.ts";
 import type { StepKindInfo } from "./load.ts";
 import { BUILTIN_STEP_OUTCOMES, OVERRIDABLE_OUTCOMES, type StepRunner, type WorkflowError } from "./graph.ts";
+
+/** A signal a step routes, as a tick weighs it: its name, and the parameters its `on:` entry gives. */
+export interface ReadSignal {
+  name: string;
+  params?: Record<string, unknown>;
+  /** routed under `on:`; false for a pinned revision's `stale` or `unpushed` under `outcomes:` */
+  on: boolean;
+}
 
 export interface ReadStep {
   kind: string;
   runner: StepRunner;
-  /** every outcome the step can end with, in the order it is declared */
+  /** every outcome the step can end with by itself, in the order it is declared */
   outcomes: string[];
+  /** the routes of both blocks, by outcome or signal name: an edge is `<step>.<name>` whichever block it sits in */
   routes: Record<string, Route>;
+  /** the signals the step routes, first weighed first */
+  signals: ReadSignal[];
   /** a plugin step's extra keys */
   config?: Record<string, unknown>;
 }
@@ -23,33 +36,29 @@ const BUILTIN: readonly string[] = BUILTIN_STEP_KINDS;
 const KEYWORDS: readonly string[] = STEP_KEYWORDS;
 const OVERRIDABLE: readonly string[] = OVERRIDABLE_OUTCOMES;
 
-/** The keys beside its head each built-in kind takes; a plugin kind takes `description`, `outcomes` and its configSchema's keys. */
+/** The keys beside its head each built-in kind takes; a plugin kind takes `description`, `outcomes` and its configSchema's keys, and `on` when it waits. */
 const KEYS_OF: Readonly<Record<string, readonly string[]>> = {
   agent: ["description", "outcomes", "means", "verdict", "skills", "inputs", "attended", "by", "model", "criteria", "hand_back", "deadline", "nudges", "retries"],
   check: ["description", "outcomes", "timeout", "exits"],
-  gate: ["description", "outcomes"],
+  gate: ["description", "outcomes", "on"],
   slices: ["description", "outcomes"],
 };
 const PLUGIN_KEYS: readonly string[] = ["description", "outcomes"];
 
 /**
- * Outcomes a built-in step ends with only where it routes them: a gate goes `stale` when the base moved
- * under a story waiting there, and `unpushed` when the story's branch holds commits its change lacks,
- * each only through a route the workflow gives it.
+ * The signals a gate or a wait step without `on:` may route under `outcomes:`. A unit keeps the workflow
+ * it pinned, so a pinned revision may route them there; it loads to the graph `on:` would give, the
+ * signals weighed in this order.
  */
-const ROUTED_ONLY: Readonly<Record<string, readonly string[]>> = { gate: ["stale", "unpushed"] };
-/** A story waiting on a `wait` step kind leaves it the same way a waiting gate does, by the kind's mode rather than its name. */
-const WAIT_ROUTED_ONLY: readonly string[] = ["unpushed"];
+const LEGACY_SIGNALS: readonly string[] = ["stale", "unpushed"];
 
-function routedOnly(head: string, plugin: StepKindInfo | undefined): readonly string[] {
-  if (!plugin) return ROUTED_ONLY[head] ?? [];
-  return plugin.mode === "wait" ? WAIT_ROUTED_ONLY.filter((o) => !plugin.outcomes.includes(o)) : [];
-}
+const NO_PARAMS = Type.Object({}, { additionalProperties: false });
 
 export function readStep(
   name: string,
   step: WorkflowStepDoc,
   stepKinds: Readonly<Record<string, StepKindInfo>>,
+  signals: Readonly<Record<string, SignalDeclaration>>,
 ): { ok: true; step: ReadStep } | { ok: false; errors: WorkflowError[] } {
   const at = `/steps/${name}`;
   const raw = step as Record<string, unknown>;
@@ -65,13 +74,18 @@ export function readStep(
   }
 
   const plugin = Object.hasOwn(stepKinds, head) && !BUILTIN.includes(head) ? stepKinds[head] : undefined;
-  const allowed = plugin ? PLUGIN_KEYS : (KEYS_OF[head] ?? []);
+  const waits = plugin ? plugin.mode === "wait" : head === "gate";
+  const allowed = plugin ? (waits ? [...PLUGIN_KEYS, "on"] : PLUGIN_KEYS) : (KEYS_OF[head] ?? []);
   const errors: WorkflowError[] = [];
-  for (const k of keys)
-    if (k !== head && KEYWORDS.includes(k) && !allowed.includes(k)) errors.push({ path: `${at}/${k}`, message: `\`${k}\` is not a key of a ${head} step` });
+  for (const k of keys) {
+    if (k === head || !KEYWORDS.includes(k) || allowed.includes(k)) continue;
+    // a running agent, check or effect is never interrupted: it ends by itself or by its own bounds
+    if (k === "on") errors.push({ path: `${at}/on`, message: `\`on\` is only for a gate or a wait step, and step '${name}' is a ${plugin ? `${head} (an effect)` : head} step` });
+    else errors.push({ path: `${at}/${k}`, message: `\`${k}\` is not a key of a ${head} step` });
+  }
   if (!plugin) for (const k of loose) errors.push({ path: `${at}/${k}`, message: `\`${k}\` is not a key of a ${head} step` });
 
-  const routes = (step.outcomes ?? {}) as Record<string, Route>;
+  const outcomeRoutes = (step.outcomes ?? {}) as Record<string, Route>;
   let config: Record<string, unknown> | undefined;
   if (plugin) {
     if (raw[head] !== null) errors.push({ path: `${at}/${head}`, message: `\`${head}\` takes no value: its settings are the step's other keys` });
@@ -81,17 +95,56 @@ export function readStep(
   }
   if (head === "check" && step.timeout === undefined) errors.push({ path: at, message: "a check needs a timeout" });
 
-  const ends = endsOf(head, step, plugin, routes, at, errors);
-  for (const o of ends) if (!Object.hasOwn(routes, o)) errors.push({ path: `${at}/outcomes`, message: `step '${name}' can end with '${o}' but routes it nowhere` });
-  const optional = routedOnly(head, plugin);
-  for (const o of Object.keys(routes)) {
-    if (ends.includes(o) || optional.includes(o) || (head === "agent" && OVERRIDABLE.includes(o))) continue;
-    errors.push({ path: `${at}/outcomes/${o}`, message: `step '${name}' (${head}) never ends with '${o}'` });
+  const ends = endsOf(head, step, plugin, outcomeRoutes, at, errors);
+  // a wait kind may answer by itself what the host also reports between its polls (await-merge's
+  // `unpushed`): one route under on: serves both, so the name still sits in one block
+  const onRoutes = waits ? ((step.on ?? {}) as Record<string, OnRoute>) : {};
+  for (const o of ends) if (!Object.hasOwn(outcomeRoutes, o) && !(plugin && Object.hasOwn(onRoutes, o) && Object.hasOwn(signals, o))) errors.push({ path: `${at}/outcomes`, message: `step '${name}' can end with '${o}' but routes it nowhere` });
+  // a step with an `on:` block is written in the new form, where `outcomes:` holds only how it ends by itself
+  const legacy = waits && step.on === undefined ? LEGACY_SIGNALS.filter((o) => Object.hasOwn(outcomeRoutes, o)) : [];
+  for (const o of Object.keys(outcomeRoutes)) {
+    if (ends.includes(o) || legacy.includes(o) || (head === "agent" && OVERRIDABLE.includes(o))) continue;
+    const hint = waits && Object.hasOwn(signals, o) ? `: '${o}' is a signal, routed under on:` : "";
+    errors.push({ path: `${at}/outcomes/${o}`, message: `step '${name}' (${head}) never ends with '${o}'${hint}` });
   }
+
+  const routes: Record<string, Route> = { ...outcomeRoutes };
+  const read: ReadSignal[] = [];
+  if (waits)
+    for (const [signal, entry] of Object.entries(onRoutes)) {
+      const where = `${at}/on/${signal}`;
+      const declared = Object.hasOwn(signals, signal) ? signals[signal] : undefined;
+      if (!declared) {
+        errors.push({ path: where, message: `\`${signal}\` is not a signal the host or a configured plugin reports: add the plugin that provides it` });
+        continue;
+      }
+      if (Object.hasOwn(outcomeRoutes, signal)) {
+        errors.push({ path: where, message: `step '${name}' routes '${signal}' under both outcomes and on: a name sits in one block` });
+        continue;
+      }
+      const { route, params } = splitEntry(entry);
+      const r = check(declared.params ?? NO_PARAMS, params ?? {});
+      if (!r.ok) {
+        errors.push(...r.errors.map((e) => ({ path: `${where}${e.path}`, message: `${signal}: ${e.message}` })));
+        continue;
+      }
+      routes[signal] = route;
+      read.push({ name: signal, ...(params && { params }), on: true });
+    }
+  for (const o of legacy) read.push({ name: o, on: false });
+
   if (errors.length) return { ok: false, errors };
   const runner: StepRunner = plugin ? { type: "plugin", mode: plugin.mode } : { type: "builtin" };
-  const outcomes = [...ends, ...optional.filter((o) => Object.hasOwn(routes, o))];
-  return { ok: true, step: { kind: head, runner, outcomes, routes, ...(config && { config }) } };
+  return { ok: true, step: { kind: head, runner, outcomes: ends, routes, signals: read, ...(config && { config }) } };
+}
+
+/** An `on:` entry as its route and the signal's parameters beside it; no parameters is `undefined`. */
+function splitEntry(entry: OnRoute): { route: Route; params?: Record<string, unknown> } {
+  if (typeof entry === "string") return { route: entry };
+  const route: Record<string, unknown> = {};
+  const params: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(entry)) (ON_ROUTE_KEYS.includes(k) ? route : params)[k] = v;
+  return { route: (Object.keys(route).length === 1 && typeof route.to === "string" ? route.to : route) as Route, ...(Object.keys(params).length && { params }) };
 }
 
 /** The outcomes a step can end with that must each be routed; agent steps declare their own by routing them. */
@@ -106,8 +159,7 @@ function endsOf(head: string, step: WorkflowStepDoc, plugin: StepKindInfo | unde
     return ["pass", "fail", ...named];
   }
   if (head === "agent") return agentEnds(step, routes, at, errors);
-  const optional = ROUTED_ONLY[head] ?? [];
-  return (BUILTIN_STEP_OUTCOMES[head as keyof typeof BUILTIN_STEP_OUTCOMES] ?? []).filter((o) => !optional.includes(o));
+  return [...(BUILTIN_STEP_OUTCOMES[head as keyof typeof BUILTIN_STEP_OUTCOMES] ?? [])];
 }
 
 function agentEnds(step: WorkflowStepDoc, routes: Record<string, Route>, at: string, errors: WorkflowError[]): string[] {

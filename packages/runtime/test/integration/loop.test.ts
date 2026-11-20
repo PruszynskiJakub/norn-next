@@ -147,14 +147,14 @@ describe("a base that moves under a story waiting at merge", () => {
     await baseMoves(t, "person-1", { "unrelated.txt": "someone else's work\n" });
     const quiet = await tickUntil(m, () => true, 3);
     expect((await unitRecord(m, unit)).state?.step).toBe("merge");
-    expect(quiet.flatMap(rulesOf).filter((r) => r.includes("stale") || r.includes("!"))).toEqual([]);
+    expect(quiet.flatMap(rulesOf).filter((r) => r.includes("signal") || r.includes("!"))).toEqual([]);
     expect(quiet.flatMap((r) => r.problems)).toEqual([]);
     // the merged tree was tested, once for this base move
     expect(await m.ctx.files.read(`${m.ctx.repo.dataDir}/verify-base/${unit}.json`)).toContain('"outcome":"verified"');
 
     await baseMoves(t, "person-2", { broken: "the base broke what the story relies on\n" });
     const back = await tickUntil(m, async () => (await unitRecord(m, unit)).state?.step !== "merge", 3);
-    expect(back.flatMap(rulesOf)).toContain(`${unit} step.stale`);
+    expect(back.flatMap(rulesOf)).toContain(`${unit} step.signal`);
     expect(m.agents.starts.map((s) => s.step)).toEqual(["implement", "review", "describe"]);
   }, 60_000);
 

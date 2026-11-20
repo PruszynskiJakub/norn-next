@@ -65,7 +65,8 @@ function graphOf(hash = HASH): WorkflowGraph {
         name: "ready",
         kind: "gate",
         runner: { type: "builtin" },
-        outcomes: ["approve", "reject", "stale"],
+        outcomes: ["approve", "reject"],
+        signals: [{ name: "stale" }],
         routes: { approve: { to: "slices" }, reject: { to: "implement", counter: "ready.reject" }, stale: { to: "test", counter: "ready.stale" } },
         gate: { prompt: "Approve?" },
       },
@@ -74,7 +75,8 @@ function graphOf(hash = HASH): WorkflowGraph {
         name: "merge",
         kind: "await-merge",
         runner: { type: "plugin", mode: "wait" },
-        outcomes: ["merged", "stale"],
+        outcomes: ["merged"],
+        signals: [{ name: "stale" }],
         routes: { merged: { to: "$done" }, stale: { to: "implement", counter: "merge.stale" } },
         config: {},
       },
@@ -398,6 +400,42 @@ describe("applyReceipts: waiting steps", () => {
     expect(waiting.state).toMatchObject({ step: "merge", run: { id: "m1" }, applied_through: 3 });
     expect(waiting.routes).toEqual([]);
     expect(apply(waiting.state, journal(4, poll("stale"))).state).toMatchObject({ step: "implement", counters: { "merge.stale": 1 } });
+  });
+
+  test("a signal's firing routes like an outcome and records its occurrence for the round; a receipt without its occurrence routes alike", () => {
+    const at: RunState = { ...fresh(), step: "ready" };
+    const fired = (id: string): ReceiptData => ({ kind: "step.finished", step_kind: "gate", outcome: "stale", signal: { type: "stale", source: "vcs", id }, step: "ready" });
+    const once = apply(at, journal(1, fired("b1")));
+    expect(once.state).toMatchObject({ step: "test", counters: { "ready.stale": 1 }, signals_fired: [{ type: "stale", id: "b1" }] });
+    const twice = apply({ ...once.state, step: "ready" }, journal(2, fired("b2")));
+    expect(twice.state.signals_fired).toEqual([
+      { type: "stale", id: "b1" },
+      { type: "stale", id: "b2" },
+    ]);
+    const unnamed = apply(at, journal(1, { kind: "step.finished", step_kind: "gate", outcome: "stale", step: "ready" }));
+    expect(unnamed.state).toMatchObject({ step: "test" });
+    expect(unnamed.state.signals_fired).toBeUndefined();
+  });
+
+  test("a signal the step does not route, or one recorded under another outcome, is refused", () => {
+    const at: RunState = { ...fresh(), step: "ready" };
+    const res = apply(
+      at,
+      journal(
+        1,
+        { kind: "step.finished", step_kind: "gate", outcome: "unpushed", signal: { type: "unpushed", source: "vcs", id: "h1" } },
+        { kind: "step.finished", step_kind: "gate", outcome: "stale", signal: { type: "timeout", source: "clock", id: "ready#1" } },
+      ),
+    );
+    expect(res.rejected.map((r) => r.reason)).toEqual(["ready routes no signal unpushed", "signal timeout recorded as outcome stale"]);
+    expect(res.state.step).toBe("ready");
+  });
+
+  test("a new round starts with no signal fired", () => {
+    const at: RunState = { ...fresh(), step: "ready", signals_fired: [{ type: "stale", id: "b1" }] };
+    const res = apply(at, journal(1, { kind: "round.started", workflow: WORKFLOW.pinned, by: "a-person" }));
+    expect(res.state.step).toBe("implement");
+    expect(res.state.signals_fired).toBeUndefined();
   });
 
   test("a slices step waits while its slices run, then routes on done", () => {

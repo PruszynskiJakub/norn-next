@@ -1,10 +1,9 @@
 /**
  * `await-merge`: wait for the story's change to merge. Answers `unpushed` when the branch holds
  * commits the change lacks beyond the story's spec folder, so the workflow can route it back; otherwise `waiting`, polled every tick.
- * `stale` is declared for the workflow's route but never answered here: whether a base move is stale
- * depends on the workflow's `base.stale` and `base.verify`, which the host reads as the story's
- * `base_stale` fact and decide routes between polls. Merged is asked first, so a change that merged
- * ends the story whatever else moved.
+ * `stale` is never answered here: whether a base move is stale depends on the workflow's `base.stale`
+ * and `base.verify`, which the host reads as the `stale` signal and decide routes between polls under
+ * the step's `on:`. Merged is asked first, so a change that merged ends the story whatever else moved.
  */
 import { type ChangeRequest, fail, type HostContext, ok, type PluginResult, type StepKindDefinition, type StepKindInput, type StepKindOutcome } from "@norn/plugin-api";
 import { Type } from "@sinclair/typebox";
@@ -68,7 +67,7 @@ async function waitReady(input: StepKindInput<Record<string, never>>, change: Ch
 export const awaitMerge: StepKindDefinition<typeof AwaitMergeConfig> = {
   name: "await-merge",
   configSchema: AwaitMergeConfig,
-  outcomes: ["merged", "stale", "unpushed"],
+  outcomes: ["merged", "unpushed"],
   mode: "wait",
   run,
 };

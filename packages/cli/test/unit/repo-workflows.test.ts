@@ -75,6 +75,28 @@ describe("the repo's own workflows in .agents/workflows", () => {
     expect(again?.warning).toBeUndefined();
   });
 
+  test("a repo workflow or shared file still routing stale or unpushed under a waiting step's outcomes: loads, and doctor warns naming the step and the move to on:", async () => {
+    const gate = (on: string) => ["  ready:", "    gate: Approve?", "    outcomes:", "      approve: $done", "      reject: work", ...on.split("\n")];
+    const legacy = [...TIDY.trimEnd().replace("{ done: $done }", "{ done: ready }").split("\n"), ...gate("      stale: work\n      unpushed: work"), ""].join("\n");
+    const sharedLegacy = ["start: ready", "steps:", ...gate("      stale: $stuck"), ""].join("\n");
+    const m = repoWith({ "tidy.yaml": legacy, "shared/hold.yaml": sharedLegacy });
+    expect((await runCli(["tick", "--json"], m.io)).exit).toBe(ExitCode.ok);
+    const doctor = await runCli(["doctor", "--json"], m.io);
+    const check = (json(doctor.stdout).checks as Array<{ name: string; ok: boolean; warning?: string; do_instead?: string }>).find((c) => c.name === "workflows");
+    expect(check?.ok).toBe(true);
+    expect(check?.warning).toContain(".agents/workflows/tidy.yaml routes stale and unpushed under outcomes: (step ready)");
+    expect(check?.warning).toContain(".agents/workflows/shared/hold.yaml routes stale under outcomes: (step ready)");
+    expect(check?.do_instead).toBe("in .agents/workflows/tidy.yaml, .agents/workflows/shared/hold.yaml, move stale and unpushed from each waiting step's outcomes: to an on: block beside it");
+    expect((await runCli(["doctor"], m.io)).stdout).toContain("— do instead: in .agents/workflows/tidy.yaml");
+
+    const moved = legacy.replace("      reject: work\n      stale: work", "      reject: work\n    on:\n      stale: work");
+    await m.files.write(`${DIR}/tidy.yaml`, moved);
+    await m.files.write(`${DIR}/shared/hold.yaml`, sharedLegacy.replace("      reject: work\n", "      reject: work\n    on:\n"));
+    const again = (json((await runCli(["doctor", "--json"], m.io)).stdout).checks as Array<{ name: string; warning?: string; do_instead?: string }>).find((c) => c.name === "workflows");
+    expect(again).not.toHaveProperty("warning");
+    expect(again).not.toHaveProperty("do_instead");
+  });
+
   test("a broken repo shared file is named for the pack workflow that loads it", async () => {
     const m = repoWith({ "shared/sync.yaml": "start: sync\nsteps: [unclosed\n" });
     const tick = await runCli(["tick", "--json"], m.io);

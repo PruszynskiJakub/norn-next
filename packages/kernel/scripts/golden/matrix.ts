@@ -8,7 +8,7 @@ import type { GoldenCase } from "../../test/golden.ts";
 import { STEP_KINDS } from "../../test/shipped.ts";
 import { capabilities, caseOf, claim, config, DEPLOY_DOC, executor, item, ROUTED_DOC, type Seed, seed, shippedFiles, type WorldSetup, world } from "./catalog.ts";
 import type { Scenario } from "./journeys.ts";
-import { session, type World } from "./world.ts";
+import { session, vcsSignal, type World } from "./world.ts";
 
 /** Seed several stories, tick `ticks` times, and keep every tick, checking each expected rule fired somewhere. */
 function scenario(name: string, description: string, setup: WorldSetup, build: (w: World) => void, expected: string[], ticks = 1): Scenario {
@@ -238,14 +238,14 @@ export const MATRIX: Scenario[] = [
       w.unit("gh-102").step_run = { kind: "open-pr", running: true };
       seed(w, "gh-103", { workflow: "quick", step: "update", run: { executor: "update-branch" } });
       seed(w, "gh-104", { workflow: "quick", step: "ready" });
-      w.story("gh-104").base_stale = true;
+      w.story("gh-104").signals = [vcsSignal("stale", "b0")];
       seed(w, "gh-105", { workflow: "quick", step: "implement", run: {}, state: { parked: { reason: "agent.asking.park", since: earlier(w, 10) } } });
       w.unit("gh-105").session = session("working");
       seed(w, "gh-106", { workflow: "quick", step: "review", run: {} });
       w.unit("gh-106").session = session("working");
       w.append("gh-106", { kind: "run.reported", run_id: "run-replaced", verb: "done", outcome: "approve", step: "review", attempt: 1 });
     },
-    ["check.running", "check.rerun", "step.running", "step.resume", "gate.stale", "unit.unpark", "receipts.reject"],
+    ["check.running", "check.rerun", "step.running", "step.resume", "gate.signal", "unit.unpark", "receipts.reject"],
   ),
   scenario(
     "agent-no-executor",
@@ -363,12 +363,12 @@ export const MATRIX: Scenario[] = [
     { files: shippedFiles("quick", "slice") },
     (w) => {
       seed(w, "gh-170", { workflow: "quick", step: "ready" });
-      w.story("gh-170").unpushed = true;
+      w.story("gh-170").signals = [vcsSignal("unpushed", "a2")];
       seed(w, "gh-171", { workflow: "quick", step: "merge", run: { executor: "await-merge" } });
       w.unit("gh-171").step_run = { kind: "await-merge", running: false, outcome: "waiting" };
-      w.story("gh-171").unpushed = true;
+      w.story("gh-171").signals = [vcsSignal("unpushed", "a3")];
     },
-    ["gate.unpushed", "step.unpushed"],
+    ["gate.signal", "step.signal"],
   ),
   scenario(
     "base-stale-at-merge",
@@ -377,12 +377,11 @@ export const MATRIX: Scenario[] = [
     (w) => {
       seed(w, "gh-175", { workflow: "quick", step: "merge", run: { executor: "await-merge" } });
       w.unit("gh-175").step_run = { kind: "await-merge", running: false, outcome: "waiting" };
-      w.story("gh-175").base_stale = true;
+      w.story("gh-175").signals = [vcsSignal("stale", "b1")];
       seed(w, "gh-176", { workflow: "quick", step: "merge", run: { executor: "await-merge" } });
       w.unit("gh-176").step_run = { kind: "await-merge", running: false, outcome: "waiting" };
-      w.story("gh-176").base_stale = false;
     },
-    ["step.stale", "step.poll"],
+    ["step.signal", "step.poll"],
   ),
   scenario(
     "change-closed-at-merge",

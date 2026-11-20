@@ -53,7 +53,8 @@ function fixedOutcomes<const K extends string, S extends TSchema>(keys: readonly
  * evidence by. `resolution`: one `git show --remerge-diff <sha>` per merge commit since the round's
  * latest approval, from the git summary the last routed update recorded. `base_side`: the commit a
  * base update (or a slice's integrate) could not merge, and per path it conflicted in, the commands that
- * show what that side changed there since the merge base.
+ * show what that side changed there since the merge base. `signal`: the detail of the signal that routed
+ * the story here, for the agent step right after it.
  */
 export const InputKind = Type.Union([
   Type.Literal("spec"),
@@ -66,6 +67,7 @@ export const InputKind = Type.Union([
   Type.Literal("record"),
   Type.Literal("resolution"),
   Type.Literal("base_side"),
+  Type.Literal("signal"),
 ]);
 export type InputKind = Static<typeof InputKind>;
 export const StepInput = Type.Union([
@@ -193,8 +195,12 @@ function stepTypes<S extends TSchema>(outcome: S) {
  * model's `type`-tagged step. `outcomes:` holds only routes; an agent step's meanings and verdicts sit
  * beside it in `means:` and `verdict:`.
  */
-function fileStepTypes<R extends TSchema>(route: R) {
+function fileStepTypes<R extends TSchema>(route: R, onRoute: TSchema) {
   const routes = openOutcomes(route);
+  /** What may interrupt a waiting step from outside: signal name → route, with the signal's parameters (`after:` for `timeout`). */
+  const on = Type.Optional(
+    Type.Record(OutcomeName, onRoute, { minProperties: 1, additionalProperties: false, description: "Signal → route: stale, unpushed, timeout, or one a plugin declares" }),
+  );
   const model = stepTypes(route);
   const { type: _t, instructions: _i, agent: _a, outcomes: _o, ...agentKeys } = model.AgentStep.properties;
   const AgentStep = Type.Object(
@@ -217,12 +223,15 @@ function fileStepTypes<R extends TSchema>(route: R) {
       gate: Type.String({ minLength: 1, pattern: "\\S", description: "What the person decides; shown in inbox" }),
       ...common,
       outcomes: fixedOutcomes(["approve", "reject", "stale"] as const, route),
+      on,
     },
     { additionalProperties: false },
   );
-  const verb = <K extends string>(head: K, outcomes: readonly string[]) =>
+  const verb = <K extends string>(head: K, outcomes: readonly string[], waits = false) =>
     Type.Object(
-      { [head]: Type.Null({ description: "Takes no value" }), ...common, outcomes: fixedOutcomes(outcomes, route) } as { [P in K]: ReturnType<typeof Type.Null> } & typeof common & { outcomes: TSchema },
+      { [head]: Type.Null({ description: "Takes no value" }), ...common, outcomes: fixedOutcomes(outcomes, route), ...(waits && { on }) } as {
+        [P in K]: ReturnType<typeof Type.Null>;
+      } & typeof common & { outcomes: TSchema },
       { additionalProperties: false },
     );
   return {
@@ -233,7 +242,7 @@ function fileStepTypes<R extends TSchema>(route: R) {
     OpenPrStep: verb("open-pr", ["done", "conflict"]),
     IntegrateStep: verb("integrate", ["done", "conflict"]),
     PushStep: verb("push", ["done", "conflict"]),
-    AwaitMergeStep: verb("await-merge", ["stale"]),
+    AwaitMergeStep: verb("await-merge", ["stale"], true),
     SlicesStep: verb("slices", ["done", "stuck"]),
   };
 }
@@ -336,10 +345,17 @@ const RouteEdge = Type.Object(
   { additionalProperties: false },
 );
 const FileRoute = Type.Union([Target, RouteEdge]);
-const fileSteps = (route: TSchema) => Object.values(fileStepTypes(route)) as TObject[];
-const FileSteps = fileSteps(FileRoute);
+/**
+ * A route under `on:`: a route as under `outcomes:`, whose edge may also carry the signal's parameters.
+ * Open, since a plugin's signal declares its own parameters, which only the loader knows to check.
+ */
+const signalParams = { after: Type.Optional(Duration) };
+const OnEdge = Type.Object({ ...RouteEdge.properties, ...signalParams }, { additionalProperties: true });
+const OnExit = Type.Object({ exit: OutcomeName, ...signalParams }, { additionalProperties: true });
+const fileSteps = (route: TSchema, onRoute: TSchema) => Object.values(fileStepTypes(route, onRoute)) as TObject[];
+const FileSteps = fileSteps(FileRoute, Type.Union([Target, OnEdge]));
 // A shared file's route may also leave it through an exit, which its `use` step routes by name
-const SharedSteps = fileSteps(Type.Union([FileRoute, Type.Object({ exit: OutcomeName }, { additionalProperties: false })]));
+const SharedSteps = fileSteps(Type.Union([FileRoute, Type.Object({ exit: OutcomeName }, { additionalProperties: false })]), Type.Union([Target, OnEdge, OnExit]));
 
 // As written in a shared file: a declared (dotless) counter, and a `max` the loader turns into a derived counter
 const SharedModelEdge = Type.Object(

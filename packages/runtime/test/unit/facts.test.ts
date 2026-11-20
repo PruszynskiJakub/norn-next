@@ -8,6 +8,9 @@ import { Type } from "@sinclair/typebox";
 import { createRuntimeEnv, gatherFacts, loadPinned, stepsForgePlugin } from "../../src/index.ts";
 import { has, harness, record, tickUntil, trackerItem } from "./support.ts";
 
+/** The occurrence of `type` the story's facts hold, or null when none. */
+const signalId = (story: { signals?: Array<{ type: string; id: string }> } | undefined, type: string): string | null => story?.signals?.find((s) => s.type === type)?.id ?? null;
+
 describe("pinned workflows", () => {
   test("every shipped workflow reloads from the flat document a unit pins to the same hash", () => {
     const h = harness();
@@ -138,26 +141,26 @@ describe("the remote fetch", () => {
 
 describe("vcs facts", () => {
   test("unpushed: the story branch moved past its open change's head", async () => {
-    const h = harness({ workflow: "stepped" });
+    const h = harness({ workflow: "pushed" });
     h.items.push(trackerItem(1));
-    await tickUntil(h, has("round.start"));
+    await tickUntil(h, has("gate.park"));
     h.heads["norn/lt-1"] = "b2";
     h.changes["norn/lt-1"] = { id: 4, state: "open", draft: true, head_branch: "norn/lt-1", base_branch: "main", head_sha: "b2", title: "Story 1" };
     const same = await gatherFacts(h.env, h.tickIds[0] as string);
-    expect(same.ok && same.value.facts.stories[0]?.unpushed).toBe(false);
+    expect(same.ok && signalId(same.value.facts.stories[0], "unpushed")).toBeNull();
     h.heads["norn/lt-1"] = "c3";
     const moved = await gatherFacts(h.env, h.tickIds[0] as string);
     // the fake vcs reads only a commit as its own ancestor, so a moved head no longer contains the change's
-    expect(moved.ok && moved.value.facts.stories[0]?.unpushed).toBe(false);
+    expect(moved.ok && signalId(moved.value.facts.stories[0], "unpushed")).toBeNull();
     h.env.slots.vcs.isAncestor = async () => ({ ok: true, value: true });
     const ahead = await gatherFacts(h.env, h.tickIds[0] as string);
-    expect(ahead.ok && ahead.value.facts.stories[0]?.unpushed).toBe(true);
+    expect(ahead.ok && signalId(ahead.value.facts.stories[0], "unpushed")).toBe("c3");
   });
 
   test("unpushed counts no commit that touches only the story's spec folder, when the vcs can name the paths", async () => {
-    const h = harness({ workflow: "stepped" });
+    const h = harness({ workflow: "pushed" });
     h.items.push(trackerItem(1));
-    await tickUntil(h, has("round.start"));
+    await tickUntil(h, has("gate.park"));
     h.heads["norn/lt-1"] = "c3";
     h.changes["norn/lt-1"] = { id: 4, state: "open", draft: true, head_branch: "norn/lt-1", base_branch: "main", head_sha: "b2", title: "Story 1" };
     h.env.slots.vcs.isAncestor = async () => ({ ok: true, value: true });
@@ -168,15 +171,15 @@ describe("vcs facts", () => {
       return { ok: true, value: paths };
     };
     const specOnly = await gatherFacts(h.env, h.tickIds[0] as string);
-    expect(specOnly.ok && specOnly.value.facts.stories[0]?.unpushed).toBe(false);
+    expect(specOnly.ok && signalId(specOnly.value.facts.stories[0], "unpushed")).toBeNull();
     expect(asked).toEqual([["b2", "c3"]]);
     // another story's spec folder is code to this one
     paths = [".agents/specs/lt-1/notes.md", ".agents/specs/lt-10/spec.md"];
     const other = await gatherFacts(h.env, h.tickIds[0] as string);
-    expect(other.ok && other.value.facts.stories[0]?.unpushed).toBe(true);
+    expect(other.ok && signalId(other.value.facts.stories[0], "unpushed")).toBe("c3");
   });
 
-  test("base_stale under stale: conflict: a clean base move is not stale, a conflicting one is, and a clean one that fails base.verify is", async () => {
+  test("the stale signal under stale: conflict, named by the base commit: a clean base move is not stale, a conflicting one is, and a clean one that fails base.verify is", async () => {
     const h = harness({ workflow: "based" });
     const verified: string[] = [];
     let verdict: { outcome: string; detail?: Record<string, unknown> } = { outcome: "verified" };
@@ -205,33 +208,33 @@ describe("vcs facts", () => {
     await tickUntil(h, has("gate.park"));
     const stale = async () => {
       const r = await gatherFacts(env, h.tickIds[0] as string);
-      return r.ok ? r.value.facts.stories[0]?.base_stale : "failed";
+      return r.ok ? signalId(r.value.facts.stories[0], "stale") : "failed";
     };
     h.heads["norn/lt-1"] = "s1";
     h.heads.main = "s1";
-    expect(await stale()).toBe(false);
+    expect(await stale()).toBeNull();
     // the base moved: the fake vcs reads only a commit as its own ancestor
     h.heads.main = "b2";
     let conflicts: string[] = [];
     env.slots.vcs.conflicts = async () => ok(conflicts);
-    expect(await stale()).toBe(false);
+    expect(await stale()).toBeNull();
     expect(verified).toEqual(["lt-1 bun test"]);
     conflicts = ["shared.txt"];
-    expect(await stale()).toBe(true);
+    expect(await stale()).toBe("b2");
     conflicts = [];
     verdict = { outcome: "broken" };
-    expect(await stale()).toBe(true);
+    expect(await stale()).toBe("b2");
     // the pair tested once answers waiting, its outcome kept as `tested`
     verdict = { outcome: "waiting", detail: { tested: "broken" } };
-    expect(await stale()).toBe(true);
+    expect(await stale()).toBe("b2");
     verdict = { outcome: "waiting", detail: { tested: "verified" } };
-    expect(await stale()).toBe(false);
+    expect(await stale()).toBeNull();
     // a vcs that cannot try a merge leaves the fact out rather than guess
     delete env.slots.vcs.conflicts;
-    expect(await stale()).toBeUndefined();
+    expect(await stale()).toBeNull();
   });
 
-  test("base.verify runs the command the config's checks name for the verify step, and a name it lacks leaves base_stale unsaid", async () => {
+  test("base.verify runs the command the config's checks name for the verify step, and a name it lacks leaves the stale signal unsaid", async () => {
     const run = async (workflow: string) => {
       const h = harness({ workflow, checks: { test: "npm test" } });
       const verified: string[] = [];
@@ -262,14 +265,14 @@ describe("vcs facts", () => {
       built.value.slots.vcs.conflicts = async () => ok([]);
       const r = await gatherFacts(built.value, h.tickIds[0] as string);
       if (!r.ok) throw new Error(r.failure.message);
-      return { verified, stale: r.value.facts.stories[0]?.base_stale, problems: r.value.problems };
+      return { verified, stale: signalId(r.value.facts.stories[0], "stale"), problems: r.value.problems };
     };
     const named = await run("based");
     expect(named.verified).toEqual(["npm test"]);
-    expect(named.stale).toBe(false);
+    expect(named.stale).toBeNull();
     const missing = await run("misbased");
     expect(missing.verified).toEqual([]);
-    expect(missing.stale).toBeUndefined();
+    expect(missing.stale).toBeNull();
     expect(missing.problems.some((p) => p.includes("base.verify test") && p.includes("checks.nope") && p.includes("the base move is not verified"))).toBe(true);
   });
 
@@ -279,6 +282,6 @@ describe("vcs facts", () => {
     await tickUntil(h, has("round.start"));
     const r = await gatherFacts(h.env, h.tickIds[0] as string);
     const story = r.ok ? r.value.facts.stories[0] : undefined;
-    expect([story?.base_stale, story?.unpushed]).toEqual([undefined, undefined]);
+    expect(story?.signals).toBeUndefined();
   });
 });

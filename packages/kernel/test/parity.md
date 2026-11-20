@@ -138,15 +138,15 @@ back as the unit's `corrupt_marked` fact.
 | (none) | | `check.finished` | `apply_receipts` (`check.finished` from the check's answered outcome) |
 | `check.queued` | `noop` | dropped: every due check starts; no cap bounds the runs at once | |
 | `check.no_worktree` | `noop` | dropped: the host resolves the worktree when it runs the check | |
-| `verify.run` | `run_check` | folded into `base_stale`: the host runs the vcs plugin's `verify-base` step kind on a clean base move under a story waiting at a step that routes `stale`, once per (head, base) pair, and a red merged tree reads as `base_stale` | then `gate.stale` or `step.stale` (the failing output is not handed to the next step as `last_check`) |
+| `verify.run` | `run_check` | folded into the `stale` signal: the host runs the vcs plugin's `verify-base` step kind on a clean base move under a story waiting at a step that routes `stale`, once per (head, base) pair, and a red merged tree reads as `stale` | then `gate.signal` or `step.signal` (the failing output is not handed to the next step as `last_check`) |
 | `verify.awaits_sync` | `noop` | dropped: as `verify.run` | |
 | `gate.wait` | `noop` | `gate.park` (entering), then `unit.parked` | `park` (inbox `gate`, the gate's prompt) |
-| `gate.stale` | `classify` | `gate.stale` | `apply_receipts` (`step.finished` gate stale, from `base_stale`) |
+| `gate.stale` | `classify` | `gate.signal` | `apply_receipts` (`step.finished` gate with the signal's name as outcome and its `signal` occurrence, from the story's `signals`: the first the gate routes under `on:` not fired this round, the story's own unit only) |
 | `gate.stale.awaits_sync` | `noop` | dropped: the host gathers fresh facts before decide | |
 | `gate.carried` | `apply_receipts` | dropped: decide never decides a gate; a light path is a route the workflow names | |
-| (none) | | `step.stale` | `apply_receipts` (`step.finished` stale at a `wait` step kind, from `base_stale`, between polls; `await-merge` never answers `stale` itself, since the base policy is the workflow's) |
+| (none) | | `step.signal` | `apply_receipts` (`step.finished` at a `wait` step kind, as `gate.signal`, between polls and after the kind's own answer; `await-merge` never answers `stale` itself, since the base policy is the workflow's) |
 | `merge.wait` | `noop` | `step.poll` | `run_step` (step kind `await-merge`, mode `wait`, no intent after the first poll) |
-| `open_pr.guard` | `classify` | `gate.unpushed` (a gate), `step.unpushed` (a `wait` step kind, between polls) | `apply_receipts` (`step.finished` unpushed, from the story's `unpushed` fact, the story's own unit only); the workflow routes `unpushed` back to its open-pr step (`shared/ship.yaml`'s `ready` and `merge` gain `unpushed: open-pr` as mechanical edits), counted as a stale route is, where the old engine took it with no edge and no counter |
+| `open_pr.guard` | `classify` | `gate.signal` (a gate), `step.signal` (a `wait` step kind, between polls) | `apply_receipts` (`step.finished` unpushed, from the story's `unpushed` signal, the story's own unit only); the workflow routes `unpushed` back to its open-pr step (`shared/ship.yaml`'s `ready` and `merge` gain `unpushed: open-pr` as mechanical edits), counted as a stale route is, where the old engine took it with no edge and no counter |
 | `open_pr.guard.awaits_sync` | `noop` | dropped: as `gate.stale.awaits_sync` | |
 | `git.integrate` | `run_git` | `step.run` | `run_step` (step kind `integrate`, mode `effect`) |
 | `git.push` | `run_git` | `step.run` | `run_step` (step kind `push`, mode `effect`) |

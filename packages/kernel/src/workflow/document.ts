@@ -32,6 +32,20 @@ export type ExitRoute = Static<typeof ExitRoute>;
 export const SharedRoute = Type.Union([Target, RouteEdge, ExitRoute]);
 export type SharedRoute = Static<typeof SharedRoute>;
 
+/**
+ * A route under `on:`: the shape of a route under `outcomes:`, whose edge may also carry the signal's
+ * parameters (`timeout`'s `after:`). The loader checks those against the signal's declaration, as it
+ * checks a plugin step's keys against its kind, so the schema lets them through.
+ */
+const ROUTE_KEYS = { to: Target, counter: Type.Optional(DocCounterName), max: Type.Optional(PosInt) };
+export const OnRoute = Type.Union([Target, Type.Object(ROUTE_KEYS, { additionalProperties: true })]);
+export type OnRoute = Static<typeof OnRoute>;
+export const SharedOnRoute = Type.Union([Target, Type.Object(ROUTE_KEYS, { additionalProperties: true }), Type.Object({ exit: OutcomeName }, { additionalProperties: true })]);
+export type SharedOnRoute = Static<typeof SharedOnRoute>;
+
+/** The keys of an `on:` entry that are its route; the rest are the signal's parameters. */
+export const ON_ROUTE_KEYS: readonly string[] = ["to", "counter", "max", "exit"];
+
 /** What an agent's report of an outcome must come with. */
 export const HandBack = Type.Union([Type.Literal("findings"), Type.Literal("evidence")]);
 export type HandBack = Static<typeof HandBack>;
@@ -49,7 +63,7 @@ export type StepInputDoc = Static<typeof StepInputDoc>;
 const EXIT_CODE_PATTERN = "^(?:[1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
 const SharedName = Type.String({ pattern: "^[a-z][a-z0-9_-]*$", description: "A shared file's name, without `.yaml`" });
 
-function stepDoc<R extends TSchema>(route: R) {
+function stepDoc<R extends TSchema, O extends TSchema>(route: R, onRoute: O) {
   return Type.Object(
     {
       // the built-in head keys; exactly one head per step is the loader's check, not the schema's
@@ -61,6 +75,8 @@ function stepDoc<R extends TSchema>(route: R) {
       like: Type.Optional(StepName),
       description: Type.Optional(Type.String()),
       outcomes: Type.Optional(Type.Record(OutcomeName, route, closed)),
+      /** what may interrupt a waiting step from outside: signal name → route, in the order a tick weighs them */
+      on: Type.Optional(Type.Record(OutcomeName, onRoute, { ...closed, minProperties: 1 })),
       means: Type.Optional(Type.Record(OutcomeName, Type.String({ minLength: 1 }), closed)),
       verdict: Type.Optional(Type.Record(OutcomeName, Verdict, closed)),
       skills: Type.Optional(Type.Array(NonEmpty, { uniqueItems: true })),
@@ -81,9 +97,9 @@ function stepDoc<R extends TSchema>(route: R) {
   );
 }
 
-export const WorkflowStepDoc = stepDoc(Route);
+export const WorkflowStepDoc = stepDoc(Route, OnRoute);
 export type WorkflowStepDoc = Static<typeof WorkflowStepDoc>;
-export const SharedStepDoc = stepDoc(SharedRoute);
+export const SharedStepDoc = stepDoc(SharedRoute, SharedOnRoute);
 export type SharedStepDoc = Static<typeof SharedStepDoc>;
 
 const ResetEdge = Type.String({ pattern: "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*$", description: "<step>.<outcome> whose edge resets the counter" });

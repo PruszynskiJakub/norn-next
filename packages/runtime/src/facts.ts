@@ -1,7 +1,7 @@
 /**
  * Gathering KernelFacts: the tracker's intake and items, the forge's changes, every unit read through
- * the Journal with its version, claims, the mailbox, sessions, in-flight step runs, base_stale and
- * unpushed from the vcs, and the slice plan of a story at its slices step. Facts are read, never acted on as run state, so gathering twice changes nothing.
+ * the Journal with its version, claims, the mailbox, sessions, in-flight step runs, the signals of
+ * a story waiting where its step routes them, and the slice plan of a story at its slices step. Facts are read, never acted on as run state, so gathering twice changes nothing.
  *
  * A story whose record or claim cannot be read is left out of the tick whole: half a story (a slice
  * missing, a claim read as nobody's) would let decide start what is already running. A tracker or
@@ -25,8 +25,8 @@ import { branchOf } from "./branches.ts";
 import type { RuntimeEnv } from "./env.ts";
 import { readUnitFacts } from "./facts-unit.ts";
 import { readBackDocs } from "./inputs.ts";
+import { gatherSignals } from "./signals.ts";
 import { readSlicePlan } from "./slice-plan.ts";
-import { vcsFacts } from "./facts-vcs.ts";
 import { tickWorkflows } from "./workflows.ts";
 
 export interface GatheredFacts {
@@ -45,7 +45,7 @@ export interface GatheredFacts {
 export interface GatherOptions {
   readOnly?: boolean;
   /**
-   * Read only this machine's record: no fetch, no tracker or forge call, no intake, no vcs facts. For
+   * Read only this machine's record: no fetch, no tracker or forge call, no intake, no signals. For
    * a view polled every few seconds (herdr's tab bar), where a call to the code host per story would
    * cost more than the line is worth; items, changes and intake come back empty, never as a guess.
    */
@@ -248,7 +248,10 @@ export async function gatherFacts(env: RuntimeEnv, tickId: string, opts: GatherO
     const change = changes[branchOf(r.key)] ?? null;
     const graph = own ? workflows.byHash[own.workflow.hash]?.graph : undefined;
     const story: StoryFacts = { key: r.key, item: opts.local ? null : await itemOf(env, r.key, problems), change, claim: r.claim, units: r.units, mailbox: r.mailbox };
-    if (!opts.local) Object.assign(story, await vcsFacts(env, r.key, own, graph, change, problems));
+    if (!opts.local) {
+      const signals = await gatherSignals(env, r.key, own, graph, change, problems);
+      if (signals.length) story.signals = signals;
+    }
     if (store.capabilities.shared && store.diverged) {
       const split = await store.diverged(r.key);
       if (!split.ok) problems.push(`${r.key}: store: ${split.failure.message}`);

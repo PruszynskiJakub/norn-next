@@ -49,6 +49,7 @@ export const STEP_KEYWORDS = [
   "retries",
   "timeout",
   "exits",
+  "on",
 ] as const;
 
 /** The outcome a `wait` kind answers while what it waits for has not happened; never routed. */

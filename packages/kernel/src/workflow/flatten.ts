@@ -87,14 +87,13 @@ export function flatten(doc: WorkflowDocument, sharedFiles: Readonly<Record<stri
   for (const [name, step] of Object.entries(own.steps)) {
     const inc = byUse.get(name);
     if (!inc) {
-      steps[name] = isObj(step) && isObj(step.outcomes) ? { ...step, outcomes: mapValues(step.outcomes, (r) => retarget(r, enter)) } : step;
+      steps[name] = mapRoutes(step, (r) => retarget(r, enter));
       continue;
     }
     for (const [inner, s] of Object.entries(inc.steps)) {
       included[inner] = inc.name;
-      const routes = isObj(s) && isObj(s.outcomes) ? s.outcomes : {};
-      for (const [o, route] of Object.entries(routes)) if (isObj(route) && typeof route.exit === "string") exits[`${inner}.${o}`] = exitOf(inc, route.exit);
-      steps[inner] = isObj(s) && isObj(s.outcomes) ? { ...s, outcomes: mapValues(s.outcomes, (r) => leave(r, inc.routes, enter)) } : s;
+      for (const [o, route] of routesOf(s)) if (isObj(route) && typeof route.exit === "string") exits[`${inner}.${o}`] = exitOf(inc, route.exit);
+      steps[inner] = mapRoutes(s, (r) => leave(r, inc.routes, enter));
     }
   }
   const base = doc.base && (doc.base.step === undefined ? doc.base : { ...doc.base, step: enter(doc.base.step) });
@@ -118,14 +117,14 @@ function readShared(name: string, by: string, routes: Obj, value: unknown, workf
   if (!Object.hasOwn(steps, r.value.start)) errors.push(inFile("/start", `\`${r.value.start}\` is not a step of this file`));
   const exits: string[] = [];
   for (const [s, step] of Object.entries(steps))
-    for (const [o, route] of Object.entries(((step as Obj).outcomes as Obj | undefined) ?? {})) {
+    for (const [o, route, block] of routesOf(step)) {
       if (isObj(route) && typeof route.exit === "string") {
         if (!exits.includes(route.exit)) exits.push(route.exit);
         continue;
       }
       const to = typeof route === "string" ? route : isObj(route) ? String(route.to) : "";
       if (!to.startsWith("$") && !Object.hasOwn(steps, to))
-        errors.push(inFile(`/steps/${s}/outcomes/${o}`, `\`${to}\` is not a step of this file; a shared file leaves through an exit (\`{ exit: <name> }\`)`));
+        errors.push(inFile(`/steps/${s}/${block}/${o}`, `\`${to}\` is not a step of this file; a shared file leaves through an exit (\`{ exit: <name> }\`)`));
     }
   return errors.length ? { errors } : { name, by, routes, start: r.value.start, steps, exits };
 }
@@ -207,6 +206,25 @@ function exitOf(inc: Included, exit: string): ExitLeft {
     ...(isObj(r) && typeof r.counter === "string" && { counter: r.counter }),
     ...(isObj(r) && typeof r.max === "number" && { max: r.max }),
   };
+}
+
+/** The routes a step writes under both blocks, `outcomes:` and `on:`, each with the block it sits in. */
+function routesOf(step: unknown): Array<[string, unknown, "outcomes" | "on"]> {
+  if (!isObj(step)) return [];
+  const out: Array<[string, unknown, "outcomes" | "on"]> = [];
+  for (const block of ["outcomes", "on"] as const) {
+    const routes = step[block];
+    if (isObj(routes)) for (const [o, r] of Object.entries(routes)) out.push([o, r, block]);
+  }
+  return out;
+}
+
+/** The step with every route of both blocks mapped; a step without them is returned as it is. */
+function mapRoutes(step: unknown, f: (v: unknown) => unknown): unknown {
+  if (!isObj(step)) return step;
+  const out = { ...step };
+  for (const block of ["outcomes", "on"] as const) if (isObj(step[block])) out[block] = mapValues(step[block], f);
+  return out;
 }
 
 function mapValues(o: Obj, f: (v: unknown) => unknown): Obj {

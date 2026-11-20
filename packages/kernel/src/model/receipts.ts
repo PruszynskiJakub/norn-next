@@ -5,7 +5,7 @@
  * written for, so one written for an earlier visit is refused rather than routing the current one.
  */
 import { EndReason, ReportVerb } from "@norn/plugin-api";
-import { CriterionVerdict, Finding, IsoTime, Mode, NonEmpty, Note, OutcomeName, PosInt, StepName, TaggedUnion } from "@norn/schema";
+import { CriterionVerdict, Finding, IsoTime, Mode, NonEmpty, Note, OutcomeName, PosInt, SignalRef, StepName, TaggedUnion } from "@norn/schema";
 import { type Static, type TProperties, Type } from "@sinclair/typebox";
 import { GraphCounterName, PinnedWorkflow } from "../workflow/graph.ts";
 import { Ended } from "./run-state.ts";
@@ -76,7 +76,14 @@ const KINDS = [
     error: Type.Optional(Type.String({ minLength: 1 })),
   }),
   kind("check.finished", { run_id: Id, exit: Type.Integer({ minimum: 0, maximum: 255 }), outcome: OutcomeName }),
-  kind("step.finished", { run_id: Type.Optional(Id), step_kind: NonEmpty, outcome: OutcomeName, detail: Type.Optional(Type.Unknown()) }),
+  kind("step.finished", {
+    run_id: Type.Optional(Id),
+    step_kind: NonEmpty,
+    outcome: OutcomeName,
+    detail: Type.Optional(Type.Unknown()),
+    /** the signal whose firing ended the step; its outcome is the signal's name */
+    signal: Type.Optional(SignalRef),
+  }),
   kind("gate.decided", {
     outcome: GateOutcome,
     by: NonEmpty,

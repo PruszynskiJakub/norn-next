@@ -17,6 +17,8 @@ import {
   ok,
   type Pack,
   type PluginResult,
+  type SignalDeclaration,
+  type SignalSourceDefinition,
   type StepKindDefinition,
   type Store,
   type Tracker,
@@ -32,7 +34,15 @@ export interface ResolvedSlots {
   vcs: Vcs;
   executors: Readonly<Record<string, Harness>>;
   stepKinds: Readonly<Record<string, StepKindDefinition>>;
+  /** the signal sources the plugins provide, by signal name; the host's own (vcs, clock) are not among them */
+  signals: Readonly<Record<string, ProvidedSignal>>;
   pack: Pack;
+}
+
+/** A plugin's signal source with the plugin that provides it, the `source` its signals name. */
+export interface ProvidedSignal {
+  source: string;
+  def: SignalSourceDefinition;
 }
 
 export type SlotName = "tracker" | "forge" | "store" | "vcs" | "harness" | "packs" | "runners";
@@ -61,6 +71,24 @@ export function collectStepKinds(plugins: readonly NornPlugin[]): PluginResult<R
   return ok(out);
 }
 
+/** Every signal source the plugins provide; two plugins giving one signal name is a refusal, since an `on:` entry could not say which it means. */
+export function collectSignals(plugins: readonly NornPlugin[]): PluginResult<Readonly<Record<string, ProvidedSignal>>> {
+  const out: Record<string, ProvidedSignal> = {};
+  for (const p of plugins) {
+    for (const [key, def] of Object.entries(p.provides.signals ?? {})) {
+      const had = out[key];
+      if (had !== undefined) return fail("invalid", `signal ${key} is provided by ${had.source} and ${p.name}`);
+      out[key] = { source: p.name, def };
+    }
+  }
+  return ok(out);
+}
+
+/** What the workflow loader reads of the plugins' signals: each name, who reports it, and the parameters an `on:` entry may give it. */
+export function signalDeclarations(signals: Readonly<Record<string, ProvidedSignal>>): Record<string, SignalDeclaration> {
+  return Object.fromEntries(Object.entries(signals).map(([name, s]) => [name, { name, source: s.source, ...(s.def.params !== undefined && { params: s.def.params }) }]));
+}
+
 export function resolveSlots(ctx: HostContext, plugins: readonly NornPlugin[], config: RuntimeConfig): PluginResult<ResolvedSlots> {
   const trackerF = findProvided<Parameters<typeof createTracker>[0]>(plugins, "tracker", config.tracker.name);
   if (!trackerF.ok) return trackerF;
@@ -81,6 +109,8 @@ export function resolveSlots(ctx: HostContext, plugins: readonly NornPlugin[], c
   }
   const stepKinds = collectStepKinds(plugins);
   if (!stepKinds.ok) return stepKinds;
+  const signals = collectSignals(plugins);
+  if (!signals.ok) return signals;
   const tracker = createTracker(trackerF.value, ctx, config.tracker.config ?? {});
   if (!tracker.ok) return tracker;
   const forge = createForge(forgeF.value, ctx, config.forge.config ?? {});
@@ -89,7 +119,7 @@ export function resolveSlots(ctx: HostContext, plugins: readonly NornPlugin[], c
   if (!store.ok) return store;
   const vcs = createVcs(vcsF.value, ctx, config.vcs.config ?? {});
   if (!vcs.ok) return vcs;
-  return ok({ tracker: tracker.value, forge: forge.value, store: store.value, vcs: vcs.value, executors, stepKinds: stepKinds.value, pack: pack.value });
+  return ok({ tracker: tracker.value, forge: forge.value, store: store.value, vcs: vcs.value, executors, stepKinds: stepKinds.value, signals: signals.value, pack: pack.value });
 }
 
 function parseYaml(text: string): { ok: true; value: unknown } | { ok: false; message: string } {
@@ -111,6 +141,7 @@ export function loadPackWorkflows(
   pack: Pack,
   stepKinds: Readonly<Record<string, StepKindDefinition>>,
   config: Pick<RuntimeConfig["kernel"], "counterDefaults" | "maxNudges" | "maxRetries" | "deadlineMs"> = DEFAULT_KERNEL_CONFIG,
+  signals: Readonly<Record<string, SignalDeclaration>> = {},
 ): PluginResult<KernelWorkflows["byName"]> {
   const sharedFiles: Record<string, unknown> = {};
   const sharedBroken: WorkflowError[] = [];
@@ -127,7 +158,7 @@ export function loadPackWorkflows(
       byName[name] = { ok: false, errors: [{ path: "", message: `${file} does not parse: ${doc.message}` }] };
       continue;
     }
-    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config });
+    const load = loadWorkflow(doc.value, { stepKinds, sharedFiles, config, signals });
     byName[name] = load.ok || sharedBroken.length === 0 ? load : { ok: false, errors: [...sharedBroken, ...load.errors] };
   }
   return ok(byName);

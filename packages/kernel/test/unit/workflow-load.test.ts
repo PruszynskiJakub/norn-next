@@ -154,11 +154,11 @@ describe("the shipped workflows", () => {
     expect(w.graph.start).toBe("sync");
     expect(w.graph.steps["sync-base"]).toBeUndefined();
     expect(w.graph.steps.sync?.routes.done).toEqual({ to: "slice" });
-    expect(w.graph.steps.merge).toMatchObject({ kind: "await-merge", runner: { type: "plugin", mode: "wait" }, outcomes: ["merged", "stale", "unpushed"] });
+    expect(w.graph.steps.merge).toMatchObject({ kind: "await-merge", runner: { type: "plugin", mode: "wait" }, outcomes: ["merged", "unpushed"], signals: [{ name: "stale" }, { name: "unpushed" }] });
     expect(w.graph.steps["test-merge"]?.check).toEqual({ command: "{checks.test}", timeout_ms: 15 * 60_000, exits: {} });
     expect(w.graph.steps.ci?.outcomes).toEqual(["pass", "fail", "stale"]);
     expect(w.graph.steps["approve-slices"]?.outcomes).toEqual(["approve", "reject"]);
-    expect(w.graph.steps["human-qa"]?.outcomes).toEqual(["approve", "reject", "stale"]);
+    expect(w.graph.steps["human-qa"]).toMatchObject({ outcomes: ["approve", "reject"], signals: [{ name: "stale" }] });
     expect(w.graph.steps.qa?.agent).toMatchObject({ criteria: true, hand_back: { fail: "findings" }, nudges: CONFIG.maxNudges, deadline_ms: CONFIG.deadlineMs });
     expect(w.graph.base).toEqual({ stale: "conflict", step: "update", verify: "test" });
   });
@@ -338,20 +338,137 @@ describe("loading", () => {
     expect(w.graph.steps.ok?.outcomes).toEqual(["approve", "reject"]);
   });
 
-  test("a gate or a wait step kind may route unpushed back to the push, counted as a stale route is; an effect step kind never ends unpushed", () => {
+  test("a gate or a wait step kind routing unpushed under outcomes: routes it back to the push as a signal, counted as a stale route is; an effect step kind never ends unpushed", () => {
     const doc = wf({
       push: { "open-pr": null, outcomes: { done: "ok" } },
       ok: { gate: "Approve?", outcomes: { approve: "merge", reject: "$stuck", unpushed: "push" } },
       merge: { "await-merge": null, outcomes: { merged: "$done", stale: "$stuck", unpushed: "push" } },
     });
     const w = loaded(loadWorkflow(doc, opts()));
-    expect(w.graph.steps.ok?.outcomes).toEqual(["approve", "reject", "unpushed"]);
-    expect(w.graph.steps.merge?.outcomes).toEqual(["merged", "stale", "unpushed"]);
+    expect(w.graph.steps.ok).toMatchObject({ outcomes: ["approve", "reject"], signals: [{ name: "unpushed" }] });
+    expect(w.graph.steps.merge).toMatchObject({ outcomes: ["merged", "unpushed"], signals: [{ name: "stale" }, { name: "unpushed" }] });
     expect(countersOf(w)).toEqual({ edges: { "ok.unpushed": "ok.unpushed", "merge.unpushed": "merge.unpushed" }, counters: { "ok.unpushed": c(10), "merge.unpushed": c(10) } });
     const effect = wf({ push: { "open-pr": null, outcomes: { done: "$done", unpushed: "push" } } });
     expect(errorsOf(loadWorkflow(effect, opts()))).toEqual([{ path: "/steps/push/outcomes/unpushed", message: "step 'push' (open-pr) never ends with 'unpushed'" }]);
   });
+});
 
+describe("the on: block", () => {
+  const MERGE_KIND = { ...STEP_KINDS, "await-merge": kind("await-merge", ["merged"], "wait") };
+  const legacy = wf({
+    build: agent({ done: "push" }),
+    push: { "open-pr": null, outcomes: { done: "ok" } },
+    ok: { gate: "Approve?", outcomes: { approve: "merge", reject: "build", unpushed: "push", stale: "build" } },
+    merge: { "await-merge": null, outcomes: { merged: "$done", stale: { to: "build", max: 3 } } },
+  });
+  const modern = wf({
+    build: agent({ done: "push" }),
+    push: { "open-pr": null, outcomes: { done: "ok" } },
+    ok: { gate: "Approve?", outcomes: { approve: "merge", reject: "build" }, on: { stale: "build", unpushed: "push" } },
+    merge: { "await-merge": null, outcomes: { merged: "$done" }, on: { stale: { to: "build", max: 3 } } },
+  });
+
+  test("compiles to the graph the old form under outcomes: gives, so a pinned revision decides the same", () => {
+    const old = loaded(loadWorkflow(legacy, opts({ stepKinds: MERGE_KIND })));
+    const now = loaded(loadWorkflow(modern, opts({ stepKinds: MERGE_KIND })));
+    expect({ ...now.graph, hash: "" }).toEqual({ ...old.graph, hash: "" });
+    expect(now.graph.steps.ok).toMatchObject({ outcomes: ["approve", "reject"], signals: [{ name: "stale" }, { name: "unpushed" }] });
+    expect(countersOf(now)).toEqual({
+      edges: { "ok.reject": "ok.reject", "ok.stale": "ok.stale", "ok.unpushed": "ok.unpushed", "merge.stale": "merge.stale" },
+      counters: { "ok.reject": c(2), "ok.stale": c(10), "ok.unpushed": c(10), "merge.stale": c(3) },
+    });
+    // the old form's own document is pinned as it was written, so its hash does not move
+    expect(old.pinned.doc.steps.ok).toEqual({ gate: "Approve?", outcomes: { approve: "merge", reject: { to: "build", counter: "ok.reject" }, unpushed: { to: "push", counter: "ok.unpushed" }, stale: { to: "build", counter: "ok.stale" } } });
+  });
+
+  test("the pinned document keeps the block apart, with its derived counters and the signal's parameters, and loads again to the same hash", () => {
+    const doc = wf({
+      build: agent({ done: "ok" }),
+      ok: { gate: "Approve?", outcomes: { approve: "$done", reject: "build" }, on: { timeout: { after: "48h", to: "build" }, stale: "$stuck" } },
+    });
+    const w = loaded(loadWorkflow(doc, opts()));
+    expect(w.pinned.doc.steps.ok as unknown).toEqual({
+      gate: "Approve?",
+      outcomes: { approve: "$done", reject: { to: "build", counter: "ok.reject" } },
+      on: { timeout: { to: "build", counter: "ok.timeout", after: "48h" }, stale: "$stuck" },
+    });
+    expect(w.graph.steps.ok?.signals).toEqual([{ name: "timeout", params: { after: "48h" } }, { name: "stale" }]);
+    expect(w.graph.counters["ok.timeout"]).toEqual(c(10));
+    const again = loaded(loadWorkflow(w.pinned.doc, opts()));
+    expect(again.pinned.hash).toBe(w.pinned.hash);
+    expect(again.graph).toEqual(w.graph);
+  });
+
+  test("weighs signals in the block's order; the old form keeps the order the kernel always weighed them in", () => {
+    const at = (ok: Record<string, unknown>) => loaded(loadWorkflow(wf({ build: agent({ done: "ok" }), ok: { gate: "Approve?", ...ok } }), opts())).graph.steps.ok?.signals;
+    expect(at({ outcomes: { approve: "$done", reject: "build" }, on: { unpushed: "build", stale: "build" } })).toEqual([{ name: "unpushed" }, { name: "stale" }]);
+    expect(at({ outcomes: { approve: "$done", reject: "build", unpushed: "build", stale: "build" } })).toEqual([{ name: "stale" }, { name: "unpushed" }]);
+  });
+
+  test("takes a signal a configured plugin declares, with the parameters it declares", () => {
+    const signals = { "ci-failed": { name: "ci-failed", source: "forge", params: Type.Object({ checks: Type.Array(Type.String()) }, { additionalProperties: false }) } };
+    const doc = wf({ build: agent({ done: "ok" }), ok: { gate: "Approve?", outcomes: { approve: "$done", reject: "build" }, on: { "ci-failed": { to: "build", checks: ["test"] } } } });
+    expect(loaded(loadWorkflow(doc, opts({ signals }))).graph.steps.ok?.signals).toEqual([{ name: "ci-failed", params: { checks: ["test"] } }]);
+    expect(errorsOf(loadWorkflow(doc, opts()))).toEqual([{ path: "/steps/ok/on/ci-failed", message: "`ci-failed` is not a signal the host or a configured plugin reports: add the plugin that provides it" }]);
+  });
+
+  test("a wait kind's own outcome that the host also reports routes once under on:, to the graph the old form gives", () => {
+    const steps = (merge: Record<string, unknown>) => wf({ push: { "open-pr": null, outcomes: { done: "merge" } }, merge: { "await-merge": null, ...merge } });
+    const now = loaded(loadWorkflow(steps({ outcomes: { merged: "$done" }, on: { stale: "$stuck", unpushed: "push" } }), opts()));
+    const old = loaded(loadWorkflow(steps({ outcomes: { merged: "$done", stale: "$stuck", unpushed: "push" } }), opts()));
+    expect(now.graph.steps.merge).toMatchObject({ outcomes: ["merged", "unpushed"], routes: { unpushed: { to: "push", counter: "merge.unpushed" } }, signals: [{ name: "stale" }, { name: "unpushed" }] });
+    expect({ ...now.graph, hash: "" }).toEqual({ ...old.graph, hash: "" });
+    // a name still sits in one block, and an outcome the kind declares is still routed somewhere
+    expect(errorsOf(loadWorkflow(steps({ outcomes: { merged: "$done", unpushed: "push" }, on: { unpushed: "push" } }), opts()))).toEqual([
+      { path: "/steps/merge/on/unpushed", message: "step 'merge' routes 'unpushed' under both outcomes and on: a name sits in one block" },
+    ]);
+    expect(errorsOf(loadWorkflow(steps({ outcomes: { merged: "$done" }, on: { stale: "$stuck" } }), opts()))).toEqual([
+      { path: "/steps/merge/outcomes", message: "step 'merge' can end with 'unpushed' but routes it nowhere" },
+    ]);
+  });
+
+  test("is refused on a step that runs rather than waits: an agent, a check, an effect step kind, slices", () => {
+    const on = { on: { stale: "$stuck" } };
+    const steps = {
+      work: agent({ done: "test" }, on),
+      test: { check: "bun test", timeout: "5m", outcomes: { pass: "push", fail: "$stuck" }, ...on },
+      push: { "open-pr": null, outcomes: { done: "split" }, ...on },
+      split: { slices: null, outcomes: { done: "$done", stuck: "$stuck" }, ...on },
+    };
+    expect(errorsOf(loadWorkflow(wf(steps), opts()))).toEqual([
+      { path: "/steps/work/on", message: "`on` is only for a gate or a wait step, and step 'work' is a agent step" },
+      { path: "/steps/test/on", message: "`on` is only for a gate or a wait step, and step 'test' is a check step" },
+      { path: "/steps/push/on", message: "`on` is only for a gate or a wait step, and step 'push' is a open-pr (an effect) step" },
+      { path: "/steps/split/on", message: "`on` is only for a gate or a wait step, and step 'split' is a slices step" },
+    ]);
+  });
+
+  test("refuses a name in both blocks, a signal left under outcomes: beside an on: block, and parameters the signal does not take", () => {
+    const at = (ok: Record<string, unknown>) => errorsOf(loadWorkflow(wf({ build: agent({ done: "ok" }), ok: { gate: "Approve?", ...ok } }), opts()));
+    expect(at({ outcomes: { approve: "$done", reject: "build", stale: "build" }, on: { stale: "build" } })).toEqual([
+      { path: "/steps/ok/outcomes/stale", message: "step 'ok' (gate) never ends with 'stale': 'stale' is a signal, routed under on:" },
+      { path: "/steps/ok/on/stale", message: "step 'ok' routes 'stale' under both outcomes and on: a name sits in one block" },
+    ]);
+    expect(at({ outcomes: { approve: "$done", reject: "build", unpushed: "build" }, on: { stale: "build" } })).toEqual([
+      { path: "/steps/ok/outcomes/unpushed", message: "step 'ok' (gate) never ends with 'unpushed': 'unpushed' is a signal, routed under on:" },
+    ]);
+    expect(at({ outcomes: { approve: "$done", reject: "build" }, on: { timeout: "build" } }).map((e) => e.path)).toEqual(["/steps/ok/on/timeout"]);
+    expect(at({ outcomes: { approve: "$done", reject: "build" }, on: { stale: { to: "build", after: "1h" } } }).map((e) => e.path)).toEqual(["/steps/ok/on/stale"]);
+    expect(at({ outcomes: { approve: "$done", reject: "build" }, on: { stale: "nowhere" } })).toEqual([{ path: "/steps/ok/on/stale", message: "ok.stale → 'nowhere', which is not a step, $done or $stuck" }]);
+  });
+
+  test("a shared file's waiting step leaves through an exit under on:, and the use step routes it", () => {
+    const shared = {
+      ship: { start: "ok", steps: { ok: { gate: "Approve?", outcomes: { approve: "$done", reject: { exit: "rejected" } }, on: { timeout: { exit: "late", after: "2d" } } } } },
+    };
+    const doc = wf({ build: agent({ done: "ship" }), ship: { use: "ship", outcomes: { rejected: "build", late: "build" } } });
+    const w = loaded(loadWorkflow(doc, opts({ sharedFiles: shared })));
+    expect(w.graph.steps.ok?.routes.timeout).toEqual({ to: "build", counter: "ship.late" });
+    expect(w.graph.steps.ok?.signals).toEqual([{ name: "timeout", params: { after: "2d" } }]);
+  });
+});
+
+describe("loading: copies, limits and hashes", () => {
   test("like copies a step of its own file, the copy's keys replacing the target's", () => {
     const doc = wf({
       test: { check: "bun test", timeout: "5m", outcomes: { pass: "again", fail: "$stuck" } },
