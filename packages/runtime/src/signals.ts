@@ -25,7 +25,8 @@ export interface WaitingVisit {
 /**
  * The visit of a story unit waiting where signals may move it, or null. A gate waits from its park;
  * one not parked yet parks this tick unless a signal moves it first, so it waits from now. A wait step
- * waits from its run's start, and one whose run has not started yet is not waiting.
+ * waits from its run's start; one whose run starts this tick waits from now, and is read on that tick
+ * too, so a base move under it is verified once whichever tick first sees it.
  */
 export function waitingVisit(env: RuntimeEnv, state: RunState, graph: WorkflowGraph): WaitingVisit | null {
   if (state.ended !== undefined) return null;
@@ -33,7 +34,7 @@ export function waitingVisit(env: RuntimeEnv, state: RunState, graph: WorkflowGr
   if (!step?.signals?.length) return null;
   const visit = `${state.step}#${state.attempt}`;
   if (step.kind === "gate") return { step: state.step, visit, since: state.parked?.since ?? env.ctx.now() };
-  if (step.runner.type === "plugin" && step.runner.mode === "wait" && state.run !== null) return { step: state.step, visit, since: state.run.started_at };
+  if (step.runner.type === "plugin" && step.runner.mode === "wait") return { step: state.step, visit, since: state.run?.started_at ?? env.ctx.now() };
   return null;
 }
 

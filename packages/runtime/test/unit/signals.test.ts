@@ -39,7 +39,7 @@ async function stateOf(h: Harnessed): Promise<RunState> {
 }
 
 describe("the waiting visit", () => {
-  test("a gate waits from its park, a wait step from its run, and every other step is not waiting", async () => {
+  test("a gate waits from its park, a wait step from its run or from now before its run starts, and an ended unit is not waiting", async () => {
     const asked: SignalReadInput[] = [];
     const h = harness({ workflow: "signalled", plugins: [ticker(asked, () => ok(null))] });
     h.stepAnswers["await-thing"] = ["waiting"];
@@ -54,6 +54,8 @@ describe("the waiting visit", () => {
     await tickUntil(h, has("step.poll"));
     const waiting = await stateOf(h);
     expect(waitingVisit(h.env, waiting, graph())).toEqual({ step: "wait", visit: "wait#1", since: waiting.run?.started_at as string });
+    // the tick that starts the wait step's run reads its signals too
+    expect(waitingVisit(h.env, { ...waiting, run: null }, graph())).toEqual({ step: "wait", visit: "wait#1", since: h.env.ctx.now() });
     h.stepAnswers["await-thing"] = ["ready"];
     await tickUntil(h, has("gate.park"));
     const parked = await stateOf(h);

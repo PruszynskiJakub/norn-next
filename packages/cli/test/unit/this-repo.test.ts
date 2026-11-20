@@ -148,11 +148,11 @@ describe("this repo's workflows, as norn loads them", () => {
     expect(w.steps.prepare?.outcomes).toEqual({ done: "open-pr" });
     expect(w.steps["open-pr"]?.outcomes).toEqual({ done: "ci" });
     expect(w.steps.ci?.outcomes).toEqual({ pass: "ready", fail: "$stuck", stale: { to: "update", counter: "stale_loop" } });
-    expect(w.steps.ready?.outcomes).toEqual({ approve: "merge", reject: { to: "prepare", counter: "ready.reject" } });
-    expect(w.steps.ready?.on).toMatchObject({ stale: { to: "update", counter: "stale_loop" } });
+    // a signal may be routed under `on:` or, in the form the released norn reads, under `outcomes:`
+    const routes = (s: string) => ({ ...w.steps[s]?.outcomes, ...w.steps[s]?.on });
+    expect(routes("ready")).toEqual({ approve: "merge", reject: { to: "prepare", counter: "ready.reject" }, stale: { to: "update", counter: "stale_loop" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
     expect(w.counters?.["ready.reject"]).toEqual({ max: 2 });
-    expect(w.steps.merge?.outcomes).toEqual({ merged: "$done" });
-    expect(w.steps.merge?.on).toMatchObject({ stale: { to: "update", counter: "stale_loop" } });
+    expect(routes("merge")).toEqual({ merged: "$done", stale: { to: "update", counter: "stale_loop" }, unpushed: expect.objectContaining({ to: "open-pr" }) });
     expect(w.base).toEqual({ stale: "behind" });
   });
 
@@ -179,7 +179,9 @@ describe("this repo's workflows, as norn loads them", () => {
 
   test("the repo's copies of the pack's workflows have the same steps, kinds and edges", () => {
     // what a step does is the one key beside these; its text (agent, check, gate) is the repo's own
-    const NOT_KIND = new Set(["outcomes", "skills", "inputs", "means", "hand_back", "timeout", "exits"]);
+    // `on:` is compared with the outcomes: the released norn reads only the form that routes signals under
+    // `outcomes:`, so the repo's copies keep it until a release reads `on:`, and both forms load to one graph
+    const NOT_KIND = new Set(["outcomes", "on", "skills", "inputs", "means", "hand_back", "timeout", "exits"]);
     // a counter's name follows the exit its edge leaves by, and the copies name their exits apart: compare its bound
     const bounded = (w: Written, outcomes: Record<string, unknown>) =>
       Object.fromEntries(
@@ -191,7 +193,7 @@ describe("this repo's workflows, as norn loads them", () => {
       );
     const shape = (w: Written) => ({
       start: w.start,
-      steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { kind: Object.keys(step).filter((k) => !NOT_KIND.has(k)), skills: step.skills, outcomes: bounded(w, step.outcomes) }])),
+      steps: Object.fromEntries(Object.entries(w.steps).map(([s, step]) => [s, { kind: Object.keys(step).filter((k) => !NOT_KIND.has(k)), skills: step.skills, outcomes: bounded(w, { ...step.outcomes, ...step.on }) }])),
     });
     for (const wf of ["triage", "reproduce", "refinement", "story", "slice", "quick"]) expect({ wf, ...shape(repo[wf] as Written) }).toEqual({ wf, ...shape(pack[wf] as Written) });
   });
