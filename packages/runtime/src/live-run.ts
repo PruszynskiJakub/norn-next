@@ -72,9 +72,9 @@ export function liveStepOf(state: RunState | null, unapplied: readonly KernelRec
 }
 
 /**
- * Set to `docs` in a docs-only run's launch env, resumes too. The hook guard reads the step's rule
- * from the record; when the record cannot be read it holds this instead, so a docs-only run never
- * falls back to the worktree rule.
+ * The step's `writes` in every launch env, resumes too, set always so a value inherited from the
+ * launching process never stands. The hook guard reads the step's rule from the record; when the
+ * record cannot be read it holds this instead, so a docs-only run never falls back to the worktree rule.
  */
 export const WRITES_ENV = "NORN_WRITES";
 

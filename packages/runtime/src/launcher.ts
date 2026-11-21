@@ -6,7 +6,7 @@
  *   the harness's `skillsDir` (skills.ts), the brief rendered and marked
  *   (prompt id = the run id) and recorded as sent, `harness.launch` (headless when the runner has no
  *   pane), then `runner.start` keyed by the run id, so a replayed start finds the first process. The
- *   launch env carries RUN_ENV (unit and run), WRITES_ENV on a docs-only step, and never the per-launch
+ *   launch env carries RUN_ENV (unit and run), WRITES_ENV (the step's writes), and never the per-launch
  *   NORN_PROMPT_SOURCE.
  * - nudge / answer: marked with an id derived from the decision (nudgePromptId, answerPromptId) and recorded as sent, then `runner.send` when the runner has pane input
  *   and the harness reads typed prompts; else queued in the run's outbox for the next hook answer
@@ -195,7 +195,7 @@ export class HarnessLauncher implements AgentLauncher {
     const model = run.brief.model ?? e.model;
     const agentEnv = await this.agentEnv();
     if (!agentEnv.ok) return agentEnv;
-    const env = { ...agentEnv.value, [RUN_ENV.unit]: run.unit, [RUN_ENV.run]: run.run_id, ...(run.writes === "docs" && { [WRITES_ENV]: "docs" }) };
+    const env = { ...agentEnv.value, [RUN_ENV.unit]: run.unit, [RUN_ENV.run]: run.run_id, [WRITES_ENV]: run.writes ?? "worktree" };
     let spec: ReturnType<Harness["launch"]>;
     try {
       spec = e.harness.launch({

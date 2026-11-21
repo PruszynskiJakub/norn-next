@@ -127,7 +127,7 @@ export async function resumeWith(input: ResumeInput): Promise<PluginResult<void>
     const prepared = await input.prepare(launch.value.cwd);
     if (!prepared.ok) return prepared;
   }
-  const env = { ...input.env, [RUN_ENV.unit]: h.unit, [RUN_ENV.run]: h.run_id, ...(launch.value.writes === "docs" && { [WRITES_ENV]: "docs" }) };
+  const env = { ...input.env, [RUN_ENV.unit]: h.unit, [RUN_ENV.run]: h.run_id, [WRITES_ENV]: launch.value.writes ?? "worktree" };
   let spec: ReturnType<Harness["launch"]>;
   try {
     const model = launch.value.model;
