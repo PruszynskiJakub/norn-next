@@ -84,8 +84,12 @@ describe("a changed repo workflow is held for the person's confirmation", () => 
     expect(env.held).toEqual({});
     // an edit to an instruction since needs nothing more
     expect(envWith({ "ship.yaml": wider.replace("Build it.", "Build it well.") }, confirmed).held).toEqual({});
-    // back to the pack's own allow: is what the binary ships, which needs no confirmation either
-    expect(envWith({ "ship.yaml": ship().replace("Build it.", "Build it well.") }, confirmed).held).toEqual({});
+    // back to the pack's own allow: still changes what the person confirmed, so it is held on their revision
+    const back = envWith({ "ship.yaml": ship().replace("Build it.", "Build it well.") }, confirmed);
+    expect(back.held.ship?.changes).toEqual(["step review: allow [code:write] → [docs:write]"]);
+    expect(loaded(back, "ship").pinned.hash).toBe(current.pinned.hash);
+    // and so is the repo's file removed, which leaves the pack's
+    expect(envWith({}, confirmed).held.ship?.running).toEqual({ hash: current.pinned.hash, from: "confirmed" });
     // a change from both is held on the revision the person confirmed
     const attended = envWith({ "ship.yaml": wider.replace("do: Build it.,", "do: Build it., attended: person,") }, confirmed);
     expect(attended.held.ship?.changes).toEqual(["step build: attended none → person"]);

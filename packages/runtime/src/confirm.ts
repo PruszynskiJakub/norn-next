@@ -3,8 +3,9 @@
  * agent inside its step, so one that changes what the person confirms (`guardChanges`: its person's
  * steps, `attended:`, `allow:`) is not run until the person confirms it with `norn workflow confirm`;
  * new rounds keep the revision the person last confirmed, else the pack's, and a workflow only the
- * repo has, weighed against no steps at all, waits with none. The pack's own files are trusted as the binary the person installed, and
- * a change that matches the pack's guarded parts, or the confirmed revision's, runs as it is.
+ * repo has, weighed against no steps at all, waits with none. The pack's own files are trusted as the binary the person installed
+ * until the person confirms a revision; from then on only a change that matches that revision's guarded
+ * parts runs as it is, so a file edited back to the pack's cannot drop a person's step they confirmed.
  * Confirmed revisions live in the machine dir, outside every worktree.
  */
 import { join } from "node:path";
@@ -79,7 +80,7 @@ function confirmedLoad(text: string | undefined, name: string, opts: ConfirmOpti
 
 /**
  * `overlaid`: what each workflow loads to with the repo's files; `packOnly`: what it loads to from
- * the pack alone. A workflow the repo left as the pack has it is never held.
+ * the pack alone. A workflow the repo left as the pack has it is held only against a revision the person confirmed.
  */
 export function holdChanged(
   overlaid: KernelWorkflows["byName"],
@@ -94,11 +95,12 @@ export function holdChanged(
     const current = load.workflow;
     const fromPack = packOnly[name];
     const pack = fromPack?.ok ? fromPack.workflow : null;
-    if (pack?.pinned.hash === current.pinned.hash) continue;
     const { workflow: record, refused } = confirmedLoad(confirmed[name], name, opts);
-    const trusted = [record && { w: record, from: "confirmed" as const }, pack && { w: pack, from: "pack" as const }].filter((t) => t !== null);
-    if (trusted.some(({ w }) => w.pinned.hash === current.pinned.hash || guardChanges(w.pinned.doc, current.pinned.doc).length === 0)) continue;
-    const running = trusted[0] ?? null;
+    // the person's confirmed revision, once there is one, is the only baseline: falling back to the pack's
+    // would let a file edited back to the pack's gates drop a person's step the person confirmed
+    const running = record ? { w: record, from: "confirmed" as const } : pack && { w: pack, from: "pack" as const };
+    if (running?.w.pinned.hash === current.pinned.hash) continue;
+    if (running && guardChanges(running.w.pinned.doc, current.pinned.doc).length === 0) continue;
     // a workflow only the repo has is weighed against none: its own person's steps, attended: and allow: are all new
     const changes = guardChanges(running?.w.pinned.doc ?? { ...current.pinned.doc, steps: {} }, current.pinned.doc);
     if (changes.length === 0) continue;
