@@ -59,7 +59,7 @@ A step written `use:` brings in a shared file's steps, and `like:` copies anothe
 A step hands a file to the steps after it by declaring it. An agent step's `produces:` names each file it writes in the story's spec folder (`describe` produces `pr_body`, written to `pr.md`); a later agent step lists the name under `inputs:`, and a step kind declares what it reads (`open-pr` reads `pr_body`). Two rules hold:
 
 - **Inputs.** A step reads only what the host provides or what an earlier step on every path to it produces. A file breaking it is refused when it loads, with the step and one path that lacks a producer. A route back is fine: what counts is that a producer comes first on every path.
-- **Outputs.** A report is accepted only with everything its outcome produces. `norn done` is refused while a declared file is missing or empty in the worktree, and says which file to write.
+- **Outputs.** A report is accepted only with everything its outcome produces. `norn done` is refused while a declared file is missing or empty in the worktree, and says which file to write. It checks only that the file is there and not empty, not that this run wrote it: a file an earlier pass left passes the check, so a step that must rewrite it says so in its text.
 
 A step kind may read a name with a fallback instead: it runs without the file, and says what it does then. `open-pr` reads `pr_body` that way, because the light path of a base update (only the base moved) reaches it again without `describe`, on a change an earlier pass already described.
 
