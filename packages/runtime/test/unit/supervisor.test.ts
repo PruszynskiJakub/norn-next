@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { claudeHarness } from "@norn/harness-claude";
 import { ASKED_PARK } from "@norn/kernel";
-import { briefOf, reportRun } from "../../src/index.ts";
+import { RUN_ENV } from "@norn/plugin-api";
+import { briefOf, ingestHook, reportRun } from "../../src/index.ts";
 import { type Harnessed, has, harness, record, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
 
 const GRANT = { standIn: { attended: ["supervised.build"], gates: [] } };
@@ -56,6 +58,24 @@ describe("the supervisor of an attended: agent step", () => {
     expect(delivered?.[2]).toContain("not the person");
     expect(h.launcher.of("stop")).toContainEqual([sup.session]);
     expect((await record(h, "lt-1")).state?.supervised).toEqual({ answered: 1 });
+  });
+
+  test("its file-tool write to code is denied from the record, though its step lets the agent write the worktree and its launch env says nothing", async () => {
+    const h = harness({ workflow: "supervised", kernel: GRANT });
+    const { runId } = await asked(h, "Which database should the cache use?");
+    const sup = await supervisorOf(h);
+    const worktree = "/machine/repo/worktrees/lt-1";
+    const write = async (run: string, path: string) => {
+      const deps = { ctx: h.ctx, harnesses: { claude: claudeHarness }, journal: h.env.journal, worktreeOf: () => worktree };
+      const payload = { hook_event_name: "PreToolUse", session_id: run, tool_use_id: `t-${run}`, tool_name: "Write", tool_input: { file_path: path, content: "x" } };
+      const r = await ingestHook(deps, { harness: "claude", hook: "PreToolUse", payload, env: { [RUN_ENV.unit]: "lt-1", [RUN_ENV.run]: run } });
+      await r.delivered();
+      return r.reply.stdout === "" ? null : JSON.parse(r.reply.stdout).hookSpecificOutput;
+    };
+    expect(await write(runId, "src/cache.ts")).toBeNull();
+    const denied = await write(sup.id, "src/cache.ts");
+    expect(denied?.permissionDecision).toBe("deny");
+    expect(denied?.permissionDecisionReason).toContain("writes: docs");
   });
 
   test("a question naming a merge or a push goes to the person and no supervisor starts", async () => {
