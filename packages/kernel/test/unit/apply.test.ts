@@ -282,9 +282,10 @@ describe("applyReceipts: refusals", () => {
     expect(res.state).toMatchObject({ step: "ready", applied_through: 2 });
   });
 
-  test("a delegated decision is a person's and routes", () => {
-    const res = apply({ ...fresh(), step: "ready" }, journal(1, { kind: "gate.decided", outcome: "approve", by: "supervisor", delegated: true }));
-    expect(res.state.step).toBe("slices");
+  test("a delegated decision no supervisor norn launched for the gate's visit made is refused, and the gate waits on", () => {
+    const res = apply({ ...fresh(), step: "ready" }, journal(1, { kind: "gate.decided", outcome: "approve", by: "supervisor", delegated: true, step: "ready", attempt: 1 }));
+    expect(res.rejected[0]?.reason).toContain("supervisor norn launched for this gate's visit");
+    expect(res.state.step).toBe("ready");
   });
 
   test("a report from a replaced run, or one written for another step or attempt, moves nothing", () => {

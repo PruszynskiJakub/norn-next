@@ -11,6 +11,7 @@ import type { Signal } from "@norn/schema";
 import type { Decision } from "../model/actions.ts";
 import type { RunInfo } from "../model/run-state.ts";
 import type { CheckStepSpec } from "../workflow/graph.ts";
+import { delegationBlocked, grantedTo } from "./supervisor.ts";
 import { applyDecision, applyOrPark, endStuckDecision, intentFor, noop, parkDecision, type UnitView } from "./unit-support.ts";
 
 /** The step run the facts show, when it belongs to the step the unit is at. */
@@ -101,7 +102,11 @@ function signalFinished(v: UnitView, rule: string, s: Signal, run_id?: string): 
 export function decideGate(v: UnitView, prompt: string): Decision {
   const signal = routedSignal(v);
   if (signal) return signalFinished(v, "gate.signal", signal);
-  return parkDecision(v, "gate.park", "gate", { text: prompt });
+  if (!grantedTo(v.ctx.config, "gates", v.state.workflow.name, v.state.step)) return parkDecision(v, "gate.park", "gate", { text: prompt });
+  const blocked = delegationBlocked(v.ctx, v.graph);
+  return parkDecision(v, "gate.park", "gate", {
+    text: `${prompt}\n\npolicy.stand_in.gates grants this gate to a supervisor, but ${blocked ?? "no supervisor can take it"}: without an OS sandbox an agent's shell could forge the decision, so it is yours to decide`,
+  });
 }
 
 export function decidePluginStep(v: UnitView, mode: "effect" | "wait"): Decision {

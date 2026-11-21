@@ -53,6 +53,7 @@ export function applyOne(state: RunState, r: KernelReceipt, graph: WorkflowGraph
     case "gate.decided":
       if (step.kind !== "gate") return { reject: `${state.step} is a ${step.kind} step, not a gate` };
       if (d.run_id !== undefined) return { reject: `a step agent may not ${d.outcome} a gate (run ${d.run_id}); a person or their delegate decides it` };
+      if (d.delegated === true) return { reject: "a delegated decision stands only when the supervisor norn launched for this gate's visit made it" };
       return route(state, graph, d.outcome);
     case "answer.sent":
       return { state: unparked(state) };

@@ -14,6 +14,8 @@ export interface RunnerCapabilities {
   headless: boolean;
   /** `send` types into the agent's pane; without it an answer or nudge goes through a hook instead */
   paneInput: boolean;
+  /** the agent's process runs inside an OS sandbox (plugin API 1.26), as `HarnessCapabilities.sandbox` says it */
+  sandbox?: boolean;
 }
 
 export interface RunnerStartRequest {

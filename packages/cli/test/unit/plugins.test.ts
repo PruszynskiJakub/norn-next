@@ -3,6 +3,8 @@ import { memoryFiles } from "@norn/conformance";
 import type { WorkflowLoad } from "@norn/kernel";
 import { SDLC_PACK } from "@norn/pack-sdlc";
 import { defineNornPlugin, type NornPlugin, PLUGIN_API_VERSION, stepRoles } from "@norn/plugin-api";
+import { HEADLESS_CAPABILITIES } from "@norn/runner-headless";
+import { HERDR_CAPABILITIES } from "@norn/runner-herdr";
 import { AGENT_ROLES } from "@norn/schema";
 import {
   BUNDLED_PLUGINS,
@@ -63,6 +65,13 @@ function failureOf(r: ReturnType<typeof resolvePlugins>): CliFailure {
 describe("bundled plugins", () => {
   test("the roles the loader falls back to, for a pack that registers none, are the shipped pack's step roles", () => {
     expect(stepRoles(SDLC_PACK.roles ?? {})).toEqual([...AGENT_ROLES]);
+  });
+
+  test("no shipped harness or runner claims an OS sandbox, so no policy can hand a gate to a supervisor yet", () => {
+    const harnesses = BUNDLED_PLUGINS.flatMap((p) => Object.values(p.provides.harness ?? {}));
+    expect(harnesses.length).toBeGreaterThan(0);
+    expect(harnesses.filter((h) => h.capabilities.sandbox === true).map((h) => h.name)).toEqual([]);
+    expect([HEADLESS_CAPABILITIES.sandbox, HERDR_CAPABILITIES.sandbox]).toEqual([undefined, undefined]);
   });
 
   test("the binary ships exactly the agreed set", () => {

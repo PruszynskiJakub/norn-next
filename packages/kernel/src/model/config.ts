@@ -68,6 +68,13 @@ export const KernelConfig = Type.Object(
      * a step reading a source neither binds parks `source.unbound`. Absent: none.
      */
     sources: Type.Optional(Type.Record(NonEmpty, NonEmpty)),
+    /**
+     * What the person's own policy lets stand in for them (`policy.stand_in`), each a step as
+     * `<workflow>.<step>`: the gates a supervisor may decide, and the agent steps whose questions it may
+     * answer. A granted gate is still the person's while any agent of its workflow, or the supervisor,
+     * runs outside an OS sandbox. Absent: nothing stands in.
+     */
+    standIn: Type.Optional(Type.Object({ gates: Type.Array(NonEmpty), attended: Type.Array(NonEmpty) }, closed)),
     /** how long a claim holds, and how long before it expires the holder renews it */
     claimTtlMs: PosInt,
     claimRenewBeforeMs: PosInt,

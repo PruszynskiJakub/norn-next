@@ -99,6 +99,8 @@ export interface ExecutorModes extends LauncherModes {
   dialogKeys: boolean;
   /** the runner can bring a run's pane in front of a person */
   focus: boolean;
+  /** the runner keeps the agent inside an OS sandbox */
+  sandbox?: boolean;
 }
 
 export interface AnswerOptions {

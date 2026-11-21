@@ -133,6 +133,24 @@ describe("a gate", () => {
   });
 });
 
+describe("a gate the person's policy grants to a stand-in", () => {
+  const granted = { standIn: { gates: ["story.approve"], attended: [] } };
+
+  test("still waits for the person while no executor runs in an OS sandbox, and says why", () => {
+    const d = kindOf(decideCase({ state: stateAt("approve"), config: granted }), "park");
+    expect(d.rule).toBe("gate.park");
+    expect(d.inbox?.kind).toBe("gate");
+    expect(d.inbox?.text).toStartWith("Ship it?");
+    expect(d.inbox?.text).toContain("policy.stand_in.gates");
+    expect(d.inbox?.text).toContain("sandbox");
+  });
+
+  test("a gate of another workflow, or one nobody grants, waits with its prompt alone", () => {
+    const other = { standIn: { gates: ["quick.approve"], attended: [] } };
+    expect(kindOf(decideCase({ state: stateAt("approve"), config: other }), "park").inbox?.text).toBe("Ship it?");
+  });
+});
+
 describe("a plugin step kind", () => {
   test("an effect kind runs once, recorded first, with the step's config", () => {
     const d = kindOf(decideCase({ state: stateAt("ship") }), "run_step");

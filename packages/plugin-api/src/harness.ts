@@ -33,6 +33,13 @@ export interface HarnessCapabilities {
    * such a delivery is refused rather than given to an agent that never saw the question.
    */
   resume?: boolean;
+  /**
+   * The agent runs inside an OS sandbox that keeps it from the store, `.git/refs`, `.git/hooks`,
+   * `.git/config`, the main checkout and the network (plugin API 1.26). Only then may a person's policy
+   * hand a gate to a supervisor: without one, an agent's shell could write that decision itself, so a
+   * host treats an absent flag as no sandbox.
+   */
+  sandbox?: boolean;
 }
 
 /**

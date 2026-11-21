@@ -175,6 +175,7 @@ export class HarnessLauncher implements AgentLauncher {
       paneInput: r.paneInput && e.harness.capabilities.paneInput,
       dialogKeys: typeof e.runner.keys === "function" && typeof e.harness.dialogKeys === "function",
       focus: typeof e.runner.focus === "function",
+      ...(r.sandbox === true && { sandbox: true }),
     };
   }
 

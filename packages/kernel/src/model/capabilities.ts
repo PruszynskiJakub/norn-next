@@ -35,6 +35,8 @@ export const HarnessCapabilitiesSchema = Type.Object(
     paneInput: Type.Boolean(),
     promptMarks: Type.Optional(Type.Boolean()),
     resume: Type.Optional(Type.Boolean()),
+    /** the agent runs inside an OS sandbox, from its harness or its runner; absent: none, so no gate is delegated to a supervisor on it */
+    sandbox: Type.Optional(Type.Boolean()),
   },
   closed,
 );

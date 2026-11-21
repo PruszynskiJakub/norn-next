@@ -287,3 +287,23 @@ describe("vcs facts", () => {
     expect(story?.signals).toBeUndefined();
   });
 });
+
+describe("an executor's OS sandbox", () => {
+  const TICK = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+  const capsOf = async (env: Parameters<typeof gatherFacts>[0]) => {
+    const r = await gatherFacts(env, TICK, { readOnly: true, local: true });
+    if (!r.ok) throw new Error(r.failure.message);
+    return r.value.facts.capabilities.executors.claude;
+  };
+
+  test("is a fact only when its harness or its runner declares one; none declared reads as none", async () => {
+    const h = harness();
+    expect((await capsOf(h.env))?.sandbox).toBeUndefined();
+    const harnessed = h.env.slots.executors.claude;
+    if (!harnessed) throw new Error("no claude executor");
+    const byHarness = { ...h.env, slots: { ...h.env.slots, executors: { claude: { ...harnessed, capabilities: { ...harnessed.capabilities, sandbox: true } } } } };
+    expect((await capsOf(byHarness))?.sandbox).toBe(true);
+    const launcher = Object.assign(Object.create(Object.getPrototypeOf(h.launcher)), h.launcher, { modesOf: () => ({ headless: true, attended: false, paneInput: false, dialogKeys: false, focus: false, sandbox: true }) });
+    expect((await capsOf({ ...h.env, launcher }))?.sandbox).toBe(true);
+  });
+});

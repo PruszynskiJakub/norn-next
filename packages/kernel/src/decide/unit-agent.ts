@@ -17,6 +17,7 @@ import type { RunInfo } from "../model/run-state.ts";
 import type { SessionFacts } from "../session/view.ts";
 import { codeLevelOf, docsOnlyGrant, grantOf } from "../model/grant.ts";
 import type { AgentStepSpec } from "../workflow/graph.ts";
+import { stepCandidates } from "./supervisor.ts";
 import { ageMs, applyDecision, intentFor, noop, parkDecision, type UnitView } from "./unit-support.ts";
 
 /** The story's own mode, then the workflow's, then the config's. */
@@ -32,17 +33,8 @@ function personDrives(v: UnitView): boolean {
   return effectiveMode(v) === "manual" && v.state.requested === undefined;
 }
 
-/**
- * The executors a step may run on, first choice first: an older step's `by:`, else the config's
- * binding of this workflow's step, else of the step's role, else the config's executor.
- */
 function candidatesOf(v: UnitView, spec: AgentStepSpec): readonly string[] {
-  if (spec.executor !== null) return [spec.executor];
-  const bind = v.ctx.config.bind ?? {};
-  const own = bind[`${v.state.workflow.name}.${v.state.step}`];
-  if (own) return own;
-  const byRole = spec.role !== undefined ? bind[spec.role] : undefined;
-  return byRole ?? [v.ctx.config.executor];
+  return stepCandidates(v.ctx.config, v.state.workflow.name, v.state.step, spec);
 }
 
 type Match = { ok: true; target: string; caps: ExecutorCapabilities } | { ok: false; rule: string; text: string };
