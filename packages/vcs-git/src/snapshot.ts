@@ -33,11 +33,20 @@ async function refsDigest(ctx: HostContext, path: string): Promise<PluginResult<
   return ok(digest(out.value.split("\n").filter((l) => l !== "" && !OWN_REFS.some((p) => l.startsWith(p))).join("\n")));
 }
 
+/**
+ * The tracking keys `worktree add -b` writes for a new branch and a branch delete removes, so another
+ * unit starting or finishing while a run works changes them. Every push norn makes names its remote and
+ * refspec, so these keys redirect none of it; `pushRemote` and the rest of a branch's section stay noted.
+ */
+const TRACKING_KEY = /^branch\..+\.(remote|merge)$/;
+
 async function configDigest(ctx: HostContext, path: string): Promise<PluginResult<string>> {
   const out = await git(ctx, path, ["config", "--local", "--list", "-z"]);
   // exit 1 with nothing said is a repo with no local config
   if (out.code !== 0 && !(out.code === 1 && out.stderr.trim() === "")) return gitFailure(out, "config --list");
-  return ok(digest(out.stdout));
+  // each entry is `key\nvalue`, the key's section and name lowercased by git
+  const kept = out.stdout.split("\0").filter((e) => e !== "" && !TRACKING_KEY.test(e.split("\n", 1)[0] ?? ""));
+  return ok(digest(kept.join("\0")));
 }
 
 /** The repo's own hooks folder, whatever `core.hooksPath` says: a change to that setting is the config's. */

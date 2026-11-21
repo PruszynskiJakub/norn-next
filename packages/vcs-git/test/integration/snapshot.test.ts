@@ -44,6 +44,21 @@ describe("a snapshot of a unit's checkout", () => {
     expect(value(await w.vcs.snapshot!(path))).toEqual(before);
   });
 
+  test("another unit's worktree coming and its branch going move no part of it: the tracking config git writes for a branch is left out", async () => {
+    const w = await world();
+    const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));
+    const before = value(await w.vcs.snapshot!(path));
+    const other = value(await w.vcs.worktree.ensure("gh-13", "gh-13-signup", "origin/main"));
+    expect(await git(w.repo, "config", "--get", "branch.gh-13-signup.merge")).toBe("refs/heads/main");
+    expect(value(await w.vcs.snapshot!(path)).config).toBe(before.config);
+    await git(w.repo, "worktree", "remove", "--force", other.path);
+    await git(w.repo, "branch", "-D", "gh-13-signup");
+    expect(value(await w.vcs.snapshot!(path)).config).toBe(before.config);
+    // a key that can redirect a push is still noted
+    await git(path, "config", "branch.gh-12-login.pushRemote", "elsewhere");
+    expect(value(await w.vcs.snapshot!(path)).config).not.toBe(before.config);
+  });
+
   test("restore drops a commit and puts the paths back as the snapshot held them, a file it lacked removed; again it changes nothing", async () => {
     const w = await world();
     const { path } = value(await w.vcs.worktree.ensure("gh-12", "gh-12-login", "origin/main"));
