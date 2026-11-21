@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { claudeHarness } from "@norn/harness-claude";
 import { ASKED_PARK } from "@norn/kernel";
-import { RUN_ENV } from "@norn/plugin-api";
-import { briefOf, ingestHook, reportRun } from "../../src/index.ts";
+import { defineNornPlugin, ok, RUN_ENV } from "@norn/plugin-api";
+import { Type } from "@sinclair/typebox";
+import { type AgentRunRequest, briefOf, createRuntimeEnv, HarnessLauncher, ingestHook, reportRun } from "../../src/index.ts";
 import { type Harnessed, has, harness, record, rulesOf, session, tickUntil, trackerItem } from "./support.ts";
 
 const GRANT = { standIn: { attended: ["supervised.build"], gates: [] } };
@@ -58,6 +59,37 @@ describe("the supervisor of an attended: agent step", () => {
     expect(delivered?.[2]).toContain("not the person");
     expect(h.launcher.of("stop")).toContainEqual([sup.session]);
     expect((await record(h, "lt-1")).state?.supervised).toEqual({ answered: 1 });
+  });
+
+  test("its brief renders at its launch, while its supervisor.started is still unapplied, through the launcher the runtime builds", async () => {
+    const h = harness({ workflow: "supervised", kernel: GRANT });
+    const bg = { attended: false, headless: true, paneInput: false };
+    const runners = defineNornPlugin({
+      name: "fake-runners",
+      api: "^1.5",
+      provides: { runners: { bg: { configSchema: Type.Object({}), create: () => ({ name: "bg", capabilities: bg, start: async () => ok({ handle: "x" }), alive: async () => ok(true), send: async () => ok(undefined), stop: async () => ok(undefined) }) } } },
+    });
+    const real = createRuntimeEnv({ ctx: h.ctx, plugins: [...h.plugins, runners], config: { ...h.config, runner: { name: "bg" } }, sessions: h.sessions });
+    if (!real.ok) throw new Error(real.failure.message);
+    const renderBrief = (real.value.launcher as HarnessLauncher).opts.renderBrief;
+    const rendered: { applied: boolean; brief: Awaited<ReturnType<typeof renderBrief>> }[] = [];
+    const start = h.launcher.start.bind(h.launcher);
+    h.launcher.start = async (run: AgentRunRequest) => {
+      if (run.supervisor !== undefined) {
+        const applied = (await record(h, "lt-1")).state?.supervisor !== undefined;
+        rendered.push({ applied, brief: await renderBrief(run) });
+      }
+      return start(run);
+    };
+    await asked(h, "Which database should the cache use?");
+    await supervisorOf(h);
+    expect(rendered).toHaveLength(1);
+    const [first] = rendered;
+    expect(first?.applied).toBe(false);
+    const brief = first?.brief;
+    if (!brief?.ok) throw new Error(brief ? brief.failure.message : "no brief rendered");
+    expect(brief.value).toContain('<untrusted from="the agent\'s question">');
+    expect(brief.value).toContain("norn done answer --note");
   });
 
   test("its file-tool write to code is denied from the record, though its step lets the agent write the worktree and its launch env says nothing", async () => {
