@@ -3,7 +3,9 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
 import { REPO_ROOT } from "../../../../test/support/repo-root.ts";
-import { outcomeEdge, toJsonSchema, validate } from "../../src/index.ts";
+import { Ajv } from "ajv";
+import addFormatsModule from "ajv-formats";
+import { CAPABILITIES, outcomeEdge, toJsonSchema, validate } from "../../src/index.ts";
 
 /** §11 slice workflow example of the rules, as a file writes it: one head key per step. */
 export const SLICE_EXAMPLE = `
@@ -329,6 +331,17 @@ describe("a step written with by: in the workflow-source and workflow-shared sch
   test("an agent role, a person, shell, a step kind and norn.each each validate as a file writes them", () => {
     for (const [actor, step] of Object.entries(ACTORS)) expect({ actor, source: errorsOf(source({ a: step })), shared: sharedErrorsOf(shared({ a: step })) }).toEqual({ actor, source: [], shared: [] });
     expect(validate("workflow", source({ a: ACTORS.person })).ok).toBe(false);
+  });
+
+  test("the published schemas take an agent step asking for every capability and bounding its supervisor's asks, as the loader does", () => {
+    const addFormats = addFormatsModule as unknown as (ajv: Ajv) => Ajv;
+    const step = { ...ACTORS.agent, allow: [...CAPABILITIES], attended: "agent", limits: { deadline: "2h", nudges: 1, retries: 0, asks: 3 } };
+    for (const [name, value] of [["workflow-source", source({ a: step })], ["workflow-shared", shared({ a: step })]] as const) {
+      const published = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "json", `${name}.schema.json`), "utf8")) as Record<string, unknown>;
+      const check = addFormats(new Ajv({ allErrors: true, strict: false, discriminator: true })).compile(published);
+      expect({ name, ok: check(value), errors: check.errors ?? null }).toEqual({ name, ok: true, errors: null });
+    }
+    expect(validate("workflow-source", source({ a: { ...step, allow: ["code:fly"] } })).ok).toBe(false);
   });
 
   test("an agent step names who stays beside it: the person, a supervisor or nobody", () => {

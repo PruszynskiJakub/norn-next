@@ -37,6 +37,31 @@ export const AGENT_ROLES = ["builder", "reviewer", "qa", "investigator", "writer
 export type AgentRole = (typeof AGENT_ROLES)[number];
 
 /**
+ * Every capability a role may be granted. The code levels and `docs:write` say what an agent may change,
+ * `exec:` what it may run, `out:` which reports it may write, `tracker:` what it may post, and the last
+ * four what a supervisor may do on the person's behalf. Kept here so the published workflow schema and
+ * the kernel's loader accept the same `allow:` list.
+ */
+export const CAPABILITIES = [
+  "code:read",
+  "code:scratch",
+  "code:write",
+  "docs:write",
+  "exec:checks",
+  "exec:any",
+  "out:criteria",
+  "out:findings",
+  "out:evidence",
+  "tracker:comment",
+  "tracker:label",
+  "read:any",
+  "answer",
+  "decide:granted",
+  "escalate",
+] as const;
+export type Capability = (typeof CAPABILITIES)[number];
+
+/**
  * Who stays beside an agent step's agent: the person (in a runner with presence), a supervisor, or
  * nobody. It picks the runner the agent runs in, from the config's `runners:`.
  */
@@ -297,7 +322,11 @@ function fileStepTypes<R extends TSchema>(route: R, agentRoute: TSchema, onRoute
       reads: agentKeys.inputs,
       produces: Type.Optional(ProducesList),
       allow: Type.Optional(
-        Type.Array(Type.Union([Type.Literal("code:write"), Type.Literal("docs:write")]), { minItems: 1, uniqueItems: true, description: "What the step may write; docs:write alone keeps it to the story's documents" }),
+        Type.Array(Type.Union(CAPABILITIES.map((c) => Type.Literal(c))), {
+          minItems: 1,
+          uniqueItems: true,
+          description: "The capabilities the step asks of its role, narrowing them; with no code level above read it keeps to the story's documents",
+        }),
       ),
       attended: Type.Optional(
         Type.Union(
@@ -309,7 +338,17 @@ function fileStepTypes<R extends TSchema>(route: R, agentRoute: TSchema, onRoute
           { description: "Who stays alongside the agent, which picks its runner" },
         ),
       ),
-      limits: Type.Optional(Type.Object({ deadline: agentKeys.deadline, nudges: agentKeys.nudges, retries: agentKeys.retries }, { additionalProperties: false })),
+      limits: Type.Optional(
+        Type.Object(
+          {
+            deadline: agentKeys.deadline,
+            nudges: agentKeys.nudges,
+            retries: agentKeys.retries,
+            asks: Type.Optional(Type.Integer({ minimum: 0, description: "The questions a supervisor answers in one visit; only an attended: agent step has one" })),
+          },
+          { additionalProperties: false },
+        ),
+      ),
       outcomes: openOutcomes(agentRoute),
     },
     { additionalProperties: false },

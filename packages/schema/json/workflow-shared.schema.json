@@ -198,16 +198,68 @@
                 "allow": {
                   "minItems": 1,
                   "uniqueItems": true,
-                  "description": "What the step may write; docs:write alone keeps it to the story's documents",
+                  "description": "The capabilities the step asks of its role, narrowing them; with no code level above read it keeps to the story's documents",
                   "type": "array",
                   "items": {
                     "anyOf": [
+                      {
+                        "const": "code:read",
+                        "type": "string"
+                      },
+                      {
+                        "const": "code:scratch",
+                        "type": "string"
+                      },
                       {
                         "const": "code:write",
                         "type": "string"
                       },
                       {
                         "const": "docs:write",
+                        "type": "string"
+                      },
+                      {
+                        "const": "exec:checks",
+                        "type": "string"
+                      },
+                      {
+                        "const": "exec:any",
+                        "type": "string"
+                      },
+                      {
+                        "const": "out:criteria",
+                        "type": "string"
+                      },
+                      {
+                        "const": "out:findings",
+                        "type": "string"
+                      },
+                      {
+                        "const": "out:evidence",
+                        "type": "string"
+                      },
+                      {
+                        "const": "tracker:comment",
+                        "type": "string"
+                      },
+                      {
+                        "const": "tracker:label",
+                        "type": "string"
+                      },
+                      {
+                        "const": "read:any",
+                        "type": "string"
+                      },
+                      {
+                        "const": "answer",
+                        "type": "string"
+                      },
+                      {
+                        "const": "decide:granted",
+                        "type": "string"
+                      },
+                      {
+                        "const": "escalate",
                         "type": "string"
                       }
                     ]
@@ -250,6 +302,11 @@
                     "retries": {
                       "minimum": 0,
                       "description": "Max fresh-session retries after died",
+                      "type": "integer"
+                    },
+                    "asks": {
+                      "minimum": 0,
+                      "description": "The questions a supervisor answers in one visit; only an attended: agent step has one",
                       "type": "integer"
                     }
                   }

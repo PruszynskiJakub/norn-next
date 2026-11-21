@@ -5,29 +5,10 @@
  * workflows.
  */
 
-/**
- * Every capability a role may be granted. The code levels and `docs:write` say what an agent may change,
- * `exec:` what it may run, `out:` which reports it may write, `tracker:` what it may post, and the last
- * four what a supervisor may do on the person's behalf.
- */
-export const CAPABILITIES = [
-  "code:read",
-  "code:scratch",
-  "code:write",
-  "docs:write",
-  "exec:checks",
-  "exec:any",
-  "out:criteria",
-  "out:findings",
-  "out:evidence",
-  "tracker:comment",
-  "tracker:label",
-  "read:any",
-  "answer",
-  "decide:granted",
-  "escalate",
-] as const;
-export type Capability = (typeof CAPABILITIES)[number];
+import { CAPABILITIES, type Capability } from "@norn/schema";
+
+/** Every capability a role may be granted: the schema holds the list, so the published workflow schema accepts the same `allow:`. */
+export { CAPABILITIES, type Capability } from "@norn/schema";
 
 export interface RoleDefinition {
   /** what the role's agent is for, in a sentence */
