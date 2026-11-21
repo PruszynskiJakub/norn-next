@@ -24,6 +24,8 @@ describe("pinned workflows", () => {
       sessions: h.sessions,
     });
     if (!env.ok) throw new Error(env.failure.message);
+    // loaded as a pack's files are, against the inputs the host provides
+    expect(Object.entries(env.value.workflows).flatMap(([name, load]) => (load.ok ? [] : [[name, load.errors]]))).toEqual([]);
     const loaded = Object.entries(env.value.workflows).flatMap(([name, load]) => (load.ok ? [[name, load.workflow] as const] : []));
     expect(loaded.map(([name]) => name)).toContain("story");
     for (const [name, wf] of loaded) expect([name, loadPinned(env.value, wf.pinned)?.pinned.hash]).toEqual([name, wf.pinned.hash]);

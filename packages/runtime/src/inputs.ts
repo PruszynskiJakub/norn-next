@@ -313,9 +313,21 @@ async function materializeDoc(env: RuntimeEnv, worktree: string, d: Doc, text: s
   await env.ctx.files.write(`${worktree}/${d.base}`, text);
 }
 
+/**
+ * Every input name a step may list, each served by its case in `materializeOne`: the workflow loader
+ * refuses a file naming any other, so a misspelt name fails at load instead of reaching the agent as
+ * an empty input. Adding an input means adding its name here and its case below; the switch is
+ * checked against this list.
+ */
+export const HOST_INPUTS = ["spec", "handoff", "last_check", "last_findings", SIGNAL_INPUT, "diff", "slice", "slices", "record", "resolution", "base_side"] as const;
+type HostInput = (typeof HOST_INPUTS)[number];
+const isHostInput = (name: string): name is HostInput => (HOST_INPUTS as readonly string[]).includes(name);
+
 async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: BriefInputs, worktree: string, name: string, item: TrackerItem | null, out: MaterializedInputs): Promise<BriefInputView> {
   const unit = record.unit;
   const [spec, handoff] = docsOf(unit) as [Doc, Doc];
+  // only a revision a unit pinned before unknown names were refused still lists one
+  if (!isHostInput(name)) return { name, note: "norn provides no input of this name" };
   switch (name) {
     case "spec": {
       const mirrored = item ? await mirrorSpec(env, unit, item) : await readStoryDoc(env, unit, SPEC_ARTIFACT);
@@ -366,12 +378,6 @@ async function materializeOne(env: RuntimeEnv, record: UnitJournal, brief: Brief
       return resolvedInput(env, worktree, name, "the resolution to review: each merge's remerge-diff and the conflicts this round recorded", resolutionOf(record));
     case "base_side":
       return resolvedInput(env, worktree, name, "the base side of the conflict: the base commit to merge and what it changed in each conflicting path", await baseSideOf(env, record));
-    default: {
-      // a kind the host has no rule for: a story document of that name, when one was kept
-      const kept = await readStoryDoc(env, unit, `${name}.md`);
-      if (kept.ok && kept.value !== null) return written(env, worktree, name, `${name}.md`, `the story's ${name}`, kept.value);
-      return { name, note: "norn holds nothing for this input yet" };
-    }
   }
 }
 

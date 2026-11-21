@@ -113,7 +113,7 @@ Each unit works in its own git worktree, made by the vcs plugin in the machine d
 
 - **Skills.** The pack's skills go to `.agents/skills/<name>/`, linked from the harness's own folder (`.claude/skills/<name>`, `.pi/skills/<name>`), in every unit worktree before a launch and in the main checkout when `norn init` or `norn doctor` runs, so a person's own session finds the skills a person runs (`/norn-fsd`, `/norn-fsd-round`, `/norn-retro`, `/norn-triage`). They are ignored by git. A skill folder the repo commits, or a person keeps, under the same name is theirs and wins over the pack's.
 - **The spec and the handoff.** The story's spec is `.agents/specs/<story>/spec.md`, mirrored from the tracker item; each unit's **handoff** is `.agents/specs/<story>/handoffs/<unit>.md`, the unit's current state in prose (goal, proof, what is easy to miss, notes, the next action), rewritten by whoever works on it. The agent edits both in place; norn reads them back when it reports, and keeps them with the run data, never on the branch.
-- **Other inputs.** The last check's output, a rejection's findings and the like go to `.agents/inputs/`, rewritten for every run.
+- **Other inputs.** The last check's output, a rejection's findings and the like go to `.agents/inputs/`, rewritten for every run. A step lists the ones it reads under `inputs:`, by the names in [Reference › Inputs](reference.md#inputs).
 - **Hooks.** The harness wires norn's hooks into the tool's local settings in that worktree (`.claude/settings.local.json` for Claude Code, an extension for pi). They feed norn the agent's events, keep it from ending a turn without a report, and refuse a file write outside the worktree or into norn's run state.
 
 The branch, and the PR, hold only the code.

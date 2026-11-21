@@ -320,6 +320,29 @@ describe("refusals", () => {
     expect(errors).toEqual([{ path: "/steps/p/outcomes/landed", message: "`landed` is not an exit of shared/p.yaml (its exits: pushed)" }]);
   });
 
+  test("an input name the host does not provide, naming the inputs it does", () => {
+    const doc = wf({ work: agent({ done: "fix" }, { inputs: ["spec", "last_finding"] }), fix: agent({ done: "$done" }, { inputs: ["handoff", { file: "docs/x.md" }, "mystery"] }) });
+    const errors = errorsOf(loadWorkflow(doc, opts({ inputs: ["spec", "handoff", "last_findings"] })));
+    expect(errors).toEqual([
+      { path: "/steps/work/inputs/1", message: "`last_finding` is not an input norn provides: name one of spec, handoff, last_findings, or a file as {file: <path>}" },
+      { path: "/steps/fix/inputs/2", message: "`mystery` is not an input norn provides: name one of spec, handoff, last_findings, or a file as {file: <path>}" },
+    ]);
+  });
+
+  test("an unknown input inside a shared file is refused, naming the file", () => {
+    const shared = { start: "go", steps: { go: agent({ done: { exit: "done" } }, { inputs: ["nope"] }) } };
+    const errors = errorsOf(loadWorkflow(wf({ p: { use: "p", outcomes: { done: "$done" } } }), opts({ sharedFiles: { p: shared }, inputs: ["spec"] })));
+    expect(errors).toEqual([{ path: "/steps/go/inputs/0", message: "shared/p.yaml: `nope` is not an input norn provides: name one of spec, or a file as {file: <path>}", shared: "p" }]);
+  });
+
+  test("without the host's inputs, as a pinned revision loads, any input name loads to the same hash", () => {
+    const doc = wf({ work: agent({ done: "$done" }, { inputs: ["spec", "mystery", { file: "docs/x.md", label: "Design" }] }) });
+    const pinned = loaded(loadWorkflow(doc, opts()));
+    expect(pinned.graph.steps.work?.agent?.inputs).toEqual(["spec", "mystery", { file: "docs/x.md", label: "Design" }]);
+    expect(loaded(loadWorkflow(structuredClone(pinned.pinned.doc), opts())).pinned.hash).toBe(pinned.pinned.hash);
+    expect(loaded(loadWorkflow(wf({ work: agent({ done: "$done" }, { inputs: ["spec", { file: "docs/x.md" }] }) }), opts({ inputs: ["spec"] }))).graph.steps.work?.agent?.inputs).toEqual(["spec", { file: "docs/x.md" }]);
+  });
+
   test("a schema failure is data, never a throw", () => {
     for (const junk of [null, 7, "x", {}, { name: "t", start: "a", steps: [] }, { name: "t", start: "a", steps: { a: null } }])
       expect(loadWorkflow(junk, opts()).ok).toBe(false);

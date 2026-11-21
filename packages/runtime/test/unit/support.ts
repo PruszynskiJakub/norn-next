@@ -268,7 +268,7 @@ export const WORKFLOWS: Record<string, string> = {
     "    outcomes: { done: review }",
     "  review:",
     "    agent: Review the thing.",
-    "    inputs: [spec, handoff, last_findings, diff, mystery]",
+    "    inputs: [spec, handoff, last_findings, diff]",
     "    outcomes: { done: $done }",
     "",
   ].join("\n"),

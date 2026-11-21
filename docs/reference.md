@@ -1,6 +1,6 @@
 # Reference
 
-Every command and flag, every config key, the signals a workflow can route, the workflows the bundled pack ships and the exit codes. The lists between the two marker comments below are generated from the CLI itself (`bun run docs:emit`), so they match the release this file ships with. What the terms mean is in [Concepts](concepts.md).
+Every command and flag, every config key, the signals a workflow can route, the inputs an agent step can name, the workflows the bundled pack ships and the exit codes. The lists between the two marker comments below are generated from the CLI itself (`bun run docs:emit`), so they match the release this file ships with. What the terms mean is in [Concepts](concepts.md).
 
 ## Output and exit codes
 
@@ -33,6 +33,26 @@ A gate or a wait step kind (`await-merge`) routes signals under `on:`, beside it
 | `timeout` | clock | `after:` a duration (`30m`, `48h`, `7d`), required | the step has waited `after:`: a gate since it parked, a wait step since its run started | the step visit (`ready#3`) |
 
 A plugin declares more under `provides.signals`; `norn plugin list` names them, and a workflow that routes one loads only with that plugin configured. A signal fires once per occurrence id in a round, the first listed first, one per tick, and only for the story's own unit. `on:` on an agent, check, effect step or slices step is refused, and so is an undeclared signal or a name under both `outcomes:` and `on:`. A wait step kind that answers a signal's name as its own outcome (`await-merge` answers `unpushed`) takes the one route under `on:` for both. A waiting step written before `on:`, with `stale` or `unpushed` under `outcomes:`, still loads to the same graph; `norn doctor` warns about a repo file in that form.
+
+## Inputs
+
+An agent step's `inputs:` lists what its brief gives it. norn writes each one under `.agents/` in the unit's worktree, and the brief names its path; an input norn holds nothing for yet is listed with a note.
+
+| Input | What the agent gets |
+|---|---|
+| `spec` | the story's spec, `.agents/specs/<story>/spec.md`: its tracker item, mirrored, and the sections later steps added |
+| `handoff` | this unit's handoff, `.agents/specs/<story>/handoffs/<unit>.md`, which the agent keeps current |
+| `last_check` | the last check's exit, outcome and the end of its output |
+| `last_findings` | the findings that sent the work back: a rejected gate's reason, or the report of the step that handed findings back |
+| `signal` | the signal that moved the story from where it waited, with what its source reported; the agent step right after a signal gets it whether or not it lists it |
+| `diff` | the `git diff` command that shows the change so far |
+| `slice` | this slice's file, `slices/<nn>-<slug>.md` in the story's spec folder |
+| `slices` | every slice file of the story, with where each slice stands |
+| `record` | the story's record: every unit's outcomes, gate rulings and criteria reports with their evidence |
+| `resolution` | the resolution to review: each merge's remerge-diff and the conflicts this round recorded |
+| `base_side` | the base side of a conflict: the base commit to merge and what it changed in each conflicting path |
+
+An entry may also be a file in the repo, `{file: <path>, label: <text>}`, which the brief names as it is. A workflow file naming any other input is refused when it loads, at the step and the entry (`/steps/review/inputs/2`), with the names above. A unit that pinned a workflow naming one before norn refused such names keeps running it, and its brief notes that norn provides no input of that name.
 
 ## Generated reference
 

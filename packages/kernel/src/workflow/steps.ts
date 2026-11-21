@@ -59,6 +59,7 @@ export function readStep(
   step: WorkflowStepDoc,
   stepKinds: Readonly<Record<string, StepKindInfo>>,
   signals: Readonly<Record<string, SignalDeclaration>>,
+  inputs?: readonly string[],
 ): { ok: true; step: ReadStep } | { ok: false; errors: WorkflowError[] } {
   const at = `/steps/${name}`;
   const raw = step as Record<string, unknown>;
@@ -93,6 +94,11 @@ export function readStep(
     const r = check(plugin.configSchema, config);
     if (!r.ok) errors.push(...r.errors.map((e) => ({ path: `${at}${e.path}`, message: `${head}: ${e.message}` })));
   }
+  if (head === "agent" && inputs !== undefined)
+    (step.inputs ?? []).forEach((input, i) => {
+      if (typeof input === "string" && !inputs.includes(input))
+        errors.push({ path: `${at}/inputs/${i}`, message: `\`${input}\` is not an input norn provides: name one of ${inputs.join(", ")}, or a file as {file: <path>}` });
+    });
   if (head === "check" && step.timeout === undefined) errors.push({ path: at, message: "a check needs a timeout" });
 
   const ends = endsOf(head, step, plugin, outcomeRoutes, at, errors);

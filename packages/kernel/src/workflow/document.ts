@@ -52,7 +52,8 @@ export type HandBack = Static<typeof HandBack>;
 
 /**
  * An input the brief gives the agent: a named kind (`spec`, `diff`, `last_findings`, ...) the host's
- * brief builder resolves, or a file. Decide passes them through and never opens them.
+ * brief builder resolves (the loader, given the host's names, refuses any other), or a file. Decide
+ * passes them through and never opens them.
  */
 export const StepInputDoc = Type.Union([
   Type.String({ pattern: OUTCOME_NAME_PATTERN }),

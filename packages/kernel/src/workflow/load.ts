@@ -25,6 +25,12 @@ export interface LoadWorkflowOptions {
   config: Pick<KernelConfig, "counterDefaults" | "maxNudges" | "maxRetries" | "deadlineMs">;
   /** the signals configured plugins report, by name, beside the host's own (`BUILTIN_SIGNALS`), which they never replace */
   signals?: Readonly<Record<string, SignalDeclaration>>;
+  /**
+   * the input names the host's brief builder provides; an agent step naming another is refused. Left
+   * out when loading a unit's pinned revision, which loads as it was pinned: it was accepted then, and
+   * refusing it now would leave the unit with no workflow to decide by.
+   */
+  inputs?: readonly string[];
 }
 
 type Fail = { ok: false; errors: WorkflowError[] };
@@ -37,7 +43,8 @@ const fail = (errors: WorkflowError[]): Fail => ({ ok: false, errors });
  * step can end with left unrouted (the overridable built-in outcomes excepted); a target that is not a
  * step, `$done` or `$stuck`; a step no route reaches; a route back that no counter bounds; and an
  * `on:` block on a step that does not wait, naming a signal no source reports, giving parameters the
- * signal does not take, or naming what `outcomes:` already routes.
+ * signal does not take, or naming what `outcomes:` already routes; and, when `opts.inputs` is given, an
+ * agent step's input name the host does not provide.
  * Counters are derived by edge kind (see `deriveCounters`) and written into the pinned document, so
  * its hash covers them, and loading a pinned document again gives the same hash.
  */
@@ -57,7 +64,7 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
   const read: Record<string, ReadStep> = {};
   const errors: WorkflowError[] = [];
   for (const [name, step] of Object.entries(flatSteps)) {
-    const r = readStep(name, step, opts.stepKinds, signals);
+    const r = readStep(name, step, opts.stepKinds, signals, opts.inputs);
     if (r.ok) read[name] = r.step;
     else errors.push(...r.errors.map(inShared));
   }
