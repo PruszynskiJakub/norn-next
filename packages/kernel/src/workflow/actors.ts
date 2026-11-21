@@ -15,8 +15,6 @@ import type { StepKindInfo } from "./load.ts";
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 
-const ROLES: readonly string[] = AGENT_ROLES;
-
 /** The capabilities `allow:` may ask for while the pinned document holds only `writes:`. */
 const CAPABILITIES: readonly string[] = ["code:write", "docs:write"];
 
@@ -51,6 +49,8 @@ const WRITTEN_NOW: Readonly<Record<string, string>> = {
 export interface SurfaceNames {
   stepKinds: Readonly<Record<string, StepKindInfo>>;
   signals: Readonly<Record<string, SignalDeclaration>>;
+  /** the agent roles the host registers that do a step; absent, the shipped pack's (`AGENT_ROLES`) */
+  roles?: readonly string[];
 }
 
 type Lowered = { step: Obj } | { errors: WorkflowError[] };
@@ -86,20 +86,22 @@ export function lowerActor(name: string, step: Obj, names: SurfaceNames): Lowere
   if (errors.length) return { errors };
 
   const by = String(step.by);
+  const roles: readonly string[] = names.roles ?? AGENT_ROLES;
   if (by === "person") return person(name, step, names);
   if (by === "shell") return shell(name, step);
   if (by.includes(".")) return stepKind(name, step, by, names);
-  if (ROLES.includes(by)) return agent(name, step);
+  if (roles.includes(by)) return agent(name, step, by);
   const bare = Object.hasOwn(names.stepKinds, by) ? names.stepKinds[by] : undefined;
   const ns = bare && namespaceOf(bare);
   if (bare) return refused(`${at}/by`, ns ? `\`${by}\` is a step kind: name it \`${ns}.${by}\`` : `\`${by}\` is a step kind its host names no namespace for: write the step with the head key \`${by}:\``);
-  return refused(`${at}/by`, `\`${by}\` is not an actor: name an agent role (${ROLES.join(", ")}), person, shell, or a step kind as <namespace>.<kind>`);
+  return refused(`${at}/by`, `\`${by}\` is not an actor: name an agent role (${roles.join(", ")}), person, shell, or a step kind as <namespace>.<kind>`);
 }
 
-function agent(name: string, step: Obj): Lowered {
+function agent(name: string, step: Obj, role: string): Lowered {
   const at = `/steps/${name}`;
   const errors = onlyKeys(name, step, "agent", ["by", "do", "with", "reads", "produces", "allow", "attended", "limits", "outcomes", "description"]);
-  const out: Obj = pick(step, ["description", "outcomes", "produces"]);
+  // the role is pinned, as the config's bind: maps it to an executor on each tick
+  const out: Obj = { ...pick(step, ["description", "outcomes", "produces"]), role };
   if (step.do === undefined) errors.push({ path: at, message: `step '${name}' says what to do with do:` });
   else out.agent = step.do;
   for (const [k, v] of Object.entries(isObj(step.with) ? step.with : {})) {
@@ -115,12 +117,10 @@ function agent(name: string, step: Obj): Lowered {
     // asking for no code write narrows the agent to the story's documents
     if (!step.allow.includes("code:write")) out.writes = "docs";
   }
+  // person keeps the older form's pin, and none is the pin's default
   if (step.attended === "person") out.attended = true;
-  else if (step.attended !== undefined)
-    errors.push({
-      path: `${at}/attended`,
-      message: typeof step.attended === "boolean" ? "attended: names who stays beside the agent: person" : "attended: takes person; agent and none come with supervised and unattended steps: leave attended out for a step nobody stays beside",
-    });
+  else if (step.attended === "agent") out.attended = "agent";
+  else if (step.attended !== undefined && step.attended !== "none") errors.push({ path: `${at}/attended`, message: "attended: names who stays beside the agent: person, agent or none" });
   const limits = isObj(step.limits) ? step.limits : {};
   for (const [k, v] of Object.entries(limits)) {
     if (k === "deadline" || k === "nudges" || k === "retries") out[k] = v;

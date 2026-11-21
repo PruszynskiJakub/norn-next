@@ -56,6 +56,11 @@ describe("defineNornPlugin: step kinds", () => {
       expect(stepKindProblems(key, kind({ name: key }))).toEqual(["is a name the kernel keeps for itself"]);
     }
   });
+
+  test("`role` is a key a pinned agent step holds (plugin API 1.23), so no step kind takes it as its name or a config key", () => {
+    expect(stepKindProblems("open-pr", kind({ configSchema: Type.Object({ role: Type.String() }) }))).toEqual(["config keys role clash with step keys"]);
+    expect(stepKindProblems("role", kind({ name: "role" }))).toEqual(["is a name the kernel keeps for itself"]);
+  });
 });
 
 describe("step kind reads (plugin API 1.20)", () => {

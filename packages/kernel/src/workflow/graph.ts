@@ -3,7 +3,7 @@
  * compiled from it that applyReceipts and decide walk. The graph holds no `use` or `like` step and no
  * `max:`; every bounded edge names its counter, and every counter is declared.
  */
-import { Mode, NonEmpty, NonNegInt, OutcomeName, PosInt, StepName, StepWrites, Target, Verdict } from "@norn/schema";
+import { Attendance, Mode, NonEmpty, NonNegInt, OutcomeName, PosInt, StepName, StepWrites, Target, Verdict } from "@norn/schema";
 import { type Static, Type } from "@sinclair/typebox";
 import { BaseDoc, DocCounterName, HandBack, SourcesDoc, StepInputDoc, WorkflowDocument } from "./document.ts";
 
@@ -68,7 +68,10 @@ export const AgentStepSpec = Type.Object(
     /** the executor named by `by:`; null takes the config's */
     executor: Type.Union([NonEmpty, Type.Null()]),
     model: Type.Optional(NonEmpty),
-    attended: Type.Boolean(),
+    /** the agent role the step names, which the config's `bind:` maps to executors; absent for a step in the older form */
+    role: Type.Optional(NonEmpty),
+    /** who stays beside the agent, which picks the runner: the person, a supervisor, or nobody */
+    attended: Attendance,
     criteria: Type.Boolean(),
     hand_back: Type.Record(OutcomeName, HandBack),
     /** produced name → its file and outcomes; absent when the step produces nothing */

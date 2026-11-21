@@ -90,7 +90,7 @@ function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
   const unbound = unboundSource(v, spec);
   if (unbound) return unbound;
   // an attended step waits for the person who works beside it to start it (`run.requested`), in either mode
-  if (spec.attended && v.state.requested === undefined) return parkDecision(v, "agent.ready.attended", "attended", { text: spec.instructions });
+  if (spec.attended === "person" && v.state.requested === undefined) return parkDecision(v, "agent.ready.attended", "attended", { text: spec.instructions });
   const executor = executorOf(v, spec);
   const caps = capsOf(v, executor);
   if (!caps) return parkDecision(v, "agent.no_executor", "stuck", { text: `executor '${executor}' is not configured` });
@@ -103,7 +103,7 @@ function startAgent(v: UnitView, spec: AgentStepSpec): Decision {
   if (!caps.headless && !personStarted) return parkDecision(v, "agent.ready.no_headless", "manual", { text: `auto mode, but executor '${executor}' cannot run headless` });
   const run_id = v.ctx.nextId();
   // attended only where the person can sit beside it (a pane); started headless, it is retried and nudged as an auto run
-  const attended = spec.attended === true && personStarted;
+  const attended = spec.attended === "person" && personStarted;
   return {
     kind: "start_run",
     unit: v.unit.id,

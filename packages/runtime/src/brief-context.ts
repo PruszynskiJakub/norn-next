@@ -148,7 +148,7 @@ export async function renderInputFrom(env: RuntimeEnv, record: UnitJournal, brie
     ...(step.description !== undefined && { description: step.description }),
     ...(Object.keys(means).length > 0 && { means }),
     ...(wantsCriteria(spec) && { criteria: { required: spec.criteria, verdict: { ...spec.verdict } } }),
-    ...(attendedRun(record, runId, spec.attended) && { attended: true }),
+    ...(attendedRun(record, runId, spec.attended === "person") && { attended: true }),
     ...(Object.keys(spec.hand_back).length > 0 && { handBack: { ...spec.hand_back } }),
     ...(produced.length > 0 && { produced }),
     outDir: OUT_DIR,

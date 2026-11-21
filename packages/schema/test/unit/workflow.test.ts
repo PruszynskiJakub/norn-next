@@ -331,6 +331,11 @@ describe("a step written with by: in the workflow-source and workflow-shared sch
     expect(validate("workflow", source({ a: ACTORS.person })).ok).toBe(false);
   });
 
+  test("an agent step names who stays beside it: the person, a supervisor or nobody", () => {
+    for (const attended of ["person", "agent", "none"]) expect({ attended, errors: errorsOf(source({ a: { ...ACTORS.agent, attended } })) }).toEqual({ attended, errors: [] });
+    expect(validate("workflow-source", source({ a: { ...ACTORS.agent, attended: "everyone" } })).ok).toBe(false);
+  });
+
   test("a step written with by: takes none of the older form's keys, and each actor only its own", () => {
     for (const [actor, extra] of [
       ["agent", { skills: ["x"] }],

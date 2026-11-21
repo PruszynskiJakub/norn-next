@@ -255,9 +255,24 @@
                   }
                 },
                 "attended": {
-                  "description": "A person stays alongside the agent and starts the step",
-                  "const": "person",
-                  "type": "string"
+                  "description": "Who stays alongside the agent, which picks its runner",
+                  "anyOf": [
+                    {
+                      "description": "A person stays alongside the agent, in a runner with presence, and starts the step",
+                      "const": "person",
+                      "type": "string"
+                    },
+                    {
+                      "description": "A supervisor stays alongside the agent; it runs in the config's runners.agent",
+                      "const": "agent",
+                      "type": "string"
+                    },
+                    {
+                      "description": "Nobody stays alongside the agent (the default); it runs in the config's runners.none",
+                      "const": "none",
+                      "type": "string"
+                    }
+                  ]
                 },
                 "limits": {
                   "additionalProperties": false,

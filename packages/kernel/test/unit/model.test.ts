@@ -50,7 +50,7 @@ const WORKFLOW: LoadedWorkflow = {
           skills: [],
           inputs: [],
           executor: null,
-          attended: false,
+          attended: "none",
           criteria: false,
           hand_back: {},
           writes: "worktree",

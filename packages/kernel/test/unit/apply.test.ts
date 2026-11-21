@@ -24,7 +24,7 @@ const spec = (over: Partial<AgentStepSpec> = {}): AgentStepSpec => ({
   skills: [],
   inputs: [],
   executor: null,
-  attended: false,
+  attended: "none",
   criteria: false,
   hand_back: {},
   writes: "worktree",

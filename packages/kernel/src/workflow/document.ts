@@ -168,7 +168,11 @@ function stepProps<R extends TSchema, O extends TSchema, P extends TSchema>(rout
     inputs: Type.Optional(Type.Array(StepInputDoc, { uniqueItems: true })),
     /** what an agent step writes for later steps, by the name their `inputs:` (or a step kind's `reads`) use */
     produces: Type.Optional(produces),
-    attended: Type.Optional(Type.Boolean({ description: "Worked with a person; always started by a person" })),
+    attended: Type.Optional(
+      Type.Union([Type.Boolean({ description: "Worked with a person; always started by a person" }), Type.Literal("agent", { description: "A supervisor stays beside the agent" })]),
+    ),
+    /** the agent role a step written with `by:` names, which the config's `bind:` maps to an executor */
+    role: Type.Optional(Type.String({ pattern: "^[a-z][a-z0-9_-]*$" })),
     by: Type.Optional(Type.String({ minLength: 1, description: "The executor that runs the agent; default the config's" })),
     model: Type.Optional(NonEmpty),
     criteria: Type.Optional(Type.Literal("required")),

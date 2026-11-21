@@ -34,7 +34,7 @@ export function agentSpec(over: Partial<AgentStepSpec> = {}): AgentStepSpec {
     skills: ["norn-implement"],
     inputs: ["spec"],
     executor: null,
-    attended: false,
+    attended: "none",
     criteria: false,
     hand_back: {},
     writes: "worktree",

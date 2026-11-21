@@ -54,6 +54,7 @@ describe("a step names its actor with by:", () => {
           skills: ["norn-review"],
           inputs: ["spec", "diff"],
           writes: "docs",
+          role: "reviewer",
           attended: true,
           deadline: "2h",
           nudges: 1,
@@ -61,9 +62,29 @@ describe("a step names its actor with by:", () => {
           outcomes: { approve: "$done", changes_requested: "fix" },
           hand_back: { changes_requested: "findings" },
         },
-        fix: { agent: "Fix it.", outcomes: { done: { to: "review", max: 3 } } },
+        fix: { agent: "Fix it.", role: "builder", outcomes: { done: { to: "review", max: 3 } } },
       }),
     );
+  });
+
+  test("an agent role is pinned as the step's role, attended: agent as a supervisor beside it, and attended: none as nobody", () => {
+    const step = (attended?: string) => loaded(loadWorkflow(wf({ a: { by: "qa", do: "Do it.", ...(attended && { attended }), outcomes: { done: "$done" } } }), opts())).pinned.doc.steps.a;
+    expect(step()).toEqual({ agent: "Do it.", role: "qa", outcomes: { done: "$done" } });
+    expect(step("none")).toEqual(step());
+    expect(step("agent")).toEqual({ agent: "Do it.", role: "qa", attended: "agent", outcomes: { done: "$done" } });
+    expect(step("person")).toEqual({ agent: "Do it.", role: "qa", attended: true, outcomes: { done: "$done" } });
+    const graph = (attended?: string) => loaded(loadWorkflow(wf({ a: { by: "qa", do: "Do it.", ...(attended && { attended }), outcomes: { done: "$done" } } }), opts())).graph.steps.a?.agent;
+    expect([graph()?.role, graph()?.attended, graph("agent")?.attended, graph("person")?.attended]).toEqual(["qa", "none", "agent", "person"]);
+    // an older step names no role, and its attended: true is a person beside the agent
+    const older = loaded(loadWorkflow(wf({ a: { agent: "Do it.", attended: true, outcomes: { done: "$done" } } }), opts())).graph.steps.a?.agent;
+    expect([older?.role, older?.attended]).toEqual([undefined, "person"]);
+  });
+
+  test("a role is checked against the roles the host registers, when it gives them", () => {
+    expect(refusals(wf({ a: { by: "designer", do: "Do it.", outcomes: { done: "$done" } } }), { roles: ["builder", "designer"] })).toEqual([]);
+    expect(refusals(wf({ a: { by: "qa", do: "Do it.", outcomes: { done: "$done" } } }), { roles: ["builder", "designer"] })).toEqual([
+      { path: "/steps/a/by", message: "`qa` is not an actor: name an agent role (builder, designer), person, shell, or a step kind as <namespace>.<kind>" },
+    ]);
   });
 
   test("shell runs do: as its command, with: names its exit codes, and limits: its timeout", () => {
@@ -105,7 +126,7 @@ describe("a step names its actor with by:", () => {
   });
 
   test("allow: without docs:write alone leaves the agent its worktree write", () => {
-    const older = wf({ a: { agent: "Do it.", outcomes: { done: "$done" } } });
+    const older = wf({ a: { agent: "Do it.", role: "builder", outcomes: { done: "$done" } } });
     pinsAlike(wf({ a: { by: "builder", do: "Do it.", allow: ["code:write"], outcomes: { done: "$done" } } }), older);
     pinsAlike(wf({ a: { by: "builder", do: "Do it.", allow: ["code:write", "docs:write"], outcomes: { done: "$done" } } }), older);
   });
@@ -281,7 +302,6 @@ describe("refusals of the step form", () => {
 
   test("limits and attended take what the pinned document can hold", () => {
     expect(refusals(wf({ a: { by: "builder", do: "Do it.", limits: { timeout: "1h", asks: 3 }, attended: "none", outcomes: { done: "$done" } } }))).toEqual([
-      { path: "/steps/a/attended", message: "attended: takes person; agent and none come with supervised and unattended steps: leave attended out for a step nobody stays beside" },
       { path: "/steps/a/limits/timeout", message: "an agent step is bounded by deadline, never timeout" },
       { path: "/steps/a/limits/asks", message: "`asks` bounds a supervisor's answers, and no step has a supervisor yet" },
     ]);
@@ -289,7 +309,7 @@ describe("refusals of the step form", () => {
       { path: "/steps/a/limits/retries", message: "`retries` bounds an agent step: a shell step is bounded by timeout" },
     ]);
     expect(refusals(wf({ a: { by: "builder", do: "Do it.", attended: true, outcomes: { done: "$done" } } }))).toEqual([
-      { path: "/steps/a/attended", message: "attended: names who stays beside the agent: person" },
+      { path: "/steps/a/attended", message: "attended: names who stays beside the agent: person, agent or none" },
     ]);
     expect(refusals(wf({ a: { agent: "Do it.", attended: "person", outcomes: { done: "$done" } } }))).toEqual([
       { path: "/steps/a/attended", message: "`attended: person` belongs to a step written with by:; an agent: step takes attended: true" },

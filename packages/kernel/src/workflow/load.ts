@@ -48,6 +48,11 @@ export interface LoadWorkflowOptions {
    * file naming one, or lying in one, is refused. Left out with `inputs` for a pinned revision.
    */
   specFiles?: readonly string[];
+  /**
+   * the agent roles the host's pack registers that do a step; `by:` naming another is refused. Absent:
+   * the shipped pack's. A pinned revision already holds its role, so loading it needs none.
+   */
+  roles?: readonly string[];
 }
 
 type Fail = { ok: false; errors: WorkflowError[] };
@@ -78,7 +83,7 @@ export function loadWorkflow(doc: unknown, opts: LoadWorkflowOptions): WorkflowL
   const written: WorkflowFile = lifted.doc;
   const signals: Record<string, SignalDeclaration> = { ...opts.signals, ...BUILTIN_SIGNALS };
   const byKeys = schema.value.signals !== undefined || schema.value.entries !== undefined;
-  const flat = flatten(written, opts.sharedFiles, { stepKinds: opts.stepKinds, signals });
+  const flat = flatten(written, opts.sharedFiles, { stepKinds: opts.stepKinds, signals, ...(opts.roles && { roles: opts.roles }) });
   if (!flat.ok) return byKeys ? fail(flat.errors.map(inWorkflowKeys)) : flat;
   const { steps: flatSteps, included } = flat.flat;
   const inShared = (e: WorkflowError): WorkflowError => {
@@ -319,7 +324,8 @@ function agentSpec(s: WorkflowStepDoc, d: NonNullable<WorkflowDocument["defaults
     ...(required.length > 0 && { sources: required }),
     executor: s.by ?? null,
     ...(s.model !== undefined && { model: s.model }),
-    attended: s.attended ?? false,
+    ...(s.role !== undefined && { role: s.role }),
+    attended: s.attended === true ? "person" : s.attended === "agent" ? "agent" : "none",
     criteria: s.criteria === "required",
     hand_back: { ...(s.hand_back ?? {}) },
     ...(s.produces !== undefined && { produces: Object.fromEntries(Object.entries(producesOn(s)).map(([name, on]) => [name, { file: s.produces?.[name]?.file as string, on }])) }),

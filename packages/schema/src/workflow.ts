@@ -29,9 +29,20 @@ export type StepWrites = Static<typeof StepWrites>;
 /** A signal as a step written with `by:` names it under `on:`: `<namespace>.<signal>`. */
 const SignalSurfaceName = Type.String({ pattern: "^[^.\\s]+\\.[a-z][a-z0-9_-]*$" });
 
-/** The agent roles a step written with `by:` may name; a repo's own roles come with the executor binding. */
+/**
+ * The agent roles a step written with `by:` may name when its host registers none: the roles the
+ * shipped pack registers that do a step (its supervisor does none).
+ */
 export const AGENT_ROLES = ["builder", "reviewer", "qa", "investigator", "writer"] as const;
 export type AgentRole = (typeof AGENT_ROLES)[number];
+
+/**
+ * Who stays beside an agent step's agent: the person (in a runner with presence), a supervisor, or
+ * nobody. It picks the runner the agent runs in, from the config's `runners:`.
+ */
+export const ATTENDANCE = ["person", "agent", "none"] as const;
+export const Attendance = Type.Union(ATTENDANCE.map((a) => Type.Literal(a)));
+export type Attendance = Static<typeof Attendance>;
 
 /** Full outcome edge: `{ to, counter?, means? }`. */
 export const OutcomeEdge = Type.Object(
@@ -288,7 +299,16 @@ function fileStepTypes<R extends TSchema>(route: R, agentRoute: TSchema, onRoute
       allow: Type.Optional(
         Type.Array(Type.Union([Type.Literal("code:write"), Type.Literal("docs:write")]), { minItems: 1, uniqueItems: true, description: "What the step may write; docs:write alone keeps it to the story's documents" }),
       ),
-      attended: Type.Optional(Type.Literal("person", { description: "A person stays alongside the agent and starts the step" })),
+      attended: Type.Optional(
+        Type.Union(
+          [
+            Type.Literal("person", { description: "A person stays alongside the agent, in a runner with presence, and starts the step" }),
+            Type.Literal("agent", { description: "A supervisor stays alongside the agent; it runs in the config's runners.agent" }),
+            Type.Literal("none", { description: "Nobody stays alongside the agent (the default); it runs in the config's runners.none" }),
+          ],
+          { description: "Who stays alongside the agent, which picks its runner" },
+        ),
+      ),
       limits: Type.Optional(Type.Object({ deadline: agentKeys.deadline, nudges: agentKeys.nudges, retries: agentKeys.retries }, { additionalProperties: false })),
       outcomes: openOutcomes(agentRoute),
     },
